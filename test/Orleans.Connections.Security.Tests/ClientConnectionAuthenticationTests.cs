@@ -23,6 +23,7 @@ public sealed class ClientConnectionAuthenticationTests
     [Fact]
     public async Task AuthenticatedClientConnection_CanCallGrain()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var recorderId = Guid.NewGuid().ToString();
         var recorder = new ValidationRecorder();
         Assert.True(Recorders.TryAdd(recorderId, recorder));
@@ -32,7 +33,7 @@ public sealed class ClientConnectionAuthenticationTests
         {
             var certificate = TestCertificateHelper.CreateSelfSignedCertificate(
                 TargetHost,
-                [TestCertificateHelper.ServerAuthenticationOid]);
+                [TestCertificateHelper.ClientAuthenticationOid, TestCertificateHelper.ServerAuthenticationOid]);
             var builder = new TestClusterBuilder()
                 .AddSiloBuilderConfigurator<AuthenticatedGatewayConfigurator>()
                 .AddClientBuilderConfigurator<AuthenticatedClientConfigurator>();
@@ -41,7 +42,7 @@ public sealed class ClientConnectionAuthenticationTests
             builder.Properties[RecorderConfigKey] = recorderId;
 
             cluster = builder.Build();
-            await cluster.DeployAsync();
+            await cluster.DeployAsync(cancellationToken);
 
             var grain = cluster.Client.GetGrain<IPingGrain>("authenticated-client");
             Assert.Equal("authenticated", await grain.Echo("authenticated"));
@@ -54,7 +55,7 @@ public sealed class ClientConnectionAuthenticationTests
             Recorders.TryRemove(recorderId, out _);
             if (cluster is not null)
             {
-                await cluster.StopAllSilosAsync();
+                await cluster.StopAllSilosAsync(cancellationToken);
                 cluster.Dispose();
             }
         }
@@ -73,7 +74,8 @@ public sealed class ClientConnectionAuthenticationTests
                     tls =>
                     {
                         tls.LocalCertificate = certificate;
-                        tls.RemoteCertificateMode = RemoteCertificateMode.NoCertificate;
+                        tls.RemoteCertificateMode = RemoteCertificateMode.RequireCertificate;
+                        tls.AllowAnyRemoteCertificate();
                     },
                     authentication =>
                     {
@@ -87,8 +89,14 @@ public sealed class ClientConnectionAuthenticationTests
     {
         public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
         {
+            var certificate = TestCertificateHelper.ConvertFromBase64(configuration[CertificateConfigKey]!);
             clientBuilder.UseAuthenticatedClientConnections(
-                tls => tls.AllowAnyRemoteCertificate(),
+                tls =>
+                {
+                    tls.AllowAnyRemoteCertificate();
+                    tls.ClientCertificateMode = RemoteCertificateMode.RequireCertificate;
+                    tls.LocalClientCertificateSelector = (_, _, _, _, _) => certificate;
+                },
                 authentication =>
                 {
                     authentication.Mode = SiloConnectionAuthenticationMode.Audit;

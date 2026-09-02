@@ -71,14 +71,14 @@ internal sealed class EntraJwtValidator
 
         ValidateUntrustedClaims(document, clusterId);
         var snapshot = await _configurationProvider.GetConfigurationAsync(cancellationToken).ConfigureAwait(false);
-        var result = await ValidateSignatureAndStandardClaimsAsync(token, snapshot).ConfigureAwait(false);
+        var result = await ValidateSignatureAndStandardClaimsAsync(token, document, snapshot).ConfigureAwait(false);
 
         if (!result.IsValid && result.Exception is SecurityTokenSignatureKeyNotFoundException)
         {
             snapshot = await _configurationProvider.RefreshForUnknownSigningKeyAsync(
                 snapshot.Generation,
                 cancellationToken).ConfigureAwait(false);
-            result = await ValidateSignatureAndStandardClaimsAsync(token, snapshot).ConfigureAwait(false);
+            result = await ValidateSignatureAndStandardClaimsAsync(token, document, snapshot).ConfigureAwait(false);
         }
 
         if (!result.IsValid)
@@ -97,6 +97,7 @@ internal sealed class EntraJwtValidator
 
     private Task<TokenValidationResult> ValidateSignatureAndStandardClaimsAsync(
         string token,
+        JwtDocument document,
         EntraOpenIdConfigurationSnapshot snapshot)
     {
         var validAudiences = new HashSet<string>(_options.ValidAudiences, StringComparer.Ordinal);
@@ -109,7 +110,12 @@ internal sealed class EntraJwtValidator
         {
             ClockSkew = _options.ClockSkew,
             IssuerSigningKeys = snapshot.Configuration.SigningKeys.Where(
-                key => EntraSigningKey.IsUsable(key, snapshot.Configuration, _options)),
+                key => EntraSigningKey.IsUsable(
+                    key,
+                    snapshot.Configuration,
+                    _options,
+                    document.Issuer,
+                    document.TenantId)),
             LifetimeValidator = ValidateLifetime,
             RequireExpirationTime = true,
             RequireSignedTokens = true,

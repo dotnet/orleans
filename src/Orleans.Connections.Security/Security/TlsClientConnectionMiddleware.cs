@@ -26,10 +26,17 @@ namespace Orleans.Connections.Security
                 throw new ArgumentNullException(nameof(options));
             }
 
-            // capture the certificate now so it can't be switched after validation
-            _certificate = ValidateCertificate(options.LocalCertificate, options.ClientCertificateMode);
+            // Capture a fixed certificate now; selector results are validated on every invocation to support rotation.
             _certificateSelector = options.LocalClientCertificateSelector;
-
+            if (options.LocalCertificate is { } certificate)
+            {
+                _certificate = ValidateCertificate(certificate, options.ClientCertificateMode);
+            }
+            else if (options.ClientCertificateMode == RemoteCertificateMode.RequireCertificate
+                && _certificateSelector is null)
+            {
+                EnsureCertificateIsAllowedForClientAuth(certificate: null);
+            }
 
             _options = options;
             _logger = loggerFactory?.CreateLogger<TlsClientConnectionMiddleware>();
@@ -119,10 +126,7 @@ namespace Orleans.Connections.Security
                         selector = (sender, targetHost, localCertificates, remoteCertificate, acceptableIssuers) =>
                         {
                             var cert = _certificateSelector(sender, targetHost, localCertificates, remoteCertificate, acceptableIssuers);
-                            if (cert != null)
-                            {
-                                EnsureCertificateIsAllowedForClientAuth(cert);
-                            }
+                            ValidateSelectedCertificate(cert, _options.ClientCertificateMode);
 
 #if NET10_0_OR_GREATER
                             return cert;
@@ -208,6 +212,16 @@ namespace Orleans.Connections.Security
             }
         }
 
+        internal static void ValidateSelectedCertificate(
+            X509Certificate2? certificate,
+            RemoteCertificateMode mode)
+        {
+            if (certificate is not null || mode == RemoteCertificateMode.RequireCertificate)
+            {
+                EnsureCertificateIsAllowedForClientAuth(certificate);
+            }
+        }
+
         private static X509Certificate2? ValidateCertificate(X509Certificate2? certificate, RemoteCertificateMode mode)
         {
             switch (mode)
@@ -237,6 +251,12 @@ namespace Orleans.Connections.Security
             if (!CertificateLoader.IsCertificateAllowedForClientAuth(certificate))
             {
                 throw new InvalidOperationException($"Invalid client certificate for client authentication: {certificate.Thumbprint}");
+            }
+
+            if (!certificate.HasPrivateKey)
+            {
+                throw new InvalidOperationException(
+                    $"Client certificate does not have an accessible private key: {certificate.Thumbprint}");
             }
         }
 

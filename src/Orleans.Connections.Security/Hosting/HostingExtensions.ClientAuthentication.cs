@@ -178,9 +178,11 @@ public static partial class OrleansConnectionSecurityHostingExtensions
 
     private static void ValidateClientTlsOptions(TlsOptions options)
     {
-        if (options.LocalCertificate is null && options.ClientCertificateMode == RemoteCertificateMode.RequireCertificate)
+        if (options.LocalCertificate is null
+            && options.LocalClientCertificateSelector is null
+            && options.ClientCertificateMode == RemoteCertificateMode.RequireCertificate)
         {
-            throw new InvalidOperationException("No client TLS certificate was specified.");
+            throw new InvalidOperationException("No client TLS certificate or certificate selector was specified.");
         }
 
         if (options.LocalCertificate is { } certificate && !certificate.HasPrivateKey)
