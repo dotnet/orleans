@@ -377,6 +377,44 @@ try {
         Assert-Equal '100.00%' $summary.branch_rate_display 'Displayed branch rate differs.'
     }
 
+    Invoke-Test 'supports aggregate branch counts without conditions' {
+        $testCase = New-TestCase
+        $lines = '<line number="10" hits="1" branch="True" condition-coverage="50% (1/2)" />'
+        [void] (Write-Report $testCase (Get-ReportXml (Join-Path $testCase.SourceRoot 'Example.cs') $lines))
+        Invoke-Summarizer $testCase
+        $summary = Get-Content -Raw $testCase.JsonOutput | ConvertFrom-Json
+        Assert-Equal 1 $summary.covered_branches 'Aggregate covered branches differ.'
+        Assert-Equal 2 $summary.total_branches 'Aggregate total branches differ.'
+        Assert-Equal '50.00%' $summary.branch_rate_display 'Aggregate branch rate differs.'
+    }
+
+    Invoke-Test 'rejects branch markers without aggregate counts' {
+        $testCase = New-TestCase
+        $lines = '<line number="10" hits="1" branch="True" />'
+        [void] (Write-Report $testCase (Get-ReportXml (Join-Path $testCase.SourceRoot 'Example.cs') $lines))
+        Assert-Throws { Invoke-Summarizer $testCase } 'invalid condition coverage'
+    }
+
+    Invoke-Test 'combines duplicate aggregate branch coverage conservatively' {
+        $testCase = New-TestCase
+        $sourceFile = [Security.SecurityElement]::Escape((Join-Path $testCase.SourceRoot 'Example.cs'))
+        $xml = @"
+<coverage><packages><package><classes>
+  <class filename="$sourceFile"><lines>
+    <line number="10" hits="1" branch="True" condition-coverage="50% (1/2)" />
+  </lines></class>
+  <class filename="$sourceFile"><lines>
+    <line number="10" hits="1" branch="True" condition-coverage="50% (1/2)" />
+  </lines></class>
+</classes></package></packages></coverage>
+"@
+        [void] (Write-Report $testCase $xml)
+        Invoke-Summarizer $testCase
+        $summary = Get-Content -Raw $testCase.JsonOutput | ConvertFrom-Json
+        Assert-Equal 1 $summary.covered_branches 'Duplicate aggregate covered branches differ.'
+        Assert-Equal 2 $summary.total_branches 'Duplicate aggregate total branches differ.'
+    }
+
     Invoke-Test 'rejects inconsistent branch coverage' {
         $testCase = New-TestCase
         $lines = @'
@@ -384,6 +422,20 @@ try {
   <conditions><condition number="0" type="jump" coverage="50%" /></conditions>
 </line>
 '@
+        [void] (Write-Report $testCase (Get-ReportXml (Join-Path $testCase.SourceRoot 'Example.cs') $lines))
+        Assert-Throws { Invoke-Summarizer $testCase } 'inconsistent condition coverage'
+    }
+
+    Invoke-Test 'rejects branch percentages inconsistent with counts' {
+        $testCase = New-TestCase
+        $lines = '<line number="10" hits="1" branch="True" condition-coverage="0% (2/2)" />'
+        [void] (Write-Report $testCase (Get-ReportXml (Join-Path $testCase.SourceRoot 'Example.cs') $lines))
+        Assert-Throws { Invoke-Summarizer $testCase } 'inconsistent condition coverage'
+    }
+
+    Invoke-Test 'rejects excessive per-line branch counts' {
+        $testCase = New-TestCase
+        $lines = '<line number="10" hits="1" branch="True" condition-coverage="0% (0/1025)" />'
         [void] (Write-Report $testCase (Get-ReportXml (Join-Path $testCase.SourceRoot 'Example.cs') $lines))
         Assert-Throws { Invoke-Summarizer $testCase } 'inconsistent condition coverage'
     }
@@ -422,12 +474,23 @@ try {
         Assert-Equal 2 $summary.total_lines 'Distinct source line count differs.'
     }
 
-    Invoke-Test 'rejects multiple reports' {
+    Invoke-Test 'combines multiple validated reports' {
         $testCase = New-TestCase
-        $xml = Get-ReportXml (Join-Path $testCase.SourceRoot 'Example.cs')
-        [void] (Write-Report $testCase $xml 'first.cobertura.xml')
-        [void] (Write-Report $testCase $xml 'second.cobertura.xml')
-        Assert-Throws { Invoke-Summarizer $testCase } 'Expected one merged Cobertura report'
+        $sourceFile = Join-Path $testCase.SourceRoot 'Example.cs'
+        [void] (Write-Report $testCase (Get-ReportXml $sourceFile '<line number="10" hits="0" />') 'first.cobertura.xml')
+        [void] (Write-Report $testCase (Get-ReportXml $sourceFile '<line number="10" hits="1" />') 'second.cobertura.xml')
+        Invoke-Summarizer $testCase
+        $summary = Get-Content -Raw $testCase.JsonOutput | ConvertFrom-Json
+        Assert-Equal 1 $summary.covered_lines 'Multiple report covered lines differ.'
+        Assert-Equal 1 $summary.total_lines 'Multiple report total lines differ.'
+        Assert-Equal 2 $summary.reports 'Multiple report count differs.'
+    }
+
+    Invoke-Test 'requires canonical source lines from every report' {
+        $testCase = New-TestCase
+        [void] (Write-Report $testCase (Get-ReportXml (Join-Path $testCase.SourceRoot 'Example.cs')) 'product.cobertura.xml')
+        [void] (Write-Report $testCase (Get-ReportXml (Join-Path $testCase.Root 'test/ExampleTests.cs')) 'tests.cobertura.xml')
+        Assert-Throws { Invoke-Summarizer $testCase } 'tests\.cobertura\.xml contains no measured lines under the source root'
     }
 
     Invoke-Test 'rejects reports without source lines' {
@@ -673,7 +736,7 @@ exit 0
         }
     }
 
-    Invoke-Test 'validates the exact coverage matrix before trusted merging' {
+    Invoke-Test 'validates the exact coverage matrix before trusted aggregation' {
         $workflow = Get-Content -Raw -LiteralPath $testResultsWorkflowPath
         $validator = Get-Content -Raw -LiteralPath $validateCoverageArtifactsScriptPath
         $expectedArtifacts = @(Get-Content -LiteralPath $expectedCoverageArtifactsPath)
@@ -684,16 +747,13 @@ exit 0
         Assert-Equal 0 ([regex]::Matches($workflow, 'merge-multiple:\s*true')).Count 'Coverage downloads must preserve artifact identities.'
         Assert-Matches `
             $workflow `
-            '(?s)Validate coverage matrix.*?Merge coverage' `
-            'Coverage artifact validation must run before merging.'
+            '(?s)Validate coverage matrix.*?Summarize coverage' `
+            'Coverage artifact validation must run before aggregation.'
         Assert-Matches `
             $workflow `
             '(?s)validate-coverage-artifacts\.ps1.*?coverage-artifacts\.txt' `
             'Trusted coverage reporting must use the reviewed artifact manifest.'
-        Assert-Matches `
-            $workflow `
-            'dotnet-coverage merge @reports' `
-            'Coverage reports must be merged directly by dotnet-coverage.'
+        Assert-Equal 0 ([regex]::Matches($workflow, 'dotnet-coverage merge')).Count 'The trusted reporter must preserve raw branch identities.'
         Assert-Matches `
             $validator `
             'Coverage artifact set differs from the expected CI matrix' `
@@ -968,22 +1028,26 @@ exit 0
         Assert-Equal 'Current-main artifacts are unavailable.' $unavailable.baseline.reason 'Unavailable comparison reason differs.'
     }
 
-    Invoke-Test 'merges coverage only in the trusted reporting workflow' {
+    Invoke-Test 'aggregates coverage only in the trusted reporting workflow' {
         $ciWorkflow = Get-Content -Raw -LiteralPath $workflowPath
         $reportingWorkflow = Get-Content -Raw -LiteralPath $testResultsWorkflowPath
         Assert-Equal 0 ([regex]::Matches($ciWorkflow, 'dotnet-coverage merge')).Count 'Pull request code must not merge its own coverage.'
         Assert-Matches `
             $reportingWorkflow `
-            '(?s)Checkout trusted reporter.*?Validate coverage matrix.*?Verify tested commit.*?Download covered source.*?Merge coverage.*?Summarize coverage' `
+            '(?s)Checkout trusted reporter.*?Validate coverage matrix.*?Verify tested commit.*?Download covered source.*?Summarize coverage' `
             'Trusted reporting must validate raw reports against the covered source before summarizing.'
+        Assert-Matches `
+            $reportingWorkflow `
+            '(?s)Summarize coverage.*?-ReportDirectory coverage-data' `
+            'Canonical coverage must be summarized directly from the validated raw reports.'
         Assert-Matches `
             $reportingWorkflow `
             '(?s)Pin trusted main.*?TRUSTED_MAIN_SHA: \$\{\{ steps\.trusted-main\.outputs\.sha \}\}.*?-ExpectedSha \$env:TRUSTED_MAIN_SHA' `
             'Baseline selection must use the exact main snapshot executing the trusted reporter.'
         Assert-Matches `
             $reportingWorkflow `
-            '(?s)Download covered source.*?Verify trusted coverage inputs.*?get-coverage-input-fingerprint\.ps1.*?Merge coverage' `
-            'Pull request coverage inputs must match the pinned trusted reporter before merging.'
+            '(?s)Download covered source.*?Verify trusted coverage inputs.*?get-coverage-input-fingerprint\.ps1.*?Summarize coverage' `
+            'Pull request coverage inputs must match the pinned trusted reporter before aggregation.'
         Assert-Equal 13 (@(Get-Content -LiteralPath $coverageInputsPath)).Count 'Trusted coverage input count differs.'
         Assert-Matches `
             $reportingWorkflow `
@@ -999,7 +1063,7 @@ exit 0
             'The coverage check must compare canonical coverage with current main.'
         Assert-Matches `
             $reportingWorkflow `
-            '(?s)Select current-main baseline.*?Download current-main coverage.*?Validate current-main coverage matrix.*?Aggregate current-main coverage.*?Compare coverage with current main' `
+            '(?s)Select current-main baseline.*?Download current-main coverage.*?Validate current-main coverage matrix.*?Summarize current-main coverage.*?Compare coverage with current main' `
             'The trusted reporter must aggregate the same current-main matrix before comparison.'
         Assert-Matches `
             $reportingWorkflow `

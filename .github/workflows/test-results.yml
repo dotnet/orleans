@@ -11,9 +11,6 @@ permissions:
   contents: read
   actions: read
 
-env:
-  DOTNET_COVERAGE_VERSION: 18.5.2
-
 jobs:
   report:
     name: Report test results
@@ -74,11 +71,6 @@ jobs:
       - name: Test coverage reporting
         shell: pwsh
         run: ./.github/scripts/test-summarize-coverage.ps1
-      - name: Setup .NET
-        uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
-        with:
-          global-json-file: global.json
-      - uses: ./.github/actions/setup-coverage
       - name: Download coverage
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -141,18 +133,12 @@ jobs:
           if ($tested.sha256 -ne $trusted.sha256) {
             throw 'The pull request changes trusted coverage collection inputs. Merge reviewed coverage infrastructure changes before measuring other pull requests.'
           }
-      - name: Merge coverage
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force coverage | Out-Null
-          $reports = @(Get-ChildItem -LiteralPath coverage-data -Recurse -File -Filter '*.cobertura.xml' | Select-Object -ExpandProperty FullName)
-          dotnet-coverage merge @reports --output coverage/coverage.cobertura.xml --output-format cobertura --nologo
       - name: Summarize coverage
         id: coverage
         shell: pwsh
         run: |
           ./.github/scripts/summarize-coverage.ps1 `
-            -ReportDirectory coverage `
+            -ReportDirectory coverage-data `
             -SourceRoot "$env:GITHUB_WORKSPACE/coverage-source/src" `
             -MarkdownOutput coverage-summary.md `
             -JsonOutput coverage-summary.json
@@ -230,21 +216,14 @@ jobs:
             --gzip \
             --directory current-main-source \
             --strip-components 1
-      - name: Aggregate current-main coverage
+      - name: Summarize current-main coverage
         id: current-main-summary
         if: steps.current-main-source.outcome == 'success'
         continue-on-error: true
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force current-main-coverage | Out-Null
-          $reports = @(Get-ChildItem -LiteralPath current-main-coverage-data -Recurse -File -Filter '*.cobertura.xml' | Select-Object -ExpandProperty FullName)
-          dotnet-coverage merge @reports --output current-main-coverage/coverage.cobertura.xml --output-format cobertura --nologo
-          if ($LASTEXITCODE -ne 0) {
-            throw "Current-main coverage merge failed with exit code $LASTEXITCODE"
-          }
-
           ./.github/scripts/summarize-coverage.ps1 `
-            -ReportDirectory current-main-coverage `
+            -ReportDirectory current-main-coverage-data `
             -SourceRoot "$env:GITHUB_WORKSPACE/current-main-source/src" `
             -MarkdownOutput current-main-summary.md `
             -JsonOutput current-main-summary.json
