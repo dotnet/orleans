@@ -40,6 +40,9 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Orleans.Core" />
     <InternalsVisibleTo Include="Orleans.Core.Tests" />
+    <InternalsVisibleTo Include="Orleans.DefaultCluster.Tests" />
+    <InternalsVisibleTo Include="Orleans.Runtime" />
+    <InternalsVisibleTo Include="Orleans.Runtime.Tests" />
     <InternalsVisibleTo Include="Orleans.Serialization.UnitTests" />
   </ItemGroup>
 

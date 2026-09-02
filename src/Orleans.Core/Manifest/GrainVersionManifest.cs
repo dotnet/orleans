@@ -19,7 +19,7 @@ namespace Orleans.Runtime.Versions
         private readonly ConcurrentDictionary<GrainInterfaceType, GrainInterfaceType> _genericInterfaceMapping = new ConcurrentDictionary<GrainInterfaceType, GrainInterfaceType>();
         private readonly ConcurrentDictionary<GrainType, GrainType> _genericGrainTypeMapping = new ConcurrentDictionary<GrainType, GrainType>();
         private readonly IClusterManifestProvider _clusterManifestProvider;
-        private readonly Dictionary<GrainInterfaceType, ushort> _localVersions;
+        private Dictionary<GrainInterfaceType, ushort> _localVersions;
         private Cache _cache;
 
         /// <summary>
@@ -31,6 +31,13 @@ namespace Orleans.Runtime.Versions
             _clusterManifestProvider = clusterManifestProvider;
             _cache = BuildCache(clusterManifestProvider.Current);
             _localVersions = BuildLocalVersionMap(clusterManifestProvider.LocalGrainManifest);
+        }
+
+        internal void OnLocalManifestUpdated(GrainManifest localManifest)
+        {
+            Volatile.Write(ref _localVersions, BuildLocalVersionMap(localManifest));
+            _genericInterfaceMapping.Clear();
+            _genericGrainTypeMapping.Clear();
         }
 
         /// <summary>

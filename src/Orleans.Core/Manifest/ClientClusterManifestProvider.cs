@@ -66,7 +66,13 @@ namespace Orleans.Runtime
         public IAsyncEnumerable<ClusterManifest> Updates => _updates;
 
         /// <inheritdoc />
-        public GrainManifest LocalGrainManifest { get; }
+        public GrainManifest LocalGrainManifest { get; private set; }
+
+        /// <summary>
+        /// Replaces the local client manifest after a hot reload metadata update; the periodic gateway
+        /// refresh includes it in subsequently published cluster manifests.
+        /// </summary>
+        internal void OnLocalManifestUpdated(GrainManifest localManifest) => LocalGrainManifest = localManifest;
 
         /// <summary>
         /// Starts this service.

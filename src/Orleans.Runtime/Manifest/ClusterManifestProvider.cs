@@ -59,7 +59,39 @@ namespace Orleans.Runtime.Metadata
 
         public IAsyncEnumerable<ClusterManifest> Updates => _updates;
 
-        public GrainManifest LocalGrainManifest { get; }
+        public GrainManifest LocalGrainManifest { get; private set; }
+
+        /// <summary>
+        /// Publishes an updated manifest for the local silo after a hot reload metadata update. Only the
+        /// minor version is bumped: placement (<see cref="Versions.CachedVersionSelectorManager"/>) spin-waits
+        /// until the manifest's major version matches the membership version, so the major version must not
+        /// be advanced here.
+        /// </summary>
+        internal void OnLocalManifestUpdated(GrainManifest localManifest)
+        {
+            lock (_currentLock)
+            {
+                LocalGrainManifest = localManifest;
+            }
+
+            // Publish with a retry: a concurrently published manifest (e.g. built from membership processing
+            // before this update) can win the race while still carrying the previous local manifest.
+            for (var attempt = 0; attempt < 3; attempt++)
+            {
+                var current = _current;
+                if (current.Silos.TryGetValue(_localSiloAddress, out var existing) && ReferenceEquals(existing, localManifest))
+                {
+                    return;
+                }
+
+                var version = new MajorMinorVersion(current.Version.Major, current.Version.Minor + 1);
+                var updated = CreateClusterManifest(version, current.Silos.SetItem(_localSiloAddress, localManifest));
+                if (TryPublishManifest(updated))
+                {
+                    return;
+                }
+            }
+        }
 
         private ClusterManifest EnsureValidManifestForCurrentMembership(ClusterMembershipSnapshot clusterMembership)
         {

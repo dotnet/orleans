@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Immutable;
+using System.Threading;
 using System.Diagnostics.CodeAnalysis;
 using Orleans.Runtime;
 using Orleans.Serialization.TypeSystem;
@@ -12,7 +13,7 @@ namespace Orleans.Metadata
     public class GrainClassMap
     {
         private readonly TypeConverter _typeConverter;
-        private readonly ImmutableDictionary<GrainType, Type> _types;
+        private ImmutableDictionary<GrainType, Type> _types;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="GrainClassMap"/> class.
@@ -24,6 +25,12 @@ namespace Orleans.Metadata
             _typeConverter = typeConverter;
             _types = classes;
         }
+
+        /// <summary>
+        /// Replaces the grain class mapping after a hot reload update; this shared singleton is registered
+        /// separately from the manifest provider, so it is updated in place rather than replaced.
+        /// </summary>
+        internal void OnManifestUpdated(ImmutableDictionary<GrainType, Type> classes) => Volatile.Write(ref _types, classes);
 
         /// <summary>
         /// Returns the grain class type corresponding to the provided grain type.
