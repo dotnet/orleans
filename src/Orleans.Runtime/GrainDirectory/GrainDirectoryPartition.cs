@@ -1120,10 +1120,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         }
     }
 
-    ValueTask<GrainDirectoryLeaseCleanupResult> IGrainDirectoryTestHooks.CleanupExpiredLeasesAsync() =>
-        new(CleanupExpiredLeases());
-
-    internal async Task<GrainDirectoryLeaseCleanupResult> CleanupExpiredLeases()
+    async ValueTask<GrainDirectoryLeaseCleanupResult> IGrainDirectoryTestHooks.CleanupExpiredLeasesAsync()
     {
         GrainDirectoryLeaseCleanupResult? result = null;
         await this.QueueAction(
@@ -1132,6 +1129,9 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
             nameof(CleanupExpiredLeases));
         return result!;
     }
+
+    internal void CleanupExpiredLeases() => this.QueueAction(static state =>
+        state.CleanupExpiredLeasesCore(), this, nameof(CleanupExpiredLeases));
 
     private void AddRangeLeaseHold(RingRange range, DateTimeOffset expiration)
     {
