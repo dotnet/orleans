@@ -289,9 +289,9 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
         var requestVar = IdentifierName("request");
         var methodSymbol = methodDescription.Method;
         var invokable = methodDescription.GeneratedInvokable;
-        ExpressionSyntax createRequestExpr = TryGetActivatorIndex(activators, methodDescription, out var activatorIndex) switch
+        ExpressionSyntax createRequestExpr = TryGetActivatorFieldName(activators, methodDescription, out var activatorFieldName) switch
         {
-            true => InvocationExpression(IdentifierName($"_activator{activatorIndex}").Member("Create")),
+            true => InvocationExpression(IdentifierName(activatorFieldName).Member("Create")),
             _ => (!invokable.IsEmptyConstructable || invokable.UseActivator) switch
             {
                 true => InvocationExpression(ThisExpression().Member("GetInvokable", invokable.TypeSyntax))
@@ -561,7 +561,7 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
                     ExpressionStatement(
                         AssignmentExpression(
                             SyntaxKind.SimpleAssignmentExpression,
-                            IdentifierName($"_activator{activator.Index}"),
+                            IdentifierName(activator.FieldName),
                             InvocationExpression(
                                 IdentifierName(CodecProviderMemberName).Member("GetActivator", activator.Method.GeneratedInvokable.TypeSyntax)))));
             }
@@ -592,7 +592,7 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
             if (method.MethodTypeParameters.Count == 0
                 && method.GeneratedInvokable.UsesInvokablePool)
             {
-                result.Add(new(method, result.Count));
+                result.Add(new(method));
             }
         }
 
@@ -608,35 +608,35 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
                 FieldDeclaration(
                     VariableDeclaration(
                         LibraryTypes.IActivator_1.ToTypeSyntax(activator.Method.GeneratedInvokable.TypeSyntax),
-                        SingletonSeparatedList(VariableDeclarator($"_activator{activator.Index}"))))
+                        SingletonSeparatedList(VariableDeclarator(activator.FieldName))))
                 .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.ReadOnlyKeyword)));
         }
 
         return [.. result];
     }
 
-    private static bool TryGetActivatorIndex(
+    private static bool TryGetActivatorFieldName(
         List<ActivatorDescription> activators,
         ProxyMethodDescription method,
-        out int index)
+        out string fieldName)
     {
         foreach (var activator in activators)
         {
             if (ReferenceEquals(activator.Method, method))
             {
-                index = activator.Index;
+                fieldName = activator.FieldName;
                 return true;
             }
         }
 
-        index = default;
+        fieldName = default!;
         return false;
     }
 
-    private sealed class ActivatorDescription(ProxyMethodDescription method, int index)
+    private sealed class ActivatorDescription(ProxyMethodDescription method)
     {
         public ProxyMethodDescription Method { get; } = method;
-        public int Index { get; } = index;
+        public string FieldName { get; } = $"_activator_{method.GeneratedMethodId}";
     }
 
     private static ParameterSyntax GetParameterSyntax(int index, IParameterSymbol parameter, Dictionary<ITypeParameterSymbol, string>? typeParameterSubstitutions)
