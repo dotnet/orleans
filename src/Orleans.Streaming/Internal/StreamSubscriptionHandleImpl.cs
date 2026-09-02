@@ -223,7 +223,8 @@ namespace Orleans.Streams
                 if (IsRewindable)
                 {
                     if (this.expectedToken is DeliveryToken deliveryToken
-                        && deliveryToken.Token.Equals(currentToken))
+                        && deliveryToken.Token is { } deliveredToken
+                        && deliveredToken.Equals(currentToken))
                         return this.expectedToken;
                 }
             }

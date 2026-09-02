@@ -327,7 +327,7 @@ public class StreamSubscriptionHandleImplTests
         IAsyncObserver<int>? observer = null,
         IAsyncBatchObserver<int>? batchObserver = null,
         StreamSequenceToken? token = null,
-        StreamSubscriptionOptions options = default,
+        StreamSubscriptionStartPosition? startPosition = null,
         string? filterData = "phase-1-filter",
         bool disableHandshake = false,
         StreamSubscriptionHandleImpl<int>.SharedHandshakeState? handshakeState = null,
@@ -348,7 +348,7 @@ public class StreamSubscriptionHandleImplTests
             batchObserver,
             stream,
             token,
-            options,
+            startPosition,
             filterData,
             disableHandshake,
             handshakeState,
@@ -452,12 +452,23 @@ public class StreamSubscriptionHandleImplTests
             string? filterData = null)
             => throw new NotSupportedException();
 
+        public Task<StreamSubscriptionHandle<T>> SubscribeAsync(
+            IAsyncObserver<T> observer,
+            StreamSubscriptionStartPosition startPosition,
+            string? filterData = null)
+            => throw new NotSupportedException();
+
         public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncBatchObserver<T> observer)
             => throw new NotSupportedException();
 
         public Task<StreamSubscriptionHandle<T>> SubscribeAsync(
             IAsyncBatchObserver<T> observer,
             StreamSequenceToken? token)
+            => throw new NotSupportedException();
+
+        public Task<StreamSubscriptionHandle<T>> SubscribeAsync(
+            IAsyncBatchObserver<T> observer,
+            StreamSubscriptionStartPosition startPosition)
             => throw new NotSupportedException();
 
         public Task UnsubscribeAsync(StreamSubscriptionHandle<T> handle)
@@ -1639,6 +1650,7 @@ public class StreamSubscriptionHandleImplTests
             batchObserver: null,
             stream,
             token,
+            startPosition: null,
             filterData: null,
             clusterId: "phase-1-cluster");
         return new(handle, provider);
