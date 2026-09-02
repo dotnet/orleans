@@ -14,6 +14,7 @@
     <NpmAppSources Include="$(NpmAppRootDirectory)\public\**\*" />
     <NpmAppSources Include="$(NpmAppRootDirectory)\package.json" />
     <NpmAppSources Include="$(NpmAppRootDirectory)\package-lock.json" />
+    <NpmAppSources Include="$(NpmAppRootDirectory)\.npmrc" />
     <NpmAppSources Include="$(NpmAppRootDirectory)\vite.config.ts" />
     <NpmAppSources Include="$(NpmAppRootDirectory)\tsconfig.json" />
     <NpmAppSources Include="$(NpmAppRootDirectory)\index.html" />
@@ -53,8 +54,8 @@
          because of network errors or HTTP 5xx responses. Increasing that bounded retry
          budget makes CI resilient to brief registry interruptions without retrying
          deterministic dependency, lockfile, authentication, or lifecycle-script failures.
-         Keep these options on this command instead of in the app's local-development
-         .npmrc so direct frontend development retains npm's defaults. -->
+         Keep these options on this command so registry policy remains separate from
+         resiliency tuning. -->
     <Exec
       Command="npm ci --prefer-offline --no-audit $(NpmFetchRetryArgs) $(NpmConfigArg)"
       WorkingDirectory="$(NpmAppRootDirectory)"
