@@ -1,7 +1,7 @@
 ---
 title: Operate and tune Orleans streams
 description: Apply backpressure, tune persistent providers, and observe Orleans streaming health.
-ms.date: 08/17/2026
+ms.date: 09/01/2026
 ms.topic: concept-article
 ---
 
@@ -35,6 +35,16 @@ The slow-consuming monitor lets a single observed lagging cursor apply cache pre
 The monitor starts calculating cursor pressure after the partition cache spans at least 10,000 Event Hubs sequence numbers. In this example, when Orleans reads the next cached item for a subscription whose cursor is more than 70% of the cache span behind the newest cached position, the provider stops new Event Hubs reads for at least 10 seconds. Tune both values from measured lag and processing time. The slow-consuming policy intentionally limits partition ingestion to protect the slowest observed subscription: cache misses are less likely, but end-to-end lag for every subscription can increase and backlog can move into Event Hubs. Ensure that Event Hubs retention can absorb that backlog and that sustained ingress doesn't exceed the slowest required subscription's capacity.
 
 Pressure is sampled as Orleans advances subscriptions through cached items, so keep consumer turns bounded to keep detection current. First reduce CPU saturation and hot-grain bottlenecks. If workloads need independent throughput or retention policies, isolate them using separate Orleans stream providers and Event Hubs consumer groups instead of coupling them through one partition cache.
+
+### Bound Event Hubs cache memory
+
+The Event Hubs provider applies one active cache memory watermark across all partitions owned by a provider instance. The default <xref:Orleans.Configuration.EventHubStreamCacheMemoryOptions.MaxActiveCacheMemory> is 512 MiB. It includes active payload buffers and cached-message metadata. When usage reaches the watermark, Orleans pauses new Event Hubs reads. Partition caches without active subscriptions release eligible oldest buffers until provider usage falls below the watermark. Caches with active subscriptions retain their delivery boundary, so memory pressure pauses ingestion instead of advancing past a slow or in-flight consumer.
+
+The built-in adaptive buffer pool retains up to 64 MiB of idle payload buffers per provider by default through <xref:Orleans.Configuration.EventHubStreamCacheMemoryOptions.MaxBufferPoolMemory>. Buffers above that limit are released when they become idle. A custom buffer pool controls its own allocation and retention policy. Configure both values with <xref:Orleans.Hosting.SiloEventHubStreamConfiguratorExtensions.ConfigureCacheMemory*>.
+
+The active watermark is a flow-control threshold rather than a hard process-memory ceiling. Reads already in flight complete so that dequeued events remain available for ordered delivery. Temporary overshoot therefore scales with concurrent partition reads, received batch sizes, event payload sizes, and cached-message metadata growth. Size the watermark with headroom for one in-flight read per concurrently active partition, and keep Event Hubs retention long enough to absorb the backlog while reads are paused.
+
+Increase the active watermark when measured cache pressure repeatedly pauses healthy consumers and the silo has sufficient memory headroom. Reduce it to reserve memory for grains and other providers. Increase idle retention when allocation churn is measurable after bursts; reduce it when many providers or silos retain unused cache buffers. Monitor `orleans-streams-queue-cache-under-pressure`, `orleans-streams-queue-cache-size`, `orleans-streams-block-pool-total-memory`, broker backlog, and silo process memory together.
 
 ## Tune the pulling pipeline
 
