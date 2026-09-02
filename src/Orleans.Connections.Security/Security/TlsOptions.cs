@@ -14,6 +14,7 @@ namespace Orleans.Connections.Security
     /// </summary>
     public class TlsOptions
     {
+        private static readonly TimeSpan MaximumFiniteHandshakeTimeout = TimeSpan.FromMilliseconds(uint.MaxValue - 1);
         private TimeSpan _handshakeTimeout = TimeSpan.FromSeconds(10);
 
         /// <summary>
@@ -98,20 +99,29 @@ namespace Orleans.Connections.Security
         public Action<ConnectionContext, TlsClientAuthenticationOptions>? OnAuthenticateAsClient { get; set; }
 
         /// <summary>
-        /// Specifies the maximum amount of time allowed for the TLS/SSL handshake. This must be positive and finite.
+        /// Specifies the maximum amount of time allowed for the TLS/SSL handshake.
+        /// This must be positive and no greater than 4,294,967,294 milliseconds (approximately 49.7 days),
+        /// or <see cref="Timeout.InfiniteTimeSpan"/> to disable the timeout.
         /// </summary>
         public TimeSpan HandshakeTimeout
         {
             get => _handshakeTimeout;
             set
             {
-                if (value <= TimeSpan.Zero && value != Timeout.InfiniteTimeSpan)
+                if ((value <= TimeSpan.Zero && value != Timeout.InfiniteTimeSpan) || value > MaximumFiniteHandshakeTimeout)
                 {
-                    throw new ArgumentOutOfRangeException(nameof(value), nameof(HandshakeTimeout) + " must be positive");
+                    throw new ArgumentOutOfRangeException(
+                        nameof(value),
+                        $"{nameof(HandshakeTimeout)} must be positive and no greater than {MaximumFiniteHandshakeTimeout}, or {nameof(Timeout)}.{nameof(Timeout.InfiniteTimeSpan)}");
                 }
 
-                _handshakeTimeout = value != Timeout.InfiniteTimeSpan ? value : TimeSpan.MaxValue;
+                _handshakeTimeout = value;
             }
         }
+
+        internal CancellationTokenSource CreateHandshakeCancellationTokenSource() =>
+            _handshakeTimeout == Timeout.InfiniteTimeSpan
+                ? new CancellationTokenSource()
+                : new CancellationTokenSource(_handshakeTimeout);
     }
 }

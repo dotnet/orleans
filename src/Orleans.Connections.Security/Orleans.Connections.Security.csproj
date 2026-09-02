@@ -12,4 +12,8 @@
   <ItemGroup>
     <ProjectReference Include="..\Orleans.Runtime\Orleans.Runtime.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Orleans.Connections.Security.Tests" />
+  </ItemGroup>
 </Project>

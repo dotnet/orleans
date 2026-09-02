@@ -125,8 +125,8 @@ namespace Orleans.Connections.Security
 
             var sslStream = tlsDuplexPipe.Stream;
 
-            using (var cancellationTokeSource = new CancellationTokenSource(_options.HandshakeTimeout))
-            using (cancellationTokeSource.Token.UnsafeRegister(state => ((ConnectionContext)state!).Abort(), context))
+            using (var cancellationTokenSource = _options.CreateHandshakeCancellationTokenSource())
+            using (cancellationTokenSource.Token.UnsafeRegister(state => ((ConnectionContext)state!).Abort(), context))
             {
                 try
                 {
@@ -168,7 +168,7 @@ namespace Orleans.Connections.Security
 
                     _options.OnAuthenticateAsServer?.Invoke(context, sslOptions);
 
-                    await sslStream.AuthenticateAsServerAsync(sslOptions.Value, cancellationTokeSource.Token);
+                    await sslStream.AuthenticateAsServerAsync(sslOptions.Value, cancellationTokenSource.Token);
                 }
                 catch (OperationCanceledException ex)
                 {
