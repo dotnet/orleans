@@ -333,10 +333,10 @@ public class StreamConsumerLifecycleTests
             => Extension.SetObserver(
                 subscriptionId,
                 Stream,
-                observer,
+                observer: observer,
                 batchObserver: null,
-                token,
-                filterData);
+                token: token,
+                filterData: filterData);
 
         public StreamSubscriptionHandleImpl<int> Register(
             GuidId subscriptionId,
@@ -347,9 +347,9 @@ public class StreamConsumerLifecycleTests
                 subscriptionId,
                 Stream,
                 observer: null,
-                observer,
-                token,
-                filterData);
+                batchObserver: observer,
+                token: token,
+                filterData: filterData);
 
         public void AssertNoStreamProviderAcquisitions()
         {

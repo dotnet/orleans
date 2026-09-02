@@ -1,3 +1,4 @@
+using System.Runtime.ExceptionServices;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -1546,7 +1547,7 @@ public class StreamSubscriptionHandleImplTests
 
         public void OnError(Exception error)
         {
-            throw error;
+            ExceptionDispatchInfo.Throw(error);
         }
 
         public void OnNext(Orleans.Streaming.Diagnostics.StreamingEvents.StreamingEvent value)
