@@ -16,6 +16,8 @@ internal static class GatewayEvents
 
     internal static bool IsClientDroppedEnabled() => Listener.IsEnabled(nameof(ClientDropped));
 
+    internal static bool IsDeadSiloRequestRejectedEnabled() => Listener.IsEnabled(nameof(DeadSiloRequestRejected));
+
     internal static bool IsGatewayListUpdatedEnabled() => Listener.IsEnabled(nameof(GatewayListUpdated));
 
     internal abstract class GatewayEvent
@@ -44,6 +46,18 @@ internal static class GatewayEvents
         public readonly GrainId ClientId = clientId;
 
         public readonly TimeSpan DisconnectedDuration = disconnectedDuration;
+    }
+
+    internal sealed class DeadSiloRequestRejected(
+        SiloAddress siloAddress,
+        GrainId clientId,
+        Message rejection) : GatewayEvent
+    {
+        public readonly SiloAddress SiloAddress = siloAddress;
+
+        public readonly GrainId ClientId = clientId;
+
+        public readonly Message Rejection = rejection;
     }
 
     internal static void EmitGatewayListUpdated(object source, IReadOnlyList<SiloAddress> knownGateways, IReadOnlyList<SiloAddress> liveGateways)
@@ -75,6 +89,22 @@ internal static class GatewayEvents
         static void Emit(SiloAddress siloAddress, GrainId clientId, TimeSpan disconnectedDuration)
         {
             Listener.Write(nameof(ClientDropped), new ClientDropped(siloAddress, clientId, disconnectedDuration));
+        }
+    }
+
+    internal static void EmitDeadSiloRequestRejected(SiloAddress siloAddress, GrainId clientId, Message rejection)
+    {
+        if (!IsDeadSiloRequestRejectedEnabled())
+        {
+            return;
+        }
+
+        Emit(siloAddress, clientId, rejection);
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void Emit(SiloAddress siloAddress, GrainId clientId, Message rejection)
+        {
+            Listener.Write(nameof(DeadSiloRequestRejected), new DeadSiloRequestRejected(siloAddress, clientId, rejection));
         }
     }
 
