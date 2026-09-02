@@ -643,6 +643,7 @@ namespace Orleans.Runtime.Messaging
                     Message.RejectionTypes.Transient,
                     "Target silo became unavailable",
                     exception);
+                rejection.RequestContextData = null;
                 SendSyntheticResponse(rejection);
             }
 
