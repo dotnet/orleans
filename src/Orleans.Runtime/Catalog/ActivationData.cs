@@ -1433,7 +1433,6 @@ internal sealed partial class ActivationData :
     private void InvokeIncomingRequest(Message message)
     {
         _shared.MessagingProcessingInstruments.OnDispatcherMessageProcessedOk(message);
-        _shared.InternalRuntime.MessagingTrace.OnScheduleMessage(message);
 
         try
         {

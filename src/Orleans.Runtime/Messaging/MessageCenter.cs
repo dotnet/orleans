@@ -200,8 +200,6 @@ namespace Orleans.Runtime.Messaging
                     return;
                 }
 
-                MessagingEvents.EmitSent(msg);
-
                 if (targetSilo.Matches(_siloAddress))
                 {
                     LogTraceMessageLoopedBack(log, msg);

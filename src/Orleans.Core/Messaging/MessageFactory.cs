@@ -16,13 +16,11 @@ namespace Orleans.Runtime
         private readonly ulong _seed;
         private readonly DeepCopier _deepCopier;
         private readonly ILogger _logger;
-        private readonly MessagingTrace _messagingTrace;
 
-        public MessageFactory(DeepCopier deepCopier, ILogger<MessageFactory> logger, MessagingTrace messagingTrace)
+        public MessageFactory(DeepCopier deepCopier, ILogger<MessageFactory> logger, MessagingTrace _)
         {
             _deepCopier = deepCopier;
             _logger = logger;
-            _messagingTrace = messagingTrace;
 
             // Generate a 64-bit nonce for the host, to be combined with per-message correlation ids to get a unique, per-host value.
             // This avoids id collisions across different hosts for a given grain.
@@ -42,7 +40,6 @@ namespace Orleans.Runtime
                 RequestContextData = RequestContextExtensions.Export(_deepCopier),
             };
 
-            _messagingTrace.OnCreateMessage(message);
             return message;
         }
 
@@ -70,7 +67,6 @@ namespace Orleans.Runtime
                 RequestContextData = RequestContextExtensions.Export(_deepCopier),
             };
 
-            _messagingTrace.OnCreateMessage(response);
             return response;
         }
 
