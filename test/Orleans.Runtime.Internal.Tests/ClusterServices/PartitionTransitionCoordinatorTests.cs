@@ -465,7 +465,7 @@ public sealed class PartitionTransitionCoordinatorTests
     private readonly record struct LinearSegment(uint Start, uint End);
 
     [Fact]
-    public async Task Fail_PreservesExactFailureCancelsCompletionAndKeepsGateUntilAbort()
+    public async Task Fail_PreservesExactFailureFaultsCompletionAndRemovesGate()
     {
         var coordinator = new PartitionTransitionCoordinator();
         var transition = coordinator.BeginBarrier(Range, View2);
@@ -477,38 +477,34 @@ public sealed class PartitionTransitionCoordinatorTests
         Assert.Same(failure, transition.Failure);
         Assert.Equal(PartitionTransitionStage.Failed, transition.Stage);
         Assert.Same(completion, transition.Completion);
-        Assert.True(completion.IsCanceled);
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => completion);
-        Assert.True(coordinator.TryGetBlockingTransition(Range, View2.MembershipVersion, out var blocked));
-        Assert.Same(completion, blocked);
+        var observed = await Assert.ThrowsAsync<InvalidOperationException>(() => completion);
+        Assert.Same(failure, observed);
+        Assert.False(coordinator.IsBlocked(Range, View2.MembershipVersion));
+        Assert.False(coordinator.TryGetBlockingTransition(Range, View2.MembershipVersion, out var released));
+        Assert.Same(Task.CompletedTask, released);
 
         var repeatedFailure = new ArgumentException("must not replace the first failure");
         var rejection = Assert.Throws<InvalidOperationException>(() => transition.Fail(repeatedFailure));
 
-        Assert.Equal("Transition stage 'Failed' cannot fail.", rejection.Message);
+        Assert.Equal("The transition is no longer active.", rejection.Message);
         Assert.Same(failure, transition.Failure);
         Assert.Equal(PartitionTransitionStage.Failed, transition.Stage);
         Assert.Same(completion, transition.Completion);
-        Assert.True(completion.IsCanceled);
-        Assert.True(coordinator.TryGetBlockingTransition(Range, View2.MembershipVersion, out blocked));
-        Assert.Same(completion, blocked);
 
         var completionRejection = Assert.Throws<InvalidOperationException>(transition.Complete);
 
         Assert.Equal("A barrier transition must remain blocked until completion.", completionRejection.Message);
         Assert.Same(failure, transition.Failure);
         Assert.Equal(PartitionTransitionStage.Failed, transition.Stage);
-        Assert.True(coordinator.IsBlocked(Range, View2.MembershipVersion));
 
-        transition.Abort(TestContext.Current.CancellationToken);
+        var abortRejection = Assert.Throws<InvalidOperationException>(
+            () => transition.Abort(TestContext.Current.CancellationToken));
 
-        Assert.Equal(PartitionTransitionStage.Aborted, transition.Stage);
+        Assert.Equal("The transition is no longer active.", abortRejection.Message);
+        Assert.Equal(PartitionTransitionStage.Failed, transition.Stage);
         Assert.Same(failure, transition.Failure);
         Assert.Same(completion, transition.Completion);
-        Assert.True(completion.IsCanceled);
         Assert.False(coordinator.IsBlocked(Range, View2.MembershipVersion));
-        Assert.False(coordinator.TryGetBlockingTransition(Range, View2.MembershipVersion, out var released));
-        Assert.Same(Task.CompletedTask, released);
     }
 
     [Theory]
@@ -518,7 +514,7 @@ public sealed class PartitionTransitionCoordinatorTests
     [InlineData(
         (int)PartitionTransitionDirection.Outbound,
         "An outbound transition must drain operations before completion.")]
-    public void Complete_RejectsFailedInboundAndOutboundWithoutReleasingGate(
+    public async Task Complete_RejectsFailedInboundAndOutboundAfterReleasingGate(
         int directionValue,
         string expectedMessage)
     {
@@ -535,12 +531,11 @@ public sealed class PartitionTransitionCoordinatorTests
         Assert.Equal(expectedMessage, rejection.Message);
         Assert.Same(failure, transition.Failure);
         Assert.Equal(PartitionTransitionStage.Failed, transition.Stage);
-        Assert.True(transition.Completion.IsCanceled);
-        Assert.True(coordinator.TryGetBlockingTransition(Range, View2.MembershipVersion, out var blocked));
-        Assert.Same(transition.Completion, blocked);
-
-        transition.Abort(TestContext.Current.CancellationToken);
+        var observed = await Assert.ThrowsAsync<InvalidOperationException>(() => transition.Completion);
+        Assert.Same(failure, observed);
         Assert.False(coordinator.IsBlocked(Range, View2.MembershipVersion));
+        Assert.False(coordinator.TryGetBlockingTransition(Range, View2.MembershipVersion, out var released));
+        Assert.Same(Task.CompletedTask, released);
     }
 
     [Fact]

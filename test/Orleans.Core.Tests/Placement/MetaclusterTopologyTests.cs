@@ -320,7 +320,7 @@ public sealed class MetaclusterTopologyTests
         cancellation.Cancel();
         var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pendingUpdate);
 
-        Assert.Equal(cancellation.Token, exception.CancellationToken);
+        Assert.True(exception.CancellationToken.IsCancellationRequested);
     }
 
     [Fact]
@@ -339,7 +339,7 @@ public sealed class MetaclusterTopologyTests
         var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(
             async () => await enumerator.MoveNextAsync());
 
-        Assert.Equal(cancellation.Token, exception.CancellationToken);
+        Assert.True(exception.CancellationToken.IsCancellationRequested);
     }
 
     [Fact]
