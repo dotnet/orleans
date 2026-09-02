@@ -67,6 +67,21 @@ namespace Orleans.Runtime.Messaging
             return false;
         }
 
+        internal bool TryRemove(CorrelationId requestId, SiloAddress targetSilo, out Message request)
+        {
+            if (_requests is { } requests
+                && requests.TryGetValue(requestId, out var trackedRequest)
+                && targetSilo.Equals(trackedRequest.TargetSilo)
+                && requests.Remove(requestId))
+            {
+                request = CreateRequest(trackedRequest);
+                return true;
+            }
+
+            request = null!;
+            return false;
+        }
+
         internal List<Message>? RemoveForSilo(SiloAddress silo)
         {
             if (_requests is not { Count: > 0 } requests)
