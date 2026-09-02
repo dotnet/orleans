@@ -464,6 +464,7 @@ namespace Orleans.Runtime.Messaging
 
             public void RecordDisconnection()
             {
+                bool requestTrackingStopped;
                 lock (_requestLock)
                 {
                     var connection = Interlocked.Exchange(ref _connection, null);
@@ -473,9 +474,10 @@ namespace Orleans.Runtime.Messaging
                     }
 
                     _disconnectedSince.Restart();
-                    ClearPendingRequestsCore();
+                    requestTrackingStopped = ClearPendingRequestsCore();
                 }
 
+                EmitRequestTrackingStopped(requestTrackingStopped);
                 _signal.Signal();
             }
 
@@ -524,12 +526,14 @@ namespace Orleans.Runtime.Messaging
 
             public void SendResponse(Message message)
             {
+                bool requestTrackingStopped;
                 lock (_requestLock)
                 {
                     _pendingRequests.TryComplete(message);
-                    UnregisterRequestTrackingIfEmptyCore();
+                    requestTrackingStopped = UnregisterRequestTrackingIfEmptyCore();
                 }
 
+                EmitRequestTrackingStopped(requestTrackingStopped);
                 SendSyntheticResponse(message);
             }
 
@@ -545,6 +549,7 @@ namespace Orleans.Runtime.Messaging
                 Connection destination)
             {
                 Message? requestToReject = null;
+                var requestTrackingStopped = false;
                 lock (_requestLock)
                 {
                     if (_gateway.IsStopping || Connection is null)
@@ -574,9 +579,10 @@ namespace Orleans.Runtime.Messaging
                     }
 
                     _pendingRequests.TryRemove(message.Id, out requestToReject);
-                    UnregisterRequestTrackingIfEmptyCore();
+                    requestTrackingStopped = UnregisterRequestTrackingIfEmptyCore();
                 }
 
+                EmitRequestTrackingStopped(requestTrackingStopped);
                 if (requestToReject is not null)
                 {
                     RejectRequest(requestToReject, message.TargetSilo!);
@@ -588,46 +594,56 @@ namespace Orleans.Runtime.Messaging
 
             public void ClearPendingRequests()
             {
+                bool requestTrackingStopped;
                 lock (_requestLock)
                 {
-                    ClearPendingRequestsCore();
+                    requestTrackingStopped = ClearPendingRequestsCore();
                 }
+
+                EmitRequestTrackingStopped(requestTrackingStopped);
             }
 
-            private void ClearPendingRequestsCore()
+            private bool ClearPendingRequestsCore()
             {
                 _pendingRequests.Clear();
-                UnregisterRequestTrackingIfEmptyCore();
+                return UnregisterRequestTrackingIfEmptyCore();
             }
 
-            private void UnregisterRequestTrackingIfEmptyCore()
+            private bool UnregisterRequestTrackingIfEmptyCore()
             {
                 if (_isRequestTrackingRegistered && _pendingRequests.Count == 0)
                 {
                     _gateway.clientsWithTrackedRequests.TryRemove(this, out _);
                     _isRequestTrackingRegistered = false;
-                    GatewayEvents.EmitRequestTrackingStopped(_gateway.siloAddress, Id.GrainId);
+                    return true;
                 }
+
+                return false;
             }
 
             public void DropExpiredRequests()
             {
+                bool requestTrackingStopped;
                 lock (_requestLock)
                 {
                     _pendingRequests.RemoveExpired();
-                    UnregisterRequestTrackingIfEmptyCore();
+                    requestTrackingStopped = UnregisterRequestTrackingIfEmptyCore();
                 }
+
+                EmitRequestTrackingStopped(requestTrackingStopped);
             }
 
             public void RejectRequestsToSilo(SiloAddress deadSilo)
             {
                 List<Message>? requests;
+                bool requestTrackingStopped;
                 lock (_requestLock)
                 {
                     requests = _pendingRequests.RemoveForSilo(deadSilo);
-                    UnregisterRequestTrackingIfEmptyCore();
+                    requestTrackingStopped = UnregisterRequestTrackingIfEmptyCore();
                 }
 
+                EmitRequestTrackingStopped(requestTrackingStopped);
                 if (requests is not null)
                 {
                     foreach (var request in requests)
@@ -639,6 +655,7 @@ namespace Orleans.Runtime.Messaging
 
             public void RejectRequest(Message request, SiloAddress deadSilo)
             {
+                bool requestTrackingStopped;
                 lock (_requestLock)
                 {
                     if (_pendingRequests.TryRemove(request.Id, out var trackedRequest))
@@ -646,13 +663,22 @@ namespace Orleans.Runtime.Messaging
                         request = trackedRequest;
                     }
 
-                    UnregisterRequestTrackingIfEmptyCore();
+                    requestTrackingStopped = UnregisterRequestTrackingIfEmptyCore();
                 }
 
+                EmitRequestTrackingStopped(requestTrackingStopped);
                 _gateway._messagingInstruments.OnRejectedMessage(request);
                 var rejection = _gateway.CreateDeadSiloRejection(request, deadSilo);
                 SendSyntheticResponse(rejection);
                 GatewayEvents.EmitDeadSiloRequestRejected(_gateway.siloAddress, Id.GrainId, rejection);
+            }
+
+            private void EmitRequestTrackingStopped(bool requestTrackingStopped)
+            {
+                if (requestTrackingStopped)
+                {
+                    GatewayEvents.EmitRequestTrackingStopped(_gateway.siloAddress, Id.GrainId);
+                }
             }
 
             private async Task RunMessageLoop()
