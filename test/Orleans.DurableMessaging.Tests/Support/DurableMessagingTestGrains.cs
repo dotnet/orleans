@@ -15,15 +15,15 @@ public interface IDurableMessagingTestGrain : IGrainWithGuidKey
     Task<Guid> SendAndDeactivateAsync(GrainId target, string route, DurableTestMessage message);
     Task<Guid> StageWithoutCommitAsync(GrainId target, string route, DurableTestMessage message);
     Task DeleteThenWriteStateAsync();
-    [AlwaysInterleave] Task RetryWriteStateAsync();
-    [AlwaysInterleave] Task RevertStateAsync();
+    Task RetryWriteStateAsync();
+    Task RevertStateAsync();
     Task SetInboxJobIdAsync(string jobId);
-    [AlwaysInterleave] Task DeactivateOnNextRecoveryAsync();
+    Task DeactivateOnNextRecoveryAsync();
     Task<DuplicateRouteRegistrationResult> RegisterDuplicateExactRouteHandlersAsync(string route);
     Task<RouteLookupValidationResult> ValidateRouteLookupAsync(string? route);
     Task<bool> RemoveInboxDeadLetterAsync(GrainId senderId, Guid messageId);
     Task<bool> RemoveOutboxDeadLetterAsync(Guid messageId);
-    [AlwaysInterleave] Task<DurableEndpointSnapshot> GetSnapshotAsync();
+    Task<DurableEndpointSnapshot> GetSnapshotAsync();
     Task RequestDeactivationAsync();
 }
 
@@ -239,6 +239,10 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
     }
 
     public Task<DurableEndpointSnapshot> GetSnapshotAsync() => Task.FromResult(CreateSnapshot());
+
+    internal DurableEndpointSnapshot GetSnapshotForTest() => CreateSnapshot();
+
+    internal void DeactivateOnNextRecoveryForTest() => _deactivateOnNextRecovery = true;
 
     public Task RequestDeactivationAsync()
     {

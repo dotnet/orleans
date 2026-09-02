@@ -1,6 +1,8 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using NSubstitute;
 using Orleans.DurableMessaging.Configuration;
 using Orleans.Hosting;
 using Orleans.Journaling;
@@ -53,6 +55,79 @@ public sealed class PublicDurableMessagingRegistrationTests
     }
 
     [Fact]
+    public void AddDurableMessaging_SelectsBinaryJournalFormat()
+    {
+        var services = new ServiceCollection();
+        services.AddOptions<JournaledStateManagerOptions>();
+        services.AddDurableMessaging();
+        using var provider = services.BuildServiceProvider();
+
+        Assert.Equal(
+            "orleans-binary",
+            provider.GetRequiredService<IOptions<JournaledStateManagerOptions>>().Value.JournalFormatKey);
+    }
+
+    [Fact]
+    public void ActivationValidator_RejectsReentrantGrainTypes()
+    {
+        var validatorType = typeof(IDurableInbox).Assembly.GetType(
+            "Orleans.DurableMessaging.DurableMessagingActivationValidator",
+            throwOnError: true)!;
+        var validate = validatorType.GetMethod(
+            "Validate",
+            BindingFlags.Static | BindingFlags.Public)!;
+        var context = Substitute.For<IGrainContext>();
+        context.GrainInstance.Returns(new ReentrantTestGrain());
+
+        var exception = Assert.Throws<TargetInvocationException>(
+            () => validate.Invoke(null, [context]));
+
+        var diagnostic = Assert.IsType<InvalidOperationException>(exception.InnerException);
+        Assert.Contains("non-reentrant", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Contains(typeof(ReentrantTestGrain).ToString(), diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ActivationValidator_RejectsAlwaysInterleaveMethods()
+    {
+        var validatorType = typeof(IDurableInbox).Assembly.GetType(
+            "Orleans.DurableMessaging.DurableMessagingActivationValidator",
+            throwOnError: true)!;
+        var validate = validatorType.GetMethod(
+            "Validate",
+            BindingFlags.Static | BindingFlags.Public)!;
+        var context = Substitute.For<IGrainContext>();
+        context.GrainInstance.Returns(new InterleavableTestGrain());
+
+        var exception = Assert.Throws<TargetInvocationException>(
+            () => validate.Invoke(null, [context]));
+
+        var diagnostic = Assert.IsType<InvalidOperationException>(exception.InnerException);
+        Assert.Contains("interleavable method", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(IInterleavableBase.PingAsync), diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ActivationValidator_RejectsStatelessWorkers()
+    {
+        var validatorType = typeof(IDurableInbox).Assembly.GetType(
+            "Orleans.DurableMessaging.DurableMessagingActivationValidator",
+            throwOnError: true)!;
+        var validate = validatorType.GetMethod(
+            "Validate",
+            BindingFlags.Static | BindingFlags.Public)!;
+        var context = Substitute.For<IGrainContext>();
+        context.GrainInstance.Returns(new StatelessWorkerTestGrain());
+
+        var exception = Assert.Throws<TargetInvocationException>(
+            () => validate.Invoke(null, [context]));
+
+        var diagnostic = Assert.IsType<InvalidOperationException>(exception.InnerException);
+        Assert.Contains("one activation", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Contains("stateless worker", diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void AddDurableMessaging_InvalidOptionsFailThroughOptionsContract()
     {
         var services = new ServiceCollection();
@@ -97,6 +172,31 @@ public sealed class PublicDurableMessagingRegistrationTests
     private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => utcNow;
+    }
+
+    [Orleans.Concurrency.Reentrant]
+    private sealed class ReentrantTestGrain
+    {
+    }
+
+    public interface IInterleavableBase
+    {
+        [Orleans.Concurrency.AlwaysInterleave]
+        Task PingAsync();
+    }
+
+    public interface IInterleavableTestGrain : IGrain, IInterleavableBase
+    {
+    }
+
+    private sealed class InterleavableTestGrain : IInterleavableTestGrain
+    {
+        public Task PingAsync() => Task.CompletedTask;
+    }
+
+    [Orleans.Concurrency.StatelessWorker]
+    private sealed class StatelessWorkerTestGrain
+    {
     }
 
     private class RollbackOnlyStateManager : IJournaledStateManager

@@ -1022,8 +1022,12 @@ internal sealed partial class DurableInboxExtension :
         }
     }
 
-    public Task OnStart(CancellationToken cancellationToken) =>
-        ResumeProcessingAsync(replaceExisting: true, cancellationToken);
+    public Task OnStart(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        DurableMessagingActivationValidator.Validate(_grainContext);
+        return ResumeProcessingAsync(replaceExisting: true, cancellationToken);
+    }
 
     public Task OnStop(CancellationToken cancellationToken)
     {

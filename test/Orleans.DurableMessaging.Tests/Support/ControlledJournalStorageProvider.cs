@@ -7,20 +7,31 @@ namespace Orleans.DurableMessaging.Tests.Support;
 
 public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, IJournalStorageCatalog
 {
-    private readonly VolatileJournalStorageProvider _inner = new(
-        Options.Create(new JournaledStateManagerOptions { JournalFormatKey = "orleans-binary" }));
+    private VolatileJournalStorageProvider? _inner;
     private readonly ConcurrentDictionary<JournalId, WritePlan> _readPlans = new();
     private readonly ConcurrentDictionary<JournalId, WritePlan> _writePlans = new();
     private readonly ConcurrentDictionary<JournalId, WritePlan> _postWritePlans = new();
     private readonly ConcurrentDictionary<JournalId, int> _successfulWrites = new();
 
+    public string? JournalFormatKey { get; private set; }
+
+    public void Configure(IOptions<JournaledStateManagerOptions> options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        JournalFormatKey = options.Value.JournalFormatKey;
+        _inner ??= new VolatileJournalStorageProvider(options);
+    }
+
     public IJournalStorage CreateStorage(JournalId journalId) =>
-        new ControlledJournalStorage(this, journalId, _inner.CreateStorage(journalId));
+        new ControlledJournalStorage(this, journalId, Inner.CreateStorage(journalId));
 
     public IAsyncEnumerable<JournalId> ListAsync(
         JournalId prefix = default,
         CancellationToken cancellationToken = default) =>
-        _inner.ListAsync(prefix, cancellationToken);
+        Inner.ListAsync(prefix, cancellationToken);
+
+    private VolatileJournalStorageProvider Inner =>
+        _inner ?? throw new InvalidOperationException("The controlled journal storage provider has not been configured.");
 
     public WriteBarrier BlockWrite(JournalId journalId, int matchingWrite = 1)
     {

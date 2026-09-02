@@ -26,6 +26,12 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
     public ValueTask DisposeAsync() => fixture.DisposeAsync();
 
     [Fact]
+    public void DefaultHosting_UsesBinaryJournalFormat()
+    {
+        Assert.Equal("orleans-binary", fixture.Storage.JournalFormatKey);
+    }
+
+    [Fact]
     public async Task ApplicationJournaledStateNamesDoNotCollideWithMessagingState()
     {
         var grain = NewGrain();
@@ -49,7 +55,7 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
         await barrier.WaitUntilEnteredAsync();
 
         Assert.False(delivery.IsCompleted);
-        var staged = await receiver.GetSnapshotAsync();
+        var staged = fixture.GetSnapshot(receiver);
         Assert.Equal(1, staged.InboxCount);
         Assert.Empty(staged.Effects);
 
@@ -115,7 +121,7 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
         await schedule.WaitUntilEnteredAsync();
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => receiver.RetryWriteStateAsync());
+            () => fixture.WriteStateAsync(receiver).AsTask());
         Assert.Contains("waiting for job scheduling", exception.Message, StringComparison.Ordinal);
 
         schedule.Continue();
@@ -133,12 +139,12 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
 
         var delivery = DeliverAsync(receiver, envelope.Value);
         await schedule.WaitUntilEnteredAsync();
-        await receiver.RevertStateAsync();
+        await fixture.RevertStateAsync(receiver);
         schedule.Continue();
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => delivery);
         Assert.Contains("interrupted by state recovery", exception.Message, StringComparison.Ordinal);
-        Assert.Equal(0, (await receiver.GetSnapshotAsync()).InboxCount);
+        Assert.Equal(0, fixture.GetSnapshot(receiver).InboxCount);
     }
 
     [Fact]
@@ -348,7 +354,7 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
 
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
         await handler.WaitUntilEnteredAsync();
-        await receiver.RevertStateAsync();
+        await fixture.RevertStateAsync(receiver);
         handler.Release();
 
         var completed = await fixture.WaitForEffectCountAsync(receiver, 1);
@@ -368,7 +374,7 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
 
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
         await handler.WaitUntilEnteredAsync();
-        await receiver.RevertStateAsync();
+        await fixture.RevertStateAsync(receiver);
         handler.Release();
 
         var completed = await fixture.WaitForEffectCountAsync(receiver, 1);
@@ -390,7 +396,7 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
 
         Assert.Equal(DeliveryStatus.Accepted, first.Status);
         Assert.False(second.IsCompleted);
-        Assert.Equal(1, (await receiver.GetSnapshotAsync()).InboxCount);
+        Assert.Equal(1, fixture.GetSnapshot(receiver).InboxCount);
 
         barrier.Release();
         Assert.Equal(DeliveryStatus.Duplicate, (await second).Status);
@@ -539,7 +545,7 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
             "messages/outbox-crash-window",
             NewMessage(52, "durable-wakeup"));
         await receiverWrite.WaitUntilEnteredAsync();
-        var committed = await sender.GetSnapshotAsync();
+        var committed = fixture.GetSnapshot(sender);
 
         Assert.Equal(1, committed.OutboxCount);
         Assert.False(string.IsNullOrEmpty(committed.OutboxJobId));
@@ -733,7 +739,7 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
         await handler.WaitUntilEnteredAsync();
         fixture.Storage.FailWrite(JournalId.FromGrainId(receiver.GetGrainId()), matchingWrite: 2);
-        await receiver.DeactivateOnNextRecoveryAsync();
+        fixture.DeactivateOnNextRecovery(receiver);
         handler.Release();
 
         var recovered = await fixture.SnapshotProbe.WaitAsync(
@@ -760,7 +766,7 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
 
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
         await handler.WaitUntilEnteredAsync();
-        var accepted = await receiver.GetSnapshotAsync();
+        var accepted = fixture.GetSnapshot(receiver);
 
         Assert.NotNull(accepted.InboxJobId);
         Assert.NotEqual(staleJobId, accepted.InboxJobId);
@@ -780,7 +786,7 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
 
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
         await handler.WaitUntilEnteredAsync();
-        var owned = await receiver.GetSnapshotAsync();
+        var owned = fixture.GetSnapshot(receiver);
         Assert.False(string.IsNullOrEmpty(owned.InboxJobId));
         var completionBaseline = fixture.Metrics.GetCount("orleans-durablejobs-jobs-completed");
         var manager = fixture.Cluster.Silos[0].ServiceProvider.GetRequiredService<ILocalDurableJobManager>();
@@ -801,7 +807,7 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
             "orleans-durablejobs-jobs-completed",
             completionBaseline + 1);
 
-        Assert.Equal(owned.InboxJobId, (await receiver.GetSnapshotAsync()).InboxJobId);
+        Assert.Equal(owned.InboxJobId, fixture.GetSnapshot(receiver).InboxJobId);
         handler.Release();
         Assert.Equal("newer-inbox-owner", Assert.Single((await fixture.WaitForEffectCountAsync(receiver, 1)).Effects).Value);
     }
@@ -820,7 +826,7 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
             "messages/stale-outbox-generation",
             NewMessage(61, "newer-outbox-owner"));
         await receiverWrite.WaitUntilEnteredAsync();
-        var owned = await sender.GetSnapshotAsync();
+        var owned = fixture.GetSnapshot(sender);
         Assert.False(string.IsNullOrEmpty(owned.OutboxJobId));
         var completionBaseline = fixture.Metrics.GetCount("orleans-durablejobs-jobs-completed");
         var manager = fixture.Cluster.Silos[0].ServiceProvider.GetRequiredService<ILocalDurableJobManager>();
@@ -843,7 +849,7 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
                 "orleans-durablejobs-jobs-completed",
                 completionBaseline + 1);
 
-            Assert.Equal(owned.OutboxJobId, (await sender.GetSnapshotAsync()).OutboxJobId);
+            Assert.Equal(owned.OutboxJobId, fixture.GetSnapshot(sender).OutboxJobId);
         }
         finally
         {
@@ -868,10 +874,10 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
             "messages/recovery-visibility",
             NewMessage(62, "recovery-visibility"));
         await receiverWrite.WaitUntilEnteredAsync();
-        var owned = await sender.GetSnapshotAsync();
+        var owned = fixture.GetSnapshot(sender);
         var ownershipId = Assert.IsType<string>(owned.OutboxJobId);
         var recoveryRead = fixture.Storage.BlockRead(JournalId.FromGrainId(sender.GetGrainId()));
-        var recovery = sender.RevertStateAsync();
+        var recovery = fixture.RevertStateAsync(sender).AsTask();
         await recoveryRead.WaitUntilEnteredAsync();
         var handlerBaseline = fixture.Metrics.GetCount("orleans-durablejobs-handler-executions-started");
         var completionBaseline = fixture.Metrics.GetCount("orleans-durablejobs-jobs-completed");
@@ -995,7 +1001,7 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
         var independent = await fixture.WaitForEffectCountAsync(independentReceiver, 1);
 
         Assert.Equal("independent", Assert.Single(independent.Effects).Value);
-        Assert.Empty((await blocked.GetSnapshotAsync()).Effects);
+        Assert.Empty(fixture.GetSnapshot(blocked).Effects);
         barrier.Release();
         Assert.Equal("blocked", Assert.Single((await fixture.WaitForEffectCountAsync(blocked, 1)).Effects).Value);
     }

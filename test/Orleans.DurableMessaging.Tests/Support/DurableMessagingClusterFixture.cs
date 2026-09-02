@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using Orleans.Configuration;
 using Orleans.DurableJobs;
@@ -49,12 +50,16 @@ public class DurableMessagingClusterFixture : IAsyncLifetime
             siloBuilder.AddDurableMessaging(ConfigureOptions);
             siloBuilder.ConfigureServices(services =>
                 ControlledDurableJobManager.Decorate(services, JobManagerProbe));
-            siloBuilder.Services.Configure<JournaledStateManagerOptions>(
-                options => options.JournalFormatKey = "orleans-binary");
             siloBuilder.Services.RemoveAll<IJournalStorageProvider>();
             siloBuilder.Services.RemoveAll<IJournalStorageCatalog>();
-            siloBuilder.Services.AddSingleton<IJournalStorageProvider>(Storage);
-            siloBuilder.Services.AddSingleton<IJournalStorageCatalog>(Storage);
+            siloBuilder.Services.AddSingleton(Storage);
+            siloBuilder.Services.AddSingleton<IJournalStorageProvider>(serviceProvider =>
+            {
+                Storage.Configure(serviceProvider.GetRequiredService<IOptions<JournaledStateManagerOptions>>());
+                return Storage;
+            });
+            siloBuilder.Services.AddSingleton<IJournalStorageCatalog>(
+                serviceProvider => (IJournalStorageCatalog)serviceProvider.GetRequiredService<IJournalStorageProvider>());
         });
         Cluster = builder.Build();
     }
@@ -83,6 +88,36 @@ public class DurableMessagingClusterFixture : IAsyncLifetime
 
     public Task<DurableEndpointSnapshot> WaitForOutboxCountAsync(IDurableMessagingTestGrain grain, int expected) =>
         SnapshotProbe.WaitAsync(grain.GetGrainId(), snapshot => snapshot.OutboxCount == expected);
+
+    public DurableEndpointSnapshot GetSnapshot(IDurableMessagingTestGrain grain) =>
+        GetGrainInstance(grain).GetSnapshotForTest();
+
+    public ValueTask RevertStateAsync(IDurableMessagingTestGrain grain) =>
+        GetGrainContext(grain).ActivationServices
+            .GetRequiredService<IJournaledStateManager>()
+            .RevertPendingChangesAsync(TestContext.Current.CancellationToken);
+
+    public ValueTask WriteStateAsync(IDurableMessagingTestGrain grain) =>
+        GetGrainContext(grain).ActivationServices
+            .GetRequiredService<IJournaledStateManager>()
+            .WriteStateAsync(TestContext.Current.CancellationToken);
+
+    public void DeactivateOnNextRecovery(IDurableMessagingTestGrain grain) =>
+        GetGrainInstance(grain).DeactivateOnNextRecoveryForTest();
+
+    private IGrainContext GetGrainContext(IDurableMessagingTestGrain grain)
+    {
+        if (!Cluster.TryGetGrainContext(grain.GetGrainId(), out var context))
+        {
+            throw new InvalidOperationException($"Grain '{grain.GetGrainId()}' is not active.");
+        }
+
+        return context;
+    }
+
+    private DurableMessagingTestGrain GetGrainInstance(IDurableMessagingTestGrain grain) =>
+        GetGrainContext(grain).GrainInstance as DurableMessagingTestGrain
+        ?? throw new InvalidOperationException($"Grain '{grain.GetGrainId()}' has an unexpected implementation.");
 
     protected virtual void ConfigureOptions(DurableInboxOptions options)
     {
