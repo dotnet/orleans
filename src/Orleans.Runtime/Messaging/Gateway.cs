@@ -649,7 +649,9 @@ namespace Orleans.Runtime.Messaging
                 }
 
                 _gateway._messagingInstruments.OnRejectedMessage(request);
-                SendSyntheticResponse(_gateway.CreateDeadSiloRejection(request, deadSilo));
+                var rejection = _gateway.CreateDeadSiloRejection(request, deadSilo);
+                SendSyntheticResponse(rejection);
+                GatewayEvents.EmitDeadSiloRequestRejected(_gateway.siloAddress, Id.GrainId, rejection);
             }
 
             private async Task RunMessageLoop()
