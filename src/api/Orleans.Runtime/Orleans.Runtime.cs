@@ -1364,8 +1364,7 @@ namespace Orleans.Runtime.MembershipService.SiloMetadata
 
         public static SiloMetadata Empty { get { throw null; } }
 
-        [Id(0)]
-        public System.Collections.Immutable.ImmutableDictionary<string, string> Metadata { get { throw null; } }
+        public System.Collections.Generic.IReadOnlyDictionary<string, string> Metadata { get { throw null; } }
     }
 
     public static partial class SiloMetadataHostingExtensions

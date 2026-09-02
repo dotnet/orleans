@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Collections.ObjectModel;
 using AwesomeAssertions.Common;
 using Orleans;
 using Orleans.Runtime;
@@ -100,6 +101,19 @@ namespace NonSilo.Tests.Membership
 
             Assert.Same(metadata, copy.Metadata);
             Assert.Equal(SiloStatus.Stopping, copy.Status);
+        }
+
+        [Fact]
+        public void MembershipEntry_AcceptsReadOnlyMetadataAndCopiesIt()
+        {
+            var source = new ReadOnlyDictionary<string, string>(
+                new Dictionary<string, string> { ["region"] = "west" });
+            var entry = Entry(Silo("127.0.0.1:100@1"), SiloStatus.Active);
+            entry.Metadata = source;
+
+            Assert.Equal("west", entry.Metadata["region"]);
+            Assert.NotSame(source, entry.Metadata);
+            Assert.IsType<ImmutableDictionary<string, string>>(entry.Metadata);
         }
 
         [Fact]

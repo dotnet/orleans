@@ -69,7 +69,12 @@ namespace Orleans.Runtime.MembershipService
             this.fatalErrorHandler = fatalErrorHandler;
             this.gossiper = gossiper;
             this.clusterMembershipOptions = clusterMembershipOptions.Value;
-            this.localSiloMetadata = siloMetadata?.Value.Metadata ?? ImmutableDictionary<string, string>.Empty;
+            this.localSiloMetadata = siloMetadata?.Value.Metadata switch
+            {
+                null => ImmutableDictionary<string, string>.Empty,
+                ImmutableDictionary<string, string> immutable => immutable,
+                var metadata => metadata.ToImmutableDictionary(StringComparer.Ordinal)
+            };
             this.myAddress = this.localSiloDetails.SiloAddress;
             this.log = log;
             this.siloLifecycle = siloLifecycle;
