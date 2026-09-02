@@ -251,24 +251,33 @@ namespace Orleans.Configuration
     public class EventHubStreamCacheMemoryOptions
     {
         /// <summary>
-        /// The default maximum number of bytes which active caches for one provider can allocate.
+        /// The default provider-wide active cache memory watermark.
         /// </summary>
         public const long DefaultMaxActiveCacheMemory = 512L * 1024 * 1024;
 
         /// <summary>
-        /// The default maximum number of bytes retained in the payload buffer pool.
+        /// The default provider-wide limit for idle payload buffers retained for reuse.
         /// </summary>
         public const long DefaultMaxBufferPoolMemory = 64L * 1024 * 1024;
 
         /// <summary>
-        /// Gets or sets the maximum number of bytes which active caches for one provider can allocate.
-        /// Reads pause after this limit is reached. Batches which are already in flight can temporarily exceed the limit.
+        /// Gets or sets the provider-wide active cache memory watermark, in bytes.
         /// </summary>
+        /// <remarks>
+        /// The watermark includes active payload buffers and cached-message metadata across all partitions owned by
+        /// one provider instance. Orleans pauses new Event Hubs reads after reaching the watermark and reclaims
+        /// eligible buffers until usage falls below it. Concurrent reads which are already in flight can temporarily
+        /// exceed the watermark; the overshoot depends on their batch sizes and event payload sizes.
+        /// </remarks>
         public long MaxActiveCacheMemory { get; set; } = DefaultMaxActiveCacheMemory;
 
         /// <summary>
-        /// Gets or sets the maximum number of bytes retained in the payload buffer pool.
+        /// Gets or sets the provider-wide limit, in bytes, for idle payload buffers retained for reuse.
         /// </summary>
+        /// <remarks>
+        /// Buffers above this limit are released when they become idle. This limit applies to the built-in adaptive
+        /// buffer pool; a custom buffer pool controls its own retention policy.
+        /// </remarks>
         public long MaxBufferPoolMemory { get; set; } = DefaultMaxBufferPoolMemory;
     }
 

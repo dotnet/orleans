@@ -168,19 +168,6 @@ namespace Orleans.Providers.Streams.Common
             }
         }
 
-        /// <summary>
-        /// Releases all buffers when the associated cache is empty.
-        /// </summary>
-        public void ReleaseAllBuffers()
-        {
-            if (!this.PurgeObservable.IsEmpty)
-            {
-                throw new InvalidOperationException("Cannot release buffers while the cache contains messages.");
-            }
-
-            ReleaseBuffers();
-        }
-
         /// <inheritdoc />
         public void Dispose()
         {
