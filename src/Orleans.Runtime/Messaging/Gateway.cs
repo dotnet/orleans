@@ -296,6 +296,19 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
+        internal Message CreateDeadSiloRejection(Message request, SiloAddress deadSilo)
+        {
+            var exception = new SiloUnavailableException(
+                $"The target silo {deadSilo} became unavailable while processing request {request.Id} for grain {request.TargetGrain}.");
+            var rejection = messageFactory.CreateRejectionResponse(
+                request,
+                Message.RejectionTypes.Transient,
+                "Target silo became unavailable",
+                exception);
+            rejection.RequestContextData = null;
+            return rejection;
+        }
+
         public void SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status)
         {
             if (status != SiloStatus.Dead)
@@ -635,16 +648,8 @@ namespace Orleans.Runtime.Messaging
                     UnregisterRequestTrackingIfEmptyCore();
                 }
 
-                var exception = new SiloUnavailableException(
-                    $"The target silo {deadSilo} became unavailable while processing request {request.Id} for grain {request.TargetGrain}.");
                 _gateway._messagingInstruments.OnRejectedMessage(request);
-                var rejection = _gateway.messageFactory.CreateRejectionResponse(
-                    request,
-                    Message.RejectionTypes.Transient,
-                    "Target silo became unavailable",
-                    exception);
-                rejection.RequestContextData = null;
-                SendSyntheticResponse(rejection);
+                SendSyntheticResponse(_gateway.CreateDeadSiloRejection(request, deadSilo));
             }
 
             private async Task RunMessageLoop()
