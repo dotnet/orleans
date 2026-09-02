@@ -36,13 +36,13 @@ namespace Orleans.Serialization.Serializers
         private readonly ConcurrentDictionary<Type, object> _instantiatedBaseCopiers = new();
         private readonly ConcurrentDictionary<Type, object> _instantiatedValueSerializers = new();
         private readonly ConcurrentDictionary<Type, object> _instantiatedActivators = new();
-        private Dictionary<Type, Type> _baseCodecs = new();
-        private Dictionary<Type, Type> _valueSerializers = new();
-        private Dictionary<Type, Type> _fieldCodecs = new();
-        private Dictionary<Type, Type> _copiers = new();
-        private Dictionary<Type, Type> _converters = new();
-        private Dictionary<Type, Type> _baseCopiers = new();
-        private Dictionary<Type, Type> _activators = new();
+        private volatile Dictionary<Type, Type> _baseCodecs = new();
+        private volatile Dictionary<Type, Type> _valueSerializers = new();
+        private volatile Dictionary<Type, Type> _fieldCodecs = new();
+        private volatile Dictionary<Type, Type> _copiers = new();
+        private volatile Dictionary<Type, Type> _converters = new();
+        private volatile Dictionary<Type, Type> _baseCopiers = new();
+        private volatile Dictionary<Type, Type> _activators = new();
         private readonly List<IGeneralizedCodec> _generalizedCodecs = new();
         private readonly List<ISpecializableCodec> _specializableCodecs = new();
         private readonly List<IGeneralizedBaseCodec> _generalizedBaseCodecs = new();
@@ -137,13 +137,13 @@ namespace Orleans.Serialization.Serializers
             AddFromMetadata(converters, metadata.ConverterTypes, typeof(IConverter<,>));
             AddFromMetadata(baseCopiers, metadata.CopierTypes, typeof(IBaseCopier<>));
 
-            Volatile.Write(ref _baseCodecs, baseCodecs);
-            Volatile.Write(ref _valueSerializers, valueSerializers);
-            Volatile.Write(ref _fieldCodecs, fieldCodecs);
-            Volatile.Write(ref _copiers, copiers);
-            Volatile.Write(ref _converters, converters);
-            Volatile.Write(ref _baseCopiers, baseCopiers);
-            Volatile.Write(ref _activators, activators);
+            _baseCodecs = baseCodecs;
+            _valueSerializers = valueSerializers;
+            _fieldCodecs = fieldCodecs;
+            _copiers = copiers;
+            _converters = converters;
+            _baseCopiers = baseCopiers;
+            _activators = activators;
 
 #if NET5_0_OR_GREATER
             [UnconditionalSuppressMessage(
