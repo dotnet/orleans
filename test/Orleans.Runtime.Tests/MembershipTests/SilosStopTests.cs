@@ -147,9 +147,11 @@ namespace UnitTests.MembershipTests
         public async Task GatewayForwardedRequestCancellationAndSiloDeathRaceClearsTracking()
         {
             var gateway = GetGateway();
+            var clientId = Assert.Single(((IConnectedClientCollection)gateway).GetConnectedClientIds());
             var targetSilo = HostedCluster.SecondarySilos[0];
             var target = await GetGrainOnTargetSilo(targetSilo);
             Assert.NotNull(target);
+            using var gatewayEvents = new DiagnosticEventCollector(GatewayEvents.ListenerName);
 
             var observer = new LongRunningTaskObserver();
             var observerReference = GrainFactory.CreateObjectReference<ILongRunningTaskObserver>(observer);
@@ -165,6 +167,13 @@ namespace UnitTests.MembershipTests
 
                 await observer.WaitForCallToStart(callId);
                 Assert.Equal(1, gateway.TrackedRequestClientCount);
+                gatewayEvents.Clear();
+                var trackingStoppedTask = gatewayEvents.WaitForEventAsync(
+                    nameof(GatewayEvents.RequestTrackingStopped),
+                    diagnosticEvent => diagnosticEvent.Payload is GatewayEvents.RequestTrackingStopped stopped
+                        && stopped.ClientId.Equals(clientId),
+                    TimeSpan.FromSeconds(30),
+                    TestContext.Current.CancellationToken);
 
                 var releaseRace = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                 var cancelTask = Task.Run(
@@ -190,9 +199,17 @@ namespace UnitTests.MembershipTests
                 Assert.True(
                     exception is OperationCanceledException or SiloUnavailableException,
                     $"Expected cancellation or dead-silo rejection, but received {exception?.GetType().FullName ?? "no exception"}: {exception}");
+                var trackingStopped = Assert.IsType<GatewayEvents.RequestTrackingStopped>(
+                    (await trackingStoppedTask).Payload);
+                Assert.Equal(HostedCluster.Primary!.SiloAddress, trackingStopped.SiloAddress);
+                Assert.Equal(clientId, trackingStopped.ClientId);
+                Assert.Equal(0, gateway.TrackedRequestClientCount);
                 await HostedCluster.WaitForLivenessToStabilizeAsync(didKill: true)
                     .WaitAsync(TestContext.Current.CancellationToken);
-                Assert.Equal(0, gateway.TrackedRequestClientCount);
+                Assert.Single(
+                    gatewayEvents.GetEvents(nameof(GatewayEvents.RequestTrackingStopped)),
+                    diagnosticEvent => diagnosticEvent.Payload is GatewayEvents.RequestTrackingStopped stopped
+                        && stopped.ClientId.Equals(clientId));
             }
             finally
             {
