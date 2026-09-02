@@ -36,13 +36,13 @@ namespace Orleans.Serialization.Serializers
         private readonly ConcurrentDictionary<Type, object> _instantiatedBaseCopiers = new();
         private readonly ConcurrentDictionary<Type, object> _instantiatedValueSerializers = new();
         private readonly ConcurrentDictionary<Type, object> _instantiatedActivators = new();
-        private readonly Dictionary<Type, Type> _baseCodecs = new();
-        private readonly Dictionary<Type, Type> _valueSerializers = new();
-        private readonly Dictionary<Type, Type> _fieldCodecs = new();
-        private readonly Dictionary<Type, Type> _copiers = new();
-        private readonly Dictionary<Type, Type> _converters = new();
-        private readonly Dictionary<Type, Type> _baseCopiers = new();
-        private readonly Dictionary<Type, Type> _activators = new();
+        private Dictionary<Type, Type> _baseCodecs = new();
+        private Dictionary<Type, Type> _valueSerializers = new();
+        private Dictionary<Type, Type> _fieldCodecs = new();
+        private Dictionary<Type, Type> _copiers = new();
+        private Dictionary<Type, Type> _converters = new();
+        private Dictionary<Type, Type> _baseCopiers = new();
+        private Dictionary<Type, Type> _activators = new();
         private readonly List<IGeneralizedCodec> _generalizedCodecs = new();
         private readonly List<ISpecializableCodec> _specializableCodecs = new();
         private readonly List<IGeneralizedBaseCodec> _generalizedBaseCodecs = new();
@@ -65,7 +65,7 @@ namespace Orleans.Serialization.Serializers
         {
             _serviceProvider = serviceProvider;
 
-            ConsumeMetadata(codecConfiguration);
+            ConsumeMetadata(codecConfiguration.Value);
         }
 
         /// <inheritdoc/>
@@ -89,20 +89,61 @@ namespace Orleans.Serialization.Serializers
                 _specializableBaseCodecs.AddRange(_serviceProvider.GetServices<ISpecializableBaseCodec>());
 
                 _initialized = true;
+
+#if NET
+                if (System.Reflection.Metadata.MetadataUpdater.IsSupported)
+                {
+                    // Construct the hot reload refresher (if registered) so it subscribes before the first update.
+                    _ = _serviceProvider.GetService<Hosting.SerializationHotReloadRefresher>();
+                }
+#endif
             }
         }
 
-        private void ConsumeMetadata(IOptions<TypeManifestOptions> codecConfiguration)
+        /// <summary>
+        /// Rebuilds the metadata maps after a hot reload update and clears the lazy caches, evicting any
+        /// fallback codec cached for a type that now has a generated one.
+        /// </summary>
+        internal void OnManifestUpdated(TypeManifestOptions metadata)
         {
-            var metadata = codecConfiguration.Value;
-            AddFromMetadata(_baseCodecs, metadata.SerializerTypes, typeof(IBaseCodec<>));
-            AddFromMetadata(_valueSerializers, metadata.SerializerTypes, typeof(IValueSerializer<>));
-            AddFromMetadata(_fieldCodecs, metadata.SerializerTypes, typeof(IFieldCodec<>));
-            AddFromMetadata(_fieldCodecs, metadata.FieldCodecTypes, typeof(IFieldCodec<>));
-            AddFromMetadata(_activators, metadata.ActivatorTypes, typeof(IActivator<>));
-            AddFromMetadata(_copiers, metadata.CopierTypes, typeof(IDeepCopier<>));
-            AddFromMetadata(_converters, metadata.ConverterTypes, typeof(IConverter<,>));
-            AddFromMetadata(_baseCopiers, metadata.CopierTypes, typeof(IBaseCopier<>));
+            ConsumeMetadata(metadata);
+
+            _untypedCodecs.Clear();
+            _typedCodecs.Clear();
+            _typedBaseCodecs.Clear();
+            _untypedCopiers.Clear();
+            _typedCopiers.Clear();
+            _instantiatedBaseCopiers.Clear();
+            _instantiatedValueSerializers.Clear();
+            _instantiatedActivators.Clear();
+        }
+
+        private void ConsumeMetadata(TypeManifestOptions metadata)
+        {
+            var baseCodecs = new Dictionary<Type, Type>();
+            var valueSerializers = new Dictionary<Type, Type>();
+            var fieldCodecs = new Dictionary<Type, Type>();
+            var copiers = new Dictionary<Type, Type>();
+            var converters = new Dictionary<Type, Type>();
+            var baseCopiers = new Dictionary<Type, Type>();
+            var activators = new Dictionary<Type, Type>();
+
+            AddFromMetadata(baseCodecs, metadata.SerializerTypes, typeof(IBaseCodec<>));
+            AddFromMetadata(valueSerializers, metadata.SerializerTypes, typeof(IValueSerializer<>));
+            AddFromMetadata(fieldCodecs, metadata.SerializerTypes, typeof(IFieldCodec<>));
+            AddFromMetadata(fieldCodecs, metadata.FieldCodecTypes, typeof(IFieldCodec<>));
+            AddFromMetadata(activators, metadata.ActivatorTypes, typeof(IActivator<>));
+            AddFromMetadata(copiers, metadata.CopierTypes, typeof(IDeepCopier<>));
+            AddFromMetadata(converters, metadata.ConverterTypes, typeof(IConverter<,>));
+            AddFromMetadata(baseCopiers, metadata.CopierTypes, typeof(IBaseCopier<>));
+
+            Volatile.Write(ref _baseCodecs, baseCodecs);
+            Volatile.Write(ref _valueSerializers, valueSerializers);
+            Volatile.Write(ref _fieldCodecs, fieldCodecs);
+            Volatile.Write(ref _copiers, copiers);
+            Volatile.Write(ref _converters, converters);
+            Volatile.Write(ref _baseCopiers, baseCopiers);
+            Volatile.Write(ref _activators, activators);
 
 #if NET5_0_OR_GREATER
             [UnconditionalSuppressMessage(

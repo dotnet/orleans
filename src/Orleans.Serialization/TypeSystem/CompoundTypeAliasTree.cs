@@ -1,6 +1,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Threading;
 
 namespace Orleans.Serialization.TypeSystem;
 
@@ -77,6 +78,44 @@ public class CompoundTypeAliasTree
     /// <param name="key">The key for the new node.</param>
     /// <param name="value">The value for the new node.</param>
     public CompoundTypeAliasTree Add(Type key, Type value) => AddInternal(key, value);
+
+    /// <summary>
+    /// Merges the nodes of <paramref name="other"/> into this tree, keeping existing values (the
+    /// first-one-wins semantics of <see cref="Add(Type, Type)"/>) and publishing copy-on-write so
+    /// concurrent readers never observe a partially updated child collection.
+    /// </summary>
+    internal void MergeFrom(CompoundTypeAliasTree other)
+    {
+        if (other._children is not { Count: > 0 } otherChildren)
+        {
+            return;
+        }
+
+        var children = _children;
+        Dictionary<object, CompoundTypeAliasTree>? updated = null;
+        foreach (var pair in otherChildren)
+        {
+            if (children is not null && children.TryGetValue(pair.Key, out var existing))
+            {
+                if (existing.Value is null && pair.Value.Value is { } newValue)
+                {
+                    existing.Value = newValue;
+                }
+
+                existing.MergeFrom(pair.Value);
+            }
+            else
+            {
+                updated ??= children is null ? new() : new(children);
+                updated[pair.Key] = pair.Value;
+            }
+        }
+
+        if (updated is not null)
+        {
+            Volatile.Write(ref _children, updated);
+        }
+    }
 
     private CompoundTypeAliasTree AddInternal(object key) => AddInternal(key, default);
     private CompoundTypeAliasTree AddInternal(object key, Type? value)

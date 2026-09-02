@@ -86,6 +86,13 @@ namespace Orleans.Serialization
                 services.TryAddSingleton(typeof(ValueSerializer<>));
                 services.TryAddSingleton<DeepCopier>();
                 services.TryAddSingleton(typeof(DeepCopier<>));
+
+#if NET
+                if (System.Reflection.Metadata.MetadataUpdater.IsSupported)
+                {
+                    services.TryAddSingleton<Hosting.SerializationHotReloadRefresher>();
+                }
+#endif
             }
 
             configure?.Invoke(context.Builder);
