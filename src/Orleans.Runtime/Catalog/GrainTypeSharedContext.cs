@@ -23,6 +23,7 @@ public sealed class GrainTypeSharedContext
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly Dictionary<Type, object> _components = [];
+    private readonly ClusterOwnershipLeaseMonitor? _clusterOwnershipLeaseMonitor;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="GrainTypeSharedContext"/> class.
@@ -53,6 +54,37 @@ public sealed class GrainTypeSharedContext
         GrainReferenceActivator grainReferenceActivator,
         IServiceProvider serviceProvider,
         SerializerSessionPool serializerSessionPool)
+        : this(
+            grainType,
+            clusterManifestProvider,
+            grainClassMap,
+            placementStrategyResolver,
+            messagingOptions,
+            collectionOptions,
+            schedulingOptions,
+            grainRuntime,
+            loggerFactory,
+            grainReferenceActivator,
+            serviceProvider,
+            serializerSessionPool,
+            serviceProvider.GetService<ClusterLocatorResolver>())
+    {
+    }
+
+    public GrainTypeSharedContext(
+        GrainType grainType,
+        IClusterManifestProvider clusterManifestProvider,
+        GrainClassMap grainClassMap,
+        PlacementStrategyResolver placementStrategyResolver,
+        IOptions<SiloMessagingOptions> messagingOptions,
+        IOptions<GrainCollectionOptions> collectionOptions,
+        IOptions<SchedulingOptions> schedulingOptions,
+        IGrainRuntime grainRuntime,
+        ILoggerFactory loggerFactory,
+        GrainReferenceActivator grainReferenceActivator,
+        IServiceProvider serviceProvider,
+        SerializerSessionPool serializerSessionPool,
+        ClusterLocatorResolver? clusterLocatorResolver)
     {
         if (!grainClassMap.TryGetGrainClass(grainType, out var grainClass))
         {
@@ -77,6 +109,11 @@ public sealed class GrainTypeSharedContext
         CatalogInstruments = serviceProvider.GetRequiredService<CatalogInstruments>();
         GrainInstruments = serviceProvider.GetRequiredService<GrainInstruments>();
         MessagingProcessingInstruments = serviceProvider.GetRequiredService<MessagingProcessingInstruments>();
+        if (serviceProvider.GetService<IOptions<MetaclusterOptions>>()?.Value.Enabled == true
+            && clusterLocatorResolver?.Resolve(grainType) is IClusterOwnershipValidator)
+        {
+            _clusterOwnershipLeaseMonitor = serviceProvider.GetRequiredService<ClusterOwnershipLeaseMonitor>();
+        }
 
         CollectionAgeLimit = GetCollectionAgeLimit(
             grainType,
@@ -250,6 +287,7 @@ public sealed class GrainTypeSharedContext
     public void OnCreateActivation(IGrainContext grainContext)
     {
         GrainInstruments.IncrementGrainCounts(GrainTypeName);
+        _clusterOwnershipLeaseMonitor?.Track(grainContext);
     }
 
     /// <summary>
@@ -258,6 +296,7 @@ public sealed class GrainTypeSharedContext
     /// <param name="grainContext">The grain activation.</param>
     public void OnDestroyActivation(IGrainContext grainContext)
     {
+        _clusterOwnershipLeaseMonitor?.Untrack(grainContext);
         GrainInstruments.DecrementGrainCounts(GrainTypeName);
     }
 }

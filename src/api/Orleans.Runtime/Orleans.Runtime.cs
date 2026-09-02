@@ -397,6 +397,37 @@ namespace Orleans.Hosting
             where TRule : class, Placement.Repartitioning.IImbalanceToleranceRule { throw null; }
     }
 
+    public static partial class ClusterPlacementSiloBuilderExtensions
+    {
+        public static ISiloBuilder AddClusterLocator<TLocator>(this ISiloBuilder builder, string name)
+            where TLocator : class, Runtime.IClusterLocator { throw null; }
+
+        public static ISiloBuilder AddClusterPlacement<TStrategy, TDirector>(this ISiloBuilder builder)
+            where TStrategy : Runtime.ClusterPlacementStrategy, new()
+            where TDirector : class, Runtime.IClusterPlacementDirector { throw null; }
+
+        public static ISiloBuilder AddDirectoryClusterLocator<TDirectory>(this ISiloBuilder builder, string name)
+            where TDirectory : class, Runtime.IClusterDirectory { throw null; }
+
+        public static ISiloBuilder AddInterClusterRequestAuthorizer<TAuthorizer>(this ISiloBuilder builder)
+            where TAuthorizer : class, Runtime.IInterClusterRequestAuthorizer { throw null; }
+
+        public static ISiloBuilder AddInterClusterTransport<TTransport>(this ISiloBuilder builder)
+            where TTransport : class, Runtime.IInterClusterTransport { throw null; }
+
+        public static ISiloBuilder AddMetaclusterTopologyProvider<TProvider>(this ISiloBuilder builder)
+            where TProvider : class, Runtime.IMetaclusterTopologyProvider { throw null; }
+
+        public static ISiloBuilder AddRendezvousClusterLocator(this ISiloBuilder builder, string name) { throw null; }
+
+        public static ISiloBuilder UseClientInterClusterTransport<TClientProvider>(this ISiloBuilder builder)
+            where TClientProvider : class, Runtime.IInterClusterClientProvider { throw null; }
+
+        public static ISiloBuilder UseMetacluster(this ISiloBuilder builder, System.Action<Configuration.MetaclusterOptions> configure) { throw null; }
+
+        public static ISiloBuilder UseMetacluster(this ISiloBuilder builder) { throw null; }
+    }
+
     public static partial class CoreHostingExtensions
     {
         public static ISiloBuilder AddActivityPropagation(this ISiloBuilder builder) { throw null; }
@@ -699,6 +730,8 @@ namespace Orleans.Runtime
     public sealed partial class GrainTypeSharedContext
     {
         public GrainTypeSharedContext(GrainType grainType, IClusterManifestProvider clusterManifestProvider, Orleans.Metadata.GrainClassMap grainClassMap, Placement.PlacementStrategyResolver placementStrategyResolver, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.SiloMessagingOptions> messagingOptions, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.GrainCollectionOptions> collectionOptions, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.SchedulingOptions> schedulingOptions, IGrainRuntime grainRuntime, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory, GrainReferences.GrainReferenceActivator grainReferenceActivator, System.IServiceProvider serviceProvider, Orleans.Serialization.Session.SerializerSessionPool serializerSessionPool) { }
+
+        public GrainTypeSharedContext(GrainType grainType, IClusterManifestProvider clusterManifestProvider, Orleans.Metadata.GrainClassMap grainClassMap, Placement.PlacementStrategyResolver placementStrategyResolver, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.SiloMessagingOptions> messagingOptions, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.GrainCollectionOptions> collectionOptions, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.SchedulingOptions> schedulingOptions, IGrainRuntime grainRuntime, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory, GrainReferences.GrainReferenceActivator grainReferenceActivator, System.IServiceProvider serviceProvider, Orleans.Serialization.Session.SerializerSessionPool serializerSessionPool, Placement.ClusterLocatorResolver clusterLocatorResolver) { }
 
         public System.TimeSpan CollectionAgeLimit { get { throw null; } }
 
