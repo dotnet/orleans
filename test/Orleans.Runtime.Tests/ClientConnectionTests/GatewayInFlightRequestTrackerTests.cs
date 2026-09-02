@@ -151,6 +151,43 @@ public class GatewayInFlightRequestTrackerTests
     }
 
     [Fact]
+    public void RemovingOldGenerationDoesNotStealSameEndpointRetry()
+    {
+        var oldGeneration = SiloAddress.New(new IPEndPoint(Silo1.Endpoint.Address, Silo1.Endpoint.Port), 1);
+        var newGeneration = SiloAddress.New(new IPEndPoint(Silo1.Endpoint.Address, Silo1.Endpoint.Port), 2);
+        var tracker = CreateTracker();
+        var original = CreateMessage(1, Message.Directions.Request, oldGeneration);
+        var retry = CreateMessage(1, Message.Directions.Request, newGeneration);
+        Assert.True(tracker.Track(original));
+        Assert.True(tracker.Track(retry));
+
+        Assert.False(tracker.TryRemove(original.Id, oldGeneration, out _));
+        Assert.Equal(1, tracker.Count);
+        Assert.True(tracker.TryRemove(retry.Id, newGeneration, out var removed));
+        Assert.Equal(newGeneration, removed.TargetSilo);
+        Assert.Equal(0, tracker.Count);
+    }
+
+    [Fact]
+    public void SameCorrelationIdIsIsolatedByClientTracker()
+    {
+        var firstClient = CreateTracker();
+        var secondClient = CreateTracker();
+        var firstRequest = CreateMessage(1, Message.Directions.Request, Silo1);
+        var secondRequest = CreateMessage(1, Message.Directions.Request, Silo2);
+        Assert.True(firstClient.Track(firstRequest));
+        Assert.True(secondClient.Track(secondRequest));
+
+        Assert.True(firstClient.TryRemove(firstRequest.Id, Silo1, out _));
+
+        Assert.Equal(0, firstClient.Count);
+        Assert.Equal(1, secondClient.Count);
+        Assert.True(secondClient.TryRemove(secondRequest.Id, Silo2, out var removed));
+        Assert.Equal(Silo2, removed.TargetSilo);
+        Assert.Equal(0, secondClient.Count);
+    }
+
+    [Fact]
     public void ClearRemovesAllRequestsOnDisconnect()
     {
         var tracker = CreateTracker();
