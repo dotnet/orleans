@@ -67,7 +67,6 @@ namespace Orleans.Runtime
             };
 
             response.SetTimeToLive(request);
-            _messagingTrace.OnCreateMessage(response);
             return response;
         }
 
