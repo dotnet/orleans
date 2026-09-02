@@ -1107,6 +1107,12 @@ exit 0
         $missing = Invoke-Comparison $missingComparison
         Assert-Equal 'baseline-missing' $missing.conclusion 'Missing comparison conclusion differs.'
 
+        $advancedMissingComparison = New-ComparisonCase -BaselineStatus 'missing'
+        $advancedMissingComparison.ExpectedBaselineSha = 'dddddddddddddddddddddddddddddddddddddddd'
+        $advancedMissing = Invoke-Comparison $advancedMissingComparison
+        Assert-Equal 'baseline-missing' $advancedMissing.conclusion 'Advanced missing comparison conclusion differs.'
+        Assert-Equal 'Baseline status is missing.' $advancedMissing.baseline.reason 'Advanced missing comparison reason differs.'
+
         $staleComparison = New-ComparisonCase -BaselineStatus 'available'
         $staleComparison.ExpectedBaselineSha = 'dddddddddddddddddddddddddddddddddddddddd'
         $stale = Invoke-Comparison $staleComparison

@@ -152,7 +152,7 @@ $selectionStatus = [string] (Get-RequiredProperty $selection 'status' 'Baseline 
 $selectionReason = [string] (Get-RequiredProperty $selection 'reason' 'Baseline selection')
 $selectionExpectedSha = [string] (Get-RequiredProperty $selection 'expected_sha' 'Baseline selection')
 $baselineStatus = $selectionStatus
-if ($selectionExpectedSha -ne $ExpectedBaselineSha) {
+if ($selectionStatus -ne 'missing' -and $selectionExpectedSha -ne $ExpectedBaselineSha) {
     $baselineStatus = 'stale'
     $selectionReason = "Current main advanced from $selectionExpectedSha to $ExpectedBaselineSha while coverage was aggregated."
 }
