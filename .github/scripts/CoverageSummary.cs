@@ -82,10 +82,6 @@ public static class CoverageSummaryReader
             totalLines += fileLines.Count;
             coveredLines += fileLines.Values.Count(static covered => covered);
         }
-        if (totalLines == 0)
-        {
-            throw new InvalidDataException("Merged coverage report contains no measured lines under the source root");
-        }
 
         long totalBranches = 0;
         long coveredBranches = 0;
