@@ -2,14 +2,14 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 
-#nullable disable
+#nullable enable
 namespace Orleans.Runtime.Messaging
 {
     internal class ConnectionLogScope : IReadOnlyList<KeyValuePair<string, object>>
     {
         private readonly Connection _connection;
 
-        private string _cachedToString;
+        private string? _cachedToString;
 
         public ConnectionLogScope(Connection connection)
         {
