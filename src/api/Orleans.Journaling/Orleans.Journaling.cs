@@ -230,7 +230,7 @@ namespace Orleans.Journaling
 
         System.Threading.Tasks.ValueTask DeleteStateAsync(System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.ValueTask InitializeAsync(System.Threading.CancellationToken cancellationToken);
-        void RegisterObserver(IJournaledStateObserver observer);
+        void RegisterObserver(IJournaledStateObserver observer) { throw null; }
         void RegisterState(string name, IJournaledState state);
         System.Threading.Tasks.ValueTask RevertPendingChangesAsync(System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.ValueTask System.IAsyncDisposable.DisposeAsync();
@@ -246,14 +246,14 @@ namespace Orleans.Journaling
     public partial interface IJournaledStateObserver
     {
         void OnDeleteCompleted() { }
-        System.Threading.Tasks.ValueTask OnDeletePreparingAsync(System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.ValueTask OnDeletePreparingAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
         void OnDeleteRequested() { }
         void OnRecoveryCompleted();
         void OnRecoveryRequested() { }
         void OnRecoveryStarted() { }
         void OnWriteCompleted();
-        System.Threading.Tasks.ValueTask OnWriteFinalizingAsync(System.Threading.CancellationToken cancellationToken);
-        System.Threading.Tasks.ValueTask OnWritePreparingAsync(System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.ValueTask OnWriteFinalizingAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
+        System.Threading.Tasks.ValueTask OnWritePreparingAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
         void OnWriteRequested() { }
         void OnWriteStarted();
     }
