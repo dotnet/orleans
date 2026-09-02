@@ -105,7 +105,9 @@ namespace UnitTests
             Assert.True(promise.Status == TaskStatus.Faulted);
 
             // Verify request tracking is cleaned up - no requests should be pending
-            Assert.Equal(expected: 0, actual: this.runtimeClient.GetRunningRequestsCount(errorGrainType));
+            Assert.Equal(
+                expected: 0,
+                actual: ((IRuntimeClientTestAccessor)this.runtimeClient).GetRunningRequestCount(errorGrainType));
 
             // Re-awaiting a timed-out task should fail immediately
             try

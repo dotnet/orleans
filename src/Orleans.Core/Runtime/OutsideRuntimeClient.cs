@@ -18,7 +18,7 @@ using static Orleans.Internal.StandardExtensions;
 
 namespace Orleans
 {
-    internal partial class OutsideRuntimeClient : IRuntimeClient, IDisposable, IClusterConnectionStatusListener
+    internal partial class OutsideRuntimeClient : IRuntimeClient, IRuntimeClientTestAccessor, IDisposable, IClusterConnectionStatusListener
     {
         internal static bool TestOnlyThrowExceptionDuringInit { get; set; }
 
@@ -300,6 +300,8 @@ namespace Orleans
                 callbacks.TryAdd(message.Id, callbackData);
                 callbackData.SubscribeForCancellation(cancellationToken);
 
+                // Shutdown sets _isStopping before sweeping callbacks. Recheck it after registration so that
+                // a callback published after the sweep passed it completes and removes itself here.
                 if (Volatile.Read(ref _isStopping) != 0)
                 {
                     callbackData.OnHostShutdown();
@@ -471,7 +473,7 @@ namespace Orleans
             }
         }
 
-        public int GetRunningRequestsCount(GrainInterfaceType grainInterfaceType)
+        int IRuntimeClientTestAccessor.GetRunningRequestCount(GrainInterfaceType grainInterfaceType)
             => this.callbacks.Count(c => c.Value.Message.InterfaceType == grainInterfaceType);
 
         /// <inheritdoc />

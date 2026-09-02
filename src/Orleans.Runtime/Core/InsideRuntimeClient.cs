@@ -25,7 +25,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// Internal class for system grains to get access to runtime object
     /// </summary>
-    internal sealed partial class InsideRuntimeClient : IRuntimeClient, ILifecycleParticipant<ISiloLifecycle>
+    internal sealed partial class InsideRuntimeClient : IRuntimeClient, IRuntimeClientTestAccessor, ILifecycleParticipant<ISiloLifecycle>
     {
         private readonly ILogger logger;
         private readonly ILogger invokeExceptionLogger;
@@ -195,12 +195,7 @@ namespace Orleans.Runtime
                     return;
                 }
 
-                if (!callbacks.TryRegister(callbackData))
-                {
-                    callbackData.OnHostShutdown();
-                    return;
-                }
-
+                callbacks.Register(callbackData);
                 callbackData.SubscribeForCancellation(cancellationToken);
             }
             else
@@ -212,8 +207,8 @@ namespace Orleans.Runtime
                 }
             }
 
-            // Completing callbacks during shutdown can resume application code which issues follow-up
-            // calls. Reject those calls so that they cannot outlive the shutdown callback sweep.
+            // Shutdown sets _isStopping before sweeping callbacks. Recheck it after registration so that
+            // a callback published after its stripe was swept completes and removes itself here.
             if (Volatile.Read(ref _isStopping) != 0)
             {
                 callbackData?.OnHostShutdown();
@@ -551,7 +546,6 @@ namespace Orleans.Runtime
         {
             Volatile.Write(ref _isStopping, 1);
             this.callbackTimer.Dispose();
-            callbacks.Close();
             // Once the silo is shutting down it can no longer receive responses, so any requests which
             // are still outstanding will never complete. Fault them now so that in-flight grain calls
             // observe a terminal result instead of hanging forever, which would otherwise deadlock grain
@@ -616,10 +610,8 @@ namespace Orleans.Runtime
             lifecycle.Subscribe<InsideRuntimeClient>(ServiceLifecycleStage.RuntimeInitialize, OnRuntimeInitializeStart, OnRuntimeInitializeStop);
         }
 
-        public int GetRunningRequestsCount(GrainInterfaceType grainInterfaceType)
-            => this.callbacks.CountWhere(
-                grainInterfaceType,
-                static (callback, grainInterfaceType) => callback.Message.InterfaceType == grainInterfaceType);
+        int IRuntimeClientTestAccessor.GetRunningRequestCount(GrainInterfaceType grainInterfaceType)
+            => this.callbacks.GetRunningRequestCountForTest(grainInterfaceType);
 
         private async Task MonitorCallbackExpiry()
         {
