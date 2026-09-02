@@ -316,7 +316,7 @@ public static class CoverageSummaryReader
 
         if (!measuredFiles.TryGetValue(sourcePath.RepositoryPath, out var fileLines))
         {
-            fileLines = [];
+            fileLines = new Dictionary<int, bool>();
             measuredFiles.Add(sourcePath.RepositoryPath, fileLines);
         }
         fileLines.TryGetValue(lineNumber, out var covered);
