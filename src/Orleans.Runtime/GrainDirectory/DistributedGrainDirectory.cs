@@ -618,7 +618,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
             {
                 foreach (var partition in _partitions)
                 {
-                    _ = partition.CleanupExpiredLeases();
+                    partition.CleanupExpiredLeases().Ignore();
                 }
             }
         }
