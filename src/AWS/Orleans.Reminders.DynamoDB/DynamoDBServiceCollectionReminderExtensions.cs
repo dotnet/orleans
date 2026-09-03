@@ -1,9 +1,9 @@
-using Microsoft.Extensions.DependencyInjection;
-using Orleans.Configuration;
-using Orleans.Runtime;
-using Orleans.Reminders.DynamoDB;
 using System;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
+using Orleans.Reminders.DynamoDB;
+using Orleans.Runtime;
 
 namespace Orleans.Hosting
 {

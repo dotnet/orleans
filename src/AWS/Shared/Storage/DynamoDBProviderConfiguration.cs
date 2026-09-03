@@ -102,6 +102,47 @@ namespace Orleans.Reminders.DynamoDB
                     $"The {nameof(DynamoDBClientOptions.Service)} is required for {providerName}.");
             }
 
+            ValidateCredentials(options, providerName);
+        }
+
+        public static void ValidateTableOptions(
+            DynamoDBClientOptions options,
+            string? tableName,
+            bool useProvisionedThroughput,
+            int readCapacityUnits,
+            int writeCapacityUnits,
+            string providerName,
+            bool requireService = true)
+        {
+            if (requireService)
+            {
+                ValidateClientOptions(options, providerName);
+            }
+            else
+            {
+                ValidateCredentials(options, providerName);
+            }
+
+            if (string.IsNullOrWhiteSpace(tableName))
+            {
+                throw new OrleansConfigurationException($"The TableName is required for {providerName}.");
+            }
+
+            if (useProvisionedThroughput && readCapacityUnits <= 0)
+            {
+                throw new OrleansConfigurationException(
+                    $"ReadCapacityUnits must be greater than zero when provisioned throughput is enabled for {providerName}.");
+            }
+
+            if (useProvisionedThroughput && writeCapacityUnits <= 0)
+            {
+                throw new OrleansConfigurationException(
+                    $"WriteCapacityUnits must be greater than zero when provisioned throughput is enabled for {providerName}.");
+            }
+        }
+
+        private static void ValidateCredentials(DynamoDBClientOptions options, string providerName)
+        {
             var hasAccessKey = !string.IsNullOrEmpty(options.AccessKey);
             var hasSecretKey = !string.IsNullOrEmpty(options.SecretKey);
             if (hasAccessKey != hasSecretKey)
@@ -121,28 +162,6 @@ namespace Orleans.Reminders.DynamoDB
             {
                 throw new OrleansConfigurationException(
                     $"Explicit credentials and {nameof(DynamoDBClientOptions.ProfileName)} cannot both be configured for {providerName}.");
-            }
-        }
-
-        public static void ValidateTableOptions(
-            DynamoDBClientOptions options,
-            string? tableName,
-            bool useProvisionedThroughput,
-            int readCapacityUnits,
-            int writeCapacityUnits,
-            string providerName)
-        {
-            ValidateClientOptions(options, providerName);
-
-            if (string.IsNullOrWhiteSpace(tableName))
-            {
-                throw new OrleansConfigurationException($"The TableName is required for {providerName}.");
-            }
-
-            if (useProvisionedThroughput && (readCapacityUnits <= 0 || writeCapacityUnits <= 0))
-            {
-                throw new OrleansConfigurationException(
-                    $"ReadCapacityUnits and WriteCapacityUnits must be greater than zero when provisioned throughput is enabled for {providerName}.");
             }
         }
 
