@@ -6,9 +6,22 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Journaling;
 
+/// <summary>
+/// Represents a list whose mutations are recorded in a journal.
+/// </summary>
+/// <typeparam name="T">The type of elements in the list.</typeparam>
 public interface IDurableList<T> : IList<T>
 {
+    /// <summary>
+    /// Adds the elements of the specified collection to the end of the list.
+    /// </summary>
+    /// <param name="collection">The collection whose elements are added to the list.</param>
     void AddRange(IEnumerable<T> collection);
+
+    /// <summary>
+    /// Returns a read-only wrapper for the current list.
+    /// </summary>
+    /// <returns>A read-only wrapper for the current list.</returns>
     ReadOnlyCollection<T> AsReadOnly();
 }
 

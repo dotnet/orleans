@@ -5,8 +5,16 @@ using Orleans.Runtime;
 
 namespace Orleans.Journaling;
 
+/// <summary>
+/// Provides extensions for configuring journaling services.
+/// </summary>
 public static class HostingExtensions
 {
+    /// <summary>
+    /// Adds the services, durable state types, and journal formats required for journaling.
+    /// </summary>
+    /// <param name="builder">The silo builder.</param>
+    /// <returns>The silo builder.</returns>
     public static ISiloBuilder AddJournalStorage(this ISiloBuilder builder)
     {
         builder.Services.AddOptions<JournaledStateManagerOptions>();

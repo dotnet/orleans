@@ -5,15 +5,61 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Journaling;
 
+/// <summary>
+/// Represents a first-in, first-out collection whose mutations are recorded in a journal.
+/// </summary>
+/// <typeparam name="T">The type of elements in the queue.</typeparam>
 public interface IDurableQueue<T> : IEnumerable<T>, IReadOnlyCollection<T>
 {
+    /// <summary>
+    /// Removes all elements from the queue.
+    /// </summary>
     void Clear();
+
+    /// <summary>
+    /// Determines whether the queue contains the specified element.
+    /// </summary>
+    /// <param name="item">The element to locate in the queue.</param>
+    /// <returns><see langword="true"/> if the queue contains <paramref name="item"/>; otherwise, <see langword="false"/>.</returns>
     bool Contains(T item);
+
+    /// <summary>
+    /// Copies the queue elements to an array, starting at the specified array index.
+    /// </summary>
+    /// <param name="array">The destination array.</param>
+    /// <param name="arrayIndex">The zero-based index in <paramref name="array"/> at which copying begins.</param>
     void CopyTo(T[] array, int arrayIndex);
+
+    /// <summary>
+    /// Removes and returns the element at the beginning of the queue.
+    /// </summary>
+    /// <returns>The element removed from the beginning of the queue.</returns>
     T Dequeue();
+
+    /// <summary>
+    /// Adds an element to the end of the queue.
+    /// </summary>
+    /// <param name="item">The element to add to the queue.</param>
     void Enqueue(T item);
+
+    /// <summary>
+    /// Returns the element at the beginning of the queue without removing it.
+    /// </summary>
+    /// <returns>The element at the beginning of the queue.</returns>
     T Peek();
+
+    /// <summary>
+    /// Attempts to remove and return the element at the beginning of the queue.
+    /// </summary>
+    /// <param name="item">The removed element, or the default value of <typeparamref name="T"/> when the queue is empty.</param>
+    /// <returns><see langword="true"/> if an element was removed; otherwise, <see langword="false"/>.</returns>
     bool TryDequeue([MaybeNullWhen(false)] out T item);
+
+    /// <summary>
+    /// Attempts to return the element at the beginning of the queue without removing it.
+    /// </summary>
+    /// <param name="item">The element at the beginning of the queue, or the default value of <typeparamref name="T"/> when the queue is empty.</param>
+    /// <returns><see langword="true"/> if an element was returned; otherwise, <see langword="false"/>.</returns>
     bool TryPeek([MaybeNullWhen(false)] out T item);
 }
 

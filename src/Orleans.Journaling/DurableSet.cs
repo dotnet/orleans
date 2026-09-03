@@ -4,16 +4,37 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Journaling;
 
+/// <summary>
+/// Represents a set whose mutations are recorded in a journal.
+/// </summary>
+/// <typeparam name="T">The type of elements in the set.</typeparam>
 public interface IDurableSet<T> : ISet<T>, IReadOnlyCollection<T>, IReadOnlySet<T>
 {
+    /// <inheritdoc/>
     new int Count { get; }
+
+    /// <inheritdoc/>
     new bool Contains(T item);
+
+    /// <inheritdoc/>
     new bool Add(T item);
+
+    /// <inheritdoc/>
     new bool IsProperSubsetOf(IEnumerable<T> other);
+
+    /// <inheritdoc/>
     new bool IsProperSupersetOf(IEnumerable<T> other);
+
+    /// <inheritdoc/>
     new bool IsSubsetOf(IEnumerable<T> other);
+
+    /// <inheritdoc/>
     new bool IsSupersetOf(IEnumerable<T> other);
+
+    /// <inheritdoc/>
     new bool Overlaps(IEnumerable<T> other);
+
+    /// <inheritdoc/>
     new bool SetEquals(IEnumerable<T> other);
 }
 
