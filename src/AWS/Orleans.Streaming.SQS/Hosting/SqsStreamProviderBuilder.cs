@@ -214,6 +214,11 @@ public sealed class SqsStreamProviderBuilder : IProviderBuilder<ISiloBuilder>, I
         {
             ValidateServiceEndpoint(service);
         }
+        else if (service.Contains(':'))
+        {
+            throw new OrleansConfigurationException(
+                "SQS streaming service endpoint values must be absolute HTTP or HTTPS URIs.");
+        }
     }
 
     private static void ValidateServiceEndpoint(string serviceEndpoint)
