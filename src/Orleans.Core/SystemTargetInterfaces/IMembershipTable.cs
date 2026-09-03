@@ -142,17 +142,11 @@ namespace Orleans
             VersionEtag = eTag;
         }
 
-<<<<<<< HEAD
         /// <summary>
         /// Creates the next membership table version while retaining the current entity tag for concurrency validation.
         /// </summary>
         /// <returns>The next membership table version.</returns>
         public TableVersion Next() => new(Version + 1, VersionEtag);
-||||||| parent of 82a763ec4 (style: format solution whitespace)
-        public TableVersion Next() => new (Version + 1, VersionEtag);
-=======
-        public TableVersion Next() => new(Version + 1, VersionEtag);
->>>>>>> 82a763ec4 (style: format solution whitespace)
 
         /// <inheritdoc />
         public override string ToString() => $"<{Version}, {VersionEtag}>";

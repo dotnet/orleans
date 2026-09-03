@@ -24,11 +24,4 @@ public static class PlacementFilterExtensions
 
         return services;
     }
-<<<<<<< HEAD
-||||||| parent of 82a763ec4 (style: format solution whitespace)
-
-}
-=======
-
->>>>>>> 82a763ec4 (style: format solution whitespace)
 }

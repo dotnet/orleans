@@ -111,17 +111,8 @@ namespace Orleans.Runtime
 #pragma warning restore 618
         }
 
-<<<<<<< HEAD
         /// <inheritdoc/>
         public override string ToString() => @$"SiloRuntimeStatistics: ActivationCount={ActivationCount} RecentlyUsedActivationCount={RecentlyUsedActivationCount} CpuUsagePercentage={EnvironmentStatistics.FilteredCpuUsagePercentage} MemoryUsageBytes={EnvironmentStatistics.FilteredMemoryUsageBytes} AvailableMemory={EnvironmentStatistics.FilteredAvailableMemoryBytes} MaximumAvailableMemoryBytes={EnvironmentStatistics.MaximumAvailableMemoryBytes} IsOverloaded={IsOverloaded} ClientCount={ClientCount} ReceivedMessages={ReceivedMessages} SentMessages={SentMessages} DateTime={DateTime}";
-||||||| parent of 82a763ec4 (style: format solution whitespace)
-        public override string ToString() => @$"SiloRuntimeStatistics: ActivationCount={ActivationCount} RecentlyUsedActivationCount={RecentlyUsedActivationCount
-            } CpuUsagePercentage={EnvironmentStatistics.FilteredCpuUsagePercentage} MemoryUsageBytes={EnvironmentStatistics.FilteredMemoryUsageBytes
-            } AvailableMemory={EnvironmentStatistics.FilteredAvailableMemoryBytes} MaximumAvailableMemoryBytes={EnvironmentStatistics.MaximumAvailableMemoryBytes
-            } IsOverloaded={IsOverloaded} ClientCount={ClientCount} ReceivedMessages={ReceivedMessages} SentMessages={SentMessages} DateTime={DateTime}";
-=======
-        public override string ToString() => @$"SiloRuntimeStatistics: ActivationCount={ActivationCount} RecentlyUsedActivationCount={RecentlyUsedActivationCount} CpuUsagePercentage={EnvironmentStatistics.FilteredCpuUsagePercentage} MemoryUsageBytes={EnvironmentStatistics.FilteredMemoryUsageBytes} AvailableMemory={EnvironmentStatistics.FilteredAvailableMemoryBytes} MaximumAvailableMemoryBytes={EnvironmentStatistics.MaximumAvailableMemoryBytes} IsOverloaded={IsOverloaded} ClientCount={ClientCount} ReceivedMessages={ReceivedMessages} SentMessages={SentMessages} DateTime={DateTime}";
->>>>>>> 82a763ec4 (style: format solution whitespace)
     }
 
     /// <summary>

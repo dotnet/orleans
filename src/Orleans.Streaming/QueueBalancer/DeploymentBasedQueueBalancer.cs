@@ -30,7 +30,6 @@ namespace Orleans.Streams
         private string _name;
         private bool isStarting;
 
-<<<<<<< HEAD
         /// <summary>
         /// Initializes a new instance of the <see cref="DeploymentBasedQueueBalancer"/> class.
         /// </summary>
@@ -39,10 +38,6 @@ namespace Orleans.Streams
         /// <param name="options">The queue balancer options.</param>
         /// <param name="services">The service provider.</param>
         /// <param name="logger">The logger.</param>
-||||||| parent of 82a763ec4 (style: format solution whitespace)
-        
-=======
->>>>>>> 82a763ec4 (style: format solution whitespace)
         public DeploymentBasedQueueBalancer(
             ISiloStatusOracle siloStatusOracle,
             IDeploymentConfiguration deploymentConfig,

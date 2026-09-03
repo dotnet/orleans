@@ -333,13 +333,7 @@ namespace Orleans.Transactions.TestKit.Correctnesss
             this.loggerFactory = loggerFactory;
         }
 
-<<<<<<< HEAD
-
         /// <inheritdoc/>
-||||||| parent of 82a763ec4 (style: format solution whitespace)
-        
-=======
->>>>>>> 82a763ec4 (style: format solution whitespace)
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             this.logger = this.loggerFactory.CreateLogger(this.GetGrainId().ToString());

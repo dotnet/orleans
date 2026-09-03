@@ -7,16 +7,10 @@ using Orleans.Streams;
 
 namespace Orleans.Hosting
 {
-<<<<<<< HEAD
     /// <summary>
     /// Configures a named Azure Event Hubs stream provider.
     /// </summary>
     public interface IEventHubStreamConfigurator : INamedServiceConfigurator { }
-||||||| parent of 82a763ec4 (style: format solution whitespace)
-    public interface IEventHubStreamConfigurator : INamedServiceConfigurator {}
-=======
-    public interface IEventHubStreamConfigurator : INamedServiceConfigurator { }
->>>>>>> 82a763ec4 (style: format solution whitespace)
 
     /// <summary>
     /// Extension methods for configuring Azure Event Hubs stream providers.

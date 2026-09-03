@@ -177,7 +177,6 @@ namespace Orleans.Transactions.TestKit
     /// </summary>
     public enum FaultInjectionType
     {
-<<<<<<< HEAD
         /// <summary>
         /// No fault is injected.
         /// </summary>
@@ -186,11 +185,6 @@ namespace Orleans.Transactions.TestKit
         /// <summary>
         /// Deactivates the grain after the selected transaction phase.
         /// </summary>
-||||||| parent of 82a763ec4 (style: format solution whitespace)
-        None, 
-=======
-        None,
->>>>>>> 82a763ec4 (style: format solution whitespace)
         Deactivation,
 
         /// <summary>

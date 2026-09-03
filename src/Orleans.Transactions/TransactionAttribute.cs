@@ -111,7 +111,6 @@ namespace Orleans
     /// </summary>
     public enum TransactionOptionAlias
     {
-<<<<<<< HEAD
         /// <summary>
         /// Maps to <see cref="TransactionOption.Supported"/>.
         /// </summary>
@@ -136,19 +135,6 @@ namespace Orleans
         /// Maps to <see cref="TransactionOption.NotAllowed"/>.
         /// </summary>
         Never = TransactionOption.NotAllowed,
-||||||| parent of 82a763ec4 (style: format solution whitespace)
-        Suppress     = TransactionOption.Supported,
-        Required     = TransactionOption.CreateOrJoin,
-        RequiresNew  = TransactionOption.Create,
-        Mandatory    = TransactionOption.Join,
-        Never        = TransactionOption.NotAllowed,
-=======
-        Suppress = TransactionOption.Supported,
-        Required = TransactionOption.CreateOrJoin,
-        RequiresNew = TransactionOption.Create,
-        Mandatory = TransactionOption.Join,
-        Never = TransactionOption.NotAllowed,
->>>>>>> 82a763ec4 (style: format solution whitespace)
     }
 
     /// <summary>

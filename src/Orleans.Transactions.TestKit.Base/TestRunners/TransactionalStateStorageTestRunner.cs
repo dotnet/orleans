@@ -32,34 +32,12 @@ namespace Orleans.Transactions.TestKit
         /// <summary>
         /// Initializes a new instance of the <see cref="TransactionalStateStorageTestRunner{TState}"/> class.
         /// </summary>
-<<<<<<< HEAD
         /// <param name="stateStorageFactory">The factory which creates a storage instance with empty initial state.</param>
         /// <param name="stateFactory">The factory which creates test state values from integer seeds.</param>
         /// <param name="grainFactory">The grain factory used by the test runner.</param>
         /// <param name="testOutput">The callback used to write test output.</param>
         /// <param name="assertConfig">An optional callback which configures state equivalency comparisons.</param>
         protected TransactionalStateStorageTestRunner(Func<Task<ITransactionalStateStorage<TState>>> stateStorageFactory, Func<int, TState> stateFactory,
-||||||| parent of 82a763ec4 (style: format solution whitespace)
-        /// <param name="stateStorageFactory">factory to create ITransactionalStateStorage, the test runner are assuming the state 
-        /// in storage is empty when ITransactionalStateStorage was created </param>
-        /// <param name="stateFactory">factory to create TState for test</param>
-        /// <param name="grainFactory">grain Factory needed for test runner</param>
-        /// <param name="testOutput">test output to helpful messages</param>
-        /// <param name="assertConfig">A reference to the AwesomeAssertions.Equivalency.EquivalencyOptions`1
-        ///     configuration object that can be used to influence the way the object graphs
-        ///     are compared</param>
-        protected TransactionalStateStorageTestRunner(Func<Task<ITransactionalStateStorage<TState>>> stateStorageFactory, Func<int, TState> stateFactory, 
-=======
-        /// <param name="stateStorageFactory">factory to create ITransactionalStateStorage, the test runner are assuming the state 
-        /// in storage is empty when ITransactionalStateStorage was created </param>
-        /// <param name="stateFactory">factory to create TState for test</param>
-        /// <param name="grainFactory">grain Factory needed for test runner</param>
-        /// <param name="testOutput">test output to helpful messages</param>
-        /// <param name="assertConfig">A reference to the AwesomeAssertions.Equivalency.EquivalencyOptions`1
-        ///     configuration object that can be used to influence the way the object graphs
-        ///     are compared</param>
-        protected TransactionalStateStorageTestRunner(Func<Task<ITransactionalStateStorage<TState>>> stateStorageFactory, Func<int, TState> stateFactory,
->>>>>>> 82a763ec4 (style: format solution whitespace)
             IGrainFactory grainFactory, Action<string> testOutput,
             Func<EquivalencyOptions<TState>, EquivalencyOptions<TState>>? assertConfig = null)
             : base(grainFactory, testOutput)
@@ -89,16 +67,10 @@ namespace Orleans.Transactions.TestKit
 
         private static readonly List<PendingTransactionState<TState>> emptyPendingStates = new List<PendingTransactionState<TState>>();
 
-<<<<<<< HEAD
-
         /// <summary>
         /// Verifies that storing unchanged state creates an ETag and persists metadata without changing state.
         /// </summary>
         /// <returns>A task which represents the storage test.</returns>
-||||||| parent of 82a763ec4 (style: format solution whitespace)
-  
-=======
->>>>>>> 82a763ec4 (style: format solution whitespace)
         public virtual async Task StoreWithoutChanges()
         {
             var stateStorage = await this.stateStorageFactory();
