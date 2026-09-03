@@ -877,20 +877,23 @@ namespace UnitTests.Runtime
 
             var lifecycle = new SiloLifecycleSubject(NullLogger<SiloLifecycleSubject>.Instance);
             ((ILifecycleParticipant<ISiloLifecycle>)workingSet).Participate(lifecycle);
-            await lifecycle.OnStart(TestContext.Current.CancellationToken);
-            await scanStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
-
             var mutationStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            var mutationTask = Task.Run(() =>
-            {
-                mutationStarted.SetResult();
-                workingSet.OnEvicted(member);
-                workingSet.OnActivated(member);
-            }, TestContext.Current.CancellationToken);
-            await mutationStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            Task? mutationTask = null;
+            Task? stopTask = null;
+            var lifecycleStarted = false;
             try
             {
-                var stopTask = lifecycle.OnStop(TestContext.Current.CancellationToken);
+                await lifecycle.OnStart(TestContext.Current.CancellationToken);
+                lifecycleStarted = true;
+                await scanStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+                mutationTask = Task.Run(() =>
+                {
+                    mutationStarted.SetResult();
+                    workingSet.OnEvicted(member);
+                    workingSet.OnActivated(member);
+                }, TestContext.Current.CancellationToken);
+                await mutationStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+                stopTask = lifecycle.OnStop(TestContext.Current.CancellationToken);
                 Assert.False(stopTask.IsCompleted);
                 Assert.False(mutationTask.IsCompleted);
                 resumeScan.Set();
@@ -900,6 +903,16 @@ namespace UnitTests.Runtime
             finally
             {
                 resumeScan.Set();
+                if (mutationTask is not null)
+                {
+                    await ObserveCleanup(mutationTask);
+                }
+
+                if (lifecycleStarted)
+                {
+                    stopTask ??= lifecycle.OnStop(CancellationToken.None);
+                    await ObserveCleanup(stopTask);
+                }
             }
 
             Assert.Equal(1, workingSet.Count);
@@ -940,20 +953,23 @@ namespace UnitTests.Runtime
 
             var lifecycle = new SiloLifecycleSubject(NullLogger<SiloLifecycleSubject>.Instance);
             ((ILifecycleParticipant<ISiloLifecycle>)workingSet).Participate(lifecycle);
-            await lifecycle.OnStart(TestContext.Current.CancellationToken);
-            await removalScanStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
-
             var mutationStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            var mutationTask = Task.Run(() =>
-            {
-                mutationStarted.SetResult();
-                workingSet.OnEvicted(member);
-                workingSet.OnActivated(member);
-            }, TestContext.Current.CancellationToken);
-            await mutationStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            Task? mutationTask = null;
+            Task? stopTask = null;
+            var lifecycleStarted = false;
             try
             {
-                var stopTask = lifecycle.OnStop(TestContext.Current.CancellationToken);
+                await lifecycle.OnStart(TestContext.Current.CancellationToken);
+                lifecycleStarted = true;
+                await removalScanStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+                mutationTask = Task.Run(() =>
+                {
+                    mutationStarted.SetResult();
+                    workingSet.OnEvicted(member);
+                    workingSet.OnActivated(member);
+                }, TestContext.Current.CancellationToken);
+                await mutationStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+                stopTask = lifecycle.OnStop(TestContext.Current.CancellationToken);
                 Assert.False(stopTask.IsCompleted);
                 Assert.False(mutationTask.IsCompleted);
                 resumeScan.Set();
@@ -963,6 +979,16 @@ namespace UnitTests.Runtime
             finally
             {
                 resumeScan.Set();
+                if (mutationTask is not null)
+                {
+                    await ObserveCleanup(mutationTask);
+                }
+
+                if (lifecycleStarted)
+                {
+                    stopTask ??= lifecycle.OnStop(CancellationToken.None);
+                    await ObserveCleanup(stopTask);
+                }
             }
 
             Assert.Equal(1, workingSet.Count);
@@ -1054,10 +1080,10 @@ namespace UnitTests.Runtime
                     workingSet.OnActivated(member);
                 }
             }, TestContext.Current.CancellationToken);
-            await firstEviction.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
             try
             {
+                await firstEviction.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
                 while (enumerator.MoveNext())
                 {
                     enumeratedMembers.Add(enumerator.Current);
@@ -1066,9 +1092,8 @@ namespace UnitTests.Runtime
             finally
             {
                 resumeWriter.Set();
+                await ObserveCleanup(writer);
             }
-
-            await writer.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
             Assert.All(enumeratedMembers, member => Assert.Contains(member, members));
             Assert.Equal(members.Length, workingSet.Count);
@@ -1131,26 +1156,40 @@ namespace UnitTests.Runtime
 
             var lifecycle = new SiloLifecycleSubject(NullLogger<SiloLifecycleSubject>.Instance);
             ((ILifecycleParticipant<ISiloLifecycle>)workingSet).Participate(lifecycle);
-            await lifecycle.OnStart(TestContext.Current.CancellationToken);
-            await removalScanStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
-
             var reactivationStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            var reactivationTask = Task.Run(() =>
-            {
-                reactivationStarted.SetResult();
-                workingSet.OnActive(member);
-            }, TestContext.Current.CancellationToken);
-            await reactivationStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            Task? reactivationTask = null;
+            Task? stopTask = null;
+            var lifecycleStarted = false;
             try
             {
+                await lifecycle.OnStart(TestContext.Current.CancellationToken);
+                lifecycleStarted = true;
+                await removalScanStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+                reactivationTask = Task.Run(() =>
+                {
+                    reactivationStarted.SetResult();
+                    workingSet.OnActive(member);
+                }, TestContext.Current.CancellationToken);
+                await reactivationStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
                 Assert.False(reactivationTask.IsCompleted);
                 resumeScan.Set();
                 await reactivationTask;
-                await lifecycle.OnStop(TestContext.Current.CancellationToken);
+                stopTask = lifecycle.OnStop(TestContext.Current.CancellationToken);
+                await stopTask;
             }
             finally
             {
                 resumeScan.Set();
+                if (reactivationTask is not null)
+                {
+                    await ObserveCleanup(reactivationTask);
+                }
+
+                if (lifecycleStarted)
+                {
+                    stopTask ??= lifecycle.OnStop(CancellationToken.None);
+                    await ObserveCleanup(stopTask);
+                }
             }
 
             Assert.Equal(1, workingSet.Count);
@@ -1237,6 +1276,17 @@ namespace UnitTests.Runtime
 
         private IActivationWorkingSetMember PrepareActivation(int collectionAgeLimitMinutes, ActivationCollector collector)
             => PrepareActivation(TimeSpan.FromMinutes(collectionAgeLimitMinutes), collector);
+
+        private static async Task ObserveCleanup(Task task)
+        {
+            try
+            {
+                await task.WaitAsync(TimeSpan.FromSeconds(10), CancellationToken.None);
+            }
+            catch (OperationCanceledException) when (task.IsCanceled)
+            {
+            }
+        }
 
         private static CatalogInstruments CreateCatalogInstruments()
         {
