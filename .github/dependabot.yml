@@ -1,4 +1,17 @@
 version: 2
+registries:
+  cfs-nuget:
+    type: "nuget-feed"
+    url: "https://packagefeedproxy.microsoft.io/nuget/v3/index.json"
+    replaces-base: true
+  cfs-pypi:
+    type: "python-index"
+    url: "https://packagefeedproxy.microsoft.io/pypi/simple/"
+    replaces-base: true
+  cfs-npm:
+    type: "npm-registry"
+    url: "https://packagefeedproxy.microsoft.io/npm/"
+    replaces-base: true
 updates:
   - package-ecosystem: "dotnet-sdk"
     directory: "/"
