@@ -29,7 +29,10 @@ public static class ClientBuilderExtensions
     /// </summary>
     /// <param name="builder">The client builder.</param>
     /// <param name="name">The stream provider name.</param>
-    /// <param name="configure">The delegate used to configure the provider, or <see langword="null"/> to use default settings.</param>
+    /// <param name="configure">
+    /// The delegate used to configure the provider, or <see langword="null"/> to omit inline configuration.
+    /// Required options, including <see cref="NatsOptions.StreamName"/>, must be configured separately.
+    /// </param>
     /// <returns>The same <paramref name="builder"/> instance.</returns>
     public static IClientBuilder AddNatsStreams(this IClientBuilder builder, string name,
         Action<ClusterClientNatsStreamConfigurator>? configure)

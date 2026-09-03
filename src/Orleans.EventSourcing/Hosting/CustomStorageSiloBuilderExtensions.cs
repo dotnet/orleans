@@ -19,8 +19,8 @@ namespace Orleans.Hosting
         /// </summary>
         /// <param name="builder">The silo builder.</param>
         /// <param name="primaryCluster">
-        /// The identifier of the cluster which accesses storage directly, or <see langword="null"/> to allow every cluster
-        /// to access storage directly.
+        /// The cluster identifier stored in the provider options and passed to each custom-storage adaptor.
+        /// Custom-storage adaptors accept submissions from every cluster.
         /// </param>
         /// <returns>The silo builder.</returns>
         public static ISiloBuilder AddCustomStorageBasedLogConsistencyProviderAsDefault(this ISiloBuilder builder, string? primaryCluster = null)
@@ -34,8 +34,8 @@ namespace Orleans.Hosting
         /// <param name="builder">The silo builder.</param>
         /// <param name="name">The provider name.</param>
         /// <param name="primaryCluster">
-        /// The identifier of the cluster which accesses storage directly, or <see langword="null"/> to allow every cluster
-        /// to access storage directly.
+        /// The cluster identifier stored in the provider options and passed to each custom-storage adaptor.
+        /// Custom-storage adaptors accept submissions from every cluster.
         /// </param>
         /// <returns>The silo builder.</returns>
         public static ISiloBuilder AddCustomStorageBasedLogConsistencyProvider(this ISiloBuilder builder, string name = "LogStorage", string? primaryCluster = null)

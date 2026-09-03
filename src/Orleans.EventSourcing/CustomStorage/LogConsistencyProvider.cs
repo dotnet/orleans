@@ -11,16 +11,15 @@ namespace Orleans.EventSourcing.CustomStorage
     /// reading states from storage, and appending deltas to storage.
     /// Grains that wish to use this provider must implement the <see cref="ICustomStorageInterface{TState, TDelta}"/>
     /// interface, to define how state is read and how deltas are written.
-    /// If the provider attribute "PrimaryCluster" is supplied in the provider configuration, then only the specified cluster
-    /// accesses storage, and other clusters may not issue updates. 
+    /// The configured primary cluster identifier is passed to each custom-storage adaptor.
+    /// Custom-storage adaptors accept submissions from every cluster.
     /// </summary>
     public class LogConsistencyProvider : ILogViewAdaptorFactory
     {
         private readonly CustomStorageLogConsistencyOptions options;
 
         /// <summary>
-        /// Specifies a cluster id of the primary cluster from which to access storage exclusively, null if
-        /// storage should be accessed directly from all clusters.
+        /// Gets the cluster identifier passed to each custom-storage adaptor.
         /// </summary>
         public string? PrimaryCluster => options.PrimaryCluster;
 

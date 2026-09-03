@@ -6,8 +6,8 @@ namespace Orleans.Configuration
     public class CustomStorageLogConsistencyOptions
     {
         /// <summary>
-        /// Gets or sets the identifier of the cluster which accesses storage directly.
-        /// When unset, every cluster accesses storage directly.
+        /// Gets or sets the cluster identifier passed to each custom-storage adaptor.
+        /// Custom-storage adaptors accept submissions from every cluster.
         /// </summary>
         public string? PrimaryCluster { get; set; }
     }

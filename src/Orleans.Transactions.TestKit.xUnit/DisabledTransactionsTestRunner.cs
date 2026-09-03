@@ -10,7 +10,7 @@ namespace Orleans.Transactions.TestKit.xUnit
         /// </summary>
         /// <param name="grainFactory">The grain factory used to access test grains.</param>
         /// <param name="output">The xUnit test output helper.</param>
-        public DisabledTransactionsTestRunnerxUnit(IGrainFactory grainFactory, ITestOutputHelper output)
+        protected DisabledTransactionsTestRunnerxUnit(IGrainFactory grainFactory, ITestOutputHelper output)
             : base(grainFactory, output.WriteLine) { }
 
         /// <inheritdoc cref="DisabledTransactionsTestRunner.TransactionGrainsThrowWhenTransactions(string)"/>

@@ -36,7 +36,8 @@ public class NatsOptions
     /// </summary>
     /// <remarks>
     /// The provider creates the stream and its subject mapping when it starts for the first time.
-    /// To change the partition count for an existing stream, update the stream definition in NATS before changing this value.
+    /// When the configured partition count changes, the provider attempts to update the existing stream definition
+    /// during startup. Startup fails if the NATS server rejects the requested update.
     /// For details, see
     /// <see href="https://docs.nats.io/nats-concepts/subject_mapping#deterministic-subject-token-partitioning">
     /// deterministic subject token partitioning
