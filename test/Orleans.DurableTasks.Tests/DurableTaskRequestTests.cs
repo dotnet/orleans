@@ -54,7 +54,7 @@ public class DurableTaskRequestTests
         handle.WaitAsync(Arg.Any<CancellationToken>())
             .Returns(new ValueTask<DurableTaskResponse>(DurableTaskResponse.FromResult(73)));
         var grainContext = Substitute.For<IGrainContext>();
-        grainContext.GetComponent<IDurableTaskGrainRuntime>().Returns(runtime);
+        grainContext.GetComponent(typeof(IDurableTaskGrainRuntime)).Returns(runtime);
 
         RuntimeContext.SetExecutionContext(grainContext, out var previous);
         ValueTask<DurableTaskResponse> operation;
@@ -96,7 +96,7 @@ public class DurableTaskRequestTests
         runtime.ScheduleRemoteAsync(taskId, request, Arg.Any<CancellationToken>())
             .Returns(new ValueTask<DurableTaskResponse>(DurableTaskResponse.FromResult(9)));
         var grainContext = Substitute.For<IGrainContext>();
-        grainContext.GetComponent<IDurableTaskGrainRuntime>().Returns(runtime);
+        grainContext.GetComponent(typeof(IDurableTaskGrainRuntime)).Returns(runtime);
         RuntimeContext.SetExecutionContext(grainContext, out var previous);
         ValueTask<DurableTaskResponse> localOperation;
         try
