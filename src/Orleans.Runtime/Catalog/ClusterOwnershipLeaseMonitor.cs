@@ -87,7 +87,7 @@ internal sealed class ClusterOwnershipLeaseMonitor : ILifecycleParticipant<ISilo
     {
         if (_enabled)
         {
-            _runTask = Task.Run(Run);
+            _runTask = Task.Run(Run, CancellationToken.None);
         }
 
         return Task.CompletedTask;
