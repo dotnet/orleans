@@ -69,7 +69,7 @@ namespace Orleans.Networking.Shared
         {
             if (size > _blockSize)
             {
-                ThrowArgumentOutOfRangeException_BufferRequestTooLarge(_blockSize);
+                ThrowArgumentOutOfRangeException_BufferRequestTooLarge(size, _blockSize);
             }
 
             var block = Lease();
@@ -207,9 +207,9 @@ namespace Orleans.Networking.Shared
             }
         }
 
-        private static void ThrowArgumentOutOfRangeException_BufferRequestTooLarge(int maxSize)
+        private static void ThrowArgumentOutOfRangeException_BufferRequestTooLarge(int size, int maxSize)
         {
-            throw new ArgumentOutOfRangeException("size", $"Cannot allocate more than {maxSize} bytes in a single buffer");
+            throw new ArgumentOutOfRangeException(nameof(size), size, $"Cannot allocate more than {maxSize} bytes in a single buffer");
         }
 
         private static void ThrowObjectDisposedException() => throw new ObjectDisposedException("MemoryPool");

@@ -106,7 +106,7 @@ public sealed class AzureTableJournalStorageOptions
             throw new ArgumentException("The journal id must not be the default value.", nameof(journalId));
         }
 
-        var mapper = GetPartitionKey ?? throw new ArgumentNullException(nameof(GetPartitionKey));
+        var mapper = GetPartitionKey ?? throw new InvalidOperationException("A partition key mapper must be configured.");
         var partitionKey = mapper(journalId);
         ArgumentException.ThrowIfNullOrWhiteSpace(partitionKey);
         ValidatePartitionKey(partitionKey, nameof(partitionKey));
@@ -131,18 +131,22 @@ public sealed class AzureTableJournalStorageOptions
     {
         if (tableName is not { Length: >= 3 and <= 63 } || !IsAsciiLetter(tableName[0]))
         {
+#pragma warning disable CA2208 // Validation reports the public configuration property rather than this helper parameter.
             throw new ArgumentException(
                 "Azure Table names must contain 3 to 63 alphanumeric characters and begin with a letter.",
                 nameof(TableName));
+#pragma warning restore CA2208
         }
 
         foreach (var character in tableName)
         {
             if (!IsAsciiLetter(character) && character is not (>= '0' and <= '9'))
             {
+#pragma warning disable CA2208 // Validation reports the public configuration property rather than this helper parameter.
                 throw new ArgumentException(
                     "Azure Table names must contain 3 to 63 alphanumeric characters and begin with a letter.",
                     nameof(TableName));
+#pragma warning restore CA2208
             }
         }
     }

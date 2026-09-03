@@ -73,7 +73,7 @@ namespace Orleans.Hosting.Kubernetes
             _options = options;
             _clusterOptions = clusterOptions.Value;
             _clusterMembershipService = clusterMembershipService;
-            _config = _options.CurrentValue.GetClientConfiguration?.Invoke() ?? throw new ArgumentNullException(nameof(KubernetesHostingOptions) + "." + nameof(KubernetesHostingOptions.GetClientConfiguration));
+            _config = _options.CurrentValue.GetClientConfiguration?.Invoke() ?? throw new ArgumentException("A Kubernetes client configuration must be provided.", nameof(options));
             _client = new k8s.Kubernetes(_config);
             _podLabelSelector = $"{KubernetesHostingOptions.ServiceIdLabel}={_clusterOptions.ServiceId},{KubernetesHostingOptions.ClusterIdLabel}={_clusterOptions.ClusterId}";
             _podNamespace = _options.CurrentValue.Namespace!;

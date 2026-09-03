@@ -132,7 +132,7 @@ namespace Orleans.Transactions.AzureStorage
             var keyETag = key.ETag.ToString();
             if ((!string.IsNullOrWhiteSpace(keyETag) || !string.IsNullOrWhiteSpace(expectedETag)) && keyETag != expectedETag)
             {
-                throw new ArgumentException(nameof(expectedETag), "Etag does not match");
+                throw new ArgumentException("Etag does not match", nameof(expectedETag));
             }
 
             try

@@ -62,8 +62,8 @@ namespace Orleans.GrainDirectory.AzureStorage
             this.options = options ?? throw new ArgumentNullException(nameof(options));
 
             Logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            TableName = options.TableName ?? throw new ArgumentNullException(nameof(options.TableName));
-            StoragePolicyOptions = options.StoragePolicyOptions ?? throw new ArgumentNullException(nameof(options.StoragePolicyOptions));
+            TableName = options.TableName ?? throw new ArgumentException("A table name must be configured.", nameof(options));
+            StoragePolicyOptions = options.StoragePolicyOptions ?? throw new ArgumentException("Storage policy options must be configured.", nameof(options));
 
             AzureTableUtils.ValidateTableName(TableName);
         }

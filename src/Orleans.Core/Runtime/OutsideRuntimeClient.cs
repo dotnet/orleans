@@ -406,7 +406,7 @@ namespace Orleans
 
             if (!localObjects!.TryRegister(obj, observerId))
             {
-                throw new ArgumentException($"Failed to add new observer {reference} to localObjects collection.", "reference");
+                throw new ArgumentException($"Failed to add new observer {reference} to localObjects collection.", nameof(obj));
             }
 
             return reference;
@@ -426,7 +426,7 @@ namespace Orleans
 
             if (!localObjects!.TryDeregister(observerId))
             {
-                throw new ArgumentException("Reference is not associated with a local object.", "reference");
+                throw new ArgumentException("Reference is not associated with a local object.", nameof(obj));
             }
         }
 

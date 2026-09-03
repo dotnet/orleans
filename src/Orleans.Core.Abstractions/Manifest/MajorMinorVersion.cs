@@ -73,7 +73,7 @@ namespace Orleans.Metadata
             if (string.IsNullOrWhiteSpace(value)) throw new ArgumentNullException(nameof(value));
 
             var i = value.IndexOf('.');
-            if (i < 0) throw new ArgumentException(nameof(value));
+            if (i < 0) throw new ArgumentException("The value must contain a major and minor version separated by a period.", nameof(value));
             return new MajorMinorVersion(long.Parse(value[..i]), long.Parse(value[(i + 1)..]));
         }
 

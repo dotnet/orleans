@@ -76,7 +76,7 @@ namespace Orleans.Streams
             StreamInstruments? streamInstruments = null)
             : base(id, shared)
         {
-            if (strProviderName == null) throw new ArgumentNullException("runtime", "PersistentStreamPullingAgent: strProviderName should not be null");
+            if (strProviderName == null) throw new ArgumentNullException(nameof(strProviderName), "PersistentStreamPullingAgent: strProviderName should not be null");
 
             QueueId = queueId;
             streamProviderName = strProviderName;

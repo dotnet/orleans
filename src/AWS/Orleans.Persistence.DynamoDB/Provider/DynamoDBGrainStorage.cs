@@ -371,7 +371,7 @@ namespace Orleans.Storage
             if ((pkSize + rkSize + versionSize + dataSize) > MAX_DATA_SIZE)
             {
                 var msg = $"Data too large to write to DynamoDB table. Size={dataSize} MaxSize={MAX_DATA_SIZE}";
-                throw new ArgumentOutOfRangeException("GrainState.Size", msg);
+                throw new ArgumentOutOfRangeException(nameof(grainState), msg);
             }
         }
 

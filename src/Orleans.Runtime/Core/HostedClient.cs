@@ -116,7 +116,7 @@ namespace Orleans.Runtime
             {
                 throw new ArgumentException(
                     string.Format("Failed to add new observer {0} to localObjects collection.", grainReference),
-                    nameof(grainReference));
+                    nameof(obj));
             }
 
             return grainReference;
@@ -137,7 +137,7 @@ namespace Orleans.Runtime
 
             if (!invokableObjects.TryDeregister(observerId))
             {
-                throw new ArgumentException("Reference is not associated with a local object.", "reference");
+                throw new ArgumentException("Reference is not associated with a local object.", nameof(obj));
             }
         }
 

@@ -296,7 +296,7 @@ namespace OrleansAWSUtils.Storage
                     throw new ArgumentNullException(nameof(message));
 
                 if (string.IsNullOrWhiteSpace(message.ReceiptHandle))
-                    throw new ArgumentNullException(nameof(message.ReceiptHandle));
+                    throw new ArgumentException("The message must have a receipt handle.", nameof(message));
 
                 if (string.IsNullOrWhiteSpace(queueUrl))
                     throw new InvalidOperationException("Queue not initialized");
@@ -368,7 +368,7 @@ namespace OrleansAWSUtils.Storage
                 throw new ArgumentNullException(nameof(message));
 
             if (string.IsNullOrWhiteSpace(message.ReceiptHandle))
-                throw new ArgumentNullException(nameof(message.ReceiptHandle));
+                throw new ArgumentException("The message must have a receipt handle.", nameof(message));
         }
 
         private void ReportErrorAndRethrow(Exception exc, string operation)

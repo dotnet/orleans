@@ -112,16 +112,16 @@ namespace Orleans.Runtime.Providers
         {
             try
             {
-                var balancer = this.ServiceProvider.GetKeyedService<IStreamQueueBalancer>(streamProviderName) ??this.ServiceProvider.GetService<IStreamQueueBalancer>();
+                var balancer = this.ServiceProvider.GetKeyedService<IStreamQueueBalancer>(streamProviderName) ?? this.ServiceProvider.GetService<IStreamQueueBalancer>();
                 if (balancer == null)
-                    throw new ArgumentOutOfRangeException("balancerType", $"Cannot create stream queue balancer for StreamProvider: {streamProviderName}.Please configure your stream provider with a queue balancer.");
+                    throw new ArgumentOutOfRangeException(nameof(streamProviderName), streamProviderName, $"Cannot create stream queue balancer for StreamProvider: {streamProviderName}. Please configure your stream provider with a queue balancer.");
                 LogInfoSuccessfullyCreatedQueueBalancer(balancer.GetType(), streamProviderName);
                 return balancer;
             }
             catch (Exception e)
             {
                 string error = $"Cannot create stream queue balancer for StreamProvider: {streamProviderName}, Exception: {e}. Please configure your stream provider with a queue balancer.";
-                throw new ArgumentOutOfRangeException("balancerType", error);
+                throw new ArgumentOutOfRangeException(nameof(streamProviderName), streamProviderName, error);
             }
         }
 

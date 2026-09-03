@@ -81,7 +81,7 @@ internal class GrainRuntime : IGrainRuntime
     public IStorage<TGrainState> GetStorage<TGrainState>(IGrainContext grainContext)
     {
         ArgumentNullException.ThrowIfNull(grainContext);
-        var grainType = grainContext.GrainInstance?.GetType() ?? throw new ArgumentNullException(nameof(IGrainContext.GrainInstance));
+        var grainType = grainContext.GrainInstance?.GetType() ?? throw new ArgumentException("The grain context must have a grain instance.", nameof(grainContext));
         IGrainStorage grainStorage = GrainStorageHelpers.GetGrainStorage(grainType, ServiceProvider);
         return new StateStorageBridge<TGrainState>("state", grainContext, grainStorage);
     }

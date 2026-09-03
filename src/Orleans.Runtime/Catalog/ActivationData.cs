@@ -1483,7 +1483,7 @@ internal sealed partial class ActivationData :
             OnCompletedRequest(message);
         }
 
-        static async ValueTask OnCompleteAsync(ActivationData activation, Message message, Task task)
+        static async Task OnCompleteAsync(ActivationData activation, Message message, Task task)
         {
             try
             {
