@@ -51,10 +51,10 @@ namespace DefaultCluster.Tests.General
             {
                 // Verify the observer was created during lifecycle participation
                 Assert.True(observerCreated, "Observer should have been created during lifecycle participation");
-                
+
                 // Verify that a grain call was successfully made during lifecycle participation
                 Assert.True(grainCalled, "Grain should have been called during lifecycle participation");
-                
+
                 // Also verify the cluster is operational by calling a grain after startup
                 var grain = cluster.Client!.GetGrain<ISimpleGrain>(42);
                 await grain.SetA(100);
@@ -100,18 +100,18 @@ namespace DefaultCluster.Tests.General
                 // should work now that lifecycle events run via Task.Run instead of on a SystemTarget
                 var observer = new TestObserver();
                 var reference = _grainFactory.CreateObjectReference<ISimpleGrainObserver>(observer);
-                
+
                 // Verify the reference was created successfully
                 Assert.NotNull(reference);
                 _onObserverCreated();
-                
+
                 // Also test that we can make grain calls during lifecycle participation
                 var grain = _grainFactory.GetGrain<ISimpleGrain>(123);
                 await grain.SetA(50);
                 var value = await grain.GetA();
                 Assert.Equal(50, value);
                 _onGrainCalled();
-                
+
                 // Clean up
                 _grainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference);
             }

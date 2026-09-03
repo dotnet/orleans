@@ -48,5 +48,5 @@ namespace UnitTests.GrainInterfaces
     {
         Task<string> DoSomething();
     }
-    
+
 }

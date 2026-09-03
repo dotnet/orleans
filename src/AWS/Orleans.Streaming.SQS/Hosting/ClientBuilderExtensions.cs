@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Orleans.Configuration;
 
 namespace Orleans.Hosting
@@ -17,8 +17,8 @@ namespace Orleans.Hosting
         /// <returns>The client builder.</returns>
         public static IClientBuilder AddSqsStreams(this IClientBuilder builder, string name, Action<SqsOptions> configureOptions)
         {
-            builder.AddSqsStreams(name, b=>
-                b.ConfigureSqs(ob=>ob.Configure(configureOptions)));
+            builder.AddSqsStreams(name, b =>
+                b.ConfigureSqs(ob => ob.Configure(configureOptions)));
             return builder;
         }
 

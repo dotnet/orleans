@@ -36,14 +36,14 @@ namespace Tester.StreamingTests
         private async Task GetInitialLease()
         {
             this.ownedQueues = new List<QueueId>(_expectedResponsibility);
-            for(int i = 0; i < _expectedResponsibility; i++)
+            for (int i = 0; i < _expectedResponsibility; i++)
             {
                 try
                 {
                     this.ownedQueues.Add(await this.leaseManagerGrain.Acquire());
                 }
                 catch (KeyNotFoundException)
-                { }   
+                { }
             }
             await this.leaseManagerGrain.RecordBalancerResponsibility(id.ToString(), this.ownedQueues.Count);
         }

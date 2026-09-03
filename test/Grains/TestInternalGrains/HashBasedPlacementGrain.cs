@@ -1,4 +1,4 @@
-﻿using Orleans.Placement;
+using Orleans.Placement;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 

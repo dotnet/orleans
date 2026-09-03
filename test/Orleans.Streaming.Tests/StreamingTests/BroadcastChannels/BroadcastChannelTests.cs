@@ -235,7 +235,7 @@ namespace Tester.StreamingTests.BroadcastChannel
                     Assert.Equal(1, values[0]);
                     Assert.Equal(2, values[1]);
                     Assert.Equal(3, values[2]);
-                } 
+                }
             }
         }
 

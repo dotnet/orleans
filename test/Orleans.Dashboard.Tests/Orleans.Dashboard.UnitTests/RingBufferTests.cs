@@ -47,7 +47,7 @@ namespace UnitTests
 
         private static List<T> ToList<T>(RingBuffer<T> buffer)
         {
-            var result = new List<T>(); 
+            var result = new List<T>();
 
             for (var i = 0; i < buffer.Count; i++)
             {

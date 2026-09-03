@@ -285,7 +285,7 @@ namespace Orleans.Runtime
                 }
 
                 activation.Deactivate(reason, cancellationToken);
-                return new (activation.Deactivated);
+                return new(activation.Deactivated);
             }).WaitAsync(cancellationToken);
         }
 
@@ -308,7 +308,7 @@ namespace Orleans.Runtime
 
                 var activation = kv.Value;
                 activation.Deactivate(reason, cancellationToken);
-                return new (activation.Deactivated);
+                return new(activation.Deactivated);
             }).WaitAsync(cancellationToken);
         }
 

@@ -66,7 +66,7 @@ namespace NonSilo.Tests.Directory
         [Fact]
         public void ListAllDirectories()
         {
-            
+
             var expected = new[] { this.azureDirectory, this.otherDirectory, this.againAnotherDirectory };
             Assert.Equal(expected, this.target.Directories.ToArray());
         }

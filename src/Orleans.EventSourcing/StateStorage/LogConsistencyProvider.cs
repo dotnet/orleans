@@ -26,7 +26,7 @@ namespace Orleans.EventSourcing.StateStorage
             where TView : class, new()
             where TEntry : class
         {
-            return new LogViewAdaptor<TView,TEntry>(hostGrain, initialState, grainStorage!, grainTypeName, services);
+            return new LogViewAdaptor<TView, TEntry>(hostGrain, initialState, grainStorage!, grainTypeName, services);
         }
     }
 }

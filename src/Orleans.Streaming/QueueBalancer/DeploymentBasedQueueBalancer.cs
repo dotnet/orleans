@@ -44,7 +44,7 @@ namespace Orleans.Streams
             DeploymentBasedQueueBalancerOptions options,
             IServiceProvider services,
             ILogger<DeploymentBasedQueueBalancer> logger)
-            : base (services, logger)
+            : base(services, logger)
         {
             this.siloStatusOracle = siloStatusOracle ?? throw new ArgumentNullException(nameof(siloStatusOracle));
             this.deploymentConfig = deploymentConfig ?? throw new ArgumentNullException(nameof(deploymentConfig));
@@ -157,8 +157,8 @@ namespace Orleans.Streams
             return new BestFitBalancer<string, QueueId>(allSiloNames, allQueues);
         }
 
-        private static HashSet<QueueId> GetQueuesOfImmatureSilos(ISiloStatusOracle siloStatusOracle, 
-            ConcurrentDictionary<SiloAddress, bool> immatureSilos, 
+        private static HashSet<QueueId> GetQueuesOfImmatureSilos(ISiloStatusOracle siloStatusOracle,
+            ConcurrentDictionary<SiloAddress, bool> immatureSilos,
             Dictionary<string, List<QueueId>> idealDistribution)
         {
             HashSet<QueueId> queuesOfImmatureSilos = new HashSet<QueueId>();

@@ -411,10 +411,10 @@ grow:
             HasTimeToLive = 1 << 8,
 
             // Message cannot be forwarded to another activation.
-            IsLocalOnly = 1 << 9, 
+            IsLocalOnly = 1 << 9,
 
             // Message must not trigger grain activation or extend an activation's lifetime.
-            SuppressKeepAlive = 1 << 10,  
+            SuppressKeepAlive = 1 << 10,
 
             // The most significant bit is reserved, possibly for use to indicate more data follows.
             Reserved = 1 << 15,

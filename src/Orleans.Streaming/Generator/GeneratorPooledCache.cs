@@ -35,7 +35,7 @@ namespace Orleans.Providers.Streams.Generator
             this.serializer = serializer;
             cache = new PooledQueueCache(this, logger, cacheMonitor, monitorWriteInterval);
             TimePurgePredicate purgePredicate = new TimePurgePredicate(TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(10));
-            this.evictionStrategy = new ChronologicalEvictionStrategy(logger, purgePredicate, cacheMonitor, monitorWriteInterval) {PurgeObservable = cache};
+            this.evictionStrategy = new ChronologicalEvictionStrategy(logger, purgePredicate, cacheMonitor, monitorWriteInterval) { PurgeObservable = cache };
         }
 
         /// <inheritdoc />

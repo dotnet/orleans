@@ -84,7 +84,7 @@ public sealed class RepeatedFieldCodec<T> : IFieldCodec<RepeatedField<T>>
                     var length = (int)UInt32Codec.ReadValue(ref reader, header);
                     reader.EnsureAvailable((uint)length);
 
-                    result = new RepeatedField<T>{ Capacity = length };
+                    result = new RepeatedField<T> { Capacity = length };
                     ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
                     break;
                 case 1:

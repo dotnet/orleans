@@ -129,7 +129,7 @@ namespace Orleans.Storage
         /// </summary>
         /// <param name="message">The message.</param>
         /// <param name="innerException">The inner exception.</param>
-        public InconsistentStateException(string message,         Exception? innerException)
+        public InconsistentStateException(string message, Exception? innerException)
             : base(message, innerException!)
         {
         }

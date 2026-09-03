@@ -10,7 +10,7 @@ public static class InvalidRpcMethodReturnTypeDiagnostic
     /// <summary>
     /// The diagnostic identifier.
     /// </summary>
-    public const string RuleId = DiagnosticRuleId.InvalidRpcMethodReturnType; 
+    public const string RuleId = DiagnosticRuleId.InvalidRpcMethodReturnType;
     private const string Category = "Usage";
     private static readonly LocalizableString Title = new LocalizableResourceString(nameof(Resources.InvalidRpcMethodReturnTypeTitle), Resources.ResourceManager, typeof(Resources));
     private static readonly LocalizableString MessageFormat = new LocalizableResourceString(nameof(Resources.InvalidRpcMethodReturnTypeMessageFormat), Resources.ResourceManager, typeof(Resources));

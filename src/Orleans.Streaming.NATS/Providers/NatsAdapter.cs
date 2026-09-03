@@ -38,7 +38,8 @@ internal sealed class NatsAdapter(
         // Request context is carried in the Orleans-serialized payload, which preserves its value types.
         return new NatsStreamMessage
         {
-            StreamId = streamId, Payload = raw
+            StreamId = streamId,
+            Payload = raw
         };
     }
 }

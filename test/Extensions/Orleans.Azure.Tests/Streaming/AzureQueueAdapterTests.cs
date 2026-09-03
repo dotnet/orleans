@@ -95,7 +95,7 @@ namespace Tester.AzureUtils.Streaming
 
             // reader threads (at most 2 active queues because only two streams)
             var work = new List<Task>();
-            foreach( KeyValuePair<QueueId, IQueueAdapterReceiver> receiverKvp in receivers)
+            foreach (KeyValuePair<QueueId, IQueueAdapterReceiver> receiverKvp in receivers)
             {
                 QueueId queueId = receiverKvp.Key;
                 var receiver = receiverKvp.Value;
@@ -112,21 +112,21 @@ namespace Tester.AzureUtils.Streaming
                             var messages = receivedMessages.ToArray();
                             if (!messages.Any())
                             {
-                               continue;
+                                continue;
                             }
                             foreach (IBatchContainer message in messages)
                             {
-                               streamsPerQueue.AddOrUpdate(queueId,
-                                   id => new HashSet<StreamId> { message.StreamId },
-                                   (id, set) =>
-                                   {
-                                       set.Add(message.StreamId);
-                                       return set;
-                                   });
-                               this.output.WriteLine("Queue {0} received message on stream {1}", queueId,
-                                   message.StreamId);
-                               Assert.Equal(NumMessagesPerBatch / 2, message.GetEvents<int>().Count());  // "Half the events were ints"
-                               Assert.Equal(NumMessagesPerBatch / 2, message.GetEvents<string>().Count());  // "Half the events were strings"
+                                streamsPerQueue.AddOrUpdate(queueId,
+                                    id => new HashSet<StreamId> { message.StreamId },
+                                    (id, set) =>
+                                    {
+                                        set.Add(message.StreamId);
+                                        return set;
+                                    });
+                                this.output.WriteLine("Queue {0} received message on stream {1}", queueId,
+                                    message.StreamId);
+                                Assert.Equal(NumMessagesPerBatch / 2, message.GetEvents<int>().Count());  // "Half the events were ints"
+                                Assert.Equal(NumMessagesPerBatch / 2, message.GetEvents<string>().Count());  // "Half the events were strings"
                             }
                             Interlocked.Add(ref receivedBatches, messages.Length);
                             qCache.AddToCache(messages);

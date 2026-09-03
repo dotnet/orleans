@@ -840,7 +840,7 @@ namespace UnitTests.Grains
         }
     }
 
-    public class GenericGrainWithContraints<A, B, C>: Grain, IGenericGrainWithConstraints<A, B, C>
+    public class GenericGrainWithContraints<A, B, C> : Grain, IGenericGrainWithConstraints<A, B, C>
         where A : ICollection<B>, new()
         where B : struct
         where C : class
@@ -871,18 +871,21 @@ namespace UnitTests.Grains
 
     public class NonGenericCastableGrain : Grain, INonGenericCastableGrain, ISomeGenericGrain<string>, IIndependentlyConcretizedGenericGrain<string>, IIndependentlyConcretizedGrain
     {
-        public Task DoSomething() {
+        public Task DoSomething()
+        {
             return Task.CompletedTask;
         }
 
-        public Task<string> Hello() {
+        public Task<string> Hello()
+        {
             return Task.FromResult("Hello!");
         }
     }
 
     public class GenericCastableGrain<T> : Grain, IGenericCastableGrain<T>, INonGenericCastGrain
     {
-        public Task<string> Hello() {
+        public Task<string> Hello()
+        {
             return Task.FromResult("Hello!");
         }
     }
@@ -937,7 +940,7 @@ namespace UnitTests.Grains
     public class UnmanagedArgGrain<T> : IUnmanagedArgGrain<T> where T : unmanaged
     {
         public ValueTask<T> Echo(T value) => new(value);
-        public ValueTask<U> EchoNonNullable<U>(U value)  where U : notnull => new(value);
+        public ValueTask<U> EchoNonNullable<U>(U value) where U : notnull => new(value);
         public ValueTask<U> EchoReference<U>(U value) where U : class => new(value);
         public ValueTask<U> EchoValue<U>(U value) where U : struct => new(value);
     }
@@ -979,7 +982,7 @@ namespace UnitTests.Grains
 
             private Type GetImmediateSubclass(Type subject)
             {
-                if(subject.BaseType == typeof(BasicGrain))
+                if (subject.BaseType == typeof(BasicGrain))
                 {
                     return subject;
                 }

@@ -10,19 +10,19 @@ namespace Consul.Tests
     {
         [Fact, TestCategory("BVT"), TestCategory("Consul")]
         public void DefaultCreationBehaviorIsRetained()
-        {            
+        {
             var options = new ConsulClusteringOptions();
 
             // ensure we set a default value.
             var actual = options.CreateClient;
 
             Assert.NotNull(actual);
-        }       
+        }
 
         [Fact, TestCategory("BVT"), TestCategory("Consul")]
         public void ThrowsArgumentNullExceptionIfCallbackIsNull()
-        {            
-            var  options = new ConsulClusteringOptions();
+        {
+            var options = new ConsulClusteringOptions();
             Func<IConsulClient> callback = null!;
 
             // ensure we check the callback.
@@ -51,12 +51,12 @@ namespace Consul.Tests
             var address = new Uri("http://localhost:8501");
             var token = "SomeToken";
 
-            var options = new ConsulClusteringOptions();            
+            var options = new ConsulClusteringOptions();
 
             //we can configure the default consult client
             options.ConfigureConsulClient(address, token);
 
-            var client = (ConsulClient) options.CreateClient();
+            var client = (ConsulClient)options.CreateClient();
 
             Assert.Equal(address, client.Config.Address);
             Assert.Equal(token, client.Config.Token);
@@ -65,7 +65,7 @@ namespace Consul.Tests
         [Fact, TestCategory("BVT"), TestCategory("Consul")]
         public void WeCanUseConfigureToSetupTheDefaultClientWithoutAAclToken()
         {
-            var address = new Uri("http://localhost:8501");           
+            var address = new Uri("http://localhost:8501");
             var options = new ConsulClusteringOptions();
 
             //we can configure the default consult client
@@ -134,7 +134,7 @@ namespace Consul.Tests
             public Task ExecuteLocked(string key, CancellationToken ct, Action action) => throw new NotImplementedException();
             public IDistributedSemaphore Semaphore(SemaphoreOptions opts) => throw new NotImplementedException();
             public IDistributedSemaphore Semaphore(string prefix, int limit) => throw new NotImplementedException();
-        }       
+        }
     }
 }
 

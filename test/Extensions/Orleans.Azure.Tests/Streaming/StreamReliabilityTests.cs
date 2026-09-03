@@ -54,7 +54,7 @@ namespace UnitTests.Streaming.Reliability
             TestUtils.CheckForAzureStorage();
 
             this._numExpectedSilos = 2;
-            builder.Options.InitialSilosCount = (short) this._numExpectedSilos;
+            builder.Options.InitialSilosCount = (short)this._numExpectedSilos;
 
             builder.ConfigureSilo((_, siloBuilder) => ConfigureSilo(siloBuilder));
             builder.ConfigureClient(ConfigureClient);
@@ -220,7 +220,7 @@ namespace UnitTests.Streaming.Reliability
         }
 
         [TestArea("Streaming")]
-        [Fact(Skip ="Ignore"), TestCategory("Failures"), TestCategory("Streaming"), TestCategory("Reliability")]
+        [Fact(Skip = "Ignore"), TestCategory("Failures"), TestCategory("Streaming"), TestCategory("Reliability")]
         public async Task SMS_AddMany_Consumers()
         {
             const string testName = "SMS_AddMany_Consumers";
@@ -502,7 +502,7 @@ namespace UnitTests.Streaming.Reliability
             // Messages received by original consumer grain
             await WaitForItemDeliveriesAsync(when2, _subscriptionId, numLoops, deliverySnapshots2[_subscriptionId]);
             await Task.WhenAll(consumers2.Select(consumer => WaitForItemDeliveriesAsync(when2, consumer.SubscriptionId, numLoops, deliverySnapshots2[consumer.SubscriptionId])));
-            await CheckReceivedCounts(when2, consumerGrain, numLoops*2 + 1, 0);
+            await CheckReceivedCounts(when2, consumerGrain, numLoops * 2 + 1, 0);
             // Messages received by new consumer grains
             await Task.WhenAll(consumers2.Select(consumer => CheckReceivedCounts(when2, consumer.Grain, numLoops, 0)));
 
@@ -1019,9 +1019,9 @@ namespace UnitTests.Streaming.Reliability
             await WaitForItemDeliveriesAsync(when + "-Old", _subscriptionId, numLoops, deliverySnapshots[_subscriptionId]);
             await WaitForItemDeliveriesAsync(when + "-New", newConsumerSubscription.HandleId, numLoops, deliverySnapshots[newConsumerSubscription.HandleId]);
             // Old consumer received the newly published messages
-            await CheckReceivedCounts(when+"-Old", consumerGrain, expectedReceived, 0);
+            await CheckReceivedCounts(when + "-Old", consumerGrain, expectedReceived, 0);
             // New consumer received the newly published messages
-            await CheckReceivedCounts(when+"-New", newConsumer, numLoops, 0);
+            await CheckReceivedCounts(when + "-New", newConsumer, numLoops, 0);
 
             StreamTestUtils.LogEndTest(testName, Logger);
         }

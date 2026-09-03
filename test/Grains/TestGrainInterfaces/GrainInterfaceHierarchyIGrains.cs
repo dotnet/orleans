@@ -1,4 +1,4 @@
-﻿namespace TestGrainInterfaces
+namespace TestGrainInterfaces
 {
     public interface IDoSomething
     {

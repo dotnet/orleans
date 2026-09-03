@@ -13,7 +13,7 @@ namespace Orleans.Transactions.TestKit.xUnit
         /// <param name="cluster">The test cluster used to run recovery scenarios.</param>
         /// <param name="testOutput">The xUnit test output helper.</param>
         public TransactionRecoveryTestsRunnerxUnit(TestCluster cluster, ITestOutputHelper testOutput)
-            :base(cluster, testOutput.WriteLine)
+            : base(cluster, testOutput.WriteLine)
         {
         }
 

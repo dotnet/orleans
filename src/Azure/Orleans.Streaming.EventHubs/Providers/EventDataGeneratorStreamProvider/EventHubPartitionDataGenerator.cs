@@ -134,7 +134,7 @@ namespace Orleans.Streaming.EventHubs.Testing
         /// <inheritdoc />
         public void AddDataGeneratorForStream(StreamId streamId)
         {
-            var generator =  this.generatorFactory(streamId);
+            var generator = this.generatorFactory(streamId);
             generator.SequenceNumberCounter = sequenceNumberCounter;
             LogInfoOnStreamSetup(streamId);
             this.generators.Add(generator);
@@ -142,7 +142,8 @@ namespace Orleans.Streaming.EventHubs.Testing
         /// <inheritdoc />
         public void StopProducingOnStream(StreamId streamId)
         {
-            this.generators.ForEach(generator => {
+            this.generators.ForEach(generator =>
+            {
                 if (generator.StreamId.Equals(streamId))
                 {
                     generator.ShouldProduce = false;

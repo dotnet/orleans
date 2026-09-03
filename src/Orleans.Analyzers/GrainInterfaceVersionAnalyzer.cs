@@ -1027,10 +1027,10 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
         }
 
         if (namedType is
-        {
-            Name: "Task" or "ValueTask",
-            ContainingNamespace: { } containingNamespace
-        }
+            {
+                Name: "Task" or "ValueTask",
+                ContainingNamespace: { } containingNamespace
+            }
             && containingNamespace.ToDisplayString() == "System.Threading.Tasks")
         {
             if (namedType.TypeArguments.IsEmpty)

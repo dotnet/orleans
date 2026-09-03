@@ -81,7 +81,7 @@ namespace UnitTests.OrleansRuntime.Streams
         {
             public CachedMessageBlock Allocate()
             {
-                return new CachedMessageBlock(TestBlockSize){Pool = this};
+                return new CachedMessageBlock(TestBlockSize) { Pool = this };
             }
 
             public void Free(CachedMessageBlock resource)
@@ -169,7 +169,7 @@ namespace UnitTests.OrleansRuntime.Streams
             // add both streams interleaved, until lock is full
             while (block.HasCapacity)
             {
-                var stream = streams[last%2];
+                var stream = streams[last % 2];
                 var message = new TestQueueMessage
                 {
                     StreamGuid = stream.Guid,

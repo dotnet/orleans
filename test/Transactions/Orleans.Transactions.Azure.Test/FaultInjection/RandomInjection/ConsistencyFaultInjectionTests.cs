@@ -10,7 +10,7 @@ namespace Orleans.Transactions.AzureStorage.Tests
     [TestSuite("Nightly")]
     [TestProvider("AzureStorage")]
     [TestArea("Transactions")]
-    public class ConsistencyFaultInjectionTests: ConsistencyTransactionTestRunnerxUnit, IClassFixture<RandomFaultInjectedTestFixture>
+    public class ConsistencyFaultInjectionTests : ConsistencyTransactionTestRunnerxUnit, IClassFixture<RandomFaultInjectedTestFixture>
     {
         public ConsistencyFaultInjectionTests(RandomFaultInjectedTestFixture fixture, ITestOutputHelper output)
             : base(fixture.GrainFactory, output)

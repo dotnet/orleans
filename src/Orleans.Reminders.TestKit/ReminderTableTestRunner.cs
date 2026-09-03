@@ -1750,52 +1750,52 @@ public abstract class ReminderTableTestRunner
             uint? begin = null,
             uint? end = null,
             RangeFixture? fixtureState = null)
+    {
+        var actualEntryList = actualEntries.ToList();
+        var actual = actualEntryList
+            .Select(entry => ReminderTableEntrySnapshot.Observe(entry, supportsSubSecondPrecision: false))
+            .ToList();
+        var difference = ReminderTableEntrySnapshotComparer.CompareExact(expected, actual);
+        if (difference is null)
         {
-            var actualEntryList = actualEntries.ToList();
-            var actual = actualEntryList
-                .Select(entry => ReminderTableEntrySnapshot.Observe(entry, supportsSubSecondPrecision: false))
-                .ToList();
-            var difference = ReminderTableEntrySnapshotComparer.CompareExact(expected, actual);
-            if (difference is null)
-            {
-                return;
-            }
-
-            var report = Report(guarantee, operation)
-                .WithExpected($"exact identities and complete entries [{string.Join(", ", expected)}]")
-                .WithObserved($"[{string.Join(", ", actual)}]")
-                .WithDetail("differingField", difference.Field)
-                .WithDetail("comparison", difference.ToString());
-            var identity = difference.Expected?.Identity ?? difference.Actual?.Identity;
-            if (identity is null)
-            {
-                var expectedIdentities = expected.Select(entry => entry.Identity).ToHashSet();
-                var actualIdentities = actual.Select(entry => entry.Identity).ToHashSet();
-                identity = actual.FirstOrDefault(entry => !expectedIdentities.Contains(entry.Identity)).Identity;
-                if (identity.Value == default)
-                {
-                    identity = expected.FirstOrDefault(entry => !actualIdentities.Contains(entry.Identity)).Identity;
-                }
-            }
-
-            if (identity is { } value)
-            {
-                report.WithIdentity(value.GrainId, value.ReminderName);
-            }
-
-            if (begin is { } rangeBegin && end is { } rangeEnd)
-            {
-                report.WithRange(rangeBegin, rangeEnd);
-            }
-
-            if (fixtureState is not null)
-            {
-                report.WithOwnership("fixture", fixtureState.All.Select(entry => entry.Hash))
-                    .WithOwnership("returned", actualEntryList.Select(entry => entry.GrainId.GetUniformHashCode()));
-            }
-
-            report.Throw();
+            return;
         }
+
+        var report = Report(guarantee, operation)
+            .WithExpected($"exact identities and complete entries [{string.Join(", ", expected)}]")
+            .WithObserved($"[{string.Join(", ", actual)}]")
+            .WithDetail("differingField", difference.Field)
+            .WithDetail("comparison", difference.ToString());
+        var identity = difference.Expected?.Identity ?? difference.Actual?.Identity;
+        if (identity is null)
+        {
+            var expectedIdentities = expected.Select(entry => entry.Identity).ToHashSet();
+            var actualIdentities = actual.Select(entry => entry.Identity).ToHashSet();
+            identity = actual.FirstOrDefault(entry => !expectedIdentities.Contains(entry.Identity)).Identity;
+            if (identity.Value == default)
+            {
+                identity = expected.FirstOrDefault(entry => !actualIdentities.Contains(entry.Identity)).Identity;
+            }
+        }
+
+        if (identity is { } value)
+        {
+            report.WithIdentity(value.GrainId, value.ReminderName);
+        }
+
+        if (begin is { } rangeBegin && end is { } rangeEnd)
+        {
+            report.WithRange(rangeBegin, rangeEnd);
+        }
+
+        if (fixtureState is not null)
+        {
+            report.WithOwnership("fixture", fixtureState.All.Select(entry => entry.Hash))
+                .WithOwnership("returned", actualEntryList.Select(entry => entry.GrainId.GetUniformHashCode()));
+        }
+
+        report.Throw();
+    }
 
     /// <summary>
     /// A reminder created by the hash-range fixture.

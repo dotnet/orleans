@@ -13,7 +13,7 @@ namespace Orleans.Serialization;
 /// </summary>
 public static class SerializationHostingExtensions
 {
-    private static readonly ServiceDescriptor ServiceDescriptor = new (typeof(NewtonsoftJsonCodec), typeof(NewtonsoftJsonCodec));
+    private static readonly ServiceDescriptor ServiceDescriptor = new(typeof(NewtonsoftJsonCodec), typeof(NewtonsoftJsonCodec));
 
     /// <summary>
     /// Adds support for serializing and deserializing values using <see cref="JsonSerializer"/>.

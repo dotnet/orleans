@@ -10,7 +10,7 @@ namespace Orleans.Hosting
     /// <summary>
     /// Configures a named Azure Event Hubs stream provider.
     /// </summary>
-    public interface IEventHubStreamConfigurator : INamedServiceConfigurator {}
+    public interface IEventHubStreamConfigurator : INamedServiceConfigurator { }
 
     /// <summary>
     /// Extension methods for configuring Azure Event Hubs stream providers.

@@ -414,7 +414,7 @@ namespace Orleans.Runtime
             }
 
             _catalogInstruments.OnActivationCollected();
-            if (candidates.Count > 0) 
+            if (candidates.Count > 0)
             {
                 LogCollectActivations(new(candidates));
 
@@ -806,7 +806,7 @@ namespace Orleans.Runtime
         [LoggerMessage(
             EventId = (int)ErrorCode.Catalog_AfterCollection,
             Level = LogLevel.Debug,
-            Message =  "After collection #{CollectionNumber} memory: {MemoryAfter}MB, #activations: {ActivationCount}, collected {CollectedCount} activations, collector: {CollectorStatus}, collection time: {CollectionTime}"
+            Message = "After collection #{CollectionNumber} memory: {MemoryAfter}MB, #activations: {ActivationCount}, collected {CollectedCount} activations, collector: {CollectorStatus}, collection time: {CollectionTime}"
         )]
         private partial void LogAfterCollection(int collectionNumber, long memoryAfter, int activationCount, int collectedCount, ActivationCollector collectorStatus, TimeSpan collectionTime);
 

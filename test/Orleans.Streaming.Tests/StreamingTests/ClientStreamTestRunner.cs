@@ -12,7 +12,7 @@ namespace Tester.StreamingTests
 {
     public class ClientStreamTestRunner
     {
-        private static readonly Func<Task<int>> DefaultDeliveryFailureCount = () => Task.FromResult(0); 
+        private static readonly Func<Task<int>> DefaultDeliveryFailureCount = () => Task.FromResult(0);
         private static readonly TimeSpan _timeout = TimeSpan.FromMinutes(3);
 
         private readonly TestCluster testHost;
@@ -57,7 +57,7 @@ namespace Tester.StreamingTests
 
             Guid streamGuid = Guid.NewGuid();
             var streamId = StreamId.Create(streamNamespace, streamGuid);
-            int[] eventCount = {0};
+            int[] eventCount = { 0 };
 
             var droppedSubscriptionId = await ProduceEventsToClient(streamProviderName, streamGuid, streamNamespace, 10, eventCount, cancellationToken);
 

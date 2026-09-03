@@ -17,7 +17,7 @@ namespace Orleans.GrainDirectory.Cosmos;
 internal abstract class BaseEntity
 {
     internal const string ID_FIELD = "id";
-    internal const string ETAG_FIELD = "_etag";    
+    internal const string ETAG_FIELD = "_etag";
 
     [JsonProperty(ID_FIELD)]
     [JsonPropertyName(ID_FIELD)]

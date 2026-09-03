@@ -30,7 +30,7 @@ namespace Tester.EventSourcingTests
 
             var expectedprefix = $"<!--This chat room was created by TestGrains.ChatGrain-->{Environment.NewLine}<root>{Environment.NewLine}  <created>";
             var expectedsuffix = $"</created>{Environment.NewLine}  <posts />{Environment.NewLine}</root>";
- 
+
             Assert.StartsWith(expectedprefix, content);
             Assert.EndsWith(expectedsuffix, content);
         }

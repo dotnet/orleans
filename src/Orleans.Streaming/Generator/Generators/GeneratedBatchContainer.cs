@@ -25,7 +25,7 @@ namespace Orleans.Providers.Streams.Generator
         /// </summary>
         /// <value>The real token.</value>
         [Id(1)]
-        public EventSequenceTokenV2 RealToken { get;  }
+        public EventSequenceTokenV2 RealToken { get; }
 
         /// <summary>
         /// Gets the enqueue time (UTC).

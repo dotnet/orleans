@@ -118,7 +118,7 @@ namespace Analyzers.Tests
                 typeof(Attribute).Assembly,
                 typeof(int).Assembly,
                 typeof(object).Assembly,
-            }; 
+            };
 
             var metadataReferences = assemblies
                 .SelectMany(x => x.GetReferencedAssemblies().Select(Assembly.Load))

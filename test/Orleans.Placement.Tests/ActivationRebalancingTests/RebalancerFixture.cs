@@ -1,4 +1,4 @@
-﻿using TestExtensions;
+using TestExtensions;
 using Orleans.Configuration;
 using Orleans.TestingHost;
 using Microsoft.Extensions.DependencyInjection;

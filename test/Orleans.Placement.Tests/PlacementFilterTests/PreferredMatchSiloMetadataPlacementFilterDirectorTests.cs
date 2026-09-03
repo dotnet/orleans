@@ -76,13 +76,13 @@ public class PreferredMatchSiloMetadataPlacementFilterDirectorTests
     [Theory, TestCategory("Functional")]
     [InlineData(1, 3, "no.match")]
     [InlineData(2, 3, "no.match")]
-    [InlineData( 1, 1, "one.match")]
-    [InlineData( 2, 3, "one.match")]
-    [InlineData( 1, 2, "two.match")]
-    [InlineData( 2, 2, "two.match")]
-    [InlineData( 3, 3, "two.match")]
-    [InlineData( 1, 3, "all.match")]
-    [InlineData( 2, 3, "all.match")]
+    [InlineData(1, 1, "one.match")]
+    [InlineData(2, 3, "one.match")]
+    [InlineData(1, 2, "two.match")]
+    [InlineData(2, 2, "two.match")]
+    [InlineData(3, 3, "two.match")]
+    [InlineData(1, 3, "all.match")]
+    [InlineData(2, 3, "all.match")]
 
     public void FiltersOnSingleMetadata(int minCandidates, int expectedCount, string key)
     {

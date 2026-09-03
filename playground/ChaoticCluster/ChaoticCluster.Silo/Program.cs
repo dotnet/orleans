@@ -66,7 +66,7 @@ var loadTask = Task.Run(async () =>
         }
         catch (OrleansMessageRejectionException omre)
         {
-           log.LogInformation(omre, "Swallowed rejection.");
+            log.LogInformation(omre, "Swallowed rejection.");
         }
         catch (Exception exception)
         {

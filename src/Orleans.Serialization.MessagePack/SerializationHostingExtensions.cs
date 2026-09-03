@@ -13,7 +13,7 @@ namespace Orleans.Serialization;
 /// </summary>
 public static class SerializationHostingExtensions
 {
-    private static readonly ServiceDescriptor ServiceDescriptor = new (typeof(MessagePackCodec), typeof(MessagePackCodec));
+    private static readonly ServiceDescriptor ServiceDescriptor = new(typeof(MessagePackCodec), typeof(MessagePackCodec));
 
     /// <summary>
     /// Adds support for serializing and deserializing values using <see cref="MessagePackSerializer"/>.

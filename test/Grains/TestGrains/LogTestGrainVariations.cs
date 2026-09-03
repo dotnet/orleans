@@ -48,7 +48,7 @@ namespace TestGrains
             }
             return storagegrain;
         }
- 
+
 
         public Task<bool> ApplyUpdatesToStorage(IReadOnlyList<object> updates, int expectedversion)
         {

@@ -82,20 +82,20 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
         }
         else
         {
-                var serializeMethod = GenerateSerializeMethod(type, fieldDescriptions, members);
-                var deserializeMethod = GenerateDeserializeMethod(type, fieldDescriptions, members);
-                if (type.IsAbstractType)
-                {
-                    if (serializeMethod != null) classDeclaration = classDeclaration.AddMembers(serializeMethod);
-                    if (deserializeMethod != null) classDeclaration = classDeclaration.AddMembers(deserializeMethod);
-                }
-                else
-                {
-                    Debug.Assert(serializeMethod is not null);
-                    Debug.Assert(deserializeMethod is not null);
-                    var writeFieldMethod = GenerateCompoundTypeWriteFieldMethod(type);
-                    var readValueMethod = GenerateCompoundTypeReadValueMethod(type, fieldDescriptions);
-                    classDeclaration = classDeclaration.AddMembers(serializeMethod!, deserializeMethod!, writeFieldMethod, readValueMethod);
+            var serializeMethod = GenerateSerializeMethod(type, fieldDescriptions, members);
+            var deserializeMethod = GenerateDeserializeMethod(type, fieldDescriptions, members);
+            if (type.IsAbstractType)
+            {
+                if (serializeMethod != null) classDeclaration = classDeclaration.AddMembers(serializeMethod);
+                if (deserializeMethod != null) classDeclaration = classDeclaration.AddMembers(deserializeMethod);
+            }
+            else
+            {
+                Debug.Assert(serializeMethod is not null);
+                Debug.Assert(deserializeMethod is not null);
+                var writeFieldMethod = GenerateCompoundTypeWriteFieldMethod(type);
+                var readValueMethod = GenerateCompoundTypeReadValueMethod(type, fieldDescriptions);
+                classDeclaration = classDeclaration.AddMembers(serializeMethod!, deserializeMethod!, writeFieldMethod, readValueMethod);
 
                 var serializerInterface = type.IsValueType ? LibraryTypes.ValueSerializer : type.IsSealedType ? null : LibraryTypes.BaseCodec_1;
                 if (serializerInterface != null)
@@ -496,11 +496,11 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
                 codecExpression = GetCodecExpression(instanceCodec);
             }
 
-           // When a static codec is available, we can call it directly and can skip passing the expected type,
-           // since it is known to be the static codec's field type:
-           //   C#: <staticCodec>.WriteField(ref writer, <fieldIdDelta, <member>)
-           // When no static codec is available:
-           //   C#: <codecField>.WriteField(ref writer, <fieldIdDelta>, <expectedType>, <member>)
+            // When a static codec is available, we can call it directly and can skip passing the expected type,
+            // since it is known to be the static codec's field type:
+            //   C#: <staticCodec>.WriteField(ref writer, <fieldIdDelta, <member>)
+            // When no static codec is available:
+            //   C#: <codecField>.WriteField(ref writer, <fieldIdDelta>, <expectedType>, <member>)
             var writeFieldArgs = new List<ArgumentSyntax> {
                 Argument(writerParam).WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword)),
                 Argument(fieldIdDeltaExpr)

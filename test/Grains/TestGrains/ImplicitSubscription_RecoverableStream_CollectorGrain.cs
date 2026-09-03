@@ -13,7 +13,7 @@ namespace TestGrains
     {
         public const string StreamNamespace = "RecoverableStream";
         public const string StorageProviderName = "AzureStorage";
-        
+
         // grain instance state
         private readonly ILogger logger;
         private IAsyncStream<GeneratedEvent> stream = null!;

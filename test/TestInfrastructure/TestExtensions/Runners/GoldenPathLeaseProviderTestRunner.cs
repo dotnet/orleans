@@ -30,7 +30,8 @@ namespace TestExtensions.Runners
                 Assert.Equal(ResponseCode.OK, result.StatusCode);
                 Assert.NotNull(result.AcquiredLease);
                 Assert.Equal(leaseRequests[i].ResourceKey, result.AcquiredLease.ResourceKey);
-            };
+            }
+            ;
         }
 
         [Fact]
@@ -61,7 +62,8 @@ namespace TestExtensions.Runners
                 Assert.Equal(ResponseCode.OK, result.StatusCode);
                 Assert.NotNull(result.AcquiredLease);
                 Assert.Equal(leaseRequests[i].ResourceKey, result.AcquiredLease.ResourceKey);
-            };
+            }
+            ;
         }
 
         [Fact]

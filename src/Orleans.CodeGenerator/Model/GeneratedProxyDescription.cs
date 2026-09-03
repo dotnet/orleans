@@ -17,7 +17,7 @@ internal class GeneratedProxyDescription
         }
         else
         {
-            MetadataName =  $"{InterfaceDescription.GeneratedNamespace}.{GeneratedClassName}`{InterfaceDescription.TypeParameters.Count}";
+            MetadataName = $"{InterfaceDescription.GeneratedNamespace}.{GeneratedClassName}`{InterfaceDescription.TypeParameters.Count}";
         }
     }
 

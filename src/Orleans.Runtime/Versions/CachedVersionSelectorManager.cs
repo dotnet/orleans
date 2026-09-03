@@ -86,8 +86,8 @@ namespace Orleans.Runtime.Versions
             var compatibilityDirector = this.CompatibilityDirectorManager.GetDirector(interfaceType);
             var available = snapshot.GetAvailableVersions(interfaceType);
             var versions = versionSelector.GetSuitableVersion(
-                requestedVersion, 
-                available, 
+                requestedVersion,
+                available,
                 compatibilityDirector);
 
             var result = snapshot.GetSupportedSilos(grainType, interfaceType, versions, out var suitableSilos);

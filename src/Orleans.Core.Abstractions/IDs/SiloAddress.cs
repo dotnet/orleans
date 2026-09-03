@@ -118,7 +118,7 @@ namespace Orleans.Runtime
             {
                 LastGeneration = elapsed = Math.Max(elapsed, LastGeneration + 1);
             }
-            
+
             return unchecked((int)elapsed); // Unchecked to truncate any bits beyond the lower 32
         }
 

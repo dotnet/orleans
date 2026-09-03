@@ -58,7 +58,7 @@ namespace AWSUtils.Tests.Streaming
             public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder
-                    .AddSqsStreams(SQSStreamProviderName, options => 
+                    .AddSqsStreams(SQSStreamProviderName, options =>
                     {
                         options.ConnectionString = AWSTestConstants.SqsConnectionString;
                     })

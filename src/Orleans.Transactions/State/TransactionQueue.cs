@@ -122,12 +122,12 @@ namespace Orleans.Transactions.State
 
                             // optimization: can immediately proceed if dependency is implied
                             bool behindRemoteEntryBySameTM = false;
-                                /* disabled - jbragg - TODO - revisit
-                                commitQueue.Count >= 2
-                                && commitQueue[commitQueue.Count - 2] is TransactionRecord<TState> rce
-                                && rce.Role == CommitRole.RemoteCommit
-                                && rce.TransactionManager.Equals(record.TransactionManager);
-                                */
+                            /* disabled - jbragg - TODO - revisit
+                            commitQueue.Count >= 2
+                            && commitQueue[commitQueue.Count - 2] is TransactionRecord<TState> rce
+                            && rce.Role == CommitRole.RemoteCommit
+                            && rce.TransactionManager.Equals(record.TransactionManager);
+                            */
 
                             if (record.NumberWrites > 0)
                             {

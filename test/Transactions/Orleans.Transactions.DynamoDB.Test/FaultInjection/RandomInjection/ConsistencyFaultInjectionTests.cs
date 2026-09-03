@@ -10,7 +10,7 @@ namespace Orleans.Transactions.DynamoDB.Tests
     [TestArea("Transactions")]
     [TestProvider("DynamoDB")]
     [TestCategory("DynamoDB"), TestCategory("Transactions-dev")]
-    public class ConsistencyFaultInjectionTests: ConsistencyTransactionTestRunnerxUnit, IClassFixture<RandomFaultInjectedTestFixture>
+    public class ConsistencyFaultInjectionTests : ConsistencyTransactionTestRunnerxUnit, IClassFixture<RandomFaultInjectedTestFixture>
     {
         public ConsistencyFaultInjectionTests(RandomFaultInjectedTestFixture fixture, ITestOutputHelper output)
             : base(fixture.GrainFactory, output)

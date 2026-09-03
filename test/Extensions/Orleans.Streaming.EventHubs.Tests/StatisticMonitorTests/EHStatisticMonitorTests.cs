@@ -48,7 +48,7 @@ namespace ServiceBus.Tests.MonitorTests
                         .AddPersistentStreams(
                             StreamProviderName,
                             EHStreamProviderForMonitorTestsAdapterFactory.Create,
-                            b=>
+                            b =>
                             {
                                 b.ConfigureComponent<IStreamQueueCheckpointerFactory>((s, n) => NoOpCheckpointerFactory.Instance);
                                 b.Configure<StreamStatisticOptions>(ob => ob.Configure(options => options.StatisticMonitorWriteInterval = monitorWriteInterval));

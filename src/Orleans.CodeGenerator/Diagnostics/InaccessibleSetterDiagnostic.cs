@@ -10,7 +10,7 @@ public static class InaccessibleSetterDiagnostic
     /// <summary>
     /// The diagnostic identifier.
     /// </summary>
-    public const string RuleId = DiagnosticRuleId.InaccessibleSetter; 
+    public const string RuleId = DiagnosticRuleId.InaccessibleSetter;
     private const string Category = "Usage";
     private static readonly LocalizableString Title = new LocalizableResourceString(nameof(Resources.InaccessibleSetterTitle), Resources.ResourceManager, typeof(Resources));
     private static readonly LocalizableString MessageFormat = new LocalizableResourceString(nameof(Resources.InaccessibleSetterMessageFormat), Resources.ResourceManager, typeof(Resources));

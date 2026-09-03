@@ -92,7 +92,8 @@ namespace UnitTests.General
             IExceptionGrain grain = this.fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
 
             // Explicitly using .Wait() instead of await the task to avoid any modification of the inner exception
-            var originalException = await Task.Run(() => {
+            var originalException = await Task.Run(() =>
+            {
                 try
                 {
 #pragma warning disable xUnit1031 // Do not use blocking task operations in test method

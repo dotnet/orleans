@@ -8,7 +8,7 @@ namespace UnitTests.General
     /// <summary>
     /// Tests for various grain placement strategies including random, prefer local, and stateless worker placement.
     /// </summary>
-        [TestArea("Placement")]
+    [TestArea("Placement")]
     public class GrainPlacementTests(DefaultClusterFixture fixture) : IClassFixture<DefaultClusterFixture>
     {
         private readonly DefaultClusterFixture _fixture = fixture;
@@ -97,7 +97,7 @@ namespace UnitTests.General
             }
 
             // check that every "prefer local grain" was placed on the same silo with its requesting random grain
-            foreach(int key in Enumerable.Range(0, numGrains))
+            foreach (int key in Enumerable.Range(0, numGrains))
             {
                 string random = randomGrainPlaces.ElementAt(key);
                 string preferLocal = preferLocalGrainPlaces.ElementAt(key);

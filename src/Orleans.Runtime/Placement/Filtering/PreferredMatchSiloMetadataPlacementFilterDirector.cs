@@ -16,7 +16,7 @@ internal class PreferredMatchSiloMetadataPlacementFilterDirector(
         var preferredMatchSiloMetadataPlacementFilterStrategy = filterStrategy as PreferredMatchSiloMetadataPlacementFilterStrategy;
         var minCandidates = preferredMatchSiloMetadataPlacementFilterStrategy?.MinCandidates ?? 1;
         var orderedMetadataKeys = preferredMatchSiloMetadataPlacementFilterStrategy?.OrderedMetadataKeys ?? [];
-        
+
         var localSiloMetadata = siloMetadataCache.GetSiloMetadata(localSiloDetails.SiloAddress).Metadata;
 
         if (localSiloMetadata.Count == 0)
@@ -35,7 +35,7 @@ internal class PreferredMatchSiloMetadataPlacementFilterDirector(
         // If no silos match any metadata keys, return the original list of silos.
         var maxScore = 0;
         var siloScores = new int[siloList.Count];
-        var scoreCounts = new int[orderedMetadataKeys.Length+1];
+        var scoreCounts = new int[orderedMetadataKeys.Length + 1];
         for (var i = 0; i < siloList.Count; i++)
         {
             var siloMetadata = siloMetadataCache.GetSiloMetadata(siloList[i]).Metadata;
@@ -64,7 +64,7 @@ internal class PreferredMatchSiloMetadataPlacementFilterDirector(
 
         var candidateCount = 0;
         var scoreCutOff = orderedMetadataKeys.Length;
-        for (var i = scoreCounts.Length-1; i >= 0; i--)
+        for (var i = scoreCounts.Length - 1; i >= 0; i--)
         {
             candidateCount += scoreCounts[i];
             if (candidateCount >= minCandidates)

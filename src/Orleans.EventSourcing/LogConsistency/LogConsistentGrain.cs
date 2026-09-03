@@ -108,7 +108,8 @@ namespace Orleans.EventSourcing
             {
                 var errMsg = $"No log consistency provider found loading grain type {this.GetType().FullName}";
                 throw new BadProviderConfigException(errMsg);
-            };
+            }
+            ;
 
             return defaultFactory;
         }

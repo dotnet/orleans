@@ -53,7 +53,7 @@ namespace ServiceBus.Tests.TestStreamProviders
             IEventHubDataAdapter dataAdapter = services.GetKeyedService<IEventHubDataAdapter>(name)
                 ?? services.GetService<IEventHubDataAdapter>()
                 ?? ActivatorUtilities.CreateInstance<EventHubDataAdapter>(services);
-            var factory = ActivatorUtilities.CreateInstance<EHStreamProviderForMonitorTestsAdapterFactory>(services, name, generatorOptions, ehOptions, receiverOptions, cacheOptions, 
+            var factory = ActivatorUtilities.CreateInstance<EHStreamProviderForMonitorTestsAdapterFactory>(services, name, generatorOptions, ehOptions, receiverOptions, cacheOptions,
                 evictionOptions, statisticOptions, dataAdapter);
             factory.Init();
             return factory;

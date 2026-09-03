@@ -38,7 +38,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             testCluster = builder.Build();
             testCluster.Deploy();
         }
-        
+
         public void Dispose()
         {
             try

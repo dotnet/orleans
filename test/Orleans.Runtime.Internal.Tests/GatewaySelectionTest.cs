@@ -42,7 +42,7 @@ namespace UnitTests.MessageCenterTests
             new Uri("gwy.tcp://127.0.0.1:3/0"),
             new Uri("gwy.tcp://127.0.0.1:4/0")
         }.ToList();
-        
+
         public GatewaySelectionTest(ITestOutputHelper output)
         {
             this.output = output;

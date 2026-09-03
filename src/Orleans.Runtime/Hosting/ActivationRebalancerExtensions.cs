@@ -40,7 +40,7 @@ public static class ActivationRebalancerExtensions
         services.AddFromExisting<IActivationRebalancer, ActivationRebalancerMonitor>();
         services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ActivationRebalancerMonitor>();
         services.AddTransient<IConfigurationValidator, ActivationRebalancerOptionsValidator>();
-        
+
         services.AddSingleton<TProvider>();
         services.AddFromExisting<IFailedSessionBackoffProvider, TProvider>();
         if (typeof(TProvider).IsAssignableTo(typeof(ILifecycleParticipant<ISiloLifecycle>)))

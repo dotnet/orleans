@@ -838,7 +838,8 @@ public class LocalDurableJobManagerTests
         messagingProcessingInstruments: CreateMessagingProcessingInstruments());
 
     private static SchedulerInstruments CreateSchedulerInstruments()
-    {        var services = new ServiceCollection();
+    {
+        var services = new ServiceCollection();
         services.AddMetrics();
         services.AddSingleton<OrleansInstruments>();
         services.AddSingleton<SchedulerInstruments>();

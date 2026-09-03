@@ -8,7 +8,7 @@ namespace Orleans.Transactions.TestKit.xUnit
 {
     /// <inheritdoc cref="TransactionalStateStorageTestRunner{TState}"/>
     public abstract class TransactionalStateStorageTestRunnerxUnit<TState> : TransactionalStateStorageTestRunner<TState>
-        where TState: class, new()
+        where TState : class, new()
     {
         /// <summary>
         /// Constructor

@@ -8,11 +8,11 @@ namespace Orleans.Streams
     {
         [Id(0)]
         public StreamSequenceToken? Token { get; private set; }
-        
+
         public static StreamHandshakeToken? CreateStartToken(StreamSequenceToken? token)
         {
             if (token == null) return default;
-            return new StartToken {Token = token};
+            return new StartToken { Token = token };
         }
 
         public static StreamHandshakeToken CreateStartPositionToken(StreamSubscriptionStartPosition startPosition)
@@ -24,7 +24,7 @@ namespace Orleans.Streams
         public static StreamHandshakeToken? CreateDeliveyToken(StreamSequenceToken? token)
         {
             if (token == null) return default;
-            return new DeliveryToken {Token = token};
+            return new DeliveryToken { Token = token };
         }
 
         public bool Equals(StreamHandshakeToken? other)
@@ -74,7 +74,7 @@ namespace Orleans.Streams
             this.startPosition = startPosition;
         }
     }
-    
+
     [Serializable]
     [GenerateSerializer]
     internal sealed class DeliveryToken : StreamHandshakeToken { }

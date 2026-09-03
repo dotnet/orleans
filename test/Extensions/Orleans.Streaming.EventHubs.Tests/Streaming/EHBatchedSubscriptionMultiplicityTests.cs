@@ -49,8 +49,8 @@ namespace ServiceBus.Tests.StreamingTests
                                  }));
                                 b.ConfigurePullingAgent(ob => ob.Configure(options =>
                                  {
-                                    // sets up batching in the pulling agent
-                                    options.BatchContainerBatchSize = 10;
+                                     // sets up batching in the pulling agent
+                                     options.BatchContainerBatchSize = 10;
                                  }));
                                 b.UseDynamicClusterConfigDeploymentBalancer();
                             });

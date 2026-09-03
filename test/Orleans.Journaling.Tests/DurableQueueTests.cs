@@ -29,48 +29,48 @@ public class DurableQueueTests : JournalingTestBase
         var codec = CodecProvider.GetCodec<string>();
         var queue = new DurableQueue<string>("testQueue", manager, new OrleansBinaryDurableQueueCommandCodec<string>(codec, SessionPool));
         await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
-        
+
         // Act - Enqueue items
         queue.Enqueue("one");
         queue.Enqueue("two");
         queue.Enqueue("three");
         await manager.WriteStateAsync(CancellationToken.None);
-        
+
         // Assert
         Assert.Equal(3, queue.Count);
-        
+
         // Act - Peek at the front of the queue
         var peeked = queue.Peek();
-        
+
         // Assert - Peek returns the first item without removing it
         Assert.Equal("one", peeked);
         Assert.Equal(3, queue.Count);
-        
+
         // Act - Dequeue
         var dequeued1 = queue.Dequeue();
         await manager.WriteStateAsync(CancellationToken.None);
-        
+
         // Assert
         Assert.Equal("one", dequeued1);
         Assert.Equal(2, queue.Count);
-        
+
         // Act - Dequeue again
         var dequeued2 = queue.Dequeue();
         await manager.WriteStateAsync(CancellationToken.None);
-        
+
         // Assert
         Assert.Equal("two", dequeued2);
         Assert.Single(queue);
-        
+
         // Act - Dequeue last item
         var dequeued3 = queue.Dequeue();
         await manager.WriteStateAsync(CancellationToken.None);
-        
+
         // Assert
         Assert.Equal("three", dequeued3);
         Assert.Empty(queue);
     }
-    
+
     /// <summary>
     /// Tests that queue state is correctly persisted and recovered.
     /// Creates a queue, adds items, then recreates the queue from the same
@@ -84,13 +84,13 @@ public class DurableQueueTests : JournalingTestBase
         var codec = CodecProvider.GetCodec<string>();
         var queue1 = new DurableQueue<string>("testQueue", sut.Manager, new OrleansBinaryDurableQueueCommandCodec<string>(codec, SessionPool));
         await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
-        
+
         // Act - Enqueue items and persist
         queue1.Enqueue("one");
         queue1.Enqueue("two");
         queue1.Enqueue("three");
         await sut.Manager.WriteStateAsync(CancellationToken.None);
-        
+
         // Create a new manager with the same storage
         var sut2 = CreateTestSystem(storage: sut.Storage);
         var queue2 = new DurableQueue<string>("testQueue", sut2.Manager, new OrleansBinaryDurableQueueCommandCodec<string>(codec, SessionPool));
@@ -99,16 +99,16 @@ public class DurableQueueTests : JournalingTestBase
         // Assert - Queue should be recovered
         Assert.Equal(3, queue2.Count);
         Assert.Equal("one", queue2.Peek());
-        
+
         // Act - Dequeue from recovered queue
         var dequeued = queue2.Dequeue();
         await sut2.Manager.WriteStateAsync(CancellationToken.None);
-        
+
         // Assert
         Assert.Equal("one", dequeued);
         Assert.Equal(2, queue2.Count);
     }
-    
+
     /// <summary>
     /// Tests that the queue correctly handles complex value types.
     /// Verifies that custom objects are properly serialized and deserialized
@@ -123,30 +123,30 @@ public class DurableQueueTests : JournalingTestBase
         var codec = CodecProvider.GetCodec<TestPerson>();
         var queue = new DurableQueue<TestPerson>("personQueue", manager, new OrleansBinaryDurableQueueCommandCodec<TestPerson>(codec, SessionPool));
         await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
-        
+
         // Act
         var person1 = new TestPerson { Id = 1, Name = "John", Age = 30 };
         var person2 = new TestPerson { Id = 2, Name = "Jane", Age = 25 };
-        
+
         queue.Enqueue(person1);
         queue.Enqueue(person2);
         await manager.WriteStateAsync(CancellationToken.None);
-        
+
         // Assert
         Assert.Equal(2, queue.Count);
         var peeked = queue.Peek();
         Assert.Equal("John", peeked.Name);
-        
+
         // Act - Dequeue
         var dequeued = queue.Dequeue();
         await manager.WriteStateAsync(CancellationToken.None);
-        
+
         // Assert
         Assert.Single(queue);
         Assert.Equal("John", dequeued.Name);
         Assert.Equal(30, dequeued.Age);
     }
-    
+
     /// <summary>
     /// Tests the Clear operation which removes all items from the queue.
     /// Verifies that the clear operation is properly journaled.
@@ -160,22 +160,22 @@ public class DurableQueueTests : JournalingTestBase
         var codec = CodecProvider.GetCodec<string>();
         var queue = new DurableQueue<string>("clearQueue", manager, new OrleansBinaryDurableQueueCommandCodec<string>(codec, SessionPool));
         await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
-        
+
         // Add items
         queue.Enqueue("one");
         queue.Enqueue("two");
         queue.Enqueue("three");
         await manager.WriteStateAsync(CancellationToken.None);
-        
+
         // Act - Clear
         queue.Clear();
         await manager.WriteStateAsync(CancellationToken.None);
-        
+
         // Assert
         Assert.Empty(queue);
         Assert.Empty(queue);
     }
-    
+
     /// <summary>
     /// Tests edge cases for operations on an empty queue.
     /// Verifies that Peek and Dequeue throw appropriate exceptions
@@ -191,15 +191,15 @@ public class DurableQueueTests : JournalingTestBase
         var queue = new DurableQueue<string>("emptyQueue", manager, new OrleansBinaryDurableQueueCommandCodec<string>(codec, SessionPool));
         await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         await manager.WriteStateAsync(CancellationToken.None);
-        
+
         // Assert
         Assert.Empty(queue);
-        
+
         // Act & Assert - Peek and Dequeue on empty queue should throw
         Assert.Throws<InvalidOperationException>(() => queue.Peek());
         Assert.Throws<InvalidOperationException>(() => queue.Dequeue());
     }
-    
+
     /// <summary>
     /// Tests queue enumeration capabilities.
     /// Verifies that the queue supports standard enumeration patterns
@@ -214,24 +214,24 @@ public class DurableQueueTests : JournalingTestBase
         var codec = CodecProvider.GetCodec<string>();
         var queue = new DurableQueue<string>("enumQueue", manager, new OrleansBinaryDurableQueueCommandCodec<string>(codec, SessionPool));
         await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
-        
+
         // Add items
         var expectedItems = new List<string> { "one", "two", "three" };
-        
+
         foreach (var item in expectedItems)
         {
             queue.Enqueue(item);
         }
-        
+
         await manager.WriteStateAsync(CancellationToken.None);
-        
+
         // Act
         var actualItems = queue.ToList();
-        
+
         // Assert - Items should be in same order as enqueued
         Assert.Equal(expectedItems, actualItems);
     }
-    
+
     /// <summary>
     /// Stress test for queue performance with large numbers of items.
     /// Tests that the journaling system can handle thousands of queue operations
@@ -246,39 +246,39 @@ public class DurableQueueTests : JournalingTestBase
         var codec = CodecProvider.GetCodec<int>();
         var queue = new DurableQueue<int>("largeQueue", manager, new OrleansBinaryDurableQueueCommandCodec<int>(codec, SessionPool));
         await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
-        
+
         // Act - Enqueue many items
         const int itemCount = 1000;
         for (int i = 0; i < itemCount; i++)
         {
             queue.Enqueue(i);
         }
-        
+
         await manager.WriteStateAsync(CancellationToken.None);
-        
+
         // Assert
         Assert.Equal(itemCount, queue.Count);
         Assert.Equal(0, queue.Peek());
-        
+
         // Create a new manager with the same storage to test recovery
         var sut2 = CreateTestSystem(storage: sut.Storage);
         var queue2 = new DurableQueue<int>("largeQueue", sut2.Manager, new OrleansBinaryDurableQueueCommandCodec<int>(codec, SessionPool));
         await sut2.Lifecycle.OnStart(TestContext.Current.CancellationToken);
-        
+
         // Assert - Large queue is correctly recovered
         Assert.Equal(itemCount, queue2.Count);
-        
+
         // Act - Dequeue all items and verify order
         for (int i = 0; i < itemCount; i++)
         {
             var item = queue2.Dequeue();
             Assert.Equal(i, item);
         }
-        
+
         await sut2.Manager.WriteStateAsync(CancellationToken.None);
         Assert.Empty(queue2);
     }
-    
+
     /// <summary>
     /// Tests complex queue operation patterns with interleaved enqueue/dequeue operations.
     /// Simulates real-world usage where items are added and removed in batches,
@@ -293,56 +293,56 @@ public class DurableQueueTests : JournalingTestBase
         var codec = CodecProvider.GetCodec<int>();
         var queue = new DurableQueue<int>("concurrentQueue", manager, new OrleansBinaryDurableQueueCommandCodec<int>(codec, SessionPool));
         await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
-        
+
         // Act - Simulate a queue with concurrent operations
         const int batchSize = 100;
-        
+
         // First batch: add 100 items
         for (int i = 0; i < batchSize; i++)
         {
             queue.Enqueue(i);
         }
         await manager.WriteStateAsync(CancellationToken.None);
-        
+
         // Remove 50 items
         for (int i = 0; i < batchSize / 2; i++)
         {
             queue.Dequeue();
         }
         await manager.WriteStateAsync(CancellationToken.None);
-        
+
         // Add another 100 items
         for (int i = batchSize; i < batchSize * 2; i++)
         {
             queue.Enqueue(i);
         }
         await manager.WriteStateAsync(CancellationToken.None);
-        
+
         // Assert
         Assert.Equal(batchSize + batchSize / 2, queue.Count); // Should have 150 items
-        
+
         // Create a new manager with the same storage to test recovery
         var sut2 = CreateTestSystem(storage: sut.Storage);
         var queue2 = new DurableQueue<int>("concurrentQueue", sut2.Manager, new OrleansBinaryDurableQueueCommandCodec<int>(codec, SessionPool));
         await sut2.Lifecycle.OnStart(TestContext.Current.CancellationToken);
-        
+
         // Assert - Queue should be recovered with correct state and ordering
         Assert.Equal(batchSize + batchSize / 2, queue2.Count);
-        
+
         // First values should be the second half of first batch
         for (int i = batchSize / 2; i < batchSize; i++)
         {
             var item = queue2.Dequeue();
             Assert.Equal(i, item);
         }
-        
+
         // Then we should get the second batch
         for (int i = batchSize; i < batchSize * 2; i++)
         {
             var item = queue2.Dequeue();
             Assert.Equal(i, item);
         }
-        
+
         await sut2.Manager.WriteStateAsync(CancellationToken.None);
         Assert.Empty(queue2);
     }

@@ -64,8 +64,8 @@ namespace Orleans.Runtime.Membership
         /// <param name="membershipTableOptions">The ZooKeeper clustering options.</param>
         /// <param name="clusterOptions">The cluster identity options.</param>
         public ZooKeeperBasedMembershipTable(
-            ILogger<ZooKeeperBasedMembershipTable> logger, 
-            IOptions<ZooKeeperClusteringSiloOptions> membershipTableOptions, 
+            ILogger<ZooKeeperBasedMembershipTable> logger,
+            IOptions<ZooKeeperClusteringSiloOptions> membershipTableOptions,
             IOptions<ClusterOptions> clusterOptions)
         {
             this.logger = logger;

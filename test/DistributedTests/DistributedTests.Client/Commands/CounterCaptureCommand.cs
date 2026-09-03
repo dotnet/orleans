@@ -42,7 +42,8 @@ namespace DistributedTests.Client.Commands
         {
             _logger.LogInformation("Connecting to cluster...");
             var hostBuilder = new HostBuilder()
-                .UseOrleansClient((ctx, builder) => {
+                .UseOrleansClient((ctx, builder) =>
+                {
                     builder
                         .Configure<ClusterOptions>(options => { options.ClusterId = parameters.ClusterId; options.ServiceId = parameters.ServiceId; })
                         .UseAzureStorageClustering(options => options.TableServiceClient = parameters.AzureTableUri.CreateTableServiceClient());
@@ -73,7 +74,7 @@ namespace DistributedTests.Client.Commands
                 BenchmarksEventSource.Measure(counter, value);
                 if (string.Equals(counter, "requests", StringComparison.InvariantCultureIgnoreCase))
                 {
-                    var rps = (float) value / duration.TotalSeconds;
+                    var rps = (float)value / duration.TotalSeconds;
                     BenchmarksEventSource.Register("rps", Operations.First, Operations.Last, "rps", "Requests per second", "n0");
                     BenchmarksEventSource.Measure("rps", rps);
                 }

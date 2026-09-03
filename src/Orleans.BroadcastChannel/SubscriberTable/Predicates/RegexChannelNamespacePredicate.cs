@@ -24,7 +24,7 @@ namespace Orleans.BroadcastChannel
         public RegexChannelNamespacePredicate(string regex)
         {
             if (regex is null) throw new ArgumentNullException(nameof(regex));
-            
+
             this.regex = new Regex(regex, RegexOptions.Compiled);
         }
 

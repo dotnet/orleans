@@ -10,7 +10,7 @@ public static class InaccessibleSerializableTypeDiagnostic
     /// <summary>
     /// The diagnostic identifier.
     /// </summary>
-    public const string RuleId = DiagnosticRuleId.InaccessibleSerializableType; 
+    public const string RuleId = DiagnosticRuleId.InaccessibleSerializableType;
 
     /// <summary>
     /// The diagnostic title.

@@ -43,7 +43,7 @@ namespace Orleans.TestingHost
         /// <param name="loggerFactory">The logger factory.</param>
         /// <param name="grainFactory">The grain factory.</param>
         /// <param name="faultInjectionOptions">The fault injection options.</param>
-        public FaultInjectionGrainStorage(IGrainStorage realStorageProvider, string name, ILoggerFactory loggerFactory, 
+        public FaultInjectionGrainStorage(IGrainStorage realStorageProvider, string name, ILoggerFactory loggerFactory,
             IGrainFactory grainFactory, FaultInjectionGrainStorageOptions faultInjectionOptions)
         {
             this.realStorageProvider = realStorageProvider;
@@ -56,7 +56,7 @@ namespace Orleans.TestingHost
         {
             return Task.Delay(this.options.Latency);
         }
-           
+
         /// <summary>Faults if exception is provided, otherwise calls through to  decorated storage provider.</summary>
         /// <returns>Completion promise for the Read operation on the specified grain.</returns>
         public async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
@@ -172,7 +172,7 @@ namespace Orleans.TestingHost
         /// <returns>The new instance.</returns>
         public static IGrainStorage Create(IServiceProvider services, string name, Func<IServiceProvider, string, IGrainStorage> injectedGrainStorageFactory)
         {
-            return new FaultInjectionGrainStorage(injectedGrainStorageFactory(services,name), name, services.GetRequiredService<ILoggerFactory>(), services.GetRequiredService<IGrainFactory>(),
+            return new FaultInjectionGrainStorage(injectedGrainStorageFactory(services, name), name, services.GetRequiredService<ILoggerFactory>(), services.GetRequiredService<IGrainFactory>(),
                 services.GetRequiredService<IOptionsMonitor<FaultInjectionGrainStorageOptions>>().Get(name));
         }
     }

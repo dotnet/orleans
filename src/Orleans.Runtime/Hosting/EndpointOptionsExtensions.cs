@@ -65,7 +65,7 @@ namespace Orleans.Hosting
             if (ip == null)
             {
                 throw new ArgumentException("Hostname '" + hostname + "' with subnet [] and family " + addressFamily + " is not a valid IP address or DNS name");
-            }            
+            }
 
             return builder.ConfigureEndpoints(ip, siloPort, gatewayPort, listenOnAnyHostAddress);
         }

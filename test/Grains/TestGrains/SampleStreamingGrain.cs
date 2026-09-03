@@ -198,7 +198,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            logger.LogInformation( "OnActivateAsync" );
+            logger.LogInformation("OnActivateAsync");
             numConsumedItems = 0;
             consumerHandle = null;
             return Task.CompletedTask;
@@ -211,17 +211,17 @@ namespace UnitTests.Grains
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            logger.LogInformation( "BecomeConsumer" );
-            IStreamProvider streamProvider = this.GetStreamProvider( providerToUse );
+            logger.LogInformation("BecomeConsumer");
+            IStreamProvider streamProvider = this.GetStreamProvider(providerToUse);
             consumer = streamProvider.GetStream<int>(streamNamespace, streamId);
-            consumerHandle = await consumer.SubscribeAsync( OnNextAsync, OnErrorAsync, OnCompletedAsync );
+            consumerHandle = await consumer.SubscribeAsync(OnNextAsync, OnErrorAsync, OnCompletedAsync);
         }
 
         public async Task StopConsuming(CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            logger.LogInformation( "StopConsuming" );
-            if ( consumerHandle != null )
+            logger.LogInformation("StopConsuming");
+            if (consumerHandle != null)
             {
                 await consumerHandle.UnsubscribeAsync();
                 //consumerHandle.Dispose();
@@ -232,25 +232,25 @@ namespace UnitTests.Grains
         public Task<int> GetNumberConsumed(CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            return Task.FromResult( numConsumedItems );
+            return Task.FromResult(numConsumedItems);
         }
 
-        public Task OnNextAsync( int item, StreamSequenceToken? token = null )
+        public Task OnNextAsync(int item, StreamSequenceToken? token = null)
         {
-            logger.LogInformation( "OnNextAsync({Item}{Token})", item, token != null ? token.ToString() : "null" );
+            logger.LogInformation("OnNextAsync({Item}{Token})", item, token != null ? token.ToString() : "null");
             numConsumedItems++;
             return Task.CompletedTask;
         }
 
         public Task OnCompletedAsync()
         {
-            logger.LogInformation( "OnCompletedAsync()" );
+            logger.LogInformation("OnCompletedAsync()");
             return Task.CompletedTask;
         }
 
-        public Task OnErrorAsync( Exception ex )
+        public Task OnErrorAsync(Exception ex)
         {
-            logger.LogInformation(ex,  "OnErrorAsync()");
+            logger.LogInformation(ex, "OnErrorAsync()");
             return Task.CompletedTask;
         }
 

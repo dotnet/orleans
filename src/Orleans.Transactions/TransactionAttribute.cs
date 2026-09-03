@@ -114,27 +114,27 @@ namespace Orleans
         /// <summary>
         /// Maps to <see cref="TransactionOption.Supported"/>.
         /// </summary>
-        Suppress     = TransactionOption.Supported,
+        Suppress = TransactionOption.Supported,
 
         /// <summary>
         /// Maps to <see cref="TransactionOption.CreateOrJoin"/>.
         /// </summary>
-        Required     = TransactionOption.CreateOrJoin,
+        Required = TransactionOption.CreateOrJoin,
 
         /// <summary>
         /// Maps to <see cref="TransactionOption.Create"/>.
         /// </summary>
-        RequiresNew  = TransactionOption.Create,
+        RequiresNew = TransactionOption.Create,
 
         /// <summary>
         /// Maps to <see cref="TransactionOption.Join"/>.
         /// </summary>
-        Mandatory    = TransactionOption.Join,
+        Mandatory = TransactionOption.Join,
 
         /// <summary>
         /// Maps to <see cref="TransactionOption.NotAllowed"/>.
         /// </summary>
-        Never        = TransactionOption.NotAllowed,
+        Never = TransactionOption.NotAllowed,
     }
 
     /// <summary>
@@ -379,7 +379,7 @@ namespace Orleans
         /// <inheritdoc/>
         public override void Dispose()
         {
-           TransactionInfo = null;
+            TransactionInfo = null;
         }
 
         void IOnDeserialized.OnDeserialized(DeserializationContext context)

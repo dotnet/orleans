@@ -77,7 +77,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <returns>A <see cref="ClusterMembershipUpdate"/> which represents this instance.</returns>
         public ClusterMembershipUpdate AsUpdate() => new ClusterMembershipUpdate(this, this.Members.Values.ToImmutableArray());
-        
+
         /// <summary>
         /// Returns a <see cref="ClusterMembershipUpdate"/> which represents the change in cluster membership from the provided snapshot to this instance.
         /// </summary>
@@ -182,7 +182,7 @@ namespace Orleans.Runtime
             charsWritten = written;
             return true;
 
-        fail:
+fail:
             charsWritten = 0;
             return false;
 

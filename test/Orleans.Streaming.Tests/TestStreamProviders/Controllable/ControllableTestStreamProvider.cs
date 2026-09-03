@@ -61,7 +61,7 @@ namespace Tester.TestStreamProviders.Controllable
 
         public Task<object?> ExecuteCommand(int command, object? arg)
         {
-            switch ((ControllableTestStreamProviderCommands) command)
+            switch ((ControllableTestStreamProviderCommands)command)
             {
                 case ControllableTestStreamProviderCommands.AdapterEcho:
                     return Task.FromResult<object?>(Tuple.Create(ControllableTestStreamProviderCommands.AdapterEcho, arg));

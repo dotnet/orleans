@@ -38,7 +38,7 @@ namespace ServiceBus.Tests.StreamingTests
                 public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder
-                        .AddEventHubStreams(StreamProviderName, b=>
+                        .AddEventHubStreams(StreamProviderName, b =>
                         {
                             b.ConfigureEventHub(ob => ob.Configure(options =>
                             {
@@ -50,7 +50,7 @@ namespace ServiceBus.Tests.StreamingTests
                                 options.PersistInterval = TimeSpan.FromSeconds(1);
                             }));
                             b.UseDynamicClusterConfigDeploymentBalancer();
-                            b.UseDataAdapter((s,n) => ActivatorUtilities.CreateInstance<StreamPerPartitionDataAdapter>(s));
+                            b.UseDataAdapter((s, n) => ActivatorUtilities.CreateInstance<StreamPerPartitionDataAdapter>(s));
                         });
                     hostBuilder
                         .AddMemoryGrainStorage("PubSubStore");
@@ -62,7 +62,7 @@ namespace ServiceBus.Tests.StreamingTests
                 public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
                 {
                     clientBuilder
-                        .AddEventHubStreams(StreamProviderName, b=>
+                        .AddEventHubStreams(StreamProviderName, b =>
                         {
                             b.ConfigureEventHub(ob => ob.Configure(options =>
                             {

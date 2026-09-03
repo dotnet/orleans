@@ -72,7 +72,7 @@ namespace TestExtensions
         }
 
         public ILogger Logger { get; private set; } = null!;
-        
+
         public string GetClientServiceId() => Client.ServiceProvider.GetRequiredService<IOptions<ClusterOptions>>().Value.ServiceId;
 
         public virtual async ValueTask InitializeAsync()

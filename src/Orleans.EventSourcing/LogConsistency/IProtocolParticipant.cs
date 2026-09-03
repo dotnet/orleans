@@ -6,7 +6,7 @@ namespace Orleans.EventSourcing
     /// <summary>
     /// Grain interface for grains that participate in multi-cluster log-consistency protocols.
     /// </summary>
-    public interface ILogConsistencyProtocolParticipant  : IGrain  
+    public interface ILogConsistencyProtocolParticipant : IGrain
     {
         /// <summary>
         /// Called immediately before the user-level OnActivateAsync, on same scheduler.

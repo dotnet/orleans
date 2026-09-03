@@ -452,7 +452,7 @@ namespace UnitTests.MembershipTests
             Assert.True(ok, "InsertRow Joining failed");
 
             newTableVersion = table.Version.Next();
-            var  newEntry = CreateMembershipEntryForTest();
+            var newEntry = CreateMembershipEntryForTest();
             ok = await membershipTable.InsertRow(newEntry, newTableVersion);
 
             Assert.True(ok, "InsertRow failed");

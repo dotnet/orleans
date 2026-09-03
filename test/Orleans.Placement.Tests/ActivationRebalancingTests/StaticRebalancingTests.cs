@@ -13,7 +13,7 @@ namespace UnitTests.ActivationRebalancingTests;
 [TestCategory("Functional"), TestCategory("ActivationRebalancing")]
 public class StaticRebalancingTests(RebalancerFixture fixture, ITestOutputHelper output)
     : RebalancingTestBase<RebalancerFixture>(fixture, output), IClassFixture<RebalancerFixture>
-{ 
+{
     [Fact]
     public async Task Should_Move_Activations_From_Silo1_And_Silo3_To_Silo2_And_Silo4()
     {
@@ -79,7 +79,7 @@ public class StaticRebalancingTests(RebalancerFixture fixture, ITestOutputHelper
 
         var preVariance = CalculateVariance([initialSilo1Activations, initialSilo2Activations, initialSilo3Activations, initialSilo4Activations]);
         var postVariance = CalculateVariance([silo1Activations, silo2Activations, silo3Activations, silo4Activations]);
-        
+
         OutputHelper.WriteLine(
             $"Post-rebalancing activations ({observedCycles} cycles):\n" +
             $"Silo1: {silo1Activations}\n" +

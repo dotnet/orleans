@@ -30,7 +30,7 @@ namespace TestExtensions
                 this.output = output;
                 this.category = category;
             }
-            
+
             public IDisposable? BeginScope<TState>(TState state) where TState : notnull => this;
 
             public void Dispose() { }

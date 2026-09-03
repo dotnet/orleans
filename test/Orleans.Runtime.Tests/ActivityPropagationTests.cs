@@ -46,14 +46,16 @@ namespace UnitTests.General
                 // where SetParentId might not work correctly if TraceId isn't accessed.
                 var _ = options.TraceId;
                 return ActivitySamplingResult.PropagationData;
-            };
+            }
+            ;
 
             static ActivitySamplingResult SampleUsingParentId(ref ActivityCreationOptions<string> options)
             {
                 //Trace id has to be accessed in sample to reproduce the scenario when SetParentId does not work
                 var _ = options.TraceId;
                 return ActivitySamplingResult.PropagationData;
-            };
+            }
+            ;
         }
 
         /// <summary>

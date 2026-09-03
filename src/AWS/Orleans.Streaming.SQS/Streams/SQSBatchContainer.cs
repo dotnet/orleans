@@ -104,7 +104,7 @@ namespace OrleansAWSUtils.Streams
                     UInt128.Parse(fifoSeqNum, CultureInfo.InvariantCulture),
                     sequenceNumber);
             }
-            else 
+            else
                 sqsBatch.sequenceToken = new EventSequenceTokenV2(sequenceNumber);
 
             return sqsBatch;

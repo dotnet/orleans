@@ -1,4 +1,4 @@
-﻿namespace TestExtensions
+namespace TestExtensions
 {
     public class TestEnvironmentFixture : SerializationTestEnvironment
     {

@@ -46,7 +46,7 @@ namespace AWSUtils.Tests.Streaming
                      {
                          options.ConnectionString = AWSTestConstants.SqsConnectionString;
                      })
-                    .AddMemoryGrainStorage("MemoryStore", op=>op.NumStorageGrains = 1);
+                    .AddMemoryGrainStorage("MemoryStore", op => op.NumStorageGrains = 1);
 
                 if (!string.IsNullOrEmpty(AWSTestConstants.DynamoDbService))
                 {
@@ -85,7 +85,7 @@ namespace AWSUtils.Tests.Streaming
                     }));
             }
         }
-        
+
         public override async ValueTask InitializeAsync()
         {
             await base.InitializeAsync();

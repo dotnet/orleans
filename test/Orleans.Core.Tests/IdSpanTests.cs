@@ -117,7 +117,7 @@ namespace NonSilo.Tests
             // Default (null) should compare differently than empty string
             Assert.NotEqual(0, defaultIdSpan.CompareTo(emptyStringIdSpan));
             Assert.NotEqual(0, emptyStringIdSpan.CompareTo(defaultIdSpan));
-            
+
             // Both should be less than a normal span
             Assert.True(defaultIdSpan.CompareTo(normalIdSpan) < 0);
             Assert.True(emptyStringIdSpan.CompareTo(normalIdSpan) < 0);

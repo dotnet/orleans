@@ -361,7 +361,7 @@ namespace Orleans.TestingHost.Tests
                 hostBuilder.AddMemoryGrainStorageAsDefault();
             }
         }
-        
+
         public ValueTask InitializeAsync()
         {
             return ValueTask.CompletedTask;

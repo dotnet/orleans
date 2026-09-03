@@ -75,7 +75,7 @@ namespace UnitTests
                 Assert.Equal(primarySiloAddress, silo);
             }
         }
-        
+
         /// <summary>
         /// Tests recovery when activation is attempted on a different silo than the poison entry.
         /// 

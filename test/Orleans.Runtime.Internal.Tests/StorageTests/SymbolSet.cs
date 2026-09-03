@@ -49,7 +49,7 @@ namespace UnitTests.StorageTests.Relational
         /// <param name="setRanges">A set of symbol ranges to collect the symbols in this collection.</param>
         public SymbolSet(IEnumerable<Range<int>> setRanges)
         {
-            if(setRanges == null)
+            if (setRanges == null)
             {
                 throw new ArgumentNullException(nameof(setRanges));
             }

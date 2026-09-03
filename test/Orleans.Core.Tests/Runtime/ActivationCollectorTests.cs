@@ -108,7 +108,7 @@ namespace UnitTests.Runtime
         [InlineData(80.0, 70.0, 1000, 250, 100, false, 0)] // Below threshold, no deactivation
         [InlineData(80.0, 70.0, 1000, 100, 200, true, 155)] // More activations, smaller per-activation size
         [InlineData(80.0, 70.0, 1000, 800, 100, false, 0)] // Well below threshold
-        [InlineData(80.0, 70.0, 1000, 50,  10,  true, 7)] // Few activations, large per-activation size
+        [InlineData(80.0, 70.0, 1000, 50, 10, true, 7)] // Few activations, large per-activation size
         [InlineData(80.0, 70.0, 1000, 100, 0, false, 0)] // No activations
         public void IsMemoryOverloaded_WorksAsExpected(
             double memoryLoadThreshold,

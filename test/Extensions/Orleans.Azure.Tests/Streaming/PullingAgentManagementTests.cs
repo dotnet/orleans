@@ -29,7 +29,7 @@ namespace UnitTests.StreamingTests
                 public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder
-                    .AddAzureQueueStreams(StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME, b=>
+                    .AddAzureQueueStreams(StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME, b =>
                         b.ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>((options, dep) =>
                            {
                                options.ConfigureTestDefaults();
@@ -61,7 +61,7 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task PullingAgents_ControlCmd_1()
         {
-            var mgmt = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);;
+            var mgmt = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0); ;
 
             await ValidateAgentsState(StreamLifecycleOptions.RunState.AgentsStarted);
 

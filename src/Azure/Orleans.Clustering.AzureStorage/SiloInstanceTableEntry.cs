@@ -28,8 +28,8 @@ namespace Orleans.AzureUtils
         public string? SuspectingSilos { get; set; }          // For liveness
         public string? SuspectingTimes { get; set; }          // For liveness
 
-        public string? StartTime       { get; set; }          // Time this silo was started. For diagnostics.
-        public string? IAmAliveTime    { get; set; }           // Time this silo updated it was alive. For diagnostics.
+        public string? StartTime { get; set; }          // Time this silo was started. For diagnostics.
+        public string? IAmAliveTime { get; set; }           // Time this silo updated it was alive. For diagnostics.
         public string? MembershipVersion { get; set; }
 
         public string PartitionKey { get; set; } = null!;

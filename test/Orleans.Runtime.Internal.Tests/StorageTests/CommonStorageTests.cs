@@ -30,7 +30,7 @@ namespace UnitTests.StorageTests.Relational
         /// <param name="version">The initial version of the state.</param>
         /// <returns>A grain reference and a state pair.</returns>
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0022")]
-        internal (GrainId GrainId, GrainState<TestState1> GrainState)  GetTestReferenceAndState(long grainId, string? version)
+        internal (GrainId GrainId, GrainState<TestState1> GrainState) GetTestReferenceAndState(long grainId, string? version)
         {
             var id = GrainId.Create(GrainType.Create("my-grain-type"), GrainIdKeyExtensions.CreateIntegerKey(grainId));
             var grainState = new GrainState<TestState1> { State = new TestState1(), ETag = version };
@@ -140,7 +140,8 @@ namespace UnitTests.StorageTests.Relational
                 await Store_WriteRead(grainTypeName, grainData.GrainId, grainData.GrainState).ConfigureAwait(false);
                 var secondVersion = grainData.GrainState.ETag;
                 Assert.NotEqual(firstVersion, secondVersion);
-            };
+            }
+            ;
 
             int MaxNumberOfThreads = Environment.ProcessorCount * 3;
             // The purpose of Parallel.ForEachAsync is to ensure the storage provider will be tested from

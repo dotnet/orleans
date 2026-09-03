@@ -49,7 +49,7 @@ namespace ServiceBus.Tests.StreamingTests
                         {
                             options.ConfigureTestDefaults();
                         })
-                    .AddEventHubStreams(StreamProviderName, b=>
+                    .AddEventHubStreams(StreamProviderName, b =>
                     {
                         b.UseDynamicClusterConfigDeploymentBalancer();
                         b.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
@@ -74,7 +74,7 @@ namespace ServiceBus.Tests.StreamingTests
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 clientBuilder
-                    .AddEventHubStreams(StreamProviderName, b=>
+                    .AddEventHubStreams(StreamProviderName, b =>
                     {
                         b.ConfigureEventHub(ob => ob.Configure(options =>
                         {

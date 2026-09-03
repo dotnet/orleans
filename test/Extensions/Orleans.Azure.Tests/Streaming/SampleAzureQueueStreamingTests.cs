@@ -30,7 +30,7 @@ namespace Tester.AzureUtils.Streaming
             public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder
-                    .AddAzureQueueStreams(StreamProvider, ob=>ob.Configure<IOptions<ClusterOptions>>(
+                    .AddAzureQueueStreams(StreamProvider, ob => ob.Configure<IOptions<ClusterOptions>>(
                         (options, dep) =>
                         {
                             options.ConfigureTestDefaults();

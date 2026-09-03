@@ -30,9 +30,9 @@ namespace Orleans.Runtime.Membership
         /// <param name="gatewayOptions">The gateway discovery options.</param>
         /// <param name="clusterOptions">The cluster identity options.</param>
         public ConsulGatewayListProvider(
-            ILogger<ConsulGatewayListProvider> logger, 
-            IOptions<ConsulClusteringOptions> options, 
-            IOptions<GatewayOptions> gatewayOptions, 
+            ILogger<ConsulGatewayListProvider> logger,
+            IOptions<ConsulClusteringOptions> options,
+            IOptions<GatewayOptions> gatewayOptions,
             IOptions<ClusterOptions> clusterOptions)
         {
             this.logger = logger;

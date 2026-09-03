@@ -73,12 +73,14 @@ public class FirestoreGrainDirectoryTests : GrainDirectoryTests<FirestoreGrainDi
     {
         var clusterOptions = new ClusterOptions
         {
-            ClusterId = Guid.NewGuid().ToString("N"), ServiceId = Guid.NewGuid().ToString("N"),
+            ClusterId = Guid.NewGuid().ToString("N"),
+            ServiceId = Guid.NewGuid().ToString("N"),
         };
 
         var options = new FirestoreOptions
         {
-            ProjectId = GoogleEmulatorHost.ProjectId, EmulatorHost = GoogleEmulatorHost.FirestoreEndpoint
+            ProjectId = GoogleEmulatorHost.ProjectId,
+            EmulatorHost = GoogleEmulatorHost.FirestoreEndpoint
         };
 
         _grainDirectory =

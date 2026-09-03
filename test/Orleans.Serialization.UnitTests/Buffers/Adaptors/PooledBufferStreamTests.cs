@@ -405,7 +405,7 @@ public class PooledBufferStreamTests
     public void ReturnReadOnlySequence_ValidBufferSegmentChain_CallsPoolReturnForEachSegment()
     {
         using var stream = new PooledBufferStream();
-        
+
         // Write data that will span multiple segments to create a chain
         var dataSize = 10000; // Large enough to span multiple segments
         var testData = GenerateTestData(dataSize);
@@ -416,7 +416,7 @@ public class PooledBufferStreamTests
 
         // Verify we have a multi-segment chain
         Assert.True(sequence.Length > 0);
-        
+
         // Count the number of segments in the chain before returning
         var segmentCount = CountSegmentsInChain(sequence);
         Assert.True(segmentCount > 1, "Test requires multiple segments to verify chain handling");
@@ -831,16 +831,16 @@ public class PooledBufferStreamTests
             data[i] = (byte)(i % 256);
         }
         long initialPosition = stream.Position;
-        
+
         stream.Write(data, 0, data.Length);
-        
+
         // Verify that the data has been correctly appended
         byte[] writtenData = stream.ToArray();
         Assert.Equal(data, writtenData);
-        
+
         // Verify that the stream length matches the written data length
         Assert.Equal(inputLength, stream.Length);
-        
+
         // Verify that the position has advanced correctly
         Assert.Equal(initialPosition + inputLength, stream.Position);
     }

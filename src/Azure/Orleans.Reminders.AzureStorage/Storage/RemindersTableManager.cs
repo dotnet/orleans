@@ -13,12 +13,12 @@ namespace Orleans.Runtime.ReminderService
 {
     internal sealed class ReminderTableEntry : ITableEntity
     {
-        public string? GrainReference        { get; set; }    // Part of RowKey
-        public string? ReminderName          { get; set; }    // Part of RowKey
-        public string? ServiceId             { get; set; }    // Part of PartitionKey
-        public string? DeploymentId          { get; set; }
-        public string? StartAt               { get; set; }
-        public string? Period                { get; set; }
+        public string? GrainReference { get; set; }    // Part of RowKey
+        public string? ReminderName { get; set; }    // Part of RowKey
+        public string? ServiceId { get; set; }    // Part of PartitionKey
+        public string? DeploymentId { get; set; }
+        public string? StartAt { get; set; }
+        public string? Period { get; set; }
         public string? GrainRefConsistentHash { get; set; }    // Part of PartitionKey
 
         public string PartitionKey { get; set; } = null!;
@@ -136,7 +136,7 @@ namespace Orleans.Runtime.ReminderService
             {
                 return await UpsertTableEntryAsync(reminderEntry);
             }
-            catch(Exception exc)
+            catch (Exception exc)
             {
                 if (AzureTableUtils.EvaluateException(exc, out var httpStatusCode, out var restStatus))
                 {
@@ -155,7 +155,7 @@ namespace Orleans.Runtime.ReminderService
                 await DeleteTableEntryAsync(reminderEntry, eTag);
                 return true;
             }
-            catch(Exception exc)
+            catch (Exception exc)
             {
                 if (AzureTableUtils.EvaluateException(exc, out var httpStatusCode, out var restStatus))
                 {

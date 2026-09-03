@@ -18,7 +18,7 @@ namespace UnitTests.ActivationsLifeCycleTests
     /// <summary>
     /// Tests for the activation collector that manages grain activation lifecycle and garbage collection.
     /// </summary>
-        [TestArea("Runtime")]
+    [TestArea("Runtime")]
     public class ActivationCollectorTests : OrleansTestingBase, IAsyncLifetime
     {
         private static readonly TimeSpan DEFAULT_COLLECTION_QUANTUM = TimeSpan.FromSeconds(1);
@@ -173,7 +173,7 @@ namespace UnitTests.ActivationsLifeCycleTests
 
             int activationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, fullGrainTypeName);
             Assert.Equal(0, activationsNotCollected);
-        }   
+        }
 
         [TestSuite("Functional")]
         [TestProvider("None")]
@@ -241,8 +241,8 @@ namespace UnitTests.ActivationsLifeCycleTests
             {
                 await CancelWorkerAsync(workerCancellation, workerTask);
             }
-        }          
-        
+        }
+
         [TestSuite("Functional")]
         [TestProvider("None")]
         [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
@@ -302,7 +302,7 @@ namespace UnitTests.ActivationsLifeCycleTests
                 await Task.Delay(shortIdleTimeout, cancellationToken);
 
                 TimeSpan everything = TimeSpan.FromMinutes(10);
-                logger.LogInformation("ManualCollectionShouldNotCollectBusyActivations: triggering manual collection (timespan is {TotalSeconds} sec).",  everything.TotalSeconds);
+                logger.LogInformation("ManualCollectionShouldNotCollectBusyActivations: triggering manual collection (timespan is {TotalSeconds} sec).", everything.TotalSeconds);
                 IManagementGrain mgmtGrain = this.testCluster.GrainFactory!.GetGrain<IManagementGrain>(0);
                 await mgmtGrain.ForceActivationCollection(everything, cancellationToken);
 
@@ -321,8 +321,8 @@ namespace UnitTests.ActivationsLifeCycleTests
             {
                 await CancelWorkerAsync(workerCancellation, workerTask);
             }
-        }    
-        
+        }
+
         [TestSuite("Functional")]
         [TestProvider("None")]
         [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
@@ -355,7 +355,7 @@ namespace UnitTests.ActivationsLifeCycleTests
 
             int activationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, fullGrainTypeName);
             Assert.Equal(0, activationsNotCollected);
-        }   
+        }
 
         [TestSuite("Functional")]
         [TestProvider("None")]
@@ -425,8 +425,8 @@ namespace UnitTests.ActivationsLifeCycleTests
             {
                 await CancelWorkerAsync(workerCancellation, workerTask);
             }
-        } 
-  
+        }
+
         [TestSuite("Functional")]
         [TestProvider("None")]
         [Fact(Skip = "Flaky test. Needs to be investigated."), TestCategory("ActivationCollector"), TestCategory("Functional")]

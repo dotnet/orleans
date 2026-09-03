@@ -26,12 +26,12 @@ namespace Orleans.EventSourcing
     /// </summary>
     /// <typeparam name="TGrainState">The type for the grain state, i.e. the aggregate view of the event log.</typeparam>
     /// <typeparam name="TEventBase">The common base class for the events</typeparam>
-    public abstract class JournaledGrain<TGrainState,TEventBase> :
+    public abstract class JournaledGrain<TGrainState, TEventBase> :
         LogConsistentGrain<TGrainState>,
         ILogConsistencyProtocolParticipant,
         ILogViewAdaptorHost<TGrainState, TEventBase>
         where TGrainState : class, new()
-        where TEventBase: class
+        where TEventBase : class
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="JournaledGrain{TGrainState, TEventBase}"/> class.
@@ -42,7 +42,7 @@ namespace Orleans.EventSourcing
         /// Raises an event.
         /// </summary>
         /// <param name="event">Event to raise.</param>
-        protected virtual void RaiseEvent<TEvent>(TEvent @event) 
+        protected virtual void RaiseEvent<TEvent>(TEvent @event)
             where TEvent : TEventBase
         {
             if (@event == null) throw new ArgumentNullException(nameof(@event));
@@ -54,12 +54,12 @@ namespace Orleans.EventSourcing
         /// Raise multiple events, as an atomic sequence.
         /// </summary>
         /// <param name="events">Events to raise.</param>
-        protected virtual void RaiseEvents<TEvent>(IEnumerable<TEvent> events) 
+        protected virtual void RaiseEvents<TEvent>(IEnumerable<TEvent> events)
             where TEvent : TEventBase
         {
             if (events == null) throw new ArgumentNullException(nameof(events));
 
-            LogViewAdaptor.SubmitRange((IEnumerable<TEventBase>) events);
+            LogViewAdaptor.SubmitRange((IEnumerable<TEventBase>)events);
         }
 
         /// <summary>
@@ -86,7 +86,7 @@ namespace Orleans.EventSourcing
             where TEvent : TEventBase
         {
             if (events == null) throw new ArgumentNullException(nameof(events));
-            return LogViewAdaptor.TryAppendRange((IEnumerable<TEventBase>) events);
+            return LogViewAdaptor.TryAppendRange((IEnumerable<TEventBase>)events);
         }
 
         /// <summary>
@@ -195,7 +195,7 @@ namespace Orleans.EventSourcing
         /// Throws <see cref="NotSupportedException"/> if the log cannot be cleared.
         /// </summary>
         protected Task ClearLogAsync(CancellationToken cancellationToken = default)
-        { 
+        {
             return LogViewAdaptor.ClearLogAsync(cancellationToken);
         }
 

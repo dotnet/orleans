@@ -22,7 +22,7 @@ namespace Orleans.Tests.SqlUtils
 
         private NoOpCommandInterceptor()
         {
-            
+
         }
 
         public void Intercept(IDbCommand command)

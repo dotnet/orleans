@@ -113,7 +113,7 @@ namespace Orleans.Serialization.TypeSystem
 
             type = Type.GetType(fullName, throwOnError: false);
             if (type is null)
-            { 
+            {
                 type = Type.GetType(
                        fullName,
                        ResolveAssembly,
@@ -146,11 +146,11 @@ namespace Orleans.Serialization.TypeSystem
                 {
                     result = Assembly.Load(assemblyName);
                 }
-                catch(Exception ex)
+                catch (Exception ex)
                 {
                     throw new TypeLoadException($"Unable to load {fullName} from assembly {fullAssemblyName}", ex);
                 }
-                
+
                 _assemblyCache[GetName(result)] = result;
                 _assemblyCache[result.FullName!] = result;
 

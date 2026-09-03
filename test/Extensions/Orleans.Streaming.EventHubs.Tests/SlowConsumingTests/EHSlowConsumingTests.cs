@@ -44,7 +44,7 @@ namespace ServiceBus.Tests.SlowConsumingTests
                     hostBuilder.AddPersistentStreams(
                         StreamProviderName,
                         EHStreamProviderWithCreatedCacheListAdapterFactory.Create,
-                        b=>
+                        b =>
                         {
                             b.Configure<EventHubStreamCachePressureOptions>(ob => ob.Configure(options =>
                             {

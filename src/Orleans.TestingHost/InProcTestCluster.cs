@@ -922,68 +922,68 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
                 var services = appBuilder.Services;
                 TryConfigureFileLogging(Options, services, siloName);
 
-            if (Debugger.IsAttached)
-            {
-                // Test is running inside debugger - Make timeout ~= infinite
-                services.Configure<SiloMessagingOptions>(op => op.ResponseTimeout = TimeSpan.FromMilliseconds(1000000));
-            }
-
-            foreach (var hostDelegate in Options.SiloHostConfigurationDelegates)
-            {
-                hostDelegate(siloOptions, appBuilder);
-            }
-
-            appBuilder.UseOrleans(siloBuilder =>
-            {
-                siloBuilder.Configure<ClusterOptions>(o =>
+                if (Debugger.IsAttached)
                 {
-                    o.ClusterId = Options.ClusterId;
-                    o.ServiceId = Options.ServiceId;
-                });
+                    // Test is running inside debugger - Make timeout ~= infinite
+                    services.Configure<SiloMessagingOptions>(op => op.ResponseTimeout = TimeSpan.FromMilliseconds(1000000));
+                }
 
-                siloBuilder.Configure<SiloOptions>(o =>
+                foreach (var hostDelegate in Options.SiloHostConfigurationDelegates)
                 {
-                    o.SiloName = siloOptions.SiloName;
-                });
+                    hostDelegate(siloOptions, appBuilder);
+                }
 
-                siloBuilder.Configure<EndpointOptions>(o =>
+                appBuilder.UseOrleans(siloBuilder =>
                 {
-                    o.AdvertisedIPAddress = IPAddress.Loopback;
-                    o.SiloPort = siloOptions.SiloPort;
-                    o.GatewayPort = siloOptions.GatewayPort;
-                });
+                    siloBuilder.Configure<ClusterOptions>(o =>
+                    {
+                        o.ClusterId = Options.ClusterId;
+                        o.ServiceId = Options.ServiceId;
+                    });
 
-                siloBuilder.Services
-                    .Configure<HostOptions>(options => options.ShutdownTimeout = TimeSpan.FromSeconds(30));
-                TestClusterFatalErrorHandler.Configure(siloBuilder.Services);
+                    siloBuilder.Configure<SiloOptions>(o =>
+                    {
+                        o.SiloName = siloOptions.SiloName;
+                    });
 
-                if (Options.UseTestClusterMembership)
-                {
-                    services.AddSingleton<IMembershipTable>(_membershipTable);
+                    siloBuilder.Configure<EndpointOptions>(o =>
+                    {
+                        o.AdvertisedIPAddress = IPAddress.Loopback;
+                        o.SiloPort = siloOptions.SiloPort;
+                        o.GatewayPort = siloOptions.GatewayPort;
+                    });
+
+                    siloBuilder.Services
+                        .Configure<HostOptions>(options => options.ShutdownTimeout = TimeSpan.FromSeconds(30));
+                    TestClusterFatalErrorHandler.Configure(siloBuilder.Services);
+
+                    if (Options.UseTestClusterMembership)
+                    {
+                        services.AddSingleton<IMembershipTable>(_membershipTable);
 #pragma warning disable ORLEANSEXP003
-                    if (!Options.UseDistributedGrainDirectory && Options.UseTestClusterGrainDirectory)
+                        if (!Options.UseDistributedGrainDirectory && Options.UseTestClusterGrainDirectory)
+#pragma warning restore ORLEANSEXP003
+                        {
+                            siloBuilder.AddGrainDirectory(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, (_, _) => _grainDirectory);
+                        }
+                    }
+
+#pragma warning disable ORLEANSEXP003
+                    if (Options.UseDistributedGrainDirectory)
 #pragma warning restore ORLEANSEXP003
                     {
-                        siloBuilder.AddGrainDirectory(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, (_, _) => _grainDirectory);
+                        new ConfigureDistributedGrainDirectory().Configure(siloBuilder);
                     }
-                }
 
-#pragma warning disable ORLEANSEXP003
-                if (Options.UseDistributedGrainDirectory)
-#pragma warning restore ORLEANSEXP003
-                {
-                    new ConfigureDistributedGrainDirectory().Configure(siloBuilder);
-                }
+                    siloBuilder.UseInMemoryConnectionTransport(_transportHub);
 
-                siloBuilder.UseInMemoryConnectionTransport(_transportHub);
-
-                services.AddSingleton<TestHooksEnvironmentStatisticsProvider>();
-                services.AddSingleton<TestHooksSystemTarget>();
-                if (!Options.UseRealEnvironmentStatistics)
-                {
-                    services.AddFromExisting<IEnvironmentStatisticsProvider, TestHooksEnvironmentStatisticsProvider>();
-                }
-            });
+                    services.AddSingleton<TestHooksEnvironmentStatisticsProvider>();
+                    services.AddSingleton<TestHooksSystemTarget>();
+                    if (!Options.UseRealEnvironmentStatistics)
+                    {
+                        services.AddFromExisting<IEnvironmentStatisticsProvider, TestHooksEnvironmentStatisticsProvider>();
+                    }
+                });
 
                 var host = appBuilder.Build();
                 TestClusterFatalErrorHandler.Attach(host);

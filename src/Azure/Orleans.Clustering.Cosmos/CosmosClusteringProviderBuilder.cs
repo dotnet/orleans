@@ -30,19 +30,19 @@ internal sealed class CosmosClusteringProviderBuilder : IProviderBuilder<ISiloBu
                 {
                     options.IsResourceCreationEnabled = irce;
                 }
-                if(int.TryParse(configurationSection[nameof(options.DatabaseThroughput)], out var dt))
+                if (int.TryParse(configurationSection[nameof(options.DatabaseThroughput)], out var dt))
                 {
                     options.DatabaseThroughput = dt;
                 }
-                if(bool.TryParse(configurationSection[nameof(options.CleanResourcesOnInitialization)], out var croi))
+                if (bool.TryParse(configurationSection[nameof(options.CleanResourcesOnInitialization)], out var croi))
                 {
                     options.CleanResourcesOnInitialization = croi;
                 }
 
                 var serviceKey = configurationSection["ServiceKey"];
-                if(!string.IsNullOrEmpty(serviceKey))
+                if (!string.IsNullOrEmpty(serviceKey))
                 {
-                    options.ConfigureCosmosClient(sp=>
+                    options.ConfigureCosmosClient(sp =>
                         new ValueTask<CosmosClient>(sp.GetRequiredKeyedService<CosmosClient>(serviceKey)));
                 }
                 else

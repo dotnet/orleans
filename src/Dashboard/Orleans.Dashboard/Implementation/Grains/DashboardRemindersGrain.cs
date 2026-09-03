@@ -35,7 +35,7 @@ internal sealed class DashboardRemindersGrain : Grain, IDashboardRemindersGrain
 
         var reminderData = await _reminderTable.ReadRows(0, 0xffffffff, cancellationToken);
 
-        if(!reminderData.Reminders.Any())
+        if (!reminderData.Reminders.Any())
         {
             return EmptyReminders;
         }

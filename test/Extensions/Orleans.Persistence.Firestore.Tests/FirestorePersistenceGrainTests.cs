@@ -12,7 +12,7 @@ namespace Orleans.Persistence.Firestore.Tests;
 public class FirestorePersistenceGrainTests : GrainPersistenceTestsRunner, IClassFixture<FirestorePersistenceGrainTests.Fixture>
 {
     public class Fixture : TestExtensions.BaseTestClusterFixture
-    {        
+    {
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             builder.Options.InitialSilosCount = 4;

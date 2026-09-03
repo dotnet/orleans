@@ -1,4 +1,4 @@
-﻿namespace Orleans.Transactions.Abstractions
+namespace Orleans.Transactions.Abstractions
 {
     /// <summary>
     /// Creates transaction committer facets for grain activations.

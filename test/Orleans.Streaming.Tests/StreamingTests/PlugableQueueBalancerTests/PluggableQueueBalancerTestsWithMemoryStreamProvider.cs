@@ -38,15 +38,15 @@ namespace Tester.StreamingTests.PlugableQueueBalancerTests
                         .AddMemoryGrainStorage("PubSubStore")
                         .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(
                             StreamProviderName,
-                            b=>
+                            b =>
                             {
                                 b.ConfigurePartitioning(totalQueueCount);
                                 b.ConfigurePartitionBalancing((s, n) => ActivatorUtilities.CreateInstance<LeaseBasedQueueBalancerForTest>(s, n, totalQueueCount / siloCount));
                             });
-                        
+
                 }
             }
-            
+
             private class MyClientBuilderConfigurator : IClientBuilderConfigurator
             {
                 public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)

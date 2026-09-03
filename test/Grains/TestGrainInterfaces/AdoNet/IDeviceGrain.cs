@@ -1,4 +1,4 @@
-﻿namespace Orleans.SqlUtils.StorageProvider.GrainInterfaces
+namespace Orleans.SqlUtils.StorageProvider.GrainInterfaces
 {
     public interface IDeviceGrain : IGrainWithGuidKey
     {

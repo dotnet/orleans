@@ -27,9 +27,9 @@ internal readonly struct RingRange : IEquatable<RingRange>, ISpanFormattable, IC
     // Whether the range includes uint.MaxValue.
     internal bool IsWrapped => _start >= _end && _start != 0;
 
-    public static RingRange Full { get; } = new (1, 1);
+    public static RingRange Full { get; } = new(1, 1);
 
-    public static RingRange Empty { get; } = new (0, 0);
+    public static RingRange Empty { get; } = new(0, 0);
 
     public uint Start => IsFull ? 0 : _start;
 
@@ -42,14 +42,14 @@ internal readonly struct RingRange : IEquatable<RingRange>, ISpanFormattable, IC
     }
 
     // For internal use only.
-    internal static RingRange Create(uint start, uint end) => new (start, end);
+    internal static RingRange Create(uint start, uint end) => new(start, end);
 
     /// <summary>
     /// Creates a range representing a single point.
     /// </summary>
     /// <param name="point">The point which the range will include.</param>
     /// <returns>A range including only <paramref name="point"/>.</returns>
-    public static RingRange FromPoint(uint point) => new (unchecked(point - 1), point);
+    public static RingRange FromPoint(uint point) => new(unchecked(point - 1), point);
 
     /// <summary>
     /// Gets the size of the range.

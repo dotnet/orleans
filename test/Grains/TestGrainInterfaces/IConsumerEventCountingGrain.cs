@@ -1,4 +1,4 @@
-﻿namespace UnitTests.GrainInterfaces
+namespace UnitTests.GrainInterfaces
 {
     /// <summary>
     /// Stream consumer grain that just counts the events it consumes

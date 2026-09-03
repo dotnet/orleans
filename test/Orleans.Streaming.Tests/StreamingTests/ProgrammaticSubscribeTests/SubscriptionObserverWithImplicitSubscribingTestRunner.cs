@@ -39,7 +39,7 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
             cts.Token.ThrowIfCancellationRequested();
             await producer.BecomeProducer(streamId.Guid, streamId.Namespace, streamId.ProviderName);
 
-            for (var i = 0; i< 10; i++)
+            for (var i = 0; i < 10; i++)
             {
                 cts.Token.ThrowIfCancellationRequested();
                 await producer.Produce();

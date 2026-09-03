@@ -65,14 +65,14 @@ namespace Orleans.Transactions.TestKit.Consistency
         public async Task<Observation[]> Run(ConsistencyTestOptions options, int depth, string stack, int maxgrain, DateTime stopAfter)
         {
             if (random == null)
-                random = new Random(options.RandomSeed* options.NumGrains + MyNumber);
+                random = new Random(options.RandomSeed * options.NumGrains + MyNumber);
 
             if (depth < options.MaxDepth && random.NextDouble() < RecursionProbability)
             {
                 switch (random.Next(2))
                 {
                     case 0:
-                        return await Recurse(options, depth, stack, random, 10, ! options.AvoidDeadlocks, maxgrain, stopAfter);
+                        return await Recurse(options, depth, stack, random, 10, !options.AvoidDeadlocks, maxgrain, stopAfter);
                     case 1:
                         return await Recurse(options, depth, stack, random, 10, false, maxgrain, stopAfter);
                     case 2:
@@ -104,7 +104,8 @@ namespace Orleans.Transactions.TestKit.Consistency
                         LogTraceRead(logger, MyNumber, TransactionContext.CurrentTransactionId, stack);
                         return await Read();
                 }
-            } catch(Exception e)
+            }
+            catch (Exception e)
             {
                 LogTraceException(logger, MyNumber, TransactionContext.CurrentTransactionId, stack, e.GetType().Name);
                 throw;
@@ -129,7 +130,7 @@ namespace Orleans.Transactions.TestKit.Consistency
         }
 
         private Task<Observation[]> Write()
-        { 
+        {
             var txid = TransactionContext.CurrentTransactionId;
             return data.PerformUpdate((state) =>
             {
@@ -217,5 +218,5 @@ namespace Orleans.Transactions.TestKit.Consistency
             Message = "g{MyNumber} {CurrentTransactionId} {Stack} Recurse {Count} {ParallelOrSequential}"
         )]
         private static partial void LogTraceRecurse(ILogger logger, int myNumber, object currentTransactionId, string stack, int count, string parallelOrSequential);
-    } 
+    }
 }

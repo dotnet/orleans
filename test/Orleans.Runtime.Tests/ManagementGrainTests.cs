@@ -28,7 +28,7 @@ namespace UnitTests.Management
     [TestSuite("BVT")]
     [TestProvider("None")]
     [TestArea("Runtime")]
-    public class ManagementGrainTests :  OrleansTestingBase, IClassFixture<ManagementGrainTests.Fixture>
+    public class ManagementGrainTests : OrleansTestingBase, IClassFixture<ManagementGrainTests.Fixture>
     {
         private readonly Fixture fixture;
         private readonly ITestOutputHelper output;

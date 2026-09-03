@@ -20,7 +20,7 @@ namespace UnitTests.RemindersTest
     {
         public MySqlRemindersTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())
         {
-            
+
         }
 
         private static LoggerFilterOptions CreateFilters()

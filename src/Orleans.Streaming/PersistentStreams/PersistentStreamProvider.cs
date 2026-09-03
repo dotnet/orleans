@@ -119,7 +119,7 @@ namespace Orleans.Providers.Streams.Common
 
         private async Task Init(CancellationToken token)
         {
-            if(!this.stateManager.PresetState(ProviderState.Initialized)) return;
+            if (!this.stateManager.PresetState(ProviderState.Initialized)) return;
             this.adapterFactory = this.runtime.ServiceProvider.GetRequiredKeyedService<IQueueAdapterFactory>(this.Name);
             this.queueAdapter = await adapterFactory.CreateAdapter(token);
 

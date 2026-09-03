@@ -35,7 +35,7 @@ namespace UnitTests.StreamingTests
                         .AddPersistentStreams(
                             StreamProviderName,
                             ControllableTestAdapterFactory.Create,
-                            b=>
+                            b =>
                             {
                                 b.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
                                 b.UseDynamicClusterConfigDeploymentBalancer();
@@ -49,7 +49,7 @@ namespace UnitTests.StreamingTests
         public ControllableStreamProviderTests(Fixture fixture)
         {
             _fixture = fixture;
-        }        
+        }
 
         [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task ControllableAdapterEchoTest()

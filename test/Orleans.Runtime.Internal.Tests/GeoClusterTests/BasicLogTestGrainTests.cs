@@ -50,7 +50,7 @@ namespace Tests.GeoClusterTests
                         {
                             options.TableServiceClient = GetTableServiceClient();
                         }))
-                        .AddMemoryGrainStorage("MemoryStore"); 
+                        .AddMemoryGrainStorage("MemoryStore");
                 }
 
                 private static TableServiceClient GetTableServiceClient()
@@ -61,7 +61,7 @@ namespace Tests.GeoClusterTests
                 }
             }
         }
-        
+
         public BasicLogTestGrainTests(Fixture fixture)
         {
             this.fixture = fixture;

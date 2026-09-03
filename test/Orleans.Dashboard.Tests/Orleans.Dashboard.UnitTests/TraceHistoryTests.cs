@@ -21,7 +21,7 @@ public class TraceHistoryTests
         {
             history.Add(_startTime.AddSeconds(_seconds), "SILO1", new[]
             {
-                new SiloGrainTraceEntry 
+                new SiloGrainTraceEntry
                 {
                     Grain = "GRAIN1",
                     Method = "METHOD1",
@@ -33,7 +33,7 @@ public class TraceHistoryTests
 
             history.Add(_startTime.AddSeconds(_seconds), "SILO2", new[]
             {
-                new SiloGrainTraceEntry 
+                new SiloGrainTraceEntry
                 {
                     Grain = "GRAIN1",
                     Method = "METHOD1",

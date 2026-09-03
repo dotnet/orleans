@@ -44,7 +44,7 @@ namespace Orleans.Transactions.TestKit
             actual = await grain.Get();
             actual.Should().Be(expected);
         }
-        
+
         /// <summary>
         /// Verifies that a transactional write remains committed after the grain is deactivated and reactivated.
         /// </summary>

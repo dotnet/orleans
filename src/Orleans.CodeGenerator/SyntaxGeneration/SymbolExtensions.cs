@@ -451,7 +451,7 @@ internal static class SymbolExtensions
             yield return member;
         }
     }
-    
+
     public static IEnumerable<TSymbol> GetDeclaredInstanceMembers<TSymbol>(this ITypeSymbol type) where TSymbol : ISymbol
     {
         foreach (var candidate in type.GetMembers())

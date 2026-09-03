@@ -136,7 +136,7 @@ namespace Orleans.Configuration
             {
                 throw new ArgumentNullException(nameof(credential));
             }
-            
+
             CreateConnection = connectionOptions => new EventHubConnection(fullyQualifiedNamespace, EventHubName, credential, connectionOptions);
         }
 

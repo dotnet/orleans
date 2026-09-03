@@ -55,7 +55,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
                 var grain = Client.GetGrain<IVersionUpgradeTestGrain>(i);
                 Assert.Equal(1, await grain.GetVersion());
             }
-            
+
             // Fallback to AllVersionsCompatible
             await ManagementGrain.SetCompatibilityStrategy(
                 ifaceId,

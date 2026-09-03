@@ -1,4 +1,4 @@
-﻿using Orleans.Concurrency;
+using Orleans.Concurrency;
 using BenchmarkGrainInterfaces.Transaction;
 
 namespace BenchmarkGrains.Transaction

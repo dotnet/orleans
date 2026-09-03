@@ -31,6 +31,21 @@ env:
   TESTCONTAINERS_RYUK_IMAGE: testcontainers/ryuk:0.14.0
   ZOOKEEPER_IMAGE: zookeeper:3.9
 jobs:
+  whitespace:
+    name: Whitespace formatting
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      with:
+        fetch-depth: 0
+    - name: Setup .NET
+      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
+      with:
+        global-json-file: global.json
+    - name: Verify .NET formatter
+      run: dotnet format --version
+    - name: Check solution
+      run: dotnet format whitespace Orleans.slnx --verify-no-changes --verbosity normal
   build:
     name: Build
     runs-on: ${{ matrix.os }}

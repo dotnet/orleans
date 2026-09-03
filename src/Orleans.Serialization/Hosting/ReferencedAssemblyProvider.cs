@@ -201,7 +201,7 @@ namespace Orleans.Serialization.Internal
             }
 
 #if NETCOREAPP3_1_OR_GREATER
-            var assemblyContext = AssemblyLoadContext.GetLoadContext(assembly) ?? AssemblyLoadContext.Default; 
+            var assemblyContext = AssemblyLoadContext.GetLoadContext(assembly) ?? AssemblyLoadContext.Default;
 #endif
 
             return ExpandApplicationParts(
@@ -241,7 +241,7 @@ namespace Orleans.Serialization.Internal
                     }
 
 #if NETCOREAPP3_1_OR_GREATER
-                    var assemblyContext = AssemblyLoadContext.GetLoadContext(assembly) ?? AssemblyLoadContext.Default; 
+                    var assemblyContext = AssemblyLoadContext.GetLoadContext(assembly) ?? AssemblyLoadContext.Default;
 #endif
 
                     foreach (var attribute in attributes)

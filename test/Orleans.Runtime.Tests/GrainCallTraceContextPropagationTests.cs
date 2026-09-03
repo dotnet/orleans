@@ -968,10 +968,10 @@ namespace UnitTests.General
             clientActivity?.Start();
 
             var callerGrain = _fixture.GrainFactory.GetGrain<ITraceContextPropagationGrain>(Random.Shared.Next());
-            
+
             // First call to ensure the grain is activated
             _ = await callerGrain.GetTraceContextInfo();
-            
+
             clientActivity?.Stop();
             Activity.Current = null;
             Started.Clear();
@@ -1030,7 +1030,7 @@ namespace UnitTests.General
             // This test documents the expected behavior when only Lifecycle source is sampled
             // In our test fixture, we DO sample Application source, so this test verifies correct behavior
             // In production, if Application source is NOT sampled, the activation will be a root span
-            
+
             Started.Clear();
 
             using var clientActivity = ActivitySources.ApplicationGrainSource.StartActivity("client-sampling-test");
@@ -1088,7 +1088,7 @@ namespace UnitTests.General
 
                 // In our test environment, Application source IS sampled, so we should have spans
                 Assert.NotNull(clientActivity);
-                Assert.True(applicationSpans.Count > 0, 
+                Assert.True(applicationSpans.Count > 0,
                     "Application source spans should exist. In production, verify Microsoft.Orleans.Application is in your TracerProvider sources.");
             }
             finally
@@ -1150,7 +1150,7 @@ namespace UnitTests.General
                 var info = await grain.GetTraceContextInfo();
 
                 _output.WriteLine($"Server received traceparent: {!string.IsNullOrEmpty(info.TraceParentFromRequestContext)}");
-                
+
                 var activationSpan = Started.FirstOrDefault(a => a.OperationName == ActivityNames.ActivateGrain);
                 if (activationSpan is not null)
                 {
@@ -1231,7 +1231,7 @@ namespace UnitTests.General
                 if (activationSpan is not null)
                 {
                     Assert.Equal(httpTraceId, activationSpan.TraceId.ToString());
-                    Assert.False(string.IsNullOrEmpty(activationSpan.ParentId), 
+                    Assert.False(string.IsNullOrEmpty(activationSpan.ParentId),
                         "Activation span should have a parent when called from HTTP activity");
                 }
             }
@@ -1312,7 +1312,7 @@ namespace UnitTests.General
 
                 // CRITICAL: Even with cross-silo placement, trace should be preserved
                 Assert.Equal(clientTraceId, serverTraceInfo.TraceId);
-                
+
                 if (activationSpan is not null)
                 {
                     Assert.Equal(clientTraceId, activationSpan.TraceId.ToString());

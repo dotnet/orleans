@@ -52,7 +52,7 @@ namespace UnitTests.StreamingTests
 
         public Task BecomeConsumer(Guid streamId, string providerToUse) =>
             BecomeConsumer(streamId, providerToUse, CancellationToken.None);
-        
+
         public Task BecomeConsumer(
             Guid streamId,
             string providerToUse,
@@ -121,12 +121,12 @@ namespace UnitTests.StreamingTests
 
         public Task ProduceSequentialSeries(int count)
         {
-             return this.producer.ProduceSequentialSeries(count);
+            return this.producer.ProduceSequentialSeries(count);
         }
 
         public Task ProduceParallelSeries(int count)
         {
-             return this.producer.ProduceParallelSeries(count);
+            return this.producer.ProduceParallelSeries(count);
         }
 
         public Task<int> GetItemsProduced()
@@ -288,23 +288,23 @@ namespace UnitTests.StreamingTests
             var dedup = new Dictionary<int, IStreaming_ConsumerGrain>();
             for (var i = 0; i < grainCount; ++i)
             {
-                    // we deduplicate the grain references to ensure that IEnumerable.Distinct() works as intended.
-                    if (dedup.ContainsKey(grainIds[i]))
-                        grains[i] = dedup[grainIds[i]];
+                // we deduplicate the grain references to ensure that IEnumerable.Distinct() works as intended.
+                if (dedup.ContainsKey(grainIds[i]))
+                    grains[i] = dedup[grainIds[i]];
+                else
+                {
+                    if (useReentrantGrain)
+                    {
+                        grains[i] = grainFactory.GetGrain<IStreaming_Reentrant_ProducerConsumerGrain>(grainIds[i]);
+                    }
                     else
                     {
-                        if (useReentrantGrain)
-                        {
-                            grains[i] = grainFactory.GetGrain<IStreaming_Reentrant_ProducerConsumerGrain>(grainIds[i]);
-                        }
-                        else
-                        {
-                            var grainFullName = typeof(Streaming_ProducerConsumerGrain).FullName;
-                            grains[i] = grainFactory.GetGrain<IStreaming_ProducerConsumerGrain>(grainIds[i], grainFullName);
-                        }
-                        dedup[grainIds[i]] = grains[i];
+                        var grainFullName = typeof(Streaming_ProducerConsumerGrain).FullName;
+                        grains[i] = grainFactory.GetGrain<IStreaming_ProducerConsumerGrain>(grainIds[i], grainFullName);
                     }
-                    }
+                    dedup[grainIds[i]] = grains[i];
+                }
+            }
             return NewConsumerProxy(streamId, streamProvider, grains, logger, grainFactory, cancellationToken);
         }
 
@@ -330,7 +330,7 @@ namespace UnitTests.StreamingTests
             if (logger == null)
                 throw new ArgumentNullException(nameof(logger));
 
-            if (string.IsNullOrEmpty(grainClassName)) 
+            if (string.IsNullOrEmpty(grainClassName))
             {
                 grainClassName = typeof(Streaming_ConsumerGrain).FullName!;
             }
@@ -381,7 +381,7 @@ namespace UnitTests.StreamingTests
         public Task<int> ConsumerCount
         {
             get { return GetConsumerCount(); }
-        }        
+        }
 
         public Task StopBeingConsumer()
         {
@@ -515,23 +515,23 @@ namespace UnitTests.StreamingTests
             var dedup = new Dictionary<int, IStreaming_ProducerGrain>();
             for (var i = 0; i < grainCount; ++i)
             {
-                    // we deduplicate the grain references to ensure that IEnumerable.Distinct() works as intended.
-                    if (dedup.ContainsKey(grainIds[i]))
-                        grains[i] = dedup[grainIds[i]];
+                // we deduplicate the grain references to ensure that IEnumerable.Distinct() works as intended.
+                if (dedup.ContainsKey(grainIds[i]))
+                    grains[i] = dedup[grainIds[i]];
+                else
+                {
+                    if (useReentrantGrain)
+                    {
+                        grains[i] = grainFactory.GetGrain<IStreaming_Reentrant_ProducerConsumerGrain>(grainIds[i]);
+                    }
                     else
                     {
-                        if (useReentrantGrain)
-                        {
-                            grains[i] = grainFactory.GetGrain<IStreaming_Reentrant_ProducerConsumerGrain>(grainIds[i]);
-                        }
-                        else
-                        {
-                            var grainFullName = typeof(Streaming_ProducerConsumerGrain).FullName;
-                            grains[i] = grainFactory.GetGrain<IStreaming_ProducerConsumerGrain>(grainIds[i], grainFullName);
-                        }
-                        dedup[grainIds[i]] = grains[i];
-                    }                    
+                        var grainFullName = typeof(Streaming_ProducerConsumerGrain).FullName;
+                        grains[i] = grainFactory.GetGrain<IStreaming_ProducerConsumerGrain>(grainIds[i], grainFullName);
+                    }
+                    dedup[grainIds[i]] = grains[i];
                 }
+            }
             return NewProducerProxy(grains, streamId, streamProvider, null, logger, cancellationToken);
         }
 
@@ -543,7 +543,7 @@ namespace UnitTests.StreamingTests
             IClusterClient client,
             int producersCount = 1,
             CancellationToken cancellationToken = default)
-        {            
+        {
             if (producersCount < 1)
                 throw new ArgumentOutOfRangeException(nameof(producersCount), "The producer count must be at least one");
             var producers = new IStreaming_ProducerGrain[producersCount];
@@ -562,7 +562,7 @@ namespace UnitTests.StreamingTests
             _cleanedUpFlag.ThrowNotInitializedIfSet();
 
             return Task.WhenAll(_targets.Select(
-                target => 
+                target =>
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     return target.BecomeProducer(streamId, providerToUse, streamNamespace!);
@@ -574,9 +574,9 @@ namespace UnitTests.StreamingTests
             _cleanedUpFlag.ThrowNotInitializedIfSet();
 
             foreach (var t in _targets.Distinct())
-                await t.ProduceSequentialSeries(count); 
+                await t.ProduceSequentialSeries(count);
         }
-            
+
         public Task ProduceParallelSeries(int count)
         {
             _cleanedUpFlag.ThrowNotInitializedIfSet();
@@ -634,7 +634,7 @@ namespace UnitTests.StreamingTests
         {
             if (!_cleanedUpFlag.TrySet())
                 return;
-                
+
             var tasks = new List<Task>();
             foreach (var i in _targets.Distinct())
             {

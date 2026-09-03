@@ -38,7 +38,7 @@ namespace Orleans.Hosting.Developer
             configurator.Configure(configureOptions);
         }
     }
-    
+
     /// <summary>
     /// Configures a named stream provider which generates Event Hubs data for development and testing.
     /// </summary>

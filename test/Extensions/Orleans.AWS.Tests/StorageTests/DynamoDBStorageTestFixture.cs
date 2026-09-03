@@ -1,4 +1,4 @@
-﻿namespace AWSUtils.Tests.StorageTests
+namespace AWSUtils.Tests.StorageTests
 {
     public class DynamoDBStorageTestsFixture
     {

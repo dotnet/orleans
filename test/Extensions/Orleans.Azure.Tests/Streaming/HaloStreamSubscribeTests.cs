@@ -50,21 +50,21 @@ namespace UnitTests.HaloTests.Streaming
                             options.DeleteStateOnClear = true;
                             options.ConfigureTestDefaults();
                         }))
-                        .AddAzureQueueStreams(AzureQueueStreamProviderName, b=>b
+                        .AddAzureQueueStreams(AzureQueueStreamProviderName, b => b
                         .ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>(
                                 (options, dep) =>
                                 {
                                     options.ConfigureTestDefaults();
                                     options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
-                            })));
+                                })));
                     hostBuilder
-                        .AddAzureQueueStreams("AzureQueueProvider2", b=>b
+                        .AddAzureQueueStreams("AzureQueueProvider2", b => b
                         .ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>(
                                 (options, dep) =>
                                 {
                                     options.ConfigureTestDefaults();
                                     options.QueueNames = AzureQueueUtilities.GenerateQueueNames($"{dep.Value.ClusterId}2", queueCount);
-                            })));
+                                })));
                 }
             }
 

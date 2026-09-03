@@ -18,7 +18,7 @@ namespace Orleans.TestingHost
         {
             // Use the siloAddress here, not the gateway address, since we may be targeting a silo on which we are not 
             // connected to the gateway
-            var internalClient = (IInternalClusterClient) client;
+            var internalClient = (IInternalClusterClient)client;
             return internalClient.GetSystemTarget<ITestHooksSystemTarget>(Constants.TestHooksSystemTargetType, silo.SiloAddress);
         }
     }

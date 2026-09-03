@@ -15,7 +15,7 @@ namespace Orleans.Runtime.Placement
     {
         private Task<SiloAddress>? _cachedLocalSilo;
 
-        public override Task<SiloAddress> 
+        public override Task<SiloAddress>
             OnAddActivation(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
         {
             var compatibleSilos = context.GetCompatibleSilos(target);

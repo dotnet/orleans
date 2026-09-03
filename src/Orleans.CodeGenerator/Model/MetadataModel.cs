@@ -8,7 +8,7 @@ internal class MetadataModel
     public Dictionary<INamedTypeSymbol, ProxyInterfaceDescription> InvokableInterfaces { get; } = new(SymbolEqualityComparer.Default);
     public Dictionary<InvokableMethodId, GeneratedInvokableDescription> GeneratedInvokables { get; } = new();
     public Dictionary<ISerializableTypeDescription, TypeSyntax> DefaultCopiers { get; } = new();
-    internal Dictionary<INamedTypeSymbol, Dictionary<INamedTypeSymbol, INamedTypeSymbol>> ProxyBaseTypeInvokableBaseTypes { get; } = new (SymbolEqualityComparer.Default);
+    internal Dictionary<INamedTypeSymbol, Dictionary<INamedTypeSymbol, INamedTypeSymbol>> ProxyBaseTypeInvokableBaseTypes { get; } = new(SymbolEqualityComparer.Default);
 }
 internal readonly struct CompoundTypeAliasComponent : IEquatable<CompoundTypeAliasComponent>
 {

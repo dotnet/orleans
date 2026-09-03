@@ -181,7 +181,7 @@ namespace Orleans.Clustering.DynamoDB
                 };
 
                 var entries = await storage.GetEntriesTxAsync(this.options.TableName,
-                    new[] {siloEntryKeys, versionEntryKeys}, fields => new SiloInstanceRecord(fields));
+                    new[] { siloEntryKeys, versionEntryKeys }, fields => new SiloInstanceRecord(fields));
 
                 MembershipTableData data = Convert(entries.ToList());
                 LogTraceReadMyEntry(siloAddress, data);
@@ -272,7 +272,7 @@ namespace Orleans.Clustering.DynamoDB
                     (versionEntryUpdate.UpdateExpression, versionEntryUpdate.ExpressionAttributeValues) =
                         this.storage.ConvertUpdate(versionEntry.GetFields(), conditionalValues);
 
-                    await this.storage.WriteTxAsync(new[] {tableEntryInsert}, new[] {versionEntryUpdate});
+                    await this.storage.WriteTxAsync(new[] { tableEntryInsert }, new[] { versionEntryUpdate });
 
                     result = true;
                 }
@@ -347,7 +347,7 @@ namespace Orleans.Clustering.DynamoDB
                     (versionEntryUpdate.UpdateExpression, versionEntryUpdate.ExpressionAttributeValues) =
                         this.storage.ConvertUpdate(versionEntry.GetFields(), versionConditionalValues);
 
-                    await this.storage.WriteTxAsync(updates: new[] {siloEntryUpdate, versionEntryUpdate});
+                    await this.storage.WriteTxAsync(updates: new[] { siloEntryUpdate, versionEntryUpdate });
                     result = true;
                 }
                 catch (TransactionCanceledException canceledException)
@@ -380,7 +380,7 @@ namespace Orleans.Clustering.DynamoDB
                 var siloEntry = ConvertPartial(entry);
                 var fields = new Dictionary<string, AttributeValue> { { SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME, new AttributeValue(siloEntry.IAmAliveTime) } };
                 var expression = $"attribute_exists({SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}) AND attribute_exists({SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME})";
-                await this.storage.UpsertEntryAsync(this.options.TableName, siloEntry.GetKeys(),fields, expression);
+                await this.storage.UpsertEntryAsync(this.options.TableName, siloEntry.GetKeys(), fields, expression);
             }
             catch (Exception exc)
             {

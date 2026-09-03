@@ -342,12 +342,12 @@ namespace UnitTests.StorageTests
 
             TimeSpan elapsed = sw.Elapsed;
             double tps = (numIterations * 2) / elapsed.TotalSeconds; // One Read and one Write per iteration
-            output.WriteLine("{0} Completed Read-Write operations in {1} at {2} TPS",  numIterations, elapsed, tps);
+            output.WriteLine("{0} Completed Read-Write operations in {1} at {2} TPS", numIterations, elapsed, tps);
 
             for (int i = 0; i < numIterations; i++)
             {
                 int expectedVal = i;
-                Assert.Equal(expectedVal,  await promises[i]);  //  "Returned value - Read @ #" + i
+                Assert.Equal(expectedVal, await promises[i]);  //  "Returned value - Read @ #" + i
             }
         }
 
@@ -1052,7 +1052,7 @@ namespace UnitTests.StorageTests
             for (int i = 0; i < numIterations; i++)
             {
                 int expectedVal = i;
-                Assert.Equal(expectedVal,  await promises[i]);  //  "Returned value - Read @ #" + i
+                Assert.Equal(expectedVal, await promises[i]);  //  "Returned value - Read @ #" + i
             }
         }
 
@@ -1090,9 +1090,9 @@ namespace UnitTests.StorageTests
             Assert.NotNull(exc.InnerException); // BaseException.InnerException should not be null
             Assert.IsAssignableFrom<BadProviderConfigException>(exc.InnerException);
 
-            Assert.StartsWith(msg3,  ae.Message);  //  "AggregateException.Message should be '{0}'", msg3
-            Assert.Equal(msg2,  exc.Message);  //  "OrleansException.Message should be '{0}'", msg2
-            Assert.Equal(msg1,  exc.InnerException.Message);  //  "InnerException.Message should be '{0}'", msg1
+            Assert.StartsWith(msg3, ae.Message);  //  "AggregateException.Message should be '{0}'", msg3
+            Assert.Equal(msg2, exc.Message);  //  "OrleansException.Message should be '{0}'", msg2
+            Assert.Equal(msg1, exc.InnerException.Message);  //  "InnerException.Message should be '{0}'", msg1
         }
 
         [TestSuite("Functional")]
@@ -1411,7 +1411,7 @@ namespace UnitTests.StorageTests
                providerName, (int)MockStorageProvider.Commands.GetProvideState, null).Result;
             object?[] replies2 = mgmtGrain.SendControlCommandToProvider<T>(
                               providerName, (int)MockStorageProvider.Commands.GetLastState, null).Result;
-            for(int i = 0; i < replies.Length; i++)
+            for (int i = 0; i < replies.Length; i++)
             {
                 MockStorageProvider.StateForTest state = (MockStorageProvider.StateForTest)replies[i]!;
                 PersistenceTestGrainState grainState = (PersistenceTestGrainState)replies2[i]!;

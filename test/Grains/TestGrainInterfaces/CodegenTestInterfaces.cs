@@ -216,7 +216,7 @@ namespace UnitTests.GrainInterfaces
 
         [Id(5)]
         public IEchoGrain? SomeGrainReference { get; set; }
-        
+
 #pragma warning disable 618
         public int GetObsoleteInt() => this.ObsoleteInt;
         public void SetObsoleteInt(int value)

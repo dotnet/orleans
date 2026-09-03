@@ -683,7 +683,7 @@ namespace Orleans.Runtime.Placement
 
             var activityContext = requestContextData.TryGetActivityContext();
 
-            if (activityContext is {} parentContext)
+            if (activityContext is { } parentContext)
             {
                 // Start the activity from the Catalog's ActivitySource to properly associate it with activation tracing
                 return ActivitySources.LifecycleGrainSource.StartActivity(operationName, ActivityKind.Internal, parentContext);

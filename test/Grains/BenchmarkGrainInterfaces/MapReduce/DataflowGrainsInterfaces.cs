@@ -1,4 +1,4 @@
-﻿namespace BenchmarkGrainInterfaces.MapReduce
+namespace BenchmarkGrainInterfaces.MapReduce
 {
     public interface IDataflowGrain : IGrain
     {
@@ -44,7 +44,7 @@
     {
         Task<List<TOutput>> ReceiveAll();
     }
-    
+
     public interface ITransformGrain<TInput, TOutput> : IPropagatorGrain<TInput, TOutput>, IProcessor<ITransformProcessor<TInput, TOutput>>
     {
     }

@@ -28,7 +28,7 @@ namespace UnitTests.Grains
 
         public Task SetTestObjectStringProperty(string value)
         {
-            if(_myObject == null)
+            if (_myObject == null)
                 _myObject = new StreamImmutabilityTestObject();
 
             _myObject.MyString = value;

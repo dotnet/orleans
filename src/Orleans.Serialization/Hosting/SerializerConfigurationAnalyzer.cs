@@ -102,7 +102,7 @@ namespace Orleans.Serialization
             /// <summary>
             /// Gets a collection of interface types which reference the type this complaint represents.
             /// </summary>
-            public Dictionary<Type, HashSet<MethodInfo>> Methods { get; } = new ();
+            public Dictionary<Type, HashSet<MethodInfo>> Methods { get; } = new();
 
             /// <summary>
             /// Gets or sets a value indicating whether a serializer is available for this type.

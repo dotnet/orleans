@@ -21,8 +21,8 @@ namespace Tester.Redis.Persistence
         private readonly CommonStorageTests commonStorageTests;
         private readonly ITestOutputHelper output;
         private readonly IGrainStorage storageProvider;
-    
-        public RedisStorageTests(ITestOutputHelper output, CommonFixture commonFixture) 
+
+        public RedisStorageTests(ITestOutputHelper output, CommonFixture commonFixture)
         {
             TestUtils.CheckForRedis();
             this.fixture = commonFixture;

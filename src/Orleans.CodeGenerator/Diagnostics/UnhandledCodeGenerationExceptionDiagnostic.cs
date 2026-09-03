@@ -10,7 +10,7 @@ public static class UnhandledCodeGenerationExceptionDiagnostic
     /// <summary>
     /// The diagnostic identifier.
     /// </summary>
-    public const string RuleId = DiagnosticRuleId.UnhandledCodeGenerationException; 
+    public const string RuleId = DiagnosticRuleId.UnhandledCodeGenerationException;
     private const string Category = "Usage";
     private static readonly LocalizableString Title = "An unhandled source generation exception occurred";
     private static readonly LocalizableString MessageFormat = "An unhandled exception occurred while generating source for your project: {0} {1}";

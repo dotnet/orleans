@@ -125,7 +125,7 @@ public class GrainPlacementFilterTests(GrainPlacementFilterTests.Fixture fixture
         await Assert.ThrowsAsync<InvalidOperationException>(async () =>
         {
             await testGrain.Ping();
-        }); 
+        });
     }
 }
 

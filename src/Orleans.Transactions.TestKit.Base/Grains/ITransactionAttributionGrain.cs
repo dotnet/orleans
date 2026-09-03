@@ -109,11 +109,11 @@ namespace Orleans.Transactions.TestKit
         /// <exception cref="NotSupportedException"><paramref name="option"/> is not a supported transaction option.</exception>
         public static ITransactionAttributionGrain GetTransactionAttributionGrain(this IGrainFactory grainFactory, Guid id, TransactionOption? option = null)
         {
-            if(!option.HasValue)
+            if (!option.HasValue)
             {
                 return new NoAttributionGrain(grainFactory.GetGrain<INoAttributionGrain>(id));
             }
-            switch(option.Value)
+            switch (option.Value)
             {
                 case TransactionOption.Suppress:
                     return new SuppressAttributionGrain(grainFactory.GetGrain<ISuppressAttributionGrain>(id));

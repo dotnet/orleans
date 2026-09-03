@@ -81,14 +81,14 @@ namespace UnitTests.Grains
 
             var task = Task.Factory.StartNew(() =>
             {
-                bar1 = (string?) RequestContext.Get("jarjar");
+                bar1 = (string?)RequestContext.Get("jarjar");
                 logger.LogInformation("bar = {Bar}.", bar1);
             });
 
             string? bar2 = null;
             var ac = Task.Factory.StartNew(() =>
             {
-                bar2 = (string?) RequestContext.Get("jarjar");
+                bar2 = (string?)RequestContext.Get("jarjar");
                 logger.LogInformation("bar = {Bar}.", bar2);
             });
 

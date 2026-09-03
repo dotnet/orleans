@@ -11,15 +11,15 @@ namespace ServiceBus.Tests.EvictionStrategyTests
     {
         public EventHubQueueCacheForTesting(IObjectPool<FixedSizeBuffer> bufferPool, IEventHubDataAdapter dataAdapter, IEvictionStrategy evictionStrategy, IStreamQueueCheckpointer<string> checkpointer,
             ILogger logger)
-            :base("test", EventHubAdapterReceiver.MaxMessagesPerRead, bufferPool, dataAdapter, evictionStrategy, checkpointer, logger, null!, null!, null!)
-            { }
+            : base("test", EventHubAdapterReceiver.MaxMessagesPerRead, bufferPool, dataAdapter, evictionStrategy, checkpointer, logger, null!, null!, null!)
+        { }
 
         public int ItemCount => this.cache.ItemCount;
     }
     public class EHEvictionStrategyForTesting : ChronologicalEvictionStrategy
     {
         public EHEvictionStrategyForTesting(ILogger logger, ICacheMonitor? cacheMonitor = null, TimeSpan? monitorWriteInterval = null, TimePurgePredicate? timePurage = null)
-            :base(logger, timePurage!, cacheMonitor!, monitorWriteInterval)
+            : base(logger, timePurage!, cacheMonitor!, monitorWriteInterval)
         { }
 
         public Queue<FixedSizeBuffer> InUseBuffers => this.inUseBuffers;
