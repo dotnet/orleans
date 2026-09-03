@@ -8,11 +8,18 @@ using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions
 {
+    /// <summary>
+    /// Dispatches transaction coordination messages to transaction managers registered on the current grain.
+    /// </summary>
     public class TransactionManagerExtension : ITransactionManagerExtension
     {
         private readonly ResourceFactoryRegistry<ITransactionManager> factories;
         private readonly Dictionary<string, ITransactionManager> managers;
 
+        /// <summary>
+        /// Initializes a new extension for the current grain context.
+        /// </summary>
+        /// <param name="contextAccessor">The accessor for the grain context containing registered transaction manager factories.</param>
         public TransactionManagerExtension(IGrainContextAccessor contextAccessor)
         {
             this.factories = contextAccessor.GrainContext.GetResourceFactoryRegistry<ITransactionManager>()!;
