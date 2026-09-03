@@ -79,6 +79,59 @@ public class InMemoryJobQueueTests
     }
 
     [Fact]
+    public async Task Enqueue_ReplacingJobInSameBucketPreservesOrderAndCount()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var queue = new InMemoryJobQueue();
+        var job1 = CreateJob("job1", now.AddSeconds(-1));
+        var job2 = CreateJob("job2", job1.DueTime);
+
+        queue.Enqueue(job1, 0);
+        queue.Enqueue(job2, 0);
+        queue.Enqueue(job1, 7);
+        queue.MarkAsComplete();
+
+        Assert.Equal(2, queue.Count);
+
+        await using var enumerator = queue.GetAsyncEnumerator(TestContext.Current.CancellationToken);
+        Assert.True(await enumerator.MoveNextAsync());
+        Assert.Equal(job1.Id, enumerator.Current.Job.Id);
+        Assert.Equal(8, enumerator.Current.DequeueCount);
+        Assert.True(queue.RemoveJob(job1.Id));
+
+        Assert.True(await enumerator.MoveNextAsync());
+        Assert.Equal(job2.Id, enumerator.Current.Job.Id);
+        Assert.True(queue.RemoveJob(job2.Id));
+
+        Assert.False(await enumerator.MoveNextAsync());
+        Assert.Equal(0, queue.Count);
+    }
+
+    [Fact]
+    public async Task Enqueue_ReplacingJobInAnotherBucketYieldsOnlyReplacement()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var queue = new InMemoryJobQueue();
+        var stale = CreateJob("job1", now.AddSeconds(-2));
+        var replacement = CreateJob("job1", now.AddSeconds(-1));
+
+        queue.Enqueue(stale, 0);
+        queue.Enqueue(replacement, 4);
+        queue.MarkAsComplete();
+
+        Assert.Equal(1, queue.Count);
+
+        await using var enumerator = queue.GetAsyncEnumerator(TestContext.Current.CancellationToken);
+        Assert.True(await enumerator.MoveNextAsync());
+        Assert.Same(replacement, enumerator.Current.Job);
+        Assert.Equal(5, enumerator.Current.DequeueCount);
+        Assert.True(queue.RemoveJob(replacement.Id));
+
+        Assert.False(await enumerator.MoveNextAsync());
+        Assert.Equal(0, queue.Count);
+    }
+
+    [Fact]
     public async Task GetAsyncEnumerator_IncrementsDequeueCount()
     {
         var queue = new InMemoryJobQueue();
@@ -458,6 +511,37 @@ public class InMemoryJobQueueTests
         queue.RemoveJob(enumerator.Current.Job.Id);
 
         Assert.False(await enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task Enqueue_SameJobIdMovedDuringBucketDrain_YieldsOnlyReplacement()
+    {
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 10, 0, TimeSpan.Zero));
+        var queue = new InMemoryJobQueue(timeProvider);
+        var staleDueTime = timeProvider.GetUtcNow().AddMinutes(-2);
+        var replacementDueTime = timeProvider.GetUtcNow().AddMinutes(-1);
+        var sentinel = CreateJob("sentinel", staleDueTime);
+        var stale = CreateJob("replaced-job", staleDueTime);
+        var replacement = CreateJob("replaced-job", replacementDueTime);
+
+        queue.Enqueue(sentinel, 0);
+        queue.Enqueue(stale, 0);
+
+        await using var enumerator = queue.GetAsyncEnumerator(TestContext.Current.CancellationToken);
+        Assert.True(await enumerator.MoveNextAsync());
+        Assert.Equal(sentinel.Id, enumerator.Current.Job.Id);
+        Assert.True(queue.RemoveJob(sentinel.Id));
+
+        queue.Enqueue(replacement, 7);
+        queue.MarkAsComplete();
+
+        Assert.True(await enumerator.MoveNextAsync());
+        Assert.Same(replacement, enumerator.Current.Job);
+        Assert.Equal(8, enumerator.Current.DequeueCount);
+        Assert.True(queue.RemoveJob(replacement.Id));
+
+        Assert.False(await enumerator.MoveNextAsync());
+        Assert.Equal(0, queue.Count);
     }
 
     private static DurableJob CreateJob(string id, DateTimeOffset dueTime, string? traceParent = null, string? traceState = null)
