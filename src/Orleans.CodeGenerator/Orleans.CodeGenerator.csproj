@@ -11,7 +11,6 @@
     <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
     <IsRoslynComponent>true</IsRoslynComponent>
-    <NoWarn>$(NoWarn);RS1038;RS1042</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

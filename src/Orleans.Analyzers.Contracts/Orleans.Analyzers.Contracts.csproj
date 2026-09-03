@@ -11,10 +11,12 @@
     <DevelopmentDependency>true</DevelopmentDependency>
     <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <!-- The contracts package includes its analyzer and code fix together; the code fix requires Roslyn Workspaces. -->
     <NoWarn>$(NoWarn);RS1038</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" PrivateAssets="all" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" PrivateAssets="all" />
     <PackageReference Update="NETStandard.Library" PrivateAssets="all" />
     <ProjectReference Include="..\Orleans.Analyzers\Orleans.Analyzers.csproj"
