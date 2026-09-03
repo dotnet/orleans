@@ -78,13 +78,13 @@ namespace Documentation.Grains.Placement.Strategies
 
     public interface IHardwareSessionGrain : IGrainWithStringKey;
 
-    [Experimental("ORLEANSEXP001")]
     internal static class PlacementConfiguration
     {
         internal static void ConfigureResourceOptimized(
             ISiloBuilder siloBuilder)
         {
             // <configure_resource_optimized_placement>
+#pragma warning disable ORLEANSEXP001
 siloBuilder.Configure<ResourceOptimizedPlacementOptions>(options =>
 {
     options.CpuUsageWeight = 40;
@@ -93,6 +93,7 @@ siloBuilder.Configure<ResourceOptimizedPlacementOptions>(options =>
     options.ActivationCountWeight = 15;
     options.LocalSiloPreferenceMargin = 5;
 });
+#pragma warning restore ORLEANSEXP001
             // </configure_resource_optimized_placement>
         }
 
@@ -105,13 +106,16 @@ siloBuilder.Services.AddSingleton<
             // </configure_random_placement>
         }
 
-        [Experimental("ORLEANSEXP002")]
         internal static void ConfigureRebalancing(ISiloBuilder siloBuilder)
         {
             // <configure_activation_rebalancing>
+#pragma warning disable ORLEANSEXP001
 siloBuilder.AddActivationRepartitioner();
+#pragma warning restore ORLEANSEXP001
 
+#pragma warning disable ORLEANSEXP002
 siloBuilder.AddActivationRebalancer();
+#pragma warning restore ORLEANSEXP002
             // </configure_activation_rebalancing>
         }
 
