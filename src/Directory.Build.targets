@@ -18,7 +18,8 @@
           or '$(MSBuildProjectName)' == 'Orleans.TestingHost'
           or '$(MSBuildProjectName)' == 'Orleans.Transactions.TestKit.Base'
           or '$(MSBuildProjectName)' == 'Orleans.Transactions.TestKit.xUnit')">false</EnableBannedApiAnalyzers>
-    <EnableBannedApiAnalyzers Condition="'$(EnableBannedApiAnalyzers)' == ''">true</EnableBannedApiAnalyzers>
+    <EnableBannedApiAnalyzers
+      Condition="'$(EnableBannedApiAnalyzers)' == '' and '$(IsOrleansRepositorySourceProject)' == 'true'">true</EnableBannedApiAnalyzers>
   </PropertyGroup>
 
   <ItemGroup Condition="'$(EnableBannedApiAnalyzers)' == 'true'">
