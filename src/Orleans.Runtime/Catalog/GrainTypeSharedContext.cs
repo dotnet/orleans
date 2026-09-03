@@ -24,6 +24,22 @@ public sealed class GrainTypeSharedContext
     private readonly IServiceProvider _serviceProvider;
     private readonly Dictionary<Type, object> _components = [];
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="GrainTypeSharedContext"/> class.
+    /// </summary>
+    /// <param name="grainType">The grain type represented by this context.</param>
+    /// <param name="clusterManifestProvider">The provider for cluster grain manifests.</param>
+    /// <param name="grainClassMap">The mapping from grain types to implementation classes.</param>
+    /// <param name="placementStrategyResolver">The resolver for the grain type's placement strategy.</param>
+    /// <param name="messagingOptions">The silo messaging options.</param>
+    /// <param name="collectionOptions">The activation collection options.</param>
+    /// <param name="schedulingOptions">The grain scheduling options.</param>
+    /// <param name="grainRuntime">The grain runtime.</param>
+    /// <param name="loggerFactory">The logger factory.</param>
+    /// <param name="grainReferenceActivator">The grain reference activator.</param>
+    /// <param name="serviceProvider">The service provider.</param>
+    /// <param name="serializerSessionPool">The serializer session pool.</param>
+    /// <exception cref="KeyNotFoundException">A grain implementation class is not registered for <paramref name="grainType"/>.</exception>
     public GrainTypeSharedContext(
         GrainType grainType,
         IClusterManifestProvider clusterManifestProvider,
