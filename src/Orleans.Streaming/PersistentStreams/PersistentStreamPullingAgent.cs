@@ -12,8 +12,8 @@ using Orleans.Runtime;
 using Orleans.Runtime.Internal;
 using Orleans.Runtime.Scheduler;
 using Orleans.Streaming;
-using StreamingEvents = Orleans.Streaming.Diagnostics.StreamingEvents;
 using Orleans.Streams.Filtering;
+using StreamingEvents = Orleans.Streaming.Diagnostics.StreamingEvents;
 using TagList = System.Diagnostics.TagList;
 
 namespace Orleans.Streams
@@ -554,6 +554,20 @@ namespace Orleans.Streams
             return queueCache!.GetCacheCursor(consumerData.StreamId, null);
         }
 
+        private IQueueCacheCursor GetCacheMissRecoveryCursor(StreamConsumerData consumerData)
+        {
+            try
+            {
+                return queueCache!.GetCacheCursorAtPosition(
+                    consumerData.StreamId,
+                    StreamSubscriptionStartPosition.EarliestAvailable);
+            }
+            catch (NotSupportedException)
+            {
+                return GetRecoveryCursor(consumerData);
+            }
+        }
+
         public Task RemoveSubscriber(GuidId subscriptionId, QualifiedStreamId streamId, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -1016,6 +1030,12 @@ namespace Orleans.Streams
                                 StreamingEvents.EmitConsumerCursorDrained(streamProviderName, consumerData.StreamId.StreamId, consumerData.SubscriptionId.Guid, Silo);
                             break;
                         }
+                    }
+                    catch (QueueCacheMissException exc)
+                    {
+                        exceptionOccured = exc;
+                        consumerData.SafeDisposeCursor(logger);
+                        consumerData.Cursor = GetCacheMissRecoveryCursor(consumerData);
                     }
                     catch (Exception exc)
                     {
