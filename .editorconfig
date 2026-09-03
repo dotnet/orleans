@@ -658,7 +658,6 @@ dotnet_diagnostic.RS0027.severity = suggestion
 dotnet_diagnostic.CA1848.severity = warning
 dotnet_diagnostic.CA1849.severity = warning
 dotnet_diagnostic.CA2000.severity = warning
-dotnet_diagnostic.CA2002.severity = warning
 
 # CA1873: Avoid potentially expensive logging
 [src/Orleans.Core.Abstractions/**.cs]
@@ -673,13 +672,6 @@ dotnet_diagnostic.CA1849.severity = warning
 dotnet_diagnostic.CA1873.severity = warning
 dotnet_diagnostic.CA2000.severity = warning
 
-[src/Orleans.Runtime/**.cs]
-dotnet_diagnostic.CA2002.severity = warning
-
-# ActivationData's shared monitor migration is tracked by #10068.
-[src/Orleans.Runtime/Catalog/ActivationData.cs]
-dotnet_diagnostic.CA2002.severity = suggestion
-
 [src/Orleans.Serialization.SystemTextJson/**.cs]
 dotnet_diagnostic.CA2000.severity = warning
 
@@ -687,6 +679,7 @@ dotnet_diagnostic.CA2000.severity = warning
 # playgrounds, templates, and tools retain advisory diagnostics during this rollout.
 [src/**/*.{cs,vb}]
 dotnet_diagnostic.CA1856.severity = warning
+dotnet_diagnostic.CA2002.severity = warning
 dotnet_diagnostic.CA2011.severity = warning
 dotnet_diagnostic.CA2012.severity = warning
 dotnet_diagnostic.CA2013.severity = warning
@@ -697,3 +690,7 @@ dotnet_diagnostic.CA2245.severity = warning
 dotnet_diagnostic.CA2246.severity = warning
 dotnet_diagnostic.IDE0035.severity = warning
 dotnet_diagnostic.IDE0043.severity = warning
+
+# ActivationData's shared monitor migration is tracked by #10068.
+[src/Orleans.Runtime/Catalog/ActivationData.cs]
+dotnet_diagnostic.CA2002.severity = suggestion
