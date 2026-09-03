@@ -188,7 +188,10 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
                         ConditionExpression = $"{DynamoDBTransactionalStateConstants.ETAG_PROPERTY_NAME} = {DynamoDBTransactionalStateConstants.CURRENT_ETAG_ALIAS}",
                         ExpressionAttributeValues = new Dictionary<string, AttributeValue>
                         {
-                            [DynamoDBTransactionalStateConstants.CURRENT_ETAG_ALIAS] = new AttributeValue { N = entity.ETag!.Value.ToString(CultureInfo.InvariantCulture) }
+                            [DynamoDBTransactionalStateConstants.CURRENT_ETAG_ALIAS] = new AttributeValue
+                            {
+                                N = GetRequiredETag(entity.ETag, entity.PartitionKey, entity.RowKey).ToString(CultureInfo.InvariantCulture)
+                            }
                         }
                     };
 
@@ -214,12 +217,12 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
                         {
                             // overwrite with new pending state
                             StateEntity existing = states[pos].Value;
-                            var currentETag = existing.ETag!.Value.ToString(CultureInfo.InvariantCulture);
+                            var currentETag = GetRequiredETag(existing.ETag, existing.PartitionKey, existing.RowKey);
                             existing.TransactionId = s.TransactionId;
                             existing.TransactionTimestamp = s.TimeStamp;
                             existing.TransactionManager = this.ConvertToStorageFormat(s.TransactionManager);
                             existing.SetState(s.State, this.serializer);
-                            existing.ETag = existing.ETag + 1;
+                            existing.ETag = currentETag + 1;
 
                             await batchOperation.Add(new TransactWriteItem
                             {
@@ -231,7 +234,7 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
                                         $"{DynamoDBTransactionalStateConstants.ETAG_PROPERTY_NAME} = {DynamoDBTransactionalStateConstants.CURRENT_ETAG_ALIAS}",
                                     ExpressionAttributeValues = new Dictionary<string, AttributeValue>
                                     {
-                                        [DynamoDBTransactionalStateConstants.CURRENT_ETAG_ALIAS] = new AttributeValue { N = currentETag }
+                                        [DynamoDBTransactionalStateConstants.CURRENT_ETAG_ALIAS] = new AttributeValue { N = currentETag.ToString(CultureInfo.InvariantCulture) }
                                     }
                                 }
                             }, existing.PartitionKey, existing.RowKey).ConfigureAwait(false);
@@ -289,7 +292,10 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
                         ConditionExpression = $"ETag = {DynamoDBTransactionalStateConstants.CURRENT_ETAG_ALIAS}",
                         ExpressionAttributeValues = new Dictionary<string, AttributeValue>
                         {
-                            [DynamoDBTransactionalStateConstants.CURRENT_ETAG_ALIAS] = new AttributeValue { N = stateToDelete.Value.ETag!.Value.ToString(CultureInfo.InvariantCulture) }
+                            [DynamoDBTransactionalStateConstants.CURRENT_ETAG_ALIAS] = new AttributeValue
+                            {
+                                N = GetRequiredETag(stateToDelete.Value.ETag, stateToDelete.Value.PartitionKey, stateToDelete.Value.RowKey).ToString(CultureInfo.InvariantCulture)
+                            }
                         }
                     };
                     await batchOperation.Add(
@@ -308,7 +314,7 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
 
             this.requiresReload = false;
             LogDebugStoredETag(this.partitionKey, this.key.CommittedSequenceId, this.key.ETag);
-            return key.ETag!.Value.ToString(CultureInfo.InvariantCulture);
+            return GetRequiredETag(key.ETag, key.PartitionKey, key.RowKey).ToString(CultureInfo.InvariantCulture);
         }
         catch (InconsistentStateException)
         {
@@ -328,6 +334,17 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
             [DynamoDBTransactionalStateConstants.PARTITION_KEY_PROPERTY_NAME] = new AttributeValue { S = partition },
             [DynamoDBTransactionalStateConstants.ROW_KEY_PROPERTY_NAME] = new AttributeValue { S = rowKey }
         };
+    }
+
+    private static long GetRequiredETag(long? etag, string partitionKey, string rowKey)
+    {
+        if (etag is not { } value)
+        {
+            throw new InconsistentStateException(
+                $"DynamoDB transactional state record is missing its required ETag. PartitionKey={partitionKey} RowKey={rowKey}.");
+        }
+
+        return value;
     }
 
     /// <summary>
