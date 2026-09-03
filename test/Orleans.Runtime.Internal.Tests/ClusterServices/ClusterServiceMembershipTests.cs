@@ -36,7 +36,7 @@ public sealed class ClusterServiceMembershipTests
     }
 
     [Fact]
-    public async Task DirectoryMembershipService_ExplicitDefaultPreservesLegacyEmptyInitialView()
+    public async Task DirectoryMembershipService_ProjectsCurrentSnapshotImmediately()
     {
         var underlyingSnapshot = CreateSnapshot(41, CreateSilo(1));
         var service = new TestClusterMembershipService(underlyingSnapshot);
@@ -54,19 +54,19 @@ public sealed class ClusterServiceMembershipTests
         Assert.Same(membership.CurrentView, updates.Current);
         Assert.Same(service, membership.ClusterMembershipService);
         Assert.Same(underlyingSnapshot, service.CurrentSnapshot);
-        Assert.NotSame(underlyingSnapshot, membership.CurrentView.ClusterMembershipSnapshot);
-        Assert.Equal(MembershipVersion.MinValue, membership.CurrentView.Version);
-        Assert.Empty(membership.CurrentView.ClusterMembershipSnapshot.Members);
-        Assert.Empty(membership.CurrentView.Members);
-        Assert.Empty(membership.CurrentView.RangeOwners);
+        Assert.Same(underlyingSnapshot, membership.CurrentView.ClusterMembershipSnapshot);
+        Assert.Equal(new MembershipVersion(41), membership.CurrentView.Version);
+        Assert.Equal([CreateSilo(1)], membership.CurrentView.Members);
+        Assert.Equal(2, membership.CurrentView.RangeOwners.Count);
         Assert.Equal(2, membership.PartitionsPerSilo);
 
         var nextUpdate = updates.MoveNextAsync().AsTask();
-        service.Publish(underlyingSnapshot);
+        var nextSnapshot = CreateSnapshot(42, CreateSilo(2));
+        service.Publish(nextSnapshot);
         Assert.True(await nextUpdate);
-        Assert.Same(underlyingSnapshot, updates.Current.ClusterMembershipSnapshot);
-        Assert.Equal(new MembershipVersion(41), updates.Current.Version);
-        Assert.Equal([CreateSilo(1)], updates.Current.Members);
+        Assert.Same(nextSnapshot, updates.Current.ClusterMembershipSnapshot);
+        Assert.Equal(new MembershipVersion(42), updates.Current.Version);
+        Assert.Equal([CreateSilo(2)], updates.Current.Members);
         Assert.Same(updates.Current, membership.CurrentView);
         Assert.Empty(logger.Exceptions);
     }
