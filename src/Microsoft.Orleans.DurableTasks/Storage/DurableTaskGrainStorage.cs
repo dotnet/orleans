@@ -49,9 +49,9 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
             return result;
         }
 
-        if (request is not null && request.Context is null)
+        if (request is not null)
         {
-            throw new InvalidOperationException("The request context must not be null.");
+            ValidateRequest(request);
         }
 
         result = new DurableTaskState
@@ -67,6 +67,7 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
     public void SetRequest(TaskId taskId, IDurableTaskState state, IDurableTaskRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
+        ValidateRequest(request);
         var typedState = GetState(taskId, state);
         typedState.Request = request;
         _items[taskId] = typedState;
@@ -192,6 +193,14 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
 
     public ValueTask ReadAsync(CancellationToken cancellationToken) =>
         _stateManager.InitializeAsync(cancellationToken);
+
+    private static void ValidateRequest(IDurableTaskRequest request)
+    {
+        if (request.Context is null)
+        {
+            throw new InvalidOperationException("The request context must not be null.");
+        }
+    }
 
     private DurableTaskState GetState(TaskId taskId, IDurableTaskState state)
     {

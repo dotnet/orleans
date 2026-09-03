@@ -3,6 +3,7 @@ using Orleans.DurableTasks.Runtime;
 using Orleans.DurableTasks.Storage;
 using Orleans.DurableTasks;
 using Microsoft.Extensions.Time.Testing;
+using NSubstitute;
 using Xunit;
 
 namespace Orleans.Journaling.Tests;
@@ -61,6 +62,23 @@ public sealed class DurableTaskStorageTests : JournalingTestBase
         Assert.Same(firstState, retainedFirst);
         Assert.True(storage.TryGetTask(secondId, out var retainedSecond));
         Assert.Same(secondState, retainedSecond);
+    }
+
+    [Fact]
+    public async Task SetRequestRejectsMissingContext()
+    {
+        var sut = CreateTestSystem();
+        var storage = CreateTaskStorage(sut.Manager);
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+        var taskId = TaskId.Parse("root/missing-context");
+        var state = storage.GetOrCreateTask(taskId, request: null);
+        var request = Substitute.For<IDurableTaskRequest>();
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => storage.SetRequest(taskId, state, request));
+
+        Assert.Equal("The request context must not be null.", exception.Message);
+        Assert.Null(state.Request);
     }
 
     private DurableTaskGrainStorage CreateTaskStorage(IJournaledStateManager manager)
