@@ -55,6 +55,19 @@ public sealed class ReferencedAssemblyProviderTests
         Assert.Contains(nameof(ReferencedAssemblyProvider.GetRelevantAssemblies), attribute!.Message);
     }
 
+    [Fact]
+    public void AssemblyFileAvailabilityUsesProviderAssemblyForDynamicEntryAssembly()
+    {
+        var dynamicAssembly = AssemblyBuilder.DefineDynamicAssembly(
+            new AssemblyName($"DynamicEntryAssembly_{Guid.NewGuid():N}"),
+            AssemblyBuilderAccess.Run);
+
+        Assert.True(ReferencedAssemblyProvider.AreAssemblyFilesAvailable(null));
+        Assert.Equal(
+            ReferencedAssemblyProvider.AreAssemblyFilesAvailable(null),
+            ReferencedAssemblyProvider.AreAssemblyFilesAvailable(dynamicAssembly));
+    }
+
 #if NET10_0_OR_GREATER
     [Fact]
     public void NetStandardAssetDependencyContextDiscoveryExposesAssemblyFileRequirement()

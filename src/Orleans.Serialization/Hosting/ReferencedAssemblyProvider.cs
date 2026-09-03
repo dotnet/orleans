@@ -212,17 +212,18 @@ namespace Orleans.Serialization.Internal
 #if NET9_0_OR_GREATER
         [FeatureGuard(typeof(RequiresAssemblyFilesAttribute))]
 #endif
+        internal static bool AssemblyFilesAvailable => AreAssemblyFilesAvailable(Assembly.GetEntryAssembly());
+
         [UnconditionalSuppressMessage(
             "SingleFile",
             "IL3000",
             Justification = "Assembly.Location is used only as the documented availability check for bundled assembly files.")]
-        internal static bool AssemblyFilesAvailable
+        internal static bool AreAssemblyFilesAvailable(Assembly? entryAssembly)
         {
-            get
-            {
-                var assembly = Assembly.GetEntryAssembly() ?? typeof(ReferencedAssemblyProvider).Assembly;
-                return !assembly.IsDynamic && !string.IsNullOrEmpty(assembly.Location);
-            }
+            var assembly = entryAssembly is null || entryAssembly.IsDynamic
+                ? typeof(ReferencedAssemblyProvider).Assembly
+                : entryAssembly;
+            return !string.IsNullOrEmpty(assembly.Location);
         }
 #endif
 
