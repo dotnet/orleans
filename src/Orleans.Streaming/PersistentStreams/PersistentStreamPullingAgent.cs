@@ -49,7 +49,6 @@ namespace Orleans.Streams
         private Task _activePumpTask = Task.CompletedTask;
         private StreamSequenceToken? _lastReadToken;
         private bool _useLegacyDeliveryProgress;
-        private int _hasUnprocessedRead;
         private bool IsShutdown => timer is null;
         private string StatisticUniquePostfix => $"{streamProviderName}.{QueueId}";
 
@@ -178,7 +177,6 @@ namespace Orleans.Streams
             _activePumpTask = Task.CompletedTask;
             _lastReadToken = null;
             _useLegacyDeliveryProgress = false;
-            Volatile.Write(ref _hasUnprocessedRead, 0);
             lastTimeCleanedPubSubCache = _timeProvider.GetUtcNow().UtcDateTime;
 
             try
@@ -280,10 +278,7 @@ namespace Orleans.Streams
 
             // Final delivery progress scan so the receiver has the latest watermark
             // before FlushAsync persists the checkpoint.
-            if (Volatile.Read(ref _hasUnprocessedRead) == 0)
-            {
-                NotifyDeliveryProgress();
-            }
+            NotifyDeliveryProgress();
 
             this.queueCache = null;
 
@@ -1044,16 +1039,6 @@ namespace Orleans.Streams
             // Retrieve one multiBatch from the queue. Every multiBatch has an IEnumerable of IBatchContainers, each IBatchContainer may have multiple events.
             IList<IBatchContainer>? multiBatch = await rcvr.GetQueueMessagesAsync(maxCacheAddCount, cancellationToken);
 
-            if (IsShutdown || cancellationToken.IsCancellationRequested)
-            {
-                if (multiBatch is { Count: > 0 })
-                {
-                    Volatile.Write(ref _hasUnprocessedRead, 1);
-                }
-                return false;
-            }
-            }
-
             // Receivers built against older Orleans versions can still return null.
             if (multiBatch is null || multiBatch.Count == 0) return false; // queue is empty. Exit the loop. Will attempt again in the next timer callback.
 
@@ -1084,12 +1069,6 @@ namespace Orleans.Streams
 
                 foreach (var group in availableMessages.GroupBy(container => container.StreamId))
                 {
-                    if (IsShutdown || cancellationToken.IsCancellationRequested)
-                    {
-                        Volatile.Write(ref _hasUnprocessedRead, 1);
-                        return false;
-                    }
-
                     var streamId = new QualifiedStreamId(queueAdapter.Name, group.Key);
                     StreamSequenceToken startToken = group.First().SequenceToken;
                     if (pubSubCache.TryGetValue(streamId, out var streamData))
@@ -1494,7 +1473,7 @@ namespace Orleans.Streams
 
             async Task SubscribeWithIsolation(PubSubSubscriptionState item)
             {
-                if (IsShutdown)
+                if (IsShutdown || cancellationToken.IsCancellationRequested)
                 {
                     return;
                 }
