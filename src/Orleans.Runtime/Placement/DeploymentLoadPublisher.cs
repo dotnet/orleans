@@ -101,7 +101,9 @@ namespace Orleans.Runtime
             LogDebugStartedDeploymentLoadPublisher(_logger);
         }
 
-        internal async Task PublishStatistics(CancellationToken cancellationToken = default)
+        internal Task PublishStatistics() => PublishStatistics(CancellationToken.None);
+
+        private async Task PublishStatistics(CancellationToken cancellationToken)
         {
             try
             {
