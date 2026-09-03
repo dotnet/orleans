@@ -6591,8 +6591,12 @@ public class DisseminationProtocolTests
     {
         public List<(SiloAddress Source, SiloRuntimeStatistics Statistics)> Updates { get; } = [];
 
-        public Task UpdateRuntimeStatistics(SiloAddress siloAddress, SiloRuntimeStatistics siloStats)
+        public Task UpdateRuntimeStatistics(
+            SiloAddress siloAddress,
+            SiloRuntimeStatistics siloStats,
+            CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             Updates.Add((siloAddress, siloStats));
             return Task.CompletedTask;
         }

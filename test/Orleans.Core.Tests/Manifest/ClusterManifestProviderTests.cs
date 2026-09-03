@@ -1345,11 +1345,20 @@ public class ClusterManifestProviderTests
         Func<MajorMinorVersion, Task<ClusterManifestUpdate?>> getUpdate,
         Func<Task<GrainManifest>> getLegacyManifest) : IClusterManifestSystemTarget, ISiloManifestSystemTarget
     {
-        public ValueTask<ClusterManifest> GetClusterManifest() => ValueTask.FromException<ClusterManifest>(
-            new NotSupportedException("This test target only supports peer repair requests."));
+        public ValueTask<ClusterManifest> GetClusterManifest(CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return ValueTask.FromException<ClusterManifest>(
+                new NotSupportedException("This test target only supports peer repair requests."));
+        }
 
-        public ValueTask<ClusterManifestUpdate?> GetClusterManifestUpdate(MajorMinorVersion previousVersion) =>
-            new(getUpdate(previousVersion));
+        public ValueTask<ClusterManifestUpdate?> GetClusterManifestUpdate(
+            MajorMinorVersion previousVersion,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return new(getUpdate(previousVersion));
+        }
 
         public ValueTask<ClusterManifestHashSummary> GetClusterManifestHashSummary() => new(getHashSummary());
 
@@ -1358,7 +1367,11 @@ public class ClusterManifestProviderTests
 
         public ValueTask<GrainManifest?> GetSiloManifestByHash(ManifestHash hash) => new((GrainManifest?)null);
 
-        public ValueTask<GrainManifest> GetSiloManifest() => new(getLegacyManifest());
+        public ValueTask<GrainManifest> GetSiloManifest(CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return new(getLegacyManifest());
+        }
     }
 
     private sealed class ManifestRequestLog(int expectedProbeCount, int expectedLegacyFetchCount)
@@ -1561,11 +1574,19 @@ public class ClusterManifestProviderTests
 
         public int LegacyManifestRequests => Volatile.Read(ref _legacyManifestRequests);
 
-        public ValueTask<ClusterManifest> GetClusterManifest() =>
-            ValueTask.FromException<ClusterManifest>(new NotSupportedException());
+        public ValueTask<ClusterManifest> GetClusterManifest(CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return ValueTask.FromException<ClusterManifest>(new NotSupportedException());
+        }
 
-        public ValueTask<ClusterManifestUpdate?> GetClusterManifestUpdate(MajorMinorVersion previousVersion) =>
-            ValueTask.FromException<ClusterManifestUpdate?>(new NotSupportedException());
+        public ValueTask<ClusterManifestUpdate?> GetClusterManifestUpdate(
+            MajorMinorVersion previousVersion,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return ValueTask.FromException<ClusterManifestUpdate?>(new NotSupportedException());
+        }
 
         public ValueTask<ClusterManifestHashSummary> GetClusterManifestHashSummary() =>
             ValueTask.FromException<ClusterManifestHashSummary>(new NotSupportedException());
@@ -1582,8 +1603,9 @@ public class ClusterManifestProviderTests
             return new(fallbackManifest);
         }
 
-        public ValueTask<GrainManifest> GetSiloManifest()
+        public ValueTask<GrainManifest> GetSiloManifest(CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             Interlocked.Increment(ref _legacyManifestRequests);
             return new(fallbackManifest);
         }
