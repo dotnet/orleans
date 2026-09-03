@@ -42,7 +42,15 @@ namespace Orleans.Transactions.DynamoDB
         /// <summary> Secret key for this dynamoDB table </summary>
         protected string? secretKey;
         private readonly string _service;
+
+        /// <summary>
+        /// The default number of read capacity units for provisioned DynamoDB tables.
+        /// </summary>
         public const int DefaultReadCapacityUnits = 10;
+
+        /// <summary>
+        /// The default number of write capacity units for provisioned DynamoDB tables.
+        /// </summary>
         public const int DefaultWriteCapacityUnits = 5;
         private readonly ProvisionedThroughput? _provisionedThroughput;
         private readonly bool _createIfNotExists;
@@ -557,6 +565,14 @@ namespace Orleans.Transactions.DynamoDB
             }
         }
 
+        /// <summary>
+        /// Creates a DynamoDB update expression and its expression attribute values.
+        /// </summary>
+        /// <param name="fields">The attributes to assign in the update expression.</param>
+        /// <param name="conditionValues">The values referenced by the condition expression.</param>
+        /// <param name="extraExpression">An additional update expression appended after the attribute assignments.</param>
+        /// <param name="extraExpressionValues">The values referenced by <paramref name="extraExpression"/>.</param>
+        /// <returns>The update expression and all expression attribute values used by the update and condition expressions.</returns>
         public (string updateExpression, Dictionary<string, AttributeValue> expressionAttributeValues)
             ConvertUpdate(Dictionary<string, AttributeValue> fields,
                 Dictionary<string, AttributeValue>? conditionValues = null,

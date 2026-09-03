@@ -11,7 +11,7 @@ using Orleans.Transactions.AzureStorage;
 namespace Orleans.Hosting
 {
     /// <summary>
-    /// <see cref="IServiceCollection"/> extensions.
+    /// Extensions for registering Azure Table Storage transactional state services.
     /// </summary>
     public static class AzureTableTransactionServicecollectionExtensions
     {

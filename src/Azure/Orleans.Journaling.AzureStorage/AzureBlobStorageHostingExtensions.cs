@@ -4,9 +4,24 @@ using Orleans.Configuration.Internal;
 
 namespace Orleans.Journaling;
 
+/// <summary>
+/// Extensions for configuring Azure Blob Storage as the journal storage provider.
+/// </summary>
 public static class AzureBlobStorageHostingExtensions
 {
+    /// <summary>
+    /// Configures Azure Blob Storage as the journal storage provider.
+    /// </summary>
+    /// <param name="builder">The silo builder.</param>
+    /// <returns>The silo builder.</returns>
     public static ISiloBuilder AddAzureBlobJournalStorage(this ISiloBuilder builder) => builder.AddAzureBlobJournalStorage(configure: null);
+
+    /// <summary>
+    /// Configures Azure Blob Storage as the journal storage provider.
+    /// </summary>
+    /// <param name="builder">The silo builder.</param>
+    /// <param name="configure">The delegate used to configure the journal storage provider.</param>
+    /// <returns>The silo builder.</returns>
     public static ISiloBuilder AddAzureBlobJournalStorage(this ISiloBuilder builder, Action<AzureBlobJournalStorageOptions>? configure)
     {
         builder.AddJournalStorage();
