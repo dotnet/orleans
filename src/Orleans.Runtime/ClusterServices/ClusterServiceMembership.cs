@@ -52,8 +52,12 @@ internal sealed partial class ClusterServiceMembership : IAsyncDisposable
         MembershipVersion minimumVersion,
         CancellationToken cancellationToken)
     {
-        _ = _clusterMembershipService.Refresh(minimumVersion, cancellationToken);
-        if (CurrentView.ViewId.MembershipVersion <= minimumVersion)
+        if (minimumVersion == default || CurrentView.ViewId.MembershipVersion < minimumVersion)
+        {
+            await _clusterMembershipService.Refresh(minimumVersion, cancellationToken);
+        }
+
+        if (CurrentView.ViewId.MembershipVersion < minimumVersion)
         {
             await foreach (var view in _viewUpdates.WithCancellation(cancellationToken))
             {
