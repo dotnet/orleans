@@ -73,7 +73,9 @@ public class MembershipGossiperTests
         await gossipTask;
         await directCompleted.Task;
 
-        await rig.RemoteMembershipService.Received(1).MembershipChangeNotification(snapshot);
+        await rig.RemoteMembershipService.Received(1).MembershipChangeNotification(
+            snapshot,
+            Arg.Any<CancellationToken>());
         await rig.DisseminationService.Received(1).Publish(
             Arg.Any<IDisseminationNamespace>(),
             DisseminationKey.Default,
@@ -111,7 +113,9 @@ public class MembershipGossiperTests
         await gossipTask;
 
         Assert.Same(snapshot, deliveredSnapshot);
-        await rig.RemoteMembershipService.Received(1).MembershipChangeNotification(snapshot);
+        await rig.RemoteMembershipService.Received(1).MembershipChangeNotification(
+            snapshot,
+            Arg.Any<CancellationToken>());
         Assert.Equal(0, rig.DisseminationServiceResolutionCount);
         Assert.Empty(rig.DisseminationService.ReceivedCalls());
     }
@@ -262,7 +266,9 @@ public class MembershipGossiperTests
         await gossipTask;
         await directCompleted.Task;
 
-        await rig.RemoteMembershipService.Received(1).MembershipChangeNotification(snapshot);
+        await rig.RemoteMembershipService.Received(1).MembershipChangeNotification(
+            snapshot,
+            Arg.Any<CancellationToken>());
         await rig.DisseminationService.Received(1).Publish(
             Arg.Any<IDisseminationNamespace>(),
             DisseminationKey.Default,
@@ -300,7 +306,9 @@ public class MembershipGossiperTests
 
         Assert.Equal(DisseminationKey.Default, publishedKey);
         Assert.Equal(snapshot.Version.Value, publishedVersion);
-        await rig.RemoteMembershipService.Received(1).MembershipChangeNotification(snapshot);
+        await rig.RemoteMembershipService.Received(1).MembershipChangeNotification(
+            snapshot,
+            Arg.Any<CancellationToken>());
         await rig.DisseminationService.Received(1).Publish(
             Arg.Any<IDisseminationNamespace>(),
             DisseminationKey.Default,
@@ -354,7 +362,9 @@ public class MembershipGossiperTests
         disseminationCompletion.TrySetException(new InvalidOperationException("Late dissemination failure."));
         var lateFailure = await rig.Logger.WaitForLateFailureAsync(TestContext.Current.CancellationToken);
         Assert.Contains("Membership dissemination publication", lateFailure, StringComparison.Ordinal);
-        await rig.RemoteMembershipService.Received(1).MembershipChangeNotification(snapshot);
+        await rig.RemoteMembershipService.Received(1).MembershipChangeNotification(
+            snapshot,
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -396,7 +406,9 @@ public class MembershipGossiperTests
 
         releaseDirect.TrySetResult();
         await directCompleted.Task;
-        await rig.RemoteMembershipService.Received(1).MembershipChangeNotification(snapshot);
+        await rig.RemoteMembershipService.Received(1).MembershipChangeNotification(
+            snapshot,
+            Arg.Any<CancellationToken>());
     }
 
     private static MembershipGossiperTestRig CreateTestRig(

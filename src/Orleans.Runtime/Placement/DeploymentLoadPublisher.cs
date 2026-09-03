@@ -103,7 +103,7 @@ namespace Orleans.Runtime
 
         internal Task PublishStatistics() => PublishStatistics(CancellationToken.None);
 
-        private async Task PublishStatistics(CancellationToken cancellationToken)
+        internal async Task PublishStatistics(CancellationToken cancellationToken)
         {
             try
             {

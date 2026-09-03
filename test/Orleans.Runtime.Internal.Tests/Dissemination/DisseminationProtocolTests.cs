@@ -6219,7 +6219,7 @@ public class DisseminationProtocolTests
         var harness = CreateDeploymentLoadPublisherHarness();
         harness.Dissemination.UnconfirmedPeers = [harness.ActiveTwo];
 
-        await harness.Publisher.PublishStatistics();
+        await harness.Publisher.PublishStatistics(TestContext.Current.CancellationToken);
 
         AssertDirectRecipients(harness, harness.ActiveTwo);
         Assert.Single(harness.Dissemination.PublishCalls);
@@ -6232,7 +6232,7 @@ public class DisseminationProtocolTests
         var harness = CreateDeploymentLoadPublisherHarness();
         harness.Dissemination.UnconfirmedPeers = [];
 
-        await harness.Publisher.PublishStatistics();
+        await harness.Publisher.PublishStatistics(TestContext.Current.CancellationToken);
 
         AssertDirectRecipients(harness);
         Assert.Single(harness.Dissemination.PublishCalls);
@@ -6245,7 +6245,7 @@ public class DisseminationProtocolTests
         var harness = CreateDeploymentLoadPublisherHarness();
         harness.Dissemination.UnconfirmedPeers = [harness.Joining];
 
-        await harness.Publisher.PublishStatistics();
+        await harness.Publisher.PublishStatistics(TestContext.Current.CancellationToken);
 
         AssertDirectRecipients(harness);
         Assert.Single(harness.Dissemination.QueryCalls);
@@ -6256,7 +6256,7 @@ public class DisseminationProtocolTests
     {
         var harness = CreateDeploymentLoadPublisherHarness(namespaceEnabled: false);
 
-        await harness.Publisher.PublishStatistics();
+        await harness.Publisher.PublishStatistics(TestContext.Current.CancellationToken);
 
         AssertDirectRecipients(harness, harness.ActiveOne, harness.ActiveTwo);
         Assert.Empty(harness.Dissemination.PublishCalls);
@@ -6268,7 +6268,7 @@ public class DisseminationProtocolTests
     {
         var harness = CreateDeploymentLoadPublisherHarness(registerDissemination: false);
 
-        await harness.Publisher.PublishStatistics();
+        await harness.Publisher.PublishStatistics(TestContext.Current.CancellationToken);
 
         AssertDirectRecipients(harness, harness.ActiveOne, harness.ActiveTwo);
         Assert.Empty(harness.Dissemination.PublishCalls);
@@ -6279,7 +6279,7 @@ public class DisseminationProtocolTests
     {
         var harness = CreateDeploymentLoadPublisherHarness(registerNamespace: false);
 
-        await harness.Publisher.PublishStatistics();
+        await harness.Publisher.PublishStatistics(TestContext.Current.CancellationToken);
 
         AssertDirectRecipients(harness, harness.ActiveOne, harness.ActiveTwo);
         Assert.Empty(harness.Dissemination.PublishCalls);
@@ -6291,7 +6291,7 @@ public class DisseminationProtocolTests
         var harness = CreateDeploymentLoadPublisherHarness();
         harness.Dissemination.PublishHandler = (_, _, _, _) => ValueTask.FromResult(false);
 
-        await harness.Publisher.PublishStatistics();
+        await harness.Publisher.PublishStatistics(TestContext.Current.CancellationToken);
 
         AssertDirectRecipients(harness, harness.ActiveOne, harness.ActiveTwo);
         Assert.Single(harness.Dissemination.PublishCalls);
@@ -6306,7 +6306,7 @@ public class DisseminationProtocolTests
         var pending = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         harness.Dissemination.PublishHandler = (_, _, _, _) => new ValueTask<bool>(pending.Task);
 
-        var publish = harness.Publisher.PublishStatistics();
+        var publish = harness.Publisher.PublishStatistics(TestContext.Current.CancellationToken);
         await harness.Dissemination.PublishStarted.Task.WaitAsync(
             TimeSpan.FromSeconds(5),
             TestContext.Current.CancellationToken);
@@ -6325,7 +6325,7 @@ public class DisseminationProtocolTests
         harness.Dissemination.PublishHandler = (_, _, _, _) =>
             ValueTask.FromException<bool>(new InvalidOperationException("test failure"));
 
-        await harness.Publisher.PublishStatistics();
+        await harness.Publisher.PublishStatistics(TestContext.Current.CancellationToken);
 
         AssertDirectRecipients(harness, harness.ActiveOne, harness.ActiveTwo);
         Assert.Single(harness.Dissemination.PublishCalls);
@@ -6338,7 +6338,7 @@ public class DisseminationProtocolTests
         var harness = CreateDeploymentLoadPublisherHarness();
         harness.Dissemination.UnconfirmedPeers = [harness.ActiveOne, harness.ActiveTwo];
 
-        await harness.Publisher.PublishStatistics();
+        await harness.Publisher.PublishStatistics(TestContext.Current.CancellationToken);
 
         AssertDirectRecipients(harness, harness.ActiveOne, harness.ActiveTwo);
         Assert.True(Assert.Single(harness.Dissemination.PublishResults));
