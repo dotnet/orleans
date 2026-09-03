@@ -1,0 +1,3 @@
+# Synchronous wait overloads introduced after net8.0.
+M:System.Threading.Tasks.Task.WaitAll(System.Collections.Generic.IEnumerable{System.Threading.Tasks.Task},System.Threading.CancellationToken);Use Task.WhenAll and await it with the cancellation token.
+M:System.Threading.Tasks.Task.WaitAll(System.ReadOnlySpan{System.Threading.Tasks.Task});Use Task.WhenAll and await it.

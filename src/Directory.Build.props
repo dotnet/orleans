@@ -13,6 +13,16 @@
     <DefaultTargetFrameworks>net8.0;net10.0</DefaultTargetFrameworks>
   </PropertyGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers"
+                      PrivateAssets="all"
+                      IncludeAssets="runtime; build; native; contentfiles; analyzers; buildtransitive" />
+    <AdditionalFiles Include="$(MSBuildProjectDirectory)\BannedSymbols.txt"
+                     Condition="Exists('$(MSBuildProjectDirectory)\BannedSymbols.txt')" />
+    <AdditionalFiles Include="$(MSBuildProjectDirectory)\BannedSymbols.$(TargetFramework).txt"
+                     Condition="Exists('$(MSBuildProjectDirectory)\BannedSymbols.$(TargetFramework).txt')" />
+  </ItemGroup>
+
   <PropertyGroup>
     <IsPackable>true</IsPackable>
   </PropertyGroup>
