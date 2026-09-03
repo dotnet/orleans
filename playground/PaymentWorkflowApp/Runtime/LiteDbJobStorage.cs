@@ -5,7 +5,7 @@ using Orleans.Serialization;
 
 namespace PaymentWorkflowApp.Runtime;
 
-public sealed class LiteDbJobStorage(Serializer<JobTaskState> serializer, DeepCopier<JobTaskState> copier) : IJobStorage
+public sealed class LiteDbJobStorage(Serializer<JobTaskState> serializer, DeepCopier<JobTaskState> copier) : IJobStorage, IDisposable
 {
     private readonly Serializer<JobTaskState> _serializer = serializer;
     private readonly DeepCopier<JobTaskState> _copier = copier;
@@ -120,6 +120,14 @@ public sealed class LiteDbJobStorage(Serializer<JobTaskState> serializer, DeepCo
         }
 
         return default;
+    }
+
+    public void Dispose()
+    {
+        lock (_lock)
+        {
+            _db.Dispose();
+        }
     }
 
     private class JobEntity
