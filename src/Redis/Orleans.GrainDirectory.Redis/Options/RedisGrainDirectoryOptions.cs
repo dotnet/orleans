@@ -34,6 +34,8 @@ namespace Orleans.Configuration
         /// <summary>
         /// The default multiplexer creation delegate.
         /// </summary>
+        /// <param name="options">The Redis grain directory options.</param>
+        /// <returns>A task which returns a provider-owned connection multiplexer.</returns>
         public static async Task<(IConnectionMultiplexer Multiplexer, bool IsShared)> DefaultCreateMultiplexer(RedisGrainDirectoryOptions options)
             => (Multiplexer: await ConnectionMultiplexer.ConnectAsync(options.ConfigurationOptions!), IsShared: false);
     }
@@ -51,6 +53,11 @@ namespace Orleans.Configuration
         private readonly RedisGrainDirectoryOptions _options;
         private readonly string _name;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="RedisGrainDirectoryOptionsValidator"/> class.
+        /// </summary>
+        /// <param name="options">The options to validate.</param>
+        /// <param name="name">The name of the grain directory.</param>
         public RedisGrainDirectoryOptionsValidator(RedisGrainDirectoryOptions options, string name)
         {
             _options = options;

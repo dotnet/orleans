@@ -12,6 +12,9 @@ using Orleans.Configuration;
 
 namespace Orleans.GrainDirectory.Firestore;
 
+/// <summary>
+/// Provides a grain directory backed by Google Cloud Firestore.
+/// </summary>
 public partial class FirestoreGrainDirectory : IGrainDirectory, ILifecycleParticipant<ISiloLifecycle>
 {
     private const int MAX_IN_FILTER = 10;
@@ -20,6 +23,12 @@ public partial class FirestoreGrainDirectory : IGrainDirectory, ILifecyclePartic
     private readonly ILogger _logger;
     private readonly FirestoreDataManager _dataManager;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="FirestoreGrainDirectory"/> class.
+    /// </summary>
+    /// <param name="clusterOptions">The cluster options.</param>
+    /// <param name="firestoreOptions">The Google Cloud Firestore options.</param>
+    /// <param name="loggerFactory">The logger factory.</param>
     public FirestoreGrainDirectory(
         IOptions<ClusterOptions> clusterOptions,
         IOptions<FirestoreOptions> firestoreOptions,
@@ -35,6 +44,11 @@ public partial class FirestoreGrainDirectory : IGrainDirectory, ILifecyclePartic
             loggerFactory.CreateLogger<FirestoreDataManager>());
     }
 
+    /// <summary>
+    /// Looks up the registered activation for a grain.
+    /// </summary>
+    /// <param name="grainId">The grain identifier.</param>
+    /// <returns>The registered grain address, or <see langword="null"/> when no registration exists.</returns>
     public Task<GrainAddress?> Lookup(GrainId grainId) => Lookup(grainId, CancellationToken.None);
 
     Task<GrainAddress?> IGrainDirectory.Lookup(GrainId grainId, CancellationToken cancellationToken) =>
@@ -57,6 +71,11 @@ public partial class FirestoreGrainDirectory : IGrainDirectory, ILifecyclePartic
         }
     }
 
+    /// <summary>
+    /// Registers a grain activation if no registration exists for the grain.
+    /// </summary>
+    /// <param name="address">The grain address to register.</param>
+    /// <returns>The grain address registered in the directory.</returns>
     public Task<GrainAddress?> Register(GrainAddress address) =>
         Register(address, previousAddress: null, cancellationToken: CancellationToken.None);
 
@@ -97,6 +116,11 @@ public partial class FirestoreGrainDirectory : IGrainDirectory, ILifecyclePartic
         }
     }
 
+    /// <summary>
+    /// Removes a grain activation when the stored activation identifier matches the supplied address.
+    /// </summary>
+    /// <param name="address">The grain address to remove.</param>
+    /// <returns>A task representing the operation.</returns>
     public Task Unregister(GrainAddress address) => Unregister(address, CancellationToken.None);
 
     Task IGrainDirectory.Unregister(GrainAddress address, CancellationToken cancellationToken) =>
@@ -126,6 +150,11 @@ public partial class FirestoreGrainDirectory : IGrainDirectory, ILifecyclePartic
         }
     }
 
+    /// <summary>
+    /// Removes all grain activations registered to the specified silos.
+    /// </summary>
+    /// <param name="siloAddresses">The silo addresses whose registrations are removed.</param>
+    /// <returns>A task representing the operation.</returns>
     public Task UnregisterSilos(List<SiloAddress> siloAddresses) =>
         UnregisterSilos(siloAddresses, CancellationToken.None);
 
@@ -195,6 +224,10 @@ public partial class FirestoreGrainDirectory : IGrainDirectory, ILifecyclePartic
         };
     }
 
+    /// <summary>
+    /// Subscribes the grain directory to the silo lifecycle.
+    /// </summary>
+    /// <param name="lifecycle">The silo lifecycle.</param>
     public void Participate(ISiloLifecycle lifecycle) =>
         lifecycle.Subscribe(nameof(FirestoreGrainDirectory), ServiceLifecycleStage.RuntimeInitialize, Init);
 

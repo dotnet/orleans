@@ -22,7 +22,7 @@ namespace Orleans.GrainDirectory.AzureStorage
 #endif
 {
     /// <summary>
-    /// Configures retry and timeout policies for Azure Storage operations.
+    /// Configures batching, retry, and timeout behavior for Azure Table Storage operations.
     /// </summary>
     public class AzureStoragePolicyOptions
     {
@@ -31,12 +31,12 @@ namespace Orleans.GrainDirectory.AzureStorage
         private TimeSpan? maxPauseBetweenOperationRetries;
 
         /// <summary>
-        /// Gets or sets the maximum number of rows in a bulk update operation.
+        /// Gets or sets the maximum number of entities included in a bulk update or delete operation.
         /// </summary>
         public int MaxBulkUpdateRows { get; set; } = 100;
 
         /// <summary>
-        /// Gets or sets the maximum number of attempts to create a storage resource.
+        /// Gets or sets the maximum number of attempts to create or connect to the table during initialization.
         /// </summary>
         public int MaxCreationRetries { get; set; } = 60;
 
@@ -47,7 +47,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         public int MaxOperationRetries { get; set; } = 5;
 
         /// <summary>
-        /// Gets or sets the delay between storage resource creation attempts.
+        /// Gets or sets the delay between attempts to create or connect to the table.
         /// </summary>
         public TimeSpan PauseBetweenCreationRetries { get; set; } = TimeSpan.FromSeconds(1);
 
@@ -73,8 +73,11 @@ namespace Orleans.GrainDirectory.AzureStorage
         }
 
         /// <summary>
-        /// Gets or sets the timeout for creating a storage resource.
+        /// Gets or sets the timeout for creating or connecting to the table.
         /// </summary>
+        /// <remarks>
+        /// The default is three times the product of <see cref="PauseBetweenCreationRetries"/> and <see cref="MaxCreationRetries"/>.
+        /// </remarks>
         public TimeSpan CreationTimeout
         {
             get => this.creationTimeout ?? TimeSpan.FromMilliseconds(this.PauseBetweenCreationRetries.TotalMilliseconds * this.MaxCreationRetries * 3);
@@ -82,7 +85,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         }
 
         /// <summary>
-        /// Gets or sets the timeout for an Azure Storage operation.
+        /// Gets or sets the duration after which a table operation is reported as slow.
         /// </summary>
         public TimeSpan OperationTimeout
         {

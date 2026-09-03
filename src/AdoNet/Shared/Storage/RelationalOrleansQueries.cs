@@ -655,10 +655,11 @@ namespace Orleans.Tests.SqlUtils
         /// Registers a new grain activation.
         /// </summary>
         /// <param name="clusterId">The cluster identifier.</param>
+        /// <param name="providerId">The grain directory provider identifier.</param>
         /// <param name="grainId">The grain identifier.</param>
         /// <param name="siloAddress">The silo address.</param>
         /// <param name="activationId">The activation identifier.</param>
-        /// <returns>The count of rows affected.</returns>
+        /// <returns>The grain activation registered in the directory.</returns>
         internal Task<AdoNetGrainDirectoryEntry> RegisterGrainActivationAsync(string clusterId, string providerId, string grainId, string siloAddress, string activationId)
         {
             ArgumentNullException.ThrowIfNull(clusterId);
@@ -690,6 +691,7 @@ namespace Orleans.Tests.SqlUtils
         /// Unregisters a grain activation.
         /// </summary>
         /// <param name="clusterId">The cluster identifier.</param>
+        /// <param name="providerId">The grain directory provider identifier.</param>
         /// <param name="grainId">The grain identifier.</param>
         /// <param name="activationId">The activation identifier.</param>
         /// <returns>The count of rows affected.</returns>
@@ -717,6 +719,7 @@ namespace Orleans.Tests.SqlUtils
         /// Looks up a grain activation.
         /// </summary>
         /// <param name="clusterId">The cluster identifier.</param>
+        /// <param name="providerId">The grain directory provider identifier.</param>
         /// <param name="grainId">The grain identifier.</param>
         /// <returns>The grain activation if found or null if not.</returns>
         internal Task<AdoNetGrainDirectoryEntry?> LookupGrainActivationAsync(string clusterId, string providerId, string grainId)
@@ -746,6 +749,7 @@ namespace Orleans.Tests.SqlUtils
         /// Unregisters all grain activations for a set of silos.
         /// </summary>
         /// <param name="clusterId">The cluster identifier.</param>
+        /// <param name="providerId">The grain directory provider identifier.</param>
         /// <param name="siloAddresses">The pipe separated set of silos.</param>
         /// <returns>The count of rows affected.</returns>
         internal Task<int> UnregisterGrainActivationsAsync(string clusterId, string providerId, string siloAddresses)

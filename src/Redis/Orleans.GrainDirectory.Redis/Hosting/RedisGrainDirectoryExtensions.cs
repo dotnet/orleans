@@ -17,6 +17,9 @@ namespace Orleans.Hosting
         /// <summary>
         /// Adds a default grain directory which persists entries in Redis.
         /// </summary>
+        /// <param name="builder">The silo builder.</param>
+        /// <param name="configureOptions">The delegate used to configure the provider.</param>
+        /// <returns>The silo builder.</returns>
         public static ISiloBuilder UseRedisGrainDirectoryAsDefault(
             this ISiloBuilder builder,
             Action<RedisGrainDirectoryOptions> configureOptions)
@@ -27,6 +30,9 @@ namespace Orleans.Hosting
         /// <summary>
         /// Adds a default grain directory which persists entries in Redis.
         /// </summary>
+        /// <param name="builder">The silo builder.</param>
+        /// <param name="configureOptions">The delegate used to configure the provider options builder.</param>
+        /// <returns>The silo builder.</returns>
         public static ISiloBuilder UseRedisGrainDirectoryAsDefault(
             this ISiloBuilder builder,
             Action<OptionsBuilder<RedisGrainDirectoryOptions>> configureOptions)
@@ -37,6 +43,10 @@ namespace Orleans.Hosting
         /// <summary>
         /// Adds a named grain directory which persists entries in Redis.
         /// </summary>
+        /// <param name="builder">The silo builder.</param>
+        /// <param name="name">The name of the grain directory.</param>
+        /// <param name="configureOptions">The delegate used to configure the provider.</param>
+        /// <returns>The silo builder.</returns>
         public static ISiloBuilder AddRedisGrainDirectory(
             this ISiloBuilder builder,
             string name,
@@ -48,6 +58,10 @@ namespace Orleans.Hosting
         /// <summary>
         /// Adds a named grain directory which persists entries in Redis.
         /// </summary>
+        /// <param name="builder">The silo builder.</param>
+        /// <param name="name">The name of the grain directory.</param>
+        /// <param name="configureOptions">The delegate used to configure the provider options builder.</param>
+        /// <returns>The silo builder.</returns>
         public static ISiloBuilder AddRedisGrainDirectory(
             this ISiloBuilder builder,
             string name,

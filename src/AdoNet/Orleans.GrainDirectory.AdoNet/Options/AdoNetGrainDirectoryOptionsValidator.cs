@@ -5,6 +5,8 @@ namespace Orleans.Configuration;
 /// <summary>
 /// Validates <see cref="AdoNetGrainDirectoryOptions"/> configuration.
 /// </summary>
+/// <param name="options">The options to validate.</param>
+/// <param name="name">The name of the grain directory.</param>
 public class AdoNetGrainDirectoryOptionsValidator(AdoNetGrainDirectoryOptions options, string name) : IConfigurationValidator
 {
     /// <inheritdoc />

@@ -329,6 +329,7 @@ internal partial class FirestoreDataManager
     /// </summary>
     /// <param name="entities">Entities to be deleted</param>
     /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>A task representing the operation.</returns>
     public async Task DeleteEntities<TEntity>(TEntity[] entities, CancellationToken cancellationToken = default) where TEntity : FirestoreEntity, new()
     {
         var collection = this.GetCollection();

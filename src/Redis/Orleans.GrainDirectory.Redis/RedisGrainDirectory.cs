@@ -14,6 +14,9 @@ using StackExchange.Redis;
 
 namespace Orleans.GrainDirectory.Redis
 {
+    /// <summary>
+    /// Provides a grain directory backed by Redis.
+    /// </summary>
     public partial class RedisGrainDirectory : IGrainDirectory, ILifecycleParticipant<ISiloLifecycle>, IDisposable, IAsyncDisposable
     {
         private readonly RedisGrainDirectoryOptions _directoryOptions;
@@ -29,6 +32,12 @@ namespace Orleans.GrainDirectory.Redis
 
         private bool _disposed;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="RedisGrainDirectory"/> class.
+        /// </summary>
+        /// <param name="directoryOptions">The Redis grain directory options.</param>
+        /// <param name="clusterOptions">The cluster options.</param>
+        /// <param name="logger">The logger.</param>
         public RedisGrainDirectory(
             RedisGrainDirectoryOptions directoryOptions,
             IOptions<ClusterOptions> clusterOptions,
@@ -41,6 +50,11 @@ namespace Orleans.GrainDirectory.Redis
             _ttl = directoryOptions.EntryExpiry is { } ts ? ts.TotalSeconds.ToString(CultureInfo.InvariantCulture) : "-1";
         }
 
+        /// <summary>
+        /// Looks up the registered activation for a grain.
+        /// </summary>
+        /// <param name="grainId">The grain identifier.</param>
+        /// <returns>The registered grain address, or <see langword="null"/> when no registration exists.</returns>
         public async Task<GrainAddress?> Lookup(GrainId grainId)
         {
             try
@@ -65,8 +79,19 @@ namespace Orleans.GrainDirectory.Redis
             }
         }
 
+        /// <summary>
+        /// Registers a grain activation if no registration exists for the grain.
+        /// </summary>
+        /// <param name="address">The grain address to register.</param>
+        /// <returns>The grain address registered in the directory.</returns>
         public Task<GrainAddress?> Register(GrainAddress address) => Register(address, null);
 
+        /// <summary>
+        /// Registers a grain activation, replacing the specified previous registration when it is current.
+        /// </summary>
+        /// <param name="address">The grain address to register.</param>
+        /// <param name="previousAddress">The previous registration to replace, or <see langword="null"/> to require an empty entry.</param>
+        /// <returns>The grain address registered in the directory.</returns>
         public async Task<GrainAddress?> Register(GrainAddress address, GrainAddress? previousAddress)
         {
             const string RegisterScript =
@@ -129,6 +154,11 @@ namespace Orleans.GrainDirectory.Redis
             }
         }
 
+        /// <summary>
+        /// Removes a grain activation when the stored activation identifier matches the supplied address.
+        /// </summary>
+        /// <param name="address">The grain address to remove.</param>
+        /// <returns>A task representing the operation.</returns>
         public async Task Unregister(GrainAddress address)
         {
             const string DeleteScript =
@@ -165,16 +195,30 @@ namespace Orleans.GrainDirectory.Redis
             }
         }
 
+        /// <summary>
+        /// Completes the silo cleanup callback. Redis entries are cleaned up through activation-specific unregister operations and optional expiry.
+        /// </summary>
+        /// <param name="siloAddresses">The silo addresses associated with the cleanup callback.</param>
+        /// <returns>A completed task.</returns>
         public Task UnregisterSilos(List<SiloAddress> siloAddresses)
         {
             return Task.CompletedTask;
         }
 
+        /// <summary>
+        /// Subscribes the grain directory to the silo lifecycle.
+        /// </summary>
+        /// <param name="lifecycle">The silo lifecycle.</param>
         public void Participate(ISiloLifecycle lifecycle)
         {
             lifecycle.Subscribe(nameof(RedisGrainDirectory), ServiceLifecycleStage.RuntimeInitialize, Initialize);
         }
 
+        /// <summary>
+        /// Creates the configured Redis connection and selects its database.
+        /// </summary>
+        /// <param name="ct">The cancellation token supplied by the silo lifecycle.</param>
+        /// <returns>A task representing the initialization operation.</returns>
         public async Task Initialize(CancellationToken ct = default)
         {
             (_redis, _redisIsShared) = await _directoryOptions.CreateMultiplexer(_directoryOptions);
@@ -188,6 +232,9 @@ namespace Orleans.GrainDirectory.Redis
             _database = _redis.GetDatabase();
         }
 
+        /// <summary>
+        /// Releases event subscriptions and disposes the provider-owned Redis connection.
+        /// </summary>
         public void Dispose()
         {
             _disposed = true;
@@ -213,6 +260,10 @@ namespace Orleans.GrainDirectory.Redis
             }
         }
 
+        /// <summary>
+        /// Releases event subscriptions and asynchronously disposes the provider-owned Redis connection.
+        /// </summary>
+        /// <returns>A value task representing the disposal operation.</returns>
         public async ValueTask DisposeAsync()
         {
             _disposed = true;
