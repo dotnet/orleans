@@ -44,7 +44,7 @@ internal class UnixSocketConnectionListener : IConnectionListener
         {
             try
             {
-                var acceptSocket = await _listenSocket.AcceptAsync();
+                var acceptSocket = await _listenSocket.AcceptAsync(cancellationToken);
 
                 var connection = new SocketConnection(acceptSocket, _memoryPool, _schedulers.GetScheduler(), _trace);
 

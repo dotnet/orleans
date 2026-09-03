@@ -87,7 +87,7 @@ namespace UnitTests.Grains
                     Assert.False(t.IsFaulted, "RecordActivateCall failed");
                     Assert.True(doingActivate, "Doing Activate");
                     doingActivate = false;
-                });
+                }, CancellationToken.None);
         }
 
         public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
@@ -102,7 +102,7 @@ namespace UnitTests.Grains
                     Assert.False(t.IsFaulted, "RecordDeactivateCall failed");
                     Assert.True(doingDeactivate, "Doing Deactivate");
                     doingDeactivate = false;
-                });
+                }, CancellationToken.None);
         }
 
         public Task<string> DoSomething()
@@ -266,7 +266,7 @@ namespace UnitTests.Grains
                 Assert.True(doingActivate, "Doing Activate 2");
                 Assert.False(doingDeactivate, "Not doing Deactivate");
 
-                await Task.Delay(TimeSpan.FromSeconds(1));
+                await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
 
                 doingActivate = false;
 
@@ -279,7 +279,11 @@ namespace UnitTests.Grains
 
         public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
-            Task.Factory.StartNew(() => logger.LogInformation("OnDeactivateAsync"));
+            Task.Factory.StartNew(
+                () => logger.LogInformation("OnDeactivateAsync"),
+                CancellationToken.None,
+                TaskCreationOptions.None,
+                TaskScheduler.Current);
 
             Assert.False(doingActivate, "Not doing Activate");
             Assert.False(doingDeactivate, "Not doing Deactivate");
@@ -293,9 +297,11 @@ namespace UnitTests.Grains
                     Assert.True(doingDeactivate, "Doing Deactivate");
                     Thread.Sleep(TimeSpan.FromSeconds(1));
                     doingDeactivate = false;
-                })
+                }, CancellationToken.None)
                 .ContinueWith((Task t) => logger.LogInformation("Finished-OnDeactivateAsync"),
-                    TaskContinuationOptions.ExecuteSynchronously);
+                    CancellationToken.None,
+                    TaskContinuationOptions.ExecuteSynchronously,
+                    TaskScheduler.Current);
         }
 
         public Task<string> DoSomething()

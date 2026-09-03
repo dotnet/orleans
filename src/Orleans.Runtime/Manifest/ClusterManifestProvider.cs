@@ -281,7 +281,7 @@ namespace Orleans.Runtime.Metadata
         private Task StartAsync(CancellationToken cancellationToken)
         {
             Debug.Assert(_grainFactory is not null);
-            _runTask = Task.Run(ProcessMembershipUpdates);
+            _runTask = Task.Run(ProcessMembershipUpdates, CancellationToken.None);
             return Task.CompletedTask;
         }
 

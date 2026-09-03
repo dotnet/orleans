@@ -1773,7 +1773,7 @@ internal sealed partial class ActivationData :
                 }
                 if (!success)
                 {
-                    Deactivate(new(DeactivationReasonCode.DirectoryFailure, registrationException, "Failed to register activation in grain directory."));
+                    Deactivate(new(DeactivationReasonCode.DirectoryFailure, registrationException, "Failed to register activation in grain directory."), cancellationToken);
                     activationMetrics.DirectoryRegistrationFailed(registrationException, cancellationToken.IsCancellationRequested);
 
                     // Activation failed.

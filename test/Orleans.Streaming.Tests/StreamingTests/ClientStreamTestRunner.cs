@@ -119,7 +119,7 @@ namespace Tester.StreamingTests
                 await GenerateEvents(streamProviderName, streamGuid, streamNamespace, eventsProduced);
 
                 await observer.WaitForItemDeliveryCountAsync(streamId, subscription.SubscriptionId, eventsProduced, streamProviderName, cts.Token);
-                Assert.Equal(eventsProduced, await consumer.GetNumberConsumed());
+                Assert.Equal(eventsProduced, await consumer.GetNumberConsumed(cancellationToken));
             }
             finally
             {
@@ -166,7 +166,7 @@ namespace Tester.StreamingTests
             await observer.WaitForItemDeliveryCountAsync(streamId, eventsProduced, streamProviderName, cts.Token);
 
             Assert.Equal(eventsProduced, eventCount[0]);
-            Assert.Equal(eventsProduced, await producer.GetNumberProduced());
+            Assert.Equal(eventsProduced, await producer.GetNumberProduced(cancellationToken));
             return subscription.HandleId;
         }
 

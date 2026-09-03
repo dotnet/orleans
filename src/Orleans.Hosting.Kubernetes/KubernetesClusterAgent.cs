@@ -99,7 +99,7 @@ namespace Orleans.Hosting.Kubernetes
                     await AddClusterOptionsToPodLabels(cancellation);
 
                     // Find the currently known cluster members first, before interrogating Kubernetes
-                    await _clusterMembershipService.Refresh();
+                    await _clusterMembershipService.Refresh(cancellationToken: cancellation);
                     var snapshot = _clusterMembershipService.CurrentSnapshot.Members;
 
                     // Find the pods which correspond to this cluster

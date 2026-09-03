@@ -133,9 +133,9 @@ namespace Tester.StreamingTests.BroadcastChannel
             using var observer = BroadcastChannelDiagnosticObserver.Create(_fixture.HostedCluster);
             var stream = provider.GetChannelWriter<int>(channelId);
 
-            await stream.Publish(1);
-            await stream.Publish(2);
-            await stream.Publish(3);
+            await stream.Publish(1, cancellationToken);
+            await stream.Publish(2, cancellationToken);
+            await stream.Publish(3, cancellationToken);
 
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             cts.CancelAfter(CallTimeout);
@@ -175,7 +175,7 @@ namespace Tester.StreamingTests.BroadcastChannel
 
                 channels.Add((id, value));
 
-                await provider.GetChannelWriter<int>(id).Publish(value);
+                await provider.GetChannelWriter<int>(id).Publish(value, cancellationToken);
             }
 
             var grain = _fixture.Client.GetGrain<ISimpleSubscriberGrain>(grainKey);
@@ -204,9 +204,9 @@ namespace Tester.StreamingTests.BroadcastChannel
             using var observer = BroadcastChannelDiagnosticObserver.Create(_fixture.HostedCluster);
             var stream = provider.GetChannelWriter<int>(channelId);
 
-            await stream.Publish(1);
-            await stream.Publish(2);
-            await stream.Publish(3);
+            await stream.Publish(1, cancellationToken);
+            await stream.Publish(2, cancellationToken);
+            await stream.Publish(3, cancellationToken);
 
             // 3 items × 2 subscribers = 6 deliveries
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -253,7 +253,7 @@ namespace Tester.StreamingTests.BroadcastChannel
             var badGrain = _fixture.Client.GetGrain<ISimpleSubscriberGrain>(grainKey);
             var goodGrain = _fixture.Client.GetGrain<IRegexNamespaceSubscriberGrain>(grainKey);
 
-            await stream.Publish(1);
+            await stream.Publish(1, cancellationToken);
             if (fireAndForget)
             {
                 // 1 item × 2 subscribers = 2 deliveries
@@ -267,7 +267,7 @@ namespace Tester.StreamingTests.BroadcastChannel
             await badGrain.ThrowsOnReceive(true);
             if (fireAndForget)
             {
-                await stream.Publish(2);
+                await stream.Publish(2, cancellationToken);
                 // Wait for good grain delivery (total: 3 successful deliveries)
                 using var cts2 = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 cts2.CancelAfter(CallTimeout);
@@ -292,7 +292,7 @@ namespace Tester.StreamingTests.BroadcastChannel
                 Assert.Single(ex.InnerExceptions);
             }
             await badGrain.ThrowsOnReceive(false);
-            await stream.Publish(3);
+            await stream.Publish(3, cancellationToken);
 
             // Wait for all remaining deliveries: 5 total (good: 3, bad: 2)
             using var ctsFinal = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);

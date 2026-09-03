@@ -108,14 +108,14 @@ namespace Orleans.Runtime
             var cancellation = new CancellationTokenSource();
             Task OnRuntimeInitializeStart(CancellationToken _)
             {
-                tasks.Add(Task.Run(() => this.ProcessMembershipUpdates(cancellation.Token)));
+                tasks.Add(Task.Run(() => this.ProcessMembershipUpdates(cancellation.Token), CancellationToken.None));
                 return Task.CompletedTask;
             }
 
             async Task OnRuntimeInitializeStop(CancellationToken ct)
             {
                 cancellation.Cancel(throwOnFirstException: false);
-                var shutdownGracePeriod = Task.WhenAll(Task.Delay(ClusterMembershipOptions.ClusteringShutdownGracePeriod), ct.WhenCancelled());
+                var shutdownGracePeriod = Task.WhenAll(Task.Delay(ClusterMembershipOptions.ClusteringShutdownGracePeriod, CancellationToken.None), ct.WhenCancelled());
                 await Task.WhenAny(shutdownGracePeriod, Task.WhenAll(tasks));
             }
 

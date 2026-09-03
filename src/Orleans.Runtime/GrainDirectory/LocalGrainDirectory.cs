@@ -1008,8 +1008,8 @@ namespace Orleans.Runtime.GrainDirectory
         {
             lifecycle.Subscribe<LocalGrainDirectory>(ServiceLifecycleStage.RuntimeServices, RunStart, RunStop);
 
-            Task RunStart(CancellationToken ct) => Task.Run(() => Start());
-            Task RunStop(CancellationToken ct) => Task.Run(() => StopAsync());
+            Task RunStart(CancellationToken ct) => Task.Run(() => Start(), CancellationToken.None);
+            Task RunStop(CancellationToken ct) => Task.Run(() => StopAsync(), CancellationToken.None);
         }
 
         private readonly struct SiloAddressLogValue(SiloAddress silo)

@@ -36,7 +36,7 @@ public static class NatsTestConstants
         await using var nats = CreateConnection();
 
         await nats.ConnectAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
-        await nats.PingAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+        await nats.PingAsync(cancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
 
         return nats.ConnectionState == NatsConnectionState.Open && nats.ServerInfo?.JetStreamAvailable == true;
     }

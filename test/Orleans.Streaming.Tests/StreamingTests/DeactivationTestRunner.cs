@@ -65,11 +65,11 @@ namespace UnitTests.StreamingTests
             Assert.True(consumerGrainReceivedStreamMessage);
 
             // Deactivate all of the pub sub rendesvous grains
-            var rendesvousGrains = await client.GetGrain<IManagementGrain>(0).GetActiveGrains(GrainType.Create("pubsubrendezvous"));
+            var rendesvousGrains = await client.GetGrain<IManagementGrain>(0).GetActiveGrains(GrainType.Create("pubsubrendezvous"), cancellationToken);
             foreach (var grainId in rendesvousGrains)
             {
                 var grain = client.GetGrain<IGrainManagementExtension>(grainId);
-                await grain.DeactivateOnIdle();
+                await grain.DeactivateOnIdle(cancellationToken);
             }
 
             // deactivating PubSubRendezvousGrain and SampleStreaming_ProducerGrain during the same GC cycle causes a deadlock
@@ -109,11 +109,11 @@ namespace UnitTests.StreamingTests
             Assert.Equal(1, count.Value);
 
             // Deactivate all of the pub sub rendesvous grains
-            var rendesvousGrains = await client.GetGrain<IManagementGrain>(0).GetActiveGrains(GrainType.Create("pubsubrendezvous"));
+            var rendesvousGrains = await client.GetGrain<IManagementGrain>(0).GetActiveGrains(GrainType.Create("pubsubrendezvous"), cancellationToken);
             foreach (var grainId in rendesvousGrains)
             {
                 var grain = client.GetGrain<IGrainManagementExtension>(grainId);
-                await grain.DeactivateOnIdle();
+                await grain.DeactivateOnIdle(cancellationToken);
             }
 
             // deactivating PubSubRendezvousGrain and SampleStreaming_ProducerGrain during the same GC cycle causes a deadlock

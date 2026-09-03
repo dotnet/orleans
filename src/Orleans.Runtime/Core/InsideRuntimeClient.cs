@@ -582,7 +582,7 @@ namespace Orleans.Runtime
         private Task OnRuntimeInitializeStart(CancellationToken tc)
         {
             var stopWatch = ValueStopwatch.StartNew();
-            this.callbackTimerTask = Task.Run(MonitorCallbackExpiry);
+            this.callbackTimerTask = Task.Run(MonitorCallbackExpiry, CancellationToken.None);
 
             LogDebugSiloStartPerfMeasure(this.logger, new(stopWatch));
 

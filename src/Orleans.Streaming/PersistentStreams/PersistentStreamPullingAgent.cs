@@ -387,7 +387,8 @@ namespace Orleans.Streams
                          // Do not retry if the agent is shutting down, or if the exception is ClientNotAvailableException
                          (exception, i) => exception is not ClientNotAvailableException && !IsShutdown,
                          this.options.MaxEventDeliveryTime,
-                         deliveryBackoffProvider);
+                         deliveryBackoffProvider,
+                         cancellationToken: CancellationToken.None);
 
                     effectiveHandshakeToken = requestedHandshakeToken;
                     if (effectiveHandshakeToken is null && ShouldApplyInitialSubscriptionStartPosition(consumerData))
@@ -1056,7 +1057,8 @@ namespace Orleans.Streams
                                 // Do not retry if the agent is shutting down, or if the exception is ClientNotAvailableException
                                 (exception, i) => exception is not ClientNotAvailableException && !IsShutdown,
                                 this.options.MaxEventDeliveryTime,
-                                deliveryBackoffProvider);
+                                deliveryBackoffProvider,
+                                cancellationToken: cancellationToken);
                             if (newToken is not null)
                             {
                                 consumerData.LastToken = newToken;

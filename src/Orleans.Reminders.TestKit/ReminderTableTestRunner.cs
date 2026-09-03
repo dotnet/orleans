@@ -194,7 +194,7 @@ public abstract class ReminderTableTestRunner
         const string Guarantee = nameof(ReminderTable_ReadRow_MissingReminder_ReturnsNull);
 
         var grainId = NewGrainId("missing-point-read");
-        var read = await ReminderTable.ReadRow(grainId, "never-registered").WaitAsync(cancellationToken);
+        var read = await ReminderTable.ReadRow(grainId, "never-registered", cancellationToken).WaitAsync(cancellationToken);
         if (read is not null)
         {
             Report(Guarantee, "ReadRow")
@@ -324,7 +324,7 @@ public abstract class ReminderTableTestRunner
         AssertEntry(Guarantee, "ReadRow", bFirst, bFirstETag, await ReadRequiredAsync(grainB, "shared-name", Guarantee, cancellationToken, bFirst, bFirstETag));
 
         // Removing one identity must not affect the two identities which share one component with it.
-        if (!await ReminderTable.RemoveRow(grainA, "shared-name", aFirstETag).WaitAsync(cancellationToken))
+        if (!await ReminderTable.RemoveRow(grainA, "shared-name", aFirstETag, cancellationToken).WaitAsync(cancellationToken))
         {
             Report(Guarantee, "RemoveRow")
                 .WithIdentity(grainA, "shared-name")
@@ -442,7 +442,7 @@ public abstract class ReminderTableTestRunner
         var entry = NewEntry(grainId, "remove-current");
         var etag = await UpsertAsync(entry, Guarantee, cancellationToken);
 
-        var removed = await ReminderTable.RemoveRow(grainId, entry.ReminderName, etag).WaitAsync(cancellationToken);
+        var removed = await ReminderTable.RemoveRow(grainId, entry.ReminderName, etag, cancellationToken).WaitAsync(cancellationToken);
         if (!removed)
         {
             Report(Guarantee, "RemoveRow")
@@ -492,7 +492,7 @@ public abstract class ReminderTableTestRunner
         var updated = NewEntry(grainId, "remove-stale", BaseTime.AddMinutes(9), TimeSpan.FromMinutes(4));
         var currentETag = await UpsertAsync(updated, Guarantee, cancellationToken, staleETag);
 
-        var removed = await ReminderTable.RemoveRow(grainId, "remove-stale", staleETag).WaitAsync(cancellationToken);
+        var removed = await ReminderTable.RemoveRow(grainId, "remove-stale", staleETag, cancellationToken).WaitAsync(cancellationToken);
         if (removed)
         {
             Report(Guarantee, "RemoveRow")
@@ -527,7 +527,7 @@ public abstract class ReminderTableTestRunner
         var entry = NewEntry(grainId, "present");
         var etag = await UpsertAsync(entry, Guarantee, cancellationToken);
 
-        var removed = await ReminderTable.RemoveRow(grainId, "absent", etag).WaitAsync(cancellationToken);
+        var removed = await ReminderTable.RemoveRow(grainId, "absent", etag, cancellationToken).WaitAsync(cancellationToken);
         if (removed)
         {
             Report(Guarantee, "RemoveRow")
@@ -559,8 +559,8 @@ public abstract class ReminderTableTestRunner
         var entry = NewEntry(grainId, "remove-twice");
         var etag = await UpsertAsync(entry, Guarantee, cancellationToken);
 
-        var first = await ReminderTable.RemoveRow(grainId, entry.ReminderName, etag).WaitAsync(cancellationToken);
-        var second = await ReminderTable.RemoveRow(grainId, entry.ReminderName, etag).WaitAsync(cancellationToken);
+        var first = await ReminderTable.RemoveRow(grainId, entry.ReminderName, etag, cancellationToken).WaitAsync(cancellationToken);
+        var second = await ReminderTable.RemoveRow(grainId, entry.ReminderName, etag, cancellationToken).WaitAsync(cancellationToken);
 
         if (!first || second)
         {
@@ -916,7 +916,7 @@ public abstract class ReminderTableTestRunner
         var rows = RequireRows(
             Guarantee,
             "ReadRows(hash, hash + 1)",
-            await ReminderTable.ReadRows(hash, end).WaitAsync(cancellationToken));
+            await ReminderTable.ReadRows(hash, end, cancellationToken).WaitAsync(cancellationToken));
         if (rows.Reminders.Any(reminder => reminder.GrainId.Equals(grainId) && string.Equals(reminder.ReminderName, expected.ReminderName, StringComparison.Ordinal)))
         {
             Report(Guarantee, "ReadRows(hash, hash + 1)")
@@ -948,7 +948,7 @@ public abstract class ReminderTableTestRunner
         try
         {
             var removed = fixtureState.All[1];
-            if (!await ReminderTable.RemoveRow(removed.GrainId, removed.ReminderName, removed.ETag).WaitAsync(cancellationToken))
+            if (!await ReminderTable.RemoveRow(removed.GrainId, removed.ReminderName, removed.ETag, cancellationToken).WaitAsync(cancellationToken))
             {
                 Report(Guarantee, "RemoveRow")
                     .WithIdentity(removed.GrainId, removed.ReminderName)
@@ -1000,7 +1000,7 @@ public abstract class ReminderTableTestRunner
         var disjoint = RequireRows(
             Guarantee,
             "ReadRows(disjoint)",
-            await ReminderTable.ReadRows(disjointBegin, disjointEnd).WaitAsync(cancellationToken));
+            await ReminderTable.ReadRows(disjointBegin, disjointEnd, cancellationToken).WaitAsync(cancellationToken));
         if (disjoint.Reminders.Any(reminder => reminder.GrainId.Equals(grainId) && string.Equals(reminder.ReminderName, entry.ReminderName, StringComparison.Ordinal)))
         {
             Report(Guarantee, "ReadRows(begin, end)")
@@ -1217,7 +1217,7 @@ public abstract class ReminderTableTestRunner
             }
 
             AssertEntry(Guarantee, "ReadRows(GrainId)", entries[expectedIndex], etags[expectedIndex]!, row);
-            await ReminderTable.RemoveRow(grainId, row.ReminderName, row.ETag!).WaitAsync(cancellationToken);
+            await ReminderTable.RemoveRow(grainId, row.ReminderName, row.ETag!, cancellationToken).WaitAsync(cancellationToken);
         }
     }
 
@@ -1242,7 +1242,7 @@ public abstract class ReminderTableTestRunner
         await UpsertAsync(NewEntry(first, "clear-a"), Guarantee, cancellationToken);
         await UpsertAsync(NewEntry(second, "clear-b"), Guarantee, cancellationToken);
 
-        await ReminderTable.TestOnlyClearTable().WaitAsync(cancellationToken);
+        await ReminderTable.TestOnlyClearTable(cancellationToken).WaitAsync(cancellationToken);
 
         var rows = RequireRows(
             Guarantee,
@@ -1501,7 +1501,7 @@ public abstract class ReminderTableTestRunner
         string etag,
         CancellationToken cancellationToken)
     {
-        await ReminderTable.RemoveRow(grainId, reminderName, etag).WaitAsync(cancellationToken);
+        await ReminderTable.RemoveRow(grainId, reminderName, etag, cancellationToken).WaitAsync(cancellationToken);
     }
 
     /// <summary>

@@ -89,8 +89,8 @@ namespace TestGrains
         {
             await Task.Run(async () =>
             {
-                await Task.Delay(10);
-            });
+                await Task.Delay(10, cancellationToken);
+            }, CancellationToken.None);
         }
 
 

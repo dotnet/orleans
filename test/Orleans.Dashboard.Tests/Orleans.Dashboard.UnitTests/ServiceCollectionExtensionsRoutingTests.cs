@@ -997,7 +997,10 @@ public class ServiceCollectionExtensionsRoutingTests
             cancellationToken.ThrowIfCancellationRequested();
             DashboardCountersCalls++;
             DashboardCounterExclusions = exclusions ?? [];
-            return Complete(nameof(DashboardCounters), DashboardCountersResult.AsImmutable());
+            return Complete(
+                nameof(DashboardCounters),
+                DashboardCountersResult.AsImmutable(),
+                cancellationToken: cancellationToken);
         }
 
         public Task<Immutable<Dictionary<string, GrainTraceEntry>>> ClusterStats(
@@ -1008,7 +1011,8 @@ public class ServiceCollectionExtensionsRoutingTests
             return Complete(
                 nameof(ClusterStats),
                 ClusterStatsResult.AsImmutable(),
-                exception: ClusterStatsException);
+                exception: ClusterStatsException,
+                cancellationToken: cancellationToken);
         }
 
         public Task<Immutable<ReminderResponse>> GetReminders(
@@ -1023,7 +1027,8 @@ public class ServiceCollectionExtensionsRoutingTests
             return Complete(
                 nameof(GetReminders),
                 ReminderResult.AsImmutable(),
-                exception: ReminderException);
+                exception: ReminderException,
+                cancellationToken: cancellationToken);
         }
 
         public Task<Immutable<SiloRuntimeStatistics?[]>> HistoricalStats(
@@ -1091,7 +1096,8 @@ public class ServiceCollectionExtensionsRoutingTests
             TopMethodExclusions = exclusions ?? [];
             return Complete(
                 nameof(TopGrainMethods),
-                new Dictionary<string, GrainMethodAggregate[]>().AsImmutable());
+                new Dictionary<string, GrainMethodAggregate[]>().AsImmutable(),
+                cancellationToken: cancellationToken);
         }
 
         public Task<Immutable<string>> GetGrainState(
@@ -1103,7 +1109,7 @@ public class ServiceCollectionExtensionsRoutingTests
             GrainStateCalls++;
             GrainStateId = id;
             GrainStateType = grainType;
-            return Complete(nameof(GetGrainState), GrainStateResult.AsImmutable(), id);
+            return Complete(nameof(GetGrainState), GrainStateResult.AsImmutable(), id, cancellationToken: cancellationToken);
         }
 
         public Task<Immutable<string[]>> GetGrainTypes(
@@ -1113,7 +1119,10 @@ public class ServiceCollectionExtensionsRoutingTests
             cancellationToken.ThrowIfCancellationRequested();
             GrainTypesCalls++;
             GrainTypeExclusions = exclusions ?? [];
-            return Complete(nameof(GetGrainTypes), Array.Empty<string>().AsImmutable());
+            return Complete(
+                nameof(GetGrainTypes),
+                Array.Empty<string>().AsImmutable(),
+                cancellationToken: cancellationToken);
         }
 
         public Task<Immutable<LifecycleStageInfo[]>> GetLifecycleStages(

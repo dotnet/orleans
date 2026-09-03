@@ -40,7 +40,7 @@ namespace TestGrains
             await base.OnActivateAsync(cancellationToken);
             _counter.State!.Counter = random.Next(100); // Persistent state is initialized before activation callbacks.
             _counter.State!.CurrentDateTime = DateTime.UtcNow; // Persistent state is initialized before activation callbacks.
-            await _counter.WriteStateAsync();
+            await _counter.WriteStateAsync(cancellationToken);
         }
     }
 

@@ -990,7 +990,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         var range = _currentRange;
         Debug.Assert(range.Equals(current.GetRange(_id, _partitionIndex)));
 
-        await WaitForRange(RingRange.Full, current.Version).AsTask().WaitAsync(cancellationToken);
+        await WaitForRange(RingRange.Full, current.Version, cancellationToken).AsTask().WaitAsync(cancellationToken);
         var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         _rangeLocks.Add((RingRange.Full, current.Version, tcs));
         try
@@ -1056,7 +1056,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         while (true)
         {
             var current = CurrentView;
-            await WaitForRange(RingRange.Full, current.Version).AsTask().WaitAsync(cancellationToken);
+            await WaitForRange(RingRange.Full, current.Version, cancellationToken).AsTask().WaitAsync(cancellationToken);
             if (!ReferenceEquals(current, CurrentView))
             {
                 continue;
@@ -1074,7 +1074,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         CancellationToken cancellationToken)
     {
         GrainRuntime.CheckRuntimeContext(this);
-        await WaitForRange(RingRange.Full, version).AsTask().WaitAsync(cancellationToken);
+        await WaitForRange(RingRange.Full, version, cancellationToken).AsTask().WaitAsync(cancellationToken);
     }
 
     async ValueTask<Immutable<List<GrainId>>> IGrainDirectoryTestHooks.CheckActivationsAsync(
@@ -1084,7 +1084,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         GrainRuntime.CheckRuntimeContext(this);
         var current = CurrentView;
 
-        await WaitForRange(RingRange.Full, current.Version).AsTask().WaitAsync(cancellationToken);
+        await WaitForRange(RingRange.Full, current.Version, cancellationToken).AsTask().WaitAsync(cancellationToken);
         var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         _rangeLocks.Add((RingRange.Full, current.Version, tcs));
         try

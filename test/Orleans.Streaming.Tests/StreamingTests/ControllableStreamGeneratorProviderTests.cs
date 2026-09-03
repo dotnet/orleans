@@ -86,7 +86,7 @@ namespace UnitTests.StreamingTests
             try
             {
                 var mgmt = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);
-                object?[] results = await mgmt.SendControlCommandToProvider<PersistentStreamProvider>(Fixture.StreamProviderName, (int)StreamGeneratorCommand.Configure, generatorConfig);
+                object?[] results = await mgmt.SendControlCommandToProvider<PersistentStreamProvider>(Fixture.StreamProviderName, (int)StreamGeneratorCommand.Configure, generatorConfig, cancellationToken);
                 Assert.Equal(2, results.Length);
                 bool[] bResults = results.Cast<bool>().ToArray();
 

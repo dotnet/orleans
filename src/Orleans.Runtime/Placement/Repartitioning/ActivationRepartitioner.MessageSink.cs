@@ -137,7 +137,7 @@ internal sealed partial class ActivationRepartitioner : IMessageStatisticsSink
         cancellationToken.ThrowIfCancellationRequested();
         while (_pendingMessages.Count > 0)
         {
-            await Task.Delay(TimeSpan.FromMilliseconds(30));
+            await Task.Delay(TimeSpan.FromMilliseconds(30), cancellationToken);
         }
     }
 

@@ -366,7 +366,7 @@ internal sealed partial class ActivationRebalancerWorker(
 
             migrationTasks.Add(grainFactory
                 .GetSystemTarget<ISiloControl>(Constants.SiloControlType, highSilo)
-                .MigrateRandomActivations(lowSilo, delta));
+                .MigrateRandomActivations(lowSilo, delta, cancellationToken));
 
             activationsMigrated += delta;
             UpdateStatistics(lowSilo, highSilo, delta);

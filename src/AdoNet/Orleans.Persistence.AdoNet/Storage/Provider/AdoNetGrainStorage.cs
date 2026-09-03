@@ -337,7 +337,7 @@ namespace Orleans.Storage
             var queries = await Storage.ReadAsync(DefaultInitializationQuery, command => { }, (selector, resultSetCount, token) =>
             {
                 return Task.FromResult(Tuple.Create(selector.GetValue<string>("QueryKey"), selector.GetValue<string>("QueryText")));
-            }).ConfigureAwait(false);
+            }, cancellationToken: cancellationToken).ConfigureAwait(false);
 
             // This check is for backward compatibility:
             // 1. Some AdoNet storage invariants may not support delete on clear.

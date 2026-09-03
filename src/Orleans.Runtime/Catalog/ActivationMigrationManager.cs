@@ -148,7 +148,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
             }
 
             // Wait a short amount of time and poll the activations again.
-            await Task.Delay(5);
+            await Task.Delay(5, CancellationToken.None);
         }
     }
 

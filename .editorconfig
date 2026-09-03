@@ -530,7 +530,7 @@ dotnet_diagnostic.CA2013.severity = suggestion
 dotnet_diagnostic.CA2014.severity = suggestion
 
 # CA2016: Forward the 'CancellationToken' parameter to methods that take one
-dotnet_diagnostic.CA2016.severity = suggestion
+dotnet_diagnostic.CA2016.severity = error
 
 # CA2200: Rethrow to preserve stack details
 dotnet_diagnostic.CA2200.severity = suggestion

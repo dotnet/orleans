@@ -300,7 +300,7 @@ namespace Orleans.Runtime.MembershipService
                     this.membershipManager.CurrentSnapshot,
                     this.monitoredSilos,
                     this.timeProvider.GetUtcNow().UtcDateTime);
-                tasks.Add(Task.Run(() => this.ProcessMembershipUpdates()));
+                tasks.Add(Task.Run(() => this.ProcessMembershipUpdates(), CancellationToken.None));
                 return Task.CompletedTask;
             }
 
@@ -317,7 +317,7 @@ namespace Orleans.Runtime.MembershipService
 
                 // Allow some minimum time for graceful shutdown.
                 var shutdownGracePeriod = Task.WhenAll(
-                    Task.Delay(ClusterMembershipOptions.ClusteringShutdownGracePeriod, this.timeProvider),
+                    Task.Delay(ClusterMembershipOptions.ClusteringShutdownGracePeriod, this.timeProvider, CancellationToken.None),
                     ct.WhenCancelled());
                 await Task.WhenAny(shutdownGracePeriod, Task.WhenAll(tasks));
             }

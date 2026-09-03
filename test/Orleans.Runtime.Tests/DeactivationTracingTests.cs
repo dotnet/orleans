@@ -682,7 +682,7 @@ namespace UnitTests.General
         {
             _state.State!.WasDeactivated = true;
             _state.State.DeactivationReason = reason.ToString();
-            await _state.WriteStateAsync();
+            await _state.WriteStateAsync(CancellationToken.None);
         }
     }
 

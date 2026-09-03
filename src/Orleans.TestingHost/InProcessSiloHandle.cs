@@ -107,7 +107,7 @@ namespace Orleans.TestingHost
 
             try
             {
-                await Task.Run(() => this.SiloHost.StopAsync(ct));
+                await Task.Run(() => this.SiloHost.StopAsync(ct), CancellationToken.None);
             }
             catch (Exception exc)
             {

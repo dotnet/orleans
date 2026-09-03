@@ -23,7 +23,7 @@ internal sealed class ActivationSheddingToyHostedService(IGrainFactory grainFact
 
             if (i % 100_000 == 0)
             {
-                var activationCount = await grainFactory.GetGrain<IManagementGrain>(0).GetTotalActivationCount();
+                var activationCount = await grainFactory.GetGrain<IManagementGrain>(0).GetTotalActivationCount(stoppingToken);
                 var envStats = environmentStatisticsProvider.GetEnvironmentStatistics();
                 while (envStats.MemoryUsagePercentage > 80)
                 {
@@ -31,7 +31,7 @@ internal sealed class ActivationSheddingToyHostedService(IGrainFactory grainFact
                     GC.Collect();
                     await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken);
                     envStats = environmentStatisticsProvider.GetEnvironmentStatistics();
-                    activationCount = await grainFactory.GetGrain<IManagementGrain>(0).GetTotalActivationCount();
+                    activationCount = await grainFactory.GetGrain<IManagementGrain>(0).GetTotalActivationCount(stoppingToken);
                 }
 
                 PrintUsage(i, stats, envStats, activationCount);
@@ -42,7 +42,7 @@ internal sealed class ActivationSheddingToyHostedService(IGrainFactory grainFact
                 using var timer = new PeriodicTimer(TimeSpan.FromSeconds(10));
                 while (await timer.WaitForNextTickAsync(stoppingToken))
                 {
-                    var activationCount = await grainFactory.GetGrain<IManagementGrain>(0).GetTotalActivationCount();
+                    var activationCount = await grainFactory.GetGrain<IManagementGrain>(0).GetTotalActivationCount(stoppingToken);
                     var envStats = environmentStatisticsProvider.GetEnvironmentStatistics();
                     PrintUsage(i, stats, envStats, activationCount);
                     if (stats.Count == 10)
