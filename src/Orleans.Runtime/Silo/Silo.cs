@@ -325,7 +325,7 @@ namespace Orleans.Runtime
                 while (!this.SystemStatus.Equals(SystemStatus.Terminated))
                 {
                     LogDebugSiloStopStillInProgress(logger);
-                    await Task.Delay(pause, CancellationToken.None).ConfigureAwait(false);
+                    await Task.Delay(pause, cancellationToken).ConfigureAwait(false);
                 }
 
                 await this.SiloTerminated.ConfigureAwait(false);
