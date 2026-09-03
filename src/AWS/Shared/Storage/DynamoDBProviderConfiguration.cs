@@ -112,7 +112,8 @@ namespace Orleans.Reminders.DynamoDB
             int readCapacityUnits,
             int writeCapacityUnits,
             string providerName,
-            bool requireService = true)
+            bool requireService = true,
+            bool reportSpecificCapacity = false)
         {
             if (requireService)
             {
@@ -126,6 +127,14 @@ namespace Orleans.Reminders.DynamoDB
             if (string.IsNullOrWhiteSpace(tableName))
             {
                 throw new OrleansConfigurationException($"The TableName is required for {providerName}.");
+            }
+
+            if (useProvisionedThroughput
+                && !reportSpecificCapacity
+                && (readCapacityUnits <= 0 || writeCapacityUnits <= 0))
+            {
+                throw new OrleansConfigurationException(
+                    $"ReadCapacityUnits and WriteCapacityUnits must be greater than zero when provisioned throughput is enabled for {providerName}.");
             }
 
             if (useProvisionedThroughput && readCapacityUnits <= 0)
