@@ -784,6 +784,10 @@ namespace Orleans.Transactions.DynamoDB
                 }
                 return (resultList, response.LastEvaluatedKey);
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception)
             {
                 LogDebugUnableToFindTableEntry(_logger, new(keys));
