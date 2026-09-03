@@ -54,12 +54,15 @@ namespace Orleans.Metadata
         [Id(1)]
         public ImmutableDictionary<GrainType, GrainProperties> Grains { get; }
 
+        /// <inheritdoc/>
         public override int GetHashCode() => _hashCode ??= HashCode.Combine(
             ComputeHashCode(Interfaces),
             ComputeHashCode(Grains));
 
+        /// <inheritdoc/>
         public override bool Equals(object? obj) => obj is GrainManifest other && Equals(other);
 
+        /// <inheritdoc/>
         public bool Equals(GrainManifest? other)
         {
             if (ReferenceEquals(this, other)) return true;

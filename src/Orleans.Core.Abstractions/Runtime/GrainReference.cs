@@ -20,6 +20,17 @@ namespace Orleans.Runtime
     /// </summary>
     public class GrainReferenceShared
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="GrainReferenceShared"/> class.
+        /// </summary>
+        /// <param name="grainType">The grain type.</param>
+        /// <param name="grainInterfaceType">The grain interface type.</param>
+        /// <param name="interfaceVersion">The grain interface version.</param>
+        /// <param name="runtime">The grain reference runtime.</param>
+        /// <param name="invokeMethodOptions">The common invocation options.</param>
+        /// <param name="codecProvider">The serialization codec provider.</param>
+        /// <param name="copyContextPool">The serialization copy context pool.</param>
+        /// <param name="serviceProvider">The service provider.</param>
         public GrainReferenceShared(
             GrainType grainType,
             GrainInterfaceType grainInterfaceType,
@@ -401,6 +412,11 @@ namespace Orleans.Runtime
         bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
             => destination.TryWrite($"GrainReference:{GrainId}:{InterfaceType}", out charsWritten);
 
+        /// <summary>
+        /// Gets or creates an invokable request instance.
+        /// </summary>
+        /// <typeparam name="TInvokable">The invokable request type.</typeparam>
+        /// <returns>An invokable request instance.</returns>
         protected TInvokable GetInvokable<TInvokable>() => ActivatorUtilities.GetServiceOrCreateInstance<TInvokable>(Shared.ServiceProvider);
 
         /// <summary>
@@ -597,10 +613,13 @@ namespace Orleans.Runtime
         /// <inheritdoc/>
         public virtual TimeSpan? GetDefaultResponseTimeout() => null;
 
+        /// <inheritdoc/>
         public virtual bool TryCancel() => false;
 
+        /// <inheritdoc/>
         public virtual CancellationToken GetCancellationToken() => default;
 
+        /// <inheritdoc/>
         public virtual bool IsCancellable => false;
     }
 
@@ -610,6 +629,7 @@ namespace Orleans.Runtime
     [SerializerTransparent]
     public abstract class Request : RequestBase
     {
+        /// <inheritdoc/>
         [System.Diagnostics.CodeAnalysis.SuppressMessage(
             "Performance",
             "CA1849:Call async methods when in an async method",
@@ -646,7 +666,10 @@ namespace Orleans.Runtime
             }
         }
 
-        // Generated
+        /// <summary>
+        /// Invokes the request against the target.
+        /// </summary>
+        /// <returns>A value task representing the invocation.</returns>
         protected abstract ValueTask InvokeInner();
     }
 
@@ -802,6 +825,9 @@ namespace Orleans.Runtime
     [SerializerTransparent]
     public abstract class VoidRequest : RequestBase
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="VoidRequest"/> class.
+        /// </summary>
         protected VoidRequest()
         {
             // All void requests are inherently one-way.

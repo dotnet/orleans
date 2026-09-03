@@ -12,8 +12,15 @@ namespace Orleans.Placement
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
     public abstract class PlacementAttribute : Attribute, IGrainPropertiesProviderAttribute
     {
+        /// <summary>
+        /// Gets the placement strategy associated with this attribute.
+        /// </summary>
         public PlacementStrategy PlacementStrategy { get; private set; }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="PlacementAttribute"/> class.
+        /// </summary>
+        /// <param name="placement">The placement strategy associated with this attribute.</param>
         protected PlacementAttribute(PlacementStrategy placement)
         {
             if (placement == null) throw new ArgumentNullException(nameof(placement));
@@ -38,6 +45,9 @@ namespace Orleans.Placement
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
     public sealed class RandomPlacementAttribute : PlacementAttribute
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="RandomPlacementAttribute"/> class.
+        /// </summary>
         public RandomPlacementAttribute() :
             base(RandomPlacement.Singleton)
         {
@@ -51,6 +61,9 @@ namespace Orleans.Placement
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
     public sealed class HashBasedPlacementAttribute : PlacementAttribute
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="HashBasedPlacementAttribute"/> class.
+        /// </summary>
         public HashBasedPlacementAttribute() :
             base(HashBasedPlacement.Singleton)
         { }
@@ -96,6 +109,9 @@ namespace Orleans.Placement
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
     public sealed class SiloRoleBasedPlacementAttribute : PlacementAttribute
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="SiloRoleBasedPlacementAttribute"/> class.
+        /// </summary>
         public SiloRoleBasedPlacementAttribute() :
             base(SiloRoleBasedPlacement.Singleton)
         { }
@@ -108,6 +124,9 @@ namespace Orleans.Placement
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
     public sealed class ResourceOptimizedPlacementAttribute : PlacementAttribute
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ResourceOptimizedPlacementAttribute"/> class.
+        /// </summary>
         public ResourceOptimizedPlacementAttribute() :
             base(ResourceOptimizedPlacement.Singleton)
         { }
