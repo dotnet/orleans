@@ -19,7 +19,15 @@ namespace Orleans.Networking.Shared
 
         private readonly Socket _socket;
         private readonly ISocketsTrace _trace;
+        [System.Diagnostics.CodeAnalysis.SuppressMessage(
+            "Usage",
+            "CA2213:Disposable fields should be disposed",
+            Justification = "The receive helper remains active for the connection processing lifetime and is disposed after both I/O loops complete.")]
         private readonly SocketReceiver _receiver;
+        [System.Diagnostics.CodeAnalysis.SuppressMessage(
+            "Usage",
+            "CA2213:Disposable fields should be disposed",
+            Justification = "The send helper remains active for the connection processing lifetime and is disposed after both I/O loops complete.")]
         private readonly SocketSender _sender;
         private readonly CancellationTokenSource _connectionClosedTokenSource = new CancellationTokenSource();
 

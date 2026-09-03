@@ -19,6 +19,10 @@ using static Orleans.Runtime.Message;
 
 namespace Orleans.Runtime.Messaging
 {
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Design",
+        "CA1001:Types that own disposable fields should be disposable",
+        Justification = "Each write resets the reusable buffer writer and releases any rented buffers. Making the transient serializer disposable would extend its lifetime through container tracking; the transport replacement in #10846 removes this field.")]
     internal sealed class MessageSerializer
     {
         private const int FramingLength = Message.LENGTH_HEADER_SIZE;

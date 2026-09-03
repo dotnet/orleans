@@ -668,17 +668,9 @@ dotnet_diagnostic.CA1873.severity = warning
 
 # CA1001: Types that own disposable fields should be disposable
 # CA2213: Disposable fields should be disposed
-[src/Orleans.Core/{Lifecycle/ServiceLifecycle,Lifecycle/ServiceLifecycleNotificationStage,Manifest/ClientClusterManifestProvider,Networking/ConnectionManager,Runtime/InvokableObjectManager,Runtime/OutsideRuntimeClient}.cs]
+[src/Orleans.Core/**.cs]
 dotnet_diagnostic.CA1001.severity = warning
 dotnet_diagnostic.CA2213.severity = warning
-
-# The message-oriented transport replacement in #10846 removes MessageSerializer's
-# reusable PrefixingBufferWriter and deletes SocketConnection.
-[src/Orleans.Core/Messaging/MessageSerializer.cs]
-dotnet_diagnostic.CA1001.severity = suggestion
-
-[src/Orleans.Core/Networking/Shared/SocketConnection.cs]
-dotnet_diagnostic.CA2213.severity = suggestion
 
 [src/Orleans.Runtime/Networking/**.cs]
 dotnet_diagnostic.CA1848.severity = warning
