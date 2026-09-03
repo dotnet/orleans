@@ -574,6 +574,30 @@ grow:
         internal object StateIdentity => GetState();
         internal ulong GenerationForTesting => _generation;
 
+        internal MessageSnapshot CaptureSnapshot()
+        {
+            using var scope = EnterMutation();
+            var state = scope.State;
+            return new(
+                state.Id,
+                state.Headers.Direction,
+                state.Headers.ResponseType,
+                state.SendingSilo,
+                state.SendingGrain,
+                state.TargetSilo,
+                state.TargetGrain,
+                state.InterfaceType,
+                state.InterfaceVersion,
+                state.Headers.ForwardCount,
+                state.RetryCount,
+                state.Headers.HasFlag(MessageFlags.SystemMessage),
+                state.Headers.HasFlag(MessageFlags.ReadOnly),
+                state.Headers.HasFlag(MessageFlags.AlwaysInterleave),
+                state.Headers.HasFlag(MessageFlags.Unordered),
+                state.Headers.HasFlag(MessageFlags.IsLocalOnly),
+                !state.Headers.HasFlag(MessageFlags.SuppressKeepAlive));
+        }
+
         private readonly ref struct MutationScope
         {
             public MutationScope(MessageState state, ulong generation)
@@ -864,4 +888,23 @@ grow:
             };
         }
     }
+
+    internal readonly record struct MessageSnapshot(
+        CorrelationId Id,
+        Message.Directions Direction,
+        Message.ResponseTypes Result,
+        SiloAddress? SendingSilo,
+        GrainId SendingGrain,
+        SiloAddress? TargetSilo,
+        GrainId TargetGrain,
+        GrainInterfaceType InterfaceType,
+        ushort InterfaceVersion,
+        int ForwardCount,
+        short RetryCount,
+        bool IsSystemMessage,
+        bool IsReadOnly,
+        bool IsAlwaysInterleave,
+        bool IsUnordered,
+        bool IsLocalOnly,
+        bool IsKeepAlive);
 }

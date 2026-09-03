@@ -18,12 +18,21 @@ public class DispatcherEventsTests
     {
         using var observer = new Observer(DispatcherEvents.AllEvents);
         var trace = new RuntimeMessagingTrace(NullLoggerFactory.Instance, CreateMessagingInstruments(), CreateMessagingProcessingInstruments());
-        var message = new Message();
+        var message = new Message
+        {
+            Id = CorrelationId.GetNext(),
+            Direction = Message.Directions.Request,
+            TargetGrain = GrainId.Create("test", "target"),
+        };
+        var messageId = message.Id;
         var exception = new InvalidOperationException("boom");
 
         trace.OnDispatcherRejectMessage(message, Message.RejectionTypes.Transient, "reason", exception);
+        message.Release();
 
-        var rejected = Assert.Single(observer.Events.OfType<DispatcherEvents.Rejected>(), evt => evt.Message == message);
+        var rejected = Assert.Single(observer.Events.OfType<DispatcherEvents.Rejected>(), evt => evt.Message.Id == messageId);
+        Assert.Equal(Message.Directions.Request, rejected.Message.Direction);
+        Assert.Equal(GrainId.Create("test", "target"), rejected.Message.TargetGrain);
         Assert.Equal(Message.RejectionTypes.Transient, rejected.RejectionType);
         Assert.Equal("reason", rejected.Reason);
         Assert.Same(exception, rejected.Exception);
