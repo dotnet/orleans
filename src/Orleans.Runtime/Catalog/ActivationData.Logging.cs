@@ -199,6 +199,11 @@ internal sealed partial class ActivationData
 
     [LoggerMessage(
         Level = LogLevel.Error,
+        Message = "Error stopping lifecycle for activation '{Activation}'")]
+    private static partial void LogErrorStoppingLifecycle(ILogger logger, Exception exception, ActivationData activation);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
         Message = "Error thrown from {MethodName} for activation '{Activation}'")]
     private static partial void LogErrorInGrainMethod(ILogger logger, Exception exception, string methodName, ActivationData activation);
 

@@ -155,7 +155,7 @@ internal sealed partial class ActivationData
                 }
                 catch (Exception exception)
                 {
-                    LogErrorStartingLifecycle(activation._shared.Logger, exception, activation);
+                    LogErrorStoppingLifecycle(activation._shared.Logger, exception, activation);
 
                     // Swallow the exception and continue with deactivation.
                     encounteredError = true;
