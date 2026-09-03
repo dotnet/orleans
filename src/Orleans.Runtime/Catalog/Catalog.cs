@@ -326,7 +326,7 @@ namespace Orleans.Runtime
                     && grainContext.Address.Equals(activationAddress))
                 {
                     // Deactivate synchronously makes the exact loser unroutable; teardown and deregistration continue asynchronously.
-                    grainContext.Deactivate(deactivationReason);
+                    grainContext.Deactivate(deactivationReason, CancellationToken.None);
                 }
             }
 

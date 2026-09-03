@@ -887,7 +887,8 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
                             await catalog.DeleteActivations(
                                 [.. batch],
                                 DeactivationReasonCode.DuplicateActivation,
-                                "This grain has been activated elsewhere").WaitAsync(cancellationToken);
+                                "This grain has been activated elsewhere",
+                                cancellationToken).WaitAsync(cancellationToken);
                             return true;
                         },
                         false,
