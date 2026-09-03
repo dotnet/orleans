@@ -1,6 +1,7 @@
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
+using System.Reflection;
 using Xunit;
 
 namespace UnitTests.OrleansRuntime.Streams
@@ -98,6 +99,28 @@ namespace UnitTests.OrleansRuntime.Streams
 
             AddAndCheck(block, dataAdapter, 0, -1);
             RemoveAndCheck(block, 0, 0);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public void RemoveAndResetClearPayloadReferences()
+        {
+            var pool = new MyTestPooled();
+            var block = pool.Allocate();
+            var firstPayload = new byte[1024];
+            var secondPayload = new byte[1024];
+            block.Add(new CachedMessage { Segment = new ArraySegment<byte>(firstPayload) });
+            block.Add(new CachedMessage { Segment = new ArraySegment<byte>(secondPayload) });
+            var messages = Assert.IsType<CachedMessage[]>(
+                typeof(CachedMessageBlock)
+                    .GetField("cachedMessages", BindingFlags.Instance | BindingFlags.NonPublic)!
+                    .GetValue(block));
+
+            Assert.True(block.Remove());
+            Assert.Null(messages[0].Segment.Array);
+            Assert.Same(secondPayload, messages[1].Segment.Array);
+
+            block.Dispose();
+            Assert.Null(messages[1].Segment.Array);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
