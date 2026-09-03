@@ -652,10 +652,15 @@ dotnet_diagnostic.RS0027.severity = suggestion
 
 # CA1848: Use the LoggerMessage delegates
 # CA1849: Call async methods when in an async method
-# CA1873: Avoid potentially expensive logging
 [src/{Orleans.Core.Abstractions,Orleans.Core}/**.cs]
 dotnet_diagnostic.CA1848.severity = warning
 dotnet_diagnostic.CA1849.severity = warning
+
+# CA1873: Avoid potentially expensive logging
+[src/Orleans.Core.Abstractions/**.cs]
+dotnet_diagnostic.CA1873.severity = warning
+
+[src/Orleans.Core/**.cs]
 dotnet_diagnostic.CA1873.severity = warning
 
 [src/Orleans.Runtime/Networking/**.cs]
