@@ -49,7 +49,8 @@ public sealed class StreamProcessorGrain(
         await this.RegisterOrUpdateReminder(
             "report-progress",
             dueTime: TimeSpan.FromMinutes(1),
-            period: TimeSpan.FromMinutes(1));
+            period: TimeSpan.FromMinutes(1),
+            cancellationToken: cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
     }
 
