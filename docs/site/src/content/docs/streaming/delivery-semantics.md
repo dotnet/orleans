@@ -53,7 +53,7 @@ A rewindable provider can start or resume a subscription from a provider sequenc
 
 Explicit subscriptions can resume from retained positions according to the provider's token semantics. An implicit subscription accepts a recovery token when an activation attaches its observer, then advances monotonically for that attachment. Once a delivery call completes successfully, resuming the active implicit handle with a sequence token throws <xref:System.InvalidOperationException>; passing `null` replaces the observer at its current position.
 
-See the [provider matrix](stream-providers.md#provider-matrix) for provider capabilities.
+New explicit subscriptions to rewindable persistent streams can also select [a cache-relative start position](subscription-start-positions.md). See the [provider matrix](stream-providers.md#provider-matrix) for provider capabilities.
 
 ## Recovery checklist
 

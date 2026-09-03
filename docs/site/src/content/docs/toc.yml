@@ -138,6 +138,8 @@ items:
         href: streaming/streams-why.md
       - name: Programming APIs
         href: streaming/streams-programming-apis.md
+      - name: Subscription start positions
+        href: streaming/subscription-start-positions.md
       - name: Stream providers
         href: streaming/stream-providers.md
       - name: External producers and consumers

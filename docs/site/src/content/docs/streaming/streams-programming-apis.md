@@ -80,6 +80,8 @@ The subscription belongs to the grain identity, not one activation. After deacti
 
 This lifecycle is durable across cluster restarts only when the configured [`PubSubStore` is durable](pubsub-storage.md). A memory `PubSubStore` preserves records only while that cluster state remains available.
 
+For a rewindable persistent provider, [choose a subscription start position](subscription-start-positions.md) to begin with new messages or replay matching messages retained in the pulling agent's local queue cache.
+
 #### End an explicit subscription
 
 End a subscription by awaiting <xref:Orleans.Streams.StreamSubscriptionHandle`1.UnsubscribeAsync*> for every handle. The streaming runtime removes each subscription from pub/sub storage and notifies active producers before the operation completes. The example's `UnsubscribeAsync` method follows this sequence.
