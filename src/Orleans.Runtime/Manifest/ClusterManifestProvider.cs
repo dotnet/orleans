@@ -527,7 +527,7 @@ namespace Orleans.Runtime.Metadata
                 LogDebugErrorRetrievingSiloManifestByHash(exception, siloAddress);
             }
             var legacyManifestProvider = _grainFactory!.GetSystemTarget<ISiloManifestSystemTarget>(Constants.ManifestProviderType, siloAddress);
-            return await legacyManifestProvider.GetSiloManifest(_shutdownCts.Token);
+            return await legacyManifestProvider.GetSiloManifest(_shutdownCts.Token).AsTask().WaitAsync(_shutdownCts.Token);
         }
 
         [MemberNotNull(nameof(_runTask))]
