@@ -25,6 +25,8 @@
     <ProjectReference Include="$(SourceRoot)src\Orleans.Reminders\Orleans.Reminders.csproj" />
     <PackageReference Include="Azure.Core" />
     <PackageReference Include="Microsoft.Azure.Cosmos" />
+    <PackageReference Include="Polly" />
+    <PackageReference Include="Polly.Extensions" />
   </ItemGroup>
 
   <ItemGroup>

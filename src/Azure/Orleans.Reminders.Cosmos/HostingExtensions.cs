@@ -75,6 +75,7 @@ public static class HostingExtensions
     public static IServiceCollection UseCosmosReminderService(this IServiceCollection services, Action<OptionsBuilder<CosmosReminderTableOptions>> configure)
     {
         services.AddReminders();
+        services.AddCosmosReadRetryPolicy();
         services.AddSingleton<IReminderTable, CosmosReminderTable>();
         configure(services.AddOptions<CosmosReminderTableOptions>());
         services.ConfigureFormatter<CosmosReminderTableOptions>();

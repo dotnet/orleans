@@ -1,6 +1,8 @@
 using System.Net;
 using System.Diagnostics;
 using Orleans.Reminders.Cosmos.Models;
+using Polly;
+using Polly.Registry;
 
 namespace Orleans.Reminders.Cosmos;
 
@@ -15,6 +17,7 @@ internal partial class CosmosReminderTable : IReminderTable
     private readonly IServiceProvider _serviceProvider;
     private readonly Func<ReminderEntity, ReminderEntry> _convertEntityToEntry;
     private readonly ICosmosOperationExecutor _executor;
+    private readonly ResiliencePipeline _readResiliencePipeline;
     private CosmosClient _client = default!;
     private Container _container = default!;
 
@@ -22,7 +25,23 @@ internal partial class CosmosReminderTable : IReminderTable
         ILoggerFactory loggerFactory,
         IServiceProvider serviceProvider,
         IOptions<CosmosReminderTableOptions> options,
-        IOptions<ClusterOptions> clusterOptions)
+        IOptions<ClusterOptions> clusterOptions,
+        ResiliencePipelineProvider<string> resiliencePipelineProvider)
+        : this(
+            loggerFactory,
+            serviceProvider,
+            options,
+            clusterOptions,
+            resiliencePipelineProvider.GetPipeline(CosmosReadRetryPolicy.PipelineKey))
+    {
+    }
+
+    internal CosmosReminderTable(
+        ILoggerFactory loggerFactory,
+        IServiceProvider serviceProvider,
+        IOptions<CosmosReminderTableOptions> options,
+        IOptions<ClusterOptions> clusterOptions,
+        ResiliencePipeline readResiliencePipeline)
     {
         _logger = loggerFactory.CreateLogger<CosmosReminderTable>();
         _serviceProvider = serviceProvider;
@@ -30,6 +49,7 @@ internal partial class CosmosReminderTable : IReminderTable
         _clusterOptions = clusterOptions.Value;
         _convertEntityToEntry = FromEntity;
         _executor = options.Value.OperationExecutor;
+        _readResiliencePipeline = readResiliencePipeline;
     }
 
     public async Task Init()
@@ -73,13 +93,14 @@ internal partial class CosmosReminderTable : IReminderTable
         {
             var pk = new PartitionKey(ReminderEntity.ConstructPartitionKey(_clusterOptions.ServiceId, grainId));
             var requestOptions = new QueryRequestOptions { PartitionKey = pk };
-            var response = await _executor.ExecuteOperation(static args =>
-            {
-                var (self, grainId, requestOptions) = args;
-                var iterator = self._container.GetItemLinqQueryable<ReminderEntity>(requestOptions: requestOptions).ToFeedIterator();
-                return iterator.ToListAsync();
-            },
-            (this, grainId, requestOptions)).ConfigureAwait(false);
+            var response = await ExecuteReadOperation(() =>
+                _executor.ExecuteOperation(static args =>
+                {
+                    var (self, grainId, requestOptions) = args;
+                    var iterator = self._container.GetItemLinqQueryable<ReminderEntity>(requestOptions: requestOptions).ToFeedIterator();
+                    return iterator.ToListAsync();
+                },
+                (this, grainId, requestOptions))).ConfigureAwait(false);
 
             return new ReminderTableData(response.Select(_convertEntityToEntry));
         }
@@ -95,19 +116,20 @@ internal partial class CosmosReminderTable : IReminderTable
     {
         try
         {
-            var response = await _executor.ExecuteOperation(static args =>
-            {
-                var (self, begin, end) = args;
-                var query = self._container.GetItemLinqQueryable<ReminderEntity>()
-                    .Where(entity => entity.ServiceId == self._clusterOptions.ServiceId);
+            var response = await ExecuteReadOperation(() =>
+                _executor.ExecuteOperation(static args =>
+                {
+                    var (self, begin, end) = args;
+                    var query = self._container.GetItemLinqQueryable<ReminderEntity>()
+                        .Where(entity => entity.ServiceId == self._clusterOptions.ServiceId);
 
-                query = begin < end
-                    ? query.Where(r => r.GrainHash > begin && r.GrainHash <= end)
-                    : query.Where(r => r.GrainHash > begin || r.GrainHash <= end);
+                    query = begin < end
+                        ? query.Where(r => r.GrainHash > begin && r.GrainHash <= end)
+                        : query.Where(r => r.GrainHash > begin || r.GrainHash <= end);
 
-                return query.ToFeedIterator().ToListAsync();
-            },
-            (this, begin, end)).ConfigureAwait(false);
+                    return query.ToFeedIterator().ToListAsync();
+                },
+                (this, begin, end))).ConfigureAwait(false);
 
             return new ReminderTableData(response.Select(_convertEntityToEntry));
         }
@@ -125,20 +147,21 @@ internal partial class CosmosReminderTable : IReminderTable
         {
             var pk = new PartitionKey(ReminderEntity.ConstructPartitionKey(_clusterOptions.ServiceId, grainId));
             var id = ReminderEntity.ConstructId(grainId, reminderName);
-            var response = await _executor.ExecuteOperation(async args =>
-            {
-                try
+            var response = await ExecuteReadOperation(() =>
+                _executor.ExecuteOperation(async args =>
                 {
-                    var (self, id, pk) = args;
-                    var result = await self._container.ReadItemAsync<ReminderEntity>(id, pk).ConfigureAwait(false);
-                    return result.Resource;
-                }
-                catch (CosmosException ce) when (ce.StatusCode == HttpStatusCode.NotFound)
-                {
-                    return null;
-                }
-            },
-            (this, id, pk)).ConfigureAwait(false);
+                    try
+                    {
+                        var (self, id, pk) = args;
+                        var result = await self._container.ReadItemAsync<ReminderEntity>(id, pk).ConfigureAwait(false);
+                        return result.Resource;
+                    }
+                    catch (CosmosException ce) when (ce.StatusCode == HttpStatusCode.NotFound)
+                    {
+                        return null;
+                    }
+                },
+                (this, id, pk))).ConfigureAwait(false);
 
             return response != null ? FromEntity(response) : default;
         }
@@ -208,13 +231,14 @@ internal partial class CosmosReminderTable : IReminderTable
     {
         try
         {
-            var entities = await _executor.ExecuteOperation(static self =>
-            {
-                var iterator = self._container.GetItemLinqQueryable<ReminderEntity>()
-                    .Where(entity => entity.ServiceId == self._clusterOptions.ServiceId)
-                    .ToFeedIterator();
-                return iterator.ToListAsync();
-            }, this).ConfigureAwait(false);
+            var entities = await ExecuteReadOperation(() =>
+                _executor.ExecuteOperation(static self =>
+                {
+                    var iterator = self._container.GetItemLinqQueryable<ReminderEntity>()
+                        .Where(entity => entity.ServiceId == self._clusterOptions.ServiceId)
+                        .ToFeedIterator();
+                    return iterator.ToListAsync();
+                }, this)).ConfigureAwait(false);
 
             var deleteTasks = new List<Task>();
             foreach (var entity in entities)
@@ -316,6 +340,12 @@ internal partial class CosmosReminderTable : IReminderTable
             await Task.Delay(1000);
         }
     }
+
+    private Task<TResult> ExecuteReadOperation<TResult>(Func<Task<TResult>> operation) =>
+        _readResiliencePipeline.ExecuteAsync(
+            static (operation, _) => new ValueTask<TResult>(operation()),
+            operation,
+            CancellationToken.None).AsTask();
 
     private ReminderEntry FromEntity(ReminderEntity entity)
     {
