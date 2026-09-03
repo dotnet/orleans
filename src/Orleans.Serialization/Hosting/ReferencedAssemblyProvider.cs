@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyModel;
 using System;
 using System.Buffers;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
 
@@ -23,8 +24,21 @@ namespace Orleans.Serialization.Internal
         public static IEnumerable<Assembly> GetRelevantAssemblies()
         {
             var parts = new HashSet<Assembly>();
+            var entryAssembly = Assembly.GetEntryAssembly();
 
-            AddFromDependencyContext(parts);
+            if (entryAssembly is not null)
+            {
+                AddAssembly(parts, entryAssembly);
+            }
+
+#if NET5_0_OR_GREATER
+            if (AssemblyFilesAvailable)
+            {
+                AddFromDependencyContext(parts, entryAssembly);
+            }
+#else
+            AddFromDependencyContext(parts, entryAssembly);
+#endif
 
 #if NETCOREAPP3_1_OR_GREATER
             AddFromAssemblyLoadContext(parts);
@@ -120,6 +134,9 @@ namespace Orleans.Serialization.Internal
         /// <param name="assembly">
         /// The assembly whose dependency context is inspected, or <see langword="null"/> to use the entry assembly.
         /// </param>
+#if NET5_0_OR_GREATER
+        [RequiresAssemblyFiles("Dependency-context discovery reads assembly files. Use GetRelevantAssemblies for single-file-compatible discovery.")]
+#endif
         public static void AddFromDependencyContext(HashSet<Assembly> parts, Assembly? assembly = null)
         {
             assembly ??= Assembly.GetEntryAssembly();
@@ -192,6 +209,24 @@ namespace Orleans.Serialization.Internal
                 }
             }
         }
+
+#if NET5_0_OR_GREATER
+#if NET9_0_OR_GREATER
+        [FeatureGuard(typeof(RequiresAssemblyFilesAttribute))]
+#endif
+        [UnconditionalSuppressMessage(
+            "SingleFile",
+            "IL3000",
+            Justification = "Assembly.Location is used only as the documented availability check for bundled assembly files.")]
+        internal static bool AssemblyFilesAvailable
+        {
+            get
+            {
+                var assembly = Assembly.GetEntryAssembly() ?? typeof(ReferencedAssemblyProvider).Assembly;
+                return !assembly.IsDynamic && !string.IsNullOrEmpty(assembly.Location);
+            }
+        }
+#endif
 
         private static IEnumerable<Assembly> GetApplicationPartAssemblies(Assembly assembly)
         {
