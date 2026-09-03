@@ -26,7 +26,7 @@ internal class UnixDomainSocketMessageTransportConnector : MessageTransportConne
     public override IFeatureCollection Features { get; } = new FeatureCollection();
 
     /// <inheritdoc/>
-    public override bool IsValid => true;
+    public override bool IsValid => Socket.OSSupportsUnixDomainSockets;
 
     /// <inheritdoc/>
     public override async ValueTask<MessageTransport> CreateAsync(EndPoint endPoint, CancellationToken cancellationToken = default)

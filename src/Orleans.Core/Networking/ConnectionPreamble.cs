@@ -75,6 +75,10 @@ namespace Orleans.Runtime.Messaging
                 Buffers = new (_buffer);
             }
 
+            [System.Diagnostics.CodeAnalysis.SuppressMessage(
+                "Reliability",
+                "CA2000:Dispose objects before losing scope",
+                Justification = "Ownership of the buffer is transferred to the returned preamble write request.")]
             public static PreambleWriteRequest Create(ConnectionPreamble preamble, Serializer<ConnectionPreamble> preambleSerializer, SerializerSessionPool serializerSessionPool)
             {
                 var buffer = new ArcBufferWriter();

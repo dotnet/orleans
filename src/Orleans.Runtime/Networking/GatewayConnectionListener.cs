@@ -62,6 +62,6 @@ namespace Orleans.Runtime.Messaging
         }
 
         Task ILifecycleObserver.OnStart(CancellationToken ct) => Task.Run(() => BindAsync(ct), ct);
-        Task ILifecycleObserver.OnStop(CancellationToken ct) => Task.Run(() => StopAsync(ct), ct);
+        Task ILifecycleObserver.OnStop(CancellationToken ct) => Task.Run(() => StopAsync(ct), CancellationToken.None);
     }
 }

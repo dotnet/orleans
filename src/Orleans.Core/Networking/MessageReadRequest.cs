@@ -108,6 +108,10 @@ internal sealed partial class MessageReadRequest(MessageHandlerShared shared) : 
         return true;
     }
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Reliability",
+        "CA2000:Dispose objects before losing scope",
+        Justification = "The decoded message is transferred to the receiver; failure paths dispose it or transfer it to an error response.")]
     void IThreadPoolWorkItem.Execute()
     {
         Message? message = null;
