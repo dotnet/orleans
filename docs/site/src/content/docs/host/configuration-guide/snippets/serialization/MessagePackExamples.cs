@@ -12,7 +12,7 @@ namespace Orleans.Docs.Snippets.Serialization;
 public class OrderMessage
 {
     [Key(0)]
-    public string OrderId { get; set; } = string.Empty;
+    public required string OrderId { get; set; }
 
     [Key(1)]
     public decimal Amount { get; set; }

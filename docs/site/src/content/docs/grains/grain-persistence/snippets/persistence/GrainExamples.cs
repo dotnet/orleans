@@ -91,7 +91,7 @@ public class MyGrain : Grain<MyGrainState>, IMyGrain
 
 public class MyGrainState
 {
-    public string Data { get; set; } = string.Empty;
+    public required string Data { get; set; }
 }
 
 public interface IMyGrain : IGrainWithStringKey

@@ -3,8 +3,6 @@ using Aspire.Hosting.Azure;
 
 namespace Orleans.Docs.Snippets.Aspire;
 
-#pragma warning disable CS0219 // Variable is assigned but its value is never used
-
 // This file contains examples for Orleans Aspire integration documentation.
 // Each example is wrapped in a region marker and a method to allow compilation.
 
@@ -113,7 +111,7 @@ public static class AppHostExamples
         var redis = builder.AddRedis("orleans-redis");
         // Redis container runs automatically during development
 
-        var orleans = builder.AddOrleans("cluster")
+        builder.AddOrleans("cluster")
             .WithClustering(redis);
 
         // ...
@@ -128,7 +126,7 @@ public static class AppHostExamples
         // Use existing Azure Cache for Redis
         var redis = builder.AddConnectionString("orleans-redis");
 
-        var orleans = builder.AddOrleans("cluster")
+        builder.AddOrleans("cluster")
             .WithClustering(redis);
 
         // ...

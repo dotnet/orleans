@@ -8,8 +8,6 @@
     <!-- Disable SourceLink for git worktree compatibility -->
     <EnableSourceLink>false</EnableSourceLink>
     <EnableSourceControlManagerQueries>false</EnableSourceControlManagerQueries>
-    <!-- Suppress warnings for intentionally unused code in snippets -->
-    <NoWarn>$(NoWarn);CS0168;CS0219</NoWarn>
   </PropertyGroup>
   
   <!-- Centralized package versions for Orleans 10.2.2 -->

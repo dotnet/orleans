@@ -59,7 +59,7 @@ public class MyForeignLibraryType
 {
     public MyForeignLibraryType() { }
 
-    public MyForeignLibraryType(int num, string str, DateTimeOffset dto)
+    public MyForeignLibraryType(int num, string? str, DateTimeOffset dto)
     {
         Num = num;
         String = str;
@@ -67,7 +67,7 @@ public class MyForeignLibraryType
     }
 
     public int Num { get; set; }
-    public string String { get; set; } = string.Empty;
+    public string? String { get; set; }
     public DateTimeOffset DateTimeOffset { get; set; }
 }
 
@@ -79,7 +79,7 @@ public struct MyForeignLibraryTypeSurrogate
     public int Num;
 
     [Id(1)]
-    public string String;
+    public string? String;
 
     [Id(2)]
     public DateTimeOffset DateTimeOffset;
@@ -121,7 +121,7 @@ public sealed class DerivedFromMyForeignLibraryType : MyForeignLibraryType
     public DerivedFromMyForeignLibraryType() { }
 
     public DerivedFromMyForeignLibraryType(
-        int intValue, int num, string str, DateTimeOffset dto) : base(num, str, dto)
+        int intValue, int num, string? str, DateTimeOffset dto) : base(num, str, dto)
     {
         IntValue = intValue;
     }
