@@ -96,11 +96,15 @@ internal sealed class DisseminationNamespaceOptionsValidator
 internal sealed class DeploymentLoadPublisherOptionsValidator : IValidateOptions<DeploymentLoadPublisherOptions>
 {
     public ValidateOptionsResult Validate(string? name, DeploymentLoadPublisherOptions options) =>
-        DisseminationNamespaceOptionsValidator.Validate(nameof(DeploymentLoadPublisherOptions.Dissemination), options.Dissemination);
+        DisseminationNamespaceOptionsValidator.Validate(
+            $"{nameof(DeploymentLoadPublisherOptions)}.{nameof(DeploymentLoadPublisherOptions.Dissemination)}",
+            options.Dissemination);
 }
 
 internal sealed class ClusterMembershipOptionsDisseminationValidator : IValidateOptions<ClusterMembershipOptions>
 {
     public ValidateOptionsResult Validate(string? name, ClusterMembershipOptions options) =>
-        DisseminationNamespaceOptionsValidator.Validate(nameof(ClusterMembershipOptions.Dissemination), options.Dissemination);
+        DisseminationNamespaceOptionsValidator.Validate(
+            $"{nameof(ClusterMembershipOptions)}.{nameof(ClusterMembershipOptions.Dissemination)}",
+            options.Dissemination);
 }

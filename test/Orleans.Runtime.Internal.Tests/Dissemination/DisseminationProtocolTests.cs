@@ -3055,7 +3055,28 @@ public class DisseminationProtocolTests
 
         var result = new DeploymentLoadPublisherOptionsValidator().Validate(Options.DefaultName, options);
 
-        Assert.True(result.Failed);
+        Assert.Equal(
+            [
+                $"{nameof(DeploymentLoadPublisherOptions)}.{nameof(DeploymentLoadPublisherOptions.Dissemination)}."
+                + $"{nameof(DisseminationNamespaceOptions.StaleItemTtl)} must be greater than 0.",
+            ],
+            result.Failures);
+    }
+
+    [Fact]
+    public void ClusterMembershipNamespaceOptionsValidatorIncludesOwningOptionsType()
+    {
+        var options = new ClusterMembershipOptions();
+        options.Dissemination.MaxPayloadBytes = 0;
+
+        var result = new ClusterMembershipOptionsDisseminationValidator().Validate(Options.DefaultName, options);
+
+        Assert.Equal(
+            [
+                $"{nameof(ClusterMembershipOptions)}.{nameof(ClusterMembershipOptions.Dissemination)}."
+                + $"{nameof(DisseminationNamespaceOptions.MaxPayloadBytes)} must be greater than 0.",
+            ],
+            result.Failures);
     }
 
     [Theory]
