@@ -5,6 +5,10 @@
 
   <Import Project="$(_ParentDirectoryBuildTargetsPath)" Condition="Exists('$(_ParentDirectoryBuildTargetsPath)')"/>
 
+  <PropertyGroup Condition="'$(IsPackable)' == 'true' and '$(GenerateDocumentationFile)' == 'true'">
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+
   <ItemGroup>
     <CompilerVisibleProperty Include="EnableOrleansContractsAnalyzer" />
     <CompilerVisibleProperty Include="OrleansContractsPath" />
