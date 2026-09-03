@@ -99,7 +99,8 @@ public abstract class StreamPartitionReadCheckpointBenchmark(string invariant, s
                 "ProviderId-0",
                 _partitionIds[i % PartitionCount],
                 afterMessageId: 0,
-                BatchSize);
+                BatchSize,
+                cancellationToken);
             _consumer.Consume(messages);
         });
     }
