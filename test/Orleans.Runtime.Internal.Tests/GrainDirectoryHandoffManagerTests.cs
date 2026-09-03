@@ -823,7 +823,8 @@ public class GrainDirectoryHandoffManagerTests
         catalogA.DeleteActivations(
                 Arg.Any<List<GrainAddress>>(),
                 Arg.Any<DeactivationReasonCode>(),
-                Arg.Any<string>())
+                Arg.Any<string>(),
+                Arg.Any<CancellationToken>())
             .Returns(async call =>
             {
                 Interlocked.Increment(ref catalogAInvocationCount);
@@ -837,7 +838,8 @@ public class GrainDirectoryHandoffManagerTests
         catalogB.DeleteActivations(
                 Arg.Any<List<GrainAddress>>(),
                 Arg.Any<DeactivationReasonCode>(),
-                Arg.Any<string>())
+                Arg.Any<string>(),
+                Arg.Any<CancellationToken>())
             .Returns(async call =>
             {
                 Interlocked.Increment(ref catalogBInvocationCount);
@@ -1004,7 +1006,8 @@ public class GrainDirectoryHandoffManagerTests
         deadCatalog.DeleteActivations(
                 Arg.Any<List<GrainAddress>>(),
                 Arg.Any<DeactivationReasonCode>(),
-                Arg.Any<string>())
+                Arg.Any<string>(),
+                Arg.Any<CancellationToken>())
             .Returns(_ =>
             {
                 Interlocked.Increment(ref deadDeletionCount);
@@ -1013,7 +1016,8 @@ public class GrainDirectoryHandoffManagerTests
         stoppingCatalog.DeleteActivations(
                 Arg.Any<List<GrainAddress>>(),
                 Arg.Any<DeactivationReasonCode>(),
-                Arg.Any<string>())
+                Arg.Any<string>(),
+                Arg.Any<CancellationToken>())
             .Returns(_ =>
             {
                 Interlocked.Increment(ref stoppingDeletionCount);
@@ -1022,7 +1026,8 @@ public class GrainDirectoryHandoffManagerTests
         activeCatalog.DeleteActivations(
                 Arg.Any<List<GrainAddress>>(),
                 Arg.Any<DeactivationReasonCode>(),
-                Arg.Any<string>())
+                Arg.Any<string>(),
+                Arg.Any<CancellationToken>())
             .Returns(async call =>
             {
                 Interlocked.Increment(ref activeDeletionCount);
