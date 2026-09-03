@@ -1,3 +1,4 @@
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Serialization;
@@ -149,6 +150,28 @@ public sealed class DurableEnvelopeContractTests : IDisposable
         Assert.False(envelope.Data.TryGetContextBytes("absent", out var absent));
         Assert.True(absent.IsEmpty);
 
+    }
+
+    [Fact]
+    public void EnvelopeData_DeepCopyOwnsContextIndexMap()
+    {
+        var envelope = new DurableEnvelopeBuilder(_sessions, GrainId.Create("sender", "copy"))
+            .To(GrainId.Create("receiver", "copy"), "copy")
+            .WithContextValue("tenant", "northwind")
+            .WithBody(new TestMessage(42, "copy"))
+            .Build();
+        var copy = _services.GetRequiredService<DeepCopier>().Copy(envelope);
+        var field = typeof(DurableEnvelopeData).GetField(
+            "_contextIndices",
+            BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var originalIndices = Assert.IsType<Dictionary<string, (int Offset, int Length)>>(
+            field.GetValue(envelope.Data));
+        var copiedIndices = Assert.IsType<Dictionary<string, (int Offset, int Length)>>(
+            field.GetValue(copy.Data));
+
+        Assert.NotSame(originalIndices, copiedIndices);
+        originalIndices.Add("mutated-after-copy", default);
+        Assert.False(copy.Data.HasContextKey("mutated-after-copy"));
     }
 
     [Fact]
