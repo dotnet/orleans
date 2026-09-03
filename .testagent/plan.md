@@ -230,17 +230,18 @@ For every submitted request, assert the complete `TransactItems` shape and `Canc
 9. `ConvertUpdate_DuplicateGeneratedAndExtraValueKey_ThrowsArgumentException`
 10. `ConvertUpdate_DuplicateGeneratedAndConditionValueKey_ThrowsArgumentException`
 11. `ConvertUpdate_DuplicateExtraAndConditionValueKey_ThrowsArgumentException`
-12. `ConvertUpdate_EmptyFieldsWithoutExtraExpression_ReturnsCurrentSECharacterization`
-   - Assert exactly `"SE"` and identify this as characterization, not a valid DynamoDB expression.
-13. `UpsertEntryAsync_BlankCondition_SubmitsUnconditionalUpdateShape`
+12. `ConvertUpdate_NullFields_ThrowsArgumentNullException`
+13. `ConvertUpdate_EmptyFields_ThrowsArgumentException`
+   - Assert the non-null, non-empty field invariant before expression construction.
+14. `UpsertEntryAsync_BlankCondition_SubmitsUnconditionalUpdateShape`
    - Assert exact table/key/update expression, absent condition expression, merged expression values, and exact token.
-14. `UpsertEntryAsync_NonblankCondition_SubmitsConditionalUpdateShape`
+15. `UpsertEntryAsync_NonblankCondition_SubmitsConditionalUpdateShape`
    - Assert exact condition text and condition values in `UpdateItemRequest`.
-15. `UpsertEntryAsync_ResponseAttributes_ReplacesExistingKeysAndAddsNewKeys`
+16. `UpsertEntryAsync_ResponseAttributes_ReplacesExistingKeysAndAddsNewKeys`
    - Return one replacement and one new key; assert both values in the caller-visible dictionary.
-16. `UpsertEntryAsync_ConversionFailure_ThrowsBeforeClientCall`
-17. `UpsertEntryAsync_AmazonServiceFailure_RethrowsSameException`
-18. `UpsertEntryAsync_CanceledClientTask_PropagatesCancellationAndToken`
+17. `UpsertEntryAsync_ConversionFailure_ThrowsBeforeClientCall`
+18. `UpsertEntryAsync_AmazonServiceFailure_RethrowsSameException`
+19. `UpsertEntryAsync_CanceledClientTask_PropagatesCancellationAndToken`
 
 The existing emulator-backed `DynamoDBDataManager_UpsertItemAsync` remains the server-semantics evidence for ETag conditional success/failure; do not duplicate it here.
 

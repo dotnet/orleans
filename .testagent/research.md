@@ -118,7 +118,7 @@ Assert identity/order in the captured request. Emulator validation of an empty t
 3. Extra values independently branch null, empty, or populated.
 4. Condition values independently branch null, empty, or populated.
 5. Duplicate keys across generated placeholders, extra values, or condition values throw `ArgumentException` from `Dictionary.Add`.
-6. Empty fields plus no extra currently returns `"SE"` because the final character is removed from `"SET"`; characterize it or record a production defect rather than pretending it is valid.
+6. Empty fields plus no extra previously returned invalid expression `"SE"`; enforce the non-null, non-empty field invariant with explicit argument exceptions.
 7. `UpsertEntryAsync` branches on blank/nonblank condition expression and merges response attributes by replacing existing keys or adding new keys.
 8. Conversion, conditional, and AWS failures propagate. Existing emulator test `DynamoDBDataManager_UpsertItemAsync` already verifies real ETag conditional success/failure.
 

@@ -1128,14 +1128,26 @@ public sealed class DynamoDBStorageUnitTests
     }
 
     [Fact]
-    public void ConvertUpdate_EmptyFieldsWithoutExtraExpression_ReturnsCurrentSECharacterization()
+    public void ConvertUpdate_NullFields_ThrowsArgumentNullException()
     {
         var (storage, client) = CreateStorage();
 
-        var (expression, values) = storage.ConvertUpdate([]);
+        var exception = Assert.Throws<ArgumentNullException>(() => storage.ConvertUpdate(null!));
 
-        Assert.Equal("SE", expression);
-        Assert.Empty(values);
+        Assert.Equal("fields", exception.ParamName);
+        Assert.Empty(client.Calls);
+        client.AssertAllScriptsConsumed();
+    }
+
+    [Fact]
+    public void ConvertUpdate_EmptyFields_ThrowsArgumentException()
+    {
+        var (storage, client) = CreateStorage();
+
+        var exception = Assert.Throws<ArgumentException>(() => storage.ConvertUpdate([]));
+
+        Assert.Equal("fields", exception.ParamName);
+        Assert.Equal("At least one field is required. (Parameter 'fields')", exception.Message);
         Assert.Empty(client.Calls);
         client.AssertAllScriptsConsumed();
     }

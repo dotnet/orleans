@@ -5,8 +5,8 @@
 - **Issue slice**: #10861 deterministic `DynamoDBStorage` mutation and table-update paths.
 - **Production target**: `src/AWS/Shared/Storage/DynamoDBStorage.cs`.
 - **Test file**: `test/Transactions/Orleans.Transactions.DynamoDB.Test/DynamoDBStorageUnitTests.cs`.
-- **Result**: 72 credential-free BVT cases pass on `net8.0` and `net10.0`.
-- **Production changes**: none.
+- **Result**: 73 credential-free BVT cases pass on `net8.0` and `net10.0`.
+- **Production changes**: `ConvertUpdate` now enforces its non-null, non-empty field invariant before constructing an update expression.
 
 ## Implemented coverage
 
@@ -27,9 +27,9 @@ The tests use the public `Orleans.Transactions.DynamoDB.DynamoDBStorage` product
 
 | Command | Result |
 |---|---|
-| `dotnet test --project test\Transactions\Orleans.Transactions.DynamoDB.Test\Orleans.Transactions.DynamoDB.Test.csproj --framework net10.0 --filter-query "/[(Provider=DynamoDB)&(Suite=BVT)&(Area=Transactions)&(Category=DynamoDBStorage)]" --minimum-expected-tests 72 --max-parallel-test-modules 1` | Exit 0; 72 passed |
-| `dotnet test --project test\Transactions\Orleans.Transactions.DynamoDB.Test\Orleans.Transactions.DynamoDB.Test.csproj --framework net8.0 --filter-query "/[(Provider=DynamoDB)&(Suite=BVT)&(Area=Transactions)&(Category=DynamoDBStorage)]" --minimum-expected-tests 72 --max-parallel-test-modules 1` | Exit 0; 72 passed |
-| `.github\scripts\invoke-coverage.ps1` wrapping the focused `net10.0` run | Exit 0; 72 passed; Cobertura generated |
+| `dotnet test --project test\Transactions\Orleans.Transactions.DynamoDB.Test\Orleans.Transactions.DynamoDB.Test.csproj --framework net10.0 --filter-query "/[(Provider=DynamoDB)&(Suite=BVT)&(Area=Transactions)&(Category=DynamoDBStorage)]" --minimum-expected-tests 73 --max-parallel-test-modules 1` | Exit 0; 73 passed |
+| `dotnet test --project test\Transactions\Orleans.Transactions.DynamoDB.Test\Orleans.Transactions.DynamoDB.Test.csproj --framework net8.0 --filter-query "/[(Provider=DynamoDB)&(Suite=BVT)&(Area=Transactions)&(Category=DynamoDBStorage)]" --minimum-expected-tests 73 --max-parallel-test-modules 1` | Exit 0; 73 passed |
+| `.github\scripts\invoke-coverage.ps1` wrapping the focused `net10.0` run | Exit 0; 73 passed; Cobertura generated |
 | `dotnet build Orleans.slnx -bl` | Exit 0 |
 
 ## Focused coverage
@@ -41,7 +41,7 @@ The tests use the public `Orleans.Transactions.DynamoDB.DynamoDBStorage` product
 | `PutEntriesAsync` | 0% | 100% | 100% | 6 |
 | `WriteTxAsync` component overload | 65.5% | 100% | 100% | 16 |
 | `WriteTxAsync` list overload | partial | 100% | no branches | 1 |
-| `ConvertUpdate` | 69.7% | 100% | 100% | 16 |
+| `ConvertUpdate` | 69.7% | 100% | 100% | 18 |
 | `TableUpdateTtlAsync` | partial | 100% | 100% | 8 |
 | `TableCreateSecondaryIndex` | partial | 100% | no branches | 1 |
 | `UpsertEntryAsync` | 90.0% | 100% | 100% | 6 |
@@ -68,8 +68,8 @@ All six behavioral mutations were killed. A separate null-guard mutation was rej
 
 ## Assertion-quality review
 
-- 67 test methods produce 72 cases.
-- 257 direct xUnit assertion call sites are present, plus shared call-order and seven-queue script-consumption assertions.
+- 68 test methods produce 73 cases.
+- 261 direct xUnit assertion call sites are present, plus 26 shared call-order checks and seven-queue script-consumption assertions in all 68 methods.
 - Every test has meaningful direct or helper-backed assertions.
 - No test is assertion-free, trivial-only, self-referential, skipped, or timing-dependent.
 - The suite uses equality, Boolean, null, exception, string, collection, negative, state/side-effect, and structural/deep assertions.
@@ -80,7 +80,7 @@ All six behavioral mutations were killed. A separate null-guard mutation was rej
 
 | Requirement | Evidence |
 |---|---|
-| "Complete its focused tests/coverage/build" | 72 passing cases on both TFMs, focused Cobertura metrics above, and `dotnet build Orleans.slnx -bl` exit 0 |
-| "finish only the already-started DynamoDBStorageUnitTests provider coverage slice" | Only `DynamoDBStorageUnitTests.cs` and the required `.testagent` artifacts are included; production has no diff |
+| "Complete its focused tests/coverage/build" | 73 passing cases on both TFMs, focused Cobertura metrics above, and `dotnet build Orleans.slnx -bl` exit 0 |
+| "finish only the already-started DynamoDBStorageUnitTests provider coverage slice" | `DynamoDBStorageUnitTests.cs`, the tightly coupled `ConvertUpdate` invariant fix, and the required `.testagent` artifacts are included |
 | Deterministic mutation/storage paths | Exact tests listed under Implemented coverage; no emulator or credentials used |
 | Mutation/assertion review | Six empirically killed mutations and the assertion-quality findings above |
