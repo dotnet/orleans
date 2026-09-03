@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Runtime;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -26,6 +27,14 @@ namespace UnitTests.General;
 [TestArea("Runtime")]
 public class StatelessWorkerActivationTests : IClassFixture<StatelessWorkerActivationTests.Fixture>
 {
+    [Fact]
+    public void MayInterleaveConfigurator_IsAppliedToEveryWorkerActivation()
+    {
+        var configurator = new MayInterleaveConfigurator(mayInterleavePredicate: null);
+
+        Assert.IsAssignableFrom<IConfigureGrainContextPerActivation>(configurator);
+    }
+
     public class Fixture : BaseTestClusterFixture
     {
         protected override void ConfigureTestCluster(TestClusterBuilder builder)

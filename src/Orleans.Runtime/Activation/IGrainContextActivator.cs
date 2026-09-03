@@ -350,7 +350,7 @@ namespace Orleans.Runtime
         public bool Invoke(object instance, IInvokable bodyObject) => _mayInterleavePredicate((T)instance, bodyObject);
     }
 
-    internal class MayInterleaveConfigurator : IConfigureGrainContext
+    internal class MayInterleaveConfigurator : IConfigureGrainContextPerActivation
     {
         private readonly IMayInterleavePredicate? _mayInterleavePredicate;
 
