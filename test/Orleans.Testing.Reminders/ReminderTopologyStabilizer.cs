@@ -80,9 +80,9 @@ public static class ReminderTopologyStabilizer
                 await Task.WhenAll(reminderServices.Select(service =>
                     service.TestOnlyWaitForSiloStatusListeners(cancellationToken)));
 
-                phase = "stable topology refresh";
-                var refreshes = reminderServices.Select(service => service.TestOnlyRefresh()).ToArray();
-                await Task.WhenAll(refreshes).WaitAsync(cancellationToken);
+                phase = "stable topology refresh start";
+                var refreshesStarted = reminderServices.Select(service => service.TestOnlyStartRefresh()).ToArray();
+                await Task.WhenAll(refreshesStarted).WaitAsync(cancellationToken);
 
                 phase = "latest reminder reconciliation";
                 var reconciliations = reminderServices.Select(service =>

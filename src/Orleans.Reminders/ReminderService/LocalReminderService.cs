@@ -392,8 +392,28 @@ namespace Orleans.Runtime.ReminderService
             return task;
         }
 
-        internal Task TestOnlyRefresh()
-            => this.QueueTask(() => TrackReconciliation(ReadAndUpdateReminders));
+        internal Task TestOnlyStartRefresh() => QueueRefresh();
+
+        internal Task TestOnlyRefresh() => QueueRefresh().Unwrap();
+
+        private Task<Task> QueueRefresh()
+        {
+            var refreshStarted = new TaskCompletionSource<Task>(TaskCreationOptions.RunContinuationsAsynchronously);
+            _ = this.QueueAction(
+                static state =>
+                {
+                    try
+                    {
+                        state.RefreshStarted.SetResult(state.Service.TrackReconciliation(state.Service.ReadAndUpdateReminders));
+                    }
+                    catch (Exception exception)
+                    {
+                        state.RefreshStarted.SetException(exception);
+                    }
+                },
+                (Service: this, RefreshStarted: refreshStarted));
+            return refreshStarted.Task;
+        }
 
         internal Task TestOnlyWaitForSiloStatusListeners(CancellationToken cancellationToken)
             => _siloStatusListenerManager.TestOnlyWaitForCurrentMembershipVersion(cancellationToken);
