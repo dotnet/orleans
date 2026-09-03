@@ -50,6 +50,7 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
         "# Details: https://aka.ms/orleans/OrleansContracts.txt"
     ];
 
+    /// <inheritdoc/>
     public sealed override ImmutableArray<string> FixableDiagnosticIds => ImmutableArray.Create(
         GrainInterfaceVersionAnalyzer.RuleId0016,  // Interface not declared
         GrainInterfaceVersionAnalyzer.RuleId0017,  // Version mismatch
@@ -60,8 +61,10 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
         GrainInterfaceVersionAnalyzer.RuleId0023,  // Grain class alias mismatch
         GrainInterfaceVersionAnalyzer.RuleId0024); // Removed grain class not retired
 
+    /// <inheritdoc/>
     public sealed override FixAllProvider GetFixAllProvider() => OrleansContractsFixAllProvider.Instance;
 
+    /// <inheritdoc/>
     public sealed override Task RegisterCodeFixesAsync(CodeFixContext context)
     {
         var validDiagnostics = context.Diagnostics.Where(HasRequiredProperties).ToImmutableArray();
