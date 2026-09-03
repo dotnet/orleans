@@ -51,7 +51,6 @@ namespace Orleans.Streams
         private Task? _shutdownTask;
         private StreamSequenceToken? _lastReadToken;
         private bool _useLegacyDeliveryProgress;
-        private int _hasUnprocessedRead;
         private bool IsShutdown => timer is null;
         private string StatisticUniquePostfix => $"{streamProviderName}.{QueueId}";
 
@@ -188,7 +187,6 @@ namespace Orleans.Streams
             _activePumpTask = Task.CompletedTask;
             _lastReadToken = null;
             _useLegacyDeliveryProgress = false;
-            Volatile.Write(ref _hasUnprocessedRead, 0);
             lastTimeCleanedPubSubCache = _timeProvider.GetUtcNow().UtcDateTime;
 
             try
@@ -298,7 +296,7 @@ namespace Orleans.Streams
             await drainTask;
 
             // All accepted work has finished progress bookkeeping and released its batch/registration pins.
-            if (!hasPendingRegistrations && Volatile.Read(ref _hasUnprocessedRead) == 0)
+            if (!hasPendingRegistrations)
             {
                 NotifyDeliveryProgress();
             }
@@ -1142,7 +1140,6 @@ namespace Orleans.Streams
                 if (!accountedFor)
                 {
                     _useLegacyDeliveryProgress = true;
-                    Volatile.Write(ref _hasUnprocessedRead, 1);
                 }
             }
 
@@ -1545,7 +1542,7 @@ namespace Orleans.Streams
 
             async Task SubscribeWithIsolation(PubSubSubscriptionState item)
             {
-                if (IsShutdown)
+                if (IsShutdown || cancellationToken.IsCancellationRequested)
                 {
                     return;
                 }
