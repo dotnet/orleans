@@ -6,7 +6,7 @@ using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime;
 
-[Reentrant]
+[GrainType("interclusterrelay"), Reentrant]
 internal sealed class InterClusterRelayGrain(IInterClusterRequestReceiver receiver) : Grain, IInterClusterRelay
 {
     public ValueTask<Response> Forward(
