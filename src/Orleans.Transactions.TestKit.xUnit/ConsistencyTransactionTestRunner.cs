@@ -4,16 +4,26 @@ using Xunit;
 
 namespace Orleans.Transactions.TestKit.xUnit
 {
+    /// <inheritdoc cref="ConsistencyTransactionTestRunner"/>
     public abstract class ConsistencyTransactionTestRunnerxUnit : ConsistencyTransactionTestRunner
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ConsistencyTransactionTestRunnerxUnit"/> class.
+        /// </summary>
+        /// <param name="grainFactory">The grain factory used to access test grains.</param>
+        /// <param name="output">The xUnit test output helper.</param>
         public ConsistencyTransactionTestRunnerxUnit(IGrainFactory grainFactory, ITestOutputHelper output)
             :base(grainFactory, output.WriteLine)
         {
         }
 
+        /// <inheritdoc cref="ConsistencyTransactionTestRunner.StorageAdaptorHasLimitedCommitSpace"/>
         protected override bool StorageAdaptorHasLimitedCommitSpace => true;
+
+        /// <inheritdoc cref="ConsistencyTransactionTestRunner.StorageErrorInjectionActive"/>
         protected override bool StorageErrorInjectionActive => true;
 
+        /// <inheritdoc cref="ConsistencyTransactionTestRunner.RandomizedConsistency(int, int, bool, bool, ReadWriteDetermination)"/>
         [Theory]
         // high congestion
         [InlineData(2, 2, true, true, ReadWriteDetermination.PerGrain)]

@@ -3,12 +3,19 @@ using Xunit;
 
 namespace Orleans.Transactions.TestKit.xUnit
 {
+    /// <inheritdoc cref="GrainFaultTransactionTestRunner"/>
     public class GrainFaultTransactionTestRunnerxUnit : GrainFaultTransactionTestRunner
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="GrainFaultTransactionTestRunnerxUnit"/> class.
+        /// </summary>
+        /// <param name="grainFactory">The grain factory used to access test grains.</param>
+        /// <param name="output">The xUnit test output helper.</param>
         public GrainFaultTransactionTestRunnerxUnit(IGrainFactory grainFactory, ITestOutputHelper output)
         : base(grainFactory, output.WriteLine)
         { }
 
+        /// <inheritdoc cref="GrainFaultTransactionTestRunner.AbortTransactionOnExceptions(string)"/>
         [Theory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
@@ -18,6 +25,7 @@ namespace Orleans.Transactions.TestKit.xUnit
             return base.AbortTransactionOnExceptions(grainStates);
         }
 
+        /// <inheritdoc cref="GrainFaultTransactionTestRunner.AbortTransactionOnReadOnlyViolatedException(string)"/>
         [Theory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
@@ -27,6 +35,7 @@ namespace Orleans.Transactions.TestKit.xUnit
             return base.AbortTransactionOnReadOnlyViolatedException(grainStates);
         }
 
+        /// <inheritdoc cref="GrainFaultTransactionTestRunner.MultiGrainAbortTransactionOnExceptions(string)"/>
         [Theory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
@@ -36,6 +45,7 @@ namespace Orleans.Transactions.TestKit.xUnit
             return base.MultiGrainAbortTransactionOnExceptions(grainStates);
         }
 
+        /// <inheritdoc cref="GrainFaultTransactionTestRunner.AbortTransactionExceptionInnerExceptionOnlyContainsOneRootCauseException(string)"/>
         [Theory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
@@ -45,6 +55,7 @@ namespace Orleans.Transactions.TestKit.xUnit
             return base.AbortTransactionExceptionInnerExceptionOnlyContainsOneRootCauseException(grainStates);
         }
 
+        /// <inheritdoc cref="GrainFaultTransactionTestRunner.AbortTransactionOnOrphanCalls(string)"/>
         [Theory()]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
