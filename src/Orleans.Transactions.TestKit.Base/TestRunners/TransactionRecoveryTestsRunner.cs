@@ -16,6 +16,9 @@ using Orleans.Transactions.TestKit.Correctnesss;
 
 namespace Orleans.Transactions.TestKit
 {
+    /// <summary>
+    /// Runs transaction recovery scenarios which interrupt silos or transaction protocol phases.
+    /// </summary>
     public partial class TransactionRecoveryTestsRunner : TransactionTestRunnerBase
     {
         private static readonly TimeSpan FailureDetectionSchedulingMargin = TimeSpan.FromSeconds(15);
@@ -26,6 +29,10 @@ namespace Orleans.Transactions.TestKit
         private readonly TimeSpan failureDetectionTimeout;
         private readonly TimeSpan recoveryTimeout;
 
+        /// <summary>
+        /// Writes a timestamped message to the test output and the runner logger.
+        /// </summary>
+        /// <param name="message">The message to write.</param>
         protected void Log(string message)
         {
             this.testOutput($"[{DateTime.Now}] {message}");
@@ -94,6 +101,11 @@ namespace Orleans.Transactions.TestKit
             int LastTransactionIndex,
             TimeSpan Elapsed);
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TransactionRecoveryTestsRunner"/> class.
+        /// </summary>
+        /// <param name="testCluster">The test cluster whose silos and grains are used by recovery scenarios.</param>
+        /// <param name="testOutput">The callback used to write test output.</param>
         public TransactionRecoveryTestsRunner(TestCluster testCluster, Action<string> testOutput)
             : base(testCluster.GrainFactory!, testOutput) // Transaction test clusters initialize a client.
         {
@@ -111,6 +123,12 @@ namespace Orleans.Transactions.TestKit
                 this.failureDetectionTimeout + TransactionalStateOptions.DefaultRemoteTransactionPingFrequency;
         }
 
+        /// <summary>
+        /// Verifies transaction recovery after gracefully stopping a randomly selected silo.
+        /// </summary>
+        /// <param name="transactionTestGrainClassName">The class name of the transaction test grain.</param>
+        /// <param name="concurrent">The number of concurrent transaction groups.</param>
+        /// <returns>A task which represents the recovery test.</returns>
         public virtual Task TransactionWillRecoverAfterRandomSiloGracefulShutdown(string transactionTestGrainClassName, int concurrent)
             => TransactionWillRecoverAfterRandomSiloFailure(
                 transactionTestGrainClassName,
@@ -123,6 +141,7 @@ namespace Orleans.Transactions.TestKit
         /// <param name="transactionTestGrainClassName">The transaction test grain class name.</param>
         /// <param name="concurrent">The number of concurrent transaction groups.</param>
         /// <param name="cancellationToken">A token which cancels the recovery test.</param>
+        /// <returns>A task which represents the recovery test.</returns>
         public virtual Task TransactionWillRecoverAfterRandomSiloGracefulShutdown(
             string transactionTestGrainClassName,
             int concurrent,
@@ -135,6 +154,12 @@ namespace Orleans.Transactions.TestKit
                 cancellationToken);
         }
 
+        /// <summary>
+        /// Verifies transaction recovery after abruptly stopping a randomly selected silo.
+        /// </summary>
+        /// <param name="transactionTestGrainClassName">The class name of the transaction test grain.</param>
+        /// <param name="concurrent">The number of concurrent transaction groups.</param>
+        /// <returns>A task which represents the recovery test.</returns>
         public virtual Task TransactionWillRecoverAfterRandomSiloUnGracefulShutdown(string transactionTestGrainClassName, int concurrent)
             => TransactionWillRecoverAfterRandomSiloFailure(
                 transactionTestGrainClassName,
@@ -147,6 +172,7 @@ namespace Orleans.Transactions.TestKit
         /// <param name="transactionTestGrainClassName">The transaction test grain class name.</param>
         /// <param name="concurrent">The number of concurrent transaction groups.</param>
         /// <param name="cancellationToken">A token which cancels the recovery test.</param>
+        /// <returns>A task which represents the recovery test.</returns>
         public virtual Task TransactionWillRecoverAfterRandomSiloUnGracefulShutdown(
             string transactionTestGrainClassName,
             int concurrent,
@@ -162,6 +188,8 @@ namespace Orleans.Transactions.TestKit
         /// <summary>
         /// Verifies recovery when the transaction manager activation is terminated while waiting for remote prepares.
         /// </summary>
+        /// <param name="transactionTestGrainClassName">The class name of the transaction test grain.</param>
+        /// <returns>A task which represents the recovery test.</returns>
         public Task TransactionWillRecoverAfterManagerWait(string transactionTestGrainClassName)
             => TransactionWillRecoverAfterTargetedPhase(
                 transactionTestGrainClassName,
@@ -171,6 +199,8 @@ namespace Orleans.Transactions.TestKit
         /// <summary>
         /// Verifies recovery when a remote participant activation is terminated after persisting its prepare.
         /// </summary>
+        /// <param name="transactionTestGrainClassName">The class name of the transaction test grain.</param>
+        /// <returns>A task which represents the recovery test.</returns>
         public Task TransactionWillRecoverAfterRemotePreparePersisted(string transactionTestGrainClassName)
             => TransactionWillRecoverAfterTargetedPhase(
                 transactionTestGrainClassName,
@@ -180,6 +210,8 @@ namespace Orleans.Transactions.TestKit
         /// <summary>
         /// Verifies recovery when the transaction manager activation is terminated after its commit is durable.
         /// </summary>
+        /// <param name="transactionTestGrainClassName">The class name of the transaction test grain.</param>
+        /// <returns>A task which represents the recovery test.</returns>
         public Task TransactionWillRecoverAfterLocalCommitStored(string transactionTestGrainClassName)
             => TransactionWillRecoverAfterTargetedPhase(
                 transactionTestGrainClassName,
@@ -343,6 +375,13 @@ namespace Orleans.Transactions.TestKit
         private static long GetDeadline(TimeSpan timeout)
             => Stopwatch.GetTimestamp() + (long)(timeout.TotalSeconds * Stopwatch.Frequency);
 
+        /// <summary>
+        /// Verifies transaction recovery after stopping a randomly selected silo.
+        /// </summary>
+        /// <param name="transactionTestGrainClassName">The class name of the transaction test grain.</param>
+        /// <param name="concurrent">The number of concurrent transaction groups.</param>
+        /// <param name="gracefulShutdown">Whether to stop the silo gracefully.</param>
+        /// <returns>A task which represents the recovery test.</returns>
         protected virtual Task TransactionWillRecoverAfterRandomSiloFailure(
             string transactionTestGrainClassName,
             int concurrent,
@@ -360,6 +399,7 @@ namespace Orleans.Transactions.TestKit
         /// <param name="concurrent">The number of concurrent transaction groups.</param>
         /// <param name="gracefulShutdown">Whether to stop the silo gracefully.</param>
         /// <param name="cancellationToken">A token which cancels the recovery test.</param>
+        /// <returns>A task which represents the recovery test.</returns>
         protected virtual async Task TransactionWillRecoverAfterRandomSiloFailure(
             string transactionTestGrainClassName,
             int concurrent,

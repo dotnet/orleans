@@ -6,12 +6,25 @@ using AwesomeAssertions;
 
 namespace Orleans.Transactions.TestKit
 {
+    /// <summary>
+    /// Runs transaction scenarios which exercise failures raised by participating grains.
+    /// </summary>
     public abstract class GrainFaultTransactionTestRunner : TransactionTestRunnerBase
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="GrainFaultTransactionTestRunner"/> class.
+        /// </summary>
+        /// <param name="grainFactory">The grain factory used to access test grains.</param>
+        /// <param name="output">The callback used to write test output.</param>
         public GrainFaultTransactionTestRunner(IGrainFactory grainFactory, Action<string> output)
         : base(grainFactory, output)
         { }
 
+        /// <summary>
+        /// Verifies that a grain exception aborts its transaction without changing committed state.
+        /// </summary>
+        /// <param name="grainStates">The transaction state configuration used to select the test grain.</param>
+        /// <returns>A task which represents the test.</returns>
         public virtual async Task AbortTransactionOnExceptions(string grainStates)
         {
             const int expected = 5;
@@ -33,6 +46,11 @@ namespace Orleans.Transactions.TestKit
             });
         }
 
+        /// <summary>
+        /// Verifies that a write attempted in a read-only transaction is rejected without changing committed state.
+        /// </summary>
+        /// <param name="grainStates">The transaction state configuration used to select the test grain.</param>
+        /// <returns>A task which represents the test.</returns>
         public virtual async Task AbortTransactionOnReadOnlyViolatedException(string grainStates)
         {
             const int expected = 5;
@@ -54,6 +72,11 @@ namespace Orleans.Transactions.TestKit
             });
         }
 
+        /// <summary>
+        /// Verifies that an exception from one participant aborts a multi-grain transaction atomically.
+        /// </summary>
+        /// <param name="grainStates">The transaction state configuration used to select test grains.</param>
+        /// <returns>A task which represents the test.</returns>
         public virtual async Task MultiGrainAbortTransactionOnExceptions(string grainStates)
         {
             const int grainCount = TransactionTestConstants.MaxCoordinatedTransactions - 1;
@@ -88,6 +111,11 @@ namespace Orleans.Transactions.TestKit
             });
         }
 
+        /// <summary>
+        /// Verifies that a multi-grain abort reports one root-cause grain exception as its inner exception.
+        /// </summary>
+        /// <param name="grainStates">The transaction state configuration used to select test grains.</param>
+        /// <returns>A task which represents the test.</returns>
         public virtual async Task AbortTransactionExceptionInnerExceptionOnlyContainsOneRootCauseException(string grainStates)
         {
             const int throwGrainCount = 3;
@@ -137,6 +165,11 @@ namespace Orleans.Transactions.TestKit
             });
         }
 
+        /// <summary>
+        /// Verifies that an orphaned call aborts its transaction without changing committed state.
+        /// </summary>
+        /// <param name="grainStates">The transaction state configuration used to select the test grain.</param>
+        /// <returns>A task which represents the test.</returns>
         public virtual async Task AbortTransactionOnOrphanCalls(string grainStates)
         {
             const int expected = 5;

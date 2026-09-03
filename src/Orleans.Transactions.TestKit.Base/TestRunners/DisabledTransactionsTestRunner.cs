@@ -6,11 +6,23 @@ using AwesomeAssertions;
 
 namespace Orleans.Transactions.TestKit
 {
+    /// <summary>
+    /// Verifies transaction calls when transaction support is disabled.
+    /// </summary>
     public abstract class DisabledTransactionsTestRunner : TransactionTestRunnerBase
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="DisabledTransactionsTestRunner"/> class.
+        /// </summary>
+        /// <param name="grainFactory">The grain factory used to access test grains.</param>
+        /// <param name="output">The callback used to write test output.</param>
         protected DisabledTransactionsTestRunner(IGrainFactory grainFactory, Action<string> output)
         : base(grainFactory, output) { }
 
+        /// <summary>
+        /// Verifies that invoking a transaction on a transaction grain reports that transactions are disabled.
+        /// </summary>
+        /// <param name="transactionTestGrainClassName">The class name of the transaction test grain to invoke.</param>
         public virtual void TransactionGrainsThrowWhenTransactions(string transactionTestGrainClassName)
         {
             const int delta = 5;
@@ -19,6 +31,10 @@ namespace Orleans.Transactions.TestKit
             var response = task.Should().ThrowAsync<OrleansTransactionsDisabledException>();
         }
 
+        /// <summary>
+        /// Verifies that invoking a transaction across multiple transaction grains reports that transactions are disabled.
+        /// </summary>
+        /// <param name="transactionTestGrainClassName">The class name of the transaction test grains to invoke.</param>
         public virtual void MultiTransactionGrainsThrowWhenTransactions(string transactionTestGrainClassName)
         {
             const int delta = 5;

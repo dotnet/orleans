@@ -6,11 +6,24 @@ using AwesomeAssertions;
 
 namespace Orleans.Transactions.TestKit
 {
+    /// <summary>
+    /// Runs successful transaction scenarios across one or more grains.
+    /// </summary>
     public abstract class GoldenPathTransactionTestRunner : TransactionTestRunnerBase
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="GoldenPathTransactionTestRunner"/> class.
+        /// </summary>
+        /// <param name="grainFactory">The grain factory used to access test grains.</param>
+        /// <param name="output">The callback used to write test output.</param>
         protected GoldenPathTransactionTestRunner(IGrainFactory grainFactory, Action<string> output)
         : base(grainFactory, output) { }
 
+        /// <summary>
+        /// Verifies the initial state returned by a single-grain read transaction.
+        /// </summary>
+        /// <param name="grainStates">The transaction state configuration used to select the test grain.</param>
+        /// <returns>A task which represents the test.</returns>
         public virtual async Task SingleGrainReadTransaction(string grainStates)
         {
             const int expected = 0;
@@ -24,6 +37,11 @@ namespace Orleans.Transactions.TestKit
             }
         }
 
+        /// <summary>
+        /// Verifies a successful write transaction on a single grain.
+        /// </summary>
+        /// <param name="grainStates">The transaction state configuration used to select the test grain.</param>
+        /// <returns>A task which represents the test.</returns>
         public virtual async Task SingleGrainWriteTransaction(string grainStates)
         {
             const int delta = 5;
@@ -35,6 +53,12 @@ namespace Orleans.Transactions.TestKit
             actual.Should().BeEquivalentTo(expected);
         }
 
+        /// <summary>
+        /// Verifies a successful write transaction across multiple grains.
+        /// </summary>
+        /// <param name="grainStates">The transaction state configuration used to select test grains.</param>
+        /// <param name="grainCount">The number of grains participating in the transaction.</param>
+        /// <returns>A task which represents the test.</returns>
         public virtual async Task MultiGrainWriteTransaction(string grainStates, int grainCount)
         {
             const int expected = 5;
@@ -58,6 +82,12 @@ namespace Orleans.Transactions.TestKit
             }
         }
 
+        /// <summary>
+        /// Verifies successive set and read-modify-write operations across multiple grains.
+        /// </summary>
+        /// <param name="grainStates">The transaction state configuration used to select test grains.</param>
+        /// <param name="grainCount">The number of grains participating in the transaction.</param>
+        /// <returns>A task which represents the test.</returns>
         public virtual async Task MultiGrainReadWriteTransaction(string grainStates, int grainCount)
         {
             const int delta = 5;
@@ -84,6 +114,12 @@ namespace Orleans.Transactions.TestKit
             }
         }
 
+        /// <summary>
+        /// Verifies repeated read-modify-write transactions across a fixed set of grains.
+        /// </summary>
+        /// <param name="grainStates">The transaction state configuration used to select test grains.</param>
+        /// <param name="grainCount">The number of grains participating in each transaction.</param>
+        /// <returns>A task which represents the test.</returns>
         public virtual async Task RepeatGrainReadWriteTransaction(string grainStates, int grainCount)
         {
             const int repeat = 10;
@@ -117,6 +153,11 @@ namespace Orleans.Transactions.TestKit
             }
         }
 
+        /// <summary>
+        /// Verifies that multiple writes to the same grain within one transaction are all applied.
+        /// </summary>
+        /// <param name="grainStates">The transaction state configuration used to select the test grain.</param>
+        /// <returns>A task which represents the test.</returns>
         public virtual async Task MultiWriteToSingleGrainTransaction(string grainStates)
         {
             const int delta = 5;
@@ -137,6 +178,12 @@ namespace Orleans.Transactions.TestKit
             }
         }
 
+        /// <summary>
+        /// Verifies a read-write-read-write access sequence across multiple grains.
+        /// </summary>
+        /// <param name="grainStates">The transaction state configuration used to select test grains.</param>
+        /// <param name="grainCount">The number of grains participating in the transaction.</param>
+        /// <returns>A task which represents the test.</returns>
         public virtual async Task RWRWTest(string grainStates, int grainCount)
         {
             const int delta = 5;
@@ -162,6 +209,12 @@ namespace Orleans.Transactions.TestKit
             }
         }
 
+        /// <summary>
+        /// Verifies a write-read-write-read access sequence across multiple grains.
+        /// </summary>
+        /// <param name="grainStates">The transaction state configuration used to select test grains.</param>
+        /// <param name="grainCount">The number of grains participating in the transaction.</param>
+        /// <returns>A task which represents the test.</returns>
         public virtual async Task WRWRTest(string grainStates, int grainCount)
         {
             const int delta = 5;

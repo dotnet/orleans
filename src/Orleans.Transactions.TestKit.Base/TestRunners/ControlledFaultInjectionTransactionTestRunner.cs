@@ -8,6 +8,9 @@ using Orleans.Configuration;
 
 namespace Orleans.Transactions.TestKit
 {
+    /// <summary>
+    /// Runs transaction tests which inject faults at controlled protocol phases and verify recovery.
+    /// </summary>
     public class ControlledFaultInjectionTransactionTestRunner : TransactionTestRunnerBase
     {
         private static readonly TimeSpan RecoveryWatchdog =
@@ -16,10 +19,19 @@ namespace Orleans.Transactions.TestKit
             + TransactionalStateOptions.DefaultRemoteTransactionPingFrequency
             + TransactionalStateOptions.DefaultLockTimeout;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ControlledFaultInjectionTransactionTestRunner"/> class.
+        /// </summary>
+        /// <param name="grainFactory">The grain factory used to access test grains.</param>
+        /// <param name="output">The callback used to write test output.</param>
         public ControlledFaultInjectionTransactionTestRunner(IGrainFactory grainFactory, Action<string> output)
          : base(grainFactory, output)
         { }
-        
+
+        /// <summary>
+        /// Verifies that a committed value remains readable after the grain is deactivated and reactivated.
+        /// </summary>
+        /// <returns>A task which represents the test.</returns>
         public virtual async Task SingleGrainReadTransaction()
         {
             const int expected = 5;
@@ -33,6 +45,10 @@ namespace Orleans.Transactions.TestKit
             actual.Should().Be(expected);
         }
         
+        /// <summary>
+        /// Verifies that a transactional write remains committed after the grain is deactivated and reactivated.
+        /// </summary>
+        /// <returns>A task which represents the test.</returns>
         public virtual async Task SingleGrainWriteTransaction()
         {
             const int delta = 5;
@@ -45,6 +61,12 @@ namespace Orleans.Transactions.TestKit
             actual.Should().Be(expected);
         }
 
+        /// <summary>
+        /// Injects a fault into a multi-grain write at a selected protocol phase and verifies the recovered state.
+        /// </summary>
+        /// <param name="injectionPhase">The transaction protocol phase at which to inject the fault.</param>
+        /// <param name="injectionType">The type of fault to inject.</param>
+        /// <returns>A task which represents the fault-injection and recovery test.</returns>
         public virtual async Task MultiGrainWriteTransaction_FaultInjection(TransactionFaultInjectPhase injectionPhase, FaultInjectionType injectionType)
         {
             const int setval = 5;

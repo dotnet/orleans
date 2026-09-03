@@ -2,8 +2,16 @@
 
 namespace Orleans.Transactions.TestKit
 {
+    /// <summary>
+    /// Verifies transaction behavior with shared locks and explicitly requested exclusive locks.
+    /// </summary>
     public abstract class ExclusiveLockTransactionTestRunner : TransactionTestRunnerBase
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ExclusiveLockTransactionTestRunner"/> class.
+        /// </summary>
+        /// <param name="grainFactory">The grain factory used to access test grains.</param>
+        /// <param name="output">The callback used to write test output.</param>
         protected ExclusiveLockTransactionTestRunner(IGrainFactory grainFactory, Action<string> output)
             : base(grainFactory, output)
         {
@@ -25,6 +33,8 @@ namespace Orleans.Transactions.TestKit
         ///   TX2: PerformUpdate → upgraded, TX1 rolled back
         ///   TX1: PerformUpdate → broken lock detected
         /// </summary>
+        /// <param name="grainStates">The transaction state configuration used to select the test grain.</param>
+        /// <returns>A task which represents the concurrent transaction test.</returns>
         public virtual async Task ConcurrentReadThenWriteWithoutExclusiveLock_ThrowsLockException(string grainStates)
         {
             const int concurrentTransactions = 10;
@@ -70,6 +80,8 @@ namespace Orleans.Transactions.TestKit
         /// Verifies that using [UseExclusiveLock] on the read method prevents
         /// lock upgrade exceptions when concurrent transactions perform Read-then-Write on the same grain.
         /// </summary>
+        /// <param name="grainStates">The transaction state configuration used by the test.</param>
+        /// <returns>A task which represents the concurrent transaction test.</returns>
         public virtual async Task ConcurrentReadThenWriteWithExclusiveLock_NoLockException(string grainStates)
         {
             const int concurrentTransactions = 10;
