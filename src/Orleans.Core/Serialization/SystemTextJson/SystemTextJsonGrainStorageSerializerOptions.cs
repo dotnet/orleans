@@ -13,8 +13,12 @@ namespace Orleans.Serialization
     public sealed class SystemTextJsonGrainStorageSerializerOptions
     {
         /// <summary>
-        /// Gets the underlying System.Text.Json serializer options.
+        /// Gets the serializer options used to read and write grain state.
         /// </summary>
+        /// <remarks>
+        /// Fields are included and properties with <see langword="null"/> values are omitted by default.
+        /// Orleans converters are added during options post-configuration.
+        /// </remarks>
         public JsonSerializerOptions JsonSerializerOptions { get; } = new JsonSerializerOptions()
         {
             IncludeFields = true,
@@ -22,8 +26,13 @@ namespace Orleans.Serialization
         };
     }
 
+    /// <summary>
+    /// Adds Orleans framework type converters to <see cref="SystemTextJsonGrainStorageSerializerOptions"/>.
+    /// </summary>
+    /// <param name="grainReferenceActivator">The activator used by the grain reference converter.</param>
     public sealed class SystemTextJsonSerializerOptionsConfigure(GrainReferenceActivator grainReferenceActivator) : IPostConfigureOptions<SystemTextJsonGrainStorageSerializerOptions>
     {
+        /// <inheritdoc />
         public void PostConfigure(string? name, SystemTextJsonGrainStorageSerializerOptions options)
         {
             options.JsonSerializerOptions.Converters.Add(new IPAddressJsonConverter());

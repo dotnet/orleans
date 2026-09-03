@@ -11,6 +11,7 @@ namespace Orleans.Serialization
     /// <summary>
     /// A <see cref="JsonConverter{T}"/> for <see cref="IAddressable"/> types (grain references).
     /// </summary>
+    /// <param name="referenceActivator">The activator used to construct grain references during deserialization.</param>
     public sealed class GrainReferenceConverter(GrainReferenceActivator referenceActivator) : JsonConverter<IAddressable>
     {
         private readonly Type _addressableType = typeof(IAddressable);

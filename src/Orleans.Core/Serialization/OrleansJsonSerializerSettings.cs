@@ -7,6 +7,9 @@ using Orleans.Serialization.TypeSystem;
 
 namespace Orleans.Serialization
 {
+    /// <summary>
+    /// Provides factory and configuration methods for Newtonsoft.Json settings which support Orleans framework types.
+    /// </summary>
     public static class OrleansJsonSerializerSettings
     {
         internal static JsonSerializerSettings GetDefaultSerializerSettings()
@@ -27,12 +30,10 @@ namespace Orleans.Serialization
         }
 
         /// <summary>
-        /// Returns the default serializer settings.
+        /// Creates the default serializer settings and configures the Orleans serialization binder and converters.
         /// </summary>
-        /// <param name="services">
-        /// The service provider.
-        /// </param>
-        /// <returns>The default serializer settings.</returns>
+        /// <param name="services">The service provider used to resolve serializer dependencies.</param>
+        /// <returns>The configured default serializer settings.</returns>
         public static JsonSerializerSettings GetDefaultSerializerSettings(IServiceProvider services)
         {
             var settings = GetDefaultSerializerSettings();
@@ -64,9 +65,16 @@ namespace Orleans.Serialization
         /// Updates the provided serializer settings with the specified options.
         /// </summary>
         /// <param name="settings">The settings.</param>
-        /// <param name="useFullAssemblyNames">if set to <c>true</c>, use full assembly-qualified names when formatting type names.</param>
-        /// <param name="indentJson">if set to <c>true</c>, indent the formatted JSON.</param>
-        /// <param name="typeNameHandling">The type name handling options.</param>
+        /// <param name="useFullAssemblyNames">
+        /// When <see langword="true"/>, use full assembly-qualified names when formatting type names;
+        /// otherwise, leave the current assembly name formatting unchanged.
+        /// </param>
+        /// <param name="indentJson">
+        /// When <see langword="true"/>, indent the formatted JSON; otherwise, leave the current formatting unchanged.
+        /// </param>
+        /// <param name="typeNameHandling">
+        /// The type name handling value to apply, or <see langword="null"/> to leave the current value unchanged.
+        /// </param>
         /// <returns>The provided serializer settings.</returns>
         public static JsonSerializerSettings UpdateSerializerSettings(JsonSerializerSettings settings, bool useFullAssemblyNames, bool indentJson, TypeNameHandling? typeNameHandling)
         {
