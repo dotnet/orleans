@@ -37,6 +37,28 @@ public sealed class ClusterManifestStabilizationHelperTests
         Assert.Equal("testHooks", exception.ParamName);
     }
 
+    [Fact]
+    public async Task WaitForExpectedClusterManifestAsync_WaitsForHookFinalResult()
+    {
+        using var silo = CreateSilo(port: 11111, generation: 7);
+        TimeSpan? observedTimeout = null;
+
+        var result = await ClusterManifestStabilizationHelper.WaitForExpectedClusterManifestAsync(
+            activeSilos: [silo],
+            waitForClusterManifest: [WaitForClusterManifest],
+            timeout: TimeSpan.Zero);
+
+        Assert.True(result);
+        Assert.Equal(TimeSpan.Zero, observedTimeout);
+
+        async Task<bool> WaitForClusterManifest(SiloAddress[] expectedSilos, TimeSpan timeout)
+        {
+            observedTimeout = timeout;
+            await Task.Yield();
+            return expectedSilos.SequenceEqual([silo.SiloAddress]);
+        }
+    }
+
     private static TestSiloHandle CreateSilo(int port, int generation) =>
         new()
         {

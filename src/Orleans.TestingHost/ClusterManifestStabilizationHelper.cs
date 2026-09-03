@@ -17,6 +17,20 @@ internal static class ClusterManifestStabilizationHelper
         ArgumentNullException.ThrowIfNull(activeSilos);
         ArgumentNullException.ThrowIfNull(testHooks);
 
+        return await WaitForExpectedClusterManifestAsync(
+            activeSilos,
+            testHooks.Select(static hooks => new Func<SiloAddress[], TimeSpan, Task<bool>>(hooks.WaitForClusterManifest)).ToArray(),
+            timeout);
+    }
+
+    internal static async Task<bool> WaitForExpectedClusterManifestAsync(
+        IReadOnlyCollection<SiloHandle> activeSilos,
+        IReadOnlyCollection<Func<SiloAddress[], TimeSpan, Task<bool>>> waitForClusterManifest,
+        TimeSpan timeout)
+    {
+        ArgumentNullException.ThrowIfNull(activeSilos);
+        ArgumentNullException.ThrowIfNull(waitForClusterManifest);
+
         if (activeSilos.Count == 0)
         {
             await Task.Delay(timeout);
@@ -26,8 +40,8 @@ internal static class ClusterManifestStabilizationHelper
         var expectedSilos = activeSilos.Select(static silo => silo.SiloAddress).ToArray();
         try
         {
-            var waitTasks = testHooks.Select(hooks => hooks.WaitForClusterManifest(expectedSilos, timeout));
-            var results = await Task.WhenAll(waitTasks).WaitAsync(timeout);
+            var waitTasks = waitForClusterManifest.Select(wait => wait(expectedSilos, timeout));
+            var results = await Task.WhenAll(waitTasks);
             return results.All(static result => result);
         }
         catch (TimeoutException)
