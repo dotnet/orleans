@@ -9,6 +9,13 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    <WarningsAsErrors>$(WarningsAsErrors);IL2072</WarningsAsErrors>
+    <!-- Keep the existing trim backlog visible in the compatibility audit while enforcing this bounded IL2072 rollout. -->
+    <NoWarn Condition="'$(EnableCompatibilityAnalyzerAudit)' != 'true'">$(NoWarn);IL2026;IL2055;IL2060;IL2070;IL2075;IL2087;IL2090;IL2091</NoWarn>
+  </PropertyGroup>
+
   <ItemGroup>
     <Content Include="buildMultiTargeting\Microsoft.Orleans.Core.targets">
       <PackagePath>%(Identity)</PackagePath>

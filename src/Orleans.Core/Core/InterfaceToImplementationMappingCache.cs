@@ -75,9 +75,9 @@ namespace Orleans
         }
 
         /// <summary>
-        /// The map from implementation types to interface types to map of method to method infos.
+        /// The map from implementation and interface types to method mappings.
         /// </summary>
-        private readonly ConcurrentDictionary<Type, Dictionary<Type, Dictionary<MethodInfo, Entry>>> mappings = new();
+        private readonly ConcurrentDictionary<(Type ImplementationType, Type InterfaceType), Dictionary<MethodInfo, Entry>> mappings = new();
 
         /// <summary>
         /// Returns a mapping from method id to method info for the provided implementation and interface types.
@@ -89,65 +89,50 @@ namespace Orleans
         /// </returns>
         public Dictionary<MethodInfo, Entry> GetOrCreate(Type implementationType, Type interfaceType)
         {
-            // Get or create the mapping between interfaceId and invoker for the provided type.
-            if (!this.mappings.TryGetValue(implementationType, out var invokerMap))
-            {
-                // Generate an the invoker mapping using the provided invoker.
-                invokerMap = mappings.GetOrAdd(implementationType, CreateInterfaceToImplementationMap(implementationType));
-            }
-
-            // Attempt to get the invoker for the provided interfaceId.
-            if (!invokerMap.TryGetValue(interfaceType, out var interfaceToImplementationMap))
+            if (!interfaceType.IsAssignableFrom(implementationType))
             {
                 throw new InvalidOperationException($"Type {implementationType} does not implement interface {interfaceType}");
             }
 
-            return interfaceToImplementationMap;
+            return mappings.GetOrAdd(
+                (implementationType, interfaceType),
+                static key => CreateInterfaceToImplementationMap(key.ImplementationType, key.InterfaceType));
         }
 
         /// <summary>
-        /// Maps the interfaces of the provided <paramref name="implementationType"/>.
+        /// Maps the provided <paramref name="interfaceType"/> onto <paramref name="implementationType"/>.
         /// </summary>
         /// <param name="implementationType">The implementation type.</param>
+        /// <param name="interfaceType">The interface type.</param>
         /// <returns>The mapped interface.</returns>
-        private static Dictionary<Type, Dictionary<MethodInfo, Entry>> CreateInterfaceToImplementationMap(Type implementationType)
+        private static Dictionary<MethodInfo, Entry> CreateInterfaceToImplementationMap(Type implementationType, Type interfaceType)
         {
-            var interfaces = implementationType.GetInterfaces();
+            var methods = GrainInterfaceUtils.GetMethods(interfaceType);
 
-            // Create an invoker for every interface on the provided type.
-            var result = new Dictionary<Type, Dictionary<MethodInfo, Entry>>(interfaces.Length);
-            foreach (var iface in interfaces)
+            // Map every method on this interface from the definition interface onto the implementation class.
+            var result = new Dictionary<MethodInfo, Entry>(methods.Length);
+
+            var mapping = default(InterfaceMapping);
+            for (var i = 0; i < methods.Length; i++)
             {
-                var methods = GrainInterfaceUtils.GetMethods(iface);
+                var method = methods[i];
 
-                // Map every method on this interface from the definition interface onto the implementation class.
-                var methodMap = new Dictionary<MethodInfo, Entry>(methods.Length);
-
-                var mapping = default(InterfaceMapping);
-                for (var i = 0; i < methods.Length; i++)
+                // If this method is not from the expected interface (eg, because it's from a parent interface), then
+                // get the mapping for the interface which it does belong to.
+                if (mapping.InterfaceType != method.DeclaringType)
                 {
-                    var method = methods[i];
-
-                    // If this method is not from the expected interface (eg, because it's from a parent interface), then
-                    // get the mapping for the interface which it does belong to.
-                    if (mapping.InterfaceType != method.DeclaringType)
-                    {
-                        mapping = implementationType.GetInterfaceMap(method.DeclaringType!);
-                    }
-
-                    // Find the index of the interface method and then get the implementation method at that position.
-                    for (var k = 0; k < mapping.InterfaceMethods!.Length; k++)
-                    {
-                        if (mapping.InterfaceMethods[k] != method) continue;
-                        Debug.Assert(method is not null);
-                        methodMap[method] = new Entry(mapping.TargetMethods![k], method);
-
-                        break;
-                    }
+                    mapping = GrainInterfaceUtils.GetInterfaceMap(implementationType, method.DeclaringType!);
                 }
 
-                // Add the resulting map of methodId -> method to the interface map.
-                result[iface] = methodMap;
+                // Find the index of the interface method and then get the implementation method at that position.
+                for (var k = 0; k < mapping.InterfaceMethods!.Length; k++)
+                {
+                    if (mapping.InterfaceMethods[k] != method) continue;
+                    Debug.Assert(method is not null);
+                    result[method] = new Entry(mapping.TargetMethods![k], method);
+
+                    break;
+                }
             }
 
             return result;
