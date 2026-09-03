@@ -228,13 +228,14 @@ namespace Orleans.Runtime
                     return false;
                 }
 
-                return await dissemination.Publish(
+                var publishTask = dissemination.Publish(
                         disseminationNamespace,
                         _siloDetails.SiloAddress,
                         myStats.DateTime.Ticks,
                         cancellation.Token)
-                    .AsTask()
-                    .WaitAsync(cancellation.Token);
+                    .AsTask();
+                publishTask.Ignore();
+                return await publishTask.WaitAsync(cancellation.Token);
             }
             catch (OperationCanceledException) when (
                 timeoutCancellation.IsCancellationRequested
