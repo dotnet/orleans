@@ -57,7 +57,15 @@ namespace Orleans.Networking.Shared
 
         private static async ValueTask<IConnectionListener> DisposeAndThrowAsync(SocketConnectionListener listener, Exception exception)
         {
-            await listener.DisposeAsync();
+            try
+            {
+                await listener.DisposeAsync();
+            }
+            catch (Exception disposeException)
+            {
+                exception.Data["Orleans.SocketConnectionListener.DisposeException"] = disposeException;
+            }
+
             ExceptionDispatchInfo.Throw(exception);
             return null!;
         }
