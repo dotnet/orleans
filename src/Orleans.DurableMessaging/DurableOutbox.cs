@@ -247,8 +247,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
             || left.ReceiverId != right.ReceiverId
             || !string.Equals(left.RouteKey, right.RouteKey, StringComparison.Ordinal)
             || !Equals(left.CorrelationKey, right.CorrelationKey)
-            || !Nullable.Equals(left.ReplyTo, right.ReplyTo)
-            || left.CreatedAt != right.CreatedAt)
+            || !Nullable.Equals(left.ReplyTo, right.ReplyTo))
         {
             return false;
         }

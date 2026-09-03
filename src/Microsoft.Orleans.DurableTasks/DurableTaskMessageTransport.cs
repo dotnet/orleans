@@ -135,7 +135,7 @@ internal sealed class DurableTaskMessageTransport(
                 CorrelationKey = envelope.CorrelationKey,
                 ReplyTo = envelope.ReplyTo,
                 Data = envelope.Data,
-                CreatedAt = DateTimeOffset.UnixEpoch,
+                CreatedAt = envelope.CreatedAt,
             };
     }
 

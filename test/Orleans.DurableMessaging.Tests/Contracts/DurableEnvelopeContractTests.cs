@@ -270,6 +270,30 @@ public sealed class DurableEnvelopeContractTests : IDisposable
         Assert.False(DurableOutbox.AreEquivalent(first, second));
     }
 
+    [Fact]
+    public void OutboxEquivalenceIgnoresCreationTimestamp()
+    {
+        var sender = GrainId.Create("sender", "timestamp-equivalence");
+        var receiver = GrainId.Create("receiver", "timestamp-equivalence");
+        var first = new DurableEnvelopeBuilder(_sessions, sender)
+            .To(receiver, "timestamp/equivalence")
+            .WithBody(42)
+            .Build();
+        var second = new DurableEnvelope
+        {
+            MessageId = first.MessageId,
+            SenderId = first.SenderId,
+            ReceiverId = first.ReceiverId,
+            RouteKey = first.RouteKey,
+            CorrelationKey = first.CorrelationKey,
+            ReplyTo = first.ReplyTo,
+            Data = first.Data,
+            CreatedAt = first.CreatedAt.AddMinutes(1),
+        };
+
+        Assert.True(DurableOutbox.AreEquivalent(first, second));
+    }
+
     [GenerateSerializer, Immutable]
     public sealed record TestMessage([property: Id(0)] int Id, [property: Id(1)] string Action);
 }

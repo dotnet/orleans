@@ -201,8 +201,8 @@ public sealed class DurableRpcProtocolTests
         var messages = outbox.Messages.ToArray();
         Assert.Equal(2, messages.Length);
         Assert.Equal(messages[0].MessageId, messages[1].MessageId);
-        Assert.Equal(DateTimeOffset.UnixEpoch, messages[0].CreatedAt);
-        Assert.Equal(messages[0].CreatedAt, messages[1].CreatedAt);
+        Assert.NotEqual(DateTimeOffset.UnixEpoch, messages[0].CreatedAt);
+        Assert.NotEqual(DateTimeOffset.UnixEpoch, messages[1].CreatedAt);
     }
 
     [Fact]
@@ -237,8 +237,8 @@ public sealed class DurableRpcProtocolTests
         Assert.Equal(3, messages.Length);
         Assert.Equal(messages[0].MessageId, messages[1].MessageId);
         Assert.NotEqual(messages[0].MessageId, messages[2].MessageId);
-        Assert.Equal(DateTimeOffset.UnixEpoch, messages[0].CreatedAt);
-        Assert.Equal(messages[0].CreatedAt, messages[1].CreatedAt);
+        Assert.NotEqual(DateTimeOffset.UnixEpoch, messages[0].CreatedAt);
+        Assert.NotEqual(DateTimeOffset.UnixEpoch, messages[1].CreatedAt);
         Assert.Equal(DurableTaskMessageTransport.InvocationRoute, messages[0].RouteKey);
         Assert.True(messages[0].Data.TryGetBody<DurableTaskInvocationMessage>(out var body));
         Assert.Equal(taskId, body!.TaskId);
@@ -271,8 +271,8 @@ public sealed class DurableRpcProtocolTests
         Assert.Equal(3, messages.Length);
         Assert.Equal(messages[0].MessageId, messages[1].MessageId);
         Assert.NotEqual(messages[0].MessageId, messages[2].MessageId);
-        Assert.Equal(DateTimeOffset.UnixEpoch, messages[0].CreatedAt);
-        Assert.Equal(messages[0].CreatedAt, messages[1].CreatedAt);
+        Assert.NotEqual(DateTimeOffset.UnixEpoch, messages[0].CreatedAt);
+        Assert.NotEqual(DateTimeOffset.UnixEpoch, messages[1].CreatedAt);
         Assert.Equal(DurableTaskMessageTransport.CancellationRoute, messages[0].RouteKey);
         Assert.True(messages[0].Data.TryGetBody<DurableTaskCancellationMessage>(out var body));
         Assert.Equal(taskId, body!.TaskId);
@@ -300,7 +300,8 @@ public sealed class DurableRpcProtocolTests
         var messages = outbox.Messages.ToArray();
         Assert.Equal(2, messages.Length);
         Assert.Equal(messages[0].MessageId, messages[1].MessageId);
-        Assert.Equal(messages[0].CreatedAt, messages[1].CreatedAt);
+        Assert.NotEqual(DateTimeOffset.UnixEpoch, messages[0].CreatedAt);
+        Assert.NotEqual(DateTimeOffset.UnixEpoch, messages[1].CreatedAt);
         Assert.Equal(Copy(messages[0].Data.GetBodyBytes()), Copy(messages[1].Data.GetBodyBytes()));
 
         static byte[] Copy(ReadOnlySequence<byte> sequence)
