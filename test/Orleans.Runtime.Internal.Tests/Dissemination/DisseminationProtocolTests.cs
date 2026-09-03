@@ -5812,6 +5812,7 @@ public class DisseminationProtocolTests
         {
             var current = Interlocked.Increment(ref inFlight);
             UpdateMaximum(ref observedMax, current);
+            var isHealthyPeer = target.Equals(healthyPeer);
             try
             {
                 if (target.Equals(blockedPeer))
@@ -5819,16 +5820,16 @@ public class DisseminationProtocolTests
                     blockedStarted.TrySetResult();
                     await releaseBlocked.Task.WaitAsync(cancellationToken);
                 }
-                else
-                {
-                    healthyCompleted.TrySetResult();
-                }
 
                 return FakeTransport.CreateAcknowledgment(batch);
             }
             finally
             {
                 Interlocked.Decrement(ref inFlight);
+                if (isHealthyPeer)
+                {
+                    healthyCompleted.TrySetResult();
+                }
             }
         };
         var ns = new FakeNamespace(local);
