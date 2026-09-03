@@ -2,6 +2,9 @@ using System.Collections.Generic;
 
 namespace Orleans.Configuration
 {
+    /// <summary>
+    /// Configures an Amazon SQS-backed persistent stream provider.
+    /// </summary>
     public class SqsOptions
     {
         /// <summary>

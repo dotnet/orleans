@@ -29,6 +29,16 @@ namespace OrleansAWSUtils.Streams
         /// </summary>
         protected Func<QueueId, Task<IStreamFailureHandler>> StreamFailureHandlerFactory { private get; set; } = null!;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="SQSAdapterFactory"/> class.
+        /// </summary>
+        /// <param name="name">The name of the stream provider.</param>
+        /// <param name="sqsOptions">The SQS options.</param>
+        /// <param name="queueMapperOptions">The stream-to-queue mapping options.</param>
+        /// <param name="cacheOptions">The receiver cache options.</param>
+        /// <param name="clusterOptions">The cluster options.</param>
+        /// <param name="dataAdapter">The adapter used to convert between Orleans stream batches and SQS messages.</param>
+        /// <param name="loggerFactory">The logger factory.</param>
         public SQSAdapterFactory(
             string name, 
             SqsOptions sqsOptions,
@@ -55,6 +65,16 @@ namespace OrleansAWSUtils.Streams
             adapterCache = new SimpleQueueAdapterCache(cacheOptions, this.providerName, this.loggerFactory);
         }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="SQSAdapterFactory"/> class using the default SQS data adapter.
+        /// </summary>
+        /// <param name="name">The name of the stream provider.</param>
+        /// <param name="sqsOptions">The SQS options.</param>
+        /// <param name="queueMapperOptions">The stream-to-queue mapping options.</param>
+        /// <param name="cacheOptions">The receiver cache options.</param>
+        /// <param name="clusterOptions">The cluster options.</param>
+        /// <param name="serializer">The serializer used by the default SQS data adapter.</param>
+        /// <param name="loggerFactory">The logger factory.</param>
         public SQSAdapterFactory(
             string name,
             SqsOptions sqsOptions,
@@ -85,6 +105,7 @@ namespace OrleansAWSUtils.Streams
         }
 
         /// <summary>Creates the Amazon SQS queue adapter.</summary>
+        /// <returns>A task containing the queue adapter.</returns>
         public virtual Task<IQueueAdapter> CreateAdapter()
         {
             var adapter = new SQSAdapter(this.dataAdapter, this.streamQueueMapper, this.loggerFactory, this.sqsOptions, this.clusterOptions.ServiceId, this.providerName);
@@ -92,12 +113,14 @@ namespace OrleansAWSUtils.Streams
         }
 
         /// <summary>Creates the adapter cache.</summary>
+        /// <returns>The adapter cache.</returns>
         public virtual IQueueAdapterCache GetQueueAdapterCache()
         {
             return adapterCache;
         }
 
         /// <summary>Creates the factory stream queue mapper.</summary>
+        /// <returns>The stream queue mapper.</returns>
         public IStreamQueueMapper GetStreamQueueMapper()
         {
             return streamQueueMapper;
@@ -106,13 +129,19 @@ namespace OrleansAWSUtils.Streams
         /// <summary>
         /// Creates a delivery failure handler for the specified queue.
         /// </summary>
-        /// <param name="queueId"></param>
-        /// <returns></returns>
+        /// <param name="queueId">The queue identifier.</param>
+        /// <returns>A task containing the delivery failure handler.</returns>
         public Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId)
         {
             return StreamFailureHandlerFactory(queueId);
         }
 
+        /// <summary>
+        /// Creates and initializes an SQS adapter factory using services registered for the named stream provider.
+        /// </summary>
+        /// <param name="services">The service provider.</param>
+        /// <param name="name">The name of the stream provider.</param>
+        /// <returns>The initialized adapter factory.</returns>
         public static SQSAdapterFactory Create(IServiceProvider services, string name)
         {
             var sqsOptions = services.GetOptionsByName<SqsOptions>(name);
