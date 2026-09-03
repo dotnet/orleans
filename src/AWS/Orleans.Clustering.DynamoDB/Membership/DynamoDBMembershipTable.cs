@@ -21,6 +21,7 @@ namespace Orleans.Clustering.DynamoDB
         private static readonly TableVersion NotFoundTableVersion = new TableVersion(0, "0");
 
         private const string CURRENT_ETAG_ALIAS = ":currentETag";
+        private const string MEMBERSHIP_DATE_FORMAT = "yyyy-MM-dd HH:mm:ss.fff 'GMT'";
         private const int MAX_BATCH_SIZE = 25;
 
         private readonly ILogger logger;
@@ -119,7 +120,7 @@ namespace Orleans.Clustering.DynamoDB
             }
             else
             {
-                if (!int.TryParse(etag, out etagInt))
+                if (!int.TryParse(etag, NumberStyles.Integer, CultureInfo.InvariantCulture, out etagInt))
                 {
                     entry = default;
                     return false;
@@ -278,7 +279,7 @@ namespace Orleans.Clustering.DynamoDB
                 }
                 catch (TransactionCanceledException canceledException)
                 {
-                    if (canceledException.Message.Contains("ConditionalCheckFailed")) //not a good way to check for this currently
+                    if (canceledException.Message.Contains("ConditionalCheckFailed", StringComparison.Ordinal)) //not a good way to check for this currently
                     {
                         result = false;
                         LogWarningInsertFailedDueToContention(entry);
@@ -304,7 +305,7 @@ namespace Orleans.Clustering.DynamoDB
             {
                 LogDebugUpdateRow(entry, etag);
                 var siloEntry = Convert(entry, tableVersion);
-                if (!int.TryParse(etag, out var currentEtag))
+                if (!int.TryParse(etag, NumberStyles.Integer, CultureInfo.InvariantCulture, out var currentEtag))
                 {
                     LogWarningUpdateFailedInvalidETag(entry, etag);
                     return false;
@@ -352,7 +353,7 @@ namespace Orleans.Clustering.DynamoDB
                 }
                 catch (TransactionCanceledException canceledException)
                 {
-                    if (canceledException.Message.Contains("ConditionalCheckFailed")) //not a good way to check for this currently
+                    if (canceledException.Message.Contains("ConditionalCheckFailed", StringComparison.Ordinal)) //not a good way to check for this currently
                     {
                         result = false;
                         LogWarningUpdateFailedDueToContention(canceledException, entry, etag);
@@ -397,7 +398,7 @@ namespace Orleans.Clustering.DynamoDB
                 var tableVersion = NotFoundTableVersion;
                 foreach (var tableEntry in entries)
                 {
-                    if (tableEntry.SiloIdentity == SiloInstanceRecord.TABLE_VERSION_ROW)
+                    if (string.Equals(tableEntry.SiloIdentity, SiloInstanceRecord.TABLE_VERSION_ROW, StringComparison.Ordinal))
                     {
                         tableVersion = new TableVersion(tableEntry.MembershipVersion, tableEntry.ETag.ToString(CultureInfo.InvariantCulture));
                     }
@@ -561,9 +562,14 @@ namespace Orleans.Clustering.DynamoDB
             }
         }
 
-        private static bool SiloIsDefunct(SiloInstanceRecord silo, DateTimeOffset beforeDate)
+        internal static bool SiloIsDefunct(SiloInstanceRecord silo, DateTimeOffset beforeDate)
         {
-            return DateTimeOffset.TryParse(silo.IAmAliveTime, out var iAmAliveTime)
+            return DateTimeOffset.TryParseExact(
+                        silo.IAmAliveTime,
+                        MEMBERSHIP_DATE_FORMAT,
+                        CultureInfo.InvariantCulture,
+                        DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                        out var iAmAliveTime)
                     && iAmAliveTime < beforeDate
                     && silo.Status != (int)SiloStatus.Active;
         }
