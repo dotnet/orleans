@@ -8,24 +8,45 @@ using System.Threading.Tasks;
 
 namespace Orleans.Transactions.TestKit.Consistency
 {
+    /// <summary>
+    /// Produces randomized transactional reads, writes, and nested calls for consistency validation.
+    /// </summary>
     [Reentrant]
     public partial class ConsistencyTestGrain : Grain, IConsistencyTestGrain
     {
         private Random? random;
         private readonly ILogger logger;
 
+        /// <summary>
+        /// Represents the versioned state maintained by a consistency test grain.
+        /// </summary>
         [Serializable]
         [GenerateSerializer]
         public class State
         {
+            /// <summary>
+            /// The identifier of the transaction which wrote the current version.
+            /// </summary>
             [Id(0)]
             public string WriterTx = ConsistencyTestHarness.InitialTx; // last writer
+
+            /// <summary>
+            /// The sequence number of the current version.
+            /// </summary>
             [Id(1)]
             public int SeqNo;   // 0, 1, 2,...
         }
 
+        /// <summary>
+        /// The transactional state used to record version and writer information.
+        /// </summary>
         protected ITransactionalState<State> data;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ConsistencyTestGrain"/> class.
+        /// </summary>
+        /// <param name="data">The transactional state for this grain.</param>
+        /// <param name="loggerFactory">The factory used to create the grain call logger.</param>
         public ConsistencyTestGrain(
             [TransactionalState("data", TransactionTestConstants.TransactionStore)]
             ITransactionalState<State> data,
@@ -40,6 +61,7 @@ namespace Orleans.Transactions.TestKit.Consistency
 
         private const double RecursionProbability = .1 - .9 * (1.0 / (10 * 40 - 1));
 
+        /// <inheritdoc />
         public async Task<Observation[]> Run(ConsistencyTestOptions options, int depth, string stack, int maxgrain, DateTime stopAfter)
         {
             if (random == null)
