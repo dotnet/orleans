@@ -178,7 +178,7 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
             return DurableJobRunResult.Failed(ex);
         }
 
-        return await ValueTask.FromCanceled<DurableJobRunResult>(new CancellationToken(canceled: true));
+        return await state.Task;
 
         async ValueTask<DurableJobRunResult> LongPollGetJobStatusAsync(
             (string JobId, long ExecutionGeneration, int DequeueCount) key,

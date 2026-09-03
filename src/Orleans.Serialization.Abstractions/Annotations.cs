@@ -296,7 +296,7 @@ namespace Orleans
     public sealed class OrleansConstructorAttribute : ActivatorUtilitiesConstructorAttribute
     {
         /// <summary>
-        /// Initializes a new instance.
+        /// Initializes a new instance of OrleansConstructorAttribute.
         /// </summary>
         public OrleansConstructorAttribute()
         {
