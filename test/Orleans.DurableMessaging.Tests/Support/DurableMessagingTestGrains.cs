@@ -103,6 +103,7 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
     private int _nullReferenceMessageCalls;
     private int _nullNullableValueMessageCalls;
     private int _handlerSelectionCalls;
+    private int _mutatingSelectionCalls;
     private bool _deactivateOnNextRecovery;
     private readonly HashSet<Guid> _failedOnce = [];
 
@@ -138,6 +139,7 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
     public override Task OnActivateAsync(CancellationToken cancellationToken)
     {
         _inbox.RegisterHandler(new ThrowingSelectionHandler(this));
+        _inbox.RegisterHandler(new MutatingSelectionHandler(this));
         _inbox.RegisterHandler("nullable/reference", new NullReferenceMessageHandler(this));
         _inbox.RegisterHandler("nullable/value", new NullNullableValueMessageHandler(this));
         _inbox.RegisterHandler(new TypedMessageHandler(this));
@@ -380,6 +382,37 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
             if (Interlocked.Increment(ref owner._handlerSelectionCalls) == 2)
             {
                 throw new InvalidOperationException("Injected handler selection failure.");
+            }
+
+            return true;
+        }
+
+        public ValueTask HandleAsync(
+            DurableTestMessage? message,
+            IInboxHandlerContext context,
+            CancellationToken cancellationToken) =>
+            owner.HandleAsync(
+                message ?? throw new InvalidOperationException("A durable test message is required."),
+                context,
+                cancellationToken);
+    }
+
+    private sealed class MutatingSelectionHandler(DurableMessagingTestGrain owner) : IInboxHandler<DurableTestMessage>
+    {
+        public bool CanHandle(IInboxHandlerContext context)
+        {
+            if (!string.Equals(context.Envelope.RouteKey, "messages/selection-mutation", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            if (Interlocked.Increment(ref owner._mutatingSelectionCalls) > 1)
+            {
+                var outgoing = context.CreateEnvelope()
+                    .To(context.GrainId, "messages/record")
+                    .WithBody(new DurableTestMessage(Guid.NewGuid(), 81, "selection-side-effect"))
+                    .Build();
+                context.Send(outgoing);
             }
 
             return true;
