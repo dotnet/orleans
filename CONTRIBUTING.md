@@ -65,17 +65,6 @@ This project uses the same contribution process as the other **[.NET projects](h
 
 * **[.NET Project Contribution Guidelines](https://github.com/dotnet/runtime/blob/main/CONTRIBUTING.md)**
 
-### Pull request workflow
-
-When creating a pull request, please follow these guidelines:
-
-1. Create a new branch from `dotnet/orleans`'s `main` branch
-2. Push your changes to your fork of the repository
-3. Open the pull request against `dotnet/orleans` main branch
-4. Use [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) for commit messages and PR titles
-5. Keep pull request descriptions focused on the problem, solution, and rationale
-
-For more details on pull request workflows, see the [.NET Project Contribution Guidelines](https://github.com/dotnet/runtime/blob/main/CONTRIBUTING.md).
 Guidelines and workflow for contributing to .NET projects on GitHub.
 
 * **[.NET CLA](https://cla.dotnetfoundation.org/)**
@@ -85,6 +74,16 @@ Contribution License Agreement for .NET projects on GitHub.
 * **[.NET Framework Design Guidelines](https://github.com/dotnet/runtime/blob/main/docs/coding-guidelines/framework-design-guidelines-digest.md)**
 
 Some basic API design rules, coding standards, and style guide for .NET Framework APIs.
+
+### Pull request workflow
+
+When creating a pull request, follow these guidelines:
+
+1. Create a branch in your fork from `main`
+2. Push your changes to that branch
+3. Open the pull request against `dotnet/orleans`'s `main`
+4. Use [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) for commit messages and PR titles
+5. Keep pull request descriptions focused on the problem, solution, and rationale
 
 ## Coding Standards and Conventions
 
