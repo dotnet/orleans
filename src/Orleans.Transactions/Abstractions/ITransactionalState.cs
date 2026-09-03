@@ -15,15 +15,17 @@ namespace Orleans.Transactions.Abstractions
         /// <summary>
         /// Performs a read operation and returns the result, without modifying the state.
         /// </summary>
-        /// <typeparam name="TResult">The type of the return value</typeparam>
-        /// <param name="readFunction">A function that reads the state and returns the result. MUST NOT modify the state.</param>
+        /// <typeparam name="TResult">The result type.</typeparam>
+        /// <param name="readFunction">A function that reads the state and returns the result. The function must not modify the state.</param>
+        /// <returns>A task whose result is the value returned by <paramref name="readFunction"/>.</returns>
         Task<TResult> PerformRead<TResult>(Func<TState, TResult> readFunction);
 
         /// <summary>
         /// Performs an update operation and returns the result.
         /// </summary>
-        /// <typeparam name="TResult">The type of the return value</typeparam>
-        /// <param name="updateFunction">A function that can read and update the state, and return a result</param>
+        /// <typeparam name="TResult">The result type.</typeparam>
+        /// <param name="updateFunction">A function that reads or updates the state and returns a result.</param>
+        /// <returns>A task whose result is the value returned by <paramref name="updateFunction"/>.</returns>
         Task<TResult> PerformUpdate<TResult>(Func<TState, TResult> updateFunction);
     }
 }

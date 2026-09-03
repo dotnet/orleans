@@ -15,8 +15,9 @@ using Orleans.Timers.Internal;
 namespace Orleans.Transactions
 {
     /// <summary>
-    /// Stateful facet that respects Orleans transaction semantics
+    /// Provides a stateful facet which participates in Orleans transactions.
     /// </summary>
+    /// <typeparam name="TState">The transactional state type.</typeparam>
     public partial class TransactionalState<TState> : ITransactionalState<TState>, ILifecycleParticipant<IGrainLifecycle>
         where TState : class, new()
     {
@@ -30,10 +31,21 @@ namespace Orleans.Transactions
         private ParticipantId participantId;
         private TransactionQueue<TState> queue = null!;
 
+        /// <summary>
+        /// Gets the identifier of the current transaction.
+        /// </summary>
         public string CurrentTransactionId => TransactionContext.GetRequiredTransactionInfo().Id;
 
         private bool detectReentrancy;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TransactionalState{TState}"/> class.
+        /// </summary>
+        /// <param name="transactionalStateConfiguration">The transactional state configuration.</param>
+        /// <param name="contextAccessor">The accessor for the current grain context.</param>
+        /// <param name="copier">The copier used to isolate transactional state versions.</param>
+        /// <param name="grainRuntime">The grain runtime.</param>
+        /// <param name="logger">The logger.</param>
         public TransactionalState(
             TransactionalStateConfiguration transactionalStateConfiguration,
             IGrainContextAccessor contextAccessor,
@@ -51,9 +63,7 @@ namespace Orleans.Transactions
             this.activationLifetime = new ActivationLifetime(this.context);
         }
 
-        /// <summary>
-        /// Read the current state.
-        /// </summary>
+        /// <inheritdoc />
         public Task<TResult> PerformRead<TResult>(Func<TState, TResult> operation)
         {
             if (detectReentrancy)
@@ -174,6 +184,7 @@ namespace Orleans.Transactions
             );
         }
 
+        /// <inheritdoc />
         public void Participate(IGrainLifecycle lifecycle)
         {
             lifecycle.Subscribe<TransactionalState<TState>>(GrainLifecycleStage.SetupState, (ct) => OnSetupState(SetupResourceFactory, ct));

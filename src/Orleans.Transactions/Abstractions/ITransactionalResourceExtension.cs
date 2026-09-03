@@ -6,26 +6,33 @@ using Orleans.Runtime;
 
 namespace Orleans.Transactions.Abstractions
 {
+    /// <summary>
+    /// Defines the grain extension used to dispatch transaction protocol messages to named transactional resources.
+    /// </summary>
     public interface ITransactionalResourceExtension : IGrainExtension
     {
-        /// <summary>Commits a read-only transaction.</summary>
-        /// <param name="resourceId">The transactional resource identifier.</param>
+        /// <summary>
+        /// Commits a read-only transaction on the specified resource.
+        /// </summary>
+        /// <param name="resourceId">The identifier of the transactional resource.</param>
         /// <param name="transactionId">The transaction identifier.</param>
-        /// <param name="accessCount">The number of resource accesses.</param>
-        /// <param name="timeStamp">The commit timestamp.</param>
-        /// <returns>The transaction status.</returns>
+        /// <param name="accessCount">The number of reads and writes performed on the resource by the transaction.</param>
+        /// <param name="timeStamp">The transaction commit timestamp.</param>
+        /// <returns>A task whose result is the transaction status reported by the resource.</returns>
         [AlwaysInterleave]
         [Transaction(TransactionOption.Suppress)]
         [Alias("CommitReadOnly")]
         Task<TransactionalStatus> CommitReadOnly(string resourceId, Guid transactionId, AccessCounter accessCount, DateTime timeStamp);
 
-        /// <summary>Commits a read-only transaction.</summary>
-        /// <param name="resourceId">The transactional resource identifier.</param>
+        /// <summary>
+        /// Commits a read-only transaction on the specified resource.
+        /// </summary>
+        /// <param name="resourceId">The identifier of the transactional resource.</param>
         /// <param name="transactionId">The transaction identifier.</param>
-        /// <param name="accessCount">The number of resource accesses.</param>
-        /// <param name="timeStamp">The commit timestamp.</param>
-        /// <param name="cancellationToken">The cancellation token.</param>
-        /// <returns>The transaction status.</returns>
+        /// <param name="accessCount">The number of reads and writes performed on the resource by the transaction.</param>
+        /// <param name="timeStamp">The transaction commit timestamp.</param>
+        /// <param name="cancellationToken">The token used to cancel the operation.</param>
+        /// <returns>A task whose result is the transaction status reported by the resource.</returns>
         [AlwaysInterleave]
         [Transaction(TransactionOption.Suppress)]
         [Alias("1BB071FE")]
@@ -98,13 +105,15 @@ namespace Orleans.Transactions.Abstractions
         Task Confirm(string resourceId, Guid transactionId, DateTime timeStamp, CancellationToken cancellationToken)
             => Confirm(resourceId, transactionId, timeStamp);
 
-        /// <summary>Prepares a transaction.</summary>
-        /// <param name="resourceId">The transactional resource identifier.</param>
+        /// <summary>
+        /// Prepares the specified resource to commit a transaction.
+        /// </summary>
+        /// <param name="resourceId">The identifier of the transactional resource.</param>
         /// <param name="transactionId">The transaction identifier.</param>
-        /// <param name="accessCount">The number of resource accesses.</param>
-        /// <param name="timeStamp">The commit timestamp.</param>
-        /// <param name="transactionManager">The transaction manager.</param>
-        /// <returns>A <see cref="Task"/> representing the operation.</returns>
+        /// <param name="accessCount">The number of reads and writes performed on the resource by the transaction.</param>
+        /// <param name="timeStamp">The transaction commit timestamp.</param>
+        /// <param name="transactionManager">The transaction manager coordinating the transaction.</param>
+        /// <returns>A task which represents the one-way operation.</returns>
         [AlwaysInterleave]
         [Transaction(TransactionOption.Suppress)]
         [OneWay]

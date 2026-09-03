@@ -75,6 +75,10 @@ namespace Orleans.Transactions.Abstractions
         );
     }
 
+    /// <summary>
+    /// Represents a state version prepared by a transaction but not yet committed.
+    /// </summary>
+    /// <typeparam name="TState">The transactional state type.</typeparam>
     [Serializable, GenerateSerializer, Immutable]
     public sealed class PendingTransactionState<TState>
         where TState : class, new()
@@ -115,12 +119,27 @@ namespace Orleans.Transactions.Abstractions
         public TState State { get; set; } = null!;
     }
 
+    /// <summary>
+    /// Represents the authoritative transactional state loaded from durable storage.
+    /// </summary>
+    /// <typeparam name="TState">The transactional state type.</typeparam>
     [Serializable, GenerateSerializer, Immutable]
     public sealed class TransactionalStorageLoadResponse<TState>
         where TState : class, new()
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TransactionalStorageLoadResponse{TState}"/> class with empty state.
+        /// </summary>
         public TransactionalStorageLoadResponse() : this(null, new TState(), 0, new TransactionalStateMetaData(), Array.Empty<PendingTransactionState<TState>>()) { }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TransactionalStorageLoadResponse{TState}"/> class.
+        /// </summary>
+        /// <param name="etag">The storage version identifier.</param>
+        /// <param name="committedState">The most recently committed state.</param>
+        /// <param name="committedSequenceId">The sequence number of the most recently committed state.</param>
+        /// <param name="metadata">The transaction protocol metadata.</param>
+        /// <param name="pendingStates">The prepared state versions which have not been committed.</param>
         public TransactionalStorageLoadResponse(string? etag, TState committedState, long committedSequenceId, TransactionalStateMetaData metadata, IReadOnlyList<PendingTransactionState<TState>> pendingStates)
         {
             this.ETag = etag;
@@ -130,9 +149,15 @@ namespace Orleans.Transactions.Abstractions
             this.PendingStates = pendingStates;
         }
 
+        /// <summary>
+        /// Gets or sets the storage version identifier.
+        /// </summary>
         [Id(0)]
         public string? ETag { get; set; }
 
+        /// <summary>
+        /// Gets or sets the most recently committed state.
+        /// </summary>
         [Id(1)]
         public TState CommittedState { get; set; }
 
@@ -162,19 +187,34 @@ namespace Orleans.Transactions.Abstractions
     [Serializable]
     public sealed class TransactionalStateMetaData
     {
+        /// <summary>
+        /// Gets or sets the latest logical timestamp observed by the transactional state.
+        /// </summary>
         [Id(0)]
         public DateTime TimeStamp { get; set; } = default;
 
+        /// <summary>
+        /// Gets or sets the commit records retained for transaction recovery.
+        /// </summary>
         [Id(1)]
         public Dictionary<Guid, CommitRecord> CommitRecords { get; set; } = new Dictionary<Guid, CommitRecord>();
     }
 
+    /// <summary>
+    /// Records the timestamp and write participants for a committed transaction.
+    /// </summary>
     [Serializable, GenerateSerializer, Immutable]
     public sealed class CommitRecord
     {
+        /// <summary>
+        /// Gets or sets the transaction commit timestamp.
+        /// </summary>
         [Id(0)]
         public DateTime Timestamp { get; set; }
 
+        /// <summary>
+        /// Gets or sets the participants which wrote during the transaction.
+        /// </summary>
         [Id(1)]
         public List<ParticipantId> WriteParticipants { get; set; } = null!;
     }

@@ -9,7 +9,7 @@ namespace Orleans.Transactions.Abstractions
         /// <summary>
         /// Create an ITransactionalStateStorage by name.
         /// </summary>
-        /// <typeparam name="TState"></typeparam>
+        /// <typeparam name="TState">The transactional state type.</typeparam>
         /// <param name="storageName">Name of transaction state storage to create.</param>
         /// <param name="stateName">Name of transaction state.</param>
         /// <returns>The transactional state storage.</returns>
