@@ -40,4 +40,7 @@ public class JobTaskState
     /// </summary>
     [Id(5)]
     public TaskId[]? CanceledAfter { get; set; }
+
+    [Id(6)]
+    public DateTimeOffset? DueTime { get; set; }
 }

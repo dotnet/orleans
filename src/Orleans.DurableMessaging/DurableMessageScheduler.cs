@@ -12,7 +12,7 @@ using Orleans.Serialization.TypeSystem;
 namespace Orleans.DurableMessaging;
 
 [GenerateSerializer]
-internal sealed class ScheduledMessageState
+internal sealed class ScheduledMessageState : IDisposable
 {
     [Id(0)]
     public required DurableEnvelope Message { get; init; }
@@ -22,6 +22,8 @@ internal sealed class ScheduledMessageState
 
     [Id(2)]
     public string? JobId { get; set; }
+
+    public void Dispose() => Message.Dispose();
 }
 
 internal sealed class DurableMessageScheduler :
@@ -37,6 +39,7 @@ internal sealed class DurableMessageScheduler :
     private readonly ILocalDurableJobManager _jobManager;
     private readonly IDurableOutbox _outbox;
     private readonly IGrainContext _grainContext;
+    private readonly TimeProvider _timeProvider;
     private readonly SemaphoreSlim _gate = new(1, 1);
 
     public DurableMessageScheduler(
@@ -45,13 +48,15 @@ internal sealed class DurableMessageScheduler :
         ILocalDurableJobManager jobManager,
         IDurableJobHandlerRegistry handlers,
         IDurableOutbox outbox,
-        IGrainContext grainContext)
+        IGrainContext grainContext,
+        [FromKeyedServices(DurableJobTimeProviderNames.DurableJobs)] TimeProvider? timeProvider = null)
     {
         _messages = messages;
         _stateManager = stateManager;
         _jobManager = jobManager;
         _outbox = outbox;
         _grainContext = grainContext;
+        _timeProvider = timeProvider ?? TimeProvider.System;
         handlers.Register(this, requiresTurnIsolation: true);
         grainContext.ObservableLifecycle.Subscribe(
             RuntimeTypeNameFormatter.Format(GetType()),
@@ -67,9 +72,15 @@ internal sealed class DurableMessageScheduler :
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(true);
         try
         {
-            if (_messages.ContainsKey(message.MessageId))
+            if (_messages.TryGetValue(message.MessageId, out var existing))
             {
-                await EnsureJobUnderGateAsync(message.MessageId, cancellationToken).ConfigureAwait(true);
+                if (!ReferenceEquals(existing.Message.Data, message.Data))
+                {
+                    message.Dispose();
+                }
+
+                await _stateManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
+                await EnsureJobOrDeactivateUnderGateAsync(message.MessageId).ConfigureAwait(true);
                 return;
             }
 
@@ -78,8 +89,8 @@ internal sealed class DurableMessageScheduler :
                 Message = message,
                 DueTime = dueTime
             };
-            await _stateManager.WriteStateAsync(cancellationToken).ConfigureAwait(true);
-            await EnsureJobUnderGateAsync(message.MessageId, cancellationToken).ConfigureAwait(true);
+            await _stateManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
+            await EnsureJobOrDeactivateUnderGateAsync(message.MessageId).ConfigureAwait(true);
         }
         finally
         {
@@ -93,48 +104,68 @@ internal sealed class DurableMessageScheduler :
         IJobRunContext context,
         CancellationToken cancellationToken)
     {
-        if (context.Job.Metadata is null
-            || !context.Job.Metadata.TryGetValue(ScheduleIdMetadataKey, out var value)
-            || !Guid.TryParse(value, out var scheduleId))
-        {
-            return DurableJobRunResult.Completed;
-        }
-
-        await _gate.WaitAsync(cancellationToken).ConfigureAwait(true);
         try
         {
-            if (!_messages.TryGetValue(scheduleId, out var state))
+            await _stateManager.InitializeAsync(cancellationToken).ConfigureAwait(true);
+            if (context.Job.Metadata is null
+                || !context.Job.Metadata.TryGetValue(ScheduleIdMetadataKey, out var value)
+                || !Guid.TryParse(value, out var scheduleId))
             {
                 return DurableJobRunResult.Completed;
             }
 
-            if (state.JobId is null)
-            {
-                state.JobId = context.Job.Id;
-                _messages[scheduleId] = state;
-                await _stateManager.WriteStateAsync(cancellationToken).ConfigureAwait(true);
-            }
-            else if (!string.Equals(state.JobId, context.Job.Id, StringComparison.Ordinal))
-            {
-                return DurableJobRunResult.Completed;
-            }
-
-            _outbox.Send(state.Message);
-            _messages.Remove(scheduleId);
+            await _gate.WaitAsync(cancellationToken).ConfigureAwait(true);
             try
             {
-                await _stateManager.WriteStateAsync(cancellationToken).ConfigureAwait(true);
+                if (!_messages.TryGetValue(scheduleId, out var state))
+                {
+                    return DurableJobRunResult.Completed;
+                }
+
+                if (state.JobId is null)
+                {
+                    state.JobId = context.Job.Id;
+                    _messages[scheduleId] = state;
+                    await _stateManager.WriteStateAsync(cancellationToken).ConfigureAwait(true);
+                }
+                else if (!string.Equals(state.JobId, context.Job.Id, StringComparison.Ordinal))
+                {
+                    return DurableJobRunResult.Completed;
+                }
+
+                var message = state.Message.Retain();
+                try
+                {
+                    _outbox.Send(message);
+                }
+                finally
+                {
+                    message.Dispose();
+                }
+                _messages.Remove(scheduleId);
+                try
+                {
+                    await _stateManager.WriteStateAsync(cancellationToken).ConfigureAwait(true);
+                }
+                catch
+                {
+                    await _stateManager.RevertPendingChangesAsync(CancellationToken.None).ConfigureAwait(true);
+                    throw;
+                }
+                return DurableJobRunResult.Completed;
             }
-            catch
+            finally
             {
-                await _stateManager.RevertPendingChangesAsync(CancellationToken.None).ConfigureAwait(true);
-                throw;
+                _gate.Release();
             }
-            return DurableJobRunResult.Completed;
         }
-        finally
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            _gate.Release();
+            throw;
+        }
+        catch
+        {
+            return DurableJobRunResult.RescheduleAt(_timeProvider.GetUtcNow() + TimeSpan.FromSeconds(1));
         }
     }
 
@@ -182,6 +213,24 @@ internal sealed class DurableMessageScheduler :
             state.JobId = job.Id;
             _messages[scheduleId] = state;
             await _stateManager.WriteStateAsync(cancellationToken).ConfigureAwait(true);
+        }
+    }
+
+    private async ValueTask EnsureJobOrDeactivateUnderGateAsync(Guid scheduleId)
+    {
+        try
+        {
+            await EnsureJobUnderGateAsync(scheduleId, CancellationToken.None).ConfigureAwait(true);
+        }
+        catch (Exception exception)
+        {
+            _grainContext.Deactivate(
+                new DeactivationReason(
+                    DeactivationReasonCode.ApplicationError,
+                    exception,
+                    $"Failed to schedule durable delivery for message '{scheduleId}'."),
+                CancellationToken.None);
+            throw;
         }
     }
 }

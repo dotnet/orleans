@@ -1,5 +1,6 @@
 ﻿#nullable enable
 using System;
+using System.Buffers;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Distributed.DurableTasks;
@@ -72,22 +73,32 @@ public interface IDurableTaskRequest : IRequest
                 $"Durable task requests exceed the {MaxEquivalentArgumentCount}-argument equivalence limit.");
         }
 
-        var totalLength = 0;
-        for (var arg = 0; arg < left.GetArgumentCount(); arg++)
+        var leftBuffer = ArrayPool<byte>.Shared.Rent(MaxEquivalentArgumentLength);
+        var rightBuffer = ArrayPool<byte>.Shared.Rent(MaxEquivalentArgumentLength);
+        try
         {
-            var leftBytes = SerializeArgument(left.GetArgument(arg), serializer, arg);
-            var rightBytes = SerializeArgument(right.GetArgument(arg), serializer, arg);
-            totalLength = checked(totalLength + leftBytes.Length + rightBytes.Length);
-            if (totalLength > MaxEquivalentArgumentsTotalLength)
+            var totalLength = 0;
+            for (var arg = 0; arg < left.GetArgumentCount(); arg++)
             {
-                throw new InvalidOperationException(
-                    $"Durable task request arguments exceed the {MaxEquivalentArgumentsTotalLength}-byte equivalence limit.");
-            }
+                var leftBytes = SerializeArgument(left.GetArgument(arg), serializer, arg, leftBuffer);
+                var rightBytes = SerializeArgument(right.GetArgument(arg), serializer, arg, rightBuffer);
+                totalLength = checked(totalLength + leftBytes.Length + rightBytes.Length);
+                if (totalLength > MaxEquivalentArgumentsTotalLength)
+                {
+                    throw new InvalidOperationException(
+                        $"Durable task request arguments exceed the {MaxEquivalentArgumentsTotalLength}-byte equivalence limit.");
+                }
 
-            if (!leftBytes.Span.SequenceEqual(rightBytes.Span))
-            {
-                return false;
+                if (!leftBytes.Span.SequenceEqual(rightBytes.Span))
+                {
+                    return false;
+                }
             }
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(leftBuffer, clearArray: true);
+            ArrayPool<byte>.Shared.Return(rightBuffer, clearArray: true);
         }
 
         return (left.Context, right.Context) switch
@@ -124,9 +135,13 @@ public interface IDurableTaskRequest : IRequest
                 .SequenceEqual(rightMethod.GetParameters().Select(static parameter => parameter.ParameterType));
         }
 
-        static ReadOnlyMemory<byte> SerializeArgument(object? value, Serializer serializer, int argumentIndex)
+        static ReadOnlyMemory<byte> SerializeArgument(
+            object? value,
+            Serializer serializer,
+            int argumentIndex,
+            byte[] buffer)
         {
-            Memory<byte> destination = new byte[MaxEquivalentArgumentLength];
+            Memory<byte> destination = buffer.AsMemory(0, MaxEquivalentArgumentLength);
             try
             {
                 serializer.Serialize(value, ref destination);

@@ -17,4 +17,5 @@ internal sealed class DurableTaskGrainRuntimeShared(
     public Serializer Serializer { get; } = serializer;
     public CleanupPolicy DefaultCleanupPolicy { get; } = new() { CleanupAge = TimeSpan.FromDays(1) };
     internal TimeSpan DeactivationDrainTimeout { get; set; } = TimeSpan.FromSeconds(30);
+    internal bool AllowTaskDelegatesForTesting { get; set; }
 }

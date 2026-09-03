@@ -469,6 +469,7 @@ public class DurableEnvelopeBuilderTests : IClassFixture<DefaultClusterFixture>
 
         // Assert
         Assert.True(envelope.Data.TryGetBody<TestRequest>(out var body));
+        Assert.NotNull(body);
         Assert.Equal(123, body.Id);
         Assert.Equal("test", body.Name);
         Assert.Equal(45.67m, body.Amount);

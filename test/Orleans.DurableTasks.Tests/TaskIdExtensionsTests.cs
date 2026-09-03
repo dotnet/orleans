@@ -1,7 +1,7 @@
 using System.Distributed.DurableTasks;
 using Xunit;
 
-namespace Orleans;
+namespace Orleans.DurableTasks.Tests;
 
 /// <summary>
 /// Tests for the <see cref="TaskIdExtensions"/> class.

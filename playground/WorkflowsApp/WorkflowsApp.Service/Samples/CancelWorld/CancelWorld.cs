@@ -43,7 +43,19 @@ internal static class CancelWorld
 
     internal class BlockingGrain : DurableGrain, IBlockingGrain
     {
-        public DurableTask BlockUntilCanceled(string name) => DurableTask.Run(cancellation => Task.Delay(Timeout.Infinite, cancellation));
+        public async DurableTask BlockUntilCanceled(string name)
+        {
+            var context = DurableExecutionContext.CurrentContext
+                ?? throw new InvalidOperationException("A durable execution context is required.");
+            using var cancellation = new CancellationTokenSource();
+            using var registration = context.RegisterCancellationCallback(
+                static (source, _) => source.CancelAsync(),
+                cancellation);
+            using var deactivationRegistration = context.RegisterDeactivationCallback(
+                static (source, _) => source.CancelAsync(),
+                cancellation);
+            await Task.Delay(Timeout.Infinite, cancellation.Token);
+        }
     }
 
     [Alias("WorkflowsApp.Service.Samples.CancelWorld.CancelWorld.IBlockingWorkflowGrain")]

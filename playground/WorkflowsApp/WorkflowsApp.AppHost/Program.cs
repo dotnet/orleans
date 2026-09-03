@@ -8,6 +8,7 @@ var azureStorage = builder.AddAzureStorage("az-storage").RunAsEmulator(builder =
 var azureBlobs = azureStorage.AddBlobs("state");
 
 builder.AddProject<Projects.WorkflowsApp_Service>("workflowsapp-service")
+    .WithArgs("--framework", "net10.0")
     .WithReference(azureBlobs, "state")
     .WaitFor(azureStorage);
 

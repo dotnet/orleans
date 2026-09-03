@@ -88,24 +88,35 @@ public sealed class LiteDbJobStorage(Serializer<JobTaskState> serializer, DeepCo
     {
         lock (_lock)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var collection = _db.GetCollection<JobEntity>("jobs");
-            foreach (var (id, task) in _workingCopy)
+            var entries = _workingCopy.Select(pair => new JobEntity
             {
-                var entry = new JobEntity
+                Id = pair.Key.ToString(),
+                Payload = _serializer.SerializeToArray(pair.Value),
+            }).ToList();
+
+            _db.BeginTrans();
+            try
+            {
+                foreach (var entry in entries)
                 {
-                    Id = id.ToString(),
-                    Payload = _serializer.SerializeToArray(task),
-                };
+                    collection.Upsert(entry);
+                }
 
-                collection.Upsert(entry);
+                foreach (var id in _removed)
+                {
+                    collection.Delete(id.ToString());
+                }
+
+                _db.Commit();
+                _removed.Clear();
             }
-
-            foreach (var id in _removed)
+            catch
             {
-                collection.Delete(id.ToString());
+                _db.Rollback();
+                throw;
             }
-
-            _removed.Clear();
         }
 
         return default;

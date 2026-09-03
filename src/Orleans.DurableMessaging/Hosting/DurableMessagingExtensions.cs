@@ -101,7 +101,8 @@ public static class DurableMessagingExtensions
                 sp.GetRequiredService<IGrainContext>(),
                 sp.GetRequiredService<DurableMessagingInstruments>(),
                 sp.GetServices<IInboxHandler>(),
-                options.MaxCapacity);
+                options.MaxCapacity,
+                sp.GetRequiredService<TimeProvider>());
         });
 
         services.TryAddKeyedScoped<IDurableOutbox, DurableOutbox>("outbox");

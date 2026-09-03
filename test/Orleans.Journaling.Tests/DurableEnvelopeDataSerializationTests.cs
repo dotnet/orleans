@@ -244,6 +244,7 @@ public class DurableEnvelopeDataSerializationTests : IDisposable
         var expected = new SimpleRecord(42, "Test");
         var data = CreateEnvelopeData(expected);
         Assert.True(data.TryGetBody<SimpleRecord>(out var value));
+        Assert.NotNull(value);
         Assert.Equal(expected.Id, value.Id);
         Assert.Equal(expected.Name, value.Name);
     }
@@ -258,6 +259,7 @@ public class DurableEnvelopeDataSerializationTests : IDisposable
         var data = CreateEnvelopeData(expected);
 
         Assert.True(data.TryGetBody<NestedRecord>(out var value));
+        Assert.NotNull(value);
         Assert.Equal(expected.Id, value.Id);
         Assert.NotNull(value.Inner);
         Assert.Equal(expected.Inner.Id, value.Inner.Id);
@@ -282,6 +284,7 @@ public class DurableEnvelopeDataSerializationTests : IDisposable
         var data = CreateEnvelopeData(expected);
 
         Assert.True(data.TryGetBody<ComplexClass>(out var value));
+        Assert.NotNull(value);
         Assert.Equal(expected.IntValue, value.IntValue);
         Assert.Equal(expected.StringValue, value.StringValue);
         Assert.Equal(expected.DoubleValue, value.DoubleValue);
@@ -309,6 +312,7 @@ public class DurableEnvelopeDataSerializationTests : IDisposable
         var data = CreateEnvelopeData(expected);
 
         Assert.True(data.TryGetBody<ComplexClass>(out var value));
+        Assert.NotNull(value);
         Assert.Null(value.NullableInt);
         Assert.Null(value.NullableString);
     }
@@ -337,6 +341,7 @@ public class DurableEnvelopeDataSerializationTests : IDisposable
         var expected = Array.Empty<int>();
         var data = CreateEnvelopeData(expected);
         Assert.True(data.TryGetBody<int[]>(out var value));
+        Assert.NotNull(value);
         Assert.Empty(value);
     }
 
@@ -360,6 +365,7 @@ public class DurableEnvelopeDataSerializationTests : IDisposable
         };
         var data = CreateEnvelopeData(expected);
         Assert.True(data.TryGetBody<List<SimpleRecord>>(out var value));
+        Assert.NotNull(value);
         Assert.Equal(expected.Count, value.Count);
         for (var i = 0; i < expected.Count; i++)
         {
@@ -392,6 +398,7 @@ public class DurableEnvelopeDataSerializationTests : IDisposable
         };
         var data = CreateEnvelopeData(expected);
         Assert.True(data.TryGetBody<Dictionary<string, SimpleRecord>>(out var value));
+        Assert.NotNull(value);
         Assert.Equal(expected.Count, value.Count);
         foreach (var kvp in expected)
         {
@@ -469,6 +476,7 @@ public class DurableEnvelopeDataSerializationTests : IDisposable
         Assert.NotEqual(Guid.Empty, guidValue);
 
         Assert.True(data.TryGetContextValue<SimpleRecord>("record-key", out var recordValue));
+        Assert.NotNull(recordValue);
         Assert.Equal(1, recordValue.Id);
         Assert.Equal("context-record", recordValue.Name);
     }
@@ -507,6 +515,7 @@ public class DurableEnvelopeDataSerializationTests : IDisposable
 
         // Verify body is preserved
         Assert.True(deserializedData.TryGetBody<SimpleRecord>(out var body));
+        Assert.NotNull(body);
         Assert.Equal(42, body.Id);
         Assert.Equal("round-trip", body.Name);
     }
@@ -571,6 +580,7 @@ public class DurableEnvelopeDataSerializationTests : IDisposable
         Assert.NotNull(deserializedData);
 
         Assert.True(deserializedData.TryGetBody<NestedRecord>(out var body));
+        Assert.NotNull(body);
         Assert.Equal(1, body.Id);
         Assert.NotNull(body.Inner);
         Assert.Equal(100, body.Inner.Id);

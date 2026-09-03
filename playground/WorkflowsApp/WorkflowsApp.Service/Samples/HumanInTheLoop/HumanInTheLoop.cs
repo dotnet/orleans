@@ -54,7 +54,19 @@ internal static class HumanInTheLoop
 
     internal class GreeterGrain([FromKeyedServices("state")] IDurableTaskCompletionSource<string> state) : DurableGrain, IGreeterGrain
     {
-        public DurableTask<string> GetGreetingAsync() => DurableTask.Run(state.Task.WaitAsync);
+        public async DurableTask<string> GetGreetingAsync()
+        {
+            var context = DurableExecutionContext.CurrentContext
+                ?? throw new InvalidOperationException("A durable execution context is required.");
+            using var cancellation = new CancellationTokenSource();
+            using var registration = context.RegisterCancellationCallback(
+                static (source, _) => source.CancelAsync(),
+                cancellation);
+            using var deactivationRegistration = context.RegisterDeactivationCallback(
+                static (source, _) => source.CancelAsync(),
+                cancellation);
+            return await state.Task.WaitAsync(cancellation.Token);
+        }
 
         public async ValueTask SetGreetingAsync(string greeting)
         {

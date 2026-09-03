@@ -213,6 +213,11 @@ namespace Orleans.Journaling
         void Initialize();
     }
 
+    public partial interface IJournaledResourceOwner : System.IDisposable
+    {
+        object ResourceIdentity { get; }
+    }
+
     public partial interface IJournaledState
     {
         void AppendEntries(JournalStreamWriter writer);

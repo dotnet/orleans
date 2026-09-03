@@ -140,7 +140,10 @@ public class DurableTaskGrainRuntimeTests
             new TestGrainContextAccessor(grainContext),
             timeProvider,
             NullLogger<DurableTaskGrainRuntime>.Instance,
-            services.GetRequiredService<Serializer>());
+            services.GetRequiredService<Serializer>())
+        {
+            AllowTaskDelegatesForTesting = true
+        };
         var transport = withTransport ? new RecordingDurableTaskMessageTransport() : null;
         IEnumerable<IDurableTaskMessageTransport> transports = transport is null ? [] : [transport];
         var runtime = new DurableTaskGrainRuntime(storage, shared, transports, turnIsolation);
@@ -170,6 +173,22 @@ public class DurableTaskGrainRuntimeTests
     /// clearly-reported test failure instead.
     /// </summary>
     private static CancellationToken BoundedWait() => new CancellationTokenSource(TimeSpan.FromSeconds(15)).Token;
+
+    private static async DurableTask WaitUntilCanceledAsync(TaskCompletionSource started)
+    {
+        var context = DurableExecutionContext.CurrentContext
+            ?? throw new InvalidOperationException("A durable execution context is required.");
+        using var cancellation = new CancellationTokenSource();
+        using var registration = context.RegisterCancellationTokenSource(cancellation);
+        started.TrySetResult();
+        await Task.Delay(Timeout.InfiniteTimeSpan, cancellation.Token);
+    }
+
+    private static async DurableTask WaitUntilReleasedAsync(TaskCompletionSource started, Task release)
+    {
+        started.TrySetResult();
+        await release;
+    }
 
     [Fact]
     public async Task ScheduleAsync_NewTask_PersistsStateAndReturnsPending()
@@ -913,11 +932,7 @@ public class DurableTaskGrainRuntimeTests
         var fixture = CreateFixture();
         var taskId = TaskId.Create("cancel-local-handle");
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var task = DurableTask.Run(async cancellationToken =>
-        {
-            started.SetResult();
-            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
-        });
+        var task = WaitUntilCanceledAsync(started);
 
         var handle = await fixture.Runtime.ScheduleChildAsync(taskId, task, CancellationToken.None);
         await started.Task.WaitAsync(
@@ -1285,10 +1300,17 @@ public class DurableTaskGrainRuntimeTests
         await restarted.ResumePendingTasksAsync(CancellationToken.None);
 
         Assert.Equal(0, recoveredRequest.CreateTaskCallCount);
-        await restarted.GetScheduledTaskHandle(taskId).CancelAsync(CancellationToken.None);
+        var cancellationTask = restarted.GetScheduledTaskHandle(taskId).CancelAsync(BoundedWait()).AsTask();
+        await Task.Yield();
         Assert.Contains(
             fixture.Transport!.Cancellations,
             cancellation => cancellation.Target == target && cancellation.TaskId == taskId);
+        await restarted.AcceptCancellationAcknowledgementAsync(
+            taskId,
+            target,
+            DurableTaskResponse.FromException(new OperationCanceledException()),
+            CancellationToken.None);
+        await cancellationTask;
     }
 
     [Fact]
@@ -1682,10 +1704,17 @@ public class DurableTaskGrainRuntimeTests
         await fixture.Storage.ReadAsync(CancellationToken.None);
         var restarted = CreateSecondRuntime(fixture);
 
-        await restarted.GetScheduledTaskHandle(taskId).CancelAsync(CancellationToken.None);
+        var cancellationTask = restarted.GetScheduledTaskHandle(taskId).CancelAsync(BoundedWait()).AsTask();
+        await Task.Yield();
 
         var cancellation = Assert.Single(fixture.Transport!.Cancellations);
         Assert.Equal((fixture.GrainId, target, taskId), cancellation);
+        await restarted.AcceptCancellationAcknowledgementAsync(
+            taskId,
+            target,
+            DurableTaskResponse.FromException(new OperationCanceledException()),
+            CancellationToken.None);
+        await cancellationTask;
     }
 
     [Fact]
@@ -2056,11 +2085,7 @@ public class DurableTaskGrainRuntimeTests
         {
             if (Interlocked.Increment(ref attempts) == 1)
             {
-                return DurableTask.Run(async cancellationToken =>
-                {
-                    firstAttemptStarted.SetResult();
-                    await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
-                });
+                return WaitUntilCanceledAsync(firstAttemptStarted);
             }
 
             return DurableTask.FromResult(53);
@@ -2097,11 +2122,7 @@ public class DurableTaskGrainRuntimeTests
         var taskId = TaskId.Create("non-cooperative-stop");
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var request = new RuntimeTestDurableTaskRequest(() => DurableTask.Run(async _ =>
-        {
-            started.TrySetResult();
-            await release.Task;
-        }))
+        var request = new RuntimeTestDurableTaskRequest(() => WaitUntilReleasedAsync(started, release.Task))
         {
             Context = new DurableTaskRequestContext { TargetId = fixture.GrainId },
         };

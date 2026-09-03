@@ -24,13 +24,13 @@ public abstract class DurableTask
     public static DurableTask Run<TState>(Func<TState, CancellationToken, Task> func, TState state) => new AsyncTaskDelegateDurableTaskWithState<TState>(func, state);
     public static DurableTask<TResult> Run<TState, TResult>(Func<TState, CancellationToken, Task<TResult>> func, TState state) => new AsyncTaskDelegateDurableTaskWithState<TState, TResult>(func, state);
 
-    public static DurableTask WhenAll(List<DurableTask> tasks)
-        => Run(async (tasks, cancellationToken) =>
+    public static async DurableTask WhenAll(List<DurableTask> tasks)
     {
-        if (DurableExecutionContext.CurrentContext is null)
-        {
-            throw new InvalidOperationException($"{nameof(DurableTask)}.{nameof(WhenAll)} can only be used within a durable task context.");
-        }
+        var context = DurableExecutionContext.CurrentContext
+            ?? throw new InvalidOperationException($"{nameof(DurableTask)}.{nameof(WhenAll)} can only be used within a durable task context.");
+        using var cancellation = new CancellationTokenSource();
+        using var registration = context.RegisterCancellationTokenSource(cancellation);
+        var cancellationToken = cancellation.Token;
 
         var result = new List<ScheduledTask>();
         for (var i = 0; i < tasks.Count; i++)
@@ -38,20 +38,26 @@ public abstract class DurableTask
             result.Add(await tasks[i].ScheduleAsync($"{i}", cancellationToken));
         }
 
+        var completions = new List<Task<DurableTaskResponse>>(result.Count);
         foreach (var task in result)
         {
-            (await task.GetResponseAsync(cancellationToken)).ThrowIfExceptionResponse();
+            completions.Add(task.GetResponseAsync(cancellationToken));
         }
 
-    }, tasks);
-
-    public static DurableTask<List<TResult>> WhenAll<TResult>(List<DurableTask<TResult>> tasks)
-        => Run(async (tasks, cancellationToken) =>
-    {
-        if (DurableExecutionContext.CurrentContext is null)
+        foreach (var response in await Task.WhenAll(completions))
         {
-            throw new InvalidOperationException($"{nameof(DurableTask)}.{nameof(WhenAll)} can only be used within a durable task context.");
+            response.ThrowIfExceptionResponse();
         }
+
+    }
+
+    public static async DurableTask<List<TResult>> WhenAll<TResult>(List<DurableTask<TResult>> tasks)
+    {
+        var context = DurableExecutionContext.CurrentContext
+            ?? throw new InvalidOperationException($"{nameof(DurableTask)}.{nameof(WhenAll)} can only be used within a durable task context.");
+        using var cancellation = new CancellationTokenSource();
+        using var registration = context.RegisterCancellationTokenSource(cancellation);
+        var cancellationToken = cancellation.Token;
 
         var result = new List<ScheduledTask<TResult>>();
         for (var i = 0; i < tasks.Count; i++)
@@ -59,23 +65,28 @@ public abstract class DurableTask
             result.Add(await tasks[i].ScheduleAsync($"{i}", cancellationToken: cancellationToken));
         }
 
-        var values = new List<TResult>(result.Count);
+        var completions = new List<Task<DurableTaskResponse>>(result.Count);
         foreach (var task in result)
         {
-            var response = await task.GetResponseAsync(cancellationToken);
+            completions.Add(task.GetResponseAsync(cancellationToken));
+        }
+
+        var values = new List<TResult>(result.Count);
+        foreach (var response in await Task.WhenAll(completions))
+        {
             values.Add(response.GetResult<TResult>());
         }
 
         return values;
-    }, tasks);
+    }
 
-    public static DurableTask<int> WhenAny(List<DurableTask> tasks)
-    => Run(async (tasks, cancellationToken) =>
+    public static async DurableTask<int> WhenAny(List<DurableTask> tasks)
     {
-        if (DurableExecutionContext.CurrentContext is null)
-        {
-            throw new InvalidOperationException($"{nameof(DurableTask)}.{nameof(WhenAny)} can only be used within a durable task context.");
-        }
+        var context = DurableExecutionContext.CurrentContext
+            ?? throw new InvalidOperationException($"{nameof(DurableTask)}.{nameof(WhenAny)} can only be used within a durable task context.");
+        using var cancellation = new CancellationTokenSource();
+        using var registration = context.RegisterCancellationTokenSource(cancellation);
+        var cancellationToken = cancellation.Token;
 
         var result = new List<ScheduledTask>();
         for (var i = 0; i < tasks.Count; i++)
@@ -83,25 +94,33 @@ public abstract class DurableTask
             result.Add(await tasks[i].ScheduleAsync($"{i}", cancellationToken));
         }
 
-        var completions = new List<Task>(result.Count);
+        using var waitCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var completions = new List<Task<DurableTaskResponse>>(result.Count);
         foreach (var task in result)
         {
-            completions.Add(task.GetResponseAsync(cancellationToken));
+            completions.Add(task.GetResponseAsync(waitCancellation.Token));
         }
 
-        var completed = await Task.WhenAny(completions);
-        var index = completions.IndexOf(completed);
-        (await result[index].GetResponseAsync(cancellationToken)).ThrowIfExceptionResponse();
-        return index;
-    }, tasks);
-
-    public static DurableTask<int> WhenAny<TResult>(List<DurableTask<TResult>> tasks)
-    => Run(async (tasks, cancellationToken) =>
-    {
-        if (DurableExecutionContext.CurrentContext is null)
+        try
         {
-            throw new InvalidOperationException($"{nameof(DurableTask)}.{nameof(WhenAny)} can only be used within a durable task context.");
+            var completed = await Task.WhenAny(completions);
+            var index = completions.IndexOf(completed);
+            (await completions[index]).ThrowIfExceptionResponse();
+            return index;
         }
+        finally
+        {
+            waitCancellation.Cancel();
+        }
+    }
+
+    public static async DurableTask<int> WhenAny<TResult>(List<DurableTask<TResult>> tasks)
+    {
+        var context = DurableExecutionContext.CurrentContext
+            ?? throw new InvalidOperationException($"{nameof(DurableTask)}.{nameof(WhenAny)} can only be used within a durable task context.");
+        using var cancellation = new CancellationTokenSource();
+        using var registration = context.RegisterCancellationTokenSource(cancellation);
+        var cancellationToken = cancellation.Token;
 
         var result = new List<ScheduledTask<TResult>>();
         for (var i = 0; i < tasks.Count; i++)
@@ -109,17 +128,25 @@ public abstract class DurableTask
             result.Add(await tasks[i].ScheduleAsync($"{i}", cancellationToken));
         }
 
-        var completions = new List<Task>(result.Count);
+        using var waitCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var completions = new List<Task<DurableTaskResponse>>(result.Count);
         foreach (var task in result)
         {
-            completions.Add(task.GetResponseAsync(cancellationToken));
+            completions.Add(task.GetResponseAsync(waitCancellation.Token));
         }
 
-        var completed = await Task.WhenAny(completions);
-        var index = completions.IndexOf(completed);
-        _ = (await result[index].GetResponseAsync(cancellationToken)).GetResult<TResult>();
-        return index;
-    }, tasks);
+        try
+        {
+            var completed = await Task.WhenAny(completions);
+            var index = completions.IndexOf(completed);
+            _ = (await completions[index]).GetResult<TResult>();
+            return index;
+        }
+        finally
+        {
+            waitCancellation.Cancel();
+        }
+    }
 
     /// <summary>
     /// Invokes the task with the provided context.
@@ -290,7 +317,7 @@ internal sealed class DelayDurableTask(TimeSpan duration) : DurableTask, ISchedu
     {
         var context = DurableExecutionContext.CurrentContext
             ?? throw new InvalidOperationException("DurableTask.Delay can only be scheduled from a durable execution context.");
-        return await context.ScheduleDelayAsync(taskId, DateTimeOffset.UtcNow + duration, cancellationToken);
+        return await context.ScheduleDelayAsync(taskId, context.GetUtcNow() + duration, cancellationToken);
     }
 
     public IScheduledTaskHandle GetHandle(TaskId taskId)
@@ -407,6 +434,7 @@ internal sealed class AsyncTaskDelegateDurableTask<TResult>(Func<CancellationTok
     {
         try
         {
+            context.EnsureTaskDelegateSupported(func);
             DurableExecutionContext.SetCurrentContext(context);
             using var cts = new CancellationTokenSource();
             using var registration = context.RegisterCancellationTokenSource(cts);
@@ -429,6 +457,7 @@ internal sealed class AsyncTaskDelegateDurableTask(Func<CancellationToken, Task>
     {
         try
         {
+            context.EnsureTaskDelegateSupported(func);
             DurableExecutionContext.SetCurrentContext(context);
             using var cts = new CancellationTokenSource();
             using var registration = context.RegisterCancellationTokenSource(cts);
@@ -505,6 +534,7 @@ internal sealed class AsyncTaskDelegateDurableTaskWithState<TState, TResult>(Fun
     {
         try
         {
+            context.EnsureTaskDelegateSupported(func);
             DurableExecutionContext.SetCurrentContext(context);
             using var cts = new CancellationTokenSource();
             using var registration = context.RegisterCancellationTokenSource(cts);
@@ -527,6 +557,7 @@ internal sealed class AsyncTaskDelegateDurableTaskWithState<TState>(Func<TState,
     {
         try
         {
+            context.EnsureTaskDelegateSupported(func);
             DurableExecutionContext.SetCurrentContext(context);
             using var cts = new CancellationTokenSource();
             using var registration = context.RegisterCancellationTokenSource(cts);

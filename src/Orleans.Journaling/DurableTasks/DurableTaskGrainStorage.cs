@@ -33,13 +33,10 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
         _stateCopier = stateCopier;
     }
 
-    public IEnumerable<(TaskId Id, IDurableTaskState State)> Tasks =>
-        _items.Select(pair => (pair.Key, (IDurableTaskState)CopyStoredState(pair.Value)));
+    public IEnumerable<(TaskId Id, IDurableTaskState State)> Tasks => EnumerateTasks(parentId: null);
 
     public IEnumerable<(TaskId Id, IDurableTaskState State)> GetChildren(TaskId parentId) =>
-        _items
-            .Where(pair => parentId.IsParentOf(pair.Key))
-            .Select(pair => (pair.Key, (IDurableTaskState)CopyStoredState(pair.Value)));
+        EnumerateTasks(parentId);
 
     public IDurableTaskState GetOrCreateTask(TaskId taskId, IDurableTaskRequest? request)
     {
@@ -75,7 +72,7 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
         ArgumentNullException.ThrowIfNull(request);
         var typedState = CopyState(taskId, state);
         typedState.Request = request;
-        _items[taskId] = typedState;
+        _items[taskId] = CopyStoredState(typedState);
     }
 
     public void SetResponse(TaskId taskId, IDurableTaskState state, DurableTaskResponse response)
@@ -84,7 +81,7 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
         var typedState = CopyState(taskId, state);
         typedState.Result = response;
         typedState.CompletedAt = _timeProvider.GetUtcNow();
-        _items[taskId] = typedState;
+        _items[taskId] = CopyStoredState(typedState);
     }
 
     public void RequestCancellation(TaskId taskId, IDurableTaskState state)
@@ -175,6 +172,25 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
     private DurableTaskState CopyStoredState(DurableTaskState state) =>
         _stateCopier.Copy(state)
         ?? throw new InvalidOperationException("The durable task state copier returned null.");
+
+    private IEnumerable<(TaskId Id, IDurableTaskState State)> EnumerateTasks(TaskId? parentId)
+    {
+        foreach (var (taskId, storedState) in _items.ToList())
+        {
+            if (parentId.HasValue && !parentId.Value.IsParentOf(taskId))
+            {
+                continue;
+            }
+
+            var copy = CopyStoredState(storedState);
+            if (copy.MigrateLegacyObservers())
+            {
+                _items[taskId] = CopyStoredState(copy);
+            }
+
+            yield return (taskId, copy);
+        }
+    }
 
     public bool RemoveTask(TaskId taskId)
     {

@@ -39,7 +39,17 @@ public class DurableJobsExtensionsTests
         var context = Substitute.For<IGrainContext>();
         context.ObservableLifecycle.Returns(Substitute.For<IGrainLifecycle>());
         configurator.Configure(context);
-        context.Received(1).SetComponent(Arg.Any<DurableJobExecutionLifetime>());
+        var componentTypes = context.ReceivedCalls()
+            .Where(static call => call.GetMethodInfo().Name == nameof(IGrainContext.SetComponent))
+            .Select(static call => call.GetMethodInfo().GetGenericArguments()[0])
+            .ToList();
+        Assert.Equal(
+            [
+                typeof(DurableJobExecutionLifetime),
+                typeof(ActivationDeactivationCoordinator),
+                typeof(IActivationDeactivationParticipant),
+            ],
+            componentTypes);
     }
 
     [Fact]

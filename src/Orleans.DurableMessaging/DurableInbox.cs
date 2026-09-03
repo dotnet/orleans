@@ -15,7 +15,7 @@ namespace Orleans.DurableMessaging;
 /// Durable inbox implementation for receiving and processing messages.
 /// Uses IDurableDictionary for persistent storage with deduplication support.
 /// </summary>
-internal sealed class DurableInbox : IDurableInbox, ILifecycleObserver
+internal sealed class DurableInbox : IDurableInbox, ILifecycleObserver, IActivationDeactivationParticipant
 {
     private readonly IDurableDictionary<(GrainId SenderId, Guid MessageId), DurableEnvelope> _inbox;
     private readonly IDurableDictionary<(GrainId SenderId, Guid MessageId), DateTimeOffset> _processed;
@@ -24,6 +24,7 @@ internal sealed class DurableInbox : IDurableInbox, ILifecycleObserver
     private readonly int _capacity;
     private readonly IServiceProvider? _serviceProvider;
     private readonly DurableMessagingInstruments? _instruments;
+    private readonly TimeProvider _timeProvider;
     private DurableInboxExtension? _extension;
 
     /// <summary>
@@ -35,7 +36,8 @@ internal sealed class DurableInbox : IDurableInbox, ILifecycleObserver
     public DurableInbox(
         IDurableDictionary<(GrainId SenderId, Guid MessageId), DurableEnvelope> inbox,
         IDurableDictionary<(GrainId SenderId, Guid MessageId), DateTimeOffset> processed,
-        int capacity = 1000)
+        int capacity = 1000,
+        TimeProvider? timeProvider = null)
     {
         ArgumentNullException.ThrowIfNull(inbox);
         ArgumentNullException.ThrowIfNull(processed);
@@ -46,6 +48,7 @@ internal sealed class DurableInbox : IDurableInbox, ILifecycleObserver
         _handlers = new List<IInboxHandler>();
         _legacyRouteHandlers = new Dictionary<string, IInboxHandler>();
         _capacity = capacity;
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     internal DurableInbox(
@@ -55,8 +58,9 @@ internal sealed class DurableInbox : IDurableInbox, ILifecycleObserver
         IGrainContext grainContext,
         DurableMessagingInstruments instruments,
         IEnumerable<IInboxHandler> handlers,
-        int capacity)
-        : this(inbox, processed, capacity)
+        int capacity,
+        TimeProvider timeProvider)
+        : this(inbox, processed, capacity, timeProvider)
     {
         ArgumentNullException.ThrowIfNull(serviceProvider);
         ArgumentNullException.ThrowIfNull(grainContext);
@@ -64,6 +68,7 @@ internal sealed class DurableInbox : IDurableInbox, ILifecycleObserver
 
         _serviceProvider = serviceProvider;
         _instruments = instruments;
+        ActivationDeactivationCoordinator.Register(grainContext, this);
         foreach (var handler in handlers)
         {
             RegisterHandler(handler);
@@ -162,7 +167,7 @@ internal sealed class DurableInbox : IDurableInbox, ILifecycleObserver
     public void MarkProcessed(GrainId senderId, Guid messageId)
     {
         var key = (senderId, messageId);
-        _processed[key] = DateTimeOffset.UtcNow;
+        _processed[key] = _timeProvider.GetUtcNow();
     }
 
     /// <summary>
@@ -265,6 +270,10 @@ internal sealed class DurableInbox : IDurableInbox, ILifecycleObserver
             await _extension.OnStop(cancellationToken).ConfigureAwait(true);
         }
     }
+
+    public void OnDeactivationRequested() => _extension?.StopProcessing();
+
+    public Task OnDeactivatingAsync(CancellationToken cancellationToken) => OnStop(cancellationToken);
 }
 
 /// <summary>

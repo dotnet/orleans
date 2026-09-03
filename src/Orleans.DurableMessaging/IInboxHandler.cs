@@ -211,7 +211,7 @@ public interface IInboxHandler<TMessage> : IInboxHandler
     {
         if (context.Envelope.Data.TryGetBody<TMessage>(out var typed))
         {
-            return HandleAsync(typed, context, cancellationToken);
+            return HandleAsync(typed!, context, cancellationToken);
         }
 
         throw new InvalidOperationException($"Failed to deserialize message body as {typeof(TMessage).Name}");

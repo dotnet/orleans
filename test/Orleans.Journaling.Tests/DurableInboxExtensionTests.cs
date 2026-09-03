@@ -958,7 +958,11 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
     {
         var phase = (DurableInboxPersistencePhase)phaseValue;
         var faultInjector = new ThrowOnceFaultInjector(phase);
+        var inbox = new Dictionary<(GrainId, Guid), DurableEnvelope>();
+        var stateManager = new TestStateManager();
         var extension = CreateInboxExtension(
+            inbox: inbox,
+            stateManager: stateManager,
             faultInjector: faultInjector,
             maxProcessingAttempts: 2);
         var handler = new CountingHandler();
@@ -968,6 +972,15 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
             GrainId.Create("test", "crash-receiver"),
             "test.route",
             "payload");
+        using var recoveryEnvelope = envelope.Retain();
+        var key = (envelope.SenderId, envelope.MessageId);
+        stateManager.RevertAction = () =>
+        {
+            if (!inbox.ContainsKey(key))
+            {
+                inbox[key] = recoveryEnvelope.Retain();
+            }
+        };
 
         _ = await extension.DeliverAsync(
             envelope,
@@ -1180,6 +1193,7 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
             new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource AllowWrite { get; } =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public Action? RevertAction { get; set; }
 
         public ValueTask InitializeAsync(CancellationToken cancellationToken = default) => ValueTask.CompletedTask;
 
@@ -1211,6 +1225,7 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
         public ValueTask RevertPendingChangesAsync(CancellationToken cancellationToken = default)
         {
             RevertCount++;
+            RevertAction?.Invoke();
             return ValueTask.CompletedTask;
         }
 

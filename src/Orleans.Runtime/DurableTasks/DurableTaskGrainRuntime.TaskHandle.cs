@@ -34,6 +34,7 @@ internal sealed partial class DurableTaskGrainRuntime
             else
             {
                 await runtime.CancelRemoteAsync(TaskId, RemoteTarget, cancellationToken);
+                _ = await ResponseTask.WaitAsync(cancellationToken);
             }
         }
 

@@ -124,28 +124,44 @@ public abstract class ScheduledTask
 
     public static async Task<ScheduledTask> WhenAny(List<ScheduledTask> tasks, CancellationToken cancellationToken = default)
     {
+        using var waitCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var completions = new List<Task>(tasks.Count);
         foreach (var task in tasks)
         {
-            completions.Add(task.GetResponseAsync(cancellationToken));
+            completions.Add(task.GetResponseAsync(waitCancellation.Token));
         }
 
-        var completed = await Task.WhenAny(completions);
-
-        return tasks[completions.IndexOf(completed)];
+        try
+        {
+            var completed = await Task.WhenAny(completions);
+            await completed;
+            return tasks[completions.IndexOf(completed)];
+        }
+        finally
+        {
+            waitCancellation.Cancel();
+        }
     }
 
     public static async Task<ScheduledTask<TResult>> WhenAny<TResult>(List<ScheduledTask<TResult>> tasks, CancellationToken cancellationToken = default)
     {
+        using var waitCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var completions = new List<Task>(tasks.Count);
         foreach (var task in tasks)
         {
-            completions.Add(task.GetResponseAsync(cancellationToken));
+            completions.Add(task.GetResponseAsync(waitCancellation.Token));
         }
 
-        var completed = await Task.WhenAny(completions);
-
-        return tasks[completions.IndexOf(completed)];
+        try
+        {
+            var completed = await Task.WhenAny(completions);
+            await completed;
+            return tasks[completions.IndexOf(completed)];
+        }
+        finally
+        {
+            waitCancellation.Cancel();
+        }
     }
 }
 

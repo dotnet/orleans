@@ -13,6 +13,8 @@ namespace Orleans.DurableTasks.Tests;
 /// </summary>
 internal sealed class TestGrainContext(GrainId grainId) : IGrainContext
 {
+    private readonly Dictionary<Type, object> _components = [];
+
     public GrainReference GrainReference => throw new NotImplementedException();
     public GrainId GrainId => grainId;
     public object? GrainInstance => throw new NotImplementedException();
@@ -26,14 +28,26 @@ internal sealed class TestGrainContext(GrainId grainId) : IGrainContext
     public void Activate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken = default) => throw new NotImplementedException();
     public void Deactivate(DeactivationReason deactivationReason, CancellationToken cancellationToken = default) => throw new NotImplementedException();
     public bool Equals(IGrainContext? other) => throw new NotImplementedException();
-    public TComponent? GetComponent<TComponent>() where TComponent : class => throw new NotImplementedException();
-    public object? GetComponent(Type componentType) => throw new NotImplementedException();
+    public TComponent? GetComponent<TComponent>() where TComponent : class =>
+        GetComponent(typeof(TComponent)) as TComponent;
+    public object? GetComponent(Type componentType) =>
+        _components.TryGetValue(componentType, out var component) ? component : null;
     public TTarget? GetTarget<TTarget>() where TTarget : class => throw new NotImplementedException();
     public object? GetTarget() => throw new NotImplementedException();
     public void Migrate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken = default) => throw new NotImplementedException();
     public void ReceiveMessage(object message) => throw new NotImplementedException();
     public void Rehydrate(IRehydrationContext context) => throw new NotImplementedException();
-    public void SetComponent<TComponent>(TComponent? value) where TComponent : class => throw new NotImplementedException();
+    public void SetComponent<TComponent>(TComponent? value) where TComponent : class
+    {
+        if (value is null)
+        {
+            _components.Remove(typeof(TComponent));
+        }
+        else
+        {
+            _components[typeof(TComponent)] = value;
+        }
+    }
 }
 
 /// <summary>

@@ -79,6 +79,7 @@ public class DurableTaskMessageTransportTests
         var envelope = Assert.Single(outbox.SentEnvelopes);
         var contextKey = Assert.Single(envelope.Data.ContextKeys);
         Assert.True(envelope.Data.TryGetContextValue<Dictionary<string, object>>(contextKey, out var requestContext));
+        Assert.NotNull(requestContext);
         Assert.Equal("contoso", requestContext["tenant"]);
     }
 

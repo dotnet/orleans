@@ -217,7 +217,8 @@ internal sealed partial class DurableInboxExtension :
                 return DeliveryResult.Backpressured();
             }
 
-            if (_processed.ContainsKey(key))
+            if (_processed.TryGetValue(key, out var processedAt)
+                && processedAt >= _timeProvider.GetUtcNow() - _deduplicationWindow)
             {
                 LogDuplicateMessageDetected(
                     _logger,
@@ -230,6 +231,8 @@ internal sealed partial class DurableInboxExtension :
                 envelope.Data.Dispose();
                 return DeliveryResult.Duplicate();
             }
+
+            _processed.Remove(key);
 
             if (_inboxDict.ContainsKey(key))
             {
@@ -250,8 +253,13 @@ internal sealed partial class DurableInboxExtension :
                 await _stateManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
                 await EnsureJobScheduledUnderGateAsync(CancellationToken.None).ConfigureAwait(true);
                 result = DeliveryResult.Duplicate();
-                shouldWait = _enableLongPolling && pollTimeout > TimeSpan.Zero;
-                envelopeToProcess = storedEnvelope;
+                if (!_messageStates.TryGetValue(key, out var messageState)
+                    || messageState.NextAttemptAt is null
+                    || messageState.NextAttemptAt <= _timeProvider.GetUtcNow())
+                {
+                    shouldWait = _enableLongPolling && pollTimeout > TimeSpan.Zero;
+                    envelopeToProcess = storedEnvelope;
+                }
             }
             else
             {
@@ -272,7 +280,18 @@ internal sealed partial class DurableInboxExtension :
                 }
 
                 var handlerContext = new InboxHandlerContext(envelope, _grainContext.GrainId, _outbox, _sessionPool);
-                if (!_durableInbox.TryFindHandler(handlerContext, out _))
+                bool handlerFound;
+                try
+                {
+                    handlerFound = _durableInbox.TryFindHandler(handlerContext, out _);
+                }
+                catch
+                {
+                    envelope.Data.Dispose();
+                    throw;
+                }
+
+                if (!handlerFound)
                 {
                     LogRouteNotFound(
                         _logger,
@@ -386,6 +405,7 @@ internal sealed partial class DurableInboxExtension :
             return DurableJobRunResult.Completed;
         }
 
+        await _stateManager.InitializeAsync(cancellationToken).ConfigureAwait(true);
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(true);
         try
         {
@@ -423,7 +443,15 @@ internal sealed partial class DurableInboxExtension :
             if (_inboxDict.Count == 0)
             {
                 _jobId.Value = null;
-                await _stateManager.WriteStateAsync(cancellationToken).ConfigureAwait(true);
+                try
+                {
+                    await _stateManager.WriteStateAsync(cancellationToken).ConfigureAwait(true);
+                }
+                catch
+                {
+                    await _stateManager.RevertPendingChangesAsync(CancellationToken.None).ConfigureAwait(true);
+                    throw;
+                }
                 return DurableJobRunResult.Completed;
             }
 
@@ -447,12 +475,18 @@ internal sealed partial class DurableInboxExtension :
         var pending = _inboxDict
             .Where(pair => !_messageStates.TryGetValue(pair.Key, out var state) || state.NextAttemptAt is null || state.NextAttemptAt <= now)
             .Take(_batchSize)
-            .Select(static pair => pair.Value)
+            .Select(static pair => pair.Key)
             .ToList();
 
-        foreach (var envelope in pending)
+        foreach (var key in pending)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (!_inboxDict.TryGetValue(key, out var envelope)
+                || _messageStates.TryGetValue(key, out var state) && state.NextAttemptAt > _timeProvider.GetUtcNow())
+            {
+                continue;
+            }
+
             _ = await GetOrStartProcessing(envelope).WaitAsync(cancellationToken).ConfigureAwait(true);
         }
     }
@@ -460,10 +494,18 @@ internal sealed partial class DurableInboxExtension :
     private DateTimeOffset GetNextAttemptAt()
     {
         var now = _timeProvider.GetUtcNow();
-        var next = _inboxDict.Keys
-            .Select(key => _messageStates.TryGetValue(key, out var state) ? state.NextAttemptAt : null)
-            .Where(static value => value.HasValue)
-            .Min();
+        DateTimeOffset? next = null;
+        foreach (var key in _inboxDict.Keys)
+        {
+            if (!_messageStates.TryGetValue(key, out var state)
+                || state.NextAttemptAt is not { } nextAttempt
+                || nextAttempt <= now)
+            {
+                return now;
+            }
+
+            next = next is null || nextAttempt < next ? nextAttempt : next;
+        }
         return next ?? now;
     }
 
@@ -520,15 +562,16 @@ internal sealed partial class DurableInboxExtension :
             {
                 if (_inboxDict.ContainsKey(key))
                 {
-                    _faultInjector?.OnPhase(DurableInboxPersistencePhase.CompletionStaged);
                     RemoveMessage(key);
-                    _messageStates.Remove(key);
-                    _processed[key] = _timeProvider.GetUtcNow();
-                    await CommitHandlerStateAsync(cancellationToken).ConfigureAwait(true);
-                    completionCommitted = true;
-                    commitScope?.Complete();
-                    _faultInjector?.OnPhase(DurableInboxPersistencePhase.CompletionCommitted);
                 }
+
+                _faultInjector?.OnPhase(DurableInboxPersistencePhase.CompletionStaged);
+                _messageStates.Remove(key);
+                _processed[key] = _timeProvider.GetUtcNow();
+                await CommitHandlerStateAsync(cancellationToken).ConfigureAwait(true);
+                completionCommitted = true;
+                commitScope?.Complete();
+                _faultInjector?.OnPhase(DurableInboxPersistencePhase.CompletionCommitted);
             }
             finally
             {
@@ -721,7 +764,8 @@ internal sealed partial class DurableInboxExtension :
             {
                 if (!context.Envelope.Data.TryGetContextValue<Dictionary<string, object>>(
                     DurableEnvelopeBuilder.RequestContextKey,
-                    out var values))
+                    out var values)
+                    || values is null)
                 {
                     throw new InvalidOperationException("The durable request context could not be deserialized.");
                 }

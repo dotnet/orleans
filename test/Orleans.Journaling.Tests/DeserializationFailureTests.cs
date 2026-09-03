@@ -675,7 +675,7 @@ public class MixedMessageHandlerGrain : DurableGrain, IMixedMessageHandlerGrain
 
         public async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
-            if (context.Envelope.Data.TryGetBody<SimpleMessage>(out var message))
+            if (context.Envelope.Data.TryGetBody<SimpleMessage>(out var message) && message is not null)
             {
                 _grain._validMessageCount++;
                 _grain._processedValues.Add(message.Value);
@@ -729,7 +729,7 @@ public class SurvivorGrain : DurableGrain, ISurvivorGrain
 
         public async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
-            if (context.Envelope.Data.TryGetBody<SimpleMessage>(out var message))
+            if (context.Envelope.Data.TryGetBody<SimpleMessage>(out var message) && message is not null)
             {
                 _grain._lastReceivedValue.Value = message.Value;
                 await _grain.WriteStateAsync();
