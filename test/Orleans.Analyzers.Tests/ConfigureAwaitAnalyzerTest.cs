@@ -1686,7 +1686,7 @@ public class ConfigureAwaitAnalyzerTest : DiagnosticAnalyzerTestBase<ConfigureAw
         return VerifySingleConfigureAwaitDiagnostic(code);
     }
 
-    private async Task VerifySingleConfigureAwaitDiagnostic(string code)
+    private async Task VerifySingleConfigureAwaitDiagnostic(string code, string? expectedInvocation = null)
     {
         var (diagnostics, completeSource) = await GetDiagnosticsAsync(code, Array.Empty<string>());
 
@@ -1705,9 +1705,302 @@ public class ConfigureAwaitAnalyzerTest : DiagnosticAnalyzerTestBase<ConfigureAw
                 candidate.Expression is Microsoft.CodeAnalysis.CSharp.Syntax.MemberAccessExpressionSyntax memberAccess
                 && memberAccess.Name.Identifier.ValueText == "ConfigureAwait");
 
+        expectedInvocation ??= invocation.ToString();
+        Assert.Equal(expectedInvocation, invocation.ToString());
         Assert.Equal(invocation.Span, diagnostic.Location.SourceSpan);
         Assert.Equal(
-            invocation.ToString(),
+            expectedInvocation,
             diagnostic.Location.SourceTree.GetText().ToString(diagnostic.Location.SourceSpan));
+    }
+
+    [Fact]
+    public async Task NonTaskLikeConfigureAwaitMethod_ShouldNotTriggerDiagnostic()
+    {
+        var code = """
+                    public class MyGrain : Grain, IMyGrain
+                    {
+                        public Task DoSomething()
+                        {
+                            new CustomAwaitable().ConfigureAwait(false);
+                            return Task.CompletedTask;
+                        }
+                    }
+
+                    public sealed class CustomAwaitable
+                    {
+                        public void ConfigureAwait(bool continueOnCapturedContext)
+                        {
+                        }
+                    }
+
+                    public interface IMyGrain : IGrainWithGuidKey
+                    {
+                        Task DoSomething();
+                    }
+                    """;
+
+        var (diagnostics, _) = await GetDiagnosticsAsync(code, Array.Empty<string>());
+
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public async Task ForeignConfigureAwaitOptionsOnTaskPrefixType_ShouldNotTriggerDiagnostic()
+    {
+        var code = """
+                    namespace Foreign
+                    {
+                        public enum ConfigureAwaitOptions
+                        {
+                            None = 0
+                        }
+                    }
+
+                    namespace System.Threading.Tasks
+                    {
+                        public sealed class TaskPrefixAwaitable
+                        {
+                            public void ConfigureAwait(global::Foreign.ConfigureAwaitOptions options)
+                            {
+                            }
+                        }
+                    }
+
+                    public class MyGrain : Grain, IMyGrain
+                    {
+                        public Task DoSomething()
+                        {
+                            new System.Threading.Tasks.TaskPrefixAwaitable().ConfigureAwait(
+                                Foreign.ConfigureAwaitOptions.None);
+                            return Task.CompletedTask;
+                        }
+                    }
+
+                    public interface IMyGrain : IGrainWithGuidKey
+                    {
+                        Task DoSomething();
+                    }
+                    """;
+
+        var (diagnostics, _) = await GetDiagnosticsAsync(code, Array.Empty<string>());
+
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public async Task NonConstantBooleanConfigureAwaitArgument_ShouldNotTriggerDiagnostic()
+    {
+        var code = """
+                    public class MyGrain : Grain, IMyGrain
+                    {
+                        public async Task DoSomething(bool continueOnCapturedContext)
+                        {
+                            await Task.CompletedTask.ConfigureAwait(continueOnCapturedContext);
+                        }
+                    }
+
+                    public interface IMyGrain : IGrainWithGuidKey
+                    {
+                        Task DoSomething(bool continueOnCapturedContext);
+                    }
+                    """;
+
+        var (diagnostics, _) = await GetDiagnosticsAsync(code, Array.Empty<string>());
+
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public async Task RuntimeCompositeWithCaptureFlagOnRight_ShouldNotTriggerDiagnostic()
+    {
+        var code = """
+                    public class MyGrain : Grain, IMyGrain
+                    {
+                        public async Task DoSomething(ConfigureAwaitOptions options)
+                        {
+                            await Task.CompletedTask.ConfigureAwait(
+                                (options & ConfigureAwaitOptions.ForceYielding) | ConfigureAwaitOptions.ContinueOnCapturedContext);
+                        }
+                    }
+
+                    public interface IMyGrain : IGrainWithGuidKey
+                    {
+                        Task DoSomething(ConfigureAwaitOptions options);
+                    }
+                    """;
+
+        var (diagnostics, _) = await GetDiagnosticsAsync(code, Array.Empty<string>());
+
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public async Task RuntimeCompositeWithCaptureFlagOnLeft_ShouldNotTriggerDiagnostic()
+    {
+        var code = """
+                    public class MyGrain : Grain, IMyGrain
+                    {
+                        public async Task DoSomething(ConfigureAwaitOptions options)
+                        {
+                            await Task.CompletedTask.ConfigureAwait(
+                                ConfigureAwaitOptions.ContinueOnCapturedContext | (options & ConfigureAwaitOptions.ForceYielding));
+                        }
+                    }
+
+                    public interface IMyGrain : IGrainWithGuidKey
+                    {
+                        Task DoSomething(ConfigureAwaitOptions options);
+                    }
+                    """;
+
+        var (diagnostics, _) = await GetDiagnosticsAsync(code, Array.Empty<string>());
+
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public Task RuntimeConditionalWithoutCaptureFlag_ShouldTriggerDiagnostic()
+    {
+        var code = """
+                    public class MyGrain : Grain, IMyGrain
+                    {
+                        public async Task DoSomething(bool condition)
+                        {
+                            await Task.CompletedTask.ConfigureAwait(condition ? ConfigureAwaitOptions.ForceYielding : ConfigureAwaitOptions.SuppressThrowing);
+                        }
+                    }
+
+                    public interface IMyGrain : IGrainWithGuidKey
+                    {
+                        Task DoSomething(bool condition);
+                    }
+                    """;
+
+        return VerifySingleConfigureAwaitDiagnostic(
+            code,
+            "Task.CompletedTask.ConfigureAwait(condition ? ConfigureAwaitOptions.ForceYielding : ConfigureAwaitOptions.SuppressThrowing)");
+    }
+
+    [Fact]
+    public async Task DynamicReceiverConfigureAwait_ShouldNotTriggerDiagnostic()
+    {
+        var code = """
+                    public class MyGrain : Grain, IMyGrain
+                    {
+                        public Task DoSomething()
+                        {
+                            dynamic receiver = Task.CompletedTask;
+                            receiver.ConfigureAwait(false);
+                            return Task.CompletedTask;
+                        }
+                    }
+
+                    public interface IMyGrain : IGrainWithGuidKey
+                    {
+                        Task DoSomething();
+                    }
+                    """;
+
+        var (diagnostics, _) = await GetDiagnosticsAsync(code, Array.Empty<string>());
+
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public async Task DelegateValuedConfigureAwaitProperty_ShouldNotTriggerDiagnostic()
+    {
+        var code = """
+                    public sealed class ConfigureAwaitHolder
+                    {
+                        public Func<bool, Task> ConfigureAwait { get; } =
+                            continueOnCapturedContext => Task.CompletedTask;
+                    }
+
+                    public class MyGrain : Grain, IMyGrain
+                    {
+                        public Task DoSomething()
+                        {
+                            var holder = new ConfigureAwaitHolder();
+                            return holder.ConfigureAwait(false);
+                        }
+                    }
+
+                    public interface IMyGrain : IGrainWithGuidKey
+                    {
+                        Task DoSomething();
+                    }
+                    """;
+
+        var (diagnostics, _) = await GetDiagnosticsAsync(code, Array.Empty<string>());
+
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public async Task TaskPrefixConfigureAwaitWithoutArguments_ShouldNotTriggerDiagnostic()
+    {
+        var code = """
+                    namespace System.Threading.Tasks
+                    {
+                        public sealed class TaskPrefixParameterlessAwaitable
+                        {
+                            public void ConfigureAwait()
+                            {
+                            }
+                        }
+                    }
+
+                    public class MyGrain : Grain, IMyGrain
+                    {
+                        public Task DoSomething()
+                        {
+                            new System.Threading.Tasks.TaskPrefixParameterlessAwaitable().ConfigureAwait();
+                            return Task.CompletedTask;
+                        }
+                    }
+
+                    public interface IMyGrain : IGrainWithGuidKey
+                    {
+                        Task DoSomething();
+                    }
+                    """;
+
+        var (diagnostics, _) = await GetDiagnosticsAsync(code, Array.Empty<string>());
+
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public async Task TaskPrefixConfigureAwaitWithNullArgument_ShouldNotTriggerDiagnostic()
+    {
+        var code = """
+                    namespace System.Threading.Tasks
+                    {
+                        public sealed class TaskPrefixNullableAwaitable
+                        {
+                            public void ConfigureAwait(object? value)
+                            {
+                            }
+                        }
+                    }
+
+                    public class MyGrain : Grain, IMyGrain
+                    {
+                        public Task DoSomething()
+                        {
+                            new System.Threading.Tasks.TaskPrefixNullableAwaitable().ConfigureAwait(null);
+                            return Task.CompletedTask;
+                        }
+                    }
+
+                    public interface IMyGrain : IGrainWithGuidKey
+                    {
+                        Task DoSomething();
+                    }
+                    """;
+
+        var (diagnostics, _) = await GetDiagnosticsAsync(code, Array.Empty<string>());
+
+        Assert.Empty(diagnostics);
     }
 }
