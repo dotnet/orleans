@@ -331,7 +331,7 @@ namespace Orleans.Runtime
                     return new SingleRange(start, end);
                 start = end; // nextStart
             }
-            throw new ArgumentException(nameof(mySubRangeIndex));
+            throw new ArgumentException("The subrange index must identify one of the divided ranges.", nameof(mySubRangeIndex));
         }
 
         // Takes a range and divides it into numSubRanges equal ranges and returns the subrange at mySubRangeIndex.
@@ -364,4 +364,3 @@ namespace Orleans.Runtime
         }
     }
 }
-

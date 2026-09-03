@@ -23,7 +23,7 @@ namespace Orleans.Streams
         {
             if (consistentRingProvider == null)
             {
-                throw new ArgumentNullException("streamProviderRuntime");
+                throw new ArgumentNullException(nameof(consistentRingProvider));
             }
 
             _myRange = consistentRingProvider.GetMyRange();

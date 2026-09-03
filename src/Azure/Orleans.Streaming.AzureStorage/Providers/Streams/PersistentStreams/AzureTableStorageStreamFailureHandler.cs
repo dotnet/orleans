@@ -37,7 +37,7 @@ namespace Orleans.Providers.Streams.PersistentStreams
             }
             if (string.IsNullOrEmpty(azureStorageOptions.TableName))
             {
-                throw new ArgumentNullException(nameof(azureStorageOptions.TableName));
+                throw new ArgumentException("A table name must be configured.", nameof(azureStorageOptions));
             }
 
             this.serializer = serializer;

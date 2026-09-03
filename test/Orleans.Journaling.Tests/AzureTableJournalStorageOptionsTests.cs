@@ -131,10 +131,10 @@ public sealed class AzureTableJournalStorageOptionsTests
     {
         var options = new AzureTableJournalStorageOptions { GetPartitionKey = null! };
 
-        var exception = Assert.Throws<ArgumentNullException>(
+        var exception = Assert.Throws<InvalidOperationException>(
             () => options.GetPartitionKeyForJournal(new JournalId("journal")));
 
-        Assert.Equal(nameof(AzureTableJournalStorageOptions.GetPartitionKey), exception.ParamName);
+        Assert.Equal("A partition key mapper must be configured.", exception.Message);
     }
 
     [Theory]

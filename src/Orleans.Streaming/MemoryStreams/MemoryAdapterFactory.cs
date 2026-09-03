@@ -86,7 +86,7 @@ namespace Orleans.Providers
             this.Name = providerName;
             this.queueMapperOptions = queueMapperOptions ?? throw new ArgumentNullException(nameof(queueMapperOptions));
             this.cacheOptions = cacheOptions ?? throw new ArgumentNullException(nameof(cacheOptions));
-            this.statisticOptions = statisticOptions ?? throw new ArgumentException(nameof(statisticOptions));
+            this.statisticOptions = statisticOptions ?? throw new ArgumentNullException(nameof(statisticOptions));
             this.grainFactory = grainFactory ?? throw new ArgumentNullException(nameof(grainFactory));
             this.loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
             this.logger = loggerFactory.CreateLogger<ILogger<MemoryAdapterFactory<TSerializer>>>();

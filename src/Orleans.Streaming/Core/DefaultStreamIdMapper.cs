@@ -50,7 +50,7 @@ namespace Orleans.Streams
         private static IdSpan GetGuidKey(StreamId streamId, bool includeNamespaceInGrainId)
         {
             var key = streamId.Key.Span;
-            if (!Utf8Parser.TryParse(key, out Guid guidKey, out var len, 'N') || len < key.Length) throw new ArgumentException(nameof(streamId));
+            if (!Utf8Parser.TryParse(key, out Guid guidKey, out var len, 'N') || len < key.Length) throw new ArgumentException("The stream key is not a valid GUID.", nameof(streamId));
 
             if (!includeNamespaceInGrainId)
                 return streamId.GetKeyIdSpan();
@@ -62,7 +62,7 @@ namespace Orleans.Streams
         private static IdSpan GetIntegerKey(StreamId streamId, bool includeNamespaceInGrainId)
         {
             var key = streamId.Key.Span;
-            if (!Utf8Parser.TryParse(key, out long intKey, out var len) || len < key.Length) throw new ArgumentException(nameof(streamId));
+            if (!Utf8Parser.TryParse(key, out long intKey, out var len) || len < key.Length) throw new ArgumentException("The stream key is not a valid integer.", nameof(streamId));
 
             return includeNamespaceInGrainId
                 ? GrainIdKeyExtensions.CreateIntegerKey(intKey, streamId.Namespace.Span)

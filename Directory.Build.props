@@ -20,10 +20,9 @@
     <RepositoryType>git</RepositoryType>
     <LangVersion>preview</LangVersion>
     <Features>strict</Features>
-    <WarningLevel>3</WarningLevel>
-    <AnalysisLevel>preview</AnalysisLevel>
-    <!-- TODO: Uncomment this and fix errors -->
-    <!-- <AnalysisMode>All</AnalysisMode> -->
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>10.0</AnalysisLevel>
+    <AnalysisMode>Recommended</AnalysisMode>
     <Nullable>enable</Nullable>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
@@ -36,6 +35,8 @@
     <IsTestingPlatformApplication>false</IsTestingPlatformApplication>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <WarningsAsErrors>$(WarningsAsErrors);nullable</WarningsAsErrors>
+    <!-- CA1824 is part of the separate performance-diagnostic rollout. -->
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);CA1824</WarningsNotAsErrors>
     <ImplicitUsings>enable</ImplicitUsings>
     <!--<NoWarn>$(NoWarn);2003</NoWarn>-->
     <!-- TODO: Disable and ensure all public members are documented: https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/compiler-messages/cs1591 -->

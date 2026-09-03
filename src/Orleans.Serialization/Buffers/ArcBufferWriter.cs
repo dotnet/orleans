@@ -1399,7 +1399,7 @@ public struct ArcBuffer(ArcBufferPage first, int token, int offset, int length) 
 #else
         if (length < 0) throw new ArgumentOutOfRangeException(nameof(length), "Length must be greater than or equal to 0.");
         if (offset < 0) throw new ArgumentOutOfRangeException(nameof(offset), "Offset must be greater than or equal to 0.");
-        if (length + offset > Length) throw new ArgumentOutOfRangeException($"{nameof(length)} + {nameof(offset)}", "Length plus offset must be less than or equal to the length of the buffer.");
+        if (length + offset > Length) throw new ArgumentOutOfRangeException(nameof(length), "Length plus offset must be less than or equal to the length of the buffer.");
 #endif
 
         CheckValidity();

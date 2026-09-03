@@ -30,7 +30,7 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
 
     public async ValueTask<DirectoryMembershipSnapshot> RefreshViewAsync(MembershipVersion version, CancellationToken cancellationToken)
     {
-        _ = ClusterMembershipService.Refresh(version, cancellationToken);
+        await ClusterMembershipService.Refresh(version, cancellationToken);
         if (CurrentView.Version <= version)
         {
             await foreach (var view in _viewUpdates.WithCancellation(cancellationToken))

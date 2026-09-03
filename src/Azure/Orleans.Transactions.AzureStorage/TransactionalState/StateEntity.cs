@@ -153,7 +153,7 @@ namespace Orleans.Transactions.AzureStorage
             if (dataSize > maxDataSize)
             {
                 var msg = string.Format("Data too large to write to table. Size={0} MaxSize={1}", dataSize, maxDataSize);
-                throw new ArgumentOutOfRangeException("state", msg);
+                throw new ArgumentOutOfRangeException(nameof(dataSize), dataSize, msg);
             }
         }
 

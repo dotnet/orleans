@@ -30,8 +30,8 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="monitorWriteInterval">"Interval to write periodic statistics. Only triggered for active caches.</param>
         public ChronologicalEvictionStrategy(ILogger logger, TimePurgePredicate timePurage, ICacheMonitor? cacheMonitor, TimeSpan? monitorWriteInterval)
         {
-            if (logger == null) throw new ArgumentException(nameof(logger));
-            if (timePurage == null) throw new ArgumentException(nameof(timePurage));
+            if (logger == null) throw new ArgumentNullException(nameof(logger));
+            if (timePurage == null) throw new ArgumentNullException(nameof(timePurage));
             this.logger = logger;
             this.timePurge = timePurage;
             this.inUseBuffers = new Queue<FixedSizeBuffer>();

@@ -37,7 +37,7 @@ namespace Orleans.Transactions
         public async Task<string> Store(string? expectedETag, TransactionalStateMetaData metadata, List<PendingTransactionState<TState>>? statesToPrepare, long? commitUpTo, long? abortAfter)
         {
             if (this.StateStorage.Etag != expectedETag)
-                throw new ArgumentException(nameof(expectedETag), "Etag does not match");
+                throw new ArgumentException("Etag does not match", nameof(expectedETag));
             var storedState = stateStorage!.State!; // StateStorage access above initializes the field and ReadStateAsync has populated its state.
             var storedETag = stateStorage.Etag;
             var state = new TransactionalStateRecord<TState>

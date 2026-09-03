@@ -215,7 +215,7 @@ namespace Orleans.Storage
             {
                 var msg = string.Format("Data too large to write to Azure table. Size={0} MaxSize={1}", dataSize, maxDataSize);
                 LogErrorDataTooLarge(dataSize, maxDataSize);
-                throw new ArgumentOutOfRangeException("GrainState.Size", msg);
+                throw new ArgumentOutOfRangeException(nameof(dataSize), dataSize, msg);
             }
         }
 
