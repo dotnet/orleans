@@ -93,15 +93,15 @@ public class ConnectionTests
         request.TargetGrain = GrainId.Create("target", "2");
 
         var runTask = connection.Run();
-        await connection.Initialized.WaitAsync(TimeSpan.FromSeconds(30));
+        await connection.Initialized.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         connection.Send(request);
 
-        var response = await messageCenter.SentMessage.WaitAsync(TimeSpan.FromSeconds(30));
+        var response = await messageCenter.SentMessage.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         Assert.Equal(Message.Directions.Response, response.Direction);
         Assert.Equal(Message.ResponseTypes.Error, response.Result);
 
-        await connection.CloseAsync(null).WaitAsync(TimeSpan.FromSeconds(30));
-        await runTask.WaitAsync(TimeSpan.FromSeconds(30));
+        await connection.CloseAsync(null).WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        await runTask.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
 
         Assert.Equal(0, connection.SendFailureCount);
     }
@@ -136,11 +136,11 @@ public class ConnectionTests
         request.TargetGrain = GrainId.Create("target", "2");
 
         var runTask = connection.Run();
-        await connection.Initialized.WaitAsync(TimeSpan.FromSeconds(30));
+        await connection.Initialized.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         connection.Send(request);
 
-        Assert.Same(request, await connection.SendFailure.WaitAsync(TimeSpan.FromSeconds(30)));
-        await runTask.WaitAsync(TimeSpan.FromSeconds(30));
+        Assert.Same(request, await connection.SendFailure.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken));
+        await runTask.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
 
         Assert.Equal(1, connection.SendFailureCount);
         Assert.False(messageCenter.SentMessage.IsCompleted);
