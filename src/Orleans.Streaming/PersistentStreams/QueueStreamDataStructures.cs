@@ -38,6 +38,7 @@ namespace Orleans.Streams
         public IBatchContainer? PendingBatch;
         [NonSerialized]
         public bool StartPositionIsProviderDefault;
+        [NonSerialized]
         public StreamSequenceToken? CursorStartToken;
 
         /// <summary>
