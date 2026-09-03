@@ -1,0 +1,29 @@
+// Durable Jobs is asynchronous end-to-end and provides a keyed TimeProvider.
+P:System.DateTime.Now;Use the injected Durable Jobs TimeProvider.
+P:System.DateTime.UtcNow;Use the injected Durable Jobs TimeProvider.
+P:System.Threading.Tasks.Task`1.Result;Await the task.
+P:System.Threading.Tasks.ValueTask`1.Result;Await the value task.
+M:System.Threading.Tasks.Task.Wait;Await the task.
+M:System.Threading.Tasks.Task.Wait(System.Int32);Await the task and apply a cancellation token or WaitAsync timeout.
+M:System.Threading.Tasks.Task.Wait(System.Int32,System.Threading.CancellationToken);Await the task and apply a cancellation token or WaitAsync timeout.
+M:System.Threading.Tasks.Task.Wait(System.Threading.CancellationToken);Await the task with the cancellation token.
+M:System.Threading.Tasks.Task.Wait(System.TimeSpan);Await the task and use WaitAsync for the timeout.
+M:System.Threading.Tasks.Task.Wait(System.TimeSpan,System.Threading.CancellationToken);Await the task and use WaitAsync for the timeout.
+M:System.Threading.Tasks.Task.WaitAll(System.Threading.Tasks.Task[]);Use Task.WhenAll and await it.
+M:System.Threading.Tasks.Task.WaitAll(System.Threading.Tasks.Task[],System.Int32);Use Task.WhenAll and await it with WaitAsync for the timeout.
+M:System.Threading.Tasks.Task.WaitAll(System.Threading.Tasks.Task[],System.Int32,System.Threading.CancellationToken);Use Task.WhenAll and await it with cancellation or a WaitAsync timeout.
+M:System.Threading.Tasks.Task.WaitAll(System.Threading.Tasks.Task[],System.Threading.CancellationToken);Use Task.WhenAll and await it with the cancellation token.
+M:System.Threading.Tasks.Task.WaitAll(System.Threading.Tasks.Task[],System.TimeSpan);Use Task.WhenAll and await it with WaitAsync for the timeout.
+M:System.Threading.Tasks.Task.WaitAny(System.Threading.Tasks.Task[]);Use Task.WhenAny and await it.
+M:System.Threading.Tasks.Task.WaitAny(System.Threading.Tasks.Task[],System.Int32);Use Task.WhenAny and await it with WaitAsync for the timeout.
+M:System.Threading.Tasks.Task.WaitAny(System.Threading.Tasks.Task[],System.Int32,System.Threading.CancellationToken);Use Task.WhenAny and await it with cancellation or a WaitAsync timeout.
+M:System.Threading.Tasks.Task.WaitAny(System.Threading.Tasks.Task[],System.Threading.CancellationToken);Use Task.WhenAny and await it with the cancellation token.
+M:System.Threading.Tasks.Task.WaitAny(System.Threading.Tasks.Task[],System.TimeSpan);Use Task.WhenAny and await it with WaitAsync for the timeout.
+M:System.Runtime.CompilerServices.ConfiguredTaskAwaitable.ConfiguredTaskAwaiter.GetResult;Await the configured task.
+M:System.Runtime.CompilerServices.ConfiguredTaskAwaitable`1.ConfiguredTaskAwaiter.GetResult;Await the configured task.
+M:System.Runtime.CompilerServices.ConfiguredValueTaskAwaitable.ConfiguredValueTaskAwaiter.GetResult;Await the configured value task.
+M:System.Runtime.CompilerServices.ConfiguredValueTaskAwaitable`1.ConfiguredValueTaskAwaiter.GetResult;Await the configured value task.
+M:System.Runtime.CompilerServices.TaskAwaiter.GetResult;Await the task.
+M:System.Runtime.CompilerServices.TaskAwaiter`1.GetResult;Await the task.
+M:System.Runtime.CompilerServices.ValueTaskAwaiter.GetResult;Await the value task.
+M:System.Runtime.CompilerServices.ValueTaskAwaiter`1.GetResult;Await the value task.
