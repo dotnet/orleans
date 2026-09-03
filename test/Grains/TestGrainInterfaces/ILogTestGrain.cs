@@ -60,14 +60,6 @@ public interface ILogTestGrain : IGrainWithIntegerKey
 
     Task<IReadOnlyList<object>> GetEventLogSegment(int fromVersion, int toVersion);
 
-<<<<<<< HEAD
-||||||| parent of f3df29b3e3 (perf(event-sourcing): copy log segments by index)
-
-=======
-    Task<IReadOnlyList<object>> GetEventLogSegment(int fromVersion, int toVersion);
-
-
->>>>>>> f3df29b3e3 (perf(event-sourcing): copy log segments by index)
     // other operations
 
     Task SynchronizeGlobalState();
@@ -75,6 +67,8 @@ public interface ILogTestGrain : IGrainWithIntegerKey
     Task RaiseEventsWithUnsupportedSecond();
 
     Task Clear();
+
+    Task ClearWithCancellation();
 
     Task Deactivate();
 }

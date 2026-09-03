@@ -32,6 +32,21 @@ public class EventSourcingClusterFixture : BaseTestClusterFixture
         JournalStorageProvider.FailNextAppend(JournalId.FromGrainId(grain.GetGrainId()), exception, afterWrite);
     }
 
+    public void FailNextJournalReplace(IAddressable grain, Exception exception, bool afterWrite = false)
+    {
+        JournalStorageProvider.FailNextReplace(JournalId.FromGrainId(grain.GetGrainId()), exception, afterWrite);
+    }
+
+    public void FailNextJournalRead(IAddressable grain, Exception exception)
+    {
+        JournalStorageProvider.FailNextRead(JournalId.FromGrainId(grain.GetGrainId()), exception);
+    }
+
+    public void RequestJournalSnapshot(IAddressable grain)
+    {
+        JournalStorageProvider.RequestSnapshot(JournalId.FromGrainId(grain.GetGrainId()));
+    }
+
     public Task BlockNextJournalAppend(IAddressable grain)
     {
         return JournalStorageProvider.BlockNextAppend(JournalId.FromGrainId(grain.GetGrainId()));
@@ -139,7 +154,9 @@ public class EventSourcingClusterFixture : BaseTestClusterFixture
     {
         private readonly ConcurrentDictionary<JournalId, AppendFailure> _appendFailures = new();
         private readonly ConcurrentDictionary<JournalId, AppendBlock> _appendBlocks = new();
-        private readonly ConcurrentDictionary<JournalId, byte> _conflictNextAppends = new();
+        private readonly ConcurrentDictionary<JournalId, AppendFailure> _replaceFailures = new();
+        private readonly ConcurrentDictionary<JournalId, Exception> _readFailures = new();
+        private readonly ConcurrentDictionary<JournalId, byte> _snapshotRequests = new();
         private readonly VolatileJournalStorageProvider _inner = new();
 
         public IJournalStorage CreateStorage(JournalId journalId) => new FaultInjectingJournalStorage(this, journalId, _inner.CreateStorage(journalId));
@@ -150,6 +167,26 @@ public class EventSourcingClusterFixture : BaseTestClusterFixture
             if (!_appendFailures.TryAdd(journalId, new(exception, afterWrite)))
             {
                 throw new InvalidOperationException($"An append failure is already configured for journal '{journalId}'.");
+            }
+        }
+
+        public void FailNextReplace(JournalId journalId, Exception exception, bool afterWrite)
+        {
+            ArgumentNullException.ThrowIfNull(exception);
+            if (!_replaceFailures.TryAdd(journalId, new(exception, afterWrite)))
+            {
+                throw new InvalidOperationException($"A replace failure is already configured for journal '{journalId}'.");
+            }
+        }
+
+        public void RequestSnapshot(JournalId journalId) => _snapshotRequests[journalId] = 0;
+
+        public void FailNextRead(JournalId journalId, Exception exception)
+        {
+            ArgumentNullException.ThrowIfNull(exception);
+            if (!_readFailures.TryAdd(journalId, exception))
+            {
+                throw new InvalidOperationException($"A read failure is already configured for journal '{journalId}'.");
             }
         }
 
@@ -176,6 +213,8 @@ public class EventSourcingClusterFixture : BaseTestClusterFixture
 
         private bool TryTakeAppendFailure(JournalId journalId, out AppendFailure failure) => _appendFailures.TryRemove(journalId, out failure);
 
+        private bool TryTakeReplaceFailure(JournalId journalId, out AppendFailure failure) => _replaceFailures.TryRemove(journalId, out failure);
+
         private readonly record struct AppendFailure(Exception Exception, bool AfterWrite);
 
         private sealed class AppendBlock
@@ -190,10 +229,14 @@ public class EventSourcingClusterFixture : BaseTestClusterFixture
             JournalId journalId,
             IJournalStorage inner) : IJournalStorage
         {
-            public bool IsCompactionRequested => inner.IsCompactionRequested;
+            public bool IsCompactionRequested => provider._snapshotRequests.ContainsKey(journalId) || inner.IsCompactionRequested;
 
-            public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken) =>
-                inner.ReadAsync(consumer, cancellationToken);
+            public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
+            {
+                return provider._readFailures.TryRemove(journalId, out var exception)
+                    ? ValueTask.FromException(exception)
+                    : inner.ReadAsync(consumer, cancellationToken);
+            }
 
             public ValueTask<bool> CreateIfNotExistsAsync(
                 IReadOnlyDictionary<string, string>? metadata = null,
@@ -210,8 +253,21 @@ public class EventSourcingClusterFixture : BaseTestClusterFixture
                 CancellationToken cancellationToken = default) =>
                 inner.UpdateMetadataAsync(set, remove, expectedETag, cancellationToken);
 
-            public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) =>
-                inner.ReplaceAsync(value, cancellationToken);
+            public async ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+            {
+                var hasFailure = provider.TryTakeReplaceFailure(journalId, out var failure);
+                if (hasFailure && !failure.AfterWrite)
+                {
+                    throw failure.Exception;
+                }
+
+                await inner.ReplaceAsync(value, cancellationToken);
+                provider._snapshotRequests.TryRemove(journalId, out _);
+                if (hasFailure)
+                {
+                    throw failure.Exception;
+                }
+            }
 
             public async ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
             {
@@ -220,11 +276,6 @@ public class EventSourcingClusterFixture : BaseTestClusterFixture
                     block.Started.TrySetResult();
                     await block.Allow.Task.WaitAsync(cancellationToken);
                     provider._appendBlocks.TryRemove(new KeyValuePair<JournalId, AppendBlock>(journalId, block));
-                }
-
-                if (provider._conflictNextAppends.TryRemove(journalId, out _))
-                {
-                    throw new InconsistentStateException("The prior append completed with an uncertain outcome.");
                 }
 
                 var hasFailure = provider.TryTakeAppendFailure(journalId, out var failure);
@@ -236,11 +287,6 @@ public class EventSourcingClusterFixture : BaseTestClusterFixture
                 await inner.AppendAsync(value, cancellationToken);
                 if (hasFailure)
                 {
-                    if (failure.Exception is not InconsistentStateException)
-                    {
-                        provider._conflictNextAppends[journalId] = 0;
-                    }
-
                     throw failure.Exception;
                 }
             }

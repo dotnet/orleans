@@ -187,6 +187,24 @@ public class LogTestGrainClearTests : IClassFixture<EventSourcingClusterFixture>
     }
 
     [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
+    public async Task JournaledStateLogStorage_DeterministicStorageFailureTerminatesWithoutRetrying()
+    {
+        var grain = this.fixture.GrainFactory.GetGrain<ILogTestGrainWithAuxiliaryState>(721020L, "TestGrains.LogTestGrainJournaledStateStorageWithAuxiliaryState");
+        await grain.Clear();
+        await grain.SetAuxiliaryValueAndAGlobal(17, 10);
+        this.fixture.FailNextJournalAppend(grain, new InvalidOperationException("Expected deterministic storage failure."));
+
+        var deactivated = this.fixture.HostedCluster.WaitForDeactivationAsync(grain);
+        await Assert.ThrowsAsync<OrleansException>(() => grain.SetAuxiliaryValueAndAGlobal(23, 41));
+        await deactivated.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        grain = this.fixture.GrainFactory.GetGrain<ILogTestGrainWithAuxiliaryState>(721020L, "TestGrains.LogTestGrainJournaledStateStorageWithAuxiliaryState");
+        Assert.Equal(17, await grain.GetAuxiliaryValue());
+        Assert.Equal(10, await grain.GetAGlobal());
+        Assert.Equal(1, await grain.GetConfirmedVersion());
+    }
+
+    [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
     public async Task JournaledStateLogStorage_UncommittedConflictFailsCompleteJournalBatch()
     {
         var grain = this.fixture.GrainFactory.GetGrain<ILogTestGrainWithAuxiliaryState>(721008L, "TestGrains.LogTestGrainJournaledStateStorageWithAuxiliaryState");
@@ -246,6 +264,64 @@ public class LogTestGrainClearTests : IClassFixture<EventSourcingClusterFixture>
     }
 
     [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
+    public async Task JournaledStateLogStorage_RecoveryReadFailureRetainsCompleteJournalBatch()
+    {
+        var grain = this.fixture.GrainFactory.GetGrain<ILogTestGrainWithAuxiliaryState>(721023L, "TestGrains.LogTestGrainJournaledStateStorageWithAuxiliaryState");
+        await grain.Clear();
+        await grain.SetAuxiliaryValueAndAGlobal(17, 10);
+        this.fixture.FailNextJournalAppend(grain, new IOException("Expected transient append failure."));
+        this.fixture.FailNextJournalRead(grain, new IOException("Expected transient recovery read failure."));
+
+        await grain.SetAuxiliaryValueAndAGlobal(23, 41);
+
+        Assert.Equal(23, await grain.GetAuxiliaryValue());
+        Assert.Equal(41, await grain.GetAGlobal());
+        Assert.Equal(2, await grain.GetConfirmedVersion());
+        AssertEventLog(await grain.GetEventLog(), 10, 41);
+    }
+
+    [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
+    public async Task JournaledStateLogStorage_UncommittedSnapshotFailureRetriesCompleteJournalBatch()
+    {
+        var grain = this.fixture.GrainFactory.GetGrain<ILogTestGrainWithAuxiliaryState>(721021L, "TestGrains.LogTestGrainJournaledStateStorageWithAuxiliaryState");
+        await grain.Clear();
+        await grain.SetAuxiliaryValueAndAGlobal(17, 10);
+        this.fixture.RequestJournalSnapshot(grain);
+        this.fixture.FailNextJournalReplace(grain, new IOException("Expected transient snapshot failure."));
+
+        await grain.SetAuxiliaryValueAndAGlobal(23, 41);
+
+        Assert.Equal(23, await grain.GetAuxiliaryValue());
+        Assert.Equal(41, await grain.GetAGlobal());
+        Assert.Equal(2, await grain.GetConfirmedVersion());
+        AssertEventLog(await grain.GetEventLog(), 10, 41);
+    }
+
+    [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
+    public async Task JournaledStateLogStorage_AmbiguousSnapshotFailureRecognizesCommittedJournalBatch()
+    {
+        var grain = this.fixture.GrainFactory.GetGrain<ILogTestGrainWithAuxiliaryState>(721022L, "TestGrains.LogTestGrainJournaledStateStorageWithAuxiliaryState");
+        await grain.Clear();
+        await grain.SetAuxiliaryValueAndAGlobal(17, 10);
+        this.fixture.RequestJournalSnapshot(grain);
+        this.fixture.FailNextJournalReplace(grain, new IOException("Expected post-commit snapshot failure."), afterWrite: true);
+
+        await grain.SetAuxiliaryValueAndAGlobal(23, 41);
+
+        Assert.Equal(23, await grain.GetAuxiliaryValue());
+        Assert.Equal(41, await grain.GetAGlobal());
+        Assert.Equal(2, await grain.GetConfirmedVersion());
+        AssertEventLog(await grain.GetEventLog(), 10, 41);
+
+        await this.fixture.HostedCluster.DeactivateAsync(grain);
+        grain = this.fixture.GrainFactory.GetGrain<ILogTestGrainWithAuxiliaryState>(721022L, "TestGrains.LogTestGrainJournaledStateStorageWithAuxiliaryState");
+        Assert.Equal(23, await grain.GetAuxiliaryValue());
+        Assert.Equal(41, await grain.GetAGlobal());
+        Assert.Equal(2, await grain.GetConfirmedVersion());
+        AssertEventLog(await grain.GetEventLog(), 10, 41);
+    }
+
+    [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
     public async Task JournaledStateLogStorage_ClearFailureRetriesCompleteJournalBatch()
     {
         var grain = this.fixture.GrainFactory.GetGrain<ILogTestGrainWithAuxiliaryState>(721010L, "TestGrains.LogTestGrainJournaledStateStorageWithAuxiliaryState");
@@ -258,6 +334,46 @@ public class LogTestGrainClearTests : IClassFixture<EventSourcingClusterFixture>
         Assert.Equal(17, await grain.GetAuxiliaryValue());
         Assert.Equal(0, await grain.GetAGlobal());
         Assert.Equal(0, await grain.GetConfirmedVersion());
+    }
+
+    [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
+    public async Task JournaledStateLogStorage_CanceledClearDeactivatesBeforeFurtherCalls()
+    {
+        var grain = this.fixture.GrainFactory.GetGrain<ILogTestGrain>(721019L, "TestGrains.LogTestGrainJournaledStateStorage");
+        await grain.Clear();
+        await grain.SetAGlobal(10);
+
+        var appendStarted = this.fixture.BlockNextJournalAppend(grain);
+        var deactivated = this.fixture.HostedCluster.WaitForDeactivationAsync(grain);
+        var clear = grain.ClearWithCancellation();
+        try
+        {
+            await appendStarted.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            Assert.True(TestGrains.LogTestGrain.CancelPendingClear(721019L));
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => clear);
+        }
+        finally
+        {
+            this.fixture.ReleaseBlockedJournalAppend(grain);
+        }
+
+        await deactivated.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        grain = this.fixture.GrainFactory.GetGrain<ILogTestGrain>(721019L, "TestGrains.LogTestGrainJournaledStateStorage");
+        var value = await grain.GetAGlobal();
+        var version = await grain.GetConfirmedVersion();
+        var eventLog = await grain.GetEventLog();
+        if (version == 0)
+        {
+            Assert.Equal(0, value);
+            Assert.Empty(eventLog);
+        }
+        else
+        {
+            Assert.Equal(1, version);
+            Assert.Equal(10, value);
+            Assert.Equal(10, Assert.IsType<TestGrains.UpdateA>(Assert.Single(eventLog)).Val);
+        }
     }
 
     [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
@@ -319,6 +435,16 @@ public class LogTestGrainClearTests : IClassFixture<EventSourcingClusterFixture>
         var exception = await Assert.ThrowsAnyAsync<Exception>(() => grain.GetAGlobal());
 
         Assert.Contains("requires a single, turn-serialized grain activation", exception.ToString(), StringComparison.Ordinal);
+    }
+
+    private static void AssertEventLog(IReadOnlyList<object> eventLog, params int[] expectedValues)
+    {
+        Assert.Equal(expectedValues.Length, eventLog.Count);
+        for (var index = 0; index < expectedValues.Length; index++)
+        {
+            var update = Assert.IsType<TestGrains.UpdateA>(eventLog[index]);
+            Assert.Equal(expectedValues[index], update.Val);
+        }
     }
 
     private static async Task<List<Exception>> RunConcurrentOperationsAroundClear(ILogTestGrain grain)
