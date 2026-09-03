@@ -61,7 +61,7 @@ public class DurableTaskStateTests
     [Fact]
     public void MigrateLegacyObservers_GrainReferenceAlreadyInCompletionDestinations_StillReturnsTrueBecauseListIsCleared()
     {
-        var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
         var observer = FakeGrainReferenceObserver.Create(services, "observer-grain-type", "observer-key");
 
         var state = new DurableTaskState();
@@ -81,7 +81,7 @@ public class DurableTaskStateTests
     [Fact]
     public void MigrateLegacyObservers_NewGrainReference_AddsGrainIdToCompletionDestinationsAndReturnsTrue()
     {
-        var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
         var observer = FakeGrainReferenceObserver.Create(services, "observer-grain-type", "new-observer-key");
 
         var state = new DurableTaskState();
@@ -100,7 +100,7 @@ public class DurableTaskStateTests
     [Fact]
     public void MigrateLegacyObservers_MixOfGrainReferenceAndNonGrainReference_OnlyGrainReferenceIsMigrated()
     {
-        var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
         var grainObserver = FakeGrainReferenceObserver.Create(services, "observer-grain-type", "mixed-key");
         var nonGrainObserver = Substitute.For<IDurableTaskObserver>();
 
