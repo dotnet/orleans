@@ -119,7 +119,7 @@ internal abstract class TlsMessageTransport : StreamMessageTransport
             certificateRequired = true;
         }
 
-        using (var cancellationTokenSource = new CancellationTokenSource(_options.HandshakeTimeout))
+        using (var cancellationTokenSource = _options.CreateHandshakeCancellationTokenSource())
         {
             try
             {

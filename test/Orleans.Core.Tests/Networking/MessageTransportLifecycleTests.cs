@@ -176,6 +176,30 @@ public class MessageTransportLifecycleTests
     }
 
     [Fact]
+    public void MessageFactory_ResponseTimeToLive_IsSerialized()
+    {
+        using var serviceProvider = CreateServiceProvider();
+        var serializer = new MessageSerializer(serviceProvider.GetRequiredService<SerializerSessionPool>(), new SiloMessagingOptions());
+        var shared = CreateMessageHandlerShared(serviceProvider);
+        var factory = new MessageFactory(
+            serviceProvider.GetRequiredService<DeepCopier>(),
+            NullLogger<MessageFactory>.Instance,
+            shared.MessagingTrace);
+        var request = new Message { TimeToLive = TimeSpan.FromMinutes(1) };
+        var response = factory.CreateResponseMessage(request);
+        using var buffer = new ArcBufferWriter();
+        var (headerLength, _) = serializer.Write(buffer, response);
+        var readRequest = new MessageReadRequest(shared);
+        readRequest.Headers = buffer.ConsumeSlice(headerLength);
+        typeof(MessageReadRequest).GetField("_headerLength", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(readRequest, headerLength);
+
+        serializer.ReadHeaders(readRequest, out var deserialized);
+
+        Assert.NotNull(deserialized.TimeToLive);
+        readRequest.Reset();
+    }
+
+    [Fact]
     public void Message_DeserializeRequestBodyFailure_ReturnsReadRequestOnce()
     {
         using var serviceProvider = CreateServiceProvider();

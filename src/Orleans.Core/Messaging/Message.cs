@@ -318,6 +318,7 @@ namespace Orleans.Runtime
 
         internal void SetTimeToLive(Message other)
         {
+            _headers.SetFlag(MessageFlags.HasTimeToLive, other._headers.HasFlag(MessageFlags.HasTimeToLive));
             _timeToExpiry = other._timeToExpiry;
         }
 
