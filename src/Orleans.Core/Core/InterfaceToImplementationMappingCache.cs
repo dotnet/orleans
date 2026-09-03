@@ -89,6 +89,11 @@ namespace Orleans
         /// </returns>
         public Dictionary<MethodInfo, Entry> GetOrCreate(Type implementationType, Type interfaceType)
         {
+            if (!interfaceType.IsInterface)
+            {
+                throw new ArgumentException($"Type {interfaceType} is not an interface", nameof(interfaceType));
+            }
+
             if (!interfaceType.IsAssignableFrom(implementationType))
             {
                 throw new InvalidOperationException($"Type {implementationType} does not implement interface {interfaceType}");
@@ -100,11 +105,12 @@ namespace Orleans
         }
 
         /// <summary>
-        /// Maps the provided <paramref name="interfaceType"/> onto <paramref name="implementationType"/>.
+        /// Maps each method from <paramref name="interfaceType"/>, including inherited interface methods,
+        /// to its implementation on <paramref name="implementationType"/>.
         /// </summary>
         /// <param name="implementationType">The implementation type.</param>
         /// <param name="interfaceType">The interface type.</param>
-        /// <returns>The mapped interface.</returns>
+        /// <returns>A mapping from interface methods to implementation methods.</returns>
         private static Dictionary<MethodInfo, Entry> CreateInterfaceToImplementationMap(Type implementationType, Type interfaceType)
         {
             var methods = GrainInterfaceUtils.GetMethods(interfaceType);

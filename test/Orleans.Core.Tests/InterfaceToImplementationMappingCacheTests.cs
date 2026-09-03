@@ -40,6 +40,17 @@ public class InterfaceToImplementationMappingCacheTests
         Assert.Throws<InvalidOperationException>(() => cache.GetOrCreate(typeof(UnrelatedImplementation), typeof(IBaseInterface)));
     }
 
+    [Fact]
+    public void GetOrCreate_NonInterfaceType_ThrowsArgumentException()
+    {
+        var cache = new InterfaceToImplementationMappingCache();
+
+        var exception = Assert.Throws<ArgumentException>(() => cache.GetOrCreate(typeof(UnrelatedImplementation), typeof(object)));
+
+        Assert.Equal("interfaceType", exception.ParamName);
+        Assert.Contains("is not an interface", exception.Message);
+    }
+
     private static void AssertMapping(
         Dictionary<MethodInfo, InterfaceToImplementationMappingCache.Entry> mapping,
         MethodInfo interfaceMethod)
