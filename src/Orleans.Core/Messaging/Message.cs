@@ -301,6 +301,8 @@ namespace Orleans.Runtime
 
         internal long GetTimeToLiveMilliseconds() => -Read(static state => state.TimeToExpiry).ElapsedMilliseconds;
 
+        internal long GetTimeToExpiryTimestamp() => Read(static state => state.TimeToExpiry).GetRawTimestamp();
+
         internal void SetTimeToLiveMilliseconds(long milliseconds)
         {
             using var mutation = EnterMutation();

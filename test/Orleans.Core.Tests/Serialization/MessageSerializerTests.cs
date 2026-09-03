@@ -51,7 +51,7 @@ namespace UnitTests.Serialization
             var message = this.messageFactory.CreateMessage(null, InvokeMethodOptions.None);
 
             message.TimeToLive = TimeSpan.FromMilliseconds(initialTimeToLiveMilliseconds);
-            var expirationTimestamp = message._timeToExpiry.GetRawTimestamp();
+            var expirationTimestamp = message.GetTimeToExpiryTimestamp();
             WaitForTimestamp(expirationTimestamp - initialTimeToLiveMilliseconds + 10);
 
             var accessStarted = CoarseStopwatch.GetTimestamp();
@@ -76,10 +76,10 @@ namespace UnitTests.Serialization
             var message = this.messageFactory.CreateMessage(null, InvokeMethodOptions.None);
 
             message.TimeToLive = TimeSpan.FromMilliseconds(initialTimeToLiveMilliseconds);
-            var sourceExpirationTimestamp = message._timeToExpiry.GetRawTimestamp();
+            var sourceExpirationTimestamp = message.GetTimeToExpiryTimestamp();
             WaitForTimestamp(sourceExpirationTimestamp - initialTimeToLiveMilliseconds + 10);
             var deserializedMessage = RoundTripMessage(message, out var serialization, out var deserialization);
-            var deserializedExpirationTimestamp = deserializedMessage._timeToExpiry.GetRawTimestamp();
+            var deserializedExpirationTimestamp = deserializedMessage.GetTimeToExpiryTimestamp();
 
             Assert.NotNull(deserializedMessage.TimeToLive);
             Assert.InRange(
@@ -201,9 +201,10 @@ namespace UnitTests.Serialization
             var (requiredBytes, _, _) = this.messageSerializer.TryRead(ref reader, out var deserializedMessage);
             var deserializationCompleted = CoarseStopwatch.GetTimestamp();
             Assert.Equal(0, requiredBytes);
+            Assert.NotNull(deserializedMessage);
             serialization = (serializationStarted, serializationCompleted);
             deserialization = (deserializationStarted, deserializationCompleted);
-            return deserializedMessage!;
+            return deserializedMessage.Value;
         }
 
         [TestSuite("Functional")]
