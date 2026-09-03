@@ -706,17 +706,14 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
             PartitionTransitionDirection.Outbound => transition.Stage is PartitionTransitionStage.Drained or PartitionTransitionStage.StateRetained,
             _ => false
         };
-        if (canceled || !canComplete)
+        if (canceled)
         {
-            if (canceled)
-            {
-                transition.Abort(ShutdownToken);
-            }
-            else
-            {
-                transition.Fail(failure ?? new InvalidOperationException(
-                    $"Range transition '{operationName}' did not reach a safe terminal stage."));
-            }
+            transition.Abort(ShutdownToken);
+        }
+        else if (failure is not null || !canComplete)
+        {
+            transition.Fail(failure ?? new InvalidOperationException(
+                $"Range transition '{operationName}' did not reach a safe terminal stage."));
         }
         else
         {
@@ -730,7 +727,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
             transition.Range,
             operationName,
             heldDuration,
-            canceled || !canComplete);
+            canceled || failure is not null || !canComplete);
     }
 
     private async Task<bool> TransferSnapshotAsync(
