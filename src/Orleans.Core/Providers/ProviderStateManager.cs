@@ -71,13 +71,29 @@ namespace Orleans.Providers
         }
     }
 
+    /// <summary>
+    /// Represents an invalid provider lifecycle state or state transition.
+    /// </summary>
     [Serializable, GenerateSerializer]
     public sealed class ProviderStateException : OrleansException
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ProviderStateException"/> class.
+        /// </summary>
         public ProviderStateException() : base("Unexpected provider state")
         { }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ProviderStateException"/> class.
+        /// </summary>
+        /// <param name="message">The message that describes the error.</param>
         public ProviderStateException(string message) : base(message) { }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ProviderStateException"/> class.
+        /// </summary>
+        /// <param name="message">The message that describes the error.</param>
+        /// <param name="innerException">The exception that caused the current exception.</param>
         public ProviderStateException(string message, Exception innerException) : base(message, innerException) { }
 
         [Obsolete]

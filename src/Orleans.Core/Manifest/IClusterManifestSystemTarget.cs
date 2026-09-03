@@ -31,6 +31,14 @@ namespace Orleans.Runtime
     [GenerateSerializer, Immutable]
     public class ClusterManifestUpdate
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ClusterManifestUpdate"/> class.
+        /// </summary>
+        /// <param name="manifestVersion">The cluster manifest version.</param>
+        /// <param name="siloManifests">The manifests for each silo in the cluster.</param>
+        /// <param name="includesAllActiveServers">
+        /// A value indicating whether <paramref name="siloManifests"/> includes every active server.
+        /// </param>
         public ClusterManifestUpdate(
             MajorMinorVersion manifestVersion,
             ImmutableDictionary<SiloAddress, GrainManifest> siloManifests,

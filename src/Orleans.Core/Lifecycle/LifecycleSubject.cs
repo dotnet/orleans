@@ -24,9 +24,17 @@ namespace Orleans
     public abstract partial class LifecycleSubject : ILifecycleSubject
     {
         private readonly List<OrderedObserver> subscribers = [];
+
+        /// <summary>
+        /// Gets the logger used to report lifecycle activity.
+        /// </summary>
         protected readonly ILogger Logger;
         private int? _highStage = null;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="LifecycleSubject"/> class.
+        /// </summary>
+        /// <param name="logger">The logger used to report lifecycle activity.</param>
         protected LifecycleSubject(ILogger logger)
         {
             ArgumentNullException.ThrowIfNull(logger);
@@ -193,6 +201,12 @@ namespace Orleans
             }
         }
 
+        /// <summary>
+        /// Invokes the stop callback for a lifecycle observer.
+        /// </summary>
+        /// <param name="observer">The observer to stop.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <returns>A task representing the observer's stop operation.</returns>
         protected virtual Task CallObserverStopAsync(ILifecycleObserver observer, CancellationToken cancellationToken)
         {
             try
@@ -211,6 +225,7 @@ namespace Orleans
         /// <param name="stage">The stage which completed.</param>
         protected virtual void OnStopStageCompleted(int stage) { }
 
+        /// <inheritdoc />
         public virtual IDisposable Subscribe(string observerName, int stage, ILifecycleObserver observer)
         {
             if (observer == null) throw new ArgumentNullException(nameof(observer));

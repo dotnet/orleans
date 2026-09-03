@@ -31,6 +31,8 @@ internal sealed partial class AsyncEnumerableGrainExtension : IAsyncEnumerableGr
     /// Initializes a new <see cref="AsyncEnumerableGrainExtension"/> instance.
     /// </summary>
     /// <param name="grainContext">The grain which this extension is attached to.</param>
+    /// <param name="messagingOptions">The messaging options.</param>
+    /// <param name="logger">The logger.</param>
     public AsyncEnumerableGrainExtension(
         IGrainContext grainContext,
         IOptions<MessagingOptions> messagingOptions,

@@ -81,14 +81,31 @@ namespace Orleans.Networking.Shared
         }
     }
 
+    /// <summary>
+    /// Represents an error which occurred while establishing a socket connection.
+    /// </summary>
     [Serializable]
     [GenerateSerializer]
     public sealed class SocketConnectionException : OrleansException
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="SocketConnectionException"/> class.
+        /// </summary>
+        /// <param name="message">The message that describes the error.</param>
         public SocketConnectionException(string message) : base(message) { }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="SocketConnectionException"/> class.
+        /// </summary>
+        /// <param name="message">The message that describes the error.</param>
+        /// <param name="innerException">The exception that caused the current exception.</param>
         public SocketConnectionException(string message, Exception innerException) : base(message, innerException) { }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="SocketConnectionException"/> class from serialized data.
+        /// </summary>
+        /// <param name="info">The serialized object data.</param>
+        /// <param name="context">Context about the serialization source or destination.</param>
         [Obsolete]
         public SocketConnectionException(SerializationInfo info, StreamingContext context)
             : base(info, context)

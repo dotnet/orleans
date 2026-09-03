@@ -5,6 +5,9 @@ namespace Orleans.Runtime.Messaging
     /// </summary>
     public enum NetworkProtocolVersion : byte
     {
+        /// <summary>
+        /// The first version of the Orleans network protocol.
+        /// </summary>
         Version1 = 1,
     }
 }

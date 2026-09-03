@@ -14,6 +14,9 @@ namespace Orleans.Hosting
         /// <param name="services">
         /// The service collection.
         /// </param>
+        /// <param name="configuration">
+        /// The client configuration.
+        /// </param>
         public ClientBuilder(IServiceCollection services, IConfiguration configuration)
         {
             Services = services;

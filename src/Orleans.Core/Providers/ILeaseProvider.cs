@@ -82,6 +82,12 @@ namespace Orleans.LeaseProviders
         [Id(2)]
         public Exception? FailureException { get; }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="AcquireLeaseResult"/> class.
+        /// </summary>
+        /// <param name="acquiredLease">The acquired or renewed lease, or <see langword="null"/> if the operation failed.</param>
+        /// <param name="statusCode">The operation status.</param>
+        /// <param name="failureException">The exception which caused the operation to fail, if any.</param>
         public AcquireLeaseResult(AcquiredLease? acquiredLease, ResponseCode statusCode, Exception? failureException)
         {
             this.AcquiredLease = acquiredLease;
@@ -90,6 +96,9 @@ namespace Orleans.LeaseProviders
         }
     }
 
+    /// <summary>
+    /// Identifies the result of a lease acquisition or renewal operation.
+    /// </summary>
     [GenerateSerializer]
     public enum ResponseCode
     {

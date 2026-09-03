@@ -242,6 +242,7 @@ internal class ConcurrentLruCache<K, V> : IEnumerable<KeyValuePair<K, V>>, ICach
     /// <summary>
     /// Attempts to remove the specified key value pair.
     /// </summary>
+    /// <param name="key">The key of the item to remove.</param>
     /// <param name="predicate">The predicate used to determine if the item should be removed.</param>
     /// <param name="predicateArgument">Argument passed to the predicate.</param>
     /// <returns>true if the item was removed successfully; otherwise, false.</returns>
@@ -851,6 +852,7 @@ internal class ConcurrentLruCache<K, V> : IEnumerable<KeyValuePair<K, V>>, ICach
     /// </remarks>
     /// <param name="key">The key.</param>
     /// <param name="value">The value.</param>
+    /// <param name="timestamp">The timestamp of the item's most recent access.</param>
     // NOTE: Internal for testing
     [DebuggerDisplay("[{Key}] = {Value}")]
     internal sealed class LruItem(K key, V value, long timestamp = 0)
