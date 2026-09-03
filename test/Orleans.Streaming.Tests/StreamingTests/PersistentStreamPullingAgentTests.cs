@@ -717,13 +717,13 @@ namespace UnitTests.StreamingTests
             public List<StreamSequenceToken> DeliveredTokens { get; } = new();
             public List<Exception> Errors { get; } = new();
 
-            public Task<StreamHandshakeToken?> DeliverImmutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken)
+            public Task<StreamHandshakeToken?> DeliverImmutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken, CancellationToken cancellationToken)
                 => throw new NotSupportedException();
 
-            public Task<StreamHandshakeToken?> DeliverMutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken)
+            public Task<StreamHandshakeToken?> DeliverMutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken, CancellationToken cancellationToken)
                 => throw new NotSupportedException();
 
-            public Task<StreamHandshakeToken?> DeliverBatch(GuidId subscriptionId, QualifiedStreamId streamId, IBatchContainer item, StreamHandshakeToken? handshakeToken)
+            public Task<StreamHandshakeToken?> DeliverBatch(GuidId subscriptionId, QualifiedStreamId streamId, IBatchContainer item, StreamHandshakeToken? handshakeToken, CancellationToken cancellationToken)
             {
                 if (handshakeToken is not StartPositionToken)
                 {
@@ -734,15 +734,15 @@ namespace UnitTests.StreamingTests
                 return Task.FromResult<StreamHandshakeToken?>(null);
             }
 
-            public Task CompleteStream(GuidId subscriptionId) => Task.CompletedTask;
+            public Task CompleteStream(GuidId subscriptionId, CancellationToken cancellationToken) => Task.CompletedTask;
 
-            public Task ErrorInStream(GuidId subscriptionId, Exception exc)
+            public Task ErrorInStream(GuidId subscriptionId, Exception exc, CancellationToken cancellationToken)
             {
                 Errors.Add(exc);
                 return Task.CompletedTask;
             }
 
-            public Task<StreamHandshakeToken?> GetSequenceToken(GuidId subscriptionId)
+            public Task<StreamHandshakeToken?> GetSequenceToken(GuidId subscriptionId, CancellationToken cancellationToken)
                 => Task.FromResult<StreamHandshakeToken?>(null);
         }
 
@@ -752,13 +752,13 @@ namespace UnitTests.StreamingTests
 
             public List<StreamSequenceToken> DeliveredTokens { get; } = new();
 
-            public Task<StreamHandshakeToken?> DeliverImmutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken)
+            public Task<StreamHandshakeToken?> DeliverImmutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken, CancellationToken cancellationToken)
                 => throw new NotSupportedException();
 
-            public Task<StreamHandshakeToken?> DeliverMutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken)
+            public Task<StreamHandshakeToken?> DeliverMutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken, CancellationToken cancellationToken)
                 => throw new NotSupportedException();
 
-            public Task<StreamHandshakeToken?> DeliverBatch(GuidId subscriptionId, QualifiedStreamId streamId, IBatchContainer item, StreamHandshakeToken? handshakeToken)
+            public Task<StreamHandshakeToken?> DeliverBatch(GuidId subscriptionId, QualifiedStreamId streamId, IBatchContainer item, StreamHandshakeToken? handshakeToken, CancellationToken cancellationToken)
             {
                 if (handshakeToken is not StartToken)
                 {
@@ -769,11 +769,11 @@ namespace UnitTests.StreamingTests
                 return Task.FromResult<StreamHandshakeToken?>(null);
             }
 
-            public Task CompleteStream(GuidId subscriptionId) => Task.CompletedTask;
+            public Task CompleteStream(GuidId subscriptionId, CancellationToken cancellationToken) => Task.CompletedTask;
 
-            public Task ErrorInStream(GuidId subscriptionId, Exception exc) => Task.CompletedTask;
+            public Task ErrorInStream(GuidId subscriptionId, Exception exc, CancellationToken cancellationToken) => Task.CompletedTask;
 
-            public Task<StreamHandshakeToken?> GetSequenceToken(GuidId subscriptionId)
+            public Task<StreamHandshakeToken?> GetSequenceToken(GuidId subscriptionId, CancellationToken cancellationToken)
                 => Task.FromResult<StreamHandshakeToken?>(null);
         }
 
@@ -785,24 +785,24 @@ namespace UnitTests.StreamingTests
 
             public List<Exception> Errors { get; } = new();
 
-            public Task<StreamHandshakeToken?> DeliverImmutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken)
+            public Task<StreamHandshakeToken?> DeliverImmutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken, CancellationToken cancellationToken)
                 => throw new NotSupportedException();
 
-            public Task<StreamHandshakeToken?> DeliverMutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken)
+            public Task<StreamHandshakeToken?> DeliverMutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken, CancellationToken cancellationToken)
                 => throw new NotSupportedException();
 
-            public Task<StreamHandshakeToken?> DeliverBatch(GuidId subscriptionId, QualifiedStreamId streamId, IBatchContainer item, StreamHandshakeToken? handshakeToken)
+            public Task<StreamHandshakeToken?> DeliverBatch(GuidId subscriptionId, QualifiedStreamId streamId, IBatchContainer item, StreamHandshakeToken? handshakeToken, CancellationToken cancellationToken)
                 => Task.FromResult<StreamHandshakeToken?>(unknownToken);
 
-            public Task CompleteStream(GuidId subscriptionId) => Task.CompletedTask;
+            public Task CompleteStream(GuidId subscriptionId, CancellationToken cancellationToken) => Task.CompletedTask;
 
-            public Task ErrorInStream(GuidId subscriptionId, Exception exc)
+            public Task ErrorInStream(GuidId subscriptionId, Exception exc, CancellationToken cancellationToken)
             {
                 Errors.Add(exc);
                 return Task.CompletedTask;
             }
 
-            public Task<StreamHandshakeToken?> GetSequenceToken(GuidId subscriptionId)
+            public Task<StreamHandshakeToken?> GetSequenceToken(GuidId subscriptionId, CancellationToken cancellationToken)
                 => Task.FromResult<StreamHandshakeToken?>(returnDuringInitialHandshake ? unknownToken : null);
         }
 
@@ -1217,7 +1217,7 @@ namespace UnitTests.StreamingTests
             Assert.IsType<NotSupportedException>(consumer.Errors[0]);
             Assert.IsType<FaultedSubscriptionException>(consumer.Errors[1]);
             Assert.False(streamData.TryGetConsumer(subscriptionId, out _));
-            await pubSub.Received(1).FaultSubscription(streamId, subscriptionId);
+            await pubSub.Received(1).FaultSubscription(streamId, subscriptionId, Arg.Any<CancellationToken>());
             await accessor.Shutdown();
         }
 
@@ -1251,7 +1251,7 @@ namespace UnitTests.StreamingTests
             Assert.IsType<NotSupportedException>(Assert.Single(consumer.Errors));
             Assert.True(streamData.TryGetConsumer(subscriptionId, out var retainedConsumer));
             Assert.NotNull(retainedConsumer.Cursor);
-            await pubSub.DidNotReceive().FaultSubscription(streamId, subscriptionId);
+            await pubSub.DidNotReceive().FaultSubscription(streamId, subscriptionId, Arg.Any<CancellationToken>());
             await accessor.Shutdown();
         }
 
@@ -1403,7 +1403,10 @@ namespace UnitTests.StreamingTests
             Assert.IsType<InvalidOperationException>(consumer.Errors[0]);
             Assert.IsType<FaultedSubscriptionException>(consumer.Errors[1]);
             Assert.Empty(streamData.AllConsumers());
-            await pubSub.Received(1).FaultSubscription(consumerData.StreamId, consumerData.SubscriptionId);
+            await pubSub.Received(1).FaultSubscription(
+                consumerData.StreamId,
+                consumerData.SubscriptionId,
+                Arg.Any<CancellationToken>());
         }
 
         [TestSuite("BVT")]
@@ -1419,7 +1422,10 @@ namespace UnitTests.StreamingTests
             Assert.IsType<InvalidOperationException>(consumer.Errors[0]);
             Assert.IsType<FaultedSubscriptionException>(consumer.Errors[1]);
             Assert.Empty(streamData.AllConsumers());
-            await pubSub.Received(1).FaultSubscription(consumerData.StreamId, consumerData.SubscriptionId);
+            await pubSub.Received(1).FaultSubscription(
+                consumerData.StreamId,
+                consumerData.SubscriptionId,
+                Arg.Any<CancellationToken>());
         }
 
         private static async Task<(
@@ -1437,7 +1443,7 @@ namespace UnitTests.StreamingTests
             var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
             queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
             var pubSub = Substitute.For<IStreamPubSub>();
-            pubSub.RegisterProducer(default, default)
+            pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
                 .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
             var agent = CreateAgent(pubSub, QueueId.GetQueueId("queue", 0u, 0u), queueAdapterCache: queueAdapterCache);
             var accessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
@@ -1469,7 +1475,7 @@ namespace UnitTests.StreamingTests
             var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
             queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
             var pubSub = Substitute.For<IStreamPubSub>();
-            pubSub.RegisterProducer(default, default)
+            pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
                 .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
             var agent = CreateAgent(pubSub, QueueId.GetQueueId("queue", 0u, 0u), queueAdapterCache: queueAdapterCache);
             var accessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
@@ -1490,7 +1496,10 @@ namespace UnitTests.StreamingTests
             Assert.IsType<NotSupportedException>(consumer.Errors[0]);
             Assert.IsType<FaultedSubscriptionException>(consumer.Errors[1]);
             Assert.Empty(streamData.AllConsumers());
-            await pubSub.Received(1).FaultSubscription(qualifiedStreamId, consumerData.SubscriptionId);
+            await pubSub.Received(1).FaultSubscription(
+                qualifiedStreamId,
+                consumerData.SubscriptionId,
+                Arg.Any<CancellationToken>());
         }
 
         [TestSuite("BVT")]
@@ -1504,7 +1513,7 @@ namespace UnitTests.StreamingTests
             var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
             queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
             var pubSub = Substitute.For<IStreamPubSub>();
-            pubSub.RegisterProducer(default, default)
+            pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
                 .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
             var agent = CreateAgent(pubSub, QueueId.GetQueueId("queue", 0u, 0u), queueAdapterCache: queueAdapterCache);
             var accessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
@@ -1527,7 +1536,10 @@ namespace UnitTests.StreamingTests
             Assert.IsType<FaultedSubscriptionException>(consumer.Errors[1]);
             Assert.Null(consumerData.Cursor);
             Assert.Empty(streamData.AllConsumers());
-            await pubSub.Received(1).FaultSubscription(streamId, consumerData.SubscriptionId);
+            await pubSub.Received(1).FaultSubscription(
+                streamId,
+                consumerData.SubscriptionId,
+                Arg.Any<CancellationToken>());
         }
 
         private sealed class RewindConsumer(StreamHandshakeToken rewindToken) : IStreamConsumerExtension
