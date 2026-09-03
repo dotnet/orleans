@@ -1,13 +1,13 @@
 using Xunit;
 
-namespace NonSilo.Tests.Orleans;
+namespace Orleans.DurableTasks.Tests;
 
 /// <summary>
 /// Tests for HierarchicalKey, which provides a way to represent hierarchical identifiers
 /// using slash-separated segments similar to file paths or URLs.
 /// </summary>
 [TestCategory("BVT")]
-public class HierarchicalKeyTests
+public class PublicHierarchicalKeyTests
 {
     [Fact]
     public void Create_WithValidString_CreatesKey()

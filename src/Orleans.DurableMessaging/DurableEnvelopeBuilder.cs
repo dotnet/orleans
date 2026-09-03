@@ -66,6 +66,7 @@ public sealed class DurableEnvelopeBuilder : IBufferWriter<byte>
     private ArcBufferWriter _buffer = new();
     private (int Offset, int Length) _bodySlice;
     private bool _bodyWritten;
+    private bool _invalid;
 
     internal DurableEnvelopeBuilder()
     {
@@ -126,13 +127,22 @@ public sealed class DurableEnvelopeBuilder : IBufferWriter<byte>
             throw new InvalidOperationException("Body has already been set.");
         }
 
-        var startOffset = _buffer.Length;
-        using var session = SessionPool.GetSession();
-        var writer = Writer.Create((IBufferWriter<byte>)this, session);
-        SessionPool.CodecProvider.GetCodec<T>().WriteField(ref writer, 0, typeof(T), body);
-        writer.Commit();
-        _bodySlice = (startOffset, _buffer.Length - startOffset);
-        _bodyWritten = true;
+        ThrowIfInvalid();
+        try
+        {
+            var startOffset = _buffer.Length;
+            using var session = SessionPool.GetSession();
+            var writer = Writer.Create((IBufferWriter<byte>)this, session);
+            SessionPool.CodecProvider.GetCodec<T>().WriteField(ref writer, 0, typeof(T), body);
+            writer.Commit();
+            _bodySlice = (startOffset, _buffer.Length - startOffset);
+            _bodyWritten = true;
+        }
+        catch
+        {
+            Invalidate();
+            throw;
+        }
 
         return this;
     }
@@ -244,6 +254,7 @@ public sealed class DurableEnvelopeBuilder : IBufferWriter<byte>
 
     private DurableEnvelopeBuilder WithContextValueCore<T>(string key, T value)
     {
+        ThrowIfInvalid();
         _contextIndices ??= new(StringComparer.Ordinal);
 
         if (_contextIndices.ContainsKey(key))
@@ -251,12 +262,20 @@ public sealed class DurableEnvelopeBuilder : IBufferWriter<byte>
             throw new InvalidOperationException($"Context key '{key}' has already been set.");
         }
 
-        var startOffset = _buffer.Length;
-        using var session = SessionPool.GetSession();
-        var writer = Writer.Create((IBufferWriter<byte>)this, session);
-        SessionPool.CodecProvider.GetCodec<T>().WriteField(ref writer, 0, typeof(T), value);
-        writer.Commit();
-        _contextIndices[key] = (startOffset, _buffer.Length - startOffset);
+        try
+        {
+            var startOffset = _buffer.Length;
+            using var session = SessionPool.GetSession();
+            var writer = Writer.Create((IBufferWriter<byte>)this, session);
+            SessionPool.CodecProvider.GetCodec<T>().WriteField(ref writer, 0, typeof(T), value);
+            writer.Commit();
+            _contextIndices[key] = (startOffset, _buffer.Length - startOffset);
+        }
+        catch
+        {
+            Invalidate();
+            throw;
+        }
 
         return this;
     }
@@ -350,6 +369,7 @@ public sealed class DurableEnvelopeBuilder : IBufferWriter<byte>
     /// </example>
     public DurableEnvelope Build()
     {
+        ThrowIfInvalid();
         if (!_bodyWritten)
         {
             throw new InvalidOperationException("Message body must be set via WithBody<T>().");
@@ -360,29 +380,43 @@ public sealed class DurableEnvelopeBuilder : IBufferWriter<byte>
             throw new InvalidOperationException("Target and route key must be set via To().");
         }
 
-        // Create the envelope data from the accumulated buffer
-        var buffer = _buffer.Length > 0 ? _buffer.ConsumeSlice(_buffer.Length) : default;
-        var data = new DurableEnvelopeData(SessionPool);
-
-        // Use reflection to set private fields
-        BufferField.SetValue(data, buffer);
-        BodySliceField.SetValue(data, _bodySlice);
-        if (_contextIndices is not null)
+        ArcBuffer buffer;
+        try
         {
-            ContextIndicesField.SetValue(data, _contextIndices);
+            buffer = _buffer.Length > 0 ? _buffer.ConsumeSlice(_buffer.Length) : default;
+        }
+        finally
+        {
+            _buffer.Dispose();
         }
 
-        return new DurableEnvelope
+        try
         {
-            MessageId = Guid.NewGuid(),
-            SenderId = SenderId,
-            ReceiverId = _receiverId,
-            RouteKey = _routeKey,
-            CorrelationKey = _correlationKey,
-            ReplyTo = _replyTo,
-            Data = data,
-            CreatedAt = DateTimeOffset.UtcNow
-        };
+            var data = new DurableEnvelopeData(SessionPool);
+            BufferField.SetValue(data, buffer);
+            BodySliceField.SetValue(data, _bodySlice);
+            if (_contextIndices is not null)
+            {
+                ContextIndicesField.SetValue(data, _contextIndices);
+            }
+
+            return new DurableEnvelope
+            {
+                MessageId = Guid.NewGuid(),
+                SenderId = SenderId,
+                ReceiverId = _receiverId,
+                RouteKey = _routeKey,
+                CorrelationKey = _correlationKey,
+                ReplyTo = _replyTo,
+                Data = data,
+                CreatedAt = DateTimeOffset.UtcNow
+            };
+        }
+        catch
+        {
+            buffer.Dispose();
+            throw;
+        }
     }
 
     /// <summary>
@@ -395,9 +429,25 @@ public sealed class DurableEnvelopeBuilder : IBufferWriter<byte>
         _correlationKey = null;
         _replyTo = null;
         _contextIndices = null;
-        _buffer.Reset();
+        _buffer.Dispose();
+        _buffer = new ArcBufferWriter();
         _bodySlice = default;
         _bodyWritten = false;
+        _invalid = false;
+    }
+
+    private void ThrowIfInvalid()
+    {
+        if (_invalid)
+        {
+            throw new InvalidOperationException("The durable envelope builder cannot be reused after serialization fails.");
+        }
+    }
+
+    private void Invalidate()
+    {
+        _invalid = true;
+        _buffer.Dispose();
     }
 
     // IBufferWriter<byte> implementation for serialization

@@ -10,6 +10,8 @@
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
     <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
+    <VersionSuffix Condition="$(VersionSuffix) != ''">$(VersionSuffix).alpha.1</VersionSuffix>
+    <VersionSuffix Condition="$(VersionSuffix) == ''">alpha.1</VersionSuffix>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 

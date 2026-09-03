@@ -16,7 +16,7 @@ internal sealed class DurableTaskMessageHandler(
         switch (context.Envelope.RouteKey)
         {
             case DurableTaskMessageTransport.InvocationRoute:
-                if (!context.Envelope.Data.TryGetBody<DurableTaskInvocationMessage>(out var invocation))
+                if (!context.Envelope.Data.TryGetBody<DurableTaskInvocationMessage>(out var invocation) || invocation is null)
                 {
                     throw new InvalidOperationException("The durable task invocation payload could not be deserialized.");
                 }
@@ -24,10 +24,18 @@ internal sealed class DurableTaskMessageHandler(
                 var requestContext = invocation.Request.Context
                     ?? throw new InvalidOperationException("The durable task invocation request did not include a request context.");
                 requestContext.CallerId = context.Envelope.ReplyTo ?? context.Envelope.SenderId;
-                var response = await ((IDurableTaskServer)runtime).ScheduleAsync(
-                    invocation.TaskId,
-                    invocation.Request,
-                    cancellationToken);
+                DurableTaskResponse response;
+                try
+                {
+                    response = await ((IDurableTaskServer)runtime).ScheduleAsync(
+                        invocation.TaskId,
+                        invocation.Request,
+                        cancellationToken);
+                }
+                catch (InvalidOperationException exception)
+                {
+                    response = DurableTaskResponse.FromException(exception);
+                }
                 if (response.IsCompleted)
                 {
                     transport.SendCompletion(
@@ -38,7 +46,7 @@ internal sealed class DurableTaskMessageHandler(
                 }
                 break;
             case DurableTaskMessageTransport.CompletionRoute:
-                if (!context.Envelope.Data.TryGetBody<DurableTaskCompletionMessage>(out var completion))
+                if (!context.Envelope.Data.TryGetBody<DurableTaskCompletionMessage>(out var completion) || completion is null)
                 {
                     throw new InvalidOperationException("The durable task completion payload could not be deserialized.");
                 }
@@ -50,7 +58,7 @@ internal sealed class DurableTaskMessageHandler(
                     cancellationToken);
                 break;
             case DurableTaskMessageTransport.CancellationRoute:
-                if (!context.Envelope.Data.TryGetBody<DurableTaskCancellationMessage>(out var cancellation))
+                if (!context.Envelope.Data.TryGetBody<DurableTaskCancellationMessage>(out var cancellation) || cancellation is null)
                 {
                     throw new InvalidOperationException("The durable task cancellation payload could not be deserialized.");
                 }
@@ -64,7 +72,7 @@ internal sealed class DurableTaskMessageHandler(
                 await transport.CommitAsync(cancellationToken);
                 break;
             case DurableTaskMessageTransport.CancellationAcknowledgementRoute:
-                if (!context.Envelope.Data.TryGetBody<DurableTaskCancellationAcknowledgementMessage>(out var acknowledgement))
+                if (!context.Envelope.Data.TryGetBody<DurableTaskCancellationAcknowledgementMessage>(out var acknowledgement) || acknowledgement is null)
                 {
                     throw new InvalidOperationException("The durable task cancellation acknowledgement payload could not be deserialized.");
                 }
@@ -76,7 +84,7 @@ internal sealed class DurableTaskMessageHandler(
                     cancellationToken);
                 break;
             case DurableTaskMessageTransport.ResumeRoute:
-                if (!context.Envelope.Data.TryGetBody<DurableTaskResumeMessage>(out var resume))
+                if (!context.Envelope.Data.TryGetBody<DurableTaskResumeMessage>(out var resume) || resume is null)
                 {
                     throw new InvalidOperationException("The durable task resume payload could not be deserialized.");
                 }

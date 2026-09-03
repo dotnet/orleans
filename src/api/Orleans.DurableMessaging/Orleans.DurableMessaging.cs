@@ -150,7 +150,7 @@ namespace Orleans.DurableMessaging
     }
 
     [GenerateSerializer]
-    public readonly partial struct DurableEnvelope : System.IDisposable
+    public readonly partial struct DurableEnvelope : System.IDisposable, Journaling.IJournaledResourceOwner
     {
         private readonly object _dummy;
         private readonly int _dummyPrimitive;
@@ -165,6 +165,8 @@ namespace Orleans.DurableMessaging
 
         [Id(0)]
         public required System.Guid MessageId { get { throw null; } init { } }
+
+        object Journaling.IJournaledResourceOwner.ResourceIdentity { get { throw null; } }
 
         [Id(2)]
         public required Runtime.GrainId ReceiverId { get { throw null; } init { } }

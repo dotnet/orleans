@@ -220,19 +220,22 @@ internal sealed class DurableJobTurnIsolationFilter : IIncomingGrainCallFilter
     }
 }
 
-internal sealed class DurableJobExecutionLifetime : ILifecycleObserver
+internal sealed class DurableJobExecutionLifetime : ILifecycleObserver, IActivationDeactivationParticipant
 {
+    private readonly IGrainContext? _grainContext;
     private readonly object _sync = new();
     private readonly CancellationTokenSource _shutdown = new();
     private readonly HashSet<Task> _executions = [];
+    private Task? _cancellationTask;
     private bool _admissionStopped;
 
     public DurableJobExecutionLifetime(IGrainContext grainContext)
         : this()
     {
+        _grainContext = grainContext;
         grainContext.ObservableLifecycle.Subscribe(
             nameof(DurableJobExecutionLifetime),
-            GrainLifecycleStage.Last,
+            GrainLifecycleStage.Activate + 1,
             this);
     }
 
@@ -273,16 +276,33 @@ internal sealed class DurableJobExecutionLifetime : ILifecycleObserver
         return task;
     }
 
-    public Task OnStart(CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public Task OnStart(CancellationToken cancellationToken = default)
+    {
+        if (_grainContext?.GrainInstance is IDurableJobHandler)
+        {
+            _grainContext.ActivationServices.GetRequiredService<DurableJobTurnIsolation>().Enable();
+        }
+
+        return Task.CompletedTask;
+    }
 
     public async Task OnStop(CancellationToken cancellationToken = default)
     {
-        lock (_sync)
+        OnDeactivationRequested();
+        var cancellationTask = _cancellationTask;
+        Exception? cancellationException = null;
+        if (cancellationTask is not null)
         {
-            _admissionStopped = true;
+            try
+            {
+                await cancellationTask;
+            }
+            catch (Exception exception)
+            {
+                cancellationException = exception;
+            }
         }
 
-        _shutdown.Cancel();
         Task[] executions;
         lock (_sync)
         {
@@ -290,6 +310,22 @@ internal sealed class DurableJobExecutionLifetime : ILifecycleObserver
         }
 
         await Task.WhenAll(executions).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+        if (cancellationException is not null)
+        {
+            throw cancellationException;
+        }
+    }
+
+    Task IActivationDeactivationParticipant.OnDeactivatingAsync(CancellationToken cancellationToken) =>
+        OnStop(cancellationToken);
+
+    public void OnDeactivationRequested()
+    {
+        lock (_sync)
+        {
+            _admissionStopped = true;
+            _cancellationTask ??= _shutdown.CancelAsync();
+        }
     }
 }
 
@@ -313,6 +349,8 @@ internal sealed class DurableJobGrainContextConfigurator :
             return;
         }
 
-        context.SetComponent(new DurableJobExecutionLifetime(context));
+        var lifetime = new DurableJobExecutionLifetime(context);
+        context.SetComponent(lifetime);
+        ActivationDeactivationCoordinator.Register(context, lifetime);
     }
 }

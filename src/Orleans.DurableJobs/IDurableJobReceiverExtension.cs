@@ -101,12 +101,20 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
                 holdTurnIsolation: false);
         }
 
+        if (_featureHandlers.TryGetIsolatedHandler(context.Job.Name, out featureHandler))
+        {
+            return _featureHandlers.StartExecution(
+                token => ExecuteFeatureHandlerAsync(featureHandler, context, token),
+                holdTurnIsolation: true);
+        }
+
         if (_grain.GrainInstance is not IDurableJobHandler handler)
         {
             LogGrainDoesNotImplementHandler(_shared.Logger, _grain.GrainId);
             throw new InvalidOperationException($"Grain {_grain.GrainId} does not implement IDurableJobHandler");
         }
 
+        _featureHandlers.EnableTurnIsolation();
         return _featureHandlers.StartExecution(
             token => ExecuteHandlerAsync(handler, context, token),
             holdTurnIsolation: true);
@@ -168,25 +176,27 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
         bool newJob,
         CancellationToken cancellationToken)
     {
-        if (!state.Task.IsCompleted)
+        var observedTask = state.Task;
+        if (!observedTask.IsCompleted)
         {
             if (newJob)
             {
-                return LongPollGetJobStatusAsync(key, context, state, cancellationToken);
+                return LongPollGetJobStatusAsync(key, context, state, observedTask, cancellationToken);
             }
 
             return new(DurableJobRunResult.InProgress(_shared.Options.JobStatusPollInterval));
         }
 
-        return ResolveCompletedJobStatusAsync(key, context, state);
+        return ResolveCompletedJobStatusAsync(key, context, state, observedTask);
 
         async ValueTask<DurableJobRunResult> LongPollGetJobStatusAsync(
             (string JobId, long ExecutionGeneration, int DequeueCount) key,
             IJobRunContext context,
             JobAttemptState state,
+            Task<DurableJobRunResult> observedTask,
             CancellationToken cancellationToken)
         {
-            if (!state.Task.IsCompleted)
+            if (!observedTask.IsCompleted)
             {
                 using var timeoutCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 var longPollDuration = TimeSpan.FromTicks(
@@ -194,7 +204,7 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
                         _shared.MessagingOptions.ResponseTimeout.Divide(2).Ticks,
                         _shared.Options.JobStatusPollInterval.Ticks));
                 var delayTask = Task.Delay(longPollDuration, _shared.TimeProvider, timeoutCancellation.Token);
-                var completedTask = await Task.WhenAny(delayTask, state.Task);
+                var completedTask = await Task.WhenAny(delayTask, observedTask);
                 if (completedTask == delayTask)
                 {
                     await delayTask;
@@ -204,38 +214,45 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
                 timeoutCancellation.Cancel();
             }
 
-            return await ResolveCompletedJobStatusAsync(key, context, state);
+            return await ResolveCompletedJobStatusAsync(key, context, state, observedTask);
         }
     }
 
     private async ValueTask<DurableJobRunResult> ResolveCompletedJobStatusAsync(
         (string JobId, long ExecutionGeneration, int DequeueCount) key,
         IJobRunContext context,
-        JobAttemptState state)
+        JobAttemptState state,
+        Task<DurableJobRunResult> observedTask)
     {
-        if (state.Task.IsCompletedSuccessfully)
+        if (observedTask.IsCompletedSuccessfully)
         {
-            return GetSuccessfulResult(key, state);
+            return GetSuccessfulResult(key, state, observedTask);
         }
 
         RecordCompletedJobAttempt(key, state);
-        if (state.Task.IsFaulted)
+        if (observedTask.IsFaulted)
         {
-            var exception = state.Task.Exception!.InnerException ?? state.Task.Exception;
+            var exception = observedTask.Exception!.InnerException ?? observedTask.Exception;
             LogErrorExecutingDurableJob(_shared.Logger, exception, context.Job.Id, _grain.GrainId);
             return DurableJobRunResult.Failed(exception);
         }
 
-        return await state.Task;
+        return await observedTask;
     }
 
     private DurableJobRunResult GetSuccessfulResult(
         (string JobId, long ExecutionGeneration, int DequeueCount) key,
-        JobAttemptState state)
+        JobAttemptState state,
+        Task<DurableJobRunResult> observedTask)
     {
-        var result = state.Task.Result;
+        var result = observedTask.Result;
         lock (_lock)
         {
+            if (!ReferenceEquals(state.Task, observedTask))
+            {
+                return result;
+            }
+
             if (result.IsInProgress)
             {
                 if (!state.PollRequested)

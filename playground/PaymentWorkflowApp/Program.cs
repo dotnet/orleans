@@ -93,7 +93,7 @@ while (!lifetime.ApplicationStopping.IsCancellationRequested)
     {
         var names = new[] { "Bob", "Mary", "Ted", "Alice", "Jehoshaphat", "Brian" };
         var jobType = "SayHello";
-        var jobArgs = Enumerable.Range(0, Random.Shared.Next(3)).Select(_ => names[Random.Shared.Next(names.Length)]).ToArray();
+        var jobArgs = Enumerable.Range(0, Random.Shared.Next(1, 4)).Select(_ => names[Random.Shared.Next(names.Length)]).ToArray();
         var jobId = $"jeb-{Random.Shared.Next(0, int.MaxValue):X}";
         await jobScheduler.CreateJob(jobType, jobArgs).ScheduleAsync(jobId);
     }

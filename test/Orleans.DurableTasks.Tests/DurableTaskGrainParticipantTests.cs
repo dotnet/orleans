@@ -34,7 +34,7 @@ public class DurableTaskGrainParticipantTests
 
         var subscription = Assert.Single(lifecycle.Subscriptions);
         Assert.Equal(nameof(DurableTaskGrainParticipant), subscription.ObserverName);
-        Assert.Equal(GrainLifecycleStage.Activate, subscription.Stage);
+        Assert.Equal(GrainLifecycleStage.Activate + 1, subscription.Stage);
     }
 
     [Fact]
@@ -52,7 +52,7 @@ public class DurableTaskGrainParticipantTests
         Assert.All(lifecycle.Subscriptions, s =>
         {
             Assert.Equal(nameof(DurableTaskGrainParticipant), s.ObserverName);
-            Assert.Equal(GrainLifecycleStage.Activate, s.Stage);
+            Assert.Equal(GrainLifecycleStage.Activate + 1, s.Stage);
         });
     }
 

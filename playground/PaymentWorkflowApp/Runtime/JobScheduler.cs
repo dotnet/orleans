@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Distributed.DurableTasks;
 using System.Runtime.InteropServices;
@@ -26,9 +27,9 @@ public class JobDescription
 public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
 {
     private readonly Dictionary<string, object> _handlers = [];
-    private readonly Dictionary<TaskId, JobDurableExecutionContext> _tasks = [];
-    private readonly Dictionary<TaskId, JobTaskHandle> _taskHandles = [];
-    private readonly Dictionary<TaskId, Task> _runningTasks = [];
+    private readonly ConcurrentDictionary<TaskId, JobDurableExecutionContext> _tasks = [];
+    private readonly ConcurrentDictionary<TaskId, JobTaskHandle> _taskHandles = [];
+    private readonly ConcurrentDictionary<TaskId, Task> _runningTasks = [];
     private readonly IJobStorage _storage = storage;
     private readonly ILogger<JobScheduler> _logger = logger;
     private readonly SemaphoreSlim _asyncLock = new(1);
@@ -42,6 +43,7 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
     {
         await _storage.ReadAsync(cancellationToken);
         var tasks = _storage.Tasks.ToList();
+        var taskIds = tasks.Select(static task => task.Id).ToHashSet();
         foreach (var (taskId, taskState) in tasks)
         {
             _ = RehydrateTaskFromStorage(taskId, taskState);
@@ -49,7 +51,9 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
 
         foreach (var (taskId, taskState) in tasks)
         {
-            if (taskState.Result is null && taskState.Type is not null)
+            if (taskState.Result is null
+                && taskState.Type is not null
+                && (taskId.Parent() == TaskId.None || !taskIds.Contains(taskId.Parent())))
             {
                 var job = new JobTask(taskState.Type, taskState.Arguments, this);
                 var executionContext = _tasks[taskId];
@@ -124,34 +128,47 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
 
     public async IAsyncEnumerable<JobDescription> GetJobsAsync(bool includeCompleted = true)
     {
-        await Task.Yield();
-        foreach (var (taskId, job) in _tasks)
+        List<JobDescription> jobs;
+        await _asyncLock.WaitAsync();
+        try
         {
-            var (result, error) = job.State.Result switch
+            jobs = new List<JobDescription>(_tasks.Count);
+            foreach (var (taskId, job) in _tasks)
             {
-                { Exception: Exception exception } => (null, exception),
-                { Result: object res } => (res, null),
-                _ => (default(object), default(Exception)),
-            };
+                var (result, error) = job.State.Result switch
+                {
+                    { Exception: Exception exception } => (null, exception),
+                    { Result: object res } => (res, null),
+                    _ => (default(object), default(Exception)),
+                };
 
-            if ((result is not null || error is not null) && !includeCompleted)
-            {
-                continue;
+                if ((result is not null || error is not null) && !includeCompleted)
+                {
+                    continue;
+                }
+
+                var isRunning = _runningTasks.ContainsKey(taskId);
+                jobs.Add(new JobDescription
+                {
+                    JobId = taskId,
+                    Arguments = job.State.Arguments,
+                    Type = job.State.Type,
+                    Status = (result, error) switch { (null, null) when isRunning => "Running", (null, null) => "Pending", (not null, null) => "Completed", (null, not null) => "Faulted", _ => "Internal Error" },
+                    Exception = error,
+                    Result = result?.ToString(),
+                    CreatedAt = job.State.CreatedAt,
+                    CompletedAt = job.State.CompletedAt,
+                });
             }
+        }
+        finally
+        {
+            _asyncLock.Release();
+        }
 
-            var isRunning = _runningTasks.ContainsKey(taskId);
-            var description = new JobDescription
-            {
-                JobId = taskId,
-                Arguments = job.State.Arguments,
-                Type = job.State.Type,
-                Status = (result, error) switch { (null, null) when isRunning => "Running", (null, null) => "Pending", (not null, null) => "Completed", (null, not null) => "Faulted", _ => "Internal Error" },
-                Exception = error,
-                Result = result?.ToString(),
-                CreatedAt = job.State.CreatedAt,
-                CompletedAt = job.State.CompletedAt,
-            };
-            yield return description;
+        foreach (var job in jobs)
+        {
+            yield return job;
         }
     }
 
@@ -167,7 +184,19 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
                     throw new InvalidOperationException($"Attempt to schedule multiple jobs with the same task id, {taskId}, but different job types. Scheduled job type: {executionContext.State.Type}. Requested job type: {job.Type}");
                 }
 
-                // and similarly for the job arguments...
+                if (!(executionContext.State.Arguments ?? [])
+                    .SequenceEqual(job.Arguments ?? [], StringComparer.Ordinal))
+                {
+                    throw new InvalidOperationException(
+                        $"Attempt to schedule multiple jobs with the same task id, {taskId}, but different arguments.");
+                }
+
+                if (executionContext.State.Result is null && !_runningTasks.ContainsKey(taskId))
+                {
+                    _taskHandles[taskId] = new JobTaskHandle(taskId, response: null);
+                    InvokeRequestMethod(job, taskId, executionContext, CancellationToken.None);
+                }
+
                 return await _taskHandles[taskId].PollAsync(
                     new PollingOptions { PollTimeout = TimeSpan.Zero },
                     cancellationToken);
@@ -193,16 +222,43 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
         {
             if (!TryGetExecutionContext(taskId, out var executionContext))
             {
-                executionContext = await CreateExecutionContextAsync(taskId, type: null, arguments: null, cancellationToken);
+                executionContext = taskDefinition is JobTask job
+                    ? await CreateExecutionContextAsync(taskId, job.Type, job.Arguments, cancellationToken)
+                    : taskDefinition is ISchedulableTask
+                        ? CreateExecutionContextWithoutWrite(taskId)
+                        : await CreateExecutionContextAsync(taskId, type: null, arguments: null, cancellationToken);
             }
-            else if (executionContext.State.Result is not null || _runningTasks.ContainsKey(taskId))
+            else
             {
-                return _taskHandles[taskId];
+                if (taskDefinition is JobTask existingJob)
+                {
+                    if (!string.Equals(executionContext.State.Type, existingJob.Type, StringComparison.Ordinal)
+                        || !(executionContext.State.Arguments ?? [])
+                            .SequenceEqual(existingJob.Arguments ?? [], StringComparer.Ordinal))
+                    {
+                        throw new InvalidOperationException(
+                            $"Task '{taskId}' is already associated with a different job definition.");
+                    }
+                }
+
+                if (executionContext.State.Result is not null || _runningTasks.ContainsKey(taskId))
+                {
+                    return _taskHandles[taskId];
+                }
+
+                _taskHandles[taskId] = new JobTaskHandle(taskId, response: null);
             }
 
-            _runningTasks.Add(
-                taskId,
-                InvokeTaskDefinitionCore(taskId, taskDefinition, executionContext, cancellationToken));
+            var invocation = taskDefinition switch
+            {
+                JobTask => InvokeTaskDefinitionCore(taskId, taskDefinition, executionContext),
+                ISchedulableTask schedulableTask => InvokeSchedulableTaskCore(taskId, schedulableTask, executionContext),
+                _ => InvokeTaskDefinitionCore(taskId, taskDefinition, executionContext),
+            };
+            if (!_runningTasks.TryAdd(taskId, invocation))
+            {
+                throw new InvalidOperationException($"Task '{taskId}' is already running.");
+            }
             return _taskHandles[taskId];
         }
         finally
@@ -211,57 +267,124 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
         }
     }
 
+    private JobDurableExecutionContext CreateExecutionContextWithoutWrite(TaskId taskId)
+    {
+        var state = new JobTaskState { CreatedAt = DateTime.UtcNow };
+        _storage.AddOrUpdateTask(taskId, state);
+        return CreateExecutionContext(taskId, state);
+    }
+
     private async Task InvokeTaskDefinitionCore(
         TaskId taskId,
         DurableTask taskDefinition,
-        JobDurableExecutionContext executionContext,
-        CancellationToken cancellationToken)
+        JobDurableExecutionContext executionContext)
     {
         await Task.Yield();
+        DurableTaskResponse response;
         try
         {
-            var response = await DurableTaskRuntimeHelper.RunAsync(taskDefinition, executionContext);
-            await CompleteRequestWithResponse(taskId, response, executionContext, cancellationToken);
+            response = await DurableTaskRuntimeHelper.RunAsync(taskDefinition, executionContext);
         }
         catch (Exception exception)
         {
-            await CompleteRequestWithResponse(
-                taskId,
-                DurableTaskResponse.FromException(exception),
-                executionContext,
-                cancellationToken);
+            response = DurableTaskResponse.FromException(exception);
+        }
+
+        try
+        {
+            await CompleteRequestWithResponse(taskId, response, executionContext, CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Error persisting durable task completion for {TaskId}", taskId);
+            _taskHandles[taskId].TrySetResponse(DurableTaskResponse.FromException(exception));
         }
         finally
         {
-            _runningTasks.Remove(taskId);
+            await RemoveRunningTaskAsync(taskId);
+        }
+    }
+
+    private async Task InvokeSchedulableTaskCore(
+        TaskId taskId,
+        ISchedulableTask schedulableTask,
+        JobDurableExecutionContext executionContext)
+    {
+        await Task.Yield();
+        DurableTaskResponse response;
+        try
+        {
+            DurableTaskRuntimeHelper.SetCurrentContext(executionContext, out var previousContext);
+            try
+            {
+                response = await schedulableTask.ScheduleAsync(taskId, CancellationToken.None);
+                if (!response.IsCompleted)
+                {
+                    response = await schedulableTask.GetHandle(taskId).WaitAsync(CancellationToken.None);
+                }
+            }
+            finally
+            {
+                DurableTaskRuntimeHelper.SetCurrentContext(previousContext);
+            }
+        }
+        catch (Exception exception)
+        {
+            response = DurableTaskResponse.FromException(exception);
+        }
+
+        try
+        {
+            await CompleteRequestWithResponse(taskId, response, executionContext, CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Error persisting scheduled durable task completion for {TaskId}", taskId);
+            _taskHandles[taskId].TrySetResponse(DurableTaskResponse.FromException(exception));
+        }
+        finally
+        {
+            await RemoveRunningTaskAsync(taskId);
         }
     }
 
     private void InvokeRequestMethod(JobTask job, TaskId taskId, JobDurableExecutionContext executionContext, CancellationToken cancellationToken)
     {
-        _runningTasks.Add(taskId, InvokeRequestMethodCore(taskId, job, executionContext, cancellationToken));
+        if (!_runningTasks.TryAdd(taskId, InvokeRequestMethodCore(taskId, job, executionContext)))
+        {
+            throw new InvalidOperationException($"Task '{taskId}' is already running.");
+        }
     }
 
-    private async Task InvokeRequestMethodCore(TaskId taskId, JobTask job, JobDurableExecutionContext executionContext, CancellationToken cancellationToken)
+    private async Task InvokeRequestMethodCore(TaskId taskId, JobTask job, JobDurableExecutionContext executionContext)
     {
         await Task.Yield();
 
+        DurableTaskResponse response;
         try
         {
-            var response = await DurableTaskRuntimeHelper.RunAsync(job, executionContext);
-
-            await CompleteRequestWithResponse(taskId, response, executionContext, cancellationToken);
+            response = await DurableTaskRuntimeHelper.RunAsync(job, executionContext);
         }
         catch (Exception exception)
         {
             var arguments = job.Arguments;
             var argString = arguments switch { { Length: 1 } arg => arg[0], { Length: > 1 } => string.Join(", ", arguments), _ => "" };
             _logger.LogError(exception, "Error invoking durable task request {Type}({Arguments})", job.Type, argString);
-            await CompleteRequestWithResponse(taskId, DurableTaskResponse.FromException(exception), executionContext, cancellationToken);
+            response = DurableTaskResponse.FromException(exception);
+        }
+
+        try
+        {
+            await CompleteRequestWithResponse(taskId, response, executionContext, CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Error persisting durable task request completion for {TaskId}", taskId);
+            _taskHandles[taskId].TrySetResponse(DurableTaskResponse.FromException(exception));
         }
         finally
         {
-            _runningTasks.Remove(taskId);
+            await RemoveRunningTaskAsync(taskId);
         }
     }
 
@@ -276,22 +399,108 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
         // that could cause the result to appear to change after it has already been observed.
         // This condition guards against the case where a scheduling call fails after the response has already been received via an OnResponse callback,
         // which could occur due to a recovery retry or concurrency (multiple clients scheduling the same workflow).
-        var state = executionContext.State;
-        if (state.Result is null)
+        await WaitForChildrenAsync(taskId);
+        await _asyncLock.WaitAsync(cancellationToken);
+        try
         {
-            Debug.Assert(state.Result is null);
+            var state = executionContext.State;
+            if (state.Result is null)
+            {
+                Debug.Assert(state.Result is null);
 
-            // Store the result.
-            // Note that this and the next call to notify callers may result in two writes in quick succession.
-            // That is ok: we want to ensure that every client always sees the same result for a task, so it is important to persist the task before notifying the first client.
-            state.Result = response;
-            state.CompletedAt = DateTime.UtcNow;
-            _storage.AddOrUpdateTask(taskId, state);
-            await _storage.WriteAsync(cancellationToken);
+                // Store the result.
+                // Note that this and the next call to notify callers may result in two writes in quick succession.
+                // That is ok: we want to ensure that every client always sees the same result for a task, so it is important to persist the task before notifying the first client.
+                state.Result = response;
+                state.CompletedAt = DateTime.UtcNow;
+                _storage.AddOrUpdateTask(taskId, state);
+                try
+                {
+                    await _storage.WriteAsync(cancellationToken);
+                }
+                catch
+                {
+                    state.Result = null;
+                    state.CompletedAt = null;
+                    _storage.AddOrUpdateTask(taskId, state);
+                    throw;
+                }
 
-            // TODO: visibility of results must only happen once all child tasks have completed.
-            _taskHandles[taskId].TrySetResponse(response);
+                // TODO: visibility of results must only happen once all child tasks have completed.
+                _taskHandles[taskId].TrySetResponse(response);
+            }
         }
+        finally
+        {
+            _asyncLock.Release();
+        }
+    }
+
+    private async Task RemoveRunningTaskAsync(TaskId taskId)
+    {
+        await _asyncLock.WaitAsync();
+        try
+        {
+            _runningTasks.TryRemove(taskId, out _);
+        }
+        finally
+        {
+            _asyncLock.Release();
+        }
+    }
+
+    private async Task WaitForChildrenAsync(TaskId taskId)
+    {
+        var handles = _tasks
+            .Where(pair => taskId.IsParentOf(pair.Key) && pair.Value.State.Result is null)
+            .Select(pair => _taskHandles.TryGetValue(pair.Key, out var handle) ? handle : null)
+            .Where(static handle => handle is not null)
+            .ToList();
+        foreach (var handle in handles)
+        {
+            _ = await handle!.WaitAsync(CancellationToken.None);
+        }
+    }
+
+    internal async ValueTask<DurableTaskResponse> ScheduleDelayAsync(
+        TaskId taskId,
+        JobTaskState state,
+        DateTimeOffset dueTime,
+        CancellationToken cancellationToken)
+    {
+        await _asyncLock.WaitAsync(cancellationToken);
+        try
+        {
+            if (state.DueTime is null)
+            {
+                state.DueTime = dueTime;
+                _storage.AddOrUpdateTask(taskId, state);
+                try
+                {
+                    await _storage.WriteAsync(cancellationToken);
+                }
+                catch
+                {
+                    state.DueTime = null;
+                    _storage.AddOrUpdateTask(taskId, state);
+                    throw;
+                }
+            }
+
+            dueTime = state.DueTime.Value;
+        }
+        finally
+        {
+            _asyncLock.Release();
+        }
+
+        var delay = dueTime - DateTimeOffset.UtcNow;
+        if (delay > TimeSpan.Zero)
+        {
+            await Task.Delay(delay, cancellationToken);
+        }
+
+        return DurableTaskResponse.Completed;
     }
 
     public async Task PruneCompletedTasksAsync(TimeSpan cleanupAge, CancellationToken cancellationToken = default)
@@ -357,30 +566,39 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
         {
             foreach (var taskId in completedTaskIds)
             {
-                // Prune all otherwise-completed children.
-                if (waitingOnParent is not null && waitingOnParent.TryGetValue(taskId, out var childTaskIds))
-                {
-                    foreach (var childTaskId in childTaskIds)
-                    {
-                        if (_logger.IsEnabled(LogLevel.Trace))
-                        {
-                            _logger.LogTrace("Pruning completed child task {TaskId}", childTaskId);
-                        }
-
-                        _storage.RemoveTask(childTaskId);
-                    }
-                }
-
-                // Prune the task.
-                if (_logger.IsEnabled(LogLevel.Trace))
-                {
-                    _logger.LogTrace("Pruning completed task {TaskId}", taskId);
-                }
-                _storage.RemoveTask(taskId);
+                RemoveCompletedTree(taskId);
             }
         }
 
         return completedTaskIds is not null;
+
+        void RemoveCompletedTree(TaskId taskId)
+        {
+            if (waitingOnParent is not null && waitingOnParent.TryGetValue(taskId, out var childTaskIds))
+            {
+                foreach (var childTaskId in childTaskIds)
+                {
+                    RemoveCompletedTree(childTaskId);
+                }
+            }
+
+            if (_logger.IsEnabled(LogLevel.Trace))
+            {
+                _logger.LogTrace("Pruning completed task {TaskId}", taskId);
+            }
+
+            RemoveTask(taskId);
+        }
+    }
+
+    private void RemoveTask(TaskId taskId)
+    {
+        if (_storage.RemoveTask(taskId))
+        {
+            _tasks.TryRemove(taskId, out _);
+            _taskHandles.TryRemove(taskId, out _);
+            _runningTasks.TryRemove(taskId, out _);
+        }
     }
 
     internal ValueTask SignalCancellationAsync(TaskId id, JobTaskState state)

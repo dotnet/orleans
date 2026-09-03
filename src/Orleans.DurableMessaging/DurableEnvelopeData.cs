@@ -27,6 +27,8 @@ namespace Orleans.DurableMessaging;
 public sealed class DurableEnvelopeData : IDisposable
 {
     [NonSerialized]
+    private int _disposed;
+    [NonSerialized]
     private readonly SerializerSessionPool? _sessionPool;
 
     /// <summary>
@@ -89,7 +91,7 @@ public sealed class DurableEnvelopeData : IDisposable
     /// <typeparam name="T">The type to deserialize the body as.</typeparam>
     /// <param name="value">The deserialized value, or default if deserialization fails.</param>
     /// <returns>True if deserialization succeeded; otherwise, false.</returns>
-    public bool TryGetBody<T>([MaybeNullWhen(false)] out T value)
+    public bool TryGetBody<T>([MaybeNull] out T value)
     {
         if (_sessionPool is null || _bodySlice.Length == 0)
         {
@@ -102,8 +104,8 @@ public sealed class DurableEnvelopeData : IDisposable
             using var session = _sessionPool.GetSession();
             var reader = Reader.Create(_buffer.AsReadOnlySequence().Slice(_bodySlice.Offset, _bodySlice.Length), session);
             var field = reader.ReadFieldHeader();
-            value = _sessionPool.CodecProvider.GetCodec<T>().ReadValue(ref reader, field);
-            return value is not null;
+            value = _sessionPool.CodecProvider.GetCodec<T>().ReadValue(ref reader, field)!;
+            return true;
         }
         catch
         {
@@ -120,7 +122,7 @@ public sealed class DurableEnvelopeData : IDisposable
     /// <param name="key">The context key to retrieve.</param>
     /// <param name="value">The deserialized value, or default if not found or deserialization fails.</param>
     /// <returns>True if the key exists and deserialization succeeded; otherwise, false.</returns>
-    public bool TryGetContextValue<T>(string key, [MaybeNullWhen(false)] out T value)
+    public bool TryGetContextValue<T>(string key, [MaybeNull] out T value)
     {
         if (_sessionPool is null || _contextIndices is null || !_contextIndices.TryGetValue(key, out var slice))
         {
@@ -133,8 +135,8 @@ public sealed class DurableEnvelopeData : IDisposable
             using var session = _sessionPool.GetSession();
             var reader = Reader.Create(_buffer.AsReadOnlySequence().Slice(slice.Offset, slice.Length), session);
             var field = reader.ReadFieldHeader();
-            value = _sessionPool.CodecProvider.GetCodec<T>().ReadValue(ref reader, field);
-            return value is not null;
+            value = _sessionPool.CodecProvider.GetCodec<T>().ReadValue(ref reader, field)!;
+            return true;
         }
         catch
         {
@@ -160,8 +162,16 @@ public sealed class DurableEnvelopeData : IDisposable
     {
         if (_contextIndices is not null && _contextIndices.TryGetValue(key, out var slice))
         {
-            value = _buffer.AsReadOnlySequence().Slice(slice.Offset, slice.Length);
-            return true;
+            try
+            {
+                value = _buffer.AsReadOnlySequence().Slice(slice.Offset, slice.Length);
+                return true;
+            }
+            catch
+            {
+                value = default;
+                return false;
+            }
         }
 
         value = default;
@@ -171,5 +181,21 @@ public sealed class DurableEnvelopeData : IDisposable
     /// <summary>
     /// Disposes the underlying buffer, releasing any held resources.
     /// </summary>
-    public void Dispose() => _buffer.Dispose();
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) == 0)
+        {
+            _buffer.Dispose();
+        }
+
+        GC.SuppressFinalize(this);
+    }
+
+    ~DurableEnvelopeData()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) == 0)
+        {
+            _buffer.Dispose();
+        }
+    }
 }

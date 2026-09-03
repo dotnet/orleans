@@ -1,5 +1,6 @@
 using System;
 using Orleans;
+using Orleans.Journaling;
 
 namespace Orleans.DurableMessaging;
 
@@ -38,7 +39,7 @@ namespace Orleans.DurableMessaging;
 /// </code>
 /// </example>
 [GenerateSerializer]
-public readonly struct DurableEnvelope : IDisposable
+public readonly struct DurableEnvelope : IDisposable, IJournaledResourceOwner
 {
     /// <summary>
     /// Unique identifier for this message instance, used for deduplication.
@@ -262,6 +263,8 @@ public readonly struct DurableEnvelope : IDisposable
     public DateTimeOffset CreatedAt { get; init; }
 
     internal DurableEnvelope Retain() => this with { Data = Data.Retain() };
+
+    object IJournaledResourceOwner.ResourceIdentity => Data;
 
     /// <inheritdoc />
     public void Dispose() => Data?.Dispose();

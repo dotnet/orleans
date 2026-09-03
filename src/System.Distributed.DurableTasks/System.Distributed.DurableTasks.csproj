@@ -9,6 +9,8 @@
     <AnalysisLevel>preview</AnalysisLevel>
     <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
     <OrleansBuildTimeCodeGen>false</OrleansBuildTimeCodeGen>
+    <VersionSuffix Condition="$(VersionSuffix) != ''">$(VersionSuffix).alpha.1</VersionSuffix>
+    <VersionSuffix Condition="$(VersionSuffix) == ''">alpha.1</VersionSuffix>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 

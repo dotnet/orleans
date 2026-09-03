@@ -15,21 +15,20 @@ internal sealed class JobDurableExecutionContext(TaskId taskId, JobScheduler job
 
     protected override TaskId CreateChildTaskId(string? name)
     {
-        if (string.IsNullOrWhiteSpace(name))
+        lock (SyncRoot)
         {
-            var sequenceNumber = _nextSequenceNumber++;
-            return TaskId.Child(sequenceNumber.ToString(CultureInfo.InvariantCulture));
-        }
-        else
-        {
-            ref var nextSequenceNumber = ref CollectionsMarshal.GetValueRefOrAddDefault(_nextChildIds ??= [], name, out _);
-            var sequenceNumber = nextSequenceNumber++;
-            if (sequenceNumber > 0)
+            if (string.IsNullOrWhiteSpace(name))
             {
-                return TaskId.Child($"{name}.{sequenceNumber.ToString(CultureInfo.InvariantCulture)}");
+                var sequenceNumber = _nextSequenceNumber++;
+                return TaskId.Child($"unnamed:{sequenceNumber.ToString(CultureInfo.InvariantCulture)}");
             }
-
-            return TaskId.Child(name);
+            else
+            {
+                ref var nextSequenceNumber = ref CollectionsMarshal.GetValueRefOrAddDefault(_nextChildIds ??= [], name, out _);
+                var sequenceNumber = nextSequenceNumber++;
+                return TaskId.Child(
+                    $"named:{name.Length.ToString(CultureInfo.InvariantCulture)}:{name}:{sequenceNumber.ToString(CultureInfo.InvariantCulture)}");
+            }
         }
     }
 
@@ -43,13 +42,7 @@ internal sealed class JobDurableExecutionContext(TaskId taskId, JobScheduler job
         DateTimeOffset dueTime,
         CancellationToken cancellationToken)
     {
-        var delay = dueTime - DateTimeOffset.UtcNow;
-        if (delay > TimeSpan.Zero)
-        {
-            await Task.Delay(delay, cancellationToken);
-        }
-
-        return DurableTaskResponse.Completed;
+        return await jobScheduler.ScheduleDelayAsync(taskId, State, dueTime, cancellationToken);
     }
 
     protected override IScheduledTaskHandle GetChildTaskHandle(TaskId taskId)

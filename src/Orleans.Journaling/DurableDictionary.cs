@@ -31,6 +31,7 @@ internal class DurableDictionary<K, V> :
     IDurableDictionaryOwnership<K>,
     IJournaledState,
     IJournaledStateWriteParticipant,
+    IDisposable,
     IDurableDictionaryCommandHandler<K, V>
     where K : notnull
 {
@@ -191,21 +192,35 @@ internal class DurableDictionary<K, V> :
 
     private void ApplyClear()
     {
-        HashSet<IDisposable>? disposables = null;
+        Dictionary<object, IDisposable>? disposables = null;
         foreach (var value in _items.Values)
         {
             if (value is IDisposable disposable)
             {
-                (disposables ??= new(ReferenceEqualityComparer.Instance)).Add(disposable);
+                (disposables ??= new(ReferenceEqualityComparer.Instance))
+                    .TryAdd(GetDisposalIdentity(value, disposable), disposable);
             }
         }
 
         _items.Clear();
         if (disposables is not null)
         {
-            foreach (var disposable in disposables)
+            List<Exception>? exceptions = null;
+            foreach (var disposable in disposables.Values)
             {
-                disposable.Dispose();
+                try
+                {
+                    disposable.Dispose();
+                }
+                catch (Exception exception)
+                {
+                    (exceptions ??= []).Add(exception);
+                }
+            }
+
+            if (exceptions is not null)
+            {
+                throw new AggregateException("One or more durable dictionary values failed to dispose.", exceptions);
             }
         }
     }
@@ -217,19 +232,23 @@ internal class DurableDictionary<K, V> :
             return;
         }
 
-        if (!typeof(V).IsValueType)
+        var identity = GetDisposalIdentity(value, disposable);
+        foreach (var candidate in _items.Values)
         {
-            foreach (var candidate in _items.Values)
+            if (candidate is IDisposable candidateDisposable
+                && ReferenceEquals(GetDisposalIdentity(candidate, candidateDisposable), identity))
             {
-                if (ReferenceEquals(candidate, value))
-                {
-                    return;
-                }
+                return;
             }
         }
 
         disposable.Dispose();
     }
+
+    private static object GetDisposalIdentity(V value, IDisposable disposable) =>
+        value is IJournaledResourceOwner owner ? owner.ResourceIdentity : disposable;
+
+    void IDisposable.Dispose() => ApplyClear();
     void IDurableDictionaryCommandHandler<K, V>.ApplySet(K key, V value) => ApplySet(key, value);
     void IDurableDictionaryCommandHandler<K, V>.ApplyRemove(K key) => ApplyRemove(key);
     void IDurableDictionaryCommandHandler<K, V>.ApplyClear() => ApplyClear();

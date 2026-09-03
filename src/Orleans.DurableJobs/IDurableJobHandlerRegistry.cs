@@ -81,6 +81,8 @@ internal interface IDurableJobHandlerLookup
     bool TryGetHandler(string jobName, [NotNullWhen(true)] out IDurableJobFeatureHandler? handler);
 
     bool TryGetIsolatedHandler(string jobName, [NotNullWhen(true)] out IDurableJobFeatureHandler? handler);
+
+    void EnableTurnIsolation() { }
 }
 
 internal sealed class DurableJobHandlerRegistry : IDurableJobHandlerRegistry, IDurableJobHandlerLookup
@@ -115,7 +117,7 @@ internal sealed class DurableJobHandlerRegistry : IDurableJobHandlerRegistry, ID
             return await factory(cancellationToken);
         }
 
-        using var lease = await _turnIsolation.EnterOrdinaryAsync();
+        using var lease = await _turnIsolation.EnterOrdinaryAsync(cancellationToken);
         lease.Activate();
         return await factory(cancellationToken);
     }
@@ -146,6 +148,8 @@ internal sealed class DurableJobHandlerRegistry : IDurableJobHandlerRegistry, ID
 
     public bool TryGetIsolatedHandler(string jobName, [NotNullWhen(true)] out IDurableJobFeatureHandler? handler) =>
         TryGetHandler(jobName, requiresTurnIsolation: true, out handler);
+
+    public void EnableTurnIsolation() => _turnIsolation?.Enable();
 
     private bool TryGetHandler(
         string jobName,

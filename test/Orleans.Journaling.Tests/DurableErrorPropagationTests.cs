@@ -364,7 +364,7 @@ public class ErrorProcessorGrain : DurableGrain, IErrorProcessorGrain
             _grain._processedCount++;
 
             // Deserialize request
-            if (!context.Envelope.Data.TryGetBody<ErrorTestRequest>(out var request))
+            if (!context.Envelope.Data.TryGetBody<ErrorTestRequest>(out var request) || request is null)
             {
                 context.SendError(StandardErrorCodes.DeserializationFailed, "Failed to deserialize request", isRetriable: false);
                 await _grain.WriteStateAsync();

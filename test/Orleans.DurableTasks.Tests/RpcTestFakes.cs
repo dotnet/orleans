@@ -354,7 +354,10 @@ internal static class RpcTestRuntimeFactory
             new TestGrainContextAccessor(grainContext),
             TimeProvider.System,
             NullLogger<DurableTaskGrainRuntime>.Instance,
-            new ServiceCollection().AddSerializer().BuildServiceProvider().GetRequiredService<Serializer>());
+            new ServiceCollection().AddSerializer().BuildServiceProvider().GetRequiredService<Serializer>())
+        {
+            AllowTaskDelegatesForTesting = true
+        };
         IEnumerable<IDurableTaskMessageTransport> transports = transport is null
             ? []
             : [transport];

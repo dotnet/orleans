@@ -262,8 +262,14 @@ internal sealed class DurableMessagingCommitCoordinator :
                 {
                     owner._currentHandler.Value = _previous;
                 }
-                state.Complete(committed: true);
-                owner._commitGate.Release();
+                try
+                {
+                    state.Complete(committed: true);
+                }
+                finally
+                {
+                    owner._commitGate.Release();
+                }
             }
         }
 
@@ -278,8 +284,14 @@ internal sealed class DurableMessagingCommitCoordinator :
                 {
                     owner._currentHandler.Value = _previous;
                 }
-                state.Complete(committed: false);
-                owner._commitGate.Release();
+                try
+                {
+                    state.Complete(committed: false);
+                }
+                finally
+                {
+                    owner._commitGate.Release();
+                }
             }
         }
     }

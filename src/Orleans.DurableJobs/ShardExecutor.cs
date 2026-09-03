@@ -328,34 +328,13 @@ internal sealed partial class ShardExecutor
                 attemptCancellationToken.ThrowIfCancellationRequested();
                 LogExecutingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, jobContext.Job.TargetGrainId, jobContext.Job.DueTime);
 
-                var featureTarget = _grainFactory.GetGrain<IDurableJobFeatureReceiverExtension>(jobContext.Job.TargetGrainId);
-                var result = await featureTarget.TryHandleFeatureJobAsync(jobContext, attemptCancellationToken);
-                if (result is not null)
+                var target = _grainFactory.GetGrain<IDurableJobReceiverExtension>(jobContext.Job.TargetGrainId);
+                var result = await target.HandleDurableJobAsync(jobContext, attemptCancellationToken);
+                while (result.IsInProgress)
                 {
-                    while (result.IsInProgress)
-                    {
-                        LogPollingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, result.PollAfterDelay.Value);
-                        await Task.Delay(result.PollAfterDelay.Value, _timeProvider, attemptCancellationToken);
-                        result = await featureTarget.TryHandleFeatureJobAsync(jobContext, attemptCancellationToken)
-                            ?? throw new InvalidOperationException(
-                                $"Durable feature job '{jobContext.Job.Id}' was no longer registered while it was in progress.");
-                    }
-                }
-                else
-                {
-                    var target = _grainFactory.GetGrain<IDurableJobReceiverExtension>(jobContext.Job.TargetGrainId);
+                    LogPollingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, result.PollAfterDelay.Value);
+                    await Task.Delay(result.PollAfterDelay.Value, _timeProvider, attemptCancellationToken);
                     result = await target.HandleDurableJobAsync(jobContext, attemptCancellationToken);
-
-                    // Handle the result based on status
-                    while (result.IsInProgress)
-                    {
-                        // Enter polling loop
-                        LogPollingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, result.PollAfterDelay.Value);
-
-                        await Task.Delay(result.PollAfterDelay.Value, _timeProvider, attemptCancellationToken);
-
-                        result = await target.HandleDurableJobAsync(jobContext, attemptCancellationToken);
-                    }
                 }
 
                 switch (result.Status)
@@ -418,6 +397,7 @@ internal sealed partial class ShardExecutor
                                 notifyOwnershipLost();
                             }
                         }
+
                         break;
                     case DurableJobRunStatus.RescheduleRequested:
                         failureException = new InvalidOperationException(

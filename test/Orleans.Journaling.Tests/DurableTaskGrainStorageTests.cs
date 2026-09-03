@@ -207,7 +207,12 @@ public class DurableTaskGrainStorageTests : JournalingTestBase
 
         storage.SetRequest(taskId, state, request);
 
-        Assert.Same(request, dictionary[taskId].Request);
+        var persisted = Assert.IsType<DurableTaskStorageTestRequest>(dictionary[taskId].Request);
+        Assert.NotSame(request, persisted);
+        Assert.NotNull(request.Context);
+        Assert.NotNull(persisted.Context);
+        Assert.Equal(request.Context.CallerId, persisted.Context.CallerId);
+        Assert.Equal(request.Context.TargetId, persisted.Context.TargetId);
     }
 
     [Fact]
@@ -223,7 +228,9 @@ public class DurableTaskGrainStorageTests : JournalingTestBase
         storage.SetResponse(taskId, state, response);
 
         var persisted = dictionary[taskId];
-        Assert.Same(response, persisted.Result);
+        Assert.NotSame(response, persisted.Result);
+        Assert.NotNull(persisted.Result);
+        Assert.Equal(42, persisted.Result.GetResult<int>());
         Assert.Equal(timeProvider.GetUtcNow(), persisted.CompletedAt);
     }
 

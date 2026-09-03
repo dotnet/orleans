@@ -62,6 +62,8 @@ namespace System.Distributed.DurableTasks
         protected internal Threading.Tasks.Task DeactivateAsync(Threading.CancellationToken cancellationToken) { throw null; }
 
         protected internal abstract IScheduledTaskHandle GetChildTaskHandle(TaskId taskId);
+        protected internal virtual DateTimeOffset GetUtcNow() { throw null; }
+
         public IDisposable RegisterCancellationCallback(Func<Threading.CancellationToken, Threading.Tasks.Task> callback) { throw null; }
 
         public IDisposable RegisterCancellationCallback<TState>(Func<TState, Threading.CancellationToken, Threading.Tasks.Task> callback, TState state) { throw null; }

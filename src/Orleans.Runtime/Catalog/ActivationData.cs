@@ -745,6 +745,7 @@ internal sealed partial class ActivationData :
 
                 if (state is ActivationState.Creating or ActivationState.Activating or ActivationState.Valid)
                 {
+                    GetComponent<IActivationDeactivationParticipant>()?.OnDeactivationRequested();
                     GrainLifecycleEvents.EmitDeactivating(this, DeactivationReason);
 
                     CancelPendingOperations();
@@ -2054,6 +2055,23 @@ internal sealed partial class ActivationData :
                 // If the grain was valid when deactivation started, call OnDeactivateAsync.
                 if (deactivateCommand.PreviousState == ActivationState.Valid)
                 {
+                    if (GetComponent<IActivationDeactivationParticipant>() is { } participant)
+                    {
+                        try
+                        {
+                            await participant.OnDeactivatingAsync(cancellationToken).WaitAsync(cancellationToken);
+                        }
+                        catch (Exception exception)
+                        {
+                            LogErrorInGrainMethod(
+                                _shared.Logger,
+                                exception,
+                                nameof(IActivationDeactivationParticipant.OnDeactivatingAsync),
+                                this);
+                            encounteredError = true;
+                        }
+                    }
+
                     if (GrainInstance is IGrainBase grainBase)
                     {
                         // Start a span for OnDeactivateAsync execution

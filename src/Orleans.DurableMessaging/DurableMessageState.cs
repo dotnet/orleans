@@ -13,6 +13,7 @@ internal sealed class InboxMessageState
 
     [Id(2)]
     public string? LastError { get; set; }
+
 }
 
 [GenerateSerializer]
@@ -26,6 +27,9 @@ internal sealed class OutboxMessageState
 
     [Id(2)]
     public string? LastError { get; set; }
+
+    [Id(3)]
+    public DateTimeOffset? EnqueuedAt { get; set; }
 }
 
 [GenerateSerializer]

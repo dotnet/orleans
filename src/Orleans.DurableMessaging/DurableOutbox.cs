@@ -163,24 +163,35 @@ internal sealed partial class DurableOutbox :
     /// </remarks>
     public void Send(DurableEnvelope envelope)
     {
-        if (TryGetValue(envelope.MessageId, out var existing)
-            && ReferenceEquals(existing.Data, envelope.Data))
+        if (ContainsKey(envelope.MessageId))
         {
             return;
         }
 
         EnsureMetricsActive();
         var isNewMessage = !ContainsKey(envelope.MessageId);
+        var ownedEnvelope = envelope.Retain();
 
-        // Store envelope keyed by MessageId for O(1) lookup during removal
-        this[envelope.MessageId] = envelope;
+        try
+        {
+            // Store envelope keyed by MessageId for O(1) lookup during removal
+            this[envelope.MessageId] = ownedEnvelope;
+        }
+        catch
+        {
+            ownedEnvelope.Dispose();
+            throw;
+        }
 
         // Track the mutation after its journal entry is complete so write-boundary snapshots
         // cannot include an entry which is still active.
         _pendingMessageIds[envelope.MessageId] = ++_pendingGeneration;
         if (isNewMessage)
         {
-            _messageStates[envelope.MessageId] = new OutboxMessageState();
+            _messageStates[envelope.MessageId] = new OutboxMessageState
+            {
+                EnqueuedAt = _timeProvider.GetUtcNow()
+            };
             _instruments.OnOutboxDepthChanged(1);
         }
 
@@ -318,6 +329,7 @@ internal sealed partial class DurableOutbox :
             foreach (var envelope in pending)
             {
                 var stopwatch = Stopwatch.StartNew();
+                var deliveryCompleted = false;
                 try
                 {
                     var targetGrain = _grainFactory.GetGrain<IDurableInboxExtension>(envelope.ReceiverId);
@@ -329,6 +341,7 @@ internal sealed partial class DurableOutbox :
                             new DeliveryOptions { PollTimeout = TimeSpan.Zero },
                             cancellationToken).ConfigureAwait(true);
                     }
+                    deliveryCompleted = true;
                     cancellationToken.ThrowIfCancellationRequested();
                     await CommitDeliveryResultAsync(envelope.MessageId, result, failure: null, cancellationToken).ConfigureAwait(true);
 
@@ -374,7 +387,9 @@ internal sealed partial class DurableOutbox :
 
                     _instruments.OnOutboxDeliveryDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
                 }
-                catch (Exception ex) when (ex is not OperationCanceledException)
+                catch (Exception ex) when (
+                    !deliveryCompleted
+                    && (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested))
                 {
                     stopwatch.Stop();
                     await CommitDeliveryResultAsync(envelope.MessageId, default, ex.ToString(), cancellationToken).ConfigureAwait(true);
@@ -496,16 +511,33 @@ internal sealed partial class DurableOutbox :
             if (Count == 0)
             {
                 _jobId.Value = null;
-                await _stateManager.WriteStateAsync(cancellationToken).ConfigureAwait(true);
+                try
+                {
+                    await _stateManager.WriteStateAsync(cancellationToken).ConfigureAwait(true);
+                }
+                catch
+                {
+                    await _stateManager.RevertPendingChangesAsync(CancellationToken.None).ConfigureAwait(true);
+                    throw;
+                }
                 return null;
             }
 
             var now = _timeProvider.GetUtcNow();
-            var nextAttempt = Values
-                .Select(envelope => _messageStates.TryGetValue(envelope.MessageId, out var state) ? state.NextAttemptAt : null)
-                .Where(static value => value.HasValue)
-                .Min() ?? now;
-            return nextAttempt <= now ? now : nextAttempt;
+            DateTimeOffset? nextAttempt = null;
+            foreach (var envelope in Values)
+            {
+                if (!_messageStates.TryGetValue(envelope.MessageId, out var state)
+                    || state.NextAttemptAt is not { } candidate
+                    || candidate <= now)
+                {
+                    return now;
+                }
+
+                nextAttempt = nextAttempt is null || candidate < nextAttempt ? candidate : nextAttempt;
+            }
+
+            return nextAttempt ?? now;
         }
         finally
         {
@@ -549,7 +581,8 @@ internal sealed partial class DurableOutbox :
         state.AttemptCount++;
         state.LastError = error;
         var now = _timeProvider.GetUtcNow();
-        if (state.AttemptCount >= _maxDeliveryAttempts || now - envelope.CreatedAt >= _maxRetryAge)
+        state.EnqueuedAt ??= now;
+        if (state.AttemptCount >= _maxDeliveryAttempts || now - state.EnqueuedAt.Value >= _maxRetryAge)
         {
             _deadLetters[envelope.MessageId] = new OutboxDeadLetter
             {
@@ -699,6 +732,7 @@ internal sealed partial class DurableOutbox :
 
     private async ValueTask<DurableJobRunResult> ExecuteJobCoreAsync(IJobRunContext context, CancellationToken cancellationToken)
     {
+        await _stateManager.InitializeAsync(cancellationToken).ConfigureAwait(true);
         if (!await TryClaimJobAsync(context.Job.Id, cancellationToken).ConfigureAwait(true))
         {
             return DurableJobRunResult.Completed;

@@ -350,7 +350,9 @@ public class DurableOutboxTests : JournalingTestBase
         await h.Outbox.DeliverPendingMessagesAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(2, h.Extension.DeliveredEnvelopes.Count);
-        Assert.All(h.Extension.DeliveredEnvelopes, envelope => Assert.Contains(envelope, durable));
+        Assert.All(
+            h.Extension.DeliveredEnvelopes,
+            envelope => Assert.Contains(envelope.MessageId, durable.Select(static candidate => candidate.MessageId)));
         Assert.Single(durable, envelope => h.Outbox.TryGetMessage(envelope.MessageId, out _));
         Assert.True(h.Outbox.TryGetMessage(uncommitted.MessageId, out _));
 

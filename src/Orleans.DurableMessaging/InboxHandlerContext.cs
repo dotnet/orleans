@@ -304,6 +304,11 @@ internal sealed class InboxHandlerContext : IInboxHandlerContext
             exceptionTypeName = exceptionTypeName.Substring(0, exceptionTypeName.Length - "Exception".Length);
         }
 
+        if (exceptionTypeName.Length == 0)
+        {
+            return "HANDLER_EXCEPTION";
+        }
+
         // Convert PascalCase to UPPER_SNAKE_CASE
         var result = System.Text.RegularExpressions.Regex.Replace(
             exceptionTypeName,

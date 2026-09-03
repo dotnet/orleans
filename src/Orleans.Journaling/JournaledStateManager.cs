@@ -449,14 +449,29 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                                         // Notify all states that the operation completed.
                                         lock (_lock)
                                         {
+                                            List<Exception>? callbackExceptions = null;
                                             foreach (var state in _states.Values)
                                             {
-                                                state.OnWriteCompleted();
+                                                try
+                                                {
+                                                    state.OnWriteCompleted();
+                                                }
+                                                catch (Exception exception)
+                                                {
+                                                    (callbackExceptions ??= []).Add(exception);
+                                                }
                                             }
 
                                             if (isSnapshot)
                                             {
                                                 _migrationSnapshotRequired = false;
+                                            }
+
+                                            if (callbackExceptions is not null)
+                                            {
+                                                throw new AggregateException(
+                                                    "One or more journaled states failed to process write completion.",
+                                                    callbackExceptions);
                                             }
                                         }
                                     }
@@ -610,6 +625,8 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                 if (blockQueuedWorkUntilRecovery)
                 {
                     LogErrorProcessingWorkItems(_shared.Logger, exception);
+                    await Task.Delay(TimeSpan.FromMilliseconds(100), _shared.TimeProvider, _shutdownCancellation.Token);
+                    _workSignal.Signal();
                     continue;
                 }
 
@@ -1231,10 +1248,64 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
             return;
         }
 
-        await StopAsync(CancellationToken.None).ConfigureAwait(false);
+        List<Exception>? exceptions = null;
+        try
+        {
+            await StopAsync(CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            (exceptions ??= []).Add(exception);
+        }
+
+        HashSet<IDisposable>? disposableStates = null;
+        lock (_lock)
+        {
+            foreach (var state in _states.Values)
+            {
+                if (state is IDisposable disposable)
+                {
+                    (disposableStates ??= new(ReferenceEqualityComparer.Instance)).Add(disposable);
+                }
+            }
+        }
+
+        if (disposableStates is not null)
+        {
+            foreach (var disposable in disposableStates)
+            {
+                try
+                {
+                    disposable.Dispose();
+                }
+                catch (Exception exception)
+                {
+                    (exceptions ??= []).Add(exception);
+                }
+            }
+        }
+
+        try
         {
             _shutdownCancellation.Dispose();
+        }
+        catch (Exception exception)
+        {
+            (exceptions ??= []).Add(exception);
+        }
+
+        try
+        {
             _journalWriter.Dispose();
+        }
+        catch (Exception exception)
+        {
+            (exceptions ??= []).Add(exception);
+        }
+
+        if (exceptions is not null)
+        {
+            throw new AggregateException("One or more journaled state resources failed to dispose.", exceptions);
         }
     }
 
