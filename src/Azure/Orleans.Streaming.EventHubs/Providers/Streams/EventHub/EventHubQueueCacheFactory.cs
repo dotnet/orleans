@@ -248,8 +248,8 @@ namespace Orleans.Streaming.EventHubs
 
                     return ReferenceEquals(cachedMessage.Segment.Array, oldestBuffer);
                 }
+
                 return base.ShouldPurge(ref cachedMessage, ref newestCachedMessage, nowUtc);
-            }
             }
         }
     }
