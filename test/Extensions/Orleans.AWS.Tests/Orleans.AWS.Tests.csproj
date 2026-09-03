@@ -18,7 +18,7 @@
     <PackageReference Include="Aspire.Hosting.AppHost" PrivateAssets="all" />
     <PackageReference Include="Aspire.Hosting.Orleans" PrivateAssets="all" />
     <PackageReference Include="MessagePack" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.Testing.Platform.MSBuild" VersionOverride="2.3.3" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Testing.Platform.MSBuild" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
