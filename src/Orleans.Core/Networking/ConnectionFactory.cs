@@ -12,8 +12,8 @@ namespace Orleans.Runtime.Messaging
         IServiceProvider serviceProvider,
         IOptions<ConnectionOptions> connectionOptions)
     {
-        private readonly IConnectionFactory connectionFactory;
-        private readonly IServiceProvider serviceProvider;
+        private readonly IConnectionFactory connectionFactory = connectionFactory;
+        private readonly IServiceProvider serviceProvider = serviceProvider;
 #if NET9_0_OR_GREATER
         private readonly Lock connectionDelegateLock = new();
 #else
