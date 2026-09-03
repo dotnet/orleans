@@ -305,6 +305,25 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task HandlerSelection_CannotStageOutboundMessages()
+    {
+        var receiver = NewGrain();
+        using var envelope = CreateEnvelope(
+            receiver,
+            NewMessage(81, "selection-mutation"),
+            "messages/selection-mutation");
+
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        var state = await fixture.WaitForDeadLetterCountAsync(receiver, 1);
+
+        Assert.Empty(state.Effects);
+        Assert.Equal(0, state.OutboxCount);
+        Assert.Empty(state.OutboxDeadLetters);
+        var deadLetter = Assert.Single(state.InboxDeadLetters);
+        Assert.Contains("selection is read-only", deadLetter.Reason, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task HandlerCannotCommitBeforeInboxCompletion()
     {
         var receiver = NewGrain();
