@@ -4616,4 +4616,443 @@ namespace Orleans.Serialization.UnitTests
         private static void ThrowUnsupported() => throw new NotSupportedException(UnsupportedMessage);
     }
 #endif
+
+    [Trait("Category", "BVT")]
+    [Trait("Suite", "BVT")]
+    [Trait("Provider", "None")]
+    [Trait("Area", "Serialization")]
+    public sealed class MutableTupleCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture)
+        : SerializationTester(output, fixture), IClassFixture<SerializationTesterFixture>
+    {
+        [Fact]
+        public void DeepCopy_Arity4_CopiesAllMutableItems_PreservesAliasAndIsIndependent()
+        {
+            var shared = new MyValue(41);
+            var item2 = new MyValue(42);
+            var item3 = new MyValue(43);
+            var input = Tuple.Create(shared, item2, item3, shared);
+            var itemCopier = GetCopier<MyValue>();
+            var copier = new TupleCopier<MyValue, MyValue, MyValue, MyValue>(
+                itemCopier, itemCopier, itemCopier, itemCopier);
+
+            Assert.False(copier.IsShallowCopyable());
+
+            using var context = GetCopyContext();
+            var copy = copier.DeepCopy(input, context);
+
+            Assert.IsType<Tuple<MyValue, MyValue, MyValue, MyValue>>(copy);
+            Assert.NotSame(input, copy);
+            Assert.Same(copy, copier.DeepCopy(input, context));
+            AssertCopied(shared, copy.Item1, 41);
+            AssertCopied(item2, copy.Item2, 42);
+            AssertCopied(item3, copy.Item3, 43);
+            AssertCopied(shared, copy.Item4, 41);
+            Assert.Same(copy.Item1, copy.Item4);
+            Assert.NotSame(copy.Item1, copy.Item2);
+            Assert.NotSame(copy.Item1, copy.Item3);
+            Assert.NotSame(copy.Item2, copy.Item3);
+
+            shared.Value = 401;
+            Assert.Equal(401, input.Item4.Value);
+            Assert.Equal(41, copy.Item1.Value);
+            Assert.Equal(41, copy.Item4.Value);
+
+            copy.Item1.Value = 402;
+            Assert.Equal(402, copy.Item4.Value);
+            Assert.Equal(401, input.Item1.Value);
+            Assert.Equal(401, input.Item4.Value);
+        }
+
+        [Fact]
+        public void DeepCopy_Arity5_CopiesAllMutableItems_PreservesAliasAndIsIndependent()
+        {
+            var shared = new MyValue(51);
+            var item2 = new MyValue(52);
+            var item3 = new MyValue(53);
+            var item4 = new MyValue(54);
+            var input = Tuple.Create(shared, item2, item3, item4, shared);
+            var itemCopier = GetCopier<MyValue>();
+            var copier = new TupleCopier<MyValue, MyValue, MyValue, MyValue, MyValue>(
+                itemCopier, itemCopier, itemCopier, itemCopier, itemCopier);
+
+            Assert.False(copier.IsShallowCopyable());
+
+            using var context = GetCopyContext();
+            var copy = copier.DeepCopy(input, context);
+
+            Assert.IsType<Tuple<MyValue, MyValue, MyValue, MyValue, MyValue>>(copy);
+            Assert.NotSame(input, copy);
+            Assert.Same(copy, copier.DeepCopy(input, context));
+            AssertCopied(shared, copy.Item1, 51);
+            AssertCopied(item2, copy.Item2, 52);
+            AssertCopied(item3, copy.Item3, 53);
+            AssertCopied(item4, copy.Item4, 54);
+            AssertCopied(shared, copy.Item5, 51);
+            Assert.Same(copy.Item1, copy.Item5);
+            Assert.NotSame(copy.Item1, copy.Item2);
+            Assert.NotSame(copy.Item1, copy.Item3);
+            Assert.NotSame(copy.Item1, copy.Item4);
+            Assert.NotSame(copy.Item2, copy.Item3);
+            Assert.NotSame(copy.Item3, copy.Item4);
+
+            shared.Value = 501;
+            Assert.Equal(501, input.Item5.Value);
+            Assert.Equal(51, copy.Item1.Value);
+            Assert.Equal(51, copy.Item5.Value);
+
+            copy.Item1.Value = 502;
+            Assert.Equal(502, copy.Item5.Value);
+            Assert.Equal(501, input.Item1.Value);
+            Assert.Equal(501, input.Item5.Value);
+        }
+
+        [Fact]
+        public void DeepCopy_Arity6_CopiesAllMutableItems_PreservesAliasAndIsIndependent()
+        {
+            var shared = new MyValue(61);
+            var item2 = new MyValue(62);
+            var item3 = new MyValue(63);
+            var item4 = new MyValue(64);
+            var item5 = new MyValue(65);
+            var input = Tuple.Create(shared, item2, item3, item4, item5, shared);
+            var itemCopier = GetCopier<MyValue>();
+            var copier = new TupleCopier<MyValue, MyValue, MyValue, MyValue, MyValue, MyValue>(
+                itemCopier, itemCopier, itemCopier, itemCopier, itemCopier, itemCopier);
+
+            Assert.False(copier.IsShallowCopyable());
+
+            using var context = GetCopyContext();
+            var copy = copier.DeepCopy(input, context);
+
+            Assert.IsType<Tuple<MyValue, MyValue, MyValue, MyValue, MyValue, MyValue>>(copy);
+            Assert.NotSame(input, copy);
+            Assert.Same(copy, copier.DeepCopy(input, context));
+            AssertCopied(shared, copy.Item1, 61);
+            AssertCopied(item2, copy.Item2, 62);
+            AssertCopied(item3, copy.Item3, 63);
+            AssertCopied(item4, copy.Item4, 64);
+            AssertCopied(item5, copy.Item5, 65);
+            AssertCopied(shared, copy.Item6, 61);
+            Assert.Same(copy.Item1, copy.Item6);
+            Assert.NotSame(copy.Item1, copy.Item2);
+            Assert.NotSame(copy.Item1, copy.Item3);
+            Assert.NotSame(copy.Item1, copy.Item4);
+            Assert.NotSame(copy.Item1, copy.Item5);
+            Assert.NotSame(copy.Item2, copy.Item3);
+            Assert.NotSame(copy.Item3, copy.Item4);
+            Assert.NotSame(copy.Item4, copy.Item5);
+
+            shared.Value = 601;
+            Assert.Equal(601, input.Item6.Value);
+            Assert.Equal(61, copy.Item1.Value);
+            Assert.Equal(61, copy.Item6.Value);
+
+            copy.Item1.Value = 602;
+            Assert.Equal(602, copy.Item6.Value);
+            Assert.Equal(601, input.Item1.Value);
+            Assert.Equal(601, input.Item6.Value);
+        }
+
+        [Fact]
+        public void DeepCopy_Arity7_CopiesAllMutableItems_PreservesAliasAndIsIndependent()
+        {
+            var shared = new MyValue(71);
+            var item2 = new MyValue(72);
+            var item3 = new MyValue(73);
+            var item4 = new MyValue(74);
+            var item5 = new MyValue(75);
+            var item6 = new MyValue(76);
+            var input = Tuple.Create(shared, item2, item3, item4, item5, item6, shared);
+            var itemCopier = GetCopier<MyValue>();
+            var copier = new TupleCopier<MyValue, MyValue, MyValue, MyValue, MyValue, MyValue, MyValue>(
+                itemCopier, itemCopier, itemCopier, itemCopier, itemCopier, itemCopier, itemCopier);
+
+            Assert.False(copier.IsShallowCopyable());
+
+            using var context = GetCopyContext();
+            var copy = copier.DeepCopy(input, context);
+
+            Assert.IsType<Tuple<MyValue, MyValue, MyValue, MyValue, MyValue, MyValue, MyValue>>(copy);
+            Assert.NotSame(input, copy);
+            Assert.Same(copy, copier.DeepCopy(input, context));
+            AssertCopied(shared, copy.Item1, 71);
+            AssertCopied(item2, copy.Item2, 72);
+            AssertCopied(item3, copy.Item3, 73);
+            AssertCopied(item4, copy.Item4, 74);
+            AssertCopied(item5, copy.Item5, 75);
+            AssertCopied(item6, copy.Item6, 76);
+            AssertCopied(shared, copy.Item7, 71);
+            Assert.Same(copy.Item1, copy.Item7);
+            Assert.NotSame(copy.Item1, copy.Item2);
+            Assert.NotSame(copy.Item1, copy.Item3);
+            Assert.NotSame(copy.Item1, copy.Item4);
+            Assert.NotSame(copy.Item1, copy.Item5);
+            Assert.NotSame(copy.Item1, copy.Item6);
+            Assert.NotSame(copy.Item2, copy.Item3);
+            Assert.NotSame(copy.Item3, copy.Item4);
+            Assert.NotSame(copy.Item4, copy.Item5);
+            Assert.NotSame(copy.Item5, copy.Item6);
+
+            shared.Value = 701;
+            Assert.Equal(701, input.Item7.Value);
+            Assert.Equal(71, copy.Item1.Value);
+            Assert.Equal(71, copy.Item7.Value);
+
+            copy.Item1.Value = 702;
+            Assert.Equal(702, copy.Item7.Value);
+            Assert.Equal(701, input.Item1.Value);
+            Assert.Equal(701, input.Item7.Value);
+        }
+
+        [Fact]
+        public void DeepCopy_Arity8_CopiesAllMutableItems_PreservesAliasRestAndIsIndependent()
+        {
+            var shared = new MyValue(81);
+            var item2 = new MyValue(82);
+            var item3 = new MyValue(83);
+            var item4 = new MyValue(84);
+            var item5 = new MyValue(85);
+            var item6 = new MyValue(86);
+            var item7 = new MyValue(87);
+            var input = new Tuple<MyValue, MyValue, MyValue, MyValue, MyValue, MyValue, MyValue, Tuple<MyValue>>(
+                shared, item2, item3, item4, item5, item6, item7, Tuple.Create(shared));
+            var itemCopier = GetCopier<MyValue>();
+            var restCopier = GetCopier<Tuple<MyValue>>();
+            var copier = new TupleCopier<MyValue, MyValue, MyValue, MyValue, MyValue, MyValue, MyValue, Tuple<MyValue>>(
+                itemCopier, itemCopier, itemCopier, itemCopier, itemCopier, itemCopier, itemCopier, restCopier);
+
+            Assert.False(copier.IsShallowCopyable());
+
+            using var context = GetCopyContext();
+            var copy = copier.DeepCopy(input, context);
+
+            Assert.IsType<Tuple<MyValue, MyValue, MyValue, MyValue, MyValue, MyValue, MyValue, Tuple<MyValue>>>(copy);
+            Assert.IsType<Tuple<MyValue>>(copy.Rest);
+            Assert.NotSame(input, copy);
+            Assert.Same(copy, copier.DeepCopy(input, context));
+            Assert.NotSame(input.Rest, copy.Rest);
+            AssertCopied(shared, copy.Item1, 81);
+            AssertCopied(item2, copy.Item2, 82);
+            AssertCopied(item3, copy.Item3, 83);
+            AssertCopied(item4, copy.Item4, 84);
+            AssertCopied(item5, copy.Item5, 85);
+            AssertCopied(item6, copy.Item6, 86);
+            AssertCopied(item7, copy.Item7, 87);
+            AssertCopied(shared, copy.Rest.Item1, 81);
+            Assert.Same(copy.Item1, copy.Rest.Item1);
+            Assert.NotSame(copy.Item1, copy.Item2);
+            Assert.NotSame(copy.Item1, copy.Item3);
+            Assert.NotSame(copy.Item1, copy.Item4);
+            Assert.NotSame(copy.Item1, copy.Item5);
+            Assert.NotSame(copy.Item1, copy.Item6);
+            Assert.NotSame(copy.Item1, copy.Item7);
+            Assert.NotSame(copy.Item2, copy.Item3);
+            Assert.NotSame(copy.Item3, copy.Item4);
+            Assert.NotSame(copy.Item4, copy.Item5);
+            Assert.NotSame(copy.Item5, copy.Item6);
+            Assert.NotSame(copy.Item6, copy.Item7);
+
+            shared.Value = 801;
+            Assert.Equal(801, input.Rest.Item1.Value);
+            Assert.Equal(81, copy.Item1.Value);
+            Assert.Equal(81, copy.Rest.Item1.Value);
+
+            copy.Item1.Value = 802;
+            Assert.Equal(802, copy.Rest.Item1.Value);
+            Assert.Equal(801, input.Item1.Value);
+            Assert.Equal(801, input.Rest.Item1.Value);
+        }
+
+        [Fact]
+        public void DeepCopy_SelectedArities_ReturnsNullTupleUnchanged()
+        {
+            using (var context = GetCopyContext())
+            {
+                Assert.Null(GetCopier<Tuple<MyValue, MyValue, MyValue, MyValue>>().DeepCopy(null!, context));
+            }
+
+            using (var context = GetCopyContext())
+            {
+                Assert.Null(GetCopier<Tuple<MyValue, MyValue, MyValue, MyValue, MyValue>>().DeepCopy(null!, context));
+            }
+
+            using (var context = GetCopyContext())
+            {
+                Assert.Null(GetCopier<Tuple<MyValue, MyValue, MyValue, MyValue, MyValue, MyValue>>().DeepCopy(null!, context));
+            }
+
+            using (var context = GetCopyContext())
+            {
+                Assert.Null(GetCopier<Tuple<MyValue, MyValue, MyValue, MyValue, MyValue, MyValue, MyValue>>().DeepCopy(null!, context));
+            }
+
+            using (var context = GetCopyContext())
+            {
+                Assert.Null(
+                    GetCopier<Tuple<MyValue, MyValue, MyValue, MyValue, MyValue, MyValue, MyValue, Tuple<MyValue>>>()
+                        .DeepCopy(null!, context));
+            }
+        }
+
+        [Fact]
+        public void DeepCopy_Arity8_PreservesNullElementAndCopiesMutableRestItem()
+        {
+            var restItem = new MyValue(98);
+            var input = new Tuple<MyValue, MyValue, MyValue, MyValue, MyValue, MyValue, MyValue, Tuple<MyValue>>(
+                new(91), null!, new(93), new(94), new(95), new(96), new(97), Tuple.Create(restItem));
+            var itemCopier = GetCopier<MyValue>();
+            var restCopier = GetCopier<Tuple<MyValue>>();
+            var copier = new TupleCopier<MyValue, MyValue, MyValue, MyValue, MyValue, MyValue, MyValue, Tuple<MyValue>>(
+                itemCopier, itemCopier, itemCopier, itemCopier, itemCopier, itemCopier, itemCopier, restCopier);
+
+            using var context = GetCopyContext();
+            var copy = copier.DeepCopy(input, context);
+
+            Assert.IsType<Tuple<MyValue, MyValue, MyValue, MyValue, MyValue, MyValue, MyValue, Tuple<MyValue>>>(copy);
+            Assert.IsType<Tuple<MyValue>>(copy.Rest);
+            Assert.NotSame(input, copy);
+            Assert.Null(copy.Item2);
+            Assert.NotSame(input.Rest, copy.Rest);
+            AssertCopied(restItem, copy.Rest.Item1, 98);
+
+            restItem.Value = 981;
+            Assert.Equal(981, input.Rest.Item1.Value);
+            Assert.Equal(98, copy.Rest.Item1.Value);
+
+            copy.Rest.Item1.Value = 982;
+            Assert.Equal(982, copy.Rest.Item1.Value);
+            Assert.Equal(981, input.Rest.Item1.Value);
+        }
+
+        [Fact]
+        public void SerializerRoundTrip_Arity8_PreservesShapeRestNullAndAlias()
+        {
+            var shared = new MyValue(101);
+            var item3 = new MyValue(103);
+            var item4 = new MyValue(104);
+            var item5 = new MyValue(105);
+            var item6 = new MyValue(106);
+            var item7 = new MyValue(107);
+            var input = new Tuple<MyValue, MyValue, MyValue, MyValue, MyValue, MyValue, MyValue, Tuple<MyValue>>(
+                shared, null!, item3, item4, item5, item6, item7, Tuple.Create(shared));
+            var serializer = ServiceProvider.GetRequiredService<
+                Serializer<Tuple<MyValue, MyValue, MyValue, MyValue, MyValue, MyValue, MyValue, Tuple<MyValue>>>>();
+
+            var payload = serializer.SerializeToArray(input);
+            var result = serializer.Deserialize(payload);
+
+            Assert.IsType<Tuple<MyValue, MyValue, MyValue, MyValue, MyValue, MyValue, MyValue, Tuple<MyValue>>>(result);
+            Assert.IsType<Tuple<MyValue>>(result.Rest);
+            Assert.NotSame(input, result);
+            Assert.NotSame(input.Rest, result.Rest);
+            AssertCopied(shared, result.Item1, 101);
+            Assert.Null(result.Item2);
+            AssertCopied(item3, result.Item3, 103);
+            AssertCopied(item4, result.Item4, 104);
+            AssertCopied(item5, result.Item5, 105);
+            AssertCopied(item6, result.Item6, 106);
+            AssertCopied(item7, result.Item7, 107);
+            AssertCopied(shared, result.Rest.Item1, 101);
+            Assert.Same(result.Item1, result.Rest.Item1);
+
+            shared.Value = 1001;
+            Assert.Equal(1001, input.Rest.Item1.Value);
+            Assert.Equal(101, result.Item1.Value);
+            Assert.Equal(101, result.Rest.Item1.Value);
+
+            result.Item1.Value = 1002;
+            Assert.Equal(1002, result.Rest.Item1.Value);
+            Assert.Equal(1001, input.Item1.Value);
+            Assert.Equal(1001, input.Rest.Item1.Value);
+        }
+
+        [Fact]
+        public void SerializerDeserialize_Arity8_TruncatedPayloadThrowsInsufficientData()
+        {
+            var input = new Tuple<int, int, int, int, int, int, int, Tuple<int>>(
+                1, 2, 3, 4, 5, 6, 7, Tuple.Create(8));
+            var serializer = ServiceProvider.GetRequiredService<
+                Serializer<Tuple<int, int, int, int, int, int, int, Tuple<int>>>>();
+            var payload = serializer.SerializeToArray(input);
+
+            var exception = Assert.Throws<InvalidOperationException>(() => serializer.Deserialize(payload[..^1]));
+
+            Assert.Equal("Insufficient data present in buffer.", exception.Message);
+        }
+
+        [Fact]
+        public void Tuple_Arity8_RejectsNullRest()
+        {
+            Assert.Throws<ArgumentException>(
+                () => new Tuple<int, int, int, int, int, int, int, Tuple<int>>(1, 2, 3, 4, 5, 6, 7, null!));
+        }
+
+        [Fact]
+        public void DeepCopy_Arity8_MixedMutableAndImmutableItems_CopiesOnlyMutableGraph()
+        {
+            var item1 = new string('a', 4);
+            var shared = new MyValue(112);
+            var item3 = new string('c', 4);
+            var item4 = new MyValue(114);
+            var item5 = new string('e', 4);
+            var item6 = new MyValue(116);
+            var item7 = new string('g', 4);
+            var input = new Tuple<string, MyValue, string, MyValue, string, MyValue, string, Tuple<MyValue>>(
+                item1, shared, item3, item4, item5, item6, item7, Tuple.Create(shared));
+            var stringCopier = GetCopier<string>();
+            var valueCopier = GetCopier<MyValue>();
+            var restCopier = GetCopier<Tuple<MyValue>>();
+            var copier = new TupleCopier<string, MyValue, string, MyValue, string, MyValue, string, Tuple<MyValue>>(
+                stringCopier, valueCopier, stringCopier, valueCopier, stringCopier, valueCopier, stringCopier, restCopier);
+
+            Assert.False(copier.IsShallowCopyable());
+
+            using var context = GetCopyContext();
+            var copy = copier.DeepCopy(input, context);
+
+            Assert.IsType<Tuple<string, MyValue, string, MyValue, string, MyValue, string, Tuple<MyValue>>>(copy);
+            Assert.IsType<Tuple<MyValue>>(copy.Rest);
+            Assert.NotSame(input, copy);
+            Assert.NotSame(input.Rest, copy.Rest);
+            Assert.Same(item1, copy.Item1);
+            Assert.Same(item3, copy.Item3);
+            Assert.Same(item5, copy.Item5);
+            Assert.Same(item7, copy.Item7);
+            AssertCopied(shared, copy.Item2, 112);
+            AssertCopied(item4, copy.Item4, 114);
+            AssertCopied(item6, copy.Item6, 116);
+            AssertCopied(shared, copy.Rest.Item1, 112);
+            Assert.Same(copy.Item2, copy.Rest.Item1);
+            Assert.NotSame(copy.Item2, copy.Item4);
+            Assert.NotSame(copy.Item2, copy.Item6);
+            Assert.NotSame(copy.Item4, copy.Item6);
+
+            shared.Value = 1121;
+            Assert.Equal(1121, input.Rest.Item1.Value);
+            Assert.Equal(112, copy.Item2.Value);
+            Assert.Equal(112, copy.Rest.Item1.Value);
+
+            copy.Item2.Value = 1122;
+            Assert.Equal(1122, copy.Rest.Item1.Value);
+            Assert.Equal(1121, input.Item2.Value);
+            Assert.Equal(1121, input.Rest.Item1.Value);
+            Assert.Equal(114, copy.Item4.Value);
+            Assert.Equal(116, copy.Item6.Value);
+        }
+
+        protected override IServiceProvider CreateServiceProvider()
+            => new ServiceCollection().AddSerializer().BuildServiceProvider();
+
+        private IDeepCopier<T> GetCopier<T>()
+            => ServiceProvider.GetRequiredService<ICodecProvider>().GetDeepCopier<T>();
+
+        private CopyContext GetCopyContext()
+            => ServiceProvider.GetRequiredService<CopyContextPool>().GetContext();
+
+        private static void AssertCopied(MyValue source, MyValue copy, int expectedValue)
+        {
+            Assert.NotSame(source, copy);
+            Assert.Equal(expectedValue, copy.Value);
+        }
+    }
 }
