@@ -138,7 +138,7 @@ namespace Orleans.DurableMessaging
         DeadLettered = 6
     }
 
-    public sealed partial class DurableDeadLetter
+    public sealed partial class DurableDeadLetter : System.IDisposable
     {
         public int AttemptCount { get { throw null; } init { } }
 
@@ -147,6 +147,8 @@ namespace Orleans.DurableMessaging
         public required DurableEnvelope Message { get { throw null; } init { } }
 
         public required string Reason { get { throw null; } init { } }
+
+        public void Dispose() { }
     }
 
     [GenerateSerializer]

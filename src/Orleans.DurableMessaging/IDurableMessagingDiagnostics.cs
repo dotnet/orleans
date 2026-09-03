@@ -13,18 +13,20 @@ public interface IDurableMessagingDiagnostics
     /// <summary>
     /// Gets messages which failed during inbox processing.
     /// </summary>
+    /// <remarks>The caller owns the returned entries and must dispose each one.</remarks>
     IReadOnlyList<DurableDeadLetter> InboxDeadLetters { get; }
 
     /// <summary>
     /// Gets messages which could not be delivered from the outbox.
     /// </summary>
+    /// <remarks>The caller owns the returned entries and must dispose each one.</remarks>
     IReadOnlyList<DurableDeadLetter> OutboxDeadLetters { get; }
 }
 
 /// <summary>
 /// Describes a dead-lettered durable message.
 /// </summary>
-public sealed class DurableDeadLetter
+public sealed class DurableDeadLetter : IDisposable
 {
     /// <summary>
     /// Gets the message.
@@ -45,6 +47,9 @@ public sealed class DurableDeadLetter
     /// Gets the number of attempts made.
     /// </summary>
     public int AttemptCount { get; init; }
+
+    /// <inheritdoc />
+    public void Dispose() => Message.Dispose();
 }
 
 internal sealed class DurableMessagingDiagnostics(

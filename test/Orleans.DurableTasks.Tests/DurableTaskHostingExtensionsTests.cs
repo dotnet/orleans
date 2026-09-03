@@ -20,7 +20,7 @@ using Xunit;
 namespace Orleans.DurableTasks.Tests;
 
 /// <summary>
-/// Tests for <see cref="DurableTaskHostingExtensions"/> (namespace <c>Orleans.Runtime.DurableTasks</c>), covering both
+/// Tests for <see cref="DurableTaskHostingExtensions"/> (namespace <c>Orleans.Hosting</c>), covering both
 /// the <see cref="IClientBuilder"/> and <see cref="ISiloBuilder"/> DI wiring overloads. These tests assert on the
 /// actual <see cref="IServiceCollection"/> registrations (service type, implementation type, lifetime) produced by
 /// the extension methods and on same-instance-per-scope behavior for forwarded services, following the pattern in
