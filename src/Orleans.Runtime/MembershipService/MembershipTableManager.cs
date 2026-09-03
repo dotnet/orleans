@@ -662,9 +662,9 @@ namespace Orleans.Runtime.MembershipService
                 }
             }
 
+            using var cancellation = new CancellationTokenSource(timeout, this.timeProvider);
             try
             {
-                using var cancellation = new CancellationTokenSource(timeout, this.timeProvider);
                 await this.gossiper.GossipToRemoteSilos(
                     gossipPartners,
                     MembershipTableSnapshot,
@@ -672,7 +672,7 @@ namespace Orleans.Runtime.MembershipService
                     updatedStatus,
                     cancellation.Token);
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
             {
                 if (updatedStatus.IsTerminating())
                 {
@@ -682,6 +682,10 @@ namespace Orleans.Runtime.MembershipService
                 {
                     LogDebugTimedOutWhileGossipingStatus(this.log, timeout);
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception exception)
             {
