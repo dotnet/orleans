@@ -2520,7 +2520,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         await _deactivationCts.CancelAsync();
         while (!_pendingHandleResponses.IsEmpty || !_committingHandleResponses.IsEmpty)
         {
-            await Task.Delay(TimeSpan.FromMilliseconds(10));
+            await Task.Delay(TimeSpan.FromMilliseconds(10), cancellationToken);
         }
 
         var shutdownResponse = DurableTaskResponse.FromCanceled(
