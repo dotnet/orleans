@@ -5,34 +5,6 @@
 
   <Import Project="$(_ParentDirectoryBuildTargetsPath)" Condition="Exists('$(_ParentDirectoryBuildTargetsPath)')"/>
 
-  <PropertyGroup>
-    <EnableBannedApiAnalyzers
-      Condition="'$(EnableBannedApiAnalyzers)' == ''
-        and ('$(MSBuildProjectName)' == 'Orleans.Analyzers'
-          or '$(MSBuildProjectName)' == 'Orleans.Analyzers.Contracts'
-          or '$(MSBuildProjectName)' == 'Orleans.CodeGenerator'
-          or '$(MSBuildProjectName)' == 'Orleans.Persistence.TestKit'
-          or '$(MSBuildProjectName)' == 'Orleans.Reminders.TestKit'
-          or '$(MSBuildProjectName)' == 'Orleans.Sdk'
-          or '$(MSBuildProjectName)' == 'Orleans.Serialization.TestKit'
-          or '$(MSBuildProjectName)' == 'Orleans.TestingHost'
-          or '$(MSBuildProjectName)' == 'Orleans.Transactions.TestKit.Base'
-          or '$(MSBuildProjectName)' == 'Orleans.Transactions.TestKit.xUnit')">false</EnableBannedApiAnalyzers>
-    <EnableBannedApiAnalyzers
-      Condition="'$(EnableBannedApiAnalyzers)' == '' and '$(IsOrleansRepositorySourceProject)' == 'true'">true</EnableBannedApiAnalyzers>
-  </PropertyGroup>
-
-  <ItemGroup Condition="'$(EnableBannedApiAnalyzers)' == 'true'">
-    <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers"
-                      PrivateAssets="all"
-                      IncludeAssets="runtime; build; native; contentfiles; analyzers; buildtransitive" />
-    <AdditionalFiles Include="$(MSBuildThisFileDirectory)BannedSymbols.txt" />
-    <AdditionalFiles Include="$(MSBuildThisFileDirectory)BannedSymbols.$(MSBuildProjectName).txt"
-                     Condition="Exists('$(MSBuildThisFileDirectory)BannedSymbols.$(MSBuildProjectName).txt')" />
-    <AdditionalFiles Include="$(MSBuildThisFileDirectory)BannedSymbols.$(MSBuildProjectName).$(TargetFramework).txt"
-                     Condition="Exists('$(MSBuildThisFileDirectory)BannedSymbols.$(MSBuildProjectName).$(TargetFramework).txt')" />
-  </ItemGroup>
-
   <ItemGroup>
     <CompilerVisibleProperty Include="EnableOrleansContractsAnalyzer" />
     <CompilerVisibleProperty Include="OrleansContractsPath" />
