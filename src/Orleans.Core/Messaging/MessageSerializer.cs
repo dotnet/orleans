@@ -53,6 +53,18 @@ namespace Orleans.Runtime.Messaging
         }
 
         public (int RequiredBytes, int HeaderLength, int BodyLength) TryRead(ref ReadOnlySequence<byte> input, out Message? message)
+            => TryRead(ref input, out message, null);
+
+        internal (int RequiredBytes, int HeaderLength, int BodyLength) TryRead(
+            ref ReadOnlySequence<byte> input,
+            out Message? message,
+            long deserializationTimestamp)
+            => TryRead(ref input, out message, (long?)deserializationTimestamp);
+
+        private (int RequiredBytes, int HeaderLength, int BodyLength) TryRead(
+            ref ReadOnlySequence<byte> input,
+            out Message? message,
+            long? deserializationTimestamp)
         {
             if (input.Length < FramingLength)
             {
@@ -89,12 +101,12 @@ namespace Orleans.Runtime.Messaging
                 if (header.IsSingleSegment)
                 {
                     var headersReader = Reader.Create(header.First.Span, _deserializationSession);
-                    Deserialize(ref headersReader, message);
+                    Deserialize(ref headersReader, message, deserializationTimestamp);
                 }
                 else
                 {
                     var headersReader = Reader.Create(header, _deserializationSession);
-                    Deserialize(ref headersReader, message);
+                    Deserialize(ref headersReader, message, deserializationTimestamp);
                 }
 
                 if (bodyLength != 0)
@@ -152,6 +164,12 @@ namespace Orleans.Runtime.Messaging
         }
 
         public (int HeaderLength, int BodyLength) Write(PipeWriter writer, Message message)
+            => Write(writer, message, null);
+
+        internal (int HeaderLength, int BodyLength) Write(PipeWriter writer, Message message, long serializationTimestamp)
+            => Write(writer, message, (long?)serializationTimestamp);
+
+        private (int HeaderLength, int BodyLength) Write(PipeWriter writer, Message message, long? serializationTimestamp)
         {
             var headers = message.Headers;
             IFieldCodec? bodyCodec = null;
@@ -174,7 +192,7 @@ namespace Orleans.Runtime.Messaging
                 bufferWriter.Init(writer);
 
                 var innerWriter = Writer.Create(new MessageBufferWriter(bufferWriter), _serializationSession);
-                Serialize(ref innerWriter, message, headers);
+                Serialize(ref innerWriter, message, headers, serializationTimestamp);
                 innerWriter.Commit();
 
                 var headerLength = bufferWriter.CommittedBytes;
@@ -222,7 +240,11 @@ namespace Orleans.Runtime.Messaging
         private void ThrowInvalidHeaderLength(int headerLength) => throw new InvalidMessageFrameException($"Invalid header size: {headerLength} (max configured value is {_maxHeaderLength}, see {nameof(MessagingOptions.MaxMessageHeaderSize)})");
         private void ThrowInvalidBodyLength(int bodyLength) => throw new InvalidMessageFrameException($"Invalid body size: {bodyLength} (max configured value is {_maxBodyLength}, see {nameof(MessagingOptions.MaxMessageBodySize)})");
 
-        private void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, Message value, PackedHeaders headers) where TBufferWriter : IBufferWriter<byte>
+        private void Serialize<TBufferWriter>(
+            ref Writer<TBufferWriter> writer,
+            Message value,
+            PackedHeaders headers,
+            long? serializationTimestamp) where TBufferWriter : IBufferWriter<byte>
         {
             writer.WriteUInt32((uint)headers);
 
@@ -234,7 +256,10 @@ namespace Orleans.Runtime.Messaging
 
             if (headers.HasFlag(MessageFlags.HasTimeToLive))
             {
-                writer.WriteInt32((int)value.GetTimeToLiveMilliseconds());
+                var timeToLive = serializationTimestamp is { } timestamp
+                    ? value.GetTimeToLiveMilliseconds(timestamp)
+                    : value.GetTimeToLiveMilliseconds();
+                writer.WriteInt32((int)timeToLive);
             }
 
             if (headers.HasFlag(MessageFlags.HasInterfaceType))
@@ -259,7 +284,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        private void Deserialize<TInput>(ref Reader<TInput> reader, Message result)
+        private void Deserialize<TInput>(ref Reader<TInput> reader, Message result, long? deserializationTimestamp)
         {
             var headers = (PackedHeaders)reader.ReadUInt32();
 
@@ -272,7 +297,15 @@ namespace Orleans.Runtime.Messaging
 
             if (headers.HasFlag(MessageFlags.HasTimeToLive))
             {
-                result.SetTimeToLiveMilliseconds(reader.ReadInt32());
+                var timeToLive = reader.ReadInt32();
+                if (deserializationTimestamp is { } timestamp)
+                {
+                    result.SetTimeToLiveMilliseconds(timeToLive, timestamp);
+                }
+                else
+                {
+                    result.SetTimeToLiveMilliseconds(timeToLive);
+                }
             }
             else
             {

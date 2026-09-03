@@ -223,12 +223,20 @@ namespace Orleans.Runtime
             }
         }
 
-        internal long GetTimeToLiveMilliseconds() => -_timeToExpiry.ElapsedMilliseconds;
+        internal long GetTimeToLiveMilliseconds() => GetTimeToLiveMilliseconds(CoarseStopwatch.GetTimestamp());
 
-        internal void SetTimeToLiveMilliseconds(long milliseconds)
+        internal long GetTimeToLiveMilliseconds(long timestamp)
+        {
+            var rawTimestamp = _timeToExpiry.GetRawTimestamp();
+            return rawTimestamp > 0 ? rawTimestamp - timestamp : rawTimestamp;
+        }
+
+        internal void SetTimeToLiveMilliseconds(long milliseconds) => SetTimeToLiveMilliseconds(milliseconds, CoarseStopwatch.GetTimestamp());
+
+        internal void SetTimeToLiveMilliseconds(long milliseconds, long timestamp)
         {
             _headers.SetFlag(MessageFlags.HasTimeToLive, true);
-            _timeToExpiry = CoarseStopwatch.StartNew(-milliseconds);
+            _timeToExpiry = CoarseStopwatch.FromTimestamp(timestamp + milliseconds);
         }
 
         internal void SetInfiniteTimeToLive()
