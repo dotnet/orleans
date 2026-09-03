@@ -339,7 +339,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                     var replica = cluster.InternalClient!.GetSystemTarget<IGrainDirectoryTestHooks>(
                         GrainDirectoryPartition.CreateGrainId(silo.SiloAddress, partitionIndex).GrainId);
                     partitionWaits.Add(
-                        replica.WaitForMembershipVersionAsync(view.Version, cancellationToken).AsTask().WaitAsync(timeout.Token));
+                        replica.WaitForMembershipVersionAsync(view.Version, timeout.Token).AsTask());
                 }
             }
 
