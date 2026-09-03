@@ -45,7 +45,7 @@ public sealed class DurableEnvelopeData
     /// Keyed indices for request context values within the buffer.
     /// Each key maps to its own (Offset, Length) slice, allowing independent deserialization.
     /// </summary>
-    [Id(2), Immutable]
+    [Id(2)]
     private Dictionary<string, (int Offset, int Length)>? _contextIndices;
 
     /// <summary>
