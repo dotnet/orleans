@@ -9,18 +9,30 @@ namespace Orleans.Serialization
 {
 
     /// <summary>
-    /// Utility class for configuring <see cref="JsonSerializerSettings"/> to support Orleans types.
+    /// Serializes and deserializes values using Newtonsoft.Json settings configured for Orleans types.
     /// </summary>
     public class OrleansJsonSerializer
     {
+        /// <summary>
+        /// The configuration property name for selecting full assembly-qualified type names.
+        /// </summary>
         public const string UseFullAssemblyNamesProperty = "UseFullAssemblyNames";
+
+        /// <summary>
+        /// The configuration property name for selecting indented JSON formatting.
+        /// </summary>
         public const string IndentJsonProperty = "IndentJSON";
+
+        /// <summary>
+        /// The configuration property name for selecting how type names are included in JSON.
+        /// </summary>
         public const string TypeNameHandlingProperty = "TypeNameHandling";
         private readonly JsonSerializerSettings settings;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="OrleansJsonSerializer"/> class.
         /// </summary>
+        /// <param name="options">The configured JSON serializer options.</param>
         public OrleansJsonSerializer(IOptions<OrleansJsonSerializerOptions> options)
         {
             this.settings = options.Value.JsonSerializerSettings;
@@ -61,6 +73,7 @@ namespace Orleans.Serialization
         /// </summary>
         /// <param name="item">The object to serialize.</param>
         /// <param name="expectedType">The type the deserializer should expect.</param>
+        /// <returns>The JSON representation of <paramref name="item"/>.</returns>
         public string Serialize(object? item, Type expectedType) => JsonConvert.SerializeObject(item, expectedType, this.settings);
 
         /// <summary>

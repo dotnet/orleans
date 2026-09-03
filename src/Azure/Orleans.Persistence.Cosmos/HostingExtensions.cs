@@ -162,6 +162,7 @@ public static class HostingExtensions
     /// </summary>
     /// <param name="builder">The silo builder.</param>
     /// <param name="name">The storage provider name.</param>
+    /// <param name="customPartitionKeyProviderType">The document id or partition key provider.</param>
     /// <param name="configureOptions">The delegate used to configure the provider.</param>
     public static ISiloBuilder AddCosmosGrainStorage(
         this ISiloBuilder builder,

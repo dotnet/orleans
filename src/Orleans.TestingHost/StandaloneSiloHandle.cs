@@ -35,7 +35,13 @@ namespace Orleans.TestingHost
 
         /// <inheritdoc />
         public override bool IsActive => isActive;
-        
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="StandaloneSiloHandle"/> class.
+        /// </summary>
+        /// <param name="siloName">The name of the silo.</param>
+        /// <param name="configuration">The configuration to pass to the standalone silo process.</param>
+        /// <param name="executablePath">The path to the executable which hosts the silo.</param>
         public StandaloneSiloHandle(string siloName, IConfiguration configuration, string executablePath)
         {
             if (string.IsNullOrWhiteSpace(executablePath) || !File.Exists(executablePath))

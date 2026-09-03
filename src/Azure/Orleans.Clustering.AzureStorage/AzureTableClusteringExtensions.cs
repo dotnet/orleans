@@ -9,6 +9,9 @@ using Orleans.Runtime.MembershipService;
 
 namespace Orleans.Hosting
 {
+    /// <summary>
+    /// Provides extension methods for configuring Azure Table Storage clustering.
+    /// </summary>
     public static class AzureTableClusteringExtensions
     {
         /// <summary>

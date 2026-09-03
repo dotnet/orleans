@@ -72,6 +72,7 @@ namespace Orleans.Concurrency
         /// Initializes a new instance of the <see cref="StatelessWorkerAttribute"/> class.
         /// </summary>
         /// <param name="maxLocalWorkers">The maximum local workers.</param>
+        /// <param name="removeIdleWorkers">A value indicating whether idle worker activations are removed.</param>
         public StatelessWorkerAttribute(int maxLocalWorkers, bool removeIdleWorkers)
             : base(new StatelessWorkerPlacement(maxLocalWorkers, removeIdleWorkers))
         {

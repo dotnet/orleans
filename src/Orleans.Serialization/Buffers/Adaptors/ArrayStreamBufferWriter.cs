@@ -9,6 +9,9 @@ namespace Orleans.Serialization.Buffers.Adaptors
     /// </summary>
     public struct ArrayStreamBufferWriter : IBufferWriter<byte>
     {
+        /// <summary>
+        /// The default initial size of the intermediate buffer, in bytes.
+        /// </summary>
         public const int DefaultInitialBufferSize = 256;
         private readonly Stream _stream;
         private byte[] _buffer;

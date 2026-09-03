@@ -15,6 +15,9 @@ namespace Orleans.Providers
         /// </summary>
         public const string DEFAULT_LOG_CONSISTENCY_PROVIDER_NAME = "Default";
 
+        /// <summary>
+        /// The default grain storage provider name used by streaming pub/sub.
+        /// </summary>
         public const string DEFAULT_PUBSUB_PROVIDER_NAME = "PubSubStore";
     }
 }

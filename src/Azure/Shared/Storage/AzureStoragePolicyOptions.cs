@@ -21,13 +21,23 @@ namespace Orleans.GrainDirectory.AzureStorage
 // No default namespace intentionally to cause compile errors if something is not defined
 #endif
 {
+    /// <summary>
+    /// Configures batching, retry, and timeout behavior for Azure Table Storage operations.
+    /// </summary>
     public class AzureStoragePolicyOptions
     {
         private TimeSpan? creationTimeout;
         private TimeSpan? operationTimeout;
         private TimeSpan? maxPauseBetweenOperationRetries;
 
+        /// <summary>
+        /// Gets or sets the maximum number of entities included in a bulk update or delete operation.
+        /// </summary>
         public int MaxBulkUpdateRows { get; set; } = 100;
+
+        /// <summary>
+        /// Gets or sets the legacy creation retry count used to calculate the default <see cref="CreationTimeout"/>.
+        /// </summary>
         public int MaxCreationRetries { get; set; } = 60;
 
         // Defaults match Azure Storage SDK retry settings.
@@ -36,6 +46,9 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// </summary>
         public int MaxOperationRetries { get; set; } = 5;
 
+        /// <summary>
+        /// Gets or sets the legacy creation retry delay used to calculate the default <see cref="CreationTimeout"/>.
+        /// </summary>
         public TimeSpan PauseBetweenCreationRetries { get; set; } = TimeSpan.FromSeconds(1);
 
         /// <summary>
@@ -59,12 +72,21 @@ namespace Orleans.GrainDirectory.AzureStorage
             }
         }
 
+        /// <summary>
+        /// Gets or sets the timeout value included in table-creation timeout diagnostics.
+        /// </summary>
+        /// <remarks>
+        /// The default is three times the product of <see cref="PauseBetweenCreationRetries"/> and <see cref="MaxCreationRetries"/>.
+        /// </remarks>
         public TimeSpan CreationTimeout
         {
             get => this.creationTimeout ?? TimeSpan.FromMilliseconds(this.PauseBetweenCreationRetries.TotalMilliseconds * this.MaxCreationRetries * 3);
             set => SetIfValidTimeout(ref this.creationTimeout, value, nameof(CreationTimeout));
         }
 
+        /// <summary>
+        /// Gets or sets the duration after which a table operation is reported as slow.
+        /// </summary>
         public TimeSpan OperationTimeout
         {
             get => this.operationTimeout ?? TimeSpan.FromSeconds(100);

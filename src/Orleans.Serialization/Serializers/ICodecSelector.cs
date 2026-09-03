@@ -15,6 +15,8 @@ public interface ICodecSelector
     /// <summary>
     /// Returns true if the specified codec should be used for this type.
     /// </summary>
+    /// <param name="type">The type to inspect.</param>
+    /// <returns><see langword="true"/> if the codec should be used for the specified type; otherwise, <see langword="false"/>.</returns>
     public bool IsSupportedType(Type type);
 }
 
@@ -31,6 +33,8 @@ public interface ICopierSelector
     /// <summary>
     /// Returns true if the specified copier should be used for this type.
     /// </summary>
+    /// <param name="type">The type to inspect.</param>
+    /// <returns><see langword="true"/> if the copier should be used for the specified type; otherwise, <see langword="false"/>.</returns>
     public bool IsSupportedType(Type type);
 }
 
@@ -39,10 +43,15 @@ public interface ICopierSelector
 /// </summary>
 public sealed class DelegateCodecSelector : ICodecSelector
 {
+    /// <inheritdoc/>
     public string CodecName { get; init; } = null!;
 
+    /// <summary>
+    /// Gets or initializes the delegate used to determine whether a type is supported.
+    /// </summary>
     public Func<Type, bool> IsSupportedTypeDelegate { get; init; } = null!;
 
+    /// <inheritdoc/>
     public bool IsSupportedType(Type type) => IsSupportedTypeDelegate(type);
 }
 
@@ -51,9 +60,14 @@ public sealed class DelegateCodecSelector : ICodecSelector
 /// </summary>
 public sealed class DelegateCopierSelector : ICopierSelector
 {
+    /// <inheritdoc/>
     public string CopierName { get; init; } = null!;
 
+    /// <summary>
+    /// Gets or initializes the delegate used to determine whether a type is supported.
+    /// </summary>
     public Func<Type, bool> IsSupportedTypeDelegate { get; init; } = null!;
 
+    /// <inheritdoc/>
     public bool IsSupportedType(Type type) => IsSupportedTypeDelegate(type);
 }

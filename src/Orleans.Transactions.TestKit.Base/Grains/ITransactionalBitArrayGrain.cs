@@ -4,24 +4,29 @@ using System.Threading.Tasks;
 
 namespace Orleans.Transactions.TestKit.Correctnesss
 {
+    /// <summary>
+    /// Defines operations for exercising transactional bit-array states.
+    /// </summary>
     public interface ITransactionalBitArrayGrain : IGrainWithGuidKey
     {
         /// <summary>
-        /// Ping 
+        /// Verifies that the grain is reachable without accessing transactional state.
         /// </summary>
-        /// <returns></returns>
+        /// <returns>A completed task.</returns>
         Task Ping();
+
         /// <summary>
-        /// apply set operation to every transaction state
+        /// Sets a bit in every transactional state.
         /// </summary>
-        /// <param name="newValue"></param>
-        /// <returns></returns>
+        /// <param name="newValue">The zero-based bit index to set.</param>
+        /// <returns>A task representing the transactional operation.</returns>
         [Transaction(TransactionOption.CreateOrJoin)]
         Task SetBit(int newValue);
 
         /// <summary>
-        /// Performs a read transaction on each state, returning the results in order.
+        /// Reads every transactional bit-array state.
         /// </summary>
+        /// <returns>The current states in transactional state order.</returns>
         [Transaction(TransactionOption.CreateOrJoin)]
         Task<List<BitArrayState>> Get();
     }

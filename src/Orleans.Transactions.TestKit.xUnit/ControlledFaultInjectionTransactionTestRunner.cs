@@ -3,24 +3,33 @@ using Xunit;
 
 namespace Orleans.Transactions.TestKit.xUnit
 {
+    /// <inheritdoc cref="ControlledFaultInjectionTransactionTestRunner"/>
     public class ControlledFaultInjectionTransactionTestRunnerxUnit : ControlledFaultInjectionTransactionTestRunner
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ControlledFaultInjectionTransactionTestRunnerxUnit"/> class.
+        /// </summary>
+        /// <param name="grainFactory">The grain factory used to access test grains.</param>
+        /// <param name="output">The xUnit test output helper.</param>
         public ControlledFaultInjectionTransactionTestRunnerxUnit(IGrainFactory grainFactory, ITestOutputHelper output)
          : base(grainFactory, output.WriteLine)
         { }
 
+        /// <inheritdoc cref="ControlledFaultInjectionTransactionTestRunner.SingleGrainReadTransaction"/>
         [Fact]
         public override Task SingleGrainReadTransaction()
         {
             return base.SingleGrainReadTransaction();
         }
 
+        /// <inheritdoc cref="ControlledFaultInjectionTransactionTestRunner.SingleGrainWriteTransaction"/>
         [Fact]
         public override Task SingleGrainWriteTransaction()
         {
             return base.SingleGrainWriteTransaction();
         }
 
+        /// <inheritdoc cref="ControlledFaultInjectionTransactionTestRunner.MultiGrainWriteTransaction_FaultInjection(TransactionFaultInjectPhase, FaultInjectionType)"/>
         [Theory]
         [InlineData(TransactionFaultInjectPhase.AfterPrepare, FaultInjectionType.Deactivation)]
         [InlineData(TransactionFaultInjectPhase.AfterConfirm, FaultInjectionType.Deactivation)]

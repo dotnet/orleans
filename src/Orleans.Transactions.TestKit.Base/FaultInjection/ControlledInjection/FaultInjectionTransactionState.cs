@@ -9,15 +9,27 @@ using Orleans.Transactions.State;
 
 namespace Orleans.Transactions.TestKit
 {
+    /// <summary>
+    /// Configures a fault to inject during the next matching transaction phase.
+    /// </summary>
     [GenerateSerializer]
     public class FaultInjectionControl
     {
+        /// <summary>
+        /// Gets or sets the transaction phase during which the fault is injected.
+        /// </summary>
         [Id(0)]
         public TransactionFaultInjectPhase FaultInjectionPhase = TransactionFaultInjectPhase.None;
 
+        /// <summary>
+        /// Gets or sets the type of fault to inject.
+        /// </summary>
         [Id(1)]
         public FaultInjectionType FaultInjectionType = FaultInjectionType.None;
 
+        /// <summary>
+        /// Clears the configured fault injection.
+        /// </summary>
         public void Reset()
         {
             this.FaultInjectionType = FaultInjectionType.None;
@@ -93,37 +105,113 @@ namespace Orleans.Transactions.TestKit
         }
     }
 
+    /// <summary>
+    /// Identifies a transaction phase where a fault can be injected.
+    /// </summary>
     [GenerateSerializer]
     public enum TransactionFaultInjectPhase
     {
+        /// <summary>
+        /// No transaction phase is selected.
+        /// </summary>
         None,
-        //deactivation injection phase
+
+        /// <summary>
+        /// Injects a fault after committing a read-only transaction.
+        /// </summary>
         AfterCommitReadOnly,
+
+        /// <summary>
+        /// Injects a fault after preparing a transaction.
+        /// </summary>
         AfterPrepare,
+
+        /// <summary>
+        /// Injects a fault after preparing and committing a transaction.
+        /// </summary>
         AfterPrepareAndCommit,
+
+        /// <summary>
+        /// Injects a fault after aborting a transaction.
+        /// </summary>
         AfterAbort,
+
+        /// <summary>
+        /// Injects a fault after receiving a prepared notification.
+        /// </summary>
         AfterPrepared,
+
+        /// <summary>
+        /// Injects a fault after canceling a transaction.
+        /// </summary>
         AfterCancel,
+
+        /// <summary>
+        /// Injects a fault after confirming a transaction.
+        /// </summary>
         AfterConfirm,
+
+        /// <summary>
+        /// Injects a fault after processing a transaction ping.
+        /// </summary>
         AfterPing,
 
-        //storage exception injection phase
+        /// <summary>
+        /// Injects a fault before confirming a transaction.
+        /// </summary>
         BeforeConfirm,
+
+        /// <summary>
+        /// Injects a fault before preparing a transaction.
+        /// </summary>
         BeforePrepare,
+
+        /// <summary>
+        /// Injects a fault before preparing and committing a transaction.
+        /// </summary>
         BeforePrepareAndCommit
     }
 
+    /// <summary>
+    /// Identifies the fault to inject into a transaction.
+    /// </summary>
     public enum FaultInjectionType
     {
+        /// <summary>
+        /// No fault is injected.
+        /// </summary>
         None, 
+
+        /// <summary>
+        /// Deactivates the grain after the selected transaction phase.
+        /// </summary>
         Deactivation,
+
+        /// <summary>
+        /// Throws a storage exception before storing transactional state.
+        /// </summary>
         ExceptionBeforeStore,
+
+        /// <summary>
+        /// Throws a storage exception after storing transactional state.
+        /// </summary>
         ExceptionAfterStore,
+
+        /// <summary>
+        /// Throws a generic exception after storing transactional state.
+        /// </summary>
         GenericExceptionAfterStore
     }
 
+    /// <summary>
+    /// Provides transactional state whose operations can inject controlled faults.
+    /// </summary>
+    /// <typeparam name="TState">The state type.</typeparam>
     public interface IFaultInjectionTransactionalState<TState> : ITransactionalState<TState> where TState : class, new()
     {
+        /// <summary>
+        /// Gets or sets the fault injection configuration.
+        /// </summary>
         FaultInjectionControl FaultInjectionControl { get; set; }
     }
 

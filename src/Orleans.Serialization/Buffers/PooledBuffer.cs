@@ -356,6 +356,10 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
         /// Gets the element in the collection at the current position of the enumerator.
         /// </summary>
         public readonly ReadOnlyMemory<byte> Current => CurrentMemory;
+
+        /// <summary>
+        /// The memory at the current position of the enumerator.
+        /// </summary>
         public ReadOnlyMemory<byte> CurrentMemory;
 
         /// <summary>

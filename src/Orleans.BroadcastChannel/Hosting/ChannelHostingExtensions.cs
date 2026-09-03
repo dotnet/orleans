@@ -7,6 +7,9 @@ using Orleans.Configuration;
 
 namespace Orleans.Hosting
 {
+    /// <summary>
+    /// Provides extension methods for configuring and resolving broadcast channel providers.
+    /// </summary>
     public static class ChannelHostingExtensions
     {
         /// <summary>
@@ -15,7 +18,7 @@ namespace Orleans.Hosting
         /// <param name="this">The builder.</param>
         /// <param name="name">The name of the provider</param>
         /// <param name="configureOptions">The configuration delegate.</param>
-        /// <returns></returns>
+        /// <returns>The silo builder.</returns>
         public static ISiloBuilder AddBroadcastChannel(this ISiloBuilder @this, string name, Action<BroadcastChannelOptions> configureOptions)
         {
             @this.Services.AddBroadcastChannel(name, ob => ob.Configure(configureOptions));
@@ -29,6 +32,7 @@ namespace Orleans.Hosting
         /// <param name="this">The builder.</param>
         /// <param name="name">The name of the provider</param>
         /// <param name="configureOptions">The configuration delegate.</param>
+        /// <returns>The silo builder.</returns>
         public static ISiloBuilder AddBroadcastChannel(this ISiloBuilder @this, string name, Action<OptionsBuilder<BroadcastChannelOptions>>? configureOptions = null)
         {
             @this.Services.AddBroadcastChannel(name, configureOptions);
@@ -42,6 +46,7 @@ namespace Orleans.Hosting
         /// <param name="this">The builder.</param>
         /// <param name="name">The name of the provider</param>
         /// <param name="configureOptions">The configuration delegate.</param>
+        /// <returns>The client builder.</returns>
         public static IClientBuilder AddBroadcastChannel(this IClientBuilder @this, string name, Action<BroadcastChannelOptions> configureOptions)
         {
             @this.Services.AddBroadcastChannel(name, ob => ob.Configure(configureOptions));
@@ -54,6 +59,7 @@ namespace Orleans.Hosting
         /// <param name="this">The builder.</param>
         /// <param name="name">The name of the provider</param>
         /// <param name="configureOptions">The configuration delegate.</param>
+        /// <returns>The client builder.</returns>
         public static IClientBuilder AddBroadcastChannel(this IClientBuilder @this, string name, Action<OptionsBuilder<BroadcastChannelOptions>>? configureOptions = null)
         {
             @this.Services.AddBroadcastChannel(name, configureOptions);
@@ -61,10 +67,11 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Get the named broadcast channel provided.
+        /// Gets a named broadcast channel provider.
         /// </summary>
         /// <param name="this">The client.</param>
         /// <param name="name">The name of the provider</param>
+        /// <returns>The named broadcast channel provider.</returns>
         public static IBroadcastChannelProvider GetBroadcastChannelProvider(this IClusterClient @this, string name)
             => @this.ServiceProvider.GetRequiredKeyedService<IBroadcastChannelProvider>(name);
 

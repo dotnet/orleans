@@ -38,8 +38,18 @@ namespace Orleans.Configuration
         /// </summary>
         internal Func<Task<QueueServiceClient>>? CreateClient { get; private set; }
 
+        /// <summary>
+        /// Gets or sets the interval for which a received message remains invisible to other queue consumers.
+        /// A <see langword="null"/> value uses the Azure Queue Service default.
+        /// </summary>
         public TimeSpan? MessageVisibilityTimeout { get; set; }
 
+        /// <summary>
+        /// Gets or sets the names of the Azure queues used to partition the stream provider.
+        /// </summary>
+        /// <remarks>
+        /// The standard silo and client configurators generate queue names from the service and provider names when this list is not configured.
+        /// </remarks>
         public List<string> QueueNames { get; set; } = null!;
 
         /// <summary>
@@ -121,6 +131,9 @@ namespace Orleans.Configuration
         }
     }
 
+    /// <summary>
+    /// Validates named <see cref="AzureQueueOptions"/> instances.
+    /// </summary>
     public class AzureQueueOptionsValidator : IConfigurationValidator
     {
         private readonly AzureQueueOptions options;
@@ -132,6 +145,10 @@ namespace Orleans.Configuration
             this.name = name;
         }
 
+        /// <summary>
+        /// Validates that the Azure Queue Service client and queue names are configured.
+        /// </summary>
+        /// <exception cref="OrleansConfigurationException">The configuration is invalid.</exception>
         public void ValidateConfiguration()
         {
             if (this.options.CreateClient is null)
@@ -144,6 +161,12 @@ namespace Orleans.Configuration
                     $"{nameof(AzureQueueOptions)} on stream provider {this.name} is invalid. {nameof(AzureQueueOptions.QueueNames)} is invalid");
         }
 
+        /// <summary>
+        /// Creates a validator for the named Azure Queue stream provider options.
+        /// </summary>
+        /// <param name="services">The service provider.</param>
+        /// <param name="name">The stream provider name.</param>
+        /// <returns>The configuration validator.</returns>
         public static IConfigurationValidator Create(IServiceProvider services, string name)
         {
             AzureQueueOptions aqOptions = services.GetOptionsByName<AzureQueueOptions>(name);

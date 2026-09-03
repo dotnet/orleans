@@ -4,12 +4,28 @@ using System.Threading.Tasks;
 
 namespace Orleans.BroadcastChannel
 {
+    /// <summary>
+    /// Represents a grain's implicit subscription to a broadcast channel.
+    /// </summary>
     public interface IBroadcastChannelSubscription
     {
+        /// <summary>
+        /// Gets the channel identifier.
+        /// </summary>
         public ChannelId ChannelId { get; }
 
+        /// <summary>
+        /// Gets the name of the broadcast channel provider.
+        /// </summary>
         public string ProviderName { get; }
 
+        /// <summary>
+        /// Attaches handlers which receive items and delivery errors for this subscription.
+        /// </summary>
+        /// <typeparam name="T">The channel item type.</typeparam>
+        /// <param name="onPublished">The handler invoked for each published item.</param>
+        /// <param name="onError">The optional handler invoked when item delivery fails.</param>
+        /// <returns>A task which completes when the handlers have been attached.</returns>
         Task Attach<T>(Func<T, Task> onPublished, Func<Exception, Task>? onError = null);
 
         /// <summary>
@@ -27,8 +43,16 @@ namespace Orleans.BroadcastChannel
                 onError is null ? null : exception => onError(exception, CancellationToken.None));
     }
 
+    /// <summary>
+    /// Receives notification when a grain's implicit broadcast channel subscription is activated.
+    /// </summary>
     public interface IOnBroadcastChannelSubscribed
     {
+        /// <summary>
+        /// Attaches handlers to an activated broadcast channel subscription.
+        /// </summary>
+        /// <param name="streamSubscription">The activated subscription.</param>
+        /// <returns>A task which completes when subscription initialization has completed.</returns>
         public Task OnSubscribed(IBroadcastChannelSubscription streamSubscription);
     }
 

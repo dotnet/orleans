@@ -13,7 +13,7 @@ public static class SerializationConfigurationExamples
         siloBuilder.Services.AddSerializer(serializerBuilder =>
         {
             serializerBuilder.AddNewtonsoftJsonSerializer(
-                isSupported: type => type.Namespace.StartsWith("Example.Namespace"));
+                isSupported: type => type.Namespace?.StartsWith("Example.Namespace") is true);
         });
         // </configure_newtonsoft_json>
     }
@@ -24,7 +24,7 @@ public static class SerializationConfigurationExamples
         siloBuilder.Services.AddSerializer(serializerBuilder =>
         {
             serializerBuilder.AddJsonSerializer(
-                isSupported: type => type.Namespace.StartsWith("Example.Namespace"));
+                isSupported: type => type.Namespace?.StartsWith("Example.Namespace") is true);
         });
         // </configure_system_text_json>
     }

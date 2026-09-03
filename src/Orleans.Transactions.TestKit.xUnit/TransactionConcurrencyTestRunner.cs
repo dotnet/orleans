@@ -3,16 +3,18 @@ using Xunit;
 
 namespace Orleans.Transactions.TestKit.xUnit
 {
+    /// <inheritdoc cref="TransactionConcurrencyTestRunner"/>
     public abstract class TransactionConcurrencyTestRunnerxUnit : TransactionConcurrencyTestRunner
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TransactionConcurrencyTestRunnerxUnit"/> class.
+        /// </summary>
+        /// <param name="grainFactory">The grain factory used to access test grains.</param>
+        /// <param name="output">The xUnit test output helper.</param>
         protected TransactionConcurrencyTestRunnerxUnit(IGrainFactory grainFactory, ITestOutputHelper output)
         : base(grainFactory, output.WriteLine) { }
 
-        /// <summary>
-        /// Two transaction share a single grain
-        /// </summary>
-        /// <param name="grainStates"></param>
-        /// <returns></returns>
+        /// <inheritdoc cref="TransactionConcurrencyTestRunner.SingleSharedGrainTest(string)"/>
         [Theory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
@@ -22,11 +24,7 @@ namespace Orleans.Transactions.TestKit.xUnit
             return base.SingleSharedGrainTest(grainStates);
         }
 
-        /// <summary>
-        /// Chain of transactions, each dependent on the results of the previous
-        /// </summary>
-        /// <param name="grainStates"></param>
-        /// <returns></returns>
+        /// <inheritdoc cref="TransactionConcurrencyTestRunner.TransactionChainTest(string)"/>
         [Theory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
@@ -36,11 +34,7 @@ namespace Orleans.Transactions.TestKit.xUnit
             return base.TransactionChainTest(grainStates);
         }
 
-        /// <summary>
-        /// Single transaction containing two grains is dependent on two other transaction, one from each grain
-        /// </summary>
-        /// <param name="grainStates"></param>
-        /// <returns></returns>
+        /// <inheritdoc cref="TransactionConcurrencyTestRunner.TransactionTreeTest(string)"/>
         [Theory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]

@@ -6,23 +6,28 @@ namespace Orleans.Hosting;
 public static class ClusterClientAdoNetStreamExtensions
 {
     /// <summary>
-    /// Configure cluster client to use ADO.NET persistent streams with default settings.
+    /// Configures the client to use an ADO.NET stream provider.
     /// </summary>
+    /// <param name="builder">The client builder.</param>
+    /// <param name="name">The stream provider name.</param>
+    /// <param name="configureOptions">The delegate used to configure the provider.</param>
+    /// <returns>The same <paramref name="builder"/> instance.</returns>
     public static IClientBuilder AddAdoNetStreams(this IClientBuilder builder, string name, Action<AdoNetStreamOptions> configureOptions)
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(configureOptions);
 
-        return builder.AddAdoNetStreams(name, b =>
-        {
-            b.ConfigureAdoNet(ob => ob.Configure(configureOptions));
-        });
+        return builder.AddAdoNetStreams(name, b => b.ConfigureAdoNet(ob => ob.Configure(configureOptions)));
     }
 
     /// <summary>
-    /// Configure cluster client to use ADO.NET persistent streams.
+    /// Configures the client to use an ADO.NET stream provider.
     /// </summary>
+    /// <param name="builder">The client builder.</param>
+    /// <param name="name">The stream provider name.</param>
+    /// <param name="configure">The delegate used to configure the provider.</param>
+    /// <returns>The same <paramref name="builder"/> instance.</returns>
     public static IClientBuilder AddAdoNetStreams(this IClientBuilder builder, string name, Action<ClusterClientAdoNetStreamConfigurator> configure)
     {
         ArgumentNullException.ThrowIfNull(builder);

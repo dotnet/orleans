@@ -32,6 +32,7 @@ namespace Orleans.Providers
         /// <param name="serializer">The serializer.</param>
         /// <param name="cacheMonitor">The cache monitor.</param>
         /// <param name="monitorWriteInterval">The monitor write interval.</param>
+        /// <param name="purgeMetadataInterval">The interval between cache purge metadata updates.</param>
         public MemoryPooledCache(
             IObjectPool<FixedSizeBuffer> bufferPool,
             TimePurgePredicate purgePredicate,

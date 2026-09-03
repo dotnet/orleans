@@ -111,6 +111,7 @@ internal partial class FirestoreDataManager
     /// Create a entity if it doesn't exist, otherwise it will throw
     /// </summary>
     /// <param name="entity">The entity</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The entity's eTag</returns>
     public async Task<string> CreateEntity<TEntity>(TEntity entity, CancellationToken cancellationToken = default) where TEntity : FirestoreEntity, new()
     {
@@ -161,6 +162,7 @@ internal partial class FirestoreDataManager
     /// Update an entity.
     /// </summary>
     /// <param name="entity">The entity</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The entity's eTag</returns>
     public async Task<string> Update<TEntity>(TEntity entity, CancellationToken cancellationToken = default) where TEntity : FirestoreEntity, new()
     {
@@ -189,6 +191,7 @@ internal partial class FirestoreDataManager
     /// Updates an existing entity without checking its current ETag.
     /// </summary>
     /// <param name="entity">The entity.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The entity's new ETag.</returns>
     public async Task<string> UpdateUnconditionally<TEntity>(TEntity entity, CancellationToken cancellationToken = default) where TEntity : FirestoreEntity, new()
     {
@@ -217,6 +220,7 @@ internal partial class FirestoreDataManager
     /// </summary>
     /// <param name="id">The entity's id</param>
     /// <param name="eTag">The entity's eTag</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>Whether the delete completed successfully.</returns>
     public async Task<bool> DeleteEntity(string id, string? eTag = null, CancellationToken cancellationToken = default)
     {
@@ -260,6 +264,7 @@ internal partial class FirestoreDataManager
     /// Read an entity.
     /// </summary>
     /// <param name="id">The entity's id</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The entity or null of not exist</returns>
     public async Task<TEntity?> ReadEntity<TEntity>(string id, CancellationToken cancellationToken = default) where TEntity : FirestoreEntity, new()
     {
@@ -323,6 +328,8 @@ internal partial class FirestoreDataManager
     /// Delete entities in a partition.
     /// </summary>
     /// <param name="entities">Entities to be deleted</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>A task representing the operation.</returns>
     public async Task DeleteEntities<TEntity>(TEntity[] entities, CancellationToken cancellationToken = default) where TEntity : FirestoreEntity, new()
     {
         var collection = this.GetCollection();
@@ -360,6 +367,7 @@ internal partial class FirestoreDataManager
     /// Query entities.
     /// </summary>
     /// <param name="query">The query filter</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>An array of entities</returns>
     public async Task<TEntity[]> QueryEntities<TEntity>(
         Func<CollectionReference, Query> query,

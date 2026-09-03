@@ -6,8 +6,12 @@ namespace Orleans.Hosting;
 public static class SiloBuilderExtensions
 {
     /// <summary>
-    /// Configure silo to use Redis streams.
+    /// Configures the silo to use a Redis stream provider.
     /// </summary>
+    /// <param name="builder">The silo builder.</param>
+    /// <param name="name">The stream provider name.</param>
+    /// <param name="configure">The delegate used to configure the provider.</param>
+    /// <returns>The same <paramref name="builder"/> instance.</returns>
     public static ISiloBuilder AddRedisStreams(this ISiloBuilder builder, string name, Action<SiloRedisStreamConfigurator> configure)
     {
         ArgumentNullException.ThrowIfNull(name);

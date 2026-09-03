@@ -3,8 +3,15 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Journaling;
 
+/// <summary>
+/// Represents a value whose changes are recorded in a journal.
+/// </summary>
+/// <typeparam name="T">The type of the value.</typeparam>
 public interface IDurableValue<T>
 {
+    /// <summary>
+    /// Gets or sets the current value.
+    /// </summary>
     T? Value { get; set; }
 }
 

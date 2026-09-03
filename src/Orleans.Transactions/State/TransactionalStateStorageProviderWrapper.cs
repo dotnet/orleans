@@ -123,20 +123,36 @@ namespace Orleans.Transactions
         }
     }
 
+    /// <summary>
+    /// Represents transactional state stored using an <see cref="IGrainStorage"/> provider.
+    /// </summary>
+    /// <typeparam name="TState">The transactional state type.</typeparam>
     [Serializable]
     [GenerateSerializer]
     public sealed class TransactionalStateRecord<TState>
         where TState : class, new()
     {
+        /// <summary>
+        /// Gets or sets the most recently committed state.
+        /// </summary>
         [Id(0)]
         public TState CommittedState { get; set; } = new TState();
 
+        /// <summary>
+        /// Gets or sets the sequence number of the most recently committed state.
+        /// </summary>
         [Id(1)]
         public long CommittedSequenceId { get; set; }
 
+        /// <summary>
+        /// Gets or sets the transaction protocol metadata.
+        /// </summary>
         [Id(2)]
         public TransactionalStateMetaData Metadata { get; set; } = new TransactionalStateMetaData();
 
+        /// <summary>
+        /// Gets or sets the prepared state versions which have not been committed.
+        /// </summary>
         [Id(3)]
         public List<PendingTransactionState<TState>> PendingStates { get; set; } = new List<PendingTransactionState<TState>>();
     }

@@ -716,7 +716,7 @@ namespace Orleans.Serialization.Buffers
 
         public int Length { get { throw null; } }
 
-        public ArcBufferPage? Next { get { throw null; } protected set { } }
+        public ArcBufferPage? Next { get { throw null; } }
 
         public System.ArraySegment<byte> ReadableArraySegment { get { throw null; } }
 

@@ -68,6 +68,7 @@ namespace Orleans.Serialization.Session
             ReferencedTypes.Reset();
         }
 
+        /// <inheritdoc/>
         public void Dispose() => OnDisposed?.Invoke(this);
     }
 }

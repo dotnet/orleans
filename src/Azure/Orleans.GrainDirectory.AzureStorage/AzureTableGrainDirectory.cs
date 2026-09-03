@@ -13,6 +13,9 @@ using Orleans.Runtime;
 
 namespace Orleans.GrainDirectory.AzureStorage
 {
+    /// <summary>
+    /// Provides a grain directory backed by Azure Table Storage.
+    /// </summary>
     public class AzureTableGrainDirectory : IGrainDirectory, ILifecycleParticipant<ISiloLifecycle>
     {
         private readonly AzureTableDataManager<GrainDirectoryEntity> tableDataManager;
@@ -58,6 +61,12 @@ namespace Orleans.GrainDirectory.AzureStorage
             internal static GrainId RowKeyToGrainId(string rowKey) => GrainId.Parse(HttpUtility.UrlDecode(rowKey, Encoding.UTF8));
         }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="AzureTableGrainDirectory"/> class.
+        /// </summary>
+        /// <param name="directoryOptions">The Azure Table Storage grain directory options.</param>
+        /// <param name="clusterOptions">The cluster options.</param>
+        /// <param name="loggerFactory">The logger factory.</param>
         public AzureTableGrainDirectory(
             AzureTableGrainDirectoryOptions directoryOptions,
             IOptions<ClusterOptions> clusterOptions,
@@ -69,6 +78,11 @@ namespace Orleans.GrainDirectory.AzureStorage
             this.clusterId = clusterOptions.Value.ClusterId;
         }
 
+        /// <summary>
+        /// Looks up the registered activation for a grain.
+        /// </summary>
+        /// <param name="grainId">The grain identifier.</param>
+        /// <returns>The registered grain address, or <see langword="null"/> when no registration exists.</returns>
         public async Task<GrainAddress?> Lookup(GrainId grainId)
         {
             var result = await this.tableDataManager.ReadSingleTableEntryAsync(this.clusterId, GrainDirectoryEntity.GrainIdToRowKey(grainId));
@@ -81,8 +95,19 @@ namespace Orleans.GrainDirectory.AzureStorage
             return result.Item1.ToGrainAddress();
         }
 
+        /// <summary>
+        /// Registers a grain activation if no registration exists for the grain.
+        /// </summary>
+        /// <param name="address">The grain address to register.</param>
+        /// <returns>The grain address registered in the directory.</returns>
         public Task<GrainAddress?> Register(GrainAddress address) => Register(address, null);
 
+        /// <summary>
+        /// Registers a grain activation, replacing the specified previous registration when it is current.
+        /// </summary>
+        /// <param name="address">The grain address to register.</param>
+        /// <param name="previousAddress">The previous registration to replace, or <see langword="null"/> to require an empty entry.</param>
+        /// <returns>The grain address registered in the directory.</returns>
         public async Task<GrainAddress?> Register(GrainAddress address, GrainAddress? previousAddress)
         {
             (bool isSuccess, string? eTag) result;
@@ -115,6 +140,11 @@ namespace Orleans.GrainDirectory.AzureStorage
             return result.isSuccess ? address : await Lookup(address.GrainId);
         }
 
+        /// <summary>
+        /// Removes a grain activation when the stored activation identifier matches the supplied address.
+        /// </summary>
+        /// <param name="address">The grain address to remove.</param>
+        /// <returns>A task representing the operation.</returns>
         public async Task Unregister(GrainAddress address)
         {
             var result = await this.tableDataManager.ReadSingleTableEntryAsync(this.clusterId, GrainDirectoryEntity.GrainIdToRowKey(address.GrainId));
@@ -131,6 +161,11 @@ namespace Orleans.GrainDirectory.AzureStorage
                 await this.tableDataManager.DeleteTableEntryAsync(GrainDirectoryEntity.FromGrainAddress(this.clusterId, address), entity.ETag.ToString());
         }
 
+        /// <summary>
+        /// Removes grain activations whose stored activation identifiers match the supplied addresses.
+        /// </summary>
+        /// <param name="addresses">The grain addresses to remove.</param>
+        /// <returns>A task representing the operation.</returns>
         public async Task UnregisterMany(List<GrainAddress> addresses)
         {
             if (addresses.Count <= this.tableDataManager.StoragePolicyOptions.MaxBulkUpdateRows)
@@ -148,6 +183,11 @@ namespace Orleans.GrainDirectory.AzureStorage
             }
         }
 
+        /// <summary>
+        /// Completes the silo cleanup callback. Azure Table entries are cleaned up through activation-specific unregister operations.
+        /// </summary>
+        /// <param name="siloAddresses">The silo addresses associated with the cleanup callback.</param>
+        /// <returns>A completed task.</returns>
         public Task UnregisterSilos(List<SiloAddress> siloAddresses)
         {
             // Too costly to implement using Azure Table
@@ -180,12 +220,21 @@ namespace Orleans.GrainDirectory.AzureStorage
             await this.tableDataManager.DeleteTableEntriesAsync(entities);
         }
 
-        // Called by lifecycle, should not be called explicitely, except for tests
+        /// <summary>
+        /// Initializes the Azure Table Storage table when required.
+        /// </summary>
+        /// <param name="ct">The cancellation token supplied by the silo lifecycle.</param>
+        /// <returns>A task representing the initialization operation.</returns>
+        /// <remarks>This method is invoked by the silo lifecycle and can also be used by tests.</remarks>
         public async Task InitializeIfNeeded(CancellationToken ct = default)
         {
             await this.tableDataManager.InitTableAsync();
         }
 
+        /// <summary>
+        /// Subscribes the grain directory to the silo lifecycle.
+        /// </summary>
+        /// <param name="lifecycle">The silo lifecycle.</param>
         public void Participate(ISiloLifecycle lifecycle)
         {
 

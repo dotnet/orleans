@@ -2,8 +2,14 @@ using Microsoft.CodeAnalysis;
 
 namespace Orleans.CodeGenerator.Diagnostics;
 
+/// <summary>
+/// Defines the diagnostic reported when source generation fails with an unhandled exception.
+/// </summary>
 public static class UnhandledCodeGenerationExceptionDiagnostic
 {
+    /// <summary>
+    /// The diagnostic identifier.
+    /// </summary>
     public const string RuleId = DiagnosticRuleId.UnhandledCodeGenerationException; 
     private const string Category = "Usage";
     private static readonly LocalizableString Title = "An unhandled source generation exception occurred";

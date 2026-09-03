@@ -7,7 +7,7 @@ namespace Orleans.Docs.Snippets.Serialization;
 // Define a placeholder class for the custom serializer example
 public class MyCustomSerializer : IGrainStorageSerializer
 {
-    public BinaryData Serialize<T>(T value) => throw new NotImplementedException();
+    public BinaryData Serialize<T>(T? value) => throw new NotImplementedException();
     public T Deserialize<T>(BinaryData data) => throw new NotImplementedException();
 }
 

@@ -169,22 +169,19 @@ public static class SiloProgram
 
 // Stub health check classes for documentation examples
 // In a real application, you would implement actual health check logic
-#pragma warning disable CS1998 // Async method lacks 'await' operators
 
 internal class GrainHealthCheck : IHealthCheck
 {
-    public async Task<HealthCheckResult> CheckHealthAsync(
+    public Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context,
         CancellationToken cancellationToken = default)
-        => HealthCheckResult.Healthy();
+        => Task.FromResult(HealthCheckResult.Healthy());
 }
 
 internal class SiloHealthCheck : IHealthCheck
 {
-    public async Task<HealthCheckResult> CheckHealthAsync(
+    public Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context,
         CancellationToken cancellationToken = default)
-        => HealthCheckResult.Healthy();
+        => Task.FromResult(HealthCheckResult.Healthy());
 }
-
-#pragma warning restore CS1998

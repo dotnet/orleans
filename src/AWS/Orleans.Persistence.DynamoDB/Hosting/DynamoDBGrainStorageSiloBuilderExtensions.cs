@@ -5,6 +5,9 @@ using Orleans.Providers;
 
 namespace Orleans.Hosting
 {
+    /// <summary>
+    /// Provides extension methods for configuring DynamoDB grain storage on an Orleans silo.
+    /// </summary>
     public static class DynamoDBGrainStorageSiloBuilderExtensions
     {
         /// <summary>

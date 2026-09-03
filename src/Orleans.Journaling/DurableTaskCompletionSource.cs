@@ -4,13 +4,40 @@ using Orleans.Serialization;
 
 namespace Orleans.Journaling;
 
+/// <summary>
+/// Represents a task completion source whose terminal state is recorded in a journal.
+/// </summary>
+/// <typeparam name="T">The type of the task result.</typeparam>
 public interface IDurableTaskCompletionSource<T>
 {
+    /// <summary>
+    /// Gets the task which completes after the terminal state has been persisted.
+    /// </summary>
     Task<T> Task { get; }
+
+    /// <summary>
+    /// Gets the current durable completion state.
+    /// </summary>
     DurableTaskCompletionSourceState<T> State { get; }
 
+    /// <summary>
+    /// Attempts to transition the durable state to canceled.
+    /// </summary>
+    /// <returns><see langword="true"/> if the state was transitioned; otherwise, <see langword="false"/>.</returns>
     bool TrySetCanceled();
+
+    /// <summary>
+    /// Attempts to transition the durable state to faulted with the specified exception.
+    /// </summary>
+    /// <param name="exception">The exception which faults the task.</param>
+    /// <returns><see langword="true"/> if the state was transitioned; otherwise, <see langword="false"/>.</returns>
     bool TrySetException(Exception exception);
+
+    /// <summary>
+    /// Attempts to transition the durable state to completed with the specified result.
+    /// </summary>
+    /// <param name="value">The task result.</param>
+    /// <returns><see langword="true"/> if the state was transitioned; otherwise, <see langword="false"/>.</returns>
     bool TrySetResult(T value);
 }
 
@@ -185,25 +212,55 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
     public IJournaledState DeepCopy() => throw new NotImplementedException();
 }
 
+/// <summary>
+/// Identifies the state of a durable task completion source.
+/// </summary>
 [GenerateSerializer]
 public enum DurableTaskCompletionSourceStatus : byte
 {
+    /// <summary>
+    /// The task is awaiting completion.
+    /// </summary>
     Pending = 0,
+
+    /// <summary>
+    /// The task completed successfully.
+    /// </summary>
     Completed,
+
+    /// <summary>
+    /// The task completed with an exception.
+    /// </summary>
     Faulted,
+
+    /// <summary>
+    /// The task was canceled.
+    /// </summary>
     Canceled
 }
 
+/// <summary>
+/// Describes the state of a durable task completion source.
+/// </summary>
+/// <typeparam name="T">The type of the task result.</typeparam>
 [GenerateSerializer, Immutable]
 public readonly struct DurableTaskCompletionSourceState<T>
 {
+    /// <summary>
+    /// Gets the completion status.
+    /// </summary>
     [Id(0)]
     public DurableTaskCompletionSourceStatus Status { get; init; }
 
+    /// <summary>
+    /// Gets the result for a successfully completed task.
+    /// </summary>
     [Id(1)]
     public T? Value { get; init; }
 
+    /// <summary>
+    /// Gets the exception for a faulted task.
+    /// </summary>
     [Id(2)]
     public Exception? Exception { get; init; }
 }
-

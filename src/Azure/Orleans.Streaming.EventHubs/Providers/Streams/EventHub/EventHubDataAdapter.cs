@@ -17,6 +17,7 @@ namespace Orleans.Streaming.EventHubs
         /// <summary>
         /// Cache data adapter that adapts EventHub's EventData to CachedEventHubMessage used in cache
         /// </summary>
+        /// <param name="serializer">The serializer used to encode and decode stream events.</param>
         public EventHubDataAdapter(Serialization.Serializer serializer)
         {
             this.serializer = serializer;
@@ -25,8 +26,8 @@ namespace Orleans.Streaming.EventHubs
         /// <summary>
         /// Converts a cached message to a batch container for delivery
         /// </summary>
-        /// <param name="cachedMessage"></param>
-        /// <returns></returns>
+        /// <param name="cachedMessage">The cached message.</param>
+        /// <returns>The batch container.</returns>
         public virtual IBatchContainer GetBatchContainer(ref CachedMessage cachedMessage)
         {
             var evenHubMessage = new EventHubMessage(cachedMessage, this.serializer);
@@ -36,8 +37,8 @@ namespace Orleans.Streaming.EventHubs
         /// <summary>
         /// Convert an EventHubMessage to a batch container
         /// </summary>
-        /// <param name="eventHubMessage"></param>
-        /// <returns></returns>
+        /// <param name="eventHubMessage">The Event Hub message.</param>
+        /// <returns>The batch container.</returns>
         protected virtual IBatchContainer GetBatchContainer(EventHubMessage eventHubMessage)
         {
             return new EventHubBatchContainer(eventHubMessage, this.serializer);
@@ -46,19 +47,21 @@ namespace Orleans.Streaming.EventHubs
         /// <summary>
         /// Gets the stream sequence token from a cached message.
         /// </summary>
-        /// <param name="cachedMessage"></param>
-        /// <returns></returns>
+        /// <param name="cachedMessage">The cached message.</param>
+        /// <returns>The stream sequence token.</returns>
         public virtual StreamSequenceToken GetSequenceToken(ref CachedMessage cachedMessage)
         {
             return new EventHubSequenceTokenV2("", cachedMessage.SequenceNumber, 0);
         }
 
+        /// <inheritdoc />
         public virtual EventData ToQueueMessage<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken? token, Dictionary<string, object>? requestContext)
         {
             if (token != null) throw new ArgumentException("EventHub streams currently does not support non-null StreamSequenceToken.", nameof(token));
             return EventHubBatchContainer.ToEventData(this.serializer, streamId, events, requestContext);
         }
 
+        /// <inheritdoc />
         public virtual CachedMessage FromQueueMessage(StreamPosition streamPosition, EventData queueMessage, DateTime dequeueTime, Func<int, ArraySegment<byte>> getSegment)
         {
             return new CachedMessage()
@@ -72,6 +75,7 @@ namespace Orleans.Streaming.EventHubs
             };
         }
 
+        /// <inheritdoc />
         public virtual StreamPosition GetStreamPosition(string partition, EventData queueMessage)
         {
             StreamId streamId = this.GetStreamIdentity(queueMessage);
@@ -83,6 +87,8 @@ namespace Orleans.Streaming.EventHubs
         /// <summary>
         /// Get offset from cached message.  Left to derived class, as only it knows how to get this from the cached message.
         /// </summary>
+        /// <param name="lastItemPurged">The cached message.</param>
+        /// <returns>The Event Hub offset.</returns>
         public virtual string GetOffset(CachedMessage lastItemPurged)
         {
             int readOffset = 0;
@@ -109,7 +115,12 @@ namespace Orleans.Streaming.EventHubs
             return StreamId.Create(streamNamespace, streamKey);
         }
 
-        // Placed object message payload into a segment.
+        /// <summary>
+        /// Encodes an Event Hub message into a cache segment.
+        /// </summary>
+        /// <param name="queueMessage">The Event Hub message.</param>
+        /// <param name="getSegment">The delegate used to allocate a cache segment of the required size.</param>
+        /// <returns>The segment containing the encoded message.</returns>
         protected virtual ArraySegment<byte> EncodeMessageIntoSegment(EventData queueMessage, Func<int, ArraySegment<byte>> getSegment)
         {
             byte[] propertiesBytes = queueMessage.SerializeProperties(this.serializer);

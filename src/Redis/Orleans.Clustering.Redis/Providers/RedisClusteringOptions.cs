@@ -68,6 +68,10 @@ namespace Orleans.Clustering.Redis
     {
         private readonly RedisClusteringOptions _options;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="RedisClusteringOptionsValidator"/> class.
+        /// </summary>
+        /// <param name="options">The options to validate.</param>
         public RedisClusteringOptionsValidator(IOptions<RedisClusteringOptions> options)
         {
             _options = options.Value;

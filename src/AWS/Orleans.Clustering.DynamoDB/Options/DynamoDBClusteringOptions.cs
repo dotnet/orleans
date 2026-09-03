@@ -2,6 +2,9 @@ using Orleans.Clustering.DynamoDB;
 
 namespace Orleans.Configuration
 {
+    /// <summary>
+    /// Configures DynamoDB-backed silo membership.
+    /// </summary>
     public class DynamoDBClusteringOptions : DynamoDBClientOptions
     {
         /// <summary>

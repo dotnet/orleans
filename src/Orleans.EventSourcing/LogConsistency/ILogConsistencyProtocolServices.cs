@@ -58,20 +58,35 @@ namespace Orleans.EventSourcing
     [GenerateSerializer]
     public sealed class ProtocolTransportException : OrleansException
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ProtocolTransportException"/> class.
+        /// </summary>
         public ProtocolTransportException()
         { }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ProtocolTransportException"/> class.
+        /// </summary>
+        /// <param name="msg">The message that describes the error.</param>
         public ProtocolTransportException(string msg)
             : base(msg)
         { }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ProtocolTransportException"/> class.
+        /// </summary>
+        /// <param name="msg">The message that describes the error.</param>
+        /// <param name="exc">The exception that caused the transport failure.</param>
         public ProtocolTransportException(string msg, Exception exc)
             : base(msg, exc)
         { }
 
         [Obsolete]
-        protected ProtocolTransportException(SerializationInfo info, StreamingContext context)
+        private ProtocolTransportException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         { }
 
+        /// <inheritdoc />
         public override string ToString()
         {
             if (InnerException != null)

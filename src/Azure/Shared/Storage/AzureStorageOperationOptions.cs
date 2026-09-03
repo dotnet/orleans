@@ -27,6 +27,9 @@ namespace Orleans.GrainDirectory.AzureStorage
 // No default namespace intentionally to cause compile errors if something is not defined
 #endif
 {
+    /// <summary>
+    /// Configures access to an Azure Table Storage table.
+    /// </summary>
     public class AzureStorageOperationOptions
     {
         private TableServiceClient? _tableServiceClient;
@@ -203,17 +206,34 @@ namespace Orleans.GrainDirectory.AzureStorage
         }
     }
 
+    /// <summary>
+    /// Validates Azure Table Storage operation options.
+    /// </summary>
+    /// <typeparam name="TOptions">The type of options to validate.</typeparam>
     public class AzureStorageOperationOptionsValidator<TOptions> : IConfigurationValidator where TOptions : AzureStorageOperationOptions
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="AzureStorageOperationOptionsValidator{TOptions}"/> class.
+        /// </summary>
+        /// <param name="options">The options to validate.</param>
+        /// <param name="name">The configured options name.</param>
         public AzureStorageOperationOptionsValidator(TOptions options, string? name = null)
         {
             Options = options;
             Name = name;
         }
 
+        /// <summary>
+        /// Gets the options to validate.
+        /// </summary>
         public TOptions Options { get; }
+
+        /// <summary>
+        /// Gets the configured options name.
+        /// </summary>
         public string? Name { get; }
 
+        /// <inheritdoc />
         public virtual void ValidateConfiguration()
         {
             Options.Validate(Name);

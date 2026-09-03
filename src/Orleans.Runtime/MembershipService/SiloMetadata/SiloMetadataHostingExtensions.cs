@@ -8,31 +8,34 @@ using Orleans.Runtime.Placement.Filtering;
 
 namespace Orleans.Runtime.MembershipService.SiloMetadata;
 
+/// <summary>
+/// Extensions for configuring silo metadata.
+/// </summary>
 public static class SiloMetadataHostingExtensions
 {
     /// <summary>
-    /// Configure silo metadata from the builder configuration.
+    /// Configures silo metadata from the builder configuration.
     /// </summary>
-    /// <param name="builder">Silo builder</param>
+    /// <param name="builder">The silo builder.</param>
     /// <remarks>
-    /// Get the ORLEANS__METADATA section from config
-    /// Key/value pairs in configuration as a <see cref="Dictionary{TKey,TValue}"/> will look like this as environment variables:
+    /// Reads the <c>Orleans:Metadata</c> configuration section.
+    /// Key-value pairs can be supplied using environment variables such as:
     /// ORLEANS__METADATA__key1=value1
     /// </remarks>
-    /// <returns></returns>
+    /// <returns>The provided silo builder.</returns>
     public static ISiloBuilder UseSiloMetadata(this ISiloBuilder builder) => builder.UseSiloMetadata(builder.Configuration);
 
     /// <summary>
-    /// Configure silo metadata from configuration.
+    /// Configures silo metadata from the provided configuration.
     /// </summary>
-    /// <param name="builder">Silo builder</param>
-    /// <param name="configuration">Configuration to pull from</param>
+    /// <param name="builder">The silo builder.</param>
+    /// <param name="configuration">The configuration containing the silo metadata.</param>
     /// <remarks>
-    /// Get the ORLEANS__METADATA section from config
-    /// Key/value pairs in configuration as a <see cref="Dictionary{TKey,TValue}"/> will look like this as environment variables:
+    /// Reads the <c>Orleans:Metadata</c> configuration section.
+    /// Key-value pairs can be supplied using environment variables such as:
     /// ORLEANS__METADATA__key1=value1
     /// </remarks>
-    /// <returns></returns>
+    /// <returns>The provided silo builder.</returns>
     public static ISiloBuilder UseSiloMetadata(this ISiloBuilder builder, IConfiguration configuration)
     {
 
@@ -42,16 +45,16 @@ public static class SiloMetadataHostingExtensions
     }
 
     /// <summary>
-    /// Configure silo metadata from configuration section.
+    /// Configures silo metadata from the provided configuration section.
     /// </summary>
-    /// <param name="builder">Silo builder</param>
-    /// <param name="configurationSection">Configuration section to pull from</param>
+    /// <param name="builder">The silo builder.</param>
+    /// <param name="configurationSection">The configuration section containing the silo metadata.</param>
     /// <remarks>
-    /// Get the ORLEANS__METADATA section from config section
-    /// Key/value pairs in configuration as a <see cref="Dictionary{TKey,TValue}"/> will look like this as environment variables:
+    /// Binds the provided section as a <see cref="Dictionary{TKey,TValue}"/>.
+    /// Key-value pairs can be supplied using environment variables such as:
     /// ORLEANS__METADATA__key1=value1
     /// </remarks>
-    /// <returns></returns>
+    /// <returns>The provided silo builder.</returns>
     public static ISiloBuilder UseSiloMetadata(this ISiloBuilder builder, IConfigurationSection configurationSection)
     {
         var dictionary = configurationSection.Get<Dictionary<string, string>>();
@@ -60,11 +63,11 @@ public static class SiloMetadataHostingExtensions
     }
 
     /// <summary>
-    /// Configure silo metadata from configuration section.
+    /// Configures the metadata published by the local silo.
     /// </summary>
-    /// <param name="builder">Silo builder</param>
-    /// <param name="metadata">Metadata to add</param>
-    /// <returns></returns>
+    /// <param name="builder">The silo builder.</param>
+    /// <param name="metadata">The metadata to publish for the local silo.</param>
+    /// <returns>The provided silo builder.</returns>
     public static ISiloBuilder UseSiloMetadata(this ISiloBuilder builder, Dictionary<string, string> metadata)
     {
         builder.ConfigureServices(services =>

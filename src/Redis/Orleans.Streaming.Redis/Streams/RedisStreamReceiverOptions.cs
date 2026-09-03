@@ -11,6 +11,10 @@ public sealed class RedisStreamReceiverOptions
     /// Redis streams message field name.
     /// </summary>
     public string FieldName { get; set; } = DefaultFieldName;
+
+    /// <summary>
+    /// The default Redis stream message field name.
+    /// </summary>
     public const string DefaultFieldName = "payload";
 
     /// <summary>

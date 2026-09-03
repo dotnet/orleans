@@ -12,6 +12,10 @@ using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions.AzureStorage
 {
+    /// <summary>
+    /// Provides Azure Table Storage-backed transactional state storage.
+    /// </summary>
+    /// <typeparam name="TState">The transactional state type.</typeparam>
     public partial class AzureTableTransactionalStateStorage<TState> : ITransactionalStateStorage<TState>
         where TState : class, new()
     {
@@ -30,6 +34,13 @@ namespace Orleans.Transactions.AzureStorage
         private List<KeyValuePair<long, StateEntity>> states = null!;
         private bool _storeRequiresLoad;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="AzureTableTransactionalStateStorage{TState}"/> class.
+        /// </summary>
+        /// <param name="table">The client for the table which stores transactional state.</param>
+        /// <param name="partition">The partition key for the transactional state.</param>
+        /// <param name="JsonSettings">The settings used to serialize transactional state.</param>
+        /// <param name="logger">The logger.</param>
         public AzureTableTransactionalStateStorage(TableClient table, string partition, JsonSerializerSettings JsonSettings, ILogger<AzureTableTransactionalStateStorage<TState>> logger)
         {
             this.table = table;
@@ -43,6 +54,7 @@ namespace Orleans.Transactions.AzureStorage
             this.jsonSettings.DefaultValueHandling = DefaultValueHandling.Include;
         }
 
+        /// <inheritdoc />
         public async Task<TransactionalStorageLoadResponse<TState>> Load()
         {
             try
@@ -122,6 +134,7 @@ namespace Orleans.Transactions.AzureStorage
             }
         }
 
+        /// <inheritdoc />
         public async Task<string> Store(string? expectedETag, TransactionalStateMetaData metadata, List<PendingTransactionState<TState>>? statesToPrepare, long? commitUpTo, long? abortAfter)
         {
             if (_storeRequiresLoad)

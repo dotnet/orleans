@@ -2,11 +2,18 @@ using System;
 
 namespace Orleans.Hosting.Developer
 {
+    /// <summary>
+    /// Extension methods for configuring generated Event Hubs streams on an Orleans silo.
+    /// </summary>
     public static class SiloBuilderExtensions
     {
         /// <summary>
-        /// Configure silo to use event data generator streams.
+        /// Adds a named stream provider which generates Event Hubs data for development and testing.
         /// </summary>
+        /// <param name="builder">The silo builder.</param>
+        /// <param name="name">The stream provider name.</param>
+        /// <param name="configure">The delegate used to configure the stream provider.</param>
+        /// <returns>The silo builder.</returns>
         public static ISiloBuilder AddEventDataGeneratorStreams(
             this ISiloBuilder builder,
             string name,

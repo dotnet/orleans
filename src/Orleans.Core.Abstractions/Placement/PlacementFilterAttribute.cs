@@ -16,6 +16,10 @@ public abstract class PlacementFilterAttribute : Attribute, IGrainPropertiesProv
     /// </summary>
     public PlacementFilterStrategy PlacementFilterStrategy { get; private set; }
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="PlacementFilterAttribute"/> class.
+    /// </summary>
+    /// <param name="placement">The placement filter strategy associated with this attribute.</param>
     protected PlacementFilterAttribute(PlacementFilterStrategy placement)
     {
         ArgumentNullException.ThrowIfNull(placement);

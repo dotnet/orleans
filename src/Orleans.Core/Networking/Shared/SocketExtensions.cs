@@ -45,6 +45,9 @@ namespace Orleans.Networking.Shared
         /// Enables TCP KeepAlive on a socket.
         /// </summary>
         /// <param name="socket">The socket.</param>
+        /// <param name="timeSeconds">The idle time, in seconds, before the first keep-alive probe is sent.</param>
+        /// <param name="intervalSeconds">The interval, in seconds, between keep-alive probes.</param>
+        /// <param name="retryCount">The number of unanswered probes allowed before the connection is terminated.</param>
         internal static void EnableKeepAlive(this Socket socket, int timeSeconds = 90, int intervalSeconds = 30, int retryCount = 2)
         {
             try

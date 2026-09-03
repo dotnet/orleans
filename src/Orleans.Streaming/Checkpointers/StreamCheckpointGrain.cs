@@ -16,6 +16,10 @@ namespace Orleans.Streams
         internal const string StateName = "chk";
         private readonly IPersistentState<StreamCheckpointerGrainState> _state;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="StreamCheckpointGrain"/> class.
+        /// </summary>
+        /// <param name="state">The persistent checkpoint state.</param>
         public StreamCheckpointGrain(
             [PersistentState(StateName, ProviderConstants.DEFAULT_PUBSUB_PROVIDER_NAME)]
             IPersistentState<StreamCheckpointerGrainState> state)
@@ -23,6 +27,7 @@ namespace Orleans.Streams
             _state = state;
         }
 
+        /// <inheritdoc />
         public ValueTask<string> Load(CancellationToken cancellationToken)
         {
             return cancellationToken.IsCancellationRequested
@@ -30,6 +35,7 @@ namespace Orleans.Streams
                 : ValueTask.FromResult(_state.State.Checkpoint);
         }
 
+        /// <inheritdoc />
         public async ValueTask<string> Update(
             string offset,
             string expectedCheckpoint,

@@ -7,24 +7,36 @@ using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions.TestKit
 {
+    /// <summary>
+    /// Verifies transactional state storage semantics for preparing, confirming, canceling, and replacing state.
+    /// </summary>
+    /// <typeparam name="TState">The type of state persisted by the transactional storage implementation.</typeparam>
     public abstract class TransactionalStateStorageTestRunner<TState> : TransactionTestRunnerBase
         where TState : class, new()
     {
+        /// <summary>
+        /// Creates a transactional state storage instance whose initial storage state is empty.
+        /// </summary>
         protected Func<Task<ITransactionalStateStorage<TState>>> stateStorageFactory;
+
+        /// <summary>
+        /// Creates a test state value from an integer seed.
+        /// </summary>
         protected Func<int, TState> stateFactory;
+
+        /// <summary>
+        /// Configures equivalency comparisons for persisted state values.
+        /// </summary>
         protected Func<EquivalencyOptions<TState>, EquivalencyOptions<TState>>? assertConfig;
 
         /// <summary>
-        /// Constructor
+        /// Initializes a new instance of the <see cref="TransactionalStateStorageTestRunner{TState}"/> class.
         /// </summary>
-        /// <param name="stateStorageFactory">factory to create ITransactionalStateStorage, the test runner are assuming the state 
-        /// in storage is empty when ITransactionalStateStorage was created </param>
-        /// <param name="stateFactory">factory to create TState for test</param>
-        /// <param name="grainFactory">grain Factory needed for test runner</param>
-        /// <param name="testOutput">test output to helpful messages</param>
-        /// <param name="assertConfig">A reference to the AwesomeAssertions.Equivalency.EquivalencyOptions`1
-        ///     configuration object that can be used to influence the way the object graphs
-        ///     are compared</param>
+        /// <param name="stateStorageFactory">The factory which creates a storage instance with empty initial state.</param>
+        /// <param name="stateFactory">The factory which creates test state values from integer seeds.</param>
+        /// <param name="grainFactory">The grain factory used by the test runner.</param>
+        /// <param name="testOutput">The callback used to write test output.</param>
+        /// <param name="assertConfig">An optional callback which configures state equivalency comparisons.</param>
         protected TransactionalStateStorageTestRunner(Func<Task<ITransactionalStateStorage<TState>>> stateStorageFactory, Func<int, TState> stateFactory, 
             IGrainFactory grainFactory, Action<string> testOutput,
             Func<EquivalencyOptions<TState>, EquivalencyOptions<TState>>? assertConfig = null)
@@ -35,6 +47,10 @@ namespace Orleans.Transactions.TestKit
             this.assertConfig = assertConfig;
         }
 
+        /// <summary>
+        /// Verifies that the first load returns the initial committed state, no pending states, and no ETag.
+        /// </summary>
+        /// <returns>A task which represents the storage test.</returns>
         public virtual async Task FirstTime_Load_ShouldReturnEmptyLoadResponse()
         {
             var stateStorage = await this.stateStorageFactory();
@@ -51,6 +67,10 @@ namespace Orleans.Transactions.TestKit
 
         private static readonly List<PendingTransactionState<TState>> emptyPendingStates = new List<PendingTransactionState<TState>>();
   
+        /// <summary>
+        /// Verifies that storing unchanged state creates an ETag and persists metadata without changing state.
+        /// </summary>
+        /// <returns>A task which represents the storage test.</returns>
         public virtual async Task StoreWithoutChanges()
         {
             var stateStorage = await this.stateStorageFactory();
@@ -90,6 +110,10 @@ namespace Orleans.Transactions.TestKit
             loadresponse.PendingStates.Should().BeEmpty();
         }
 
+        /// <summary>
+        /// Verifies that invalid or stale ETags reject writes and preserve the previously stored value.
+        /// </summary>
+        /// <returns>A task which represents the storage test.</returns>
         public virtual async Task WrongEtags()
         {
             var stateStorage = await this.stateStorageFactory();
@@ -232,6 +256,11 @@ namespace Orleans.Transactions.TestKit
             AssertTState(loadresponse.PendingStates[0].State, expectedState);
         }
 
+        /// <summary>
+        /// Verifies that confirming one pending state commits it and removes it from the pending collection.
+        /// </summary>
+        /// <param name="useTwoSteps">Whether preparing and confirming are performed in separate storage writes.</param>
+        /// <returns>A task which represents the storage test.</returns>
         public virtual async Task ConfirmOne(bool useTwoSteps)
         { 
             var stateStorage = await this.stateStorageFactory();
@@ -266,6 +295,10 @@ namespace Orleans.Transactions.TestKit
             loadresponse.Metadata.CommitRecords.Count.Should().Be(0);
         }
 
+        /// <summary>
+        /// Verifies that canceling one pending state preserves the committed state and clears the pending collection.
+        /// </summary>
+        /// <returns>A task which represents the storage test.</returns>
         public virtual async Task CancelOne()
         {
             var stateStorage = await this.stateStorageFactory();
@@ -292,6 +325,10 @@ namespace Orleans.Transactions.TestKit
             loadresponse.Metadata.CommitRecords.Count.Should().Be(0);
         }
 
+        /// <summary>
+        /// Verifies that preparing the same sequence twice replaces the pending state with the latest value.
+        /// </summary>
+        /// <returns>A task which represents the storage test.</returns>
         public virtual async Task ReplaceOne()
         {
             var stateStorage = await this.stateStorageFactory();
@@ -324,6 +361,12 @@ namespace Orleans.Transactions.TestKit
         }
 
 
+        /// <summary>
+        /// Verifies that one pending state can be confirmed while the following pending state is canceled.
+        /// </summary>
+        /// <param name="useTwoSteps">Whether confirmation and cancellation are performed in separate storage writes.</param>
+        /// <param name="reverseOrder">Whether cancellation is stored before confirmation when using two writes.</param>
+        /// <returns>A task which represents the storage test.</returns>
         public virtual async Task ConfirmOneAndCancelOne(bool useTwoSteps = false, bool reverseOrder = false)
         {
             var stateStorage = await this.stateStorageFactory();
@@ -369,6 +412,11 @@ namespace Orleans.Transactions.TestKit
             loadresponse.Metadata.CommitRecords.Count.Should().Be(0);
         }
 
+        /// <summary>
+        /// Verifies that multiple sequential states can be prepared in one storage write.
+        /// </summary>
+        /// <param name="count">The number of pending states to prepare.</param>
+        /// <returns>A task which represents the storage test.</returns>
         public virtual async Task PrepareMany(int count)
         {
             var stateStorage = await this.stateStorageFactory();
@@ -409,6 +457,12 @@ namespace Orleans.Transactions.TestKit
             }
         }
 
+        /// <summary>
+        /// Verifies that confirming multiple pending states commits the state with the highest sequence number.
+        /// </summary>
+        /// <param name="count">The number of pending states to prepare and confirm.</param>
+        /// <param name="useTwoSteps">Whether preparing and confirming are performed in separate storage writes.</param>
+        /// <returns>A task which represents the storage test.</returns>
         public virtual async Task ConfirmMany(int count, bool useTwoSteps)
         {
             var stateStorage = await this.stateStorageFactory();
@@ -451,6 +505,11 @@ namespace Orleans.Transactions.TestKit
             loadresponse.Metadata.CommitRecords.Count.Should().Be(0);
         }
 
+        /// <summary>
+        /// Verifies that canceling multiple pending states preserves the committed state and clears the pending collection.
+        /// </summary>
+        /// <param name="count">The number of pending states to prepare and cancel.</param>
+        /// <returns>A task which represents the storage test.</returns>
         public virtual async Task CancelMany(int count)
         {
             var stateStorage = await this.stateStorageFactory();
@@ -487,6 +546,11 @@ namespace Orleans.Transactions.TestKit
             loadresponse.Metadata.CommitRecords.Count.Should().Be(0);
         }
 
+        /// <summary>
+        /// Verifies that replacing multiple pending sequence numbers persists the replacement states.
+        /// </summary>
+        /// <param name="count">The number of pending states to prepare and replace.</param>
+        /// <returns>A task which represents the storage test.</returns>
         public virtual async Task ReplaceMany(int count)
         {
             var stateStorage = await this.stateStorageFactory();
@@ -541,6 +605,10 @@ namespace Orleans.Transactions.TestKit
         }
 
 
+        /// <summary>
+        /// Verifies a storage update which replaces pending states, adds later states, and confirms a prefix.
+        /// </summary>
+        /// <returns>A task which represents the storage test.</returns>
         public virtual async Task GrowingBatch()
         {
             var stateStorage = await this.stateStorageFactory();
@@ -594,6 +662,10 @@ namespace Orleans.Transactions.TestKit
             AssertTState(loadresponse.PendingStates[1].State, expectedState8);
         }
 
+        /// <summary>
+        /// Verifies a storage update which replaces and confirms a prefix while canceling later pending states.
+        /// </summary>
+        /// <returns>A task which represents the storage test.</returns>
         public virtual async Task ShrinkingBatch()
         {
             var stateStorage = await this.stateStorageFactory();

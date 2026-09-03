@@ -11,6 +11,10 @@ namespace Orleans.Configuration
         /// Interval in which deployment statistics are published.
         /// </summary>
         public TimeSpan DeploymentLoadPublisherRefreshTime { get; set; } = DEFAULT_DEPLOYMENT_LOAD_PUBLISHER_REFRESH_TIME;
+
+        /// <summary>
+        /// The default value for <see cref="DeploymentLoadPublisherRefreshTime"/>.
+        /// </summary>
         public static readonly TimeSpan DEFAULT_DEPLOYMENT_LOAD_PUBLISHER_REFRESH_TIME = TimeSpan.FromSeconds(1);
     }
 }

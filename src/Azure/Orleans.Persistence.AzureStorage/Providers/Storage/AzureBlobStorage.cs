@@ -331,6 +331,7 @@ namespace Orleans.Storage
             }
         }
 
+        /// <inheritdoc/>
         public void Participate(ISiloLifecycle lifecycle)
         {
             lifecycle.Subscribe(OptionFormattingUtilities.Name<AzureBlobGrainStorage>(this.name), this.options.InitStage, Init);
@@ -495,8 +496,17 @@ namespace Orleans.Storage
         private partial void LogErrorFromInit(Exception exception, string providerName, string providerType, int stage, long elapsedMilliseconds);
     }
 
+    /// <summary>
+    /// Creates configured <see cref="AzureBlobGrainStorage"/> instances.
+    /// </summary>
     public static class AzureBlobGrainStorageFactory
     {
+        /// <summary>
+        /// Creates an Azure Blob grain storage provider with the specified name.
+        /// </summary>
+        /// <param name="services">The service provider.</param>
+        /// <param name="name">The storage provider name.</param>
+        /// <returns>The configured grain storage provider.</returns>
         public static AzureBlobGrainStorage Create(IServiceProvider services, string name)
         {
             var optionsMonitor = services.GetRequiredService<IOptionsMonitor<AzureBlobStorageOptions>>();

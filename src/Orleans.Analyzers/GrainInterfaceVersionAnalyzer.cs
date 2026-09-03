@@ -25,17 +25,65 @@ namespace Orleans.Analyzers;
 public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
 {
     private const string DiagnosticCategory = "Versioning";
+
+    /// <summary>
+    /// The MSBuild property which enables Orleans contract compatibility analysis.
+    /// </summary>
     public const string EnableAnalyzerPropertyName = "EnableOrleansContractsAnalyzer";
+
+    /// <summary>
+    /// The diagnostic identifier for grain interfaces without an active declaration in OrleansContracts.txt.
+    /// </summary>
     public const string RuleId0016 = "ORLEANS0016";
+
+    /// <summary>
+    /// The diagnostic identifier for grain interface versions which differ from OrleansContracts.txt.
+    /// </summary>
     public const string RuleId0017 = "ORLEANS0017";
+
+    /// <summary>
+    /// The diagnostic identifier for grain interface members which are not declared in OrleansContracts.txt.
+    /// </summary>
     public const string RuleId0018 = "ORLEANS0018";
+
+    /// <summary>
+    /// The diagnostic identifier for removed grain interfaces which are not marked as retired in OrleansContracts.txt.
+    /// </summary>
     public const string RuleId0019 = "ORLEANS0019";
+
+    /// <summary>
+    /// The diagnostic identifier for a missing OrleansContracts.txt file.
+    /// </summary>
     public const string RuleId0020 = "ORLEANS0020";
+
+    /// <summary>
+    /// The diagnostic identifier for duplicate grain interface declarations in OrleansContracts.txt.
+    /// </summary>
     public const string RuleId0021 = "ORLEANS0021";
+
+    /// <summary>
+    /// The diagnostic identifier for grain classes without an active declaration in OrleansContracts.txt.
+    /// </summary>
     public const string RuleId0022 = "ORLEANS0022";
+
+    /// <summary>
+    /// The diagnostic identifier for grain class identities which differ from OrleansContracts.txt.
+    /// </summary>
     public const string RuleId0023 = "ORLEANS0023";
+
+    /// <summary>
+    /// The diagnostic identifier for removed grain classes which are not marked as retired in OrleansContracts.txt.
+    /// </summary>
     public const string RuleId0024 = "ORLEANS0024";
+
+    /// <summary>
+    /// The diagnostic identifier for duplicate grain class declarations in OrleansContracts.txt.
+    /// </summary>
     public const string RuleId0025 = "ORLEANS0025";
+
+    /// <summary>
+    /// The diagnostic identifier for grain interface members which remain in OrleansContracts.txt after removal from source.
+    /// </summary>
     public const string RuleId0027 = "ORLEANS0027";
 
     // Property bag keys for code fixes
@@ -166,6 +214,7 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
         description: new LocalizableResourceString(nameof(Resources.GrainClassDuplicateDeclarationDescription), Resources.ResourceManager, typeof(Resources)),
         helpLinkUri: Constants.GetDiagnosticHelpLink(RuleId0025));
 
+    /// <inheritdoc/>
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
         ImmutableArray.Create(
             InterfaceNotDeclaredRule,
@@ -180,6 +229,7 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
             DuplicateGrainClassDeclarationRule,
             RemovedMemberRule);
 
+    /// <inheritdoc/>
     public override void Initialize(AnalysisContext context)
     {
         context.EnableConcurrentExecution();

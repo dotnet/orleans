@@ -514,6 +514,7 @@ namespace Orleans.Storage
             return Task.CompletedTask;
         }
 
+        /// <inheritdoc/>
         public void Participate(ISiloLifecycle lifecycle)
         {
             lifecycle.Subscribe(OptionFormattingUtilities.Name<AzureTableGrainStorage>(this.name), this.options.InitStage, Init, Close);
@@ -590,8 +591,17 @@ namespace Orleans.Storage
         private partial void LogErrorInitializationFailed(string providerName, string providerType, int stage, long elapsedMilliseconds, Exception exception);
     }
 
+    /// <summary>
+    /// Creates configured <see cref="AzureTableGrainStorage"/> instances.
+    /// </summary>
     public static class AzureTableGrainStorageFactory
     {
+        /// <summary>
+        /// Creates an Azure Table grain storage provider with the specified name.
+        /// </summary>
+        /// <param name="services">The service provider.</param>
+        /// <param name="name">The storage provider name.</param>
+        /// <returns>The configured grain storage provider.</returns>
         public static AzureTableGrainStorage Create(IServiceProvider services, string name)
         {
             var optionsSnapshot = services.GetRequiredService<IOptionsMonitor<AzureTableStorageOptions>>();

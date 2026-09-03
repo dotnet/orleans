@@ -373,6 +373,7 @@ namespace Orleans
     /// <param name="name">The provider name, for example, <c>"AzureTableStorage"</c>.</param>
     /// <param name="kind">The kind of provider, for example, <c>"Clustering"</c>, <c>"Reminders"</c>.</param>
     /// <param name="target">The intended target of the provider, for example, <c>"Server"</c>, <c>"Client"</c>.</param>
+    /// <param name="type">The type used to configure the provider.</param>
     /// <seealso cref="System.Attribute" />
     [AttributeUsage(AttributeTargets.Assembly, AllowMultiple = true)]
     public sealed class RegisterProviderAttribute(
@@ -630,13 +631,17 @@ namespace Orleans.Invocation
     [AttributeUsage(AttributeTargets.Class)]
     public sealed class ReturnValueProxyAttribute : Attribute
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ReturnValueProxyAttribute"/> class.
+        /// </summary>
+        /// <param name="initializerMethodName">The name of the method used to initialize the generated request and return its proxy value.</param>
         public ReturnValueProxyAttribute(string initializerMethodName)
         {
             InitializerMethodName = initializerMethodName;
         }
 
         /// <summary>
-        /// The name of the method to 
+        /// Gets the name of the method used to initialize the generated request and return its proxy value.
         /// </summary>
         public string InitializerMethodName { get; }
     }

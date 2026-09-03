@@ -5,31 +5,83 @@ namespace Orleans.Transactions
 {
 
     /// <summary>
-    /// Used to propagate information about the status of a transaction. Used for transaction orchestration, for diagnostics, 
-    /// and for generating informative user exceptions
+    /// Describes the outcome of a transaction protocol operation.
     /// </summary>
     public enum TransactionalStatus
     {
+        /// <summary>
+        /// The operation completed successfully.
+        /// </summary>
         Ok,
 
-        PrepareTimeout,    // TM could not finish prepare in time
-        CascadingAbort,    // a transaction this transaction depends on aborted
-        BrokenLock,        // a lock was lost due to timeout, wait-die, or failures
-        LockValidationFailed,  // during prepare, recorded accesses did not match
-        ParticipantResponseTimeout, // TA timed out waiting for response from participants of read-only transaction
-        TMResponseTimeout,  // TA timed out waiting for response from TM
+        /// <summary>
+        /// The transaction manager did not complete the prepare phase before its deadline.
+        /// </summary>
+        PrepareTimeout,
 
-        StorageConflict,   // storage was modified by duplicate grain activation
+        /// <summary>
+        /// The transaction aborted because a transaction on which it depended aborted.
+        /// </summary>
+        CascadingAbort,
 
-        PresumedAbort,     // TM never heard of this transaction
+        /// <summary>
+        /// The transaction lost a lock because of a timeout, concurrency arbitration, or a failure.
+        /// </summary>
+        BrokenLock,
 
-        UnknownException,  // an unknown exception was caught
-        AssertionFailed,   // an internal assertion was violated
-        CommitFailure,     // Unable to commit transaction
+        /// <summary>
+        /// The accesses recorded during execution did not match the locks held during prepare.
+        /// </summary>
+        LockValidationFailed,
+
+        /// <summary>
+        /// The transaction agent timed out waiting for read-only transaction participants.
+        /// </summary>
+        ParticipantResponseTimeout,
+
+        /// <summary>
+        /// The transaction agent timed out waiting for the transaction manager.
+        /// </summary>
+        TMResponseTimeout,
+
+        /// <summary>
+        /// Transactional storage was modified by a competing grain activation.
+        /// </summary>
+        StorageConflict,
+
+        /// <summary>
+        /// The transaction manager had no record of the transaction, so it was presumed aborted.
+        /// </summary>
+        PresumedAbort,
+
+        /// <summary>
+        /// An unclassified exception interrupted the transaction protocol.
+        /// </summary>
+        UnknownException,
+
+        /// <summary>
+        /// An internal transaction protocol assertion failed.
+        /// </summary>
+        AssertionFailed,
+
+        /// <summary>
+        /// The transaction could not be committed.
+        /// </summary>
+        CommitFailure,
     }
 
+    /// <summary>
+    /// Provides operations for interpreting transaction statuses.
+    /// </summary>
     public static class TransactionalStatusExtensions
     {
+        /// <summary>
+        /// Determines whether a status guarantees that the transaction aborted.
+        /// </summary>
+        /// <param name="status">The transaction status.</param>
+        /// <returns>
+        /// <see langword="true"/> if the transaction is known to have aborted; otherwise, <see langword="false"/>.
+        /// </returns>
         public static bool DefinitelyAborted(this TransactionalStatus status)
         {
             switch (status)
@@ -47,6 +99,13 @@ namespace Orleans.Transactions
             }
         }
 
+        /// <summary>
+        /// Creates the user-facing transaction exception represented by a failure status.
+        /// </summary>
+        /// <param name="status">The transaction failure status.</param>
+        /// <param name="transactionId">The transaction identifier.</param>
+        /// <param name="exception">The exception which contributed to the failure, if available.</param>
+        /// <returns>An exception describing the transaction outcome.</returns>
         public static OrleansTransactionException ConvertToUserException(this TransactionalStatus status, string transactionId, Exception? exception)
         {
             switch (status)

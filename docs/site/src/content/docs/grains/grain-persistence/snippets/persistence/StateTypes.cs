@@ -7,7 +7,7 @@ namespace Orleans.Docs.Snippets.Persistence;
 [Serializable]
 public class ProfileState
 {
-    public string Name { get; set; }
+    public required string Name { get; set; }
 
     public Date DateOfBirth { get; set; }
 }
@@ -22,7 +22,7 @@ public class CartState
 
 public class CartItem
 {
-    public string ProductId { get; set; }
+    public required string ProductId { get; set; }
     public int Quantity { get; set; }
 }
 // </cart_state>

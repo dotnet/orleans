@@ -10,6 +10,9 @@ namespace Orleans.Transactions.DynamoDB
 // No default namespace intentionally to cause compile errors if something is not defined
 #endif
 {
+    /// <summary>
+    /// Configures credentials and service location for a DynamoDB client.
+    /// </summary>
     public class DynamoDBClientOptions
     {
         /// <summary>

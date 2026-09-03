@@ -3,4 +3,4 @@
 // Project-level suppressions either have no target or are given
 // a specific target and scoped to a namespace, type, member, etc.
 
-[assembly: SuppressMessage("Blocker Code Smell", "S2699:Tests should include assertions", Justification = "Test Runner")]
+[assembly: SuppressMessage("Blocker Code Smell", "S2699:Tests should include assertions", Justification = "ADO.NET integration test entry points delegate to shared test runners which perform the assertions.")]

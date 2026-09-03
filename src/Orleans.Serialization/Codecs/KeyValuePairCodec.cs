@@ -106,6 +106,7 @@ namespace Orleans.Serialization.Codecs
             _valueCopier = OrleansGeneratedCodeHelper.GetOptionalCopier(valueCopier);
         }
 
+        /// <inheritdoc />
         public bool IsShallowCopyable() => _keyCopier is null && _valueCopier is null;
 
         [return: NotNullIfNotNull(nameof(input))]

@@ -181,7 +181,11 @@ public abstract class AsyncEnumerableRequest<T> : RequestBase, IAsyncEnumerable<
     /// <inheritdoc/>
     public IAsyncEnumerator<T> GetAsyncEnumerator(CancellationToken cancellationToken = default) => new AsyncEnumeratorProxy<T>(this, cancellationToken);
 
-    // Called upon creation in generated code by the creating grain reference by virtue of the [ReturnValueProxy(nameof(InitializeRequest))] attribute on this class.
+    /// <summary>
+    /// Associates this request with its target grain reference.
+    /// </summary>
+    /// <param name="targetGrainReference">The target grain reference.</param>
+    /// <returns>This request as an asynchronous enumerable.</returns>
     public IAsyncEnumerable<T> InitializeRequest(GrainReference targetGrainReference)
     {
         TargetGrain = targetGrainReference;
@@ -194,7 +198,10 @@ public abstract class AsyncEnumerableRequest<T> : RequestBase, IAsyncEnumerable<
     /// <inheritdoc/>
     public IAsyncEnumerable<T> InvokeImplementation() => InvokeInner();
 
-    // Generated
+    /// <summary>
+    /// Invokes the request against the target.
+    /// </summary>
+    /// <returns>The asynchronous sequence returned by the invocation.</returns>
     protected abstract IAsyncEnumerable<T> InvokeInner();
 }
 
@@ -222,6 +229,7 @@ internal sealed partial class AsyncEnumeratorProxy<T> : IAsyncEnumerator<T>
     /// Initializes a new instance of the <see cref="AsyncEnumeratorProxy{T}"/> class.
     /// </summary>
     /// <param name="request">The request which this instanced proxies.</param>
+    /// <param name="cancellationToken">The cancellation token for the enumeration.</param>
     public AsyncEnumeratorProxy(AsyncEnumerableRequest<T> request, CancellationToken cancellationToken)
     {
         Debug.Assert(request.TargetGrain is not null);
@@ -412,6 +420,9 @@ internal sealed partial class AsyncEnumeratorProxy<T> : IAsyncEnumerator<T>
     private static partial void LogWarningFailedToDisposeAsyncEnumerator(ILogger logger, Exception exception);
 }
 
+/// <summary>
+/// Provides extension methods for configuring asynchronous enumerable grain requests.
+/// </summary>
 public static class AsyncEnumerableExtensions
 {
     /// <summary>
@@ -464,7 +475,7 @@ public sealed class EnumerationAbortedException : Exception
     /// Initializes a new instance of the <see cref="EnumerationAbortedException"/> class.
     /// </summary>
     [Obsolete]
-    protected EnumerationAbortedException(SerializationInfo info, StreamingContext context) : base(info, context)
+    private EnumerationAbortedException(SerializationInfo info, StreamingContext context) : base(info, context)
     {
     }
 }

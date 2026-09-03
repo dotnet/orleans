@@ -2,8 +2,14 @@ using Microsoft.CodeAnalysis;
 
 namespace Orleans.CodeGenerator.Diagnostics;
 
+/// <summary>
+/// Defines the diagnostic reported when a configured RPC proxy base class does not satisfy the required contract.
+/// </summary>
 public static class IncorrectProxyBaseClassSpecificationDiagnostic
 {
+    /// <summary>
+    /// The diagnostic identifier.
+    /// </summary>
     public const string RuleId = DiagnosticRuleId.IncorrectProxyBaseClassSpecification; 
     private const string Category = "Usage";
     private static readonly LocalizableString Title = "The proxy base class specified is not a valid proxy base class";

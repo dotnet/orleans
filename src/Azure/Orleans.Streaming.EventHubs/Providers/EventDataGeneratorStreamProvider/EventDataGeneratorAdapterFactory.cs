@@ -21,6 +21,20 @@ namespace Orleans.Streaming.EventHubs.Testing
     {
         private readonly EventDataGeneratorStreamOptions ehGeneratorOptions;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="EventDataGeneratorAdapterFactory"/> class.
+        /// </summary>
+        /// <param name="name">The stream provider name.</param>
+        /// <param name="options">The event data generator options.</param>
+        /// <param name="ehOptions">The Event Hub connection options.</param>
+        /// <param name="receiverOptions">The Event Hub receiver options.</param>
+        /// <param name="cacheOptions">The Event Hub cache pressure options.</param>
+        /// <param name="evictionOptions">The stream cache eviction options.</param>
+        /// <param name="statisticOptions">The stream statistics options.</param>
+        /// <param name="dataAdapter">The adapter used to convert between Event Hubs data and Orleans stream data.</param>
+        /// <param name="serviceProvider">The service provider.</param>
+        /// <param name="loggerFactory">The logger factory.</param>
+        /// <param name="environmentStatisticsProvider">The environment statistics provider.</param>
         public EventDataGeneratorAdapterFactory(
             string name,
             EventDataGeneratorStreamOptions options,
@@ -38,22 +52,28 @@ namespace Orleans.Streaming.EventHubs.Testing
             this.ehGeneratorOptions = options;
         }
 
+        /// <summary>
+        /// Configures the generated-event receiver factory and initializes common adapter state.
+        /// </summary>
+        /// <remarks>This provider generates events locally and does not create an Event Hubs client.</remarks>
         public override void Init()
         {
             this.EventHubReceiverFactory = this.EHGeneratorReceiverFactory;
             base.Init();
         }
 
-        /// <inheritdoc/>
+        /// <summary>
+        /// Performs no initialization because generated-event streams do not connect to Event Hubs.
+        /// </summary>
         protected override void InitEventHubClient()
         {
             //do nothing, EventDataGeneratorStreamProvider doesn't need connection with EventHubClient
         }
 
         /// <summary>
-        /// Generate mocked eventhub partition Ids from EventHubGeneratorStreamProviderSettings
+        /// Generates the simulated Event Hub partition identifiers.
         /// </summary>
-        /// <returns></returns>
+        /// <returns>A task which resolves to the simulated partition identifiers.</returns>
         protected override Task<string[]> GetPartitionIdsAsync()
         {
             return Task.FromResult(GenerateEventHubPartitions(this.ehGeneratorOptions.EventHubPartitionCount));
@@ -99,6 +119,11 @@ namespace Orleans.Streaming.EventHubs.Testing
             }
         }
 
+        /// <summary>
+        /// Generates partition identifiers for the simulated Event Hub.
+        /// </summary>
+        /// <param name="partitionCount">The number of partition identifiers to generate.</param>
+        /// <returns>The generated partition identifiers.</returns>
         public static string[] GenerateEventHubPartitions(int partitionCount)
         {
             var partitions = new string[partitionCount];
@@ -176,6 +201,12 @@ namespace Orleans.Streaming.EventHubs.Testing
             return Task.FromResult<object?>(true);
         }
 
+        /// <summary>
+        /// Creates and initializes an event data generator adapter factory.
+        /// </summary>
+        /// <param name="services">The service provider.</param>
+        /// <param name="name">The stream provider name.</param>
+        /// <returns>The initialized adapter factory.</returns>
         public new static EventDataGeneratorAdapterFactory Create(IServiceProvider services, string name)
         {
             var generatorOptions= services.GetOptionsByName<EventDataGeneratorStreamOptions>(name);

@@ -9,19 +9,35 @@ using Orleans.Configuration;
 
 namespace Orleans.Hosting
 {
+    /// <summary>
+    /// Provides extensions for configuring custom-storage log consistency providers.
+    /// </summary>
     public static class CustomStorageSiloBuilderExtensions
     {
         /// <summary>
-        /// Adds a custom storage log consistency provider as default consistency provider"/>
+        /// Adds a custom-storage log consistency provider as the default log consistency provider.
         /// </summary>
+        /// <param name="builder">The silo builder.</param>
+        /// <param name="primaryCluster">
+        /// The cluster identifier stored in the provider options and passed to each custom-storage adaptor.
+        /// Custom-storage adaptors accept submissions from every cluster.
+        /// </param>
+        /// <returns>The silo builder.</returns>
         public static ISiloBuilder AddCustomStorageBasedLogConsistencyProviderAsDefault(this ISiloBuilder builder, string? primaryCluster = null)
         {
             return builder.AddCustomStorageBasedLogConsistencyProvider(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, primaryCluster);
         }
 
         /// <summary>
-        /// Adds a custom storage log consistency provider"/>
+        /// Adds a named custom-storage log consistency provider.
         /// </summary>
+        /// <param name="builder">The silo builder.</param>
+        /// <param name="name">The provider name.</param>
+        /// <param name="primaryCluster">
+        /// The cluster identifier stored in the provider options and passed to each custom-storage adaptor.
+        /// Custom-storage adaptors accept submissions from every cluster.
+        /// </param>
+        /// <returns>The silo builder.</returns>
         public static ISiloBuilder AddCustomStorageBasedLogConsistencyProvider(this ISiloBuilder builder, string name = "LogStorage", string? primaryCluster = null)
         {
             return builder.ConfigureServices(services => services.AddCustomStorageBasedLogConsistencyProvider(name, primaryCluster));

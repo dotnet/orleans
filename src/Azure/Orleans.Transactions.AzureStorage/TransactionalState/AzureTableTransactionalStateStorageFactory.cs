@@ -12,6 +12,9 @@ using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions.AzureStorage
 {
+    /// <summary>
+    /// Creates Azure Table Storage-backed transactional state storage instances.
+    /// </summary>
     public class AzureTableTransactionalStateStorageFactory : ITransactionalStateStorageFactory, ILifecycleParticipant<ISiloLifecycle>
     {
         private readonly string name;
@@ -21,12 +24,26 @@ namespace Orleans.Transactions.AzureStorage
         private readonly ILoggerFactory loggerFactory;
         private TableClient table = null!;
 
+        /// <summary>
+        /// Creates a transactional state storage factory from the registered named options.
+        /// </summary>
+        /// <param name="services">The service provider.</param>
+        /// <param name="name">The provider name.</param>
+        /// <returns>The transactional state storage factory.</returns>
         public static ITransactionalStateStorageFactory Create(IServiceProvider services, string name)
         {
             var optionsMonitor = services.GetRequiredService<IOptionsMonitor<AzureTableTransactionalStateOptions>>();
             return ActivatorUtilities.CreateInstance<AzureTableTransactionalStateStorageFactory>(services, name, optionsMonitor.Get(name));
         }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="AzureTableTransactionalStateStorageFactory"/> class.
+        /// </summary>
+        /// <param name="name">The provider name.</param>
+        /// <param name="options">The provider options.</param>
+        /// <param name="clusterOptions">The cluster options.</param>
+        /// <param name="services">The service provider.</param>
+        /// <param name="loggerFactory">The logger factory.</param>
         public AzureTableTransactionalStateStorageFactory(string name, AzureTableTransactionalStateOptions options, IOptions<ClusterOptions> clusterOptions, IServiceProvider services, ILoggerFactory loggerFactory)
         {
             this.name = name;
@@ -36,12 +53,14 @@ namespace Orleans.Transactions.AzureStorage
             this.loggerFactory = loggerFactory;
         }
 
+        /// <inheritdoc />
         public ITransactionalStateStorage<TState> Create<TState>(string stateName, IGrainContext context) where TState : class, new()
         {
             string partitionKey = MakePartitionKey(context, stateName);
             return ActivatorUtilities.CreateInstance<AzureTableTransactionalStateStorage<TState>>(context.ActivationServices, this.table, partitionKey, this.jsonSettings);
         }
 
+        /// <inheritdoc />
         public void Participate(ISiloLifecycle lifecycle)
         {
             lifecycle.Subscribe(OptionFormattingUtilities.Name<AzureTableTransactionalStateStorageFactory>(this.name), this.options.InitStage, Init);

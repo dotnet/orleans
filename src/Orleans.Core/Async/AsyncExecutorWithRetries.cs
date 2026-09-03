@@ -76,6 +76,9 @@ namespace Orleans.Internal
         /// <param name="onErrorBackOff">
         /// The backoff provider.
         /// </param>
+        /// <param name="cancellationToken">
+        /// The cancellation token.
+        /// </param>
         /// <returns>
         /// The value returned from the successful invocation of the provided function.
         /// </returns>
@@ -130,6 +133,9 @@ namespace Orleans.Internal
         /// </param>
         /// <param name="onErrorBackOff">
         /// The backoff provider object, which determines how much to wait between error retries
+        /// </param>
+        /// <param name="cancellationToken">
+        /// The cancellation token.
         /// </param>
         /// <returns>
         /// The value returned from the successful invocation of <paramref name="function"/>.
@@ -192,6 +198,9 @@ namespace Orleans.Internal
         /// </param>
         /// <param name="onErrorBackOff">
         /// The backoff provider object, which determines how much to wait between error retries
+        /// </param>
+        /// <param name="cancellationToken">
+        /// The cancellation token.
         /// </param>
         /// <returns>
         /// The value returned from the successful invocation of <paramref name="function"/>.

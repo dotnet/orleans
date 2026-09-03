@@ -114,6 +114,11 @@ namespace Orleans.Configuration
     /// </summary>
     public class DefaultAdoNetGrainStorageOptionsHashPickerConfigurator : IPostConfigureOptions<AdoNetGrainStorageOptions>
     {
+        /// <summary>
+        /// Assigns the default Orleans storage hasher when no hash picker has been configured.
+        /// </summary>
+        /// <param name="name">The name of the options instance.</param>
+        /// <param name="options">The options to configure.</param>
         public void PostConfigure(string? name, AdoNetGrainStorageOptions options)
         {
             // preserving explicitly configured HashPicker

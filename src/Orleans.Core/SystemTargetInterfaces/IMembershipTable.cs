@@ -19,16 +19,21 @@ namespace Orleans
         /// Initializes the membership table, will be called before all other methods
         /// </summary>
         /// <param name="tryInitTableVersion">whether an attempt will be made to init the underlying table</param>
+        /// <returns>A task representing the initialization operation.</returns>
         Task InitializeMembershipTable(bool tryInitTableVersion);
 
         /// <summary>
         /// Deletes all table entries of the given clusterId
         /// </summary>
+        /// <param name="clusterId">The identifier of the cluster whose entries are deleted.</param>
+        /// <returns>A task representing the deletion operation.</returns>
         Task DeleteMembershipTableEntries(string clusterId);
 
         /// <summary>
         /// Delete all dead silo entries older than <paramref name="beforeDate"/>
         /// </summary>
+        /// <param name="beforeDate">The exclusive upper bound for the last known update time of entries to delete.</param>
+        /// <returns>A task representing the cleanup operation.</returns>
         Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate);
 
         /// <summary>
@@ -96,8 +101,8 @@ namespace Orleans
         /// this operation should not change the TableVersion of the table. It should leave it untouched.
         /// There is no scenario where this operation could fail due to table semantical reasons. It can only fail due to network problems or table unavailability.
         /// </summary>
-        /// <param name="entry"></param>
-        /// <returns>Task representing the successful execution of this operation. </returns>
+        /// <param name="entry">The membership entry containing the updated <see cref="MembershipEntry.IAmAliveTime"/> value.</param>
+        /// <returns>A task representing the update operation.</returns>
         Task UpdateIAmAlive(MembershipEntry entry);
     }
 
@@ -108,6 +113,9 @@ namespace Orleans
     {
     }
 
+    /// <summary>
+    /// Represents the version of a membership table and the entity tag used for optimistic concurrency.
+    /// </summary>
     [Serializable, GenerateSerializer, Immutable]
     public sealed class TableVersion : ISpanFormattable, IEquatable<TableVersion>
     {
@@ -123,37 +131,80 @@ namespace Orleans
         [Id(1)]
         public string VersionEtag { get; }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TableVersion"/> class.
+        /// </summary>
+        /// <param name="version">The membership table version.</param>
+        /// <param name="eTag">The entity tag used to validate updates to this version.</param>
         public TableVersion(int version, string eTag)
         {
             Version = version;
             VersionEtag = eTag;
         }
 
+        /// <summary>
+        /// Creates the next membership table version while retaining the current entity tag for concurrency validation.
+        /// </summary>
+        /// <returns>The next membership table version.</returns>
         public TableVersion Next() => new (Version + 1, VersionEtag);
 
+        /// <inheritdoc />
         public override string ToString() => $"<{Version}, {VersionEtag}>";
         string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString();
 
         bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
             => destination.TryWrite($"<{Version}, {VersionEtag}>", out charsWritten);
 
+        /// <inheritdoc />
         public override bool Equals(object? obj) => Equals(obj as TableVersion);
+
+        /// <inheritdoc />
         public override int GetHashCode() => HashCode.Combine(Version, VersionEtag);
+
+        /// <inheritdoc />
         public bool Equals(TableVersion? other) => other is not null && Version == other.Version && VersionEtag == other.VersionEtag;
+
+        /// <summary>
+        /// Determines whether two membership table versions are equal.
+        /// </summary>
+        /// <param name="left">The first membership table version to compare.</param>
+        /// <param name="right">The second membership table version to compare.</param>
+        /// <returns><see langword="true"/> if the versions and entity tags are equal; otherwise, <see langword="false"/>.</returns>
         public static bool operator ==(TableVersion? left, TableVersion? right) => EqualityComparer<TableVersion>.Default.Equals(left, right);
+
+        /// <summary>
+        /// Determines whether two membership table versions are not equal.
+        /// </summary>
+        /// <param name="left">The first membership table version to compare.</param>
+        /// <param name="right">The second membership table version to compare.</param>
+        /// <returns><see langword="true"/> if the versions or entity tags differ; otherwise, <see langword="false"/>.</returns>
         public static bool operator !=(TableVersion? left, TableVersion? right) => !(left == right);
     }
 
+    /// <summary>
+    /// Represents an atomic snapshot of membership entries and the membership table version.
+    /// </summary>
     [Serializable]
     [GenerateSerializer]
     public sealed class MembershipTableData
     {
+        /// <summary>
+        /// Gets the membership entries and their entity tags.
+        /// </summary>
         [Id(0)]
         public IReadOnlyList<Tuple<MembershipEntry, string>> Members { get; private set; }
 
+        /// <summary>
+        /// Gets the version of the membership table snapshot.
+        /// </summary>
         [Id(1)]
         public TableVersion Version { get; private set; }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="MembershipTableData"/> class from multiple membership rows.
+        /// </summary>
+        /// <param name="list">The membership entries and their entity tags.</param>
+        /// <param name="version">The version of the membership table snapshot.</param>
         public MembershipTableData(List<Tuple<MembershipEntry, string>> list, TableVersion version)
         {
             // put deads at the end, just for logging.
@@ -168,18 +219,32 @@ namespace Orleans
             Version = version;
         }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="MembershipTableData"/> class from one membership row.
+        /// </summary>
+        /// <param name="tuple">The membership entry and its entity tag.</param>
+        /// <param name="version">The version of the membership table snapshot.</param>
         public MembershipTableData(Tuple<MembershipEntry, string> tuple, TableVersion version)
         {
             Members = new[] { tuple };
             Version = version;
         }
 
+        /// <summary>
+        /// Initializes an empty instance of the <see cref="MembershipTableData"/> class.
+        /// </summary>
+        /// <param name="version">The version of the membership table snapshot.</param>
         public MembershipTableData(TableVersion version)
         {
             Members = Array.Empty<Tuple<MembershipEntry, string>>();
             Version = version;
         }
 
+        /// <summary>
+        /// Finds the membership row for the specified silo.
+        /// </summary>
+        /// <param name="silo">The silo address to find.</param>
+        /// <returns>The membership entry and entity tag, or <see langword="null"/> if the silo is not present.</returns>
         public Tuple<MembershipEntry, string>? TryGet(SiloAddress silo)
         {
             foreach (var item in Members)
@@ -189,6 +254,7 @@ namespace Orleans
             return null;
         }
 
+        /// <inheritdoc />
         public override string ToString()
         {
             int active = Members.Count(e => e.Item1.Status == SiloStatus.Active);
@@ -206,7 +272,12 @@ namespace Orleans
                 }, Version={Version}. All silos: {Utils.EnumerableToString(Members.Select(t => t.Item1))}";
         }
 
-        // return a copy of the table removing all dead appereances of dead nodes, except for the last one.
+        /// <summary>
+        /// Creates a membership table snapshot which retains only the latest dead silo generation for each endpoint.
+        /// </summary>
+        /// <returns>
+        /// A membership table snapshot containing all non-dead entries and the latest dead entry for each endpoint.
+        /// </returns>
         public MembershipTableData WithoutDuplicateDeads()
         {
             var dead = new Dictionary<IPEndPoint, Tuple<MembershipEntry, string>>();
@@ -226,6 +297,7 @@ namespace Orleans
                         dead[ipEndPoint] = next;
                 }
             }
+
             //now add back non-dead
             List<Tuple<MembershipEntry, string>> all = dead.Values.ToList();
             all.AddRange(Members.Where(item => item.Item1.Status != SiloStatus.Dead));
@@ -246,6 +318,9 @@ namespace Orleans
         }
     }
 
+    /// <summary>
+    /// Represents a silo's membership record.
+    /// </summary>
     [GenerateSerializer]
     [Serializable]
     public sealed class MembershipEntry : ISpanFormattable
@@ -287,10 +362,21 @@ namespace Orleans
         [Id(5)]
         public string SiloName { get; set; } = default!;
 
+        /// <summary>
+        /// Gets or sets the role name associated with the silo.
+        /// </summary>
         [Id(6)]
         public string? RoleName { get; set; } // Optional - only for Azure role
+
+        /// <summary>
+        /// Gets or sets the silo's update zone.
+        /// </summary>
         [Id(7)]
         public int UpdateZone { get; set; }  // Optional - only for Azure role
+
+        /// <summary>
+        /// Gets or sets the silo's fault zone.
+        /// </summary>
         [Id(8)]
         public int FaultZone { get; set; }   // Optional - only for Azure role
 
@@ -345,6 +431,12 @@ namespace Orleans
             }
         }
 
+        /// <summary>
+        /// Adds or updates a silo's vote to declare this silo unavailable.
+        /// </summary>
+        /// <param name="localSilo">The silo casting the vote.</param>
+        /// <param name="voteTime">The time at which the vote was cast.</param>
+        /// <param name="maxVotes">The maximum number of votes to retain.</param>
         public void AddOrUpdateSuspector(SiloAddress localSilo, DateTime voteTime, int maxVotes)
         {
             var allVotes = SuspectTimes ??= new List<Tuple<SiloAddress, DateTime>>();
@@ -381,6 +473,11 @@ namespace Orleans
             }
         }
 
+        /// <summary>
+        /// Adds a silo's vote to declare this silo unavailable.
+        /// </summary>
+        /// <param name="suspectingSilo">The silo casting the vote.</param>
+        /// <param name="suspectingTime">The time at which the vote was cast.</param>
         public void AddSuspector(SiloAddress suspectingSilo, DateTime suspectingTime)
             => (SuspectTimes ??= new()).Add(Tuple.Create(suspectingSilo, suspectingTime));
 
@@ -454,6 +551,7 @@ namespace Orleans
             }
         }
 
+        /// <inheritdoc />
         public override string ToString() => $"SiloAddress={SiloAddress} SiloName={SiloName} Status={Status}";
 
         string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString();
@@ -461,6 +559,10 @@ namespace Orleans
         bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
             => destination.TryWrite($"SiloAddress={SiloAddress} SiloName={SiloName} Status={Status}", out charsWritten);
 
+        /// <summary>
+        /// Returns a detailed string representation of the membership entry.
+        /// </summary>
+        /// <returns>A detailed string representation of the membership entry.</returns>
         public string ToFullString()
         {
             var suspecters = SuspectTimes == null ? null : Utils.EnumerableToString(SuspectTimes.Select(tuple => tuple.Item1));

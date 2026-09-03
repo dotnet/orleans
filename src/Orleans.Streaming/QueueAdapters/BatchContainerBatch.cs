@@ -31,7 +31,11 @@ namespace Orleans.Streams
         /// </summary>
         [Id(2)]
         public List<IBatchContainer> BatchContainers { get; }
-                
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="BatchContainerBatch"/> class.
+        /// </summary>
+        /// <param name="batchContainers">The batch containers comprising this batch.</param>
         public BatchContainerBatch(List<IBatchContainer> batchContainers)
         {
             if ((batchContainers == null) || !batchContainers.Any())

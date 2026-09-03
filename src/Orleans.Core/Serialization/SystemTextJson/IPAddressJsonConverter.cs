@@ -15,6 +15,7 @@ namespace Orleans.Serialization
     {
         private const int MaxAddressSize = 65; // Maximum bytes or chars stackallocated, taken from IPAddressParser.MaxIPv6StringLength
 
+        /// <inheritdoc />
         public override void Write(Utf8JsonWriter writer, IPAddress value, JsonSerializerOptions options)
             => WriteCore(writer, value, options, false);
 
@@ -45,6 +46,7 @@ namespace Orleans.Serialization
             }
         }
 
+        /// <inheritdoc />
         public override IPAddress? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
             => Parse(ref reader);
 
@@ -71,9 +73,11 @@ namespace Orleans.Serialization
             }
         }
 
+        /// <inheritdoc />
         public override IPAddress ReadAsPropertyName(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
             => Parse(ref reader);
 
+        /// <inheritdoc />
         public override void WriteAsPropertyName(Utf8JsonWriter writer, [DisallowNull] IPAddress value, JsonSerializerOptions options)
             => WriteCore(writer, value, options, true);
     }

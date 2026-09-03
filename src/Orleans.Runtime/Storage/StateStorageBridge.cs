@@ -64,10 +64,24 @@ namespace Orleans.Core
             _ => throw new InvalidOperationException("State has not yet been loaded")
         };
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="StateStorageBridge{TState}"/> class.
+        /// </summary>
+        /// <param name="name">The state name.</param>
+        /// <param name="grainContext">The grain context.</param>
+        /// <param name="store">The grain storage provider.</param>
+        /// <param name="loggerFactory">The logger factory retained for compatibility.</param>
+        /// <param name="activatorProvider">The activator provider retained for compatibility.</param>
         [Obsolete("Use StateStorageBridge(string, IGrainContext, IGrainStorage) instead.")]
         public StateStorageBridge(string name, IGrainContext grainContext, IGrainStorage store, ILoggerFactory loggerFactory, IActivatorProvider activatorProvider) : this(name, grainContext, store)
         { }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="StateStorageBridge{TState}"/> class.
+        /// </summary>
+        /// <param name="name">The state name.</param>
+        /// <param name="grainContext">The grain context.</param>
+        /// <param name="store">The grain storage provider.</param>
         public StateStorageBridge(string name, IGrainContext grainContext, IGrainStorage store)
         {
             ArgumentNullException.ThrowIfNull(name);

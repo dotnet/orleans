@@ -5,6 +5,9 @@ using Orleans.Connections.Security;
 
 namespace Orleans.Hosting
 {
+    /// <summary>
+    /// Provides extension methods for configuring TLS on Orleans clients and silos.
+    /// </summary>
     public static partial class OrleansConnectionSecurityHostingExtensions
     {
         /// <summary>

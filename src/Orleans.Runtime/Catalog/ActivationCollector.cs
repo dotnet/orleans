@@ -45,8 +45,10 @@ namespace Orleans.Runtime
         /// Initializes a new instance of the <see cref="ActivationCollector"/> class.
         /// </summary>
         /// <param name="timeProvider">The time provider.</param>
-        /// <param name="options">The options.</param>
+        /// <param name="options">The activation collection options.</param>
         /// <param name="logger">The logger.</param>
+        /// <param name="environmentStatisticsProvider">The provider used to monitor memory pressure.</param>
+        /// <param name="catalogInstruments">The catalog telemetry instruments.</param>
         public ActivationCollector(
             [FromKeyedServices(TimeProviderNames.ActivationManagement)] TimeProvider timeProvider,
             IOptions<GrainCollectionOptions> options,
@@ -94,6 +96,7 @@ namespace Orleans.Runtime
         /// Collects all eligible grain activations which have been idle for at least <paramref name="ageLimit"/>.
         /// </summary>
         /// <param name="ageLimit">The age limit.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>
         public Task CollectActivations(TimeSpan ageLimit, CancellationToken cancellationToken) => CollectActivationsImpl(false, ageLimit, cancellationToken);
 
@@ -108,6 +111,7 @@ namespace Orleans.Runtime
         /// <param name="timeout">
         /// The current idle collection time for the grain.
         /// </param>
+        /// <param name="now">The current time, used to calculate when the grain becomes eligible for collection.</param>
         public void ScheduleCollection(ICollectibleGrainContext item, TimeSpan timeout, DateTime now)
         {
             lock (item)
@@ -364,9 +368,12 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
-        /// Deactivates <param name="count" /> activations in due time order
-        /// <remarks>internal for testing</remarks>
+        /// Deactivates up to <paramref name="count"/> activations in due-time order.
         /// </summary>
+        /// <param name="count">The number of activations to deactivate.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <returns>A task representing the deactivation operation.</returns>
+        /// <remarks>Internal for testing.</remarks>
         internal async Task DeactivateInDueTimeOrder(int count, CancellationToken cancellationToken)
         {
             var watch = ValueStopwatch.StartNew();

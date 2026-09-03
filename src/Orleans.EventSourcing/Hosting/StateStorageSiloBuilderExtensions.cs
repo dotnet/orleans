@@ -8,19 +8,27 @@ using Orleans.EventSourcing.StateStorage;
 
 namespace Orleans.Hosting
 {
+    /// <summary>
+    /// Provides extensions for configuring state-storage log consistency providers.
+    /// </summary>
     public static class StateStorageSiloBuilderExtensions
     {
         /// <summary>
-        /// Adds a state storage log consistency provider as default consistency provider"/>
+        /// Adds a state-storage log consistency provider as the default log consistency provider.
         /// </summary>
+        /// <param name="builder">The silo builder.</param>
+        /// <returns>The silo builder.</returns>
         public static ISiloBuilder AddStateStorageBasedLogConsistencyProviderAsDefault(this ISiloBuilder builder)
         {
             return builder.AddStateStorageBasedLogConsistencyProvider(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME);
         }
 
         /// <summary>
-        /// Adds a state storage log consistency provider"/>
+        /// Adds a named state-storage log consistency provider.
         /// </summary>
+        /// <param name="builder">The silo builder.</param>
+        /// <param name="name">The provider name.</param>
+        /// <returns>The silo builder.</returns>
         public static ISiloBuilder AddStateStorageBasedLogConsistencyProvider(this ISiloBuilder builder, string name = "StateStorage")
         {
             return builder.ConfigureServices(services => services.AddStateStorageBasedLogConsistencyProvider(name));

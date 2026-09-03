@@ -655,6 +655,7 @@ namespace Orleans.Streams
         /// <param name="myQueueId"></param>
         /// <param name="rcvr"></param>
         /// <param name="maxCacheAddCount"></param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns></returns>
         private async Task<bool> ReadFromQueue(QueueId myQueueId, IQueueAdapterReceiver? rcvr, int maxCacheAddCount, CancellationToken cancellationToken)
         {

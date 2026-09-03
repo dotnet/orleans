@@ -7,6 +7,9 @@ using Orleans.Configuration;
 
 namespace Orleans.Runtime.MembershipService
 {
+    /// <summary>
+    /// Implements Orleans cluster membership using a relational database.
+    /// </summary>
     public partial class AdoNetClusteringTable : IMembershipTable
     {
         private readonly string clusterId;
@@ -15,6 +18,13 @@ namespace Orleans.Runtime.MembershipService
         private RelationalOrleansQueries orleansQueries = null!;
         private readonly AdoNetClusteringSiloOptions clusteringTableOptions;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="AdoNetClusteringTable"/> class.
+        /// </summary>
+        /// <param name="serviceProvider">The service provider.</param>
+        /// <param name="clusterOptions">The cluster identity options.</param>
+        /// <param name="clusteringOptions">The relational clustering options.</param>
+        /// <param name="logger">The logger.</param>
         public AdoNetClusteringTable(
             IServiceProvider serviceProvider,
             IOptions<ClusterOptions> clusterOptions,
@@ -27,6 +37,7 @@ namespace Orleans.Runtime.MembershipService
             this.clusterId = clusterOptions.Value.ClusterId;
         }
 
+        /// <inheritdoc />
         public async Task InitializeMembershipTable(bool tryInitTableVersion)
         {
             LogTraceInitializeMembershipTable();
@@ -51,6 +62,7 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
+        /// <inheritdoc />
         public async Task<MembershipTableData> ReadRow(SiloAddress key)
         {
             LogTraceReadRow(key);
@@ -65,6 +77,7 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
+        /// <inheritdoc />
         public async Task<MembershipTableData> ReadAll()
         {
             LogTraceReadAll();
@@ -79,6 +92,7 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
+        /// <inheritdoc />
         public async Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion)
         {
             LogTraceInsertRow(entry, tableVersion);
@@ -110,6 +124,7 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
+        /// <inheritdoc />
         public async Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion)
         {
             LogTraceUpdateRow(entry, etag, tableVersion);
@@ -141,6 +156,7 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
+        /// <inheritdoc />
         public async Task UpdateIAmAlive(MembershipEntry entry)
         {
             LogTraceUpdateIAmAlive(entry);
@@ -160,6 +176,7 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
+        /// <inheritdoc />
         public async Task DeleteMembershipTableEntries(string clusterId)
         {
             LogTraceDeleteMembershipTableEntries(clusterId);
@@ -174,6 +191,7 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
+        /// <inheritdoc />
         public async Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
         {
             LogTraceCleanupDefunctSiloEntries(beforeDate, clusterId);

@@ -34,6 +34,7 @@ namespace Orleans.EventSourcing
         /// </summary>
         protected abstract ILogViewAdaptorFactory? DefaultAdaptorFactory { get; }
 
+        /// <inheritdoc />
         public virtual void Participate(IGrainLifecycle lifecycle)
         {
             lifecycle.Subscribe<LogConsistentGrain<TView>>(GrainLifecycleStage.SetupState, OnSetupState, OnDeactivateState);

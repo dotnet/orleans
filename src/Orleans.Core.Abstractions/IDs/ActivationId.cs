@@ -131,9 +131,11 @@ namespace Orleans.Runtime
         public override void Write(Utf8JsonWriter writer, ActivationId value, JsonSerializerOptions options)
             => WriteCore(writer, value, options, false);
 
+        /// <inheritdoc />
         public override void WriteAsPropertyName(Utf8JsonWriter writer, [DisallowNull] ActivationId value, JsonSerializerOptions options)
             => WriteCore(writer, value, options, true);
 
+        /// <inheritdoc />
         public override ActivationId ReadAsPropertyName(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => Read(ref reader, typeToConvert, options);
     }
 }

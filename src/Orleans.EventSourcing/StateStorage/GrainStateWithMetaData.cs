@@ -28,9 +28,11 @@ namespace Orleans.EventSourcing.StateStorage
         [Id(1)]
         public string? ETag { get; set; }
 
+        /// <inheritdoc />
         [Id(2)]
         public bool RecordExists { get; set; }
 
+        /// <inheritdoc />
         public GrainStateWithMetaData<TView> State { get => StateAndMetaData; set => StateAndMetaData = value; }
 
         GrainStateWithMetaData<TView>? IGrainState<GrainStateWithMetaData<TView>>.State

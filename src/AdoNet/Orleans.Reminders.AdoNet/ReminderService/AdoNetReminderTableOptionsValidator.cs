@@ -10,7 +10,11 @@ namespace Orleans.Configuration
     public class AdoNetReminderTableOptionsValidator : IConfigurationValidator
     {
         private readonly AdoNetReminderTableOptions options;
-        
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="AdoNetReminderTableOptionsValidator"/> class.
+        /// </summary>
+        /// <param name="options">The reminder table options to validate.</param>
         public AdoNetReminderTableOptionsValidator(IOptions<AdoNetReminderTableOptions> options)
         {
             this.options = options.Value;

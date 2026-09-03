@@ -13,6 +13,7 @@ namespace Orleans.GrainDirectory
         /// Registers the provided address in the appropriate grain directory.
         /// </summary>
         /// <param name="address">The address to register.</param>
+        /// <param name="previousRegistration">The previous registration to replace, if known.</param>
         /// <returns>The grain address which is registered in the directory immediately following this call.</returns>
         Task<GrainAddress?> Register(GrainAddress address, GrainAddress? previousRegistration);
 

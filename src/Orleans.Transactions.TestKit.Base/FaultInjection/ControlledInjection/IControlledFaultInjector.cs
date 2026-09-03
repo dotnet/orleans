@@ -5,10 +5,24 @@ using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions.TestKit
 {
+    /// <summary>
+    /// Controls which fault is injected into the next transactional state storage operation.
+    /// </summary>
     public interface IControlledTransactionFaultInjector : ITransactionFaultInjector
     {
+        /// <summary>
+        /// Gets or sets a value indicating whether to throw a storage exception before storing transactional state.
+        /// </summary>
         bool InjectBeforeStore { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether to throw a storage exception after storing transactional state.
+        /// </summary>
         bool InjectAfterStore { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether to throw a generic exception after storing transactional state.
+        /// </summary>
         bool InjectGenericAfterStore { get; set; }
     }
 

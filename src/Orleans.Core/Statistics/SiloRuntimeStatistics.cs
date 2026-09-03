@@ -61,13 +61,13 @@ namespace Orleans.Runtime
         public long ClientCount { get; }
 
         /// <summary>
-        /// The number of messages received by that silo.
+        /// The cumulative size, in bytes, of messages received by the silo.
         /// </summary>
         [Id(8)]
         public long ReceivedMessages { get; }
 
         /// <summary>
-        /// The number of messages sent by that silo.
+        /// The cumulative size, in bytes, of messages sent by the silo.
         /// </summary>
         [Id(9)]
         public long SentMessages { get; }
@@ -78,6 +78,9 @@ namespace Orleans.Runtime
         [Id(10)]
         public DateTime DateTime { get; }
 
+        /// <summary>
+        /// Gets the environment resource utilization statistics for the silo.
+        /// </summary>
         [Id(11)]
         public EnvironmentStatistics EnvironmentStatistics { get; }
 
@@ -108,6 +111,7 @@ namespace Orleans.Runtime
 #pragma warning restore 618
         }
 
+        /// <inheritdoc/>
         public override string ToString() => @$"SiloRuntimeStatistics: ActivationCount={ActivationCount} RecentlyUsedActivationCount={RecentlyUsedActivationCount
             } CpuUsagePercentage={EnvironmentStatistics.FilteredCpuUsagePercentage} MemoryUsageBytes={EnvironmentStatistics.FilteredMemoryUsageBytes
             } AvailableMemory={EnvironmentStatistics.FilteredAvailableMemoryBytes} MaximumAvailableMemoryBytes={EnvironmentStatistics.MaximumAvailableMemoryBytes
@@ -144,6 +148,9 @@ namespace Orleans.Runtime
         public override string ToString() => $"SimpleGrainStatistic: GrainType={GrainType} Silo={SiloAddress} NumActivations={ActivationCount} ";
     }
 
+    /// <summary>
+    /// Represents an active grain and its location within the cluster.
+    /// </summary>
     [Serializable, GenerateSerializer, Immutable]
     public sealed class DetailedGrainStatistic
     {

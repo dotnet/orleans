@@ -57,7 +57,16 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
     private readonly List<(RingRange Range, DateTimeOffset Expiration)> _rangeLeaseHolds = [];
     private readonly Dictionary<SiloAddress, DateTimeOffset> _siloLeaseHolds = [];
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="GrainDirectoryPartition"/> class.
+    /// </summary>
     /// <param name="partitionIndex">The index of this partition on this silo. Each silo hosts a fixed number of dynamically sized partitions.</param>
+    /// <param name="owner">The distributed grain directory which owns this partition.</param>
+    /// <param name="deadSiloLeaseDuration">The duration of safety leases applied after an ungraceful silo failure.</param>
+    /// <param name="grainFactory">The grain factory used to access remote directory partitions.</param>
+    /// <param name="directoryInstruments">The grain directory telemetry instruments.</param>
+    /// <param name="timeProvider">The time provider used to manage safety lease expiration.</param>
+    /// <param name="shared">The shared runtime services for the system target.</param>
     public GrainDirectoryPartition(
         int partitionIndex,
         DistributedGrainDirectory owner,

@@ -9,6 +9,9 @@ using Orleans.Configuration;
 
 namespace Orleans.Runtime.Membership
 {
+    /// <summary>
+    /// Provides Orleans gateway addresses from a relational clustering table.
+    /// </summary>
     public partial class AdoNetGatewayListProvider : IGatewayListProvider
     {
         private readonly ILogger _logger;
@@ -18,6 +21,14 @@ namespace Orleans.Runtime.Membership
         private readonly IServiceProvider _serviceProvider;
         private readonly TimeSpan _maxStaleness;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="AdoNetGatewayListProvider"/> class.
+        /// </summary>
+        /// <param name="logger">The logger.</param>
+        /// <param name="serviceProvider">The service provider.</param>
+        /// <param name="options">The relational clustering options.</param>
+        /// <param name="gatewayOptions">The gateway discovery options.</param>
+        /// <param name="clusterOptions">The cluster identity options.</param>
         public AdoNetGatewayListProvider(
             ILogger<AdoNetGatewayListProvider> logger,
             IServiceProvider serviceProvider,
@@ -32,22 +43,26 @@ namespace Orleans.Runtime.Membership
             this._maxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
         }
 
+        /// <inheritdoc />
         public TimeSpan MaxStaleness
         {
             get { return this._maxStaleness; }
         }
 
+        /// <inheritdoc />
         public bool IsUpdatable
         {
             get { return true; }
         }
 
+        /// <inheritdoc />
         public async Task InitializeGatewayListProvider()
         {
             LogTraceInitializeGatewayListProvider();
             _orleansQueries = await RelationalOrleansQueries.CreateInstance(_options.Invariant, _options.ConnectionString, _options.DataSource);
         }
 
+        /// <inheritdoc />
         public async Task<IList<Uri>> GetGateways()
         {
             LogTraceGetGateways();

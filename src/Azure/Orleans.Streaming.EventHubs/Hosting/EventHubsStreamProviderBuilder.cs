@@ -23,12 +23,16 @@ using Orleans.Runtime;
 
 namespace Orleans.Hosting;
 
+/// <summary>
+/// Configures Azure Event Hubs stream providers from provider configuration.
+/// </summary>
 public sealed class EventHubsStreamProviderBuilder : IProviderBuilder<ISiloBuilder>, IProviderBuilder<IClientBuilder>
 {
     private const string EventHubNameConfigurationKey = "EventHubName";
     private const string ConsumerGroupConfigurationKey = "ConsumerGroup";
     private const string ConsumerGroupNameConfigurationKey = "ConsumerGroupName";
 
+    /// <inheritdoc />
     public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
     {
         builder.AddEventHubStreams(name!, configurator =>
@@ -38,6 +42,7 @@ public sealed class EventHubsStreamProviderBuilder : IProviderBuilder<ISiloBuild
         });
     }
 
+    /// <inheritdoc />
     public void Configure(IClientBuilder builder, string? name, IConfigurationSection configurationSection)
     {
         builder.AddEventHubStreams(name!, configurator =>

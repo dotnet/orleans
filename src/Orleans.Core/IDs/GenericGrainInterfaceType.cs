@@ -15,6 +15,7 @@ namespace Orleans.Runtime
         /// Initializes a new instance of the <see cref="GenericGrainInterfaceType"/> struct.
         /// </summary>
         /// <param name="value">The underlying grain interface type.</param>
+        /// <param name="arity">The number of generic type parameters.</param>
         private GenericGrainInterfaceType(GrainInterfaceType value, int arity)
         {
             Value = value;

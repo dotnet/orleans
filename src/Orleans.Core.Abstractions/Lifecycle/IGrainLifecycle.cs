@@ -28,6 +28,9 @@ namespace Orleans.Runtime
         void RemoveMigrationParticipant(IGrainMigrationParticipant participant);
     }
 
+    /// <summary>
+    /// Participates in the dehydration and rehydration of a grain activation during migration.
+    /// </summary>
     public interface IGrainMigrationParticipant
     {
         /// <summary>

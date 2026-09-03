@@ -181,6 +181,7 @@ internal abstract class FrequentItemCollection<TKey, TElement>(int capacity) whe
     ///  Adds the specified element to the <see cref="FrequentItemCollection{TKey, TElement}"/>.
     /// </summary>
     /// <param name="element">The element to add.</param>
+    /// <param name="key">The key used to index the element in the heap.</param>
     private void InsertHeap(Counter element, TKey key)
     {
         // Virtually add the node at the end of the underlying array.

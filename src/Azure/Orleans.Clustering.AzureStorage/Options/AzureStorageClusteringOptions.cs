@@ -5,7 +5,12 @@ namespace Orleans.Clustering.AzureStorage;
 /// </summary>
 public class AzureStorageClusteringOptions : AzureStorageOperationOptions
 {
+    /// <inheritdoc />
     public override string TableName { get; set; } = DEFAULT_TABLE_NAME;
+
+    /// <summary>
+    /// The default Azure Table Storage table name used for cluster membership.
+    /// </summary>
     public const string DEFAULT_TABLE_NAME = "OrleansSiloInstances";
 }
 

@@ -76,6 +76,15 @@ namespace Orleans.Providers.Streams.Generator
         /// </summary>
         protected Func<ReceiverMonitorDimensions, IQueueAdapterReceiverMonitor>? ReceiverMonitorFactory;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="GeneratorAdapterFactory"/> class.
+        /// </summary>
+        /// <param name="providerName">The stream provider name.</param>
+        /// <param name="queueMapperOptions">The queue mapper options.</param>
+        /// <param name="statisticOptions">The stream statistic options.</param>
+        /// <param name="serviceProvider">The service provider.</param>
+        /// <param name="serializer">The Orleans serializer.</param>
+        /// <param name="loggerFactory">The logger factory.</param>
         public GeneratorAdapterFactory(
             string providerName,
             HashRingStreamQueueMapperOptions queueMapperOptions,

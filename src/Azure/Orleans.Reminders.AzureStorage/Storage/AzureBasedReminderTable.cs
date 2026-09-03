@@ -11,6 +11,9 @@ using Orleans.Reminders.AzureStorage;
 
 namespace Orleans.Runtime.ReminderService
 {
+    /// <summary>
+    /// Stores and retrieves Orleans reminder entries using Azure Table Storage.
+    /// </summary>
     public sealed partial class AzureBasedReminderTable : IReminderTable
     {
         private readonly ILogger logger;
@@ -21,6 +24,12 @@ namespace Orleans.Runtime.ReminderService
         private readonly SemaphoreSlim _lifecycleLock = new(1, 1);
         private TaskCompletionSource _initializationTask = CreateInitializationSource();
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="AzureBasedReminderTable"/> class.
+        /// </summary>
+        /// <param name="loggerFactory">The logger factory.</param>
+        /// <param name="clusterOptions">The cluster identity options used to scope reminder entries.</param>
+        /// <param name="storageOptions">The Azure Table Storage reminder options.</param>
         public AzureBasedReminderTable(
             ILoggerFactory loggerFactory,
             IOptions<ClusterOptions> clusterOptions,
@@ -37,6 +46,11 @@ namespace Orleans.Runtime.ReminderService
                 this.loggerFactory);
         }
 
+        /// <summary>
+        /// Connects to Azure Table Storage and creates the reminder table if it does not exist.
+        /// </summary>
+        /// <param name="cancellationToken">The token used to cancel lifecycle-lock acquisition and delays between initialization attempts.</param>
+        /// <returns>A task representing the initialization operation.</returns>
         public async Task StartAsync(CancellationToken cancellationToken)
         {
             await _lifecycleLock.WaitAsync(cancellationToken);
@@ -86,6 +100,11 @@ namespace Orleans.Runtime.ReminderService
             }
         }
 
+        /// <summary>
+        /// Stops the reminder table until it is started again.
+        /// </summary>
+        /// <param name="cancellationToken">The token used to cancel the stop operation.</param>
+        /// <returns>A task representing the stop operation.</returns>
         public async Task StopAsync(CancellationToken cancellationToken)
         {
             await _lifecycleLock.WaitAsync(cancellationToken);
@@ -179,6 +198,10 @@ namespace Orleans.Runtime.ReminderService
             };
         }
 
+        /// <summary>
+        /// Deletes all reminder entries for the current Orleans service and cluster.
+        /// </summary>
+        /// <returns>A task representing the delete operation.</returns>
         public async Task TestOnlyClearTable()
         {
             await Volatile.Read(ref _initializationTask).Task;
@@ -186,6 +209,11 @@ namespace Orleans.Runtime.ReminderService
             await this.remTableManager.DeleteTableEntries();
         }
 
+        /// <summary>
+        /// Reads all reminder entries associated with the specified grain.
+        /// </summary>
+        /// <param name="grainId">The grain identifier.</param>
+        /// <returns>The reminder entries associated with <paramref name="grainId"/>.</returns>
         public async Task<ReminderTableData> ReadRows(GrainId grainId)
         {
             try
@@ -204,6 +232,12 @@ namespace Orleans.Runtime.ReminderService
             }
         }
 
+        /// <summary>
+        /// Reads reminder entries whose grain hash is in the range <c>(begin, end]</c>.
+        /// </summary>
+        /// <param name="begin">The exclusive lower bound of the hash range.</param>
+        /// <param name="end">The inclusive upper bound of the hash range.</param>
+        /// <returns>The reminder entries in the specified hash range.</returns>
         public async Task<ReminderTableData> ReadRows(uint begin, uint end)
         {
             try
@@ -222,6 +256,12 @@ namespace Orleans.Runtime.ReminderService
             }
         }
 
+        /// <summary>
+        /// Reads a reminder entry for the specified grain and reminder name.
+        /// </summary>
+        /// <param name="grainId">The grain identifier.</param>
+        /// <param name="reminderName">The reminder name.</param>
+        /// <returns>The reminder entry when found; otherwise, <see langword="null"/>.</returns>
         public async Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName)
         {
             try
@@ -239,6 +279,11 @@ namespace Orleans.Runtime.ReminderService
             }
         }
 
+        /// <summary>
+        /// Inserts or replaces a reminder entry.
+        /// </summary>
+        /// <param name="entry">The reminder entry to store.</param>
+        /// <returns>The new entity tag when the write succeeds; otherwise, <see langword="null"/>.</returns>
         public async Task<string?> UpsertRow(ReminderEntry entry)
         {
             try
@@ -262,6 +307,15 @@ namespace Orleans.Runtime.ReminderService
             }
         }
 
+        /// <summary>
+        /// Removes a reminder entry when its entity tag matches the stored entry.
+        /// </summary>
+        /// <param name="grainId">The grain identifier.</param>
+        /// <param name="reminderName">The reminder name.</param>
+        /// <param name="eTag">The entity tag used for optimistic concurrency.</param>
+        /// <returns>
+        /// <see langword="true"/> when the entry was removed; otherwise, <see langword="false"/>.
+        /// </returns>
         public async Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag)
         {
             var entry = new ReminderTableEntry

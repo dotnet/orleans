@@ -1,8 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <!-- Additional nullable warnings specific to this project -->
-    <NoWarn>$(NoWarn);CS8602;CS8603</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

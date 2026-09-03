@@ -7,6 +7,7 @@ using Orleans.Runtime;
 using Orleans.Runtime.MembershipService.SiloMetadata;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Placement.Filtering;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Documentation.Grains.Placement.Filtering
 {
@@ -32,7 +33,7 @@ siloBuilder.UseSiloMetadata(
     }
 
     // <required_metadata_filter>
-#pragma warning disable ORLEANSEXP004
+[Experimental("ORLEANSEXP004")]
 [RequiredMatchSiloMetadataPlacementFilter(
     ["zone", "tier"])]
 public sealed class PremiumZoneGrain :
@@ -40,11 +41,10 @@ public sealed class PremiumZoneGrain :
     IPremiumZoneGrain
 {
 }
-#pragma warning restore ORLEANSEXP004
     // </required_metadata_filter>
 
     // <preferred_metadata_filter>
-#pragma warning disable ORLEANSEXP004
+[Experimental("ORLEANSEXP004")]
 [PreferredMatchSiloMetadataPlacementFilter(
     ["rack", "zone"],
     minCandidates: 2)]
@@ -53,11 +53,10 @@ public sealed class LocalityGrain :
     ILocalityGrain
 {
 }
-#pragma warning restore ORLEANSEXP004
     // </preferred_metadata_filter>
 
     // <ordered_metadata_filters>
-#pragma warning disable ORLEANSEXP004
+[Experimental("ORLEANSEXP004")]
 [RequiredMatchSiloMetadataPlacementFilter(
     ["tier"],
     order: 0)]
@@ -70,7 +69,6 @@ public sealed class OrderedFilterGrain :
     IOrderedFilterGrain
 {
 }
-#pragma warning restore ORLEANSEXP004
     // </ordered_metadata_filters>
 }
 
@@ -86,6 +84,7 @@ namespace Documentation.Grains.Placement.Strategies
             ISiloBuilder siloBuilder)
         {
             // <configure_resource_optimized_placement>
+#pragma warning disable ORLEANSEXP001
 siloBuilder.Configure<ResourceOptimizedPlacementOptions>(options =>
 {
     options.CpuUsageWeight = 40;
@@ -94,6 +93,7 @@ siloBuilder.Configure<ResourceOptimizedPlacementOptions>(options =>
     options.ActivationCountWeight = 15;
     options.LocalSiloPreferenceMargin = 5;
 });
+#pragma warning restore ORLEANSEXP001
             // </configure_resource_optimized_placement>
         }
 

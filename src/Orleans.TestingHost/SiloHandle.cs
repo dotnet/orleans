@@ -22,7 +22,7 @@ namespace Orleans.TestingHost
         /// <summary>Get or set the address of the silo</summary>
         public SiloAddress SiloAddress { get; set; } = null!;
 
-        ///// <summary>Get the proxy address of the silo</summary>
+        /// <summary>Gets or sets the gateway address of the silo.</summary>
         public SiloAddress GatewayAddress { get; set; } = null!;
 
         /// <summary>Gets whether the remote silo is expected to be active</summary>

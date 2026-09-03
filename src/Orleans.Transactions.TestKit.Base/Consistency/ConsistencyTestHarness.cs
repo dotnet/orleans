@@ -8,6 +8,9 @@ using AwesomeAssertions;
 
 namespace Orleans.Transactions.TestKit.Consistency
 {
+    /// <summary>
+    /// Executes randomized transaction sequences and validates their observed histories for serial consistency.
+    /// </summary>
     public class ConsistencyTestHarness
     {
         private readonly ConsistencyTestOptions options;
@@ -30,6 +33,16 @@ namespace Orleans.Transactions.TestKit.Consistency
         private readonly Dictionary<string, bool> marks = new Dictionary<string, bool>();
 
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ConsistencyTestHarness"/> class.
+        /// </summary>
+        /// <param name="grainFactory">The grain factory used to create consistency test grains.</param>
+        /// <param name="numGrains">The number of grains participating in the test.</param>
+        /// <param name="seed">The seed used to generate repeatable test operations.</param>
+        /// <param name="avoidDeadlocks">Whether nested grain calls are ordered to avoid deadlocks.</param>
+        /// <param name="avoidTimeouts">Whether nested call scheduling stops before the transaction timeout.</param>
+        /// <param name="readWrite">How read and write operations are selected.</param>
+        /// <param name="tolerateUnknownExceptions">Whether the test scenario expects unclassified transaction outcomes.</param>
         public ConsistencyTestHarness(
             IGrainFactory grainFactory,
             int numGrains,
@@ -62,8 +75,14 @@ namespace Orleans.Transactions.TestKit.Consistency
             this.tolerateUnknownExceptions = tolerateUnknownExceptions;
         }
 
+        /// <summary>
+        /// The synthetic transaction identifier assigned to each grain's initial state.
+        /// </summary>
         public const string InitialTx = "initial";
 
+        /// <summary>
+        /// Gets the number of transactions recorded as aborted.
+        /// </summary>
         public int NumAborted => aborted.Count;
 
         internal void RecordSucceeded(params Observation[] result)
@@ -132,6 +151,14 @@ namespace Orleans.Transactions.TestKit.Consistency
 
         internal void RecordTimeout() => timeoutsOccurred = true;
 
+        /// <summary>
+        /// Runs a deterministic sequence of randomized transactions for one test partition.
+        /// </summary>
+        /// <param name="partition">The partition index used to derive the random sequence.</param>
+        /// <param name="count">The number of transactions to execute.</param>
+        /// <param name="grainFactory">The grain factory used to create consistency test grain references.</param>
+        /// <param name="output">The callback used to write test diagnostics.</param>
+        /// <returns>A task which represents the transaction sequence.</returns>
         public async Task RunRandomTransactionSequence(int partition, int count, IGrainFactory grainFactory, Action<string> output)
         {
             this.output = output;
@@ -180,6 +207,11 @@ namespace Orleans.Transactions.TestKit.Consistency
             }
         }
 
+        /// <summary>
+        /// Verifies version ordering, transaction outcomes, and serializability of the recorded history.
+        /// </summary>
+        /// <param name="tolerateGenericTimeouts">Whether recorded generic timeouts permit an incomplete history.</param>
+        /// <param name="tolerateUnknownExceptions">Whether in-doubt commit failures are accepted.</param>
         public void CheckConsistency(bool tolerateGenericTimeouts = false, bool tolerateUnknownExceptions = false)
         {
             orderEdges.Clear();

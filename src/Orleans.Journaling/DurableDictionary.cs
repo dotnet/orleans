@@ -5,6 +5,11 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Journaling;
 
+/// <summary>
+/// Represents a dictionary whose mutations are recorded in a journal.
+/// </summary>
+/// <typeparam name="K">The type of keys in the dictionary.</typeparam>
+/// <typeparam name="V">The type of values in the dictionary.</typeparam>
 public interface IDurableDictionary<K, V> : IDictionary<K, V> where K : notnull
 {
 }

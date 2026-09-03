@@ -18,6 +18,9 @@ using Orleans.Serialization.WireProtocol;
 
 namespace Orleans.Serialization;
 
+/// <summary>
+/// A serialization codec which uses <see cref="JsonSerializer"/>.
+/// </summary>
 [Alias(WellKnownAlias)]
 public class NewtonsoftJsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilter
 {

@@ -10,9 +10,10 @@ namespace Orleans.Streaming.EventHubs
     public class DefaultEventHubReceiverMonitor : DefaultQueueAdapterReceiverMonitor
     {
         /// <summary>
-        /// Constructor
+        /// Initializes a new instance of the <see cref="DefaultEventHubReceiverMonitor"/> class.
         /// </summary>
-        /// <param name="dimensions">Aggregation Dimension bag for EventhubReceiverMonitor</param>
+        /// <param name="dimensions">The Event Hub receiver metric dimensions.</param>
+        /// <param name="instruments">The Orleans runtime instruments.</param>
         public DefaultEventHubReceiverMonitor(EventHubReceiverMonitorDimensions dimensions, OrleansInstruments instruments)
             : base(new KeyValuePair<string, object>[] { new("Path", dimensions.EventHubPath), new("Partition", dimensions.EventHubPartition) }, instruments)
         {

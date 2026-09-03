@@ -14,6 +14,9 @@ namespace Orleans.Streaming.EventHubs
     /// </summary>
     public partial class EventHubQueueCache : IEventHubQueueCache
     {
+        /// <summary>
+        /// Gets the Event Hub partition cached by this instance.
+        /// </summary>
         public string Partition { get; private set; }
 
         /// <summary>
@@ -39,14 +42,14 @@ namespace Orleans.Streaming.EventHubs
         /// </summary>
         /// <param name="partition">Partition this instance is caching.</param>
         /// <param name="defaultMaxAddCount">Default max number of items that can be added to the cache between purge calls.</param>
-        /// <param name="bufferPool">raw data block pool.</param>
-        /// <param name="dataAdapter">Adapts EventData to cached.</param>
-        /// <param name="evictionStrategy">Eviction strategy manage purge related events</param>
-        /// <param name="checkpointer">Logic used to store queue position.</param>
-        /// <param name="logger"></param>
-        /// <param name="cacheMonitor"></param>
-        /// <param name="cacheMonitorWriteInterval"></param>
-        /// <param name="metadataMinTimeInCache"></param>
+        /// <param name="bufferPool">The raw data block pool.</param>
+        /// <param name="dataAdapter">The adapter used to convert Event Hubs data into cached messages.</param>
+        /// <param name="evictionStrategy">The strategy used to evict cached messages.</param>
+        /// <param name="checkpointer">The checkpointer used to persist queue progress.</param>
+        /// <param name="logger">The logger.</param>
+        /// <param name="cacheMonitor">The cache statistics monitor.</param>
+        /// <param name="cacheMonitorWriteInterval">The interval between cache statistics updates.</param>
+        /// <param name="metadataMinTimeInCache">The minimum time metadata remains in the cache.</param>
         public EventHubQueueCache(
             string partition,
             int defaultMaxAddCount,
@@ -82,7 +85,7 @@ namespace Orleans.Streaming.EventHubs
         /// <summary>
         /// Add cache pressure monitor to the cache's back pressure algorithm
         /// </summary>
-        /// <param name="monitor"></param>
+        /// <param name="monitor">The cache pressure monitor.</param>
         public void AddCachePressureMonitor(ICachePressureMonitor monitor)
         {
             monitor.CacheMonitor = this.cacheMonitor;
@@ -101,6 +104,7 @@ namespace Orleans.Streaming.EventHubs
         /// <summary>
         /// The limit of the maximum number of items that can be added
         /// </summary>
+        /// <returns>The maximum number of items which can currently be added.</returns>
         public int GetMaxAddCount()
         {
             return cachePressureMonitor.IsUnderPressure(DateTime.UtcNow) ? 0 : defaultMaxAddCount;
@@ -109,9 +113,9 @@ namespace Orleans.Streaming.EventHubs
         /// <summary>
         /// Add a list of EventHub EventData to the cache.
         /// </summary>
-        /// <param name="messages"></param>
-        /// <param name="dequeueTimeUtc"></param>
-        /// <returns></returns>
+        /// <param name="messages">The Event Hub messages to cache.</param>
+        /// <param name="dequeueTimeUtc">The UTC time when the messages were dequeued.</param>
+        /// <returns>The stream positions of the cached messages.</returns>
         public List<StreamPosition> Add(List<EventData> messages, DateTime dequeueTimeUtc)
         {
             List<StreamPosition> positions = new List<StreamPosition>();
@@ -129,9 +133,9 @@ namespace Orleans.Streaming.EventHubs
         /// <summary>
         /// Get a cursor into the cache to read events from a stream.
         /// </summary>
-        /// <param name="streamId"></param>
-        /// <param name="sequenceToken"></param>
-        /// <returns></returns>
+        /// <param name="streamId">The stream identifier.</param>
+        /// <param name="sequenceToken">The position from which to begin reading.</param>
+        /// <returns>A cache cursor.</returns>
         public object GetCursor(StreamId streamId, StreamSequenceToken? sequenceToken)
         {
             return cache.GetCursor(streamId, sequenceToken);
@@ -151,9 +155,9 @@ namespace Orleans.Streaming.EventHubs
         /// <summary>
         /// Try to get the next message in the cache for the provided cursor.
         /// </summary>
-        /// <param name="cursorObj"></param>
-        /// <param name="message"></param>
-        /// <returns></returns>
+        /// <param name="cursorObj">The cache cursor.</param>
+        /// <param name="message">The next message when one is available.</param>
+        /// <returns><see langword="true"/> when a message was returned; otherwise, <see langword="false"/>.</returns>
         public bool TryGetNextMessage(object cursorObj, [NotNullWhen(true)] out IBatchContainer? message)
         {
             if (!cache.TryGetNextMessage(cursorObj, out message))

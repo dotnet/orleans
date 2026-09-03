@@ -14,6 +14,10 @@ using Orleans.Transactions.TOC;
 
 namespace Orleans.Transactions
 {
+    /// <summary>
+    /// Enlists service operations as storage preconditions which execute during commit before the durable commit decision.
+    /// </summary>
+    /// <typeparam name="TService">The service type which receives committed operations.</typeparam>
     public partial class TransactionCommitter<TService> : ITransactionCommitter<TService>, ILifecycleParticipant<IGrainLifecycle>
         where TService : class
     {
@@ -28,6 +32,14 @@ namespace Orleans.Transactions
 
         private bool detectReentrancy;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TransactionCommitter{TService}"/> class.
+        /// </summary>
+        /// <param name="config">The committer configuration.</param>
+        /// <param name="contextAccessor">The accessor for the current grain activation context.</param>
+        /// <param name="copier">The copier used to isolate pending commit operations.</param>
+        /// <param name="grainRuntime">The grain runtime.</param>
+        /// <param name="logger">The logger.</param>
         public TransactionCommitter(
             ITransactionCommitterConfiguration config,
             IGrainContextAccessor contextAccessor,
@@ -110,6 +122,7 @@ namespace Orleans.Transactions
             );
         }
 
+        /// <inheritdoc/>
         public void Participate(IGrainLifecycle lifecycle)
         {
             lifecycle.Subscribe<TransactionalState<OperationState>>(GrainLifecycleStage.SetupState, OnSetupState);
@@ -152,10 +165,16 @@ namespace Orleans.Transactions
             await this.queue.NotifyOfRestore();
         }
 
+        /// <summary>
+        /// Stores the commit operation associated with a transaction record.
+        /// </summary>
         [Serializable]
         [GenerateSerializer]
         public sealed class OperationState
         {
+            /// <summary>
+            /// Gets or sets the operation to apply when the transaction commits.
+            /// </summary>
             [Id(0)]
             public ITransactionCommitOperation<TService> Operation { get; set; } = null!;
         }

@@ -18,6 +18,9 @@ namespace Orleans.Serialization
     [Alias("ISerializable")]
     public class DotNetSerializableCodec : IGeneralizedCodec
     {
+        /// <summary>
+        /// The type used to identify this codec.
+        /// </summary>
         public static readonly Type CodecType = typeof(DotNetSerializableCodec);
         private static readonly Type SerializableType = typeof(ISerializable);
         private readonly SerializationCallbacksFactory _serializationCallbacks;

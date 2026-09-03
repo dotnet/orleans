@@ -5,31 +5,42 @@ using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions
 {
+    /// <summary>
+    /// Detects when the transaction start rate exceeds the configured load-shedding limit.
+    /// </summary>
     public interface ITransactionOverloadDetector
     {
+        /// <summary>
+        /// Determines whether new transactions should be rejected because the transaction start rate is over its limit.
+        /// </summary>
+        /// <returns><see langword="true"/> when transaction load shedding is enabled and the measured rate exceeds its limit; otherwise, <see langword="false"/>.</returns>
         bool IsOverloaded();
     }
 
     /// <summary>
-    /// Options for load shedding based on transaction rate 
+    /// Configures load shedding based on the transaction start rate.
     /// </summary>
     public class TransactionRateLoadSheddingOptions
     {
         /// <summary>
-        /// whether to turn on transaction load shedding. Default to false;
+        /// Gets or sets a value indicating whether transaction-rate load shedding is enabled.
         /// </summary>
         public bool Enabled { get; set; }
 
         /// <summary>
-        /// Default load shedding limit
+        /// The default transaction start-rate limit, in transactions per second.
         /// </summary>
         public const double DEFAULT_LIMIT = 700;
+
         /// <summary>
-        /// Load shedding limit for transaction
+        /// Gets or sets the transaction start-rate limit, in transactions per second.
         /// </summary>
         public double Limit { get; set; } = DEFAULT_LIMIT;
     }
 
+    /// <summary>
+    /// Detects transaction overload using a weighted transaction start rate sampled over time.
+    /// </summary>
     public class TransactionOverloadDetector : ITransactionOverloadDetector
     {
         private readonly ITransactionAgentStatistics statistics;
@@ -40,6 +51,11 @@ namespace Orleans.Transactions
         private double transactionStartedPerSecond;
         private DateTime lastCheckTime;
         private static readonly TimeSpan MetricsCheck = TimeSpan.FromSeconds(15);
+        /// <summary>
+        /// Initializes a new transaction overload detector.
+        /// </summary>
+        /// <param name="statistics">The cumulative transaction-agent statistics used to calculate the start rate.</param>
+        /// <param name="options">The transaction-rate load-shedding options.</param>
         public TransactionOverloadDetector(ITransactionAgentStatistics statistics, IOptions<TransactionRateLoadSheddingOptions> options)
             : this(statistics, options, TimeProvider.System)
         {
@@ -66,6 +82,10 @@ namespace Orleans.Transactions
             this.lastCheckTime = now;
         }
 
+        /// <summary>
+        /// Determines whether the weighted transaction start rate exceeds the configured limit.
+        /// </summary>
+        /// <returns><see langword="true"/> when load shedding is enabled and the weighted rate exceeds the limit; otherwise, <see langword="false"/>.</returns>
         public bool IsOverloaded()
         {
             if (!this.options.Enabled)

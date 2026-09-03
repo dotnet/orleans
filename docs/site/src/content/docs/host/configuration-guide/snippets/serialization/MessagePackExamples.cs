@@ -12,7 +12,7 @@ namespace Orleans.Docs.Snippets.Serialization;
 public class OrderMessage
 {
     [Key(0)]
-    public string OrderId { get; set; }
+    public required string OrderId { get; set; }
 
     [Key(1)]
     public decimal Amount { get; set; }
@@ -21,7 +21,7 @@ public class OrderMessage
     public DateTime CreatedAt { get; set; }
 
     [Key(3)]
-    public List<string> Items { get; set; }
+    public List<string> Items { get; set; } = [];
 }
 // </messagepack_type_definition>
 

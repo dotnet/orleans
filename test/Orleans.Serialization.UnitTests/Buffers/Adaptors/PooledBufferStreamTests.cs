@@ -558,7 +558,7 @@ public class PooledBufferStreamTests
     /// Tests valid Seek scenarios with a preset stream length.
     /// For Begin: newPosition equals the offset.
     /// For Current: newPosition equals Position plus offset.
-    /// For End: newPosition equals Length minus offset.
+    /// For End: newPosition equals Length plus offset.
     /// </summary>
     /// <param name="offset">The offset parameter for Seek.</param>
     /// <param name="origin">The SeekOrigin used in Seek.</param>
@@ -566,7 +566,7 @@ public class PooledBufferStreamTests
     [Theory]
     [InlineData(30, SeekOrigin.Begin, 30)]
     [InlineData(20, SeekOrigin.Current, 30)]
-    [InlineData(10, SeekOrigin.End, 90)]
+    [InlineData(-10, SeekOrigin.End, 90)]
     public void Seek_ValidScenarios_ExpectedPosition(long offset, SeekOrigin origin, long expectedPosition)
     {
         // Arrange
@@ -617,14 +617,14 @@ public class PooledBufferStreamTests
     [InlineData(-1, SeekOrigin.Begin, "Attempted to seek past beginning of stream")]
     // For Current: result becomes negative.
     [InlineData(-11, SeekOrigin.Current, "Attempted to seek past beginning of stream")]
-    // For End: offset greater than Length results in negative newPosition.
-    [InlineData(101, SeekOrigin.End, "Attempted to seek past beginning of stream")]
+    // For End: a negative offset whose magnitude exceeds Length results in a negative newPosition.
+    [InlineData(-101, SeekOrigin.End, "Attempted to seek past beginning of stream")]
     // For Begin: offset greater than Length.
     [InlineData(101, SeekOrigin.Begin, "Attempted to seek past end of stream")]
     // For Current: result exceeds Length.
     [InlineData(91, SeekOrigin.Current, "Attempted to seek past end of stream")]
-    // For End: negative offset causes newPosition to exceed Length.
-    [InlineData(-1, SeekOrigin.End, "Attempted to seek past end of stream")]
+    // For End: a positive offset causes newPosition to exceed Length.
+    [InlineData(1, SeekOrigin.End, "Attempted to seek past end of stream")]
     public void Seek_OutOfBounds_ThrowsInvalidOperationException(long offset, SeekOrigin origin, string expectedMessage)
     {
         // Arrange

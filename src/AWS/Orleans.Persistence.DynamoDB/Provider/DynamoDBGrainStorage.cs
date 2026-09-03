@@ -53,6 +53,7 @@ namespace Orleans.Storage
             _activatorProvider = activatorProvider;
         }
 
+        /// <inheritdoc/>
         public void Participate(ISiloLifecycle lifecycle)
         {
             lifecycle.Subscribe(OptionFormattingUtilities.Name<DynamoDBGrainStorage>(this.name), this.options.InitStage, Init, Close);
@@ -440,8 +441,17 @@ namespace Orleans.Storage
         private static partial void LogTraceWritingBinaryData(ILogger logger, int dataSize, string partition, string row);
     }
 
+    /// <summary>
+    /// Creates configured <see cref="DynamoDBGrainStorage"/> instances.
+    /// </summary>
     public static class DynamoDBGrainStorageFactory
     {
+        /// <summary>
+        /// Creates a DynamoDB grain storage provider with the specified name.
+        /// </summary>
+        /// <param name="services">The service provider.</param>
+        /// <param name="name">The storage provider name.</param>
+        /// <returns>The configured grain storage provider.</returns>
         public static DynamoDBGrainStorage Create(IServiceProvider services, string name)
         {
             var optionsMonitor = services.GetRequiredService<IOptionsMonitor<DynamoDBStorageOptions>>();

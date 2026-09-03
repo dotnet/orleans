@@ -15,9 +15,15 @@ using System.Runtime.CompilerServices;
 
 namespace Orleans.Serialization;
 
+/// <summary>
+/// Provides serialization and deep-copy support for Protocol Buffers message types selected for the Protobuf codec.
+/// </summary>
 [Alias(WellKnownAlias)]
 public sealed class ProtobufCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilter
 {
+    /// <summary>
+    /// The well-known alias used to select the Protobuf codec and copier.
+    /// </summary>
     public const string WellKnownAlias = "protobuf";
 
     private static readonly Type SelfType = typeof(ProtobufCodec);

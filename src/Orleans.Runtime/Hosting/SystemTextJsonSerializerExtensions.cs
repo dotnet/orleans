@@ -5,6 +5,9 @@ using Orleans.Storage;
 
 namespace Orleans.Hosting
 {
+    /// <summary>
+    /// Extensions for configuring System.Text.Json-based grain storage serialization.
+    /// </summary>
     public static class SystemTextJsonSerializerExtensions
     {
         /// <summary>

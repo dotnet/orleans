@@ -2,16 +2,19 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Placement;
 
+/// <summary>
+/// Provides extension methods for registering placement filters.
+/// </summary>
 public static class PlacementFilterExtensions
 {
     /// <summary>
-    /// Configures a <typeparamref name="TFilter"/> for filtering candidate grain placements.
+    /// Registers a placement filter strategy and its director for filtering candidate grain placements.
     /// </summary>
-    /// <typeparam name="TFilter">The placement filter.</typeparam>
-    /// <typeparam name="TDirector">The placement filter director.</typeparam>
+    /// <typeparam name="TFilter">The placement filter strategy type.</typeparam>
+    /// <typeparam name="TDirector">The director which applies <typeparamref name="TFilter"/>.</typeparam>
     /// <param name="services">The service collection.</param>
-    /// <param name="strategyLifetime">The lifetime of the placement strategy.</param>
-    /// <returns>The service collection.</returns>
+    /// <param name="strategyLifetime">The service lifetime of the placement filter strategy.</param>
+    /// <returns>The provided service collection.</returns>
     public static IServiceCollection AddPlacementFilter<TFilter, TDirector>(this IServiceCollection services, ServiceLifetime strategyLifetime)
         where TFilter : PlacementFilterStrategy, new()
         where TDirector : class, IPlacementFilterDirector
@@ -21,5 +24,4 @@ public static class PlacementFilterExtensions
 
         return services;
     }
-
 }

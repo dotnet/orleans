@@ -20,6 +20,9 @@ namespace Orleans.Providers.Streams.Common
     [Serializable]
     public enum PersistentStreamProviderCommand
     {
+        /// <summary>
+        /// No command.
+        /// </summary>
         None,
 
         /// <summary>
@@ -79,9 +82,22 @@ namespace Orleans.Providers.Streams.Common
         private IStreamSubscriptionManager? streamSubscriptionManager;
         private readonly StreamPubSubOptions pubsubOptions;
         private readonly StreamLifecycleOptions lifeCycleOptions;
+
+        /// <inheritdoc />
         public string Name { get; private set; }
+
+        /// <inheritdoc />
         public bool IsRewindable { get { return queueAdapter.IsRewindable; } }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="PersistentStreamProvider"/> class.
+        /// </summary>
+        /// <param name="name">The stream provider name.</param>
+        /// <param name="pubsubOptions">The stream pub/sub options.</param>
+        /// <param name="lifeCycleOptions">The stream lifecycle options.</param>
+        /// <param name="runtime">The provider runtime.</param>
+        /// <param name="deepCopier">The deep copier.</param>
+        /// <param name="logger">The logger.</param>
         public PersistentStreamProvider(
             string name,
             StreamPubSubOptions pubsubOptions,
@@ -135,6 +151,7 @@ namespace Orleans.Providers.Streams.Common
             stateManager.CommitState();
         }
 
+        /// <inheritdoc />
         public IStreamSubscriptionManager? GetStreamSubscriptionManager()
         {
             return this.streamSubscriptionManager;
@@ -162,6 +179,7 @@ namespace Orleans.Providers.Streams.Common
             stateManager.CommitState();
         }
 
+        /// <inheritdoc />
         public IAsyncStream<T> GetStream<T>(StreamId streamId)
         {
             var id = new QualifiedStreamId(Name, streamId);
@@ -188,6 +206,7 @@ namespace Orleans.Providers.Streams.Common
             return new StreamConsumer<T>((StreamImpl<T>)stream, Name, this.runtime, this.runtime.PubSub(this.pubsubOptions.PubSubType)!, this.logger, IsRewindable); // Configured StreamPubSubType values always select a runtime.
         }
 
+        /// <inheritdoc />
         public Task<object?> ExecuteCommand(int command, object? arg)
         {
             if (command >= (int)PersistentStreamProviderCommand.AdapterCommandStartRange &&
@@ -215,12 +234,19 @@ namespace Orleans.Providers.Streams.Common
             throw new ArgumentException("PullingAgentManager is not initialized yet.");
         }
 
+        /// <inheritdoc />
         public void Participate(ILifecycleObservable lifecycle)
         {
             lifecycle.Subscribe(OptionFormattingUtilities.Name<PersistentStreamProvider>(this.Name), this.lifeCycleOptions.InitStage, Init);
             lifecycle.Subscribe(OptionFormattingUtilities.Name<PersistentStreamProvider>(this.Name), this.lifeCycleOptions.StartStage, Start, Close);
         }
 
+        /// <summary>
+        /// Creates a persistent stream provider.
+        /// </summary>
+        /// <param name="services">The service provider.</param>
+        /// <param name="name">The stream provider name.</param>
+        /// <returns>The persistent stream provider.</returns>
         public static IStreamProvider Create(IServiceProvider services, string name)
         {
             var pubsubOptions = services.GetRequiredService<IOptionsMonitor<StreamPubSubOptions>>().Get(name);
@@ -228,6 +254,13 @@ namespace Orleans.Providers.Streams.Common
             return ActivatorUtilities.CreateInstance<PersistentStreamProvider>(services, name, pubsubOptions, initOptions);
         }
 
+        /// <summary>
+        /// Gets the named persistent stream provider as a participant in the specified lifecycle.
+        /// </summary>
+        /// <typeparam name="TLifecycle">The lifecycle type.</typeparam>
+        /// <param name="serviceProvider">The service provider.</param>
+        /// <param name="name">The stream provider name.</param>
+        /// <returns>The lifecycle participant for the named stream provider.</returns>
         public static ILifecycleParticipant<TLifecycle> ParticipateIn<TLifecycle>(IServiceProvider serviceProvider, string name)
             where TLifecycle : ILifecycleObservable
         {

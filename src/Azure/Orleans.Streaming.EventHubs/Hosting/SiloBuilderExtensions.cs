@@ -3,11 +3,18 @@ using Orleans.Configuration;
 
 namespace Orleans.Hosting
 {
+    /// <summary>
+    /// Extension methods for configuring Azure Event Hubs stream providers on an Orleans silo.
+    /// </summary>
     public static class SiloBuilderExtensions
     {
         /// <summary>
-        /// Configure silo to use event hub persistent streams.
+        /// Adds a named Azure Event Hubs persistent stream provider to the silo.
         /// </summary>
+        /// <param name="builder">The silo builder.</param>
+        /// <param name="name">The stream provider name.</param>
+        /// <param name="configure">The delegate used to configure the stream provider.</param>
+        /// <returns>The silo builder.</returns>
         public static ISiloBuilder AddEventHubStreams(
             this ISiloBuilder builder,
             string name,
@@ -20,8 +27,13 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure silo to use event hub persistent streams with default check pointer and other settings
+        /// Adds a named Azure Event Hubs persistent stream provider using Azure Table Storage for checkpoints.
         /// </summary>
+        /// <param name="builder">The silo builder.</param>
+        /// <param name="name">The stream provider name.</param>
+        /// <param name="configureEventHub">The delegate used to configure the Event Hub connection.</param>
+        /// <param name="configureDefaultCheckpointer">The delegate used to configure the Azure Table Storage checkpointer.</param>
+        /// <returns>The silo builder.</returns>
         public static ISiloBuilder AddEventHubStreams(
             this ISiloBuilder builder,
             string name, Action<EventHubOptions> configureEventHub, Action<AzureTableStreamCheckpointerOptions> configureDefaultCheckpointer)

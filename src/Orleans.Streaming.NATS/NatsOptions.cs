@@ -6,78 +6,84 @@ using NATS.Client.JetStream.Models;
 namespace Orleans.Streaming.NATS;
 
 /// <summary>
-/// Configuration options for the NATS JetStream stream provider
+/// Configures the NATS JetStream stream provider.
 /// </summary>
 public class NatsOptions
 {
     /// <summary>
-    /// The NATS JetStream stream name
+    /// Gets or sets the name of the NATS JetStream stream used by the provider.
     /// </summary>
     public string StreamName { get; set; } = default!;
 
     /// <summary>
-    /// Configuration options for the NATS client.
-    /// If not provided, a default client will be created with the name Orleans-{providerName}
-    /// and will connect to the NATS server at localhost:4222
+    /// Gets or sets the NATS client options.
     /// </summary>
+    /// <remarks>
+    /// When this value is <see langword="null"/>, the provider creates a client named
+    /// <c>Orleans-{providerName}</c> which connects to <c>localhost:4222</c>.
+    /// </remarks>
     public NatsOpts? NatsClientOptions { get; set; }
 
     /// <summary>
-    /// The maximum number of messages to fetch in a single batch.
-    /// Defaults to 100.
+    /// Gets or sets the maximum number of messages to fetch in a single batch.
     /// </summary>
     public int BatchSize { get; set; } = 100;
 
     /// <summary>
-    /// The number of partitions in the stream.
-    /// This determines the number of pooling agents that will be created on this Orleans Cluster.
-    /// This is mapped to a deterministic partitioning scheme of the NATS JetStream stream.
-    /// The partitions are mapped from <remarks>"[Provider-Name].*.*"</remarks> to <remarks>"[Provider-Name].{{partition([PartitionCount],1,2)}}.{{wildcard(1)}}.{{wildcard(2)}}"</remarks>.
-    /// For details on how partitioning works in NATS JetStream, see <see ref="https://docs.nats.io/nats-concepts/subject_mapping#deterministic-subject-token-partitioning"/>
-    /// Defaults to 8. Increase it if you need more parallelism.
-    /// <remarks>
-    /// Deterministic partition scheme is a NATS server construct.
-    /// This provider when started at the first time will create the stream with the partition scheme.
-    /// If you need to change the partition count, you need to modify the value of this property and, you need to manually modify it on NATS Server first since the provider will not make updates to the JetStream stream definition.
-    /// </remarks>
+    /// Gets or sets the number of partitions in the NATS JetStream stream.
+    /// This value determines the deterministic subject partitioning scheme and must match the number of
+    /// Orleans stream queues configured for the provider.
     /// </summary>
+    /// <remarks>
+    /// The provider creates the stream and its subject mapping when it starts for the first time.
+    /// When the configured partition count changes, the provider attempts to update the existing stream definition
+    /// during startup. Startup fails if the NATS server rejects the requested update.
+    /// For details, see
+    /// <see href="https://docs.nats.io/nats-concepts/subject_mapping#deterministic-subject-token-partitioning">
+    /// deterministic subject token partitioning
+    /// </see>.
+    /// </remarks>
     public int PartitionCount { get; set; } = 8;
 
     /// <summary>
-    /// The number of connections used to send stream messages to NATS JetStream.
+    /// Gets or sets the number of connections used to send stream messages to NATS JetStream.
     /// </summary>
     public int ProducerCount { get; set; } = 8;
 
     /// <summary>
-    /// System.Text.Json serializer options to be used by the NATS provider.
+    /// Gets or sets the JSON serializer options used by the provider.
     /// </summary>
     public JsonSerializerOptions? JsonSerializerOptions { get; set; }
 
     /// <summary>
-    /// The number of stream replicas in the NATS JetStream cluster.
-    /// Higher values improve availability during node restarts (R3 survives
-    /// single-node failures in a 3-node cluster). The NATS server enforces
-    /// that the value is odd and does not exceed the cluster size.
-    /// Defaults to 1. Set to 3 for production clusters with ≥ 3 nodes.
+    /// Gets or sets the number of stream replicas in the NATS JetStream cluster.
     /// </summary>
+    /// <remarks>
+    /// Higher values improve availability during node restarts. Odd values are recommended for quorum,
+    /// and the value cannot exceed the cluster size. A value of <c>3</c> tolerates a single-node failure
+    /// in a three-node cluster.
+    /// </remarks>
     public int NumReplicas { get; set; } = 1;
 
     /// <summary>
-    /// The storage backend used by the NATS JetStream stream.
-    /// Use <see cref="StreamConfigStorage.File"/> for durability across NATS
-    /// server restarts, or <see cref="StreamConfigStorage.Memory"/> for lower
-    /// latency when durability is not required and the NATS server is
-    /// configured with a memory store. The NATS server must have the
-    /// corresponding storage type enabled; requesting a storage type the
-    /// server has not provisioned results in an "insufficient storage
-    /// resources available" error at stream creation.
-    /// Defaults to <see cref="StreamConfigStorage.File"/>.
+    /// Gets or sets the storage backend used by the NATS JetStream stream.
     /// </summary>
+    /// <remarks>
+    /// <see cref="StreamConfigStorage.File"/> provides durability across NATS server restarts.
+    /// <see cref="StreamConfigStorage.Memory"/> stores messages in memory. The selected storage type
+    /// must be enabled on the NATS server.
+    /// </remarks>
     public StreamConfigStorage StorageType { get; set; } = StreamConfigStorage.File;
 }
 
+/// <summary>
+/// Validates <see cref="NatsOptions"/> for a named NATS stream provider.
+/// </summary>
+/// <param name="options">The options to validate.</param>
+/// <param name="name">The stream provider name.</param>
 public class NatsStreamOptionsValidator(NatsOptions options, string? name = null) : IConfigurationValidator
 {
+    /// <inheritdoc />
     public void ValidateConfiguration()
     {
         if (string.IsNullOrWhiteSpace(options.StreamName))

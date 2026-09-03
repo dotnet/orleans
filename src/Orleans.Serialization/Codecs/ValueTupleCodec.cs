@@ -243,6 +243,7 @@ namespace Orleans.Serialization.Codecs
             _copier2 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier2);
         }
 
+        /// <inheritdoc />
         public bool IsShallowCopyable() => _copier1 is null && _copier2 is null;
 
         [return: NotNullIfNotNull(nameof(input))]
@@ -368,6 +369,7 @@ namespace Orleans.Serialization.Codecs
             _copier3 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier3);
         }
 
+        /// <inheritdoc />
         public bool IsShallowCopyable() => _copier1 is null && _copier2 is null && _copier3 is null;
 
         [return: NotNullIfNotNull(nameof(input))]
@@ -507,6 +509,7 @@ namespace Orleans.Serialization.Codecs
             _copier4 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier4);
         }
 
+        /// <inheritdoc />
         public bool IsShallowCopyable() => _copier1 is null && _copier2 is null && _copier3 is null && _copier4 is null;
 
         [return: NotNullIfNotNull(nameof(input))]
@@ -659,6 +662,7 @@ namespace Orleans.Serialization.Codecs
             _copier5 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier5);
         }
 
+        /// <inheritdoc />
         public bool IsShallowCopyable() => _copier1 is null && _copier2 is null && _copier3 is null && _copier4 is null && _copier5 is null;
 
         [return: NotNullIfNotNull(nameof(input))]
@@ -826,6 +830,7 @@ namespace Orleans.Serialization.Codecs
             _copier6 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier6);
         }
 
+        /// <inheritdoc />
         public bool IsShallowCopyable() => _copier1 is null && _copier2 is null && _copier3 is null && _copier4 is null && _copier5 is null && _copier6 is null;
 
         [return: NotNullIfNotNull(nameof(input))]
@@ -1008,6 +1013,7 @@ namespace Orleans.Serialization.Codecs
             _copier7 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier7);
         }
 
+        /// <inheritdoc />
         public bool IsShallowCopyable() => _copier1 is null && _copier2 is null && _copier3 is null && _copier4 is null && _copier5 is null && _copier6 is null && _copier7 is null;
 
         [return: NotNullIfNotNull(nameof(input))]
@@ -1204,6 +1210,7 @@ namespace Orleans.Serialization.Codecs
             _copier8 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier8);
         }
 
+        /// <inheritdoc />
         public bool IsShallowCopyable() => _copier1 is null && _copier2 is null && _copier3 is null && _copier4 is null && _copier5 is null && _copier6 is null && _copier7 is null && _copier8 is null;
 
         [return: NotNullIfNotNull(nameof(input))]

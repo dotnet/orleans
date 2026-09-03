@@ -30,6 +30,11 @@ public sealed class GrainAddressCacheUpdate : ISpanFormattable
     [Id(6)]
     private readonly MembershipVersion _validMembershipVersion = MembershipVersion.MinValue;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="GrainAddressCacheUpdate"/> class.
+    /// </summary>
+    /// <param name="invalidAddress">The cached grain address to invalidate.</param>
+    /// <param name="validAddress">The replacement grain address, or <see langword="null"/> to remove the invalid address without replacing it.</param>
     public GrainAddressCacheUpdate(GrainAddress invalidAddress, GrainAddress? validAddress)
     {
         ArgumentNullException.ThrowIfNull(invalidAddress);
@@ -94,6 +99,7 @@ public sealed class GrainAddressCacheUpdate : ISpanFormattable
         MembershipVersion = _invalidMembershipVersion,
     };
 
+    /// <inheritdoc />
     public override string ToString() => $"[{nameof(GrainAddressCacheUpdate)} GrainId {_grainId}, InvalidActivationId: {_invalidActivationId}, InvalidSiloAddress: {_invalidSiloAddress}, ValidGrainAddress: {ValidGrainAddress}]";
 
     string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString();
@@ -101,6 +107,10 @@ public sealed class GrainAddressCacheUpdate : ISpanFormattable
     bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
         => destination.TryWrite($"[{nameof(GrainAddressCacheUpdate)} GrainId {_grainId}, InvalidActivationId: {_invalidActivationId}, InvalidSiloAddress: {_invalidSiloAddress}, ValidGrainAddress: {ValidGrainAddress}]", out charsWritten);
 
+    /// <summary>
+    /// Returns a string representation which includes the invalid and replacement addresses and the invalid address membership version.
+    /// </summary>
+    /// <returns>A detailed string representation of this cache update.</returns>
     public string ToFullString() => $"[{nameof(GrainAddressCacheUpdate)} GrainId {_grainId}, InvalidActivationId: {_invalidActivationId}, InvalidSiloAddress: {_invalidSiloAddress}, ValidGrainAddress: {ValidGrainAddress}, MembershipVersion: {_invalidMembershipVersion}]";
 
     [DoesNotReturn]

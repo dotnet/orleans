@@ -6,14 +6,18 @@ using Azure.Storage.Blobs;
 namespace Orleans.Journaling;
 
 /// <summary>
-/// Options for configuring the Azure Blob state storage provider.
+/// Options for configuring the Azure Blob journal storage provider.
 /// </summary>
 public sealed class AzureBlobJournalStorageOptions
 {
     /// <summary>
-    /// Container name where state is stored.
+    /// Gets or sets the name of the container where journal data is stored.
     /// </summary>
     public string ContainerName { get; set; } = DEFAULT_CONTAINER_NAME;
+
+    /// <summary>
+    /// The default container name for journal data.
+    /// </summary>
     public const string DEFAULT_CONTAINER_NAME = "state";
 
     /// <summary>
@@ -71,6 +75,10 @@ public sealed class AzureBlobJournalStorageOptions
     /// before retrying. Defaults to 5.
     /// </summary>
     public int MaxMetadataOnlyConflictRetries { get; set; } = DEFAULT_MAX_METADATA_ONLY_CONFLICT_RETRIES;
+
+    /// <summary>
+    /// The default maximum number of metadata-only conflict retries.
+    /// </summary>
     public const int DEFAULT_MAX_METADATA_ONLY_CONFLICT_RETRIES = 5;
 
     /// <summary>
@@ -79,6 +87,10 @@ public sealed class AzureBlobJournalStorageOptions
     /// Set to <see cref="TimeSpan.Zero"/> to retry immediately without backoff. Defaults to 10 ms.
     /// </summary>
     public TimeSpan MetadataOnlyConflictInitialBackoff { get; set; } = DEFAULT_METADATA_ONLY_CONFLICT_INITIAL_BACKOFF;
+
+    /// <summary>
+    /// The default initial delay for metadata-only conflict retries.
+    /// </summary>
     public static readonly TimeSpan DEFAULT_METADATA_ONLY_CONFLICT_INITIAL_BACKOFF = TimeSpan.FromMilliseconds(10);
 
     /// <summary>
@@ -87,6 +99,10 @@ public sealed class AzureBlobJournalStorageOptions
     /// and never exceeds this value. Defaults to 200 ms.
     /// </summary>
     public TimeSpan MetadataOnlyConflictMaxBackoff { get; set; } = DEFAULT_METADATA_ONLY_CONFLICT_MAX_BACKOFF;
+
+    /// <summary>
+    /// The default maximum delay between metadata-only conflict retries.
+    /// </summary>
     public static readonly TimeSpan DEFAULT_METADATA_ONLY_CONFLICT_MAX_BACKOFF = TimeSpan.FromMilliseconds(200);
 
     /// <summary>

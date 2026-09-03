@@ -2002,9 +2002,6 @@ namespace Orleans.Runtime
     {
         public EnumerationAbortedException() { }
 
-        [System.Obsolete]
-        protected EnumerationAbortedException(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) { }
-
         public EnumerationAbortedException(string message, System.Exception innerException) { }
 
         public EnumerationAbortedException(string message) { }

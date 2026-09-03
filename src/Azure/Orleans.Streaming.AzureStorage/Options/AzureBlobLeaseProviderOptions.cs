@@ -18,7 +18,14 @@ namespace Orleans.Configuration
     {
         private BlobServiceClient? _blobServiceClient;
 
+        /// <summary>
+        /// Gets or sets the name of the Azure Blob container used to store lease blobs.
+        /// </summary>
         public string BlobContainerName { get; set; } = DefaultBlobContainerName;
+
+        /// <summary>
+        /// The default Azure Blob container name used to store lease blobs.
+        /// </summary>
         public const string DefaultBlobContainerName = "Leases";
 
         /// <summary>
@@ -142,6 +149,10 @@ namespace Orleans.Configuration
             this.name = name ?? string.Empty;
         }
 
+        /// <summary>
+        /// Validates the configured container name and Azure Blob Service client.
+        /// </summary>
+        /// <exception cref="OrleansConfigurationException">The configuration is invalid.</exception>
         public void ValidateConfiguration()
         {
             // name can be null, but not empty or white space.

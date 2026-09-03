@@ -21,12 +21,26 @@ namespace Orleans.Streams
         private readonly CancellationTokenSource cts;
         private Task _listenForClusterChangesTask = null!; // Initialized in Initialize.
 
+        /// <summary>
+        /// Gets the cancellation token which is signaled when this balancer shuts down.
+        /// </summary>
         protected CancellationToken Cancellation => this.cts.Token;
 
+        /// <summary>
+        /// Gets the address of the local silo.
+        /// </summary>
         protected SiloAddress SiloAddress { get; }
 
+        /// <summary>
+        /// Gets the logger.
+        /// </summary>
         protected ILogger Logger { get; }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="QueueBalancerBase"/> class.
+        /// </summary>
+        /// <param name="sp">The service provider.</param>
+        /// <param name="logger">The logger.</param>
         protected QueueBalancerBase(IServiceProvider sp, ILogger logger)
             : this(sp.GetRequiredService<IClusterMembershipService>(), sp.GetRequiredService<ILocalSiloDetails>(), logger)
         {
@@ -55,6 +69,7 @@ namespace Orleans.Streams
             return Task.CompletedTask;
         }
 
+        /// <inheritdoc />
         public virtual async Task Shutdown()
         {
             try
@@ -93,6 +108,10 @@ namespace Orleans.Streams
             }
         }
 
+        /// <summary>
+        /// Notifies subscribers that the queue distribution has changed.
+        /// </summary>
+        /// <returns>A task which represents the notification operation.</returns>
         protected Task NotifyListeners()
         {
             if (this.Cancellation.IsCancellationRequested) return Task.CompletedTask;
@@ -131,6 +150,10 @@ namespace Orleans.Streams
             }
         }
 
+        /// <summary>
+        /// Handles a change to the set of active silos.
+        /// </summary>
+        /// <param name="activeSilos">The addresses of the active silos.</param>
         protected abstract void OnClusterMembershipChange(HashSet<SiloAddress> activeSilos);
 
         [LoggerMessage(

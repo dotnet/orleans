@@ -4,38 +4,36 @@ using System.Threading.Tasks;
 namespace Orleans.Transactions
 {
     /// <summary>
-    /// The Transaction Agent it is used by the silo and activations to
-    /// interact with the transactions system.
+    /// Coordinates transaction creation, resolution, and abortion for a silo.
     /// </summary>
     /// <remarks>
-    /// There is one Transaction Agent per silo.
-    /// TODO: does this belong in Runtime instead?
+    /// A silo has one transaction agent.
     /// </remarks>
     public interface ITransactionAgent
     {
         /// <summary>
-        /// Starts a new transaction
+        /// Starts a new transaction.
         /// </summary>
-        /// <param name="readOnly">Whether it is a read-only transaction</param>
-        /// <param name="timeout">Transaction is automatically aborted if it does not complete within this time</param>
-        /// <returns>Info of the new transaction</returns>
+        /// <param name="readOnly">A value indicating whether the transaction permits read operations only.</param>
+        /// <param name="timeout">The interval after which the transaction is eligible to be aborted.</param>
+        /// <returns>The new transaction's context information.</returns>
         Task<TransactionInfo> StartTransaction(bool readOnly, TimeSpan timeout);
 
         /// <summary>
-        /// Attempt to Resolve a transaction.  Will commit or abort transaction
+        /// Resolves a transaction by committing or aborting it.
         /// </summary>
-        /// <param name="transactionInfo">transaction info</param>
-        /// <returns>null if the transaction committed successfully, or an exception otherwise.
-        /// If the exception is OrleansTransactionInDoubtException, it means the outcome of the Commit cannot be determined; otherwise,
-        /// the transaction is guaranteed to not have taken effect.</returns>
+        /// <param name="transactionInfo">The transaction context information.</param>
+        /// <returns>
+        /// The resolution status and the underlying exception, if one contributed to the outcome.
+        /// </returns>
         Task<(TransactionalStatus Status, Exception? exception)> Resolve(TransactionInfo transactionInfo);
 
         /// <summary>
         /// Abort a transaction.
         /// </summary>
-        /// <param name="transactionInfo"></param>
-        /// <returns>None.</returns>
-        /// <remarks>This method is exception-free</remarks>
+        /// <param name="transactionInfo">The transaction context information.</param>
+        /// <returns>A <see cref="Task"/> representing the abort operation.</returns>
+        /// <remarks>This operation completes without propagating transaction protocol exceptions.</remarks>
         Task Abort(TransactionInfo transactionInfo);
     }
 }

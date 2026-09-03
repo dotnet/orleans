@@ -6,8 +6,16 @@ using Orleans.Streaming.Kinesis;
 
 namespace Orleans.Hosting
 {
+    /// <summary>
+    /// Configures an Amazon Kinesis Data Streams-backed persistent stream provider on an Orleans client.
+    /// </summary>
     public class ClusterClientKinesisStreamConfigurator : ClusterClientPersistentStreamConfigurator
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ClusterClientKinesisStreamConfigurator"/> class.
+        /// </summary>
+        /// <param name="name">The name of the stream provider.</param>
+        /// <param name="builder">The client builder.</param>
         public ClusterClientKinesisStreamConfigurator(string name, IClientBuilder builder)
             : base(name, builder, KinesisAdapterFactory.Create)
         {
@@ -19,12 +27,24 @@ namespace Orleans.Hosting
             });
         }
 
+        /// <summary>
+        /// Configures the Kinesis options for the stream provider.
+        /// </summary>
+        /// <param name="configureOptions">
+        /// The delegate used to configure the named <see cref="KinesisStreamOptions"/>.
+        /// </param>
+        /// <returns>The stream provider configurator.</returns>
         public ClusterClientKinesisStreamConfigurator ConfigureKinesis(Action<OptionsBuilder<KinesisStreamOptions>> configureOptions)
         {
             this.Configure(configureOptions);
             return this;
         }
 
+        /// <summary>
+        /// Configures the Kinesis options for the stream provider.
+        /// </summary>
+        /// <param name="configureOptions">The delegate used to configure the Kinesis options.</param>
+        /// <returns>The stream provider configurator.</returns>
         public ClusterClientKinesisStreamConfigurator ConfigureKinesis(Action<KinesisStreamOptions> configureOptions)
         {
             this.ConfigureKinesis(ob => ob.Configure(configureOptions));

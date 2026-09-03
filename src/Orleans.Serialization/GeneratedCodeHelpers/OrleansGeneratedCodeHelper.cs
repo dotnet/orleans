@@ -289,20 +289,27 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         }
 
         /// <summary>
-        /// Default copier implementation for (rarely copied) exception classes
+        /// Default copier implementation for exception types.
         /// </summary>
+        /// <typeparam name="T">The exception type being copied.</typeparam>
+        /// <typeparam name="B">The base exception type copied by the base copier.</typeparam>
         public abstract class ExceptionCopier<T, B> : IDeepCopier<T>, IBaseCopier<T> where T : B where B : Exception
         {
             private readonly Type _fieldType = typeof(T);
             private readonly IActivator<T> _activator;
             private readonly IBaseCopier<B> _baseTypeCopier;
 
+            /// <summary>
+            /// Initializes a new instance of the <see cref="ExceptionCopier{T, B}"/> class.
+            /// </summary>
+            /// <param name="codecProvider">The codec provider used to resolve the activator and base copier.</param>
             protected ExceptionCopier(ICodecProvider codecProvider)
             {
                 _activator = GetService<IActivator<T>>(this, codecProvider);
                 _baseTypeCopier = GetService<IBaseCopier<B>>(this, codecProvider);
             }
 
+            /// <inheritdoc/>
             [return: NotNullIfNotNull(nameof(original))]
             public T? DeepCopy(T original, CopyContext context)
             {
@@ -321,6 +328,7 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
                 return result;
             }
 
+            /// <inheritdoc/>
             public virtual void DeepCopy(T input, T output, CopyContext context) => _baseTypeCopier.DeepCopy(input, output, context);
         }
     }

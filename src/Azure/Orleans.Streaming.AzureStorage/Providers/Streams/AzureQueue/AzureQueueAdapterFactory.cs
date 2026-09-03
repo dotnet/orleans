@@ -24,6 +24,14 @@ namespace Orleans.Providers.Streams.AzureQueue
         /// </summary>
         protected Func<QueueId, Task<IStreamFailureHandler>> StreamFailureHandlerFactory { private get; set; } = null!;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="AzureQueueAdapterFactory"/> class.
+        /// </summary>
+        /// <param name="name">The stream provider name.</param>
+        /// <param name="options">The Azure Queue stream provider options.</param>
+        /// <param name="cacheOptions">The queue cache options.</param>
+        /// <param name="dataAdapter">The adapter used to convert between stream batches and Azure Queue messages.</param>
+        /// <param name="loggerFactory">The logger factory.</param>
         public AzureQueueAdapterFactory(
             string name,
             AzureQueueOptions options,
@@ -80,6 +88,12 @@ namespace Orleans.Providers.Streams.AzureQueue
             return StreamFailureHandlerFactory(queueId);
         }
 
+        /// <summary>
+        /// Creates and initializes an adapter factory using the named options and services.
+        /// </summary>
+        /// <param name="services">The service provider.</param>
+        /// <param name="name">The stream provider name.</param>
+        /// <returns>The initialized adapter factory.</returns>
         public static AzureQueueAdapterFactory Create(IServiceProvider services, string name)
         {
             var azureQueueOptions = services.GetOptionsByName<AzureQueueOptions>(name);

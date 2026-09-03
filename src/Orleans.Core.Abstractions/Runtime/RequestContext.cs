@@ -27,6 +27,9 @@ namespace Orleans.Runtime
 
         internal static readonly AsyncLocal<ContextProperties> CallContextData = new();
 
+        /// <summary>
+        /// Gets or sets the identifier used to allow reentrant calls within the current call chain.
+        /// </summary>
         public static Guid ReentrancyId
         {
             get => Get(CALL_CHAIN_REENTRANCY_HEADER) is Guid guid ? guid : Guid.Empty;
@@ -177,11 +180,19 @@ namespace Orleans.Runtime
             public bool IsDefault => Values is null;
         }
 
+        /// <summary>
+        /// Represents a scoped change to call-chain reentrancy.
+        /// </summary>
         public readonly struct ReentrancySection : IDisposable
         {
             private readonly Guid _originalReentrancyId;
             private readonly Guid _newReentrancyId;
 
+            /// <summary>
+            /// Initializes a new instance of the <see cref="ReentrancySection"/> struct.
+            /// </summary>
+            /// <param name="originalReentrancyId">The reentrancy identifier to restore when the section is disposed.</param>
+            /// <param name="newReentrancyId">The reentrancy identifier to use for the section.</param>
             public ReentrancySection(Guid originalReentrancyId, Guid newReentrancyId)
             {
                 _originalReentrancyId = originalReentrancyId;
@@ -199,6 +210,7 @@ namespace Orleans.Runtime
                 }
             }
 
+            /// <inheritdoc/>
             public void Dispose()
             {
                 if (_newReentrancyId != Guid.Empty)

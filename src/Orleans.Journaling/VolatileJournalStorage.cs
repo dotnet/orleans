@@ -7,11 +7,17 @@ using Orleans.Journaling.Json;
 
 namespace Orleans.Journaling;
 
+/// <summary>
+/// Provides shared in-memory journal storage instances identified by journal id.
+/// </summary>
 public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJournalStorageCatalog
 {
     private readonly IOptions<JournaledStateManagerOptions>? _options;
     private readonly ConcurrentDictionary<string, VolatileJournalStorage.Store> _storage = new(StringComparer.Ordinal);
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="VolatileJournalStorageProvider"/> class using the default journal format.
+    /// </summary>
     public VolatileJournalStorageProvider()
     {
     }
@@ -26,6 +32,7 @@ public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJ
         _options = options;
     }
 
+    /// <inheritdoc/>
     public IJournalStorage CreateStorage(JournalId journalId)
     {
         if (journalId.IsDefault)
@@ -38,6 +45,7 @@ public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJ
         return new VolatileJournalStorage(store, journalFormatKey);
     }
 
+    /// <inheritdoc/>
     public async IAsyncEnumerable<JournalId> ListAsync(
         JournalId prefix = default,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -99,6 +107,9 @@ public sealed class VolatileJournalStorage : IJournalStorage
     private readonly Store _store;
     private string? _configuredJournalFormatKey;
 
+    /// <summary>
+    /// Initializes a new isolated in-memory journal storage instance using the default journal format.
+    /// </summary>
     public VolatileJournalStorage() : this(new Store(CreateVolatileStorageId()), journalFormatKey: null)
     {
     }
@@ -118,6 +129,7 @@ public sealed class VolatileJournalStorage : IJournalStorage
         SetConfiguredJournalFormatKey(journalFormatKey);
     }
 
+    /// <inheritdoc/>
     public bool IsCompactionRequested
     {
         get
@@ -155,6 +167,7 @@ public sealed class VolatileJournalStorage : IJournalStorage
         _configuredJournalFormatKey = journalFormatKey;
     }
 
+    /// <inheritdoc/>
     public ValueTask<bool> CreateIfNotExistsAsync(
         IReadOnlyDictionary<string, string>? metadata = null,
         CancellationToken cancellationToken = default)
@@ -173,6 +186,7 @@ public sealed class VolatileJournalStorage : IJournalStorage
         }
     }
 
+    /// <inheritdoc/>
     public ValueTask<IJournalMetadata?> GetMetadataAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -182,6 +196,7 @@ public sealed class VolatileJournalStorage : IJournalStorage
         }
     }
 
+    /// <inheritdoc/>
     public ValueTask<IJournalMetadata?> UpdateMetadataAsync(
         IReadOnlyDictionary<string, string>? set = null,
         IEnumerable<string>? remove = null,
@@ -260,6 +275,7 @@ public sealed class VolatileJournalStorage : IJournalStorage
         return default;
     }
 
+    /// <inheritdoc/>
     public ValueTask DeleteAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();

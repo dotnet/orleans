@@ -3,12 +3,15 @@ using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Hosting;
 
+/// <summary>
+/// Provides transaction configuration extensions for <see cref="ISiloBuilder"/>.
+/// </summary>
 public static class SiloBuilderExtensions
 {
     /// <summary>
-    /// Configure cluster to use the distributed TM algorithm
+    /// Adds Orleans transaction services and transaction protocol grain extensions to the silo.
     /// </summary>
-    /// <param name="builder">Silo host builder</param>
+    /// <param name="builder">The silo builder.</param>
     /// <returns>The silo builder.</returns>
     public static ISiloBuilder UseTransactions(this ISiloBuilder builder)
     {

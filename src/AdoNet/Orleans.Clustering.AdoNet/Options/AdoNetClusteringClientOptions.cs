@@ -2,6 +2,9 @@ using System.Data.Common;
 
 namespace Orleans.Configuration
 {
+    /// <summary>
+    /// Configures relational database access for client gateway discovery.
+    /// </summary>
     public class AdoNetClusteringClientOptions
     {
         /// <summary>

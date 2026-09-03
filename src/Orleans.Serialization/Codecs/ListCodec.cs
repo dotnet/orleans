@@ -103,6 +103,7 @@ namespace Orleans.Serialization.Codecs
 
         private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
 
+        /// <inheritdoc />
         public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, List<T> value) where TBufferWriter : IBufferWriter<byte>
         {
             if (value.Count > 0)
@@ -117,6 +118,7 @@ namespace Orleans.Serialization.Codecs
             }
         }
 
+        /// <inheritdoc />
         public void Deserialize<TInput>(ref Reader<TInput> reader, List<T> value)
         {
             // If the value has some values added by the constructor, clear them.

@@ -5,6 +5,9 @@ using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
+    /// <summary>
+    /// Provides cached access to messages received from a stream queue.
+    /// </summary>
     public interface IQueueCache : IQueueFlowController
     {
         /// <summary>

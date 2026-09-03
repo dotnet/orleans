@@ -7,6 +7,9 @@ using Orleans.CodeGenerator.Model;
 
 namespace Orleans.CodeGenerator;
 
+/// <summary>
+/// Generates Orleans serializers, copiers, activators, RPC proxies, invokers, and registration metadata.
+/// </summary>
 [Generator]
 public sealed class OrleansSerializationSourceGenerator : IIncrementalGenerator
 {
@@ -25,7 +28,7 @@ public sealed class OrleansSerializationSourceGenerator : IIncrementalGenerator
     internal const string ProxyOutputsTrackingName = "Orleans.ProxyOutputs";
     internal const string MetadataOutputsTrackingName = "Orleans.MetadataOutputs";
 
-
+    /// <inheritdoc/>
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         var generatorOptions = context.AnalyzerConfigOptionsProvider

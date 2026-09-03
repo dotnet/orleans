@@ -10,7 +10,7 @@
     <WarnOnPackingNonPackableProject>false</WarnOnPackingNonPackableProject>
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
-    <NoWarn>$(NoWarn);FS2003;1591</NoWarn>
+    <NoWarn>$(NoWarn);FS2003</NoWarn>
     <ServerGarbageCollection>true</ServerGarbageCollection>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>

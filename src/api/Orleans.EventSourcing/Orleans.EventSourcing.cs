@@ -223,9 +223,6 @@ namespace Orleans.EventSourcing
     {
         public ProtocolTransportException() { }
 
-        [System.Obsolete]
-        protected ProtocolTransportException(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) { }
-
         public ProtocolTransportException(string msg, System.Exception exc) { }
 
         public ProtocolTransportException(string msg) { }

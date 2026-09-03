@@ -11,8 +11,15 @@ namespace Orleans.Placement;
 /// </summary>
 public abstract class PlacementFilterStrategy
 {
+    /// <summary>
+    /// Gets the order in which this filter is applied relative to other placement filters.
+    /// </summary>
     public int Order { get; private set; }
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="PlacementFilterStrategy"/> class.
+    /// </summary>
+    /// <param name="order">The order in which this filter is applied relative to other placement filters.</param>
     protected PlacementFilterStrategy(int order)
     {
         Order = order;
@@ -37,6 +44,10 @@ public abstract class PlacementFilterStrategy
         AdditionalInitialize(properties);
     }
 
+    /// <summary>
+    /// Initializes strategy-specific state using the provided grain properties.
+    /// </summary>
+    /// <param name="properties">The grain properties.</param>
     public virtual void AdditionalInitialize(GrainProperties properties)
     {
     }
@@ -68,12 +79,26 @@ public abstract class PlacementFilterStrategy
         }
     }
 
+    /// <summary>
+    /// Gets a property for this placement filter strategy.
+    /// </summary>
+    /// <param name="key">The strategy-specific property key.</param>
+    /// <param name="properties">The grain properties.</param>
+    /// <returns>The property value, or <see langword="null"/> if the property is not present.</returns>
     protected string? GetPlacementFilterGrainProperty(string key, GrainProperties properties)
     {
         var typeName = GetType().Name;
         return properties.Properties.TryGetValue($"{WellKnownGrainTypeProperties.PlacementFilter}.{typeName}.{key}", out var value) ? value : null;
     }
 
+    /// <summary>
+    /// Gets the strategy-specific grain properties to populate.
+    /// </summary>
+    /// <param name="services">The service provider.</param>
+    /// <param name="grainClass">The grain class.</param>
+    /// <param name="grainType">The grain type.</param>
+    /// <param name="existingProperties">The grain properties populated so far.</param>
+    /// <returns>The strategy-specific grain properties.</returns>
     protected virtual IEnumerable<KeyValuePair<string, string>> GetAdditionalGrainProperties(IServiceProvider services, Type grainClass, GrainType grainType, IReadOnlyDictionary<string, string> existingProperties)
         => Array.Empty<KeyValuePair<string, string>>();
 }

@@ -23,18 +23,32 @@ namespace Orleans
     [AttributeUsage(AttributeTargets.Method)]
     public sealed class TransactionAttribute : Attribute
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TransactionAttribute"/> class.
+        /// </summary>
+        /// <param name="requirement">The transaction behavior required by the attributed method.</param>
         public TransactionAttribute(TransactionOption requirement)
         {
             Requirement = requirement;
         }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TransactionAttribute"/> class.
+        /// </summary>
+        /// <param name="alias">An alias for the transaction behavior required by the attributed method.</param>
         public TransactionAttribute(TransactionOptionAlias alias)
         {
             Requirement = (TransactionOption)(int)alias;
         }
 
+        /// <summary>
+        /// Gets the transaction behavior required by the attributed method.
+        /// </summary>
         public TransactionOption Requirement { get; }
 
+        /// <summary>
+        /// Gets or sets a value indicating whether the transaction permits read operations only.
+        /// </summary>
         [Obsolete("Use [ReadOnly] attribute instead.")]
         public bool ReadOnly { get; set; }
     }
@@ -56,25 +70,76 @@ namespace Orleans
     {
     }
 
+    /// <summary>
+    /// Specifies how a method call or delegate interacts with an ambient transaction.
+    /// </summary>
     public enum TransactionOption
     {
-        Suppress,     // Logic is not transactional but can be called from within a transaction.  If called within the context of a transaction, the context will not be passed to the call.
-        CreateOrJoin, // Logic is transactional.  If called within the context of a transaction, it will use that context, else it will create a new context.
-        Create,       // Logic is transactional and will always create a new transaction context, even if called within an existing transaction context.
-        Join,         // Logic is transactional but can only be called within the context of an existing transaction.
-        Supported,    // Logic is not transactional but supports transactions.  If called within the context of a transaction, the context will be passed to the call.
-        NotAllowed    // Logic is not transactional and cannot be called from within a transaction.  If called within the context of a transaction, it will throw a not supported exception.
+        /// <summary>
+        /// Executes grain calls without propagating an ambient transaction. Delegate execution rejects an existing ambient transaction.
+        /// </summary>
+        Suppress,
+
+        /// <summary>
+        /// Joins the ambient transaction when one exists; otherwise, creates a transaction.
+        /// </summary>
+        CreateOrJoin,
+
+        /// <summary>
+        /// Creates a transaction, independently of any ambient transaction.
+        /// </summary>
+        Create,
+
+        /// <summary>
+        /// Joins the ambient transaction and requires one to exist.
+        /// </summary>
+        Join,
+
+        /// <summary>
+        /// Propagates the ambient transaction when one exists and executes without a transaction otherwise.
+        /// </summary>
+        Supported,
+
+        /// <summary>
+        /// Executes without a transaction and rejects calls made within an ambient transaction.
+        /// </summary>
+        NotAllowed
     }
 
+    /// <summary>
+    /// Provides compatibility aliases for <see cref="TransactionOption"/> values.
+    /// </summary>
     public enum TransactionOptionAlias
     {
+        /// <summary>
+        /// Maps to <see cref="TransactionOption.Supported"/>.
+        /// </summary>
         Suppress     = TransactionOption.Supported,
+
+        /// <summary>
+        /// Maps to <see cref="TransactionOption.CreateOrJoin"/>.
+        /// </summary>
         Required     = TransactionOption.CreateOrJoin,
+
+        /// <summary>
+        /// Maps to <see cref="TransactionOption.Create"/>.
+        /// </summary>
         RequiresNew  = TransactionOption.Create,
+
+        /// <summary>
+        /// Maps to <see cref="TransactionOption.Join"/>.
+        /// </summary>
         Mandatory    = TransactionOption.Join,
+
+        /// <summary>
+        /// Maps to <see cref="TransactionOption.NotAllowed"/>.
+        /// </summary>
         Never        = TransactionOption.NotAllowed,
     }
 
+    /// <summary>
+    /// Provides transaction propagation and resolution for generated grain request invokers.
+    /// </summary>
     [GenerateSerializer]
     public abstract class TransactionRequestBase : RequestBase, IOutgoingGrainCallFilter, IOnDeserialized
     {
@@ -86,15 +151,29 @@ namespace Orleans
 
         private ITransactionAgent TransactionAgent => _transactionAgent ?? throw new OrleansTransactionsDisabledException();
 
+        /// <summary>
+        /// Gets or sets the transaction behavior for the request.
+        /// </summary>
         [Id(0)]
         public TransactionOption TransactionOption { get; set; }
 
+        /// <summary>
+        /// Gets or sets the transaction information propagated with the request.
+        /// </summary>
         [Id(1)]
         public TransactionInfo? TransactionInfo { get; set; }
 
+        /// <summary>
+        /// Gets or sets a value indicating whether transactional state reads acquire exclusive locks.
+        /// </summary>
         [Id(2)]
         public bool UseExclusiveLock { get; set; }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TransactionRequestBase"/> class.
+        /// </summary>
+        /// <param name="exceptionSerializer">The serializer for transaction abort exceptions.</param>
+        /// <param name="serviceProvider">The service provider used to resolve transaction services.</param>
         [GeneratedActivatorConstructor]
         protected TransactionRequestBase(Serializer<OrleansTransactionAbortedException> exceptionSerializer, IServiceProvider serviceProvider)
         {
@@ -104,6 +183,9 @@ namespace Orleans
             _transactionAgent = serviceProvider.GetService<ITransactionAgent>();
         }
 
+        /// <summary>
+        /// Gets a value indicating whether the request executes outside the ambient transaction.
+        /// </summary>
         public bool IsAmbientTransactionSuppressed => TransactionOption switch
         {
             TransactionOption.Create => true,
@@ -111,6 +193,9 @@ namespace Orleans
             _ => false
         };
 
+        /// <summary>
+        /// Gets a value indicating whether the request requires a transaction context.
+        /// </summary>
         public bool IsTransactionRequired => TransactionOption switch
         {
             TransactionOption.Create => true,
@@ -119,13 +204,27 @@ namespace Orleans
             _ => false
         };
 
+        /// <summary>
+        /// Sets the transaction behavior using a compatibility alias.
+        /// </summary>
+        /// <param name="txOption">The transaction option alias.</param>
         protected void SetTransactionOptions(TransactionOptionAlias txOption) => SetTransactionOptions((TransactionOption)txOption);
 
+        /// <summary>
+        /// Sets the transaction behavior for the request.
+        /// </summary>
+        /// <param name="txOption">The transaction option.</param>
         protected void SetTransactionOptions(TransactionOption txOption)
         {
             this.TransactionOption = txOption;
         }
 
+        /// <summary>
+        /// Sets whether transactional state reads acquire exclusive locks.
+        /// </summary>
+        /// <param name="value">
+        /// <see langword="true"/> to acquire exclusive locks for reads; otherwise, <see langword="false"/>.
+        /// </param>
         protected void SetExclusiveLock(bool value)
         {
             this.UseExclusiveLock = value;
@@ -193,6 +292,7 @@ namespace Orleans
             return transactionInfo;
         }
 
+        /// <inheritdoc/>
         public override async ValueTask<Response> Invoke()
         {
             Response response;
@@ -270,8 +370,13 @@ namespace Orleans
             return response;
         }
 
+        /// <summary>
+        /// Invokes the generated request implementation.
+        /// </summary>
+        /// <returns>A response representing the invocation result.</returns>
         protected abstract ValueTask<Response> BaseInvoke();
 
+        /// <inheritdoc/>
         public override void Dispose()
         {
            TransactionInfo = null;
@@ -284,15 +389,27 @@ namespace Orleans
         }
     }
 
+    /// <summary>
+    /// Wraps a response together with the transaction information produced by an invocation.
+    /// </summary>
     [GenerateSerializer]
     public sealed class TransactionResponse : Response
     {
         [Id(0)]
         private Response _response = null!;
 
+        /// <summary>
+        /// Gets or sets the transaction information returned by the invocation.
+        /// </summary>
         [Id(1)]
         public TransactionInfo? TransactionInfo { get; set; }
 
+        /// <summary>
+        /// Creates a transaction response which wraps an invocation response.
+        /// </summary>
+        /// <param name="response">The invocation response.</param>
+        /// <param name="transactionInfo">The transaction information to return with the response.</param>
+        /// <returns>The transaction response.</returns>
         public static TransactionResponse Create(Response response, TransactionInfo transactionInfo)
         {
             return new TransactionResponse
@@ -302,8 +419,14 @@ namespace Orleans
             };
         }
 
+        /// <summary>
+        /// Gets the wrapped invocation response.
+        /// </summary>
         public Response InnerResponse => _response;
 
+        /// <summary>
+        /// Gets or sets the wrapped response result.
+        /// </summary>
         public override object? Result
         {
             get
@@ -319,6 +442,10 @@ namespace Orleans
             set => _response.Result = value;
         }
 
+        /// <summary>
+        /// Gets <see langword="null"/> so that the wrapper can be delivered as a successful response, or sets the
+        /// exception on the wrapped response.
+        /// </summary>
         public override Exception? Exception
         {
             get
@@ -332,27 +459,43 @@ namespace Orleans
             set => _response.Exception = value;
         }
 
+        /// <summary>
+        /// Gets the exception from the wrapped response.
+        /// </summary>
+        /// <returns>The wrapped exception, or <see langword="null"/> if the invocation completed successfully.</returns>
         public Exception? GetException() => _response.Exception;
 
+        /// <inheritdoc/>
         public override string ToString() => _response?.ToString() ?? "[null]";
 
+        /// <inheritdoc/>
         public override void Dispose()
         {
             TransactionInfo = null;
             _response.Dispose();
         }
 
+        /// <inheritdoc/>
         [return: MaybeNull]
         public override T GetResult<T>() => _response.GetResult<T>();
     }
 
+    /// <summary>
+    /// Base type for generated transactional request invokers which return a <see cref="ValueTask"/>.
+    /// </summary>
     [SerializerTransparent]
     public abstract class TransactionRequest : TransactionRequestBase
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TransactionRequest"/> class.
+        /// </summary>
+        /// <param name="exceptionSerializer">The serializer for transaction abort exceptions.</param>
+        /// <param name="serviceProvider">The service provider used to resolve transaction services.</param>
         protected TransactionRequest(Serializer<OrleansTransactionAbortedException> exceptionSerializer, IServiceProvider serviceProvider) : base(exceptionSerializer, serviceProvider)
         {
         }
 
+        /// <inheritdoc/>
         protected sealed override ValueTask<Response> BaseInvoke()
         {
             try
@@ -386,16 +529,30 @@ namespace Orleans
         }
 
         // Generated
+        /// <summary>
+        /// Invokes the generated method implementation.
+        /// </summary>
+        /// <returns>A task representing the invocation.</returns>
         protected abstract ValueTask InvokeInner();
     }
 
+    /// <summary>
+    /// Base type for generated transactional request invokers which return a <see cref="ValueTask{TResult}"/>.
+    /// </summary>
+    /// <typeparam name="TResult">The invocation result type.</typeparam>
     [SerializerTransparent]
     public abstract class TransactionRequest<TResult> : TransactionRequestBase
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TransactionRequest{TResult}"/> class.
+        /// </summary>
+        /// <param name="exceptionSerializer">The serializer for transaction abort exceptions.</param>
+        /// <param name="serviceProvider">The service provider used to resolve transaction services.</param>
         protected TransactionRequest(Serializer<OrleansTransactionAbortedException> exceptionSerializer, IServiceProvider serviceProvider) : base(exceptionSerializer, serviceProvider)
         {
         }
 
+        /// <inheritdoc/>
         protected sealed override ValueTask<Response> BaseInvoke()
         {
             try
@@ -428,16 +585,30 @@ namespace Orleans
         }
 
         // Generated
+        /// <summary>
+        /// Invokes the generated method implementation.
+        /// </summary>
+        /// <returns>A task containing the invocation result.</returns>
         protected abstract ValueTask<TResult> InvokeInner();
     }
 
+    /// <summary>
+    /// Base type for generated transactional request invokers which return a <see cref="Task{TResult}"/>.
+    /// </summary>
+    /// <typeparam name="TResult">The invocation result type.</typeparam>
     [SerializerTransparent]
     public abstract class TransactionTaskRequest<TResult> : TransactionRequestBase
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TransactionTaskRequest{TResult}"/> class.
+        /// </summary>
+        /// <param name="exceptionSerializer">The serializer for transaction abort exceptions.</param>
+        /// <param name="serviceProvider">The service provider used to resolve transaction services.</param>
         protected TransactionTaskRequest(Serializer<OrleansTransactionAbortedException> exceptionSerializer, IServiceProvider serviceProvider) : base(exceptionSerializer, serviceProvider)
         {
         }
 
+        /// <inheritdoc/>
         protected sealed override ValueTask<Response> BaseInvoke()
         {
             try
@@ -471,16 +642,29 @@ namespace Orleans
         }
 
         // Generated
+        /// <summary>
+        /// Invokes the generated method implementation.
+        /// </summary>
+        /// <returns>A task containing the invocation result.</returns>
         protected abstract Task<TResult> InvokeInner();
     }
 
+    /// <summary>
+    /// Base type for generated transactional request invokers which return a <see cref="Task"/>.
+    /// </summary>
     [SerializerTransparent]
     public abstract class TransactionTaskRequest : TransactionRequestBase
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TransactionTaskRequest"/> class.
+        /// </summary>
+        /// <param name="exceptionSerializer">The serializer for transaction abort exceptions.</param>
+        /// <param name="serviceProvider">The service provider used to resolve transaction services.</param>
         protected TransactionTaskRequest(Serializer<OrleansTransactionAbortedException> exceptionSerializer, IServiceProvider serviceProvider) : base(exceptionSerializer, serviceProvider)
         {
         }
 
+        /// <inheritdoc/>
         protected sealed override ValueTask<Response> BaseInvoke()
         {
             try
@@ -515,6 +699,10 @@ namespace Orleans
         }
 
         // Generated
+        /// <summary>
+        /// Invokes the generated method implementation.
+        /// </summary>
+        /// <returns>A task representing the invocation.</returns>
         protected abstract Task InvokeInner();
     }
 }

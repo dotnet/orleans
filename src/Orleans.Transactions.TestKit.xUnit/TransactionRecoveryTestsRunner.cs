@@ -4,13 +4,20 @@ using Xunit;
 
 namespace Orleans.Transactions.TestKit.xUnit
 {
+    /// <inheritdoc cref="TransactionRecoveryTestsRunner"/>
     public class TransactionRecoveryTestsRunnerxUnit : TransactionRecoveryTestsRunner
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TransactionRecoveryTestsRunnerxUnit"/> class.
+        /// </summary>
+        /// <param name="cluster">The test cluster used to run recovery scenarios.</param>
+        /// <param name="testOutput">The xUnit test output helper.</param>
         public TransactionRecoveryTestsRunnerxUnit(TestCluster cluster, ITestOutputHelper testOutput)
             :base(cluster, testOutput.WriteLine)
         {
         }
 
+        /// <inheritdoc cref="TransactionRecoveryTestsRunner.TransactionWillRecoverAfterRandomSiloGracefulShutdown(string, int)"/>
         [Theory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain, 30)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain, 20)]
@@ -19,6 +26,7 @@ namespace Orleans.Transactions.TestKit.xUnit
             return base.TransactionWillRecoverAfterRandomSiloGracefulShutdown(transactionTestGrainClassName, concurrent);
         }
 
+        /// <inheritdoc cref="TransactionRecoveryTestsRunner.TransactionWillRecoverAfterRandomSiloUnGracefulShutdown(string, int)"/>
         [Theory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain, 30)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain, 20)]

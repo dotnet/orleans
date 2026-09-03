@@ -33,6 +33,9 @@ public interface ITimerRegistry
 
     /// <inheritdoc cref="GrainBaseExtensions.RegisterGrainTimer{TState}(IGrainBase, Func{TState, CancellationToken, Task}, TState, GrainTimerCreationOptions)"/>
     /// <param name="grainContext">The grain which the timer is associated with.</param>
+    /// <param name="callback">The timer callback, which will be invoked whenever the timer becomes due.</param>
+    /// <param name="state">The state passed to the callback.</param>
+    /// <param name="options">The options for creating the timer.</param>
     /// <typeparam name="TState">The type of the <paramref name="state"/> parameter.</typeparam>
     IGrainTimer RegisterGrainTimer<TState>(IGrainContext grainContext, Func<TState, CancellationToken, Task> callback, TState state, GrainTimerCreationOptions options);
 }

@@ -1,7 +1,11 @@
 namespace Orleans.Clustering.AzureStorage;
 
+/// <summary>
+/// Configures Azure Table Storage access for client gateway discovery.
+/// </summary>
 public class AzureStorageGatewayOptions : AzureStorageOperationOptions
 {
+    /// <inheritdoc />
     public override string TableName { get; set; } = AzureStorageClusteringOptions.DEFAULT_TABLE_NAME;
 }
 

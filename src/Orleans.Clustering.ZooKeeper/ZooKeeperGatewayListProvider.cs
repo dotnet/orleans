@@ -9,6 +9,9 @@ using Orleans.Configuration;
 
 namespace Orleans.Runtime.Membership
 {
+    /// <summary>
+    /// Provides Orleans gateway addresses from ZooKeeper cluster membership.
+    /// </summary>
     public class ZooKeeperGatewayListProvider : IGatewayListProvider
     {
         private readonly ZooKeeperWatcher _watcher;
@@ -24,6 +27,13 @@ namespace Orleans.Runtime.Membership
         private readonly string _deploymentConnectionString;
         private readonly TimeSpan _maxStaleness;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ZooKeeperGatewayListProvider"/> class.
+        /// </summary>
+        /// <param name="logger">The logger.</param>
+        /// <param name="options">The ZooKeeper gateway discovery options.</param>
+        /// <param name="gatewayOptions">The gateway discovery refresh options.</param>
+        /// <param name="clusterOptions">The cluster identity options.</param>
         public ZooKeeperGatewayListProvider(
             ILogger<ZooKeeperGatewayListProvider> logger,
             IOptions<ZooKeeperGatewayListProviderOptions> options,

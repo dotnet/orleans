@@ -7,7 +7,9 @@ using Orleans.Configuration;
 
 namespace Orleans.Hosting
 {
-
+    /// <summary>
+    /// Provides extension methods for configuring ZooKeeper clustering.
+    /// </summary>
     public static class ZooKeeperHostingExtensions
     {
         /// <summary>

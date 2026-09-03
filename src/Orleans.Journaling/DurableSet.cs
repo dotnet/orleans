@@ -4,16 +4,37 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Journaling;
 
+/// <summary>
+/// Represents a set whose mutations are recorded in a journal.
+/// </summary>
+/// <typeparam name="T">The type of elements in the set.</typeparam>
 public interface IDurableSet<T> : ISet<T>, IReadOnlyCollection<T>, IReadOnlySet<T>
 {
+    /// <inheritdoc/>
     new int Count { get; }
+
+    /// <inheritdoc/>
     new bool Contains(T item);
+
+    /// <inheritdoc/>
     new bool Add(T item);
+
+    /// <inheritdoc/>
     new bool IsProperSubsetOf(IEnumerable<T> other);
+
+    /// <inheritdoc/>
     new bool IsProperSupersetOf(IEnumerable<T> other);
+
+    /// <inheritdoc/>
     new bool IsSubsetOf(IEnumerable<T> other);
+
+    /// <inheritdoc/>
     new bool IsSupersetOf(IEnumerable<T> other);
+
+    /// <inheritdoc/>
     new bool Overlaps(IEnumerable<T> other);
+
+    /// <inheritdoc/>
     new bool SetEquals(IEnumerable<T> other);
 }
 
@@ -105,9 +126,9 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IJournaledState, IDurableS
 
     IEnumerator IEnumerable.GetEnumerator() => _items.GetEnumerator();
 
-    protected bool ApplyAdd(T item) => _items.Add(item);
-    protected bool ApplyRemove(T item) => _items.Remove(item);
-    protected void ApplyClear() => _items.Clear();
+    private bool ApplyAdd(T item) => _items.Add(item);
+    private bool ApplyRemove(T item) => _items.Remove(item);
+    private void ApplyClear() => _items.Clear();
     void IDurableSetCommandHandler<T>.ApplyAdd(T item) => ApplyAdd(item);
     void IDurableSetCommandHandler<T>.ApplyRemove(T item) => ApplyRemove(item);
     void IDurableSetCommandHandler<T>.ApplyClear() => ApplyClear();

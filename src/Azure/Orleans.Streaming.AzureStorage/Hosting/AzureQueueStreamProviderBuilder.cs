@@ -14,13 +14,28 @@ using Orleans.Providers;
 
 namespace Orleans.Hosting;
 
+/// <summary>
+/// Configures Azure Queue stream providers from configuration.
+/// </summary>
 public sealed class AzureQueueStreamProviderBuilder : IProviderBuilder<ISiloBuilder>, IProviderBuilder<IClientBuilder>
 {
+    /// <summary>
+    /// Configures an Azure Queue stream provider on a silo.
+    /// </summary>
+    /// <param name="builder">The silo builder.</param>
+    /// <param name="name">The stream provider name.</param>
+    /// <param name="configurationSection">The provider configuration.</param>
     public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
     {
         builder.AddAzureQueueStreams(name!, GetQueueOptionBuilder(configurationSection));
     }
 
+    /// <summary>
+    /// Configures an Azure Queue stream provider on a client.
+    /// </summary>
+    /// <param name="builder">The client builder.</param>
+    /// <param name="name">The stream provider name.</param>
+    /// <param name="configurationSection">The provider configuration.</param>
     public void Configure(IClientBuilder builder, string? name, IConfigurationSection configurationSection)
     {
         builder.AddAzureQueueStreams(name!, GetQueueOptionBuilder(configurationSection));

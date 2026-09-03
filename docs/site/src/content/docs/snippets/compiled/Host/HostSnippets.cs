@@ -173,10 +173,10 @@ public interface ISummerGrain : IGrain
 public sealed class MyType
 {
     [Id(0), Immutable]
-    public List<int> ReferenceData { get; set; }
+    public List<int> ReferenceData { get; set; } = [];
 
     [Id(1)]
-    public List<int> RunningTotals { get; set; }
+    public List<int> RunningTotals { get; set; } = [];
 }
     // </immutable_members>
 

@@ -9,6 +9,9 @@ using Orleans.Timers;
 
 namespace Orleans.Hosting;
 
+/// <summary>
+/// Provides extension methods for registering reminder services.
+/// </summary>
 public static class SiloBuilderReminderExtensions
 {
     /// <summary>

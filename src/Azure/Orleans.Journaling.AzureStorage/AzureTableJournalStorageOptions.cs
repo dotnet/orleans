@@ -13,6 +13,10 @@ public sealed class AzureTableJournalStorageOptions
     /// Table name where journal data is stored.
     /// </summary>
     public string TableName { get; set; } = DEFAULT_TABLE_NAME;
+
+    /// <summary>
+    /// The default table name for journal data.
+    /// </summary>
     public const string DEFAULT_TABLE_NAME = "journal";
 
     /// <summary>
@@ -58,6 +62,10 @@ public sealed class AzureTableJournalStorageOptions
     /// <see cref="IJournalStorage.IsCompactionRequested"/> becomes true. Defaults to 10,000.
     /// </summary>
     public long CompactionRowCountThreshold { get; set; } = DEFAULT_COMPACTION_ROW_COUNT_THRESHOLD;
+
+    /// <summary>
+    /// The default number of journal rows which requests compaction.
+    /// </summary>
     public const long DEFAULT_COMPACTION_ROW_COUNT_THRESHOLD = 10_000;
 
     /// <summary>
@@ -65,6 +73,10 @@ public sealed class AzureTableJournalStorageOptions
     /// <see cref="IJournalStorage.IsCompactionRequested"/> becomes true. Defaults to 32 MiB.
     /// </summary>
     public long CompactionSizeThreshold { get; set; } = DEFAULT_COMPACTION_SIZE_THRESHOLD;
+
+    /// <summary>
+    /// The default number of journal bytes which requests compaction.
+    /// </summary>
     public const long DEFAULT_COMPACTION_SIZE_THRESHOLD = 32L * 1024 * 1024;
 
     /// <summary>
@@ -76,6 +88,10 @@ public sealed class AzureTableJournalStorageOptions
     /// before retrying. Defaults to 5.
     /// </summary>
     public int MaxMetadataOnlyConflictRetries { get; set; } = DEFAULT_MAX_METADATA_ONLY_CONFLICT_RETRIES;
+
+    /// <summary>
+    /// The default maximum number of metadata-only conflict retries.
+    /// </summary>
     public const int DEFAULT_MAX_METADATA_ONLY_CONFLICT_RETRIES = 5;
 
     /// <summary>
@@ -84,6 +100,10 @@ public sealed class AzureTableJournalStorageOptions
     /// Set to <see cref="TimeSpan.Zero"/> to retry immediately without backoff. Defaults to 10 ms.
     /// </summary>
     public TimeSpan MetadataOnlyConflictInitialBackoff { get; set; } = DEFAULT_METADATA_ONLY_CONFLICT_INITIAL_BACKOFF;
+
+    /// <summary>
+    /// The default initial delay for metadata-only conflict retries.
+    /// </summary>
     public static readonly TimeSpan DEFAULT_METADATA_ONLY_CONFLICT_INITIAL_BACKOFF = TimeSpan.FromMilliseconds(10);
 
     /// <summary>
@@ -92,6 +112,10 @@ public sealed class AzureTableJournalStorageOptions
     /// and never exceeds this value. Defaults to 200 ms.
     /// </summary>
     public TimeSpan MetadataOnlyConflictMaxBackoff { get; set; } = DEFAULT_METADATA_ONLY_CONFLICT_MAX_BACKOFF;
+
+    /// <summary>
+    /// The default maximum delay between metadata-only conflict retries.
+    /// </summary>
     public static readonly TimeSpan DEFAULT_METADATA_ONLY_CONFLICT_MAX_BACKOFF = TimeSpan.FromMilliseconds(200);
 
     /// <summary>

@@ -1,5 +1,8 @@
 ﻿namespace Orleans.EventSourcing.Common
 {
+    /// <summary>
+    /// Provides operations for a compact, string-encoded set of replica identifiers used as a write vector.
+    /// </summary>
     public static class StringEncodedWriteVector
     {
 

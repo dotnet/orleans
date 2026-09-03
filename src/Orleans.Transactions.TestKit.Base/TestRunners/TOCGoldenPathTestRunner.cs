@@ -7,10 +7,25 @@ using AwesomeAssertions;
 
 namespace Orleans.Transactions.TestKit
 {
+    /// <summary>
+    /// Runs successful transaction commit service scenarios.
+    /// </summary>
     public abstract class TocGoldenPathTestRunner : TransactionTestRunnerBase
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TocGoldenPathTestRunner"/> class.
+        /// </summary>
+        /// <param name="grainFactory">The grain factory used to access test grains.</param>
+        /// <param name="output">The callback used to write test output.</param>
         protected TocGoldenPathTestRunner(IGrainFactory grainFactory, Action<string> output)
         : base(grainFactory, output) { }
+
+        /// <summary>
+        /// Verifies a successful multi-grain write coordinated with a transaction commit service.
+        /// </summary>
+        /// <param name="grainStates">The transaction state configuration used to select test grains.</param>
+        /// <param name="grainCount">The number of grains participating in the transaction.</param>
+        /// <returns>A task which represents the test.</returns>
         public virtual async Task MultiGrainWriteTransaction(string grainStates, int grainCount)
         {
             const int expected = 5;

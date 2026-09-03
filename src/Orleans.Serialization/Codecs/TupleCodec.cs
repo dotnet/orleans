@@ -98,6 +98,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="copier">The copier.</param>
         public TupleCopier(IDeepCopier<T> copier) => _copier = OrleansGeneratedCodeHelper.GetOptionalCopier(copier);
 
+        /// <inheritdoc />
         public bool IsShallowCopyable() => _copier is null;
 
         /// <inheritdoc />
@@ -230,8 +231,10 @@ namespace Orleans.Serialization.Codecs
             _copier2 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier2);
         }
 
+        /// <inheritdoc />
         public bool IsShallowCopyable() => _copier1 is null && _copier2 is null;
 
+        /// <inheritdoc />
         public Tuple<T1, T2> DeepCopy(Tuple<T1, T2> input, CopyContext context)
         {
             if (context.TryGetCopy(input, out Tuple<T1, T2>? existing))
@@ -383,6 +386,7 @@ namespace Orleans.Serialization.Codecs
             _copier3 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier3);
         }
 
+        /// <inheritdoc />
         public bool IsShallowCopyable() => _copier1 is null && _copier2 is null && _copier3 is null;
 
         /// <inheritdoc />
@@ -554,6 +558,7 @@ namespace Orleans.Serialization.Codecs
             _copier4 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier4);
         }
 
+        /// <inheritdoc />
         public bool IsShallowCopyable() => _copier1 is null && _copier2 is null && _copier3 is null && _copier4 is null;
 
         /// <inheritdoc />
@@ -745,6 +750,7 @@ namespace Orleans.Serialization.Codecs
             _copier5 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier5);
         }
 
+        /// <inheritdoc />
         public bool IsShallowCopyable() => _copier1 is null && _copier2 is null && _copier3 is null && _copier4 is null && _copier5 is null;
 
         /// <inheritdoc />
@@ -953,6 +959,7 @@ namespace Orleans.Serialization.Codecs
             _copier6 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier6);
         }
 
+        /// <inheritdoc />
         public bool IsShallowCopyable() => _copier1 is null && _copier2 is null && _copier3 is null && _copier4 is null && _copier5 is null && _copier6 is null;
 
         /// <inheritdoc />
@@ -1179,6 +1186,7 @@ namespace Orleans.Serialization.Codecs
             _copier7 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier7);
         }
 
+        /// <inheritdoc />
         public bool IsShallowCopyable() => _copier1 is null && _copier2 is null && _copier3 is null && _copier4 is null && _copier5 is null && _copier6 is null && _copier7 is null;
 
         /// <inheritdoc />
@@ -1421,6 +1429,7 @@ namespace Orleans.Serialization.Codecs
             _copier8 = OrleansGeneratedCodeHelper.GetOptionalCopier(copier8);
         }
 
+        /// <inheritdoc />
         public bool IsShallowCopyable() => _copier1 is null && _copier2 is null && _copier3 is null && _copier4 is null && _copier5 is null && _copier6 is null && _copier7 is null && _copier8 is null;
 
         /// <inheritdoc />

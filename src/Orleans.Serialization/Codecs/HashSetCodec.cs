@@ -113,6 +113,7 @@ namespace Orleans.Serialization.Codecs
 
         private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized set is missing its length field.");
 
+        /// <inheritdoc />
         public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, HashSet<T> value) where TBufferWriter : IBufferWriter<byte>
         {
             if (value.Comparer != EqualityComparer<T>.Default)

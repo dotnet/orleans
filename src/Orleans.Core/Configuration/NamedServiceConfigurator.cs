@@ -108,6 +108,11 @@ namespace Orleans.Hosting
             });
         }
 
+        /// <summary>
+        /// Provides a lifecycle configuration point for the named service.
+        /// </summary>
+        /// <typeparam name="T">The lifecycle subject type.</typeparam>
+        /// <param name="configurator">The named service configurator.</param>
         public static void ConfigureLifecycle<T>(this INamedServiceConfigurator configurator) where T : ILifecycleSubject
         {
 

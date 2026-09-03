@@ -3,14 +3,14 @@
 namespace Orleans.Transactions
 {
     /// <summary>
-    /// System clock abstraction
+    /// Provides the current Coordinated Universal Time.
     /// </summary>
     public interface IClock
     {
         /// <summary>
-        /// Current time in utc
+        /// Gets the current Coordinated Universal Time.
         /// </summary>
-        /// <returns></returns>
+        /// <returns>The current UTC date and time.</returns>
         DateTime UtcNow();
     }
 }

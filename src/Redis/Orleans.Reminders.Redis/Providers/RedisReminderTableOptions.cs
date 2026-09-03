@@ -35,6 +35,8 @@ namespace Orleans.Configuration
         /// <summary>
         /// The default multiplexer creation delegate.
         /// </summary>
+        /// <param name="options">The reminder table options containing the Redis connection configuration.</param>
+        /// <returns>A task containing the created multiplexer and an indication that the provider owns it.</returns>
         public static async Task<(IConnectionMultiplexer Multiplexer, bool IsShared)> DefaultCreateMultiplexer(RedisReminderTableOptions options)
             => (Multiplexer: await ConnectionMultiplexer.ConnectAsync(options.ConfigurationOptions!), IsShared: false);
     }
@@ -51,11 +53,16 @@ namespace Orleans.Configuration
     {
         private readonly RedisReminderTableOptions _options;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="RedisReminderTableOptionsValidator"/> class.
+        /// </summary>
+        /// <param name="options">The reminder table options to validate.</param>
         public RedisReminderTableOptionsValidator(IOptions<RedisReminderTableOptions> options)
         {
             _options = options.Value;
         }
 
+        /// <inheritdoc />
         public void ValidateConfiguration()
         {
             if (_options.ConfigurationOptions == null)

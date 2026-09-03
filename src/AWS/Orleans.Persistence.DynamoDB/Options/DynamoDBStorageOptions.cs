@@ -5,6 +5,9 @@ using Orleans.Storage;
 
 namespace Orleans.Configuration
 {
+    /// <summary>
+    /// Configures the DynamoDB grain storage provider.
+    /// </summary>
     public class DynamoDBStorageOptions : DynamoDBClientOptions, IStorageProviderSerializerOptions
     {
         /// <summary>
@@ -52,6 +55,10 @@ namespace Orleans.Configuration
         /// Stage of silo lifecycle where storage should be initialized.  Storage must be initialized prior to use.
         /// </summary>
         public int InitStage { get; set; } = DEFAULT_INIT_STAGE;
+
+        /// <summary>
+        /// The default silo lifecycle stage at which the storage provider is initialized.
+        /// </summary>
         public const int DEFAULT_INIT_STAGE = ServiceLifecycleStage.ApplicationServices;
 
         /// <summary>
@@ -59,6 +66,8 @@ namespace Orleans.Configuration
         /// every StateWrite will increase the TTL of the grain
         /// </summary>
         public TimeSpan? TimeToLive { get; set; }
+
+        /// <inheritdoc/>
         public IGrainStorageSerializer GrainStorageSerializer { get; set; } = null!;
     }
 
@@ -81,6 +90,7 @@ namespace Orleans.Configuration
             this.name = name;
         }
 
+        /// <inheritdoc/>
         public void ValidateConfiguration()
         {
             if (string.IsNullOrWhiteSpace(this.options.TableName))

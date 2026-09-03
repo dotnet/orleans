@@ -11,6 +11,10 @@ namespace Orleans.Configuration
     {
         private readonly AdoNetClusteringClientOptions options;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="AdoNetClusteringClientOptionsValidator"/> class.
+        /// </summary>
+        /// <param name="options">The options to validate.</param>
         public AdoNetClusteringClientOptionsValidator(IOptions<AdoNetClusteringClientOptions> options)
         {
             this.options = options.Value;

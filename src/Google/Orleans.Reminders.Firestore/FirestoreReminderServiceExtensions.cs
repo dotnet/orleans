@@ -6,6 +6,9 @@ using Orleans.Reminders.Firestore;
 
 namespace Orleans.Hosting;
 
+/// <summary>
+/// Provides extension methods for configuring Google Cloud Firestore reminder storage.
+/// </summary>
 public static class FirestoreReminderServiceExtensions
 {
     /// <summary>

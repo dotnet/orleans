@@ -6,6 +6,9 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Orleans.Runtime.Hosting
 {
+    /// <summary>
+    /// Extension methods for registering grain storage providers with a silo.
+    /// </summary>
     public static class StorageProviderExtensions
     {
         /// <summary>

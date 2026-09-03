@@ -11,6 +11,11 @@ namespace Orleans.Hosting;
 /// </summary>
 public sealed class SiloRedisStreamConfigurator : SiloPersistentStreamConfigurator
 {
+    /// <summary>
+    /// Initializes a new instance of the <see cref="SiloRedisStreamConfigurator"/> class.
+    /// </summary>
+    /// <param name="name">The stream provider name.</param>
+    /// <param name="configureServicesDelegate">The delegate used to configure services.</param>
     public SiloRedisStreamConfigurator(string name, Action<Action<IServiceCollection>> configureServicesDelegate)
         : base(name, configureServicesDelegate, RedisStreamAdapterFactory.Create)
     {
@@ -34,6 +39,11 @@ public sealed class SiloRedisStreamConfigurator : SiloPersistentStreamConfigurat
     /// </summary>
     public OptionsBuilder<RedisStreamingOptions> RedisStreamingOptions => this.GetNamedOptionsBuilder<RedisStreamingOptions>();
 
+    /// <summary>
+    /// Configures the Redis stream receiver options.
+    /// </summary>
+    /// <param name="configureOptions">The delegate used to configure the named receiver options.</param>
+    /// <returns>This configurator.</returns>
     public SiloRedisStreamConfigurator ConfigureReceiver(Action<OptionsBuilder<RedisStreamReceiverOptions>> configureOptions)
     {
         ArgumentNullException.ThrowIfNull(configureOptions);
@@ -42,12 +52,22 @@ public sealed class SiloRedisStreamConfigurator : SiloPersistentStreamConfigurat
         return this;
     }
 
+    /// <summary>
+    /// Configures the number of Orleans queues used to partition streams.
+    /// </summary>
+    /// <param name="numOfPartitions">The number of stream queues.</param>
+    /// <returns>This configurator.</returns>
     public SiloRedisStreamConfigurator ConfigurePartitioning(int numOfPartitions = HashRingStreamQueueMapperOptions.DEFAULT_NUM_QUEUES)
     {
         this.Configure<HashRingStreamQueueMapperOptions>(builder => builder.Configure(options => options.TotalQueueCount = numOfPartitions));
         return this;
     }
 
+    /// <summary>
+    /// Configures the receiver cache size.
+    /// </summary>
+    /// <param name="cacheSize">The cache size.</param>
+    /// <returns>This configurator.</returns>
     public SiloRedisStreamConfigurator ConfigureCache(int cacheSize = SimpleQueueCacheOptions.DEFAULT_CACHE_SIZE)
     {
         this.Configure<SimpleQueueCacheOptions>(builder => builder.Configure(options => options.CacheSize = cacheSize));
@@ -60,6 +80,11 @@ public sealed class SiloRedisStreamConfigurator : SiloPersistentStreamConfigurat
 /// </summary>
 public sealed class ClusterClientRedisStreamConfigurator : ClusterClientPersistentStreamConfigurator
 {
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ClusterClientRedisStreamConfigurator"/> class.
+    /// </summary>
+    /// <param name="name">The stream provider name.</param>
+    /// <param name="builder">The client builder.</param>
     public ClusterClientRedisStreamConfigurator(string name, IClientBuilder builder)
         : base(name, builder, RedisStreamAdapterFactory.Create)
     {
@@ -82,6 +107,11 @@ public sealed class ClusterClientRedisStreamConfigurator : ClusterClientPersiste
     /// </summary>
     public OptionsBuilder<RedisStreamingOptions> RedisStreamingOptions => this.GetNamedOptionsBuilder<RedisStreamingOptions>();
 
+    /// <summary>
+    /// Configures the number of Orleans queues used to partition streams.
+    /// </summary>
+    /// <param name="numOfPartitions">The number of stream queues.</param>
+    /// <returns>This configurator.</returns>
     public ClusterClientRedisStreamConfigurator ConfigurePartitioning(int numOfPartitions = HashRingStreamQueueMapperOptions.DEFAULT_NUM_QUEUES)
     {
         this.Configure<HashRingStreamQueueMapperOptions>(builder => builder.Configure(options => options.TotalQueueCount = numOfPartitions));

@@ -12,11 +12,19 @@ using Orleans.Configuration;
 
 namespace Orleans.LeaseProviders
 {
+    /// <summary>
+    /// Provides distributed leases using Azure Blob Storage leases.
+    /// </summary>
     public class AzureBlobLeaseProvider : ILeaseProvider
     {
         private BlobContainerClient? container;
         private readonly AzureBlobLeaseProviderOptions options;
         private BlobServiceClient? blobClient;
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="AzureBlobLeaseProvider"/> class.
+        /// </summary>
+        /// <param name="options">The Azure Blob lease provider options.</param>
         public AzureBlobLeaseProvider(IOptions<AzureBlobLeaseProviderOptions> options)
             : this(options.Value)
         {
@@ -40,6 +48,7 @@ namespace Orleans.LeaseProviders
 
         private BlobClient GetBlobClient(string category, string resourceKey) => this.container!.GetBlobClient($"{category.ToLowerInvariant()}-{resourceKey.ToLowerInvariant()}.json");
 
+        /// <inheritdoc />
         public async Task<AcquireLeaseResult[]> Acquire(string category, LeaseRequest[] leaseRequests)
         {
             await InitContainerIfNotExistsAsync();
@@ -79,6 +88,7 @@ namespace Orleans.LeaseProviders
             }
         }
 
+        /// <inheritdoc />
         public async Task Release(string category, AcquiredLease[] acquiredLeases)
         {
             await InitContainerIfNotExistsAsync();
@@ -96,6 +106,7 @@ namespace Orleans.LeaseProviders
             return leaseClient.ReleaseAsync();
         }
 
+        /// <inheritdoc />
         public async Task<AcquireLeaseResult[]> Renew(string category, AcquiredLease[] acquiredLeases)
         {
             await InitContainerIfNotExistsAsync();
@@ -134,6 +145,12 @@ namespace Orleans.LeaseProviders
             }
         }
 
+        /// <summary>
+        /// Creates an Azure Blob lease provider using the named options from the service provider.
+        /// </summary>
+        /// <param name="services">The service provider.</param>
+        /// <param name="name">The name of the configured lease provider.</param>
+        /// <returns>The configured lease provider.</returns>
         public static ILeaseProvider Create(IServiceProvider services, string name)
         {
             AzureBlobLeaseProviderOptions options = services.GetOptionsByName<AzureBlobLeaseProviderOptions>(name);

@@ -54,8 +54,13 @@ namespace Orleans.Serialization.Codecs
     {
         private readonly IDeepCopier<T>? _copier;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ImmutableStackCopier{T}"/> class.
+        /// </summary>
+        /// <param name="copier">The element copier.</param>
         public ImmutableStackCopier(IDeepCopier<T> copier) => _copier = OrleansGeneratedCodeHelper.GetOptionalCopier(copier);
 
+        /// <inheritdoc />
         public bool IsShallowCopyable() => _copier is null;
 
         /// <inheritdoc/>

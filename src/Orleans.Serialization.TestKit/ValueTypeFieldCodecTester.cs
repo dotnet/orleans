@@ -7,16 +7,33 @@ using Orleans.Serialization.Serializers;
 
 namespace Orleans.Serialization.TestKit
 {
+    /// <summary>
+    /// Provides tests for field codecs which serialize value types.
+    /// </summary>
+    /// <typeparam name="TField">The value type being serialized.</typeparam>
+    /// <typeparam name="TCodec">The field codec type.</typeparam>
     public abstract class ValueTypeFieldCodecTester<TField, TCodec> : FieldCodecTester<TField, TCodec> where TField : struct where TCodec : class, IFieldCodec<TField>
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ValueTypeFieldCodecTester{TField, TCodec}"/> class.
+        /// </summary>
+        /// <param name="output">The test output helper.</param>
         protected ValueTypeFieldCodecTester(ITestOutputHelper output) : base(output)
         {
         }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ValueTypeFieldCodecTester{TField, TCodec}"/> class.
+        /// </summary>
+        /// <param name="output">The test output helper.</param>
+        /// <param name="fixture">The fixture which provides the shared serializer service provider.</param>
         protected ValueTypeFieldCodecTester(ITestOutputHelper output, SerializationTesterFixture fixture) : base(output, fixture)
         {
         }
 
+        /// <summary>
+        /// Verifies that each test value can be round-tripped using the registered value serializer.
+        /// </summary>
         [Fact]
         public void ValueSerializerRoundTrip()
         {
@@ -31,6 +48,9 @@ namespace Orleans.Serialization.TestKit
             }
         }
 
+        /// <summary>
+        /// Verifies that each test value can be round-tripped using the value serializer provider.
+        /// </summary>
         [Fact]
         public void DirectAccessValueSerializerRoundTrip()
         {

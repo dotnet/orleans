@@ -195,6 +195,10 @@ public readonly struct EnvironmentStatistics
         return $"{bytes} B";
     }
 
+    /// <summary>
+    /// Returns a string containing the CPU and memory statistics.
+    /// </summary>
+    /// <returns>A string containing the CPU and memory statistics.</returns>
     public override string ToString()
         => $"CpuUsage: {FilteredCpuUsagePercentage:F2}% (raw: {RawCpuUsagePercentage:F2}%) | " +
            $"MemoryUsage: {FormatBytes(FilteredMemoryUsageBytes)} (raw: {FormatBytes(RawMemoryUsageBytes)}) [{MemoryUsagePercentage:F2}%] | " +

@@ -45,6 +45,9 @@ namespace Orleans.Hosting.Kubernetes
         /// </summary>
         public const string ClusterIdLabel = "orleans/clusterId";
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="KubernetesHostingOptions"/> class.
+        /// </summary>
         public KubernetesHostingOptions()
         {
             _clientConfiguration = new Lazy<KubernetesClientConfiguration>(() => this.GetClientConfiguration());

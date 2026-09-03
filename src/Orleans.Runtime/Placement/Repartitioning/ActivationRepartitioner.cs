@@ -530,12 +530,15 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
 
     /// <summary>
     /// <list type="number">
-    /// <item>Initiates the actual migration process of <paramref name="giving"/> to 'this' silo.</item>
-    /// <item>Updates the affected counters within <see cref="_edgeWeights"/> to reflect all <paramref name="accepting"/>.</item>
+    /// <item>Initiates migration of <paramref name="giving"/> from the local silo to <paramref name="targetSilo"/>.</item>
+    /// <item>Updates the affected counters to reflect the grains exchanged between the two silos.</item>
     /// </list>
     /// </summary>
-    /// <param name="giving">The grain ids to migrate to the remote host.</param>
-    /// <param name="accepting">The grain ids to which are migrating to the local host.</param>
+    /// <param name="giving">The grain ids to migrate from the local silo to <paramref name="targetSilo"/>.</param>
+    /// <param name="accepting">The grain ids migrating from <paramref name="targetSilo"/> to the local silo.</param>
+    /// <param name="targetSilo">The silo participating in the exchange with the local silo.</param>
+    /// <param name="newlyAnchoredGrains">The local grain ids whose communication patterns favor remaining on the local silo.</param>
+    /// <returns>A task representing the exchange finalization operation.</returns>
     internal async Task FinalizeProtocol(ImmutableArray<GrainId> giving, ImmutableArray<GrainId> accepting, SiloAddress targetSilo, HashSet<GrainId> newlyAnchoredGrains)
     {
         // The protocol concluded that 'this' silo should take on 'set', so we hint to the director accordingly.

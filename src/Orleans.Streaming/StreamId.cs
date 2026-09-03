@@ -277,6 +277,7 @@ namespace Orleans.Runtime
     {
         private static readonly Encoding StrictUtf8 = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
 
+        /// <inheritdoc/>
         public override StreamId Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             if (reader.TokenType != JsonTokenType.StartArray || !reader.Read())
@@ -305,6 +306,7 @@ namespace Orleans.Runtime
             return Create(hasNamespace: true, streamNamespace, key);
         }
 
+        /// <inheritdoc/>
         public override void Write(Utf8JsonWriter writer, StreamId value, JsonSerializerOptions options)
         {
             if (value == default || value.Key.IsEmpty)
@@ -326,6 +328,7 @@ namespace Orleans.Runtime
             writer.WriteEndArray();
         }
 
+        /// <inheritdoc/>
         public override StreamId ReadAsPropertyName(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             var value = reader.GetString() ?? throw new JsonException("Failed to parse StreamId from property name.");

@@ -11,22 +11,25 @@ namespace Orleans.EventSourcing.CustomStorage
     /// reading states from storage, and appending deltas to storage.
     /// Grains that wish to use this provider must implement the <see cref="ICustomStorageInterface{TState, TDelta}"/>
     /// interface, to define how state is read and how deltas are written.
-    /// If the provider attribute "PrimaryCluster" is supplied in the provider configuration, then only the specified cluster
-    /// accesses storage, and other clusters may not issue updates. 
+    /// The configured primary cluster identifier is passed to each custom-storage adaptor.
+    /// Custom-storage adaptors accept submissions from every cluster.
     /// </summary>
     public class LogConsistencyProvider : ILogViewAdaptorFactory
     {
         private readonly CustomStorageLogConsistencyOptions options;
 
         /// <summary>
-        /// Specifies a cluster id of the primary cluster from which to access storage exclusively, null if
-        /// storage should be accessed directly from all clusters.
+        /// Gets the cluster identifier passed to each custom-storage adaptor.
         /// </summary>
         public string? PrimaryCluster => options.PrimaryCluster;
 
         /// <inheritdoc/>
         public bool UsesStorageProvider => false;
-        
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="LogConsistencyProvider"/> class.
+        /// </summary>
+        /// <param name="options">The provider configuration.</param>
         public LogConsistencyProvider(CustomStorageLogConsistencyOptions options)
         {
             this.options = options;
@@ -41,8 +44,17 @@ namespace Orleans.EventSourcing.CustomStorage
         }
     }
 
+    /// <summary>
+    /// Creates custom-storage log consistency providers from named options.
+    /// </summary>
     public static class LogConsistencyProviderFactory
     {
+        /// <summary>
+        /// Creates a custom-storage log consistency provider.
+        /// </summary>
+        /// <param name="services">The service provider.</param>
+        /// <param name="name">The name of the provider configuration.</param>
+        /// <returns>The configured log view adaptor factory.</returns>
         public static ILogViewAdaptorFactory Create(IServiceProvider services, string? name)
         {
             var optionsMonitor = services.GetRequiredService<IOptionsMonitor<CustomStorageLogConsistencyOptions>>();

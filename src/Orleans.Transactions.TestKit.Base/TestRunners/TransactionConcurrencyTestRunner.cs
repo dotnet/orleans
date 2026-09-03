@@ -6,16 +6,24 @@ using AwesomeAssertions;
 
 namespace Orleans.Transactions.TestKit
 {
+    /// <summary>
+    /// Runs concurrent transaction scenarios with shared grain participants.
+    /// </summary>
     public abstract class TransactionConcurrencyTestRunner : TransactionTestRunnerBase
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TransactionConcurrencyTestRunner"/> class.
+        /// </summary>
+        /// <param name="grainFactory">The grain factory used to access test grains.</param>
+        /// <param name="output">The callback used to write test output.</param>
         protected TransactionConcurrencyTestRunner(IGrainFactory grainFactory, Action<string> output)
         : base(grainFactory, output) { }
 
         /// <summary>
-        /// Two transaction share a single grain
+        /// Verifies two concurrent transactions which share one grain.
         /// </summary>
-        /// <param name="grainStates"></param>
-        /// <returns></returns>
+        /// <param name="grainStates">The transaction state configuration used to select test grains.</param>
+        /// <returns>A task which represents the test.</returns>
         public virtual async Task SingleSharedGrainTest(string grainStates)
         {
             const int expected = 5;
@@ -41,10 +49,10 @@ namespace Orleans.Transactions.TestKit
         }
 
         /// <summary>
-        /// Chain of transactions, each dependent on the results of the previous
+        /// Verifies a chain of concurrent transactions in which adjacent transactions share a grain.
         /// </summary>
-        /// <param name="grainStates"></param>
-        /// <returns></returns>
+        /// <param name="grainStates">The transaction state configuration used to select test grains.</param>
+        /// <returns>A task which represents the test.</returns>
         public virtual async Task TransactionChainTest(string grainStates)
         {
             const int expected = 5;
@@ -82,10 +90,10 @@ namespace Orleans.Transactions.TestKit
         }
 
         /// <summary>
-        /// Single transaction containing two grains is dependent on two other transaction, one from each grain
+        /// Verifies a tree of concurrent transactions in which one transaction joins participants from two others.
         /// </summary>
-        /// <param name="grainStates"></param>
-        /// <returns></returns>
+        /// <param name="grainStates">The transaction state configuration used to select test grains.</param>
+        /// <returns>A task which represents the test.</returns>
         public virtual async Task TransactionTreeTest(string grainStates)
         {
             const int expected = 5;

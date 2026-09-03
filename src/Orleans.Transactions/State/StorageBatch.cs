@@ -9,20 +9,51 @@ using Orleans.Transactions.Abstractions;
 namespace Orleans.Transactions
 {
     /// <summary>
-    /// Events streamed to storage. 
+    /// Receives transactional state changes which are accumulated into a storage batch.
     /// </summary>
+    /// <typeparam name="TState">The transactional state type.</typeparam>
     public interface ITransactionalStateStorageEvents<TState> where TState : class, new()
     {
+        /// <summary>
+        /// Adds or replaces a prepared state version.
+        /// </summary>
+        /// <param name="sequenceNumber">The local sequence number assigned to the transaction.</param>
+        /// <param name="transactionId">The transaction identifier.</param>
+        /// <param name="timestamp">The transaction commit timestamp.</param>
+        /// <param name="transactionManager">The transaction manager coordinating the transaction.</param>
+        /// <param name="state">The state produced by the transaction.</param>
         void Prepare(long sequenceNumber, Guid transactionId, DateTime timestamp, ParticipantId transactionManager, TState state);
 
+        /// <summary>
+        /// Records a read at the specified logical timestamp.
+        /// </summary>
+        /// <param name="timestamp">The logical timestamp of the read.</param>
         void Read(DateTime timestamp);
 
+        /// <summary>
+        /// Cancels the prepared state version with the specified sequence number and excludes that version and later prepared versions from the batch.
+        /// </summary>
+        /// <param name="sequenceNumber">The sequence number to cancel.</param>
         void Cancel(long sequenceNumber);
 
+        /// <summary>
+        /// Confirms committed state through the specified sequence number.
+        /// </summary>
+        /// <param name="sequenceNumber">The confirmed sequence number.</param>
         void Confirm(long sequenceNumber);
 
+        /// <summary>
+        /// Records a committed transaction for recovery.
+        /// </summary>
+        /// <param name="transactionId">The transaction identifier.</param>
+        /// <param name="timestamp">The transaction commit timestamp.</param>
+        /// <param name="writeResources">The participants which wrote during the transaction.</param>
         void Commit(Guid transactionId, DateTime timestamp, List<ParticipantId> writeResources);
 
+        /// <summary>
+        /// Removes the recovery record for the specified transaction.
+        /// </summary>
+        /// <param name="transactionId">The transaction identifier.</param>
         void Collect(Guid transactionId);
     }
 

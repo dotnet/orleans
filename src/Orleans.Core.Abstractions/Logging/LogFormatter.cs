@@ -11,6 +11,9 @@ namespace Orleans.Runtime
     /// </summary>
     public static class LogFormatter
     {
+        /// <summary>
+        /// The maximum supported log message size.
+        /// </summary>
         public const int MAX_LOG_MESSAGE_SIZE = 20000;
         private const string TIME_FORMAT = "HH:mm:ss.fff 'GMT'"; // Example: 09:50:43.341 GMT
         private const string DATE_FORMAT = "yyyy-MM-dd " + TIME_FORMAT; // Example: 2010-09-02 09:50:43.341 GMT - Variant of UniversalSorta­bleDateTimePat­tern

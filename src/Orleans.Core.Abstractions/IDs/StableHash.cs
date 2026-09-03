@@ -7,6 +7,9 @@ using System.Text;
 
 namespace Orleans
 {
+    /// <summary>
+    /// Provides stable hash functions whose results are consistent across processes and cluster nodes.
+    /// </summary>
     public static class StableHash
     {
         /// <summary>

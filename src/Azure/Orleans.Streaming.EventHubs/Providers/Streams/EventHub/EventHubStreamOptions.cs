@@ -43,6 +43,9 @@ namespace Orleans.Configuration
         /// <summary>
         /// Configures the Azure Event Hub connection using the provided connection string.
         /// </summary>
+        /// <param name="connectionString">The Event Hub connection string.</param>
+        /// <param name="eventHubName">The Event Hub name.</param>
+        /// <param name="consumerGroup">The consumer group name.</param>
         public void ConfigureEventHubConnection(string connectionString, string eventHubName, string consumerGroup)
         {
             EventHubName = eventHubName;
@@ -61,6 +64,10 @@ namespace Orleans.Configuration
         /// <summary>
         /// Configures the Azure Event Hub connection using the provided fully-qualified namespace string and credential.
         /// </summary>
+        /// <param name="fullyQualifiedNamespace">The fully qualified Event Hubs namespace.</param>
+        /// <param name="eventHubName">The Event Hub name.</param>
+        /// <param name="consumerGroup">The consumer group name.</param>
+        /// <param name="credential">The named key credential.</param>
         public void ConfigureEventHubConnection(string fullyQualifiedNamespace, string eventHubName, string consumerGroup, AzureNamedKeyCredential credential)
         {
             EventHubName = eventHubName;
@@ -84,6 +91,10 @@ namespace Orleans.Configuration
         /// <summary>
         /// Configures the Azure Event Hub connection using the provided fully-qualified namespace string and credential.
         /// </summary>
+        /// <param name="fullyQualifiedNamespace">The fully qualified Event Hubs namespace.</param>
+        /// <param name="eventHubName">The Event Hub name.</param>
+        /// <param name="consumerGroup">The consumer group name.</param>
+        /// <param name="credential">The shared access signature credential.</param>
         public void ConfigureEventHubConnection(string fullyQualifiedNamespace, string eventHubName, string consumerGroup, AzureSasCredential credential)
         {
             EventHubName = eventHubName;
@@ -107,6 +118,10 @@ namespace Orleans.Configuration
         /// <summary>
         /// Configures the Azure Event Hub connection using the provided fully-qualified namespace string and credential.
         /// </summary>
+        /// <param name="fullyQualifiedNamespace">The fully qualified Event Hubs namespace.</param>
+        /// <param name="eventHubName">The Event Hub name.</param>
+        /// <param name="consumerGroup">The consumer group name.</param>
+        /// <param name="credential">The token credential.</param>
         public void ConfigureEventHubConnection(string fullyQualifiedNamespace, string eventHubName, string consumerGroup, TokenCredential credential)
         {
             EventHubName = eventHubName;
@@ -128,6 +143,8 @@ namespace Orleans.Configuration
         /// <summary>
         /// Configures the Azure Event Hub connection using the provided connection instance.
         /// </summary>
+        /// <param name="connection">The Event Hub connection.</param>
+        /// <param name="consumerGroup">The consumer group name.</param>
         public void ConfigureEventHubConnection(EventHubConnection connection, string consumerGroup)
         {
             EventHubName = connection.EventHubName;
@@ -140,6 +157,9 @@ namespace Orleans.Configuration
         /// <summary>
         /// Configures the Azure Event Hub connection using the provided delegate.
         /// </summary>
+        /// <param name="createConnection">The delegate used to create Event Hub connections.</param>
+        /// <param name="eventHubName">The Event Hub name.</param>
+        /// <param name="consumerGroup">The consumer group name.</param>
         public void ConfigureEventHubConnection(CreateConnectionDelegate createConnection, string eventHubName, string consumerGroup)
         {
             EventHubName = eventHubName;
@@ -162,15 +182,24 @@ namespace Orleans.Configuration
         }
     }
 
+    /// <summary>
+    /// Validates <see cref="EventHubOptions"/>.
+    /// </summary>
     public class EventHubOptionsValidator : IConfigurationValidator
     {
         private readonly EventHubOptions options;
         private readonly string name;
+        /// <summary>
+        /// Initializes a new instance of the <see cref="EventHubOptionsValidator"/> class.
+        /// </summary>
+        /// <param name="options">The options to validate.</param>
+        /// <param name="name">The stream provider name.</param>
         public EventHubOptionsValidator(EventHubOptions options, string name)
         {
             this.options = options;
             this.name = name;
         }
+        /// <inheritdoc />
         public void ValidateConfiguration()
         {
             if (options.CreateConnection is null)
@@ -190,15 +219,24 @@ namespace Orleans.Configuration
         }
     }
 
+    /// <summary>
+    /// Validates that a stream queue checkpointer is configured for an Event Hubs stream provider.
+    /// </summary>
     public class StreamCheckpointerConfigurationValidator : IConfigurationValidator
     {
         private readonly IServiceProvider services;
         private readonly string name;
+        /// <summary>
+        /// Initializes a new instance of the <see cref="StreamCheckpointerConfigurationValidator"/> class.
+        /// </summary>
+        /// <param name="services">The service provider.</param>
+        /// <param name="name">The stream provider name.</param>
         public StreamCheckpointerConfigurationValidator(IServiceProvider services, string name)
         {
             this.services = services;
             this.name = name;
         }
+        /// <inheritdoc />
         public void ValidateConfiguration()
         {
             var checkpointerFactory = services.GetKeyedService<IStreamQueueCheckpointerFactory>(this.name);
@@ -207,6 +245,9 @@ namespace Orleans.Configuration
         }
     }
 
+    /// <summary>
+    /// Configures how an Event Hubs stream provider receives events from each partition.
+    /// </summary>
     public class EventHubReceiverOptions
     {
         /// <summary>
@@ -220,6 +261,9 @@ namespace Orleans.Configuration
         private const bool DEFAULT_START_FROM_NOW = true;
     }
 
+    /// <summary>
+    /// Configures cache pressure monitoring for an Event Hubs stream provider.
+    /// </summary>
     public class EventHubStreamCachePressureOptions
     {
         /// <summary>

@@ -7,10 +7,13 @@ using Orleans.Networking.Shared;
 
 namespace Orleans.TestingHost.UnixSocketTransport;
 
+/// <summary>
+/// Options for the Orleans Unix domain socket transport.
+/// </summary>
 public partial class UnixSocketConnectionOptions
 {
     /// <summary>
-    /// Get or sets to function used to get a filename given an endpoint
+    /// Gets or sets the function which maps an endpoint to a Unix domain socket path.
     /// </summary>
     public Func<EndPoint, string> ConvertEndpointToPath { get; set; } = DefaultConvertEndpointToPath;
 

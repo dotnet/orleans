@@ -79,6 +79,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="copier">The copier.</param>
         public NullableCopier(IDeepCopier<T> copier) => _copier = OrleansGeneratedCodeHelper.GetOptionalCopier(copier);
 
+        /// <inheritdoc />
         public bool IsShallowCopyable() => _copier is null;
 
         [return: NotNullIfNotNull(nameof(input))]

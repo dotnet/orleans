@@ -63,8 +63,10 @@ namespace Orleans.Metadata
             return result.ToString();
         }
 
+        /// <inheritdoc/>
         public override bool Equals(object? obj) => obj is GrainInterfaceProperties other && Equals(other);
 
+        /// <inheritdoc/>
         public bool Equals(GrainInterfaceProperties? other)
         {
             if (ReferenceEquals(this, other)) return true;
@@ -72,6 +74,7 @@ namespace Orleans.Metadata
             return PropertiesEqual(Properties, other.Properties);
         }
 
+        /// <inheritdoc/>
         public override int GetHashCode() => _hashCode ??= ComputeHashCode(Properties);
 
         private static bool PropertiesEqual(ImmutableDictionary<string, string> left, ImmutableDictionary<string, string> right)

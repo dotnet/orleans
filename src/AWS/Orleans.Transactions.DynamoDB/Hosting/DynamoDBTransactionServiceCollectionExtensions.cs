@@ -12,7 +12,7 @@ using Orleans.Transactions.DynamoDB.TransactionalState;
 namespace Orleans.Hosting;
 
 /// <summary>
-/// <see cref="IServiceCollection"/> extensions.
+/// Extensions for registering DynamoDB transactional state services.
 /// </summary>
 public static class DynamoDBTransactionServiceCollectionExtensions
 {

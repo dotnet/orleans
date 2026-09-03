@@ -9,6 +9,9 @@ using System.Text.Json.Serialization;
 
 namespace Orleans.Runtime
 {
+    /// <summary>
+    /// Represents the composite key used by the legacy Orleans grain identifier encoding.
+    /// </summary>
     [Serializable, GenerateSerializer, Immutable]
     [SuppressReferenceTracking]
     [JsonConverter(typeof(UniqueKeyJsonConverter))]
@@ -19,40 +22,97 @@ namespace Orleans.Runtime
         /// </summary>
         public enum Category : byte
         {
+            /// <summary>
+            /// No category is specified.
+            /// </summary>
             None = 0,
+
+            /// <summary>
+            /// A system target identifier.
+            /// </summary>
             SystemTarget = 1,
+
+            /// <summary>
+            /// A system grain identifier.
+            /// </summary>
             SystemGrain = 2,
+
+            /// <summary>
+            /// A grain identifier.
+            /// </summary>
             Grain = 3,
+
+            /// <summary>
+            /// A client identifier.
+            /// </summary>
             Client = 4,
+
+            /// <summary>
+            /// A grain identifier with a key extension.
+            /// </summary>
             KeyExtGrain = 6,
             // 7 was GeoClient
+
+            /// <summary>
+            /// A system target identifier with a key extension.
+            /// </summary>
             KeyExtSystemTarget = 8,
         }
 
+        /// <summary>
+        /// Gets the first 64 bits of the primary key.
+        /// </summary>
         [Id(0)]
         public ulong N0 { get; private set; }
+
+        /// <summary>
+        /// Gets the second 64 bits of the primary key.
+        /// </summary>
         [Id(1)]
         public ulong N1 { get; private set; }
+
+        /// <summary>
+        /// Gets the packed category and type code data.
+        /// </summary>
         [Id(2)]
         public ulong TypeCodeData { get; private set; }
+
+        /// <summary>
+        /// Gets the optional primary key extension.
+        /// </summary>
         [Id(3)]
         public string? KeyExt { get; private set; }
 
         [NonSerialized]
         private uint uniformHashCache;
 
+        /// <summary>
+        /// Gets the 32-bit legacy type code.
+        /// </summary>
         public int BaseTypeCode => (int)TypeCodeData;
 
+        /// <summary>
+        /// Gets the identifier category encoded in <see cref="TypeCodeData"/>.
+        /// </summary>
         public Category IdCategory => GetCategory(TypeCodeData);
 
+        /// <summary>
+        /// Gets a value indicating whether the primary key is encoded as a <see cref="long"/>.
+        /// </summary>
         public bool IsLongKey => N0 == 0;
 
+        /// <summary>
+        /// Gets a value indicating whether this key represents a system target.
+        /// </summary>
         public bool IsSystemTargetKey
             => IsSystemTarget(IdCategory);
 
         private static bool IsSystemTarget(Category category)
             => category == Category.SystemTarget || category == Category.KeyExtSystemTarget;
 
+        /// <summary>
+        /// Gets a value indicating whether this key has a primary key extension.
+        /// </summary>
         public bool HasKeyExt => IsKeyExt(IdCategory);
 
         private static bool IsKeyExt(Category category)
@@ -104,6 +164,10 @@ namespace Orleans.Runtime
             return key;
         }
 
+        /// <summary>
+        /// Creates a key with a randomly generated GUID primary key.
+        /// </summary>
+        /// <returns>A new unique key.</returns>
         public static UniqueKey NewKey() => new UniqueKey { Guid = Guid.NewGuid() };
 
         internal static UniqueKey NewKey(Guid guid) => new UniqueKey { Guid = guid };
@@ -120,15 +184,38 @@ namespace Orleans.Runtime
         internal static UniqueKey NewEmptySystemTargetKey(long typeData)
             => new UniqueKey { TypeCodeData = GetTypeCodeData(Category.SystemTarget, typeData) };
 
+        /// <summary>
+        /// Creates a system target key with a GUID primary key.
+        /// </summary>
+        /// <param name="guid">The primary key.</param>
+        /// <param name="typeData">The system target type data.</param>
+        /// <returns>A new system target key.</returns>
         public static UniqueKey NewSystemTargetKey(Guid guid, long typeData)
             => new UniqueKey { Guid = guid, TypeCodeData = GetTypeCodeData(Category.SystemTarget, typeData) };
 
+        /// <summary>
+        /// Creates a system target key from a system identifier.
+        /// </summary>
+        /// <param name="systemId">The system identifier.</param>
+        /// <returns>A new system target key.</returns>
         public static UniqueKey NewSystemTargetKey(short systemId)
             => new UniqueKey { N1 = (ulong)systemId, TypeCodeData = GetTypeCodeData(Category.SystemTarget) };
 
+        /// <summary>
+        /// Creates a grain service key with an integer primary key.
+        /// </summary>
+        /// <param name="key">The primary key.</param>
+        /// <param name="typeData">The grain service type data.</param>
+        /// <returns>A new grain service key.</returns>
         public static UniqueKey NewGrainServiceKey(short key, long typeData)
             => new UniqueKey { N1 = (ulong)key, TypeCodeData = GetTypeCodeData(Category.SystemTarget, typeData) };
 
+        /// <summary>
+        /// Creates a grain service key with a string primary key extension.
+        /// </summary>
+        /// <param name="key">The primary key extension.</param>
+        /// <param name="typeData">The grain service type data.</param>
+        /// <returns>A new grain service key.</returns>
         public static UniqueKey NewGrainServiceKey(string key, long typeData)
             => NewKey(GetTypeCodeData(Category.KeyExtSystemTarget, typeData), key);
 
@@ -173,6 +260,11 @@ namespace Orleans.Runtime
                         methodName));
         }
 
+        /// <summary>
+        /// Gets the integer primary key and its optional key extension.
+        /// </summary>
+        /// <param name="extendedKey">When this method returns, contains the key extension, or <see langword="null"/> if none is present.</param>
+        /// <returns>The integer primary key.</returns>
         public long PrimaryKeyToLong(out string? extendedKey)
         {
             ThrowIfIsNotLong();
@@ -181,6 +273,10 @@ namespace Orleans.Runtime
             return unchecked((long)N1);
         }
 
+        /// <summary>
+        /// Gets the integer primary key of a key without an extension.
+        /// </summary>
+        /// <returns>The integer primary key.</returns>
         public long PrimaryKeyToLong()
         {
             ThrowIfIsNotLong();
@@ -188,22 +284,33 @@ namespace Orleans.Runtime
             return (long)N1;
         }
 
+        /// <summary>
+        /// Gets the GUID primary key and its optional key extension.
+        /// </summary>
+        /// <param name="extendedKey">When this method returns, contains the key extension, or <see langword="null"/> if none is present.</param>
+        /// <returns>The GUID primary key.</returns>
         public Guid PrimaryKeyToGuid(out string? extendedKey)
         {
             extendedKey = this.KeyExt;
             return Guid;
         }
 
+        /// <summary>
+        /// Gets the GUID primary key of a key without an extension.
+        /// </summary>
+        /// <returns>The GUID primary key.</returns>
         public Guid PrimaryKeyToGuid()
         {
             ThrowIfHasKeyExt("UniqueKey.PrimaryKeyToGuid");
             return Guid;
         }
 
+        /// <inheritdoc />
         public override bool Equals(object? o) => o is UniqueKey key && Equals(key);
 
         // We really want Equals to be as fast as possible, as a minimum cost, as close to native as possible.
         // No function calls, no boxing, inline.
+        /// <inheritdoc />
         public bool Equals(UniqueKey? other)
         {
             return other is not null
@@ -215,6 +322,7 @@ namespace Orleans.Runtime
 
         // We really want CompareTo to be as fast as possible, as a minimum cost, as close to native as possible.
         // No function calls, no boxing, inline.
+        /// <inheritdoc />
         public int CompareTo(UniqueKey? other)
         {
             if (other is null) return 1;
@@ -229,6 +337,7 @@ namespace Orleans.Runtime
                : string.CompareOrdinal(KeyExt, other.KeyExt);
         }
 
+        /// <inheritdoc />
         public override int GetHashCode()
         {
             return unchecked((int)GetUniformHashCode());
@@ -319,6 +428,7 @@ namespace Orleans.Runtime
             }
         }
 
+        /// <inheritdoc />
         public override string ToString()
         {
             return ToHexString();
