@@ -29,9 +29,11 @@ namespace Orleans.EventSourcing.LogStorage
         [Id(1)]
         public string? ETag { get; set; }
 
+        /// <inheritdoc />
         [Id(2)]
         public bool RecordExists { get; set; }
 
+        /// <inheritdoc />
         public LogStateWithMetaData<TEntry> State { get => StateAndMetaData; set => StateAndMetaData = value; }
 
         LogStateWithMetaData<TEntry>? IGrainState<LogStateWithMetaData<TEntry>>.State

@@ -26,7 +26,11 @@ namespace Orleans.EventSourcing.CustomStorage
 
         /// <inheritdoc/>
         public bool UsesStorageProvider => false;
-        
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="LogConsistencyProvider"/> class.
+        /// </summary>
+        /// <param name="options">The provider configuration.</param>
         public LogConsistencyProvider(CustomStorageLogConsistencyOptions options)
         {
             this.options = options;
@@ -41,8 +45,17 @@ namespace Orleans.EventSourcing.CustomStorage
         }
     }
 
+    /// <summary>
+    /// Creates custom-storage log consistency providers from named options.
+    /// </summary>
     public static class LogConsistencyProviderFactory
     {
+        /// <summary>
+        /// Creates a custom-storage log consistency provider.
+        /// </summary>
+        /// <param name="services">The service provider.</param>
+        /// <param name="name">The name of the provider configuration.</param>
+        /// <returns>The configured log view adaptor factory.</returns>
         public static ILogViewAdaptorFactory Create(IServiceProvider services, string? name)
         {
             var optionsMonitor = services.GetRequiredService<IOptionsMonitor<CustomStorageLogConsistencyOptions>>();

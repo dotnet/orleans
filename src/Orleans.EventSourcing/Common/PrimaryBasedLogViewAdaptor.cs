@@ -82,6 +82,7 @@ namespace Orleans.EventSourcing.Common
             throw new NotImplementedException();
         }
 
+        /// <inheritdoc />
         public virtual Task<IReadOnlyList<TLogEntry>> RetrieveLogSegment(int fromVersion, int length)
         {
             throw new NotSupportedException();
@@ -208,6 +209,7 @@ namespace Orleans.EventSourcing.Common
             return Task.CompletedTask;
         }
 
+        /// <inheritdoc />
         public virtual Task PostOnActivate()
         {
             Services.Log(LogLevel.Trace, "PostActivation Started");
