@@ -34,6 +34,7 @@ namespace Orleans.GrainDirectory
         /// existing entry, the directory will not override it.
         /// </summary>
         /// <param name="address">The <see cref="GrainAddress"/> to register</param>
+        /// <param name="previousAddress">The previous registration to replace, if any.</param>
         /// <returns>The <see cref="GrainAddress"/> that is effectively registered in the directory.</returns>
         Task<GrainAddress?> Register(GrainAddress address, GrainAddress? previousAddress) => GrainDirectoryExtension.Register(this, address, previousAddress);
 

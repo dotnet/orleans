@@ -4,6 +4,9 @@ using Orleans.Runtime;
 
 namespace Orleans
 {
+    /// <summary>
+    /// Provides extension methods for creating grain references.
+    /// </summary>
     public static class GrainFactoryExtensions
     {
         /// <summary>

@@ -14,9 +14,19 @@ namespace Orleans.Serialization
         void OnDeserialized(DeserializationContext context);
     }
 
+    /// <summary>
+    /// Provides services and runtime state associated with a deserialization operation.
+    /// </summary>
     public abstract class DeserializationContext
     {
+        /// <summary>
+        /// Gets the service provider associated with the deserialization operation.
+        /// </summary>
         public abstract IServiceProvider ServiceProvider { get; }
+
+        /// <summary>
+        /// Gets the Orleans runtime client associated with the deserialization operation.
+        /// </summary>
         public abstract object RuntimeClient { get; }
     }
 }

@@ -2,6 +2,9 @@ using System.Diagnostics;
 
 namespace Orleans.Diagnostics;
 
+/// <summary>
+/// Provides names for Orleans <see cref="ActivitySource"/> instances.
+/// </summary>
 public static class ActivitySources
 {
     /// <summary>

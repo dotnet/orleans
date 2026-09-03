@@ -18,9 +18,15 @@ public abstract partial class Grain : IGrainBase, IAddressable
     // any interaction with it will result in non unit-testable code. Any behavior that can be accessed
     // from within client code (including subclasses of this class), should be exposed through IGrainRuntime.
     // The better solution is to refactor this interface and make it injectable through the constructor.
+    /// <summary>
+    /// Gets the runtime context for this grain activation.
+    /// </summary>
     [AllowNull]
     public IGrainContext GrainContext { get; private set; }
 
+    /// <summary>
+    /// Gets a reference to this grain.
+    /// </summary>
     public GrainReference GrainReference { get { return GrainContext.GrainReference; } }
 
     internal IGrainRuntime Runtime { get; }

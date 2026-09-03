@@ -56,6 +56,7 @@ namespace Orleans
         /// <summary>
         /// Creates a grain timer.
         /// </summary>
+        /// <param name="grain">The grain instance.</param>
         /// <param name="callback">The timer callback, which will be invoked whenever the timer becomes due.</param>
         /// <param name="state">The state passed to the callback.</param>
         /// <param name="options">
@@ -154,6 +155,13 @@ namespace Orleans
             return RegisterGrainTimer(grain, static (callback, cancellationToken) => callback(cancellationToken), callback, options);
         }
 
+        /// <summary>
+        /// Creates a grain timer.
+        /// </summary>
+        /// <param name="grain">The grain instance.</param>
+        /// <param name="callback">The timer callback, which will be invoked whenever the timer becomes due.</param>
+        /// <param name="options">The options for creating the timer.</param>
+        /// <returns>The <see cref="IGrainTimer"/> instance which represents the timer.</returns>
         public static IGrainTimer RegisterGrainTimer(this IGrainBase grain, Func<Task> callback, GrainTimerCreationOptions options)
         {
             ArgumentNullException.ThrowIfNull(callback);
@@ -161,7 +169,10 @@ namespace Orleans
         }
 
         /// <inheritdoc cref="RegisterGrainTimer(IGrainBase, Func{Task}, GrainTimerCreationOptions)"/>
+        /// <param name="grain">The grain instance.</param>
+        /// <param name="callback">The timer callback, which will be invoked whenever the timer becomes due.</param>
         /// <param name="state">The state passed to the callback.</param>
+        /// <param name="options">The options for creating the timer.</param>
         /// <typeparam name="TState">The type of the <paramref name="state"/> parameter.</typeparam>
         public static IGrainTimer RegisterGrainTimer<TState>(this IGrainBase grain, Func<TState, Task> callback, TState state, GrainTimerCreationOptions options)
         {
@@ -223,13 +234,21 @@ namespace Orleans
             => RegisterGrainTimer(grain, callback, new() { DueTime = dueTime, Period = period });
 
         /// <inheritdoc cref="RegisterGrainTimer(IGrainBase, Func{Task}, TimeSpan, TimeSpan)"/>
+        /// <param name="grain">The grain instance.</param>
+        /// <param name="callback">The timer callback, which will be invoked whenever the timer becomes due.</param>
         /// <param name="state">The state passed to the callback.</param>
+        /// <param name="dueTime">The amount of time to delay before invoking the callback.</param>
+        /// <param name="period">The time interval between callback invocations.</param>
         /// <typeparam name="TState">The type of the <paramref name="state"/> parameter.</typeparam>
         public static IGrainTimer RegisterGrainTimer<TState>(this IGrainBase grain, Func<TState, Task> callback, TState state, TimeSpan dueTime, TimeSpan period)
             => RegisterGrainTimer(grain, callback, state, new() { DueTime = dueTime, Period = period });
 
         /// <inheritdoc cref="RegisterGrainTimer(IGrainBase, Func{Task}, TimeSpan, TimeSpan)"/>
+        /// <param name="grain">The grain instance.</param>
+        /// <param name="callback">The timer callback, which will be invoked whenever the timer becomes due.</param>
         /// <param name="state">The state passed to the callback.</param>
+        /// <param name="dueTime">The amount of time to delay before invoking the callback.</param>
+        /// <param name="period">The time interval between callback invocations.</param>
         /// <typeparam name="TState">The type of the <paramref name="state"/> parameter.</typeparam>
         public static IGrainTimer RegisterGrainTimer<TState>(this IGrainBase grain, Func<TState, CancellationToken, Task> callback, TState state, TimeSpan dueTime, TimeSpan period)
             => RegisterGrainTimer(grain, callback, state, new() { DueTime = dueTime, Period = period });

@@ -113,14 +113,29 @@ namespace Orleans.Runtime
             return sb.ToString();
         }
 
+        /// <summary>
+        /// Formats the component values of a time interval for display.
+        /// </summary>
+        /// <param name="timeSpan">The time interval to format.</param>
+        /// <returns>The formatted time interval.</returns>
         public static string TimeSpanToString(TimeSpan timeSpan)
         {
             //00:03:32.8289777
             return $"{timeSpan.Hours}h:{timeSpan.Minutes}m:{timeSpan.Seconds}s.{timeSpan.Milliseconds}ms";
         }
 
+        /// <summary>
+        /// Converts a duration from ticks to whole milliseconds.
+        /// </summary>
+        /// <param name="ticks">The duration, in ticks.</param>
+        /// <returns>The duration, in whole milliseconds.</returns>
         public static long TicksToMilliSeconds(long ticks) => ticks / TimeSpan.TicksPerMillisecond;
 
+        /// <summary>
+        /// Converts an average duration from ticks to milliseconds.
+        /// </summary>
+        /// <param name="ticks">The average duration, in ticks.</param>
+        /// <returns>The average duration, in milliseconds.</returns>
         public static float AverageTicksToMilliSeconds(float ticks) => ticks / TimeSpan.TicksPerMillisecond;
 
         /// <summary>
@@ -158,6 +173,10 @@ namespace Orleans.Runtime
         /// <returns></returns>
         public static Uri ToGatewayUri(this SiloAddress address) => new($"gwy.tcp://{new SpanFormattableIPEndPoint(address.Endpoint)}/{address.Generation}");
 
+        /// <summary>
+        /// Executes an action and suppresses any exception it throws.
+        /// </summary>
+        /// <param name="action">The action to execute.</param>
         public static void SafeExecute(Action action)
         {
             try
@@ -167,6 +186,12 @@ namespace Orleans.Runtime
             catch { }
         }
 
+        /// <summary>
+        /// Executes an action, logs any exception it throws when a logger is provided, and suppresses the exception.
+        /// </summary>
+        /// <param name="action">The action to execute.</param>
+        /// <param name="logger">The logger used to record an exception.</param>
+        /// <param name="caller">The name of the caller to include in the log entry.</param>
         public static void SafeExecute(Action action, ILogger? logger = null, string? caller = null)
         {
             try
@@ -180,6 +205,11 @@ namespace Orleans.Runtime
             }
         }
 
+        /// <summary>
+        /// Awaits a task and suppresses any exception it throws.
+        /// </summary>
+        /// <param name="task">The task to await.</param>
+        /// <returns>A task representing the operation.</returns>
         public static async Task SafeExecuteAsync(Task task)
         {
             try
@@ -207,6 +237,13 @@ namespace Orleans.Runtime
             }
         }
 
+        /// <summary>
+        /// Groups a sequence into batches, yielding each batch when it reaches the specified size.
+        /// </summary>
+        /// <param name="sequence">The sequence to split into batches.</param>
+        /// <param name="batchSize">The target number of elements in each batch.</param>
+        /// <typeparam name="T">The type of elements in the sequence.</typeparam>
+        /// <returns>A sequence of non-empty batches.</returns>
         public static IEnumerable<List<T>> BatchIEnumerable<T>(this IEnumerable<T> sequence, int batchSize)
         {
             var batch = new List<T>(batchSize);
@@ -226,6 +263,11 @@ namespace Orleans.Runtime
             }
         }
 
+        /// <summary>
+        /// Gets the current stack trace, excluding this method and the specified number of caller frames.
+        /// </summary>
+        /// <param name="skipFrames">The number of additional caller frames to exclude.</param>
+        /// <returns>The formatted stack trace.</returns>
         [MethodImpl(MethodImplOptions.NoInlining)]
         public static string GetStackTrace(int skipFrames = 0)
         {
