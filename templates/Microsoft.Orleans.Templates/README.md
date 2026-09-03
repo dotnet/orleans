@@ -32,4 +32,6 @@ Templates reference the Orleans version shipped with the template package, inclu
 dotnet new orleans-web --name MyOrleansWebApp --orleans-version 10.2.2
 ```
 
+Generated projects include `.github/instructions/orleans.instructions.md`, which directs GitHub Copilot to the current Orleans documentation and API reference.
+
 The `orleans` template uses the Aspire Orleans integration to orchestrate the silo, client, and Azurite-backed Azure Table clustering and Azure Blob grain storage. Run the generated AppHost with a container runtime available so that Aspire can start Azurite. The `orleans-web` template uses localhost clustering for a one-node local development host. See the [Orleans hosting documentation](https://dotnet.github.io/orleans/docs/host/configuration-guide/) for production configuration guidance.
