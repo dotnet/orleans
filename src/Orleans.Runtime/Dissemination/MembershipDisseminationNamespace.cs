@@ -21,6 +21,8 @@ internal sealed class MembershipDisseminationNamespace(
 
     public DisseminationNamespace Name => DisseminationNamespaceNames.Membership;
 
+    public DisseminationMembershipScope MembershipScope => DisseminationMembershipScope.AllMembers;
+
     public DisseminationNamespaceOptions Options => options.CurrentValue.Dissemination;
 
     public async ValueTask<bool> PublishAsync(

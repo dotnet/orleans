@@ -16,6 +16,9 @@ internal static class DisseminationInstruments
     private static readonly Counter<long> AntiEntropyValues = Meter.CreateCounter<long>("orleans.dissemination.anti_entropy.values", "values");
     private static readonly Counter<long> Fallbacks = Meter.CreateCounter<long>("orleans.dissemination.fallbacks", "operations");
     private static readonly Counter<long> PayloadDropped = Meter.CreateCounter<long>("orleans.dissemination.payload.dropped", "values");
+    private static readonly Counter<long> QueueAdmissionRejected = Meter.CreateCounter<long>(
+        "orleans.dissemination.queue.admission.rejected",
+        "keys");
 
     public static void OnBroadcastSent(DisseminationNamespace namespaceName, string kind, int itemCount, int byteCount)
     {
@@ -142,6 +145,17 @@ internal static class DisseminationInstruments
         if (PayloadDropped.Enabled)
         {
             PayloadDropped.Add(1, Tag("namespace", namespaceName), Tag("reason", reason));
+        }
+    }
+
+    public static void OnQueueAdmissionRejected(DisseminationNamespace namespaceName)
+    {
+        if (QueueAdmissionRejected.Enabled)
+        {
+            QueueAdmissionRejected.Add(
+                1,
+                Tag("namespace", namespaceName),
+                Tag("reason", DisseminationEvents.NamespacePendingLimitReason));
         }
     }
 

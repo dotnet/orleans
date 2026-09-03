@@ -46,6 +46,8 @@ internal static class DisseminationEvents
     }
 
     public const string BroadcastScheduledEventName = "Dissemination.BroadcastScheduled";
+    public const string QueueAdmissionRejectedEventName = "Dissemination.QueueAdmissionRejected";
+    public const string NamespacePendingLimitReason = "namespace_pending_limit";
 
     public static void EmitBroadcastScheduled(
         SiloAddress localSilo,
@@ -70,6 +72,25 @@ internal static class DisseminationEvents
         }
     }
 
+    public static void EmitQueueAdmissionRejected(
+        SiloAddress localSilo,
+        SiloAddress peer,
+        DisseminationNamespace namespaceName,
+        int limit)
+    {
+        if (Listener.IsEnabled(QueueAdmissionRejectedEventName))
+        {
+            Listener.Write(QueueAdmissionRejectedEventName, new DisseminationQueueAdmissionRejectedEvent
+            {
+                LocalSilo = localSilo,
+                Peer = peer,
+                Namespace = namespaceName,
+                Limit = limit,
+                Reason = NamespacePendingLimitReason,
+                Timestamp = DateTimeOffset.UtcNow,
+            });
+        }
+    }
 }
 
 // Why a peer pump (re)armed its flush timer, exposed for deterministic tests and diagnostics.
@@ -122,6 +143,21 @@ internal sealed class DisseminationValueEvent
     public string Result { get; init; } = string.Empty;
 
     public int PayloadBytes { get; init; }
+
+    public DateTimeOffset Timestamp { get; init; }
+}
+
+internal sealed class DisseminationQueueAdmissionRejectedEvent
+{
+    public required SiloAddress LocalSilo { get; init; }
+
+    public required SiloAddress Peer { get; init; }
+
+    public DisseminationNamespace Namespace { get; init; }
+
+    public int Limit { get; init; }
+
+    public string Reason { get; init; } = string.Empty;
 
     public DateTimeOffset Timestamp { get; init; }
 }

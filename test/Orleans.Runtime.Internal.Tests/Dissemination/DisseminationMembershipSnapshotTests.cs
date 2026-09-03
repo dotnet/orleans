@@ -172,4 +172,410 @@ public class DisseminationMembershipSnapshotTests
         int LocalSeed,
         bool LocalIsMember,
         int RequestedCount);
+
+    [Fact]
+    public void ActiveScopeProjectionIncludesOnlyActiveSilos()
+    {
+        var (snapshots, manager, silos) = CreateScopeProjections();
+
+        Assert.Equal(new[] { silos.Local, silos.Active, silos.ActiveTwo }, snapshots.ActiveMembers.Members);
+        Assert.Equal(new MembershipVersion(42), snapshots.ActiveMembers.MembershipVersion);
+        Assert.DoesNotContain(silos.Joining, snapshots.ActiveMembers.Members);
+        Assert.DoesNotContain(silos.ShuttingDown, snapshots.ActiveMembers.Members);
+        Assert.DoesNotContain(silos.Stopping, snapshots.ActiveMembers.Members);
+        Assert.DoesNotContain(silos.Dead, snapshots.ActiveMembers.Members);
+        Assert.Equal(1, manager.SnapshotReadCount);
+    }
+
+    [Fact]
+    public void AllEligibleScopeProjectionIncludesJoiningActiveShuttingDownAndStoppingSilos()
+    {
+        var (snapshots, manager, silos) = CreateScopeProjections();
+
+        Assert.Equal(
+            new[] { silos.Local, silos.Active, silos.ActiveTwo, silos.Joining, silos.ShuttingDown, silos.Stopping },
+            snapshots.AllMembers.Members);
+        Assert.Equal(new MembershipVersion(42), snapshots.AllMembers.MembershipVersion);
+        Assert.DoesNotContain(silos.Dead, snapshots.AllMembers.Members);
+        Assert.Equal(1, manager.SnapshotReadCount);
+    }
+
+    [Fact]
+    public void ScopeProjectionsShareTheSameSourceMembershipVersion()
+    {
+        var (snapshots, manager, _) = CreateScopeProjections();
+
+        Assert.Equal(new MembershipVersion(42), snapshots.MembershipVersion);
+        Assert.Equal(snapshots.MembershipVersion, snapshots.ActiveMembers.MembershipVersion);
+        Assert.Equal(snapshots.MembershipVersion, snapshots.AllMembers.MembershipVersion);
+        Assert.Equal(1, manager.SnapshotReadCount);
+        Assert.NotSame(snapshots.ActiveMembers, snapshots.AllMembers);
+    }
+
+    [Fact]
+    public void ScopeProjectionTreeIsDeterministicForSelectedMemberArray()
+    {
+        var first = CreateScopeProjections(reverseSourceEntries: false).Snapshots;
+        var second = CreateScopeProjections(reverseSourceEntries: true).Snapshots;
+        var active = first.ActiveMembers.Members;
+        var all = first.AllMembers.Members;
+
+        Assert.Equal(active, second.ActiveMembers.Members);
+        Assert.Equal(all, second.AllMembers.Members);
+        Assert.Equal(new[] { active[1], active[2] }, first.ActiveMembers.OriginatorTreeTargets);
+        Assert.Equal(new[] { active[2] }, first.ActiveMembers.ForwardingTreeTargets);
+        Assert.Equal(
+            new[] { all[1], all[2], all[3] },
+            first.AllMembers.OriginatorTreeTargets);
+        Assert.Equal(new[] { all[2], all[3] }, first.AllMembers.ForwardingTreeTargets);
+        Assert.Equal(first.ActiveMembers.OriginatorTreeTargets, second.ActiveMembers.OriginatorTreeTargets);
+        Assert.Equal(first.AllMembers.ForwardingTreeTargets, second.AllMembers.ForwardingTreeTargets);
+    }
+
+    [Fact]
+    public void ScopeProjectionAntiEntropySelectionIsDeterministic()
+    {
+        var snapshots = CreateScopeProjections().Snapshots;
+        var activePeers = snapshots.ActiveMembers.Members[1..];
+        var allPeers = snapshots.AllMembers.Members[1..];
+
+        Assert.Equal(new[] { activePeers[0] }, snapshots.ActiveMembers.SelectAntiEntropyPeers(1));
+        Assert.Equal(new[] { activePeers[1] }, snapshots.ActiveMembers.SelectAntiEntropyPeers(1));
+        Assert.Equal(new[] { activePeers[0] }, snapshots.ActiveMembers.SelectAntiEntropyPeers(1));
+
+        for (var i = 0; i < allPeers.Length; i++)
+        {
+            Assert.Equal(new[] { allPeers[i] }, snapshots.AllMembers.SelectAntiEntropyPeers(1));
+        }
+
+        Assert.Equal(new[] { allPeers[0] }, snapshots.AllMembers.SelectAntiEntropyPeers(1));
+        Assert.Equal(new MembershipVersion(42), snapshots.ActiveMembers.MembershipVersion);
+        Assert.Equal(new MembershipVersion(42), snapshots.AllMembers.MembershipVersion);
+    }
+
+    [Fact]
+    public async Task ConcurrentRefreshDoesNotReturnOlderProjection()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var local = CreateSilo(32001);
+        var firstPeer = CreateSilo(32002);
+        var secondPeer = CreateSilo(32003);
+        var manager = new MutableMembershipManager(CreateSourceSnapshot(40, local), cancellationToken);
+        var options = new BlockingDisseminationOptions(cancellationToken);
+        var membership = new DisseminationMembership(
+            manager,
+            new ScopeLocalSiloDetails(local),
+            options);
+        Assert.Equal(new MembershipVersion(40), membership.CurrentSnapshots.MembershipVersion);
+
+        manager.SetSnapshot(CreateSourceSnapshot(41, local, firstPeer));
+        var firstRefresh = Task.Run(() => membership.CurrentSnapshots, cancellationToken);
+        await options.RefreshBlocked.Task.WaitAsync(cancellationToken);
+
+        manager.SetSnapshot(CreateSourceSnapshot(42, local, firstPeer, secondPeer));
+        var secondRefresh = Task.Run(() => membership.CurrentSnapshots, cancellationToken);
+        await manager.ThirdRead.Task.WaitAsync(cancellationToken);
+        options.ReleaseRefresh();
+
+        Assert.Equal(new MembershipVersion(41), (await firstRefresh).MembershipVersion);
+        var latest = await secondRefresh;
+        Assert.Equal(new MembershipVersion(42), latest.MembershipVersion);
+        Assert.Equal(new[] { local, firstPeer, secondPeer }, latest.ActiveMembers.Members);
+        Assert.Equal(3, manager.SnapshotReadCount);
+    }
+
+    [Fact]
+    public async Task StaleConcurrentRefreshDoesNotRegressNewerProjection()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var local = CreateSilo(32101);
+        var firstPeer = CreateSilo(32102);
+        var secondPeer = CreateSilo(32103);
+        var manager = new MutableMembershipManager(CreateSourceSnapshot(40, local), cancellationToken)
+        {
+            BlockSecondSnapshotRead = true,
+        };
+        var membership = new DisseminationMembership(
+            manager,
+            new ScopeLocalSiloDetails(local),
+            Microsoft.Extensions.Options.Options.Create(new DisseminationOptions()));
+        Assert.Equal(new MembershipVersion(40), membership.CurrentSnapshots.MembershipVersion);
+
+        manager.SetSnapshot(CreateSourceSnapshot(41, local, firstPeer));
+        var staleRefresh = Task.Run(() => membership.CurrentSnapshots, cancellationToken);
+        await manager.SecondReadCaptured.Task.WaitAsync(cancellationToken);
+
+        manager.SetSnapshot(CreateSourceSnapshot(42, local, firstPeer, secondPeer));
+        var newer = await Task.Run(() => membership.CurrentSnapshots, cancellationToken);
+        manager.ReleaseSecondRead();
+        var stale = await staleRefresh;
+
+        Assert.Equal(new MembershipVersion(42), newer.MembershipVersion);
+        Assert.Equal(new MembershipVersion(42), stale.MembershipVersion);
+        Assert.Equal(new[] { local, firstPeer, secondPeer }, membership.CurrentSnapshots.ActiveMembers.Members);
+        Assert.Equal(4, manager.SnapshotReadCount);
+    }
+
+    private static (
+        DisseminationMembershipSnapshots Snapshots,
+        CountingMembershipManager Manager,
+        ScopeSilos Silos) CreateScopeProjections(bool reverseSourceEntries = false)
+    {
+        var silos = new ScopeSilos(
+            CreateSilo(31001),
+            CreateSilo(31002),
+            CreateSilo(31003),
+            CreateSilo(31004),
+            CreateSilo(31005),
+            CreateSilo(31006),
+            CreateSilo(31007));
+        var entries = new[]
+        {
+            CreateScopeMembershipEntry(silos.Dead, SiloStatus.Dead, 5),
+            CreateScopeMembershipEntry(silos.Stopping, SiloStatus.Stopping, 4),
+            CreateScopeMembershipEntry(silos.ShuttingDown, SiloStatus.ShuttingDown, 3),
+            CreateScopeMembershipEntry(silos.Joining, SiloStatus.Joining, 2),
+            CreateScopeMembershipEntry(silos.ActiveTwo, SiloStatus.Active, 2),
+            CreateScopeMembershipEntry(silos.Active, SiloStatus.Active, 1),
+            CreateScopeMembershipEntry(silos.Local, SiloStatus.Active, 0),
+        };
+        if (reverseSourceEntries)
+        {
+            Array.Reverse(entries);
+        }
+
+        var source = new MembershipTableSnapshot(
+            new MembershipVersion(42),
+            entries.ToImmutableDictionary(static entry => entry.SiloAddress));
+        var manager = new CountingMembershipManager(source);
+        var membership = new DisseminationMembership(
+            manager,
+            new ScopeLocalSiloDetails(silos.Local),
+            Microsoft.Extensions.Options.Options.Create(new DisseminationOptions
+            {
+                Overlay = new DisseminationOverlayOptions
+                {
+                    FanOutFactor = static _ => 2,
+                },
+            }));
+
+        return (membership.CurrentSnapshots, manager, silos);
+    }
+
+    private static MembershipEntry CreateScopeMembershipEntry(
+        SiloAddress silo,
+        SiloStatus status,
+        int startSeconds) => new()
+    {
+        SiloAddress = silo,
+        Status = status,
+        ProxyPort = silo.Endpoint.Port,
+        HostName = "localhost",
+        SiloName = silo.ToParsableString(),
+        RoleName = "test",
+        StartTime = DateTime.UnixEpoch.AddSeconds(startSeconds),
+        IAmAliveTime = DateTime.UnixEpoch.AddSeconds(startSeconds),
+    };
+
+    private static MembershipTableSnapshot CreateSourceSnapshot(
+        long version,
+        SiloAddress local,
+        params SiloAddress[] peers)
+    {
+        var entries = peers
+            .Prepend(local)
+            .Select((silo, index) => CreateScopeMembershipEntry(silo, SiloStatus.Active, index))
+            .ToImmutableDictionary(static entry => entry.SiloAddress);
+        return new(new MembershipVersion(version), entries);
+    }
+
+    private readonly record struct ScopeSilos(
+        SiloAddress Local,
+        SiloAddress Active,
+        SiloAddress ActiveTwo,
+        SiloAddress Joining,
+        SiloAddress ShuttingDown,
+        SiloAddress Stopping,
+        SiloAddress Dead);
+
+    private sealed class ScopeLocalSiloDetails(SiloAddress siloAddress) : ILocalSiloDetails
+    {
+        public string Name => "test";
+
+        public string ClusterId => "test";
+
+        public string DnsHostName => "localhost";
+
+        public SiloAddress SiloAddress => siloAddress;
+
+        public SiloAddress GatewayAddress => siloAddress;
+    }
+
+    private sealed class CountingMembershipManager(
+        MembershipTableSnapshot snapshot)
+        : Orleans.Runtime.MembershipService.IMembershipManager
+    {
+        public int SnapshotReadCount { get; private set; }
+
+        public MembershipTableSnapshot CurrentSnapshot
+        {
+            get
+            {
+                SnapshotReadCount++;
+                return snapshot;
+            }
+        }
+
+        public IAsyncEnumerable<MembershipTableSnapshot> MembershipUpdates =>
+            EmptyUpdates();
+
+        public SiloStatus LocalSiloStatus => SiloStatus.Active;
+
+        public Task UpdateLocalStatus(SiloStatus status, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task<bool> TryKillSilo(SiloAddress silo, CancellationToken cancellationToken) => Task.FromResult(false);
+
+        public Task<bool> TrySuspectSilo(
+            SiloAddress silo,
+            SiloAddress? indirectProbingSilo,
+            CancellationToken cancellationToken) => Task.FromResult(false);
+
+        public Task Refresh(MembershipVersion? targetVersion, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task ProcessGossipSnapshot(
+            MembershipTableSnapshot value,
+            CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task UpdateIAmAlive(CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public bool CheckHealth(DateTime lastCheckTime, out string reason)
+        {
+            reason = string.Empty;
+            return true;
+        }
+
+        public void Participate(ISiloLifecycle lifecycle)
+        {
+        }
+
+        private static async IAsyncEnumerable<MembershipTableSnapshot> EmptyUpdates()
+        {
+            await Task.CompletedTask;
+            yield break;
+        }
+    }
+
+    private sealed class MutableMembershipManager(
+        MembershipTableSnapshot snapshot,
+        CancellationToken cancellationToken)
+        : Orleans.Runtime.MembershipService.IMembershipManager
+    {
+        private readonly ManualResetEventSlim _releaseSecondRead = new();
+        private MembershipTableSnapshot _snapshot = snapshot;
+        private int _snapshotReadCount;
+
+        public int SnapshotReadCount => Volatile.Read(ref _snapshotReadCount);
+
+        public bool BlockSecondSnapshotRead { get; init; }
+
+        public TaskCompletionSource SecondReadCaptured { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource ThirdRead { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public MembershipTableSnapshot CurrentSnapshot
+        {
+            get
+            {
+                var result = Volatile.Read(ref _snapshot);
+                var readCount = Interlocked.Increment(ref _snapshotReadCount);
+                if (readCount == 2 && BlockSecondSnapshotRead)
+                {
+                    SecondReadCaptured.TrySetResult();
+                    _releaseSecondRead.Wait(cancellationToken);
+                }
+
+                if (readCount == 3)
+                {
+                    ThirdRead.TrySetResult();
+                }
+
+                return result;
+            }
+        }
+
+        public IAsyncEnumerable<MembershipTableSnapshot> MembershipUpdates => EmptyUpdates();
+
+        public SiloStatus LocalSiloStatus => SiloStatus.Active;
+
+        public void ReleaseSecondRead() => _releaseSecondRead.Set();
+
+        public void SetSnapshot(MembershipTableSnapshot value) => Volatile.Write(ref _snapshot, value);
+
+        public Task UpdateLocalStatus(SiloStatus status, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task<bool> TryKillSilo(SiloAddress silo, CancellationToken cancellationToken) => Task.FromResult(false);
+
+        public Task<bool> TrySuspectSilo(
+            SiloAddress silo,
+            SiloAddress? indirectProbingSilo,
+            CancellationToken cancellationToken) => Task.FromResult(false);
+
+        public Task Refresh(MembershipVersion? targetVersion, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task ProcessGossipSnapshot(
+            MembershipTableSnapshot value,
+            CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task UpdateIAmAlive(CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public bool CheckHealth(DateTime lastCheckTime, out string reason)
+        {
+            reason = string.Empty;
+            return true;
+        }
+
+        public void Participate(ISiloLifecycle lifecycle)
+        {
+        }
+
+        private static async IAsyncEnumerable<MembershipTableSnapshot> EmptyUpdates()
+        {
+            await Task.CompletedTask;
+            yield break;
+        }
+    }
+
+    private sealed class BlockingDisseminationOptions(CancellationToken cancellationToken)
+        : Microsoft.Extensions.Options.IOptions<DisseminationOptions>
+    {
+        private readonly ManualResetEventSlim _releaseRefresh = new();
+        private int _readCount;
+
+        public TaskCompletionSource RefreshBlocked { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public DisseminationOptions Value
+        {
+            get
+            {
+                if (Interlocked.Increment(ref _readCount) == 2)
+                {
+                    RefreshBlocked.TrySetResult();
+                    _releaseRefresh.Wait(cancellationToken);
+                }
+
+                return new()
+                {
+                    Overlay = new()
+                    {
+                        FanOutFactor = static _ => 2,
+                    },
+                };
+            }
+        }
+
+        public void ReleaseRefresh() => _releaseRefresh.Set();
+    }
 }

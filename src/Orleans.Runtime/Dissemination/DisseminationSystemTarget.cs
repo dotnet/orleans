@@ -44,6 +44,10 @@ internal sealed partial class DisseminationSystemTarget : SystemTarget, IDissemi
             version,
             cancellationToken));
 
+    IReadOnlyList<SiloAddress> IDisseminationService.GetUnconfirmedPeers(
+        IDisseminationNamespace disseminationNamespace) =>
+        _protocol.GetUnconfirmedPeers(disseminationNamespace);
+
     Task<DisseminationBroadcastResponse> IDisseminationSystemTarget.PushBroadcast(
         DisseminationBroadcastBatch batch,
         CancellationToken cancellationToken) =>

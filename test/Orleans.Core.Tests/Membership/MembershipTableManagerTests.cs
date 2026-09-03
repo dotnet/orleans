@@ -1327,6 +1327,238 @@ namespace NonSilo.Tests.Membership
                 Arg.Is<CancellationToken>(token => token == gossipCancellationToken));
         }
 
+        [Fact]
+        public async Task MembershipTableManagerAppliesSnapshotBeforeTerminatingStatusGossip()
+        {
+            var remoteSilo = Silo("127.0.0.1:200@100");
+            var membershipTable = new InMemoryMembershipTable(
+                new TableVersion(123, "123"),
+                Entry(remoteSilo, SiloStatus.Active, DateTimeOffset.UtcNow));
+            var systemTargetMembershipTable = this.CreateSystemTargetBasedMembershipTable(membershipTable);
+            var timer = new DelegateAsyncTimer(_ => Task.FromResult(false));
+            var gossipStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var releaseGossip = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            SiloStatus? localStatusAtGossipStart = null;
+            MembershipTableSnapshot? gossipSnapshot = null;
+            Task? deadStatusUpdate = null;
+
+            this.membershipGossiper
+                .GossipToRemoteSilos(
+                    Arg.Any<List<SiloAddress>>(),
+                    Arg.Any<MembershipTableSnapshot>(),
+                    Arg.Any<SiloAddress>(),
+                    Arg.Any<SiloStatus>(),
+                    Arg.Any<CancellationToken>())
+                .Returns(call =>
+                {
+                    gossipSnapshot = call.ArgAt<MembershipTableSnapshot>(1);
+                    localStatusAtGossipStart = gossipSnapshot.Entries[this.localSilo].Status;
+                    gossipStarted.TrySetResult(true);
+                    return releaseGossip.Task;
+                });
+
+            var manager = new MembershipTableManager(
+                localSiloDetails: this.localSiloDetails,
+                clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
+                membershipTable: systemTargetMembershipTable,
+                fatalErrorHandler: this.fatalErrorHandler,
+                gossiper: this.membershipGossiper,
+                log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
+                timerFactory: new DelegateAsyncTimerFactory((_, _) => timer),
+                siloLifecycle: this.lifecycle,
+                timeProvider: new Microsoft.Extensions.Time.Testing.FakeTimeProvider());
+            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
+            this.lifecycle.Subscribe(
+                "UpdateStatusToDead",
+                ServiceLifecycleStage.Active + 1,
+                _ => Task.CompletedTask,
+                _ =>
+                {
+                    deadStatusUpdate = manager.UpdateStatus(SiloStatus.Dead);
+                    return deadStatusUpdate;
+                });
+
+            await this.lifecycle.OnStart(TestContext.Current.CancellationToken);
+            var stopTask = this.lifecycle.OnStop(TestContext.Current.CancellationToken);
+            await gossipStarted.Task;
+
+            // The local status update must already be applied to the snapshot handed to the gossiper
+            // before the terminating-status gossip is invoked; the gossip never observes a stale status.
+            Assert.Equal(SiloStatus.Dead, localStatusAtGossipStart);
+            Assert.Same(manager.MembershipTableSnapshot, gossipSnapshot);
+            Assert.Equal(SiloStatus.Dead, manager.MembershipTableSnapshot.Entries[this.localSilo].Status);
+
+            releaseGossip.TrySetResult(true);
+            await stopTask;
+
+            Assert.Equal(SiloStatus.Dead, manager.CurrentStatus);
+            Assert.True(deadStatusUpdate!.IsCompletedSuccessfully);
+        }
+
+        [Fact]
+        public async Task MembershipTableManagerPreservesCallerCancellationForTerminatingStatusGossip()
+        {
+            var remoteSilo = Silo("127.0.0.1:200@100");
+            var membershipTable = new InMemoryMembershipTable(
+                new TableVersion(123, "123"),
+                Entry(remoteSilo, SiloStatus.Active, DateTimeOffset.UtcNow));
+            var systemTargetMembershipTable = this.CreateSystemTargetBasedMembershipTable(membershipTable);
+            var timer = new DelegateAsyncTimer(_ => Task.FromResult(false));
+            var gossipStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var releaseGossip = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            CancellationToken gossipCancellationToken = default;
+            Task? deadStatusUpdate = null;
+
+            using var callerCancellation = new CancellationTokenSource();
+
+            this.membershipGossiper
+                .GossipToRemoteSilos(
+                    Arg.Any<List<SiloAddress>>(),
+                    Arg.Any<MembershipTableSnapshot>(),
+                    Arg.Any<SiloAddress>(),
+                    Arg.Any<SiloStatus>(),
+                    Arg.Any<CancellationToken>())
+                .Returns(call =>
+                {
+                    gossipCancellationToken = call.ArgAt<CancellationToken>(4);
+                    gossipStarted.TrySetResult(true);
+                    return releaseGossip.Task;
+                });
+
+            var manager = new MembershipTableManager(
+                localSiloDetails: this.localSiloDetails,
+                clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
+                membershipTable: systemTargetMembershipTable,
+                fatalErrorHandler: this.fatalErrorHandler,
+                gossiper: this.membershipGossiper,
+                log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
+                timerFactory: new DelegateAsyncTimerFactory((_, _) => timer),
+                siloLifecycle: this.lifecycle,
+                timeProvider: new Microsoft.Extensions.Time.Testing.FakeTimeProvider());
+            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
+            this.lifecycle.Subscribe(
+                "UpdateStatusToDead",
+                ServiceLifecycleStage.Active + 1,
+                _ => Task.CompletedTask,
+                _ =>
+                {
+                    // UpdateLocalStatus intentionally does not forward the caller's cancellation token to
+                    // the terminating status gossip; its own internal deadline remains authoritative.
+                    deadStatusUpdate = ((IMembershipManager)manager).UpdateLocalStatus(SiloStatus.Dead, callerCancellation.Token);
+                    return deadStatusUpdate;
+                });
+
+            await this.lifecycle.OnStart(TestContext.Current.CancellationToken);
+            var stopTask = this.lifecycle.OnStop(TestContext.Current.CancellationToken);
+            await gossipStarted.Task;
+
+            callerCancellation.Cancel();
+
+            Assert.NotEqual(callerCancellation.Token, gossipCancellationToken);
+            Assert.False(gossipCancellationToken.IsCancellationRequested);
+            Assert.False(deadStatusUpdate!.IsCompleted);
+
+            releaseGossip.TrySetResult(true);
+            await stopTask;
+
+            Assert.True(deadStatusUpdate.IsCompletedSuccessfully);
+            Assert.Equal(SiloStatus.Dead, manager.CurrentStatus);
+            await this.membershipGossiper.Received(1).GossipToRemoteSilos(
+                Arg.Is<List<SiloAddress>>(partners => partners.SequenceEqual(new[] { remoteSilo })),
+                manager.MembershipTableSnapshot,
+                this.localSilo,
+                SiloStatus.Dead,
+                Arg.Is<CancellationToken>(token => token == gossipCancellationToken));
+        }
+
+        [Fact]
+        public async Task MembershipTableManagerPreservesGossipDeadlineForTerminatingStatus()
+        {
+            var remoteSilo = Silo("127.0.0.1:200@100");
+            var membershipTable = new InMemoryMembershipTable(
+                new TableVersion(123, "123"),
+                Entry(remoteSilo, SiloStatus.Active, DateTimeOffset.UtcNow));
+            var systemTargetMembershipTable = this.CreateSystemTargetBasedMembershipTable(membershipTable);
+            var timer = new DelegateAsyncTimer(_ => Task.FromResult(false));
+            var fakeTimeProvider = new Microsoft.Extensions.Time.Testing.FakeTimeProvider();
+            var gossipStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var gossipCancellationObserved = new TaskCompletionSource<CancellationToken>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var gossiperWrapperTask = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            CancellationToken gossipCancellationToken = default;
+            Task? deadStatusUpdate = null;
+
+            this.membershipGossiper
+                .GossipToRemoteSilos(
+                    Arg.Any<List<SiloAddress>>(),
+                    Arg.Any<MembershipTableSnapshot>(),
+                    Arg.Any<SiloAddress>(),
+                    Arg.Any<SiloStatus>(),
+                    Arg.Any<CancellationToken>())
+                .Returns(call =>
+                {
+                    gossipCancellationToken = call.ArgAt<CancellationToken>(4);
+                    gossipCancellationToken.Register(
+                        () =>
+                        {
+                            gossipCancellationObserved.TrySetResult(gossipCancellationToken);
+                            gossiperWrapperTask.TrySetCanceled(gossipCancellationToken);
+                        });
+                    gossipStarted.TrySetResult(true);
+                    return gossiperWrapperTask.Task;
+                });
+
+            var manager = new MembershipTableManager(
+                localSiloDetails: this.localSiloDetails,
+                clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
+                membershipTable: systemTargetMembershipTable,
+                fatalErrorHandler: this.fatalErrorHandler,
+                gossiper: this.membershipGossiper,
+                log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
+                timerFactory: new DelegateAsyncTimerFactory((_, _) => timer),
+                siloLifecycle: this.lifecycle,
+                timeProvider: fakeTimeProvider);
+            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
+            this.lifecycle.Subscribe(
+                "UpdateStatusToDead",
+                ServiceLifecycleStage.Active + 1,
+                _ => Task.CompletedTask,
+                _ =>
+                {
+                    deadStatusUpdate = manager.UpdateStatus(SiloStatus.Dead);
+                    return deadStatusUpdate;
+                });
+
+            await this.lifecycle.OnStart(TestContext.Current.CancellationToken);
+            var stopTask = this.lifecycle.OnStop(TestContext.Current.CancellationToken);
+            await gossipStarted.Task;
+
+            Assert.True(gossipCancellationToken.CanBeCanceled);
+            Assert.False(gossipCancellationToken.IsCancellationRequested);
+
+            // Terminating-status gossip uses an exact 500 millisecond deadline: advancing to just short of
+            // it must not cancel the gossip, while reaching it must cancel it deterministically.
+            fakeTimeProvider.Advance(TimeSpan.FromMilliseconds(499));
+            Assert.False(gossipCancellationToken.IsCancellationRequested);
+            Assert.False(gossipCancellationObserved.Task.IsCompleted);
+
+            fakeTimeProvider.Advance(TimeSpan.FromMilliseconds(1));
+            var observedCancellationToken = await gossipCancellationObserved.Task;
+            await stopTask;
+
+            Assert.Equal(gossipCancellationToken, observedCancellationToken);
+            Assert.True(gossipCancellationToken.IsCancellationRequested);
+            Assert.True(gossiperWrapperTask.Task.IsCanceled);
+            Assert.True(deadStatusUpdate!.IsCompletedSuccessfully);
+            Assert.Equal(SiloStatus.Dead, manager.CurrentStatus);
+            Assert.Equal(1, timer.DisposedCounter);
+            await this.membershipGossiper.Received(1).GossipToRemoteSilos(
+                Arg.Is<List<SiloAddress>>(partners => partners.SequenceEqual(new[] { remoteSilo })),
+                manager.MembershipTableSnapshot,
+                this.localSilo,
+                SiloStatus.Dead,
+                Arg.Is<CancellationToken>(token => token == gossipCancellationToken));
+        }
+
         private SystemTargetBasedMembershipTable CreateSystemTargetBasedMembershipTable(
             IMembershipTable backingTable,
             Func<MembershipEntry, TableVersion, Task<bool>> insertRow)

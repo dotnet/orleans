@@ -31,7 +31,9 @@ namespace Orleans.Runtime
         private readonly IServiceProvider _serviceProvider;
         private readonly ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics> _periodicStats;
         private readonly object _statisticsUpdateLock = new();
-        private readonly Queue<StatisticsNotification> _statisticsNotifications = new();
+        private readonly Queue<SiloAddress> _statisticsNotificationOrder = new();
+        private readonly Dictionary<SiloAddress, StatisticsNotification> _pendingStatisticsNotifications = new();
+        private readonly HashSet<SiloAddress> _terminatedSilos = new();
         private readonly TimeSpan _statisticsRefreshTime;
         private readonly List<ISiloStatisticsChangeListener> _siloStatisticsChangeListeners;
         private readonly ILogger _logger;
@@ -95,7 +97,13 @@ namespace Orleans.Runtime
             LogDebugStartedDeploymentLoadPublisher(_logger);
         }
 
+<<<<<<< HEAD
         private async Task PublishStatistics(CancellationToken cancellationToken)
+||||||| parent of f658f01d66 (feat(runtime): complete efficient broadcast behaviors)
+        private async Task PublishStatistics()
+=======
+        internal async Task PublishStatistics()
+>>>>>>> f658f01d66 (feat(runtime): complete efficient broadcast behaviors)
         {
             try
             {
@@ -118,11 +126,32 @@ namespace Orleans.Runtime
 
                 // Inform other cluster members about our refreshed statistics.
                 var members = _siloStatusOracle.GetApproximateSiloStatuses(true).Keys.ToArray();
-                if (!await TryPublishStatisticsViaDissemination(myStats))
+                IReadOnlyCollection<SiloAddress> directRecipients = members;
+                if (await TryPublishStatisticsViaDissemination(myStats))
                 {
+<<<<<<< HEAD
                     await PublishStatisticsDirectly(myStats, members, cancellationToken);
+||||||| parent of f658f01d66 (feat(runtime): complete efficient broadcast behaviors)
+                    await PublishStatisticsDirectly(myStats, members);
+=======
+                    try
+                    {
+                        var dissemination = _serviceProvider.GetService<IDisseminationService>();
+                        var disseminationNamespace = _serviceProvider.GetService<DeploymentLoadStatisticsDisseminationNamespace>();
+                        if (dissemination is not null && disseminationNamespace is not null)
+                        {
+                            var unconfirmedPeers = dissemination.GetUnconfirmedPeers(disseminationNamespace).ToHashSet();
+                            directRecipients = members.Where(unconfirmedPeers.Contains).ToArray();
+                        }
+                    }
+                    catch (Exception exception)
+                    {
+                        LogWarningRuntimeStatisticsUpdateFailure1(_logger, exception);
+                    }
+>>>>>>> f658f01d66 (feat(runtime): complete efficient broadcast behaviors)
                 }
 
+                await PublishStatisticsDirectly(myStats, directRecipients);
                 DeploymentLoadPublisherEvents.EmitClusterRefreshed(_siloDetails.SiloAddress, _periodicStats);
             }
             catch (OperationCanceledException exception) when (exception.CancellationToken == cancellationToken)
@@ -150,20 +179,25 @@ namespace Orleans.Runtime
 
         internal bool IsRuntimeStatisticsObsolete(SiloAddress siloAddress, long timestampTicks)
         {
-            if (_siloStatusOracle.GetApproximateSiloStatus(siloAddress) != SiloStatus.Active)
+            lock (_statisticsUpdateLock)
             {
-                return true;
-            }
+                if (_terminatedSilos.Contains(siloAddress)
+                    || _siloStatusOracle.GetApproximateSiloStatus(siloAddress) != SiloStatus.Active)
+                {
+                    return true;
+                }
 
-            return _periodicStats.TryGetValue(siloAddress, out var old) && old.DateTime.Ticks > timestampTicks;
+                return _periodicStats.TryGetValue(siloAddress, out var old) && old.DateTime.Ticks > timestampTicks;
+            }
         }
 
         internal IReadOnlyCollection<SiloAddress> GetActiveSilosForStatisticsDigest() =>
             _siloStatusOracle.GetApproximateSiloStatuses(onlyActive: true).Keys;
 
-        private async Task<bool> TryPublishStatisticsViaDissemination(SiloRuntimeStatistics myStats)
+        internal async Task<bool> TryPublishStatisticsViaDissemination(SiloRuntimeStatistics myStats)
         {
-            using var cancellation = new CancellationTokenSource(_statisticsRefreshTime);
+            var timeProvider = _serviceProvider.GetService<TimeProvider>() ?? TimeProvider.System;
+            using var cancellation = new CancellationTokenSource(_statisticsRefreshTime, timeProvider);
             try
             {
                 var dissemination = _serviceProvider.GetService<IDisseminationService>();
@@ -229,7 +263,8 @@ namespace Orleans.Runtime
             bool drainNotifications;
             lock (_statisticsUpdateLock)
             {
-                if (_siloStatusOracle.GetApproximateSiloStatus(siloAddress) != SiloStatus.Active)
+                if (_terminatedSilos.Contains(siloAddress)
+                    || _siloStatusOracle.GetApproximateSiloStatus(siloAddress) != SiloStatus.Active)
                 {
                     return DisseminationApplyResult.Rejected;
                 }
@@ -313,7 +348,7 @@ namespace Orleans.Runtime
             }
         }
 
-        private void NotifyAllStatisticsChangeEventsSubscribers(SiloAddress silo, SiloRuntimeStatistics? stats)
+        private ExceptionDispatchInfo? NotifyAllStatisticsChangeEventsSubscribers(SiloAddress silo, SiloRuntimeStatistics? stats)
         {
             ISiloStatisticsChangeListener[] subscribers;
             lock (_siloStatisticsChangeListeners)
@@ -321,22 +356,37 @@ namespace Orleans.Runtime
                 subscribers = [.. _siloStatisticsChangeListeners];
             }
 
+            ExceptionDispatchInfo? failure = null;
             foreach (var subscriber in subscribers)
             {
-                if (stats == null)
+                try
                 {
-                    subscriber.RemoveSilo(silo);
+                    if (stats == null)
+                    {
+                        subscriber.RemoveSilo(silo);
+                    }
+                    else
+                    {
+                        subscriber.SiloStatisticsChangeNotification(silo, stats);
+                    }
                 }
-                else
+                catch (Exception exception)
                 {
-                    subscriber.SiloStatisticsChangeNotification(silo, stats);
+                    failure ??= ExceptionDispatchInfo.Capture(exception);
                 }
             }
+
+            return failure;
         }
 
         private bool EnqueueStatisticsNotificationUnsafe(StatisticsNotification notification)
         {
-            _statisticsNotifications.Enqueue(notification);
+            if (!_pendingStatisticsNotifications.ContainsKey(notification.SiloAddress))
+            {
+                _statisticsNotificationOrder.Enqueue(notification.SiloAddress);
+            }
+
+            _pendingStatisticsNotifications[notification.SiloAddress] = notification;
             if (_isDrainingStatisticsNotifications)
             {
                 return false;
@@ -352,35 +402,56 @@ namespace Orleans.Runtime
             while (true)
             {
                 StatisticsNotification notification;
+                bool hasNotification;
                 lock (_statisticsUpdateLock)
                 {
-                    if (!_statisticsNotifications.TryDequeue(out notification))
+                    if (!_statisticsNotificationOrder.TryDequeue(out var siloAddress))
                     {
                         _isDrainingStatisticsNotifications = false;
-                        failure?.Throw();
-                        return;
+                        hasNotification = false;
+                        notification = default;
+                    }
+                    else
+                    {
+                        hasNotification = _pendingStatisticsNotifications.Remove(siloAddress, out notification);
                     }
                 }
 
-                try
+                if (!hasNotification)
                 {
-                    if (notification.Statistics is { } statistics)
+                    failure?.Throw();
+                    return;
+                }
+
+                if (notification.Statistics is { } statistics)
+                {
+                    var notificationFailure = NotifyAllStatisticsChangeEventsSubscribers(notification.SiloAddress, statistics);
+                    failure ??= notificationFailure;
+                    try
                     {
-                        NotifyAllStatisticsChangeEventsSubscribers(notification.SiloAddress, statistics);
                         DeploymentLoadPublisherEvents.EmitReceived(
                             notification.SiloAddress,
                             _siloDetails.SiloAddress,
                             statistics);
                     }
-                    else
+                    catch (Exception exception)
                     {
-                        DeploymentLoadPublisherEvents.EmitRemoved(notification.SiloAddress, _siloDetails.SiloAddress);
-                        NotifyAllStatisticsChangeEventsSubscribers(notification.SiloAddress, null);
+                        failure ??= ExceptionDispatchInfo.Capture(exception);
                     }
                 }
-                catch (Exception exception)
+                else
                 {
-                    failure ??= ExceptionDispatchInfo.Capture(exception);
+                    try
+                    {
+                        DeploymentLoadPublisherEvents.EmitRemoved(notification.SiloAddress, _siloDetails.SiloAddress);
+                    }
+                    catch (Exception exception)
+                    {
+                        failure ??= ExceptionDispatchInfo.Capture(exception);
+                    }
+
+                    var notificationFailure = NotifyAllStatisticsChangeEventsSubscribers(notification.SiloAddress, null);
+                    failure ??= notificationFailure;
                 }
             }
         }
@@ -393,13 +464,18 @@ namespace Orleans.Runtime
             });
         }
 
-        private void OnSiloStatusChange(SiloAddress updatedSilo, SiloStatus status)
+        internal void OnSiloStatusChange(SiloAddress updatedSilo, SiloStatus status)
         {
             if (!status.IsTerminating()) return;
 
             bool drainNotifications;
             lock (_statisticsUpdateLock)
             {
+                if (!_terminatedSilos.Add(updatedSilo))
+                {
+                    return;
+                }
+
                 _periodicStats.TryRemove(updatedSilo, out _);
                 drainNotifications = EnqueueStatisticsNotificationUnsafe(new(updatedSilo, Statistics: null));
             }

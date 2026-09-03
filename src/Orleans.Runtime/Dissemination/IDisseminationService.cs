@@ -8,4 +8,6 @@ internal interface IDisseminationService
         DisseminationKey key,
         long version,
         CancellationToken cancellationToken);
+
+    IReadOnlyList<SiloAddress> GetUnconfirmedPeers(IDisseminationNamespace disseminationNamespace);
 }

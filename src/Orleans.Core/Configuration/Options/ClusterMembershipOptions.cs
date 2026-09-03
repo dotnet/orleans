@@ -96,6 +96,11 @@ namespace Orleans.Configuration
         /// <summary>
         /// Gets or sets dissemination options for membership updates.
         /// </summary>
+        /// <remarks>
+        /// Membership dissemination includes Joining, Active, ShuttingDown, and Stopping silos and is a
+        /// best-effort accelerator. Direct membership gossip remains the authoritative delivery path, including
+        /// during shutdown and mixed-version operation.
+        /// </remarks>
         public DisseminationNamespaceOptions Dissemination { get; set; } = new()
         {
             ExpectedUpdateCadence = TimeSpan.FromSeconds(10),

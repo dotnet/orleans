@@ -11,13 +11,14 @@ internal sealed class DisseminationMembership(
     IOptions<DisseminationOptions> options)
 {
     private readonly object _membershipLock = new();
+    private DisseminationMembershipSnapshots? _currentSnapshots;
 
-    public DisseminationMembershipSnapshot CurrentSnapshot
+    public DisseminationMembershipSnapshots CurrentSnapshots
     {
         get
         {
             var membershipSnapshot = membershipManager.CurrentSnapshot;
-            var current = Volatile.Read(ref field);
+            var current = Volatile.Read(ref _currentSnapshots);
             if (current is not null && current.MembershipVersion == membershipSnapshot.Version)
             {
                 return current;
@@ -25,39 +26,44 @@ internal sealed class DisseminationMembership(
 
             lock (_membershipLock)
             {
-                membershipSnapshot = membershipManager.CurrentSnapshot;
-                current = Volatile.Read(ref field);
-                if (current is not null && current.MembershipVersion == membershipSnapshot.Version)
+                current = Volatile.Read(ref _currentSnapshots);
+                if (current is not null && current.MembershipVersion >= membershipSnapshot.Version)
                 {
                     return current;
                 }
 
                 current = ComputeMembership(membershipSnapshot, localSiloDetails.SiloAddress, options.Value.Overlay);
-                Volatile.Write(ref field, current);
+                Volatile.Write(ref _currentSnapshots, current);
                 return current;
             }
         }
     }
 
+    public DisseminationMembershipSnapshot CurrentSnapshot => CurrentSnapshots.AllMembers;
+
+    public DisseminationMembershipSnapshot GetSnapshot(DisseminationMembershipScope scope) =>
+        CurrentSnapshots.GetSnapshot(scope);
+
     public Task RefreshMembership(CancellationToken cancellationToken) =>
         membershipManager.Refresh(targetVersion: null, cancellationToken: cancellationToken);
 
-    public async ValueTask<DisseminationMembershipSnapshot?> GetSnapshotContainingMember(
+    public async ValueTask<DisseminationMembershipSnapshots?> GetSnapshotsContainingMember(
         SiloAddress member,
+        DisseminationMembershipScope scope,
         CancellationToken cancellationToken)
     {
-        var snapshot = CurrentSnapshot;
-        if (snapshot.ContainsMember(member))
+        var snapshots = CurrentSnapshots;
+        if (snapshots.GetSnapshot(scope).ContainsMember(member))
         {
-            return snapshot;
+            return snapshots;
         }
 
         await RefreshMembership(cancellationToken);
-        snapshot = CurrentSnapshot;
-        return snapshot.ContainsMember(member) ? snapshot : null;
+        snapshots = CurrentSnapshots;
+        return snapshots.GetSnapshot(scope).ContainsMember(member) ? snapshots : null;
     }
 
-    private static DisseminationMembershipSnapshot ComputeMembership(
+    private static DisseminationMembershipSnapshots ComputeMembership(
         MembershipTableSnapshot snapshot,
         SiloAddress localSilo,
         DisseminationOverlayOptions overlayOptions)
@@ -68,17 +74,28 @@ internal sealed class DisseminationMembership(
             .ThenBy(static entry => entry.StartTime)
             .ThenBy(static entry => entry.SiloAddress)
             .ToArray();
-        var builder = ImmutableArray.CreateBuilder<SiloAddress>(members.Length);
+        var allMembers = ImmutableArray.CreateBuilder<SiloAddress>(members.Length);
+        var activeMembers = ImmutableArray.CreateBuilder<SiloAddress>(members.Length);
         foreach (var member in members)
         {
-            builder.Add(member.SiloAddress);
+            allMembers.Add(member.SiloAddress);
+            if (member.Status == SiloStatus.Active)
+            {
+                activeMembers.Add(member.SiloAddress);
+            }
         }
 
-        return new DisseminationMembershipSnapshot(
-            snapshot.Version,
-            localSilo,
-            builder.MoveToImmutable(),
-            overlayOptions);
+        return new(
+            new DisseminationMembershipSnapshot(
+                snapshot.Version,
+                localSilo,
+                activeMembers.ToImmutable(),
+                overlayOptions),
+            new DisseminationMembershipSnapshot(
+                snapshot.Version,
+                localSilo,
+                allMembers.MoveToImmutable(),
+                overlayOptions));
     }
 
     private static bool IsDisseminationMember(SiloStatus status) =>
@@ -92,4 +109,18 @@ internal sealed class DisseminationMembership(
         SiloStatus.Stopping => 3,
         _ => 4,
     };
+}
+
+internal sealed class DisseminationMembershipSnapshots(
+    DisseminationMembershipSnapshot activeMembers,
+    DisseminationMembershipSnapshot allMembers)
+{
+    public MembershipVersion MembershipVersion => AllMembers.MembershipVersion;
+
+    public DisseminationMembershipSnapshot ActiveMembers { get; } = activeMembers;
+
+    public DisseminationMembershipSnapshot AllMembers { get; } = allMembers;
+
+    public DisseminationMembershipSnapshot GetSnapshot(DisseminationMembershipScope scope) =>
+        scope == DisseminationMembershipScope.ActiveMembers ? ActiveMembers : AllMembers;
 }

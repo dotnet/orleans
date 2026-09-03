@@ -8,6 +8,8 @@ internal interface IDisseminationNamespace
 {
     DisseminationNamespace Name { get; }
 
+    DisseminationMembershipScope MembershipScope => DisseminationMembershipScope.AllMembers;
+
     DisseminationNamespaceOptions Options { get; }
 
     IEnumerable<DigestEntry> Digests { get; }
@@ -19,6 +21,12 @@ internal interface IDisseminationNamespace
     ValueTask<DisseminationApplyResult> ApplyValueAsync(
         DisseminationValue value,
         CancellationToken cancellationToken);
+}
+
+internal enum DisseminationMembershipScope
+{
+    ActiveMembers,
+    AllMembers,
 }
 
 // A null FromVersion means no known peer baseline; a null ToVersion asks for the highest repairable version.

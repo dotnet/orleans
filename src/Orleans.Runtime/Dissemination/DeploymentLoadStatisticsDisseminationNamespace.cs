@@ -15,6 +15,8 @@ internal sealed class DeploymentLoadStatisticsDisseminationNamespace(
 
     public DisseminationNamespace Name => DisseminationNamespaceNames.DeploymentLoad;
 
+    public DisseminationMembershipScope MembershipScope => DisseminationMembershipScope.ActiveMembers;
+
     public DisseminationNamespaceOptions Options => options.CurrentValue.Dissemination;
 
     public DisseminationValue CreateValue(SiloAddress origin, SiloRuntimeStatistics statistics)

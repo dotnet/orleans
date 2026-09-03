@@ -119,8 +119,14 @@ public sealed class DisseminationNamespaceOptions
     public DisseminationPriority Priority { get; set; } = DisseminationPriority.Normal;
 
     /// <summary>
-    /// Gets or sets the maximum number of pending namespace keys per peer.
+    /// Gets or sets the hard maximum number of distinct pending keys retained for this namespace by each peer.
     /// </summary>
+    /// <remarks>
+    /// The bound applies independently to each namespace in each peer pump. A notification for a key which is
+    /// already retained updates that key at the limit, while a new distinct key is rejected with diagnostics until
+    /// acknowledged delivery or membership pruning releases capacity. Values are materialized from namespace state
+    /// only when they are sent, so this bounds retained identities rather than serialized batch bytes.
+    /// </remarks>
     public int MaxPendingItemCount { get; set; } = 1024;
 
     /// <summary>

@@ -23,6 +23,8 @@ internal sealed partial class DisseminationProtocol
     private long _antiEntropyResponseCursorAccess;
     private readonly object _valueUpdateLock = new();
     private readonly Dictionary<DigestKey, ValueUpdate> _lastValueUpdates = [];
+    private readonly object _peerSupportLock = new();
+    private readonly Dictionary<SiloAddress, Dictionary<DisseminationNamespace, long>> _confirmedPeerNamespaces = [];
     private readonly FrozenDictionary<DisseminationNamespace, IDisseminationNamespace> _namespaces;
 
     public DisseminationProtocol(
@@ -49,7 +51,8 @@ internal sealed partial class DisseminationProtocol
             _grainFactory,
             _options,
             _namespaces.Values,
-            broadcastQueueLogger);
+            broadcastQueueLogger,
+            ObserveBroadcastResponse);
     }
 
     public async ValueTask<bool> Publish(
@@ -77,7 +80,10 @@ internal sealed partial class DisseminationProtocol
             return false;
         }
 
-        var membership = await GetMembershipSnapshotForRouting(_localSilo, cancellationToken);
+        var membership = await GetMembershipSnapshotForRouting(
+            disseminationNamespace.MembershipScope,
+            _localSilo,
+            cancellationToken);
         if (membership is null)
         {
             return false;
@@ -119,6 +125,7 @@ internal sealed partial class DisseminationProtocol
                 continue;
             }
 
+            ConfirmPeerNamespaces(batch.Sender, [namespaceName]);
             var namespaceKeys = new HashSet<DisseminationKey>();
             receivedKeys.Add(disseminationNamespace, namespaceKeys);
             foreach (var item in values)
@@ -141,12 +148,14 @@ internal sealed partial class DisseminationProtocol
         }
 
         // Membership may be part of this batch, so apply everything before deriving the forwarding tree.
-        var membership = _membership.CurrentSnapshot;
-        await _broadcastQueue.Prune(membership, cancellationToken);
+        var membershipSnapshots = _membership.CurrentSnapshots;
+        PrunePeerNamespaceConfirmations(membershipSnapshots.AllMembers);
+        await _broadcastQueue.Prune(membershipSnapshots, cancellationToken);
         // Re-materialize downstream repairs from local state. Duplicate deliveries still wake children,
         // while their peer ledgers suppress redundant sends.
         foreach (var (disseminationNamespace, keys) in receivedKeys)
         {
+            var membership = membershipSnapshots.GetSnapshot(disseminationNamespace.MembershipScope);
             foreach (var key in keys)
             {
                 if (disseminationNamespace.GetVersion(key) <= 0)
@@ -192,13 +201,9 @@ internal sealed partial class DisseminationProtocol
             return;
         }
 
-        var membership = _membership.CurrentSnapshot;
-        await _broadcastQueue.Prune(membership, cancellationToken);
-        var peers = membership.SelectAntiEntropyPeers(options.Overlay.AntiEntropyPeerCount);
-        if (peers.IsDefaultOrEmpty)
-        {
-            return;
-        }
+        var membershipSnapshots = _membership.CurrentSnapshots;
+        PrunePeerNamespaceConfirmations(membershipSnapshots.AllMembers);
+        await _broadcastQueue.Prune(membershipSnapshots, cancellationToken);
 
         // Push traffic suppresses redundant checks; quiet streams are offered to a few random peers.
         var requestDigests = CreateAntiEntropyRequestDigests(_timeProvider.GetTimestamp());
@@ -209,19 +214,30 @@ internal sealed partial class DisseminationProtocol
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        var request = new DisseminationAntiEntropyRequest
+        var requests = CreateAntiEntropyRequests(
+            membershipSnapshots,
+            requestDigests,
+            options.Overlay.AntiEntropyPeerCount);
+        if (requests.Count == 0)
         {
-            Sender = _localSilo,
-            Digests = requestDigests,
-        };
-        var requestDigestCount = GetDigestCount(requestDigests);
+            return;
+        }
+
         var roundLifetime = GetAntiEntropyRoundLifetime(requestDigests);
         using var lifetimeCancellation = new CancellationTokenSource(roundLifetime, _timeProvider);
         using var exchangeCancellation = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken,
             lifetimeCancellation.Token);
-        var responseTasks = peers
-            .Select(peer => ExchangeAntiEntropyRequest(peer, request, requestDigestCount, exchangeCancellation.Token))
+        var responseTasks = requests
+            .Select(request => ExchangeAntiEntropyRequest(
+                request.Key,
+                new DisseminationAntiEntropyRequest
+                {
+                    Sender = _localSilo,
+                    Digests = request.Value,
+                },
+                GetDigestCount(request.Value),
+                exchangeCancellation.Token))
             .ToArray();
         DisseminationAntiEntropyResponse?[] responses;
         try
@@ -240,6 +256,62 @@ internal sealed partial class DisseminationProtocol
 
         cancellationToken.ThrowIfCancellationRequested();
         await ApplyAntiEntropyResponses(responses, options, cancellationToken);
+    }
+
+    private Dictionary<SiloAddress, Dictionary<DisseminationNamespace, List<DigestEntry>>> CreateAntiEntropyRequests(
+        DisseminationMembershipSnapshots membershipSnapshots,
+        Dictionary<DisseminationNamespace, List<DigestEntry>> requestDigests,
+        int peerCount)
+    {
+        var result = new Dictionary<SiloAddress, Dictionary<DisseminationNamespace, List<DigestEntry>>>();
+        var digestsByScope = new Dictionary<DisseminationMembershipScope, KeyValuePair<DisseminationNamespace, List<DigestEntry>>[]>();
+        foreach (var scope in Enum.GetValues<DisseminationMembershipScope>())
+        {
+            var scopedDigests = requestDigests
+                .Where(entry => _namespaces.TryGetValue(entry.Key, out var disseminationNamespace)
+                    && disseminationNamespace.MembershipScope == scope)
+                .ToArray();
+            if (scopedDigests.Length > 0)
+            {
+                digestsByScope.Add(scope, scopedDigests);
+            }
+        }
+
+        if (digestsByScope.Count == 0)
+        {
+            return result;
+        }
+
+        // AllMembers is a superset of ActiveMembers. Selecting from the broadest participating
+        // projection preserves one global per-round peer budget while still attaching only the
+        // namespaces for which each selected peer is eligible.
+        var selectionScope = digestsByScope.ContainsKey(DisseminationMembershipScope.AllMembers)
+            ? DisseminationMembershipScope.AllMembers
+            : DisseminationMembershipScope.ActiveMembers;
+        foreach (var peer in membershipSnapshots.GetSnapshot(selectionScope).SelectAntiEntropyPeers(peerCount))
+        {
+            Dictionary<DisseminationNamespace, List<DigestEntry>>? peerDigests = null;
+            foreach (var (scope, scopedDigests) in digestsByScope)
+            {
+                if (!membershipSnapshots.GetSnapshot(scope).ContainsMember(peer))
+                {
+                    continue;
+                }
+
+                peerDigests ??= [];
+                foreach (var entry in scopedDigests)
+                {
+                    peerDigests.Add(entry.Key, entry.Value);
+                }
+            }
+
+            if (peerDigests is not null)
+            {
+                result.Add(peer, peerDigests);
+            }
+        }
+
+        return result;
     }
 
     private TimeSpan GetAntiEntropyRoundLifetime(
@@ -365,6 +437,7 @@ internal sealed partial class DisseminationProtocol
                 continue;
             }
 
+            ReplacePeerNamespaceConfirmations(response.Sender, response.Values.Keys);
             foreach (var (namespaceName, values) in response.Values)
             {
                 if (!TryGetEnabledNamespace(namespaceName, out var disseminationNamespace))
@@ -424,6 +497,7 @@ internal sealed partial class DisseminationProtocol
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        ConfirmPeerNamespaces(request.Sender, request.Digests.Keys);
         // Incoming digests are passive evidence for existing peer pumps, not a reason to create new ones.
         foreach (var (namespaceName, entries) in request.Digests)
         {
@@ -439,7 +513,7 @@ internal sealed partial class DisseminationProtocol
 
         var options = _options.CurrentValue;
         var response = CreateAntiEntropyResponse(request, options, cancellationToken);
-        PruneAntiEntropyResponseCursors(_membership.CurrentSnapshot, request.Sender);
+        PruneAntiEntropyResponseCursors(_membership.CurrentSnapshots.AllMembers, request.Sender);
         return new(response);
     }
 
@@ -751,6 +825,160 @@ internal sealed partial class DisseminationProtocol
     internal Task StopAsync(CancellationToken cancellationToken) =>
         _broadcastQueue.StopAsync(cancellationToken);
 
+    internal IReadOnlyList<SiloAddress> GetUnconfirmedPeers(
+        IDisseminationNamespace disseminationNamespace)
+    {
+        var membershipSnapshots = _membership.CurrentSnapshots;
+        PrunePeerNamespaceConfirmations(membershipSnapshots.AllMembers);
+        var participants = membershipSnapshots.GetSnapshot(disseminationNamespace.MembershipScope).Members;
+        var now = _timeProvider.GetTimestamp();
+        var confirmationTtl = GetPeerNamespaceConfirmationTtl(disseminationNamespace);
+        lock (_peerSupportLock)
+        {
+            List<SiloAddress>? result = null;
+            foreach (var peer in participants)
+            {
+                if (Equals(peer, _localSilo))
+                {
+                    continue;
+                }
+
+                if (!_confirmedPeerNamespaces.TryGetValue(peer, out var namespaces)
+                    || !namespaces.TryGetValue(disseminationNamespace.Name, out var confirmedAt)
+                    || _timeProvider.GetElapsedTime(confirmedAt, now) >= confirmationTtl)
+                {
+                    (result ??= []).Add(peer);
+                }
+            }
+
+            return result ?? [];
+        }
+    }
+
+    private void ObserveBroadcastResponse(
+        SiloAddress peer,
+        DisseminationBroadcastResponse response)
+    {
+        ConfirmPeerNamespaces(peer, response.Acknowledgments.Keys);
+        RevokePeerNamespaces(peer, response.UnsupportedNamespaces);
+    }
+
+    private void ConfirmPeerNamespaces(
+        SiloAddress peer,
+        IEnumerable<DisseminationNamespace> namespaceNames)
+    {
+        if (Equals(peer, _localSilo)
+            || !_membership.CurrentSnapshots.AllMembers.ContainsMember(peer))
+        {
+            return;
+        }
+
+        var now = _timeProvider.GetTimestamp();
+        lock (_peerSupportLock)
+        {
+            Dictionary<DisseminationNamespace, long>? confirmedNamespaces = null;
+            foreach (var namespaceName in namespaceNames)
+            {
+                if (!_namespaces.TryGetValue(namespaceName, out var disseminationNamespace)
+                    || !disseminationNamespace.Options.Enabled)
+                {
+                    continue;
+                }
+
+                if (confirmedNamespaces is null
+                    && !_confirmedPeerNamespaces.TryGetValue(peer, out confirmedNamespaces))
+                {
+                    confirmedNamespaces = [];
+                    _confirmedPeerNamespaces.Add(peer, confirmedNamespaces);
+                }
+
+                confirmedNamespaces![namespaceName] = now;
+            }
+        }
+    }
+
+    private void ReplacePeerNamespaceConfirmations(
+        SiloAddress peer,
+        IEnumerable<DisseminationNamespace> namespaceNames)
+    {
+        if (Equals(peer, _localSilo)
+            || !_membership.CurrentSnapshots.AllMembers.ContainsMember(peer))
+        {
+            return;
+        }
+
+        var now = _timeProvider.GetTimestamp();
+        var replacements = new Dictionary<DisseminationNamespace, long>();
+        foreach (var namespaceName in namespaceNames)
+        {
+            if (_namespaces.TryGetValue(namespaceName, out var disseminationNamespace)
+                && disseminationNamespace.Options.Enabled)
+            {
+                replacements[namespaceName] = now;
+            }
+        }
+
+        lock (_peerSupportLock)
+        {
+            if (replacements.Count == 0)
+            {
+                _confirmedPeerNamespaces.Remove(peer);
+            }
+            else
+            {
+                _confirmedPeerNamespaces[peer] = replacements;
+            }
+        }
+    }
+
+    private void RevokePeerNamespaces(
+        SiloAddress peer,
+        IEnumerable<DisseminationNamespace> namespaceNames)
+    {
+        lock (_peerSupportLock)
+        {
+            if (!_confirmedPeerNamespaces.TryGetValue(peer, out var confirmedNamespaces))
+            {
+                return;
+            }
+
+            foreach (var namespaceName in namespaceNames)
+            {
+                confirmedNamespaces.Remove(namespaceName);
+            }
+
+            if (confirmedNamespaces.Count == 0)
+            {
+                _confirmedPeerNamespaces.Remove(peer);
+            }
+        }
+    }
+
+    private void PrunePeerNamespaceConfirmations(DisseminationMembershipSnapshot membership)
+    {
+        lock (_peerSupportLock)
+        {
+            foreach (var peer in _confirmedPeerNamespaces.Keys
+                .Where(peer => !membership.ContainsMember(peer))
+                .ToArray())
+            {
+                _confirmedPeerNamespaces.Remove(peer);
+            }
+        }
+    }
+
+    private TimeSpan GetPeerNamespaceConfirmationTtl(
+        IDisseminationNamespace disseminationNamespace)
+    {
+        var cadence = _options.CurrentValue.Overlay.AntiEntropyInterval;
+        if (disseminationNamespace.Options.ExpectedUpdateCadence > cadence)
+        {
+            cadence = disseminationNamespace.Options.ExpectedUpdateCadence;
+        }
+
+        return cadence + cadence;
+    }
+
     private void RecordValueUpdate(DisseminationNamespace namespaceName, DisseminationKey key, long version)
     {
         // Recent successful updates suppress anti-entropy until the namespace's expected cadence elapses.
@@ -766,13 +994,14 @@ internal sealed partial class DisseminationProtocol
     }
 
     private async ValueTask<DisseminationMembershipSnapshot?> GetMembershipSnapshotForRouting(
+        DisseminationMembershipScope scope,
         SiloAddress member,
         CancellationToken cancellationToken)
     {
         // Prune peer ledgers against the same membership view used to choose tree targets.
-        var membership = await _membership.GetSnapshotContainingMember(member, cancellationToken);
-        await _broadcastQueue.Prune(membership ?? _membership.CurrentSnapshot, cancellationToken);
-        return membership;
+        var memberships = await _membership.GetSnapshotsContainingMember(member, scope, cancellationToken);
+        await _broadcastQueue.Prune(memberships ?? _membership.CurrentSnapshots, cancellationToken);
+        return memberships?.GetSnapshot(scope);
     }
 
     private bool TryGetEnabledNamespace(DisseminationNamespace namespaceName, [NotNullWhen(true)] out IDisseminationNamespace? disseminationNamespace)

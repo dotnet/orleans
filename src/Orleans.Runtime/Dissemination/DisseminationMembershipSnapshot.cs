@@ -8,8 +8,9 @@ namespace Orleans.Runtime.Dissemination;
 internal sealed class DisseminationMembershipSnapshot
 {
     private readonly FrozenSet<SiloAddress> _set;
-    private readonly SiloAddress[] _shuffledPeers;
-    private readonly object _shuffledPeersLock = new();
+    private readonly SiloAddress[] _antiEntropyPeers;
+    private readonly object _antiEntropyPeersLock = new();
+    private int _antiEntropyCursor;
 
     public DisseminationMembershipSnapshot(
         MembershipVersion membershipVersion,
@@ -41,17 +42,17 @@ internal sealed class DisseminationMembershipSnapshot
 
         if (localIndex < 0)
         {
-            _shuffledPeers = [];
+            _antiEntropyPeers = [];
         }
         else
         {
-            _shuffledPeers = new SiloAddress[Members.Length - 1];
+            _antiEntropyPeers = new SiloAddress[Members.Length - 1];
             var candidateIndex = 0;
             for (var i = 0; i < Members.Length; i++)
             {
                 if (i != localIndex)
                 {
-                    _shuffledPeers[candidateIndex++] = Members[i];
+                    _antiEntropyPeers[candidateIndex++] = Members[i];
                 }
             }
         }
@@ -72,7 +73,7 @@ internal sealed class DisseminationMembershipSnapshot
     public ImmutableArray<SiloAddress> SelectAntiEntropyPeers(int peerCount)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(peerCount);
-        var candidates = _shuffledPeers;
+        var candidates = _antiEntropyPeers;
         var count = Math.Min(peerCount, candidates.Length);
         if (count <= 0)
         {
@@ -80,18 +81,14 @@ internal sealed class DisseminationMembershipSnapshot
         }
 
         var peers = new SiloAddress[count];
-        lock (_shuffledPeersLock)
+        lock (_antiEntropyPeersLock)
         {
             for (var i = 0; i < count; i++)
             {
-                var index = Random.Shared.Next(i, candidates.Length);
-                if (index != i)
-                {
-                    (candidates[i], candidates[index]) = (candidates[index], candidates[i]);
-                }
-
-                peers[i] = candidates[i];
+                peers[i] = candidates[(_antiEntropyCursor + i) % candidates.Length];
             }
+
+            _antiEntropyCursor = (_antiEntropyCursor + count) % candidates.Length;
         }
 
         return ImmutableCollectionsMarshal.AsImmutableArray(peers);

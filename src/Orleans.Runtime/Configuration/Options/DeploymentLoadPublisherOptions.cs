@@ -21,10 +21,12 @@ namespace Orleans.Configuration
         /// Gets or sets dissemination options for deployment load statistics.
         /// </summary>
         /// <remarks>
-        /// When enabled, dissemination replaces per-refresh direct fan-out. Direct publication is used when the
-        /// dissemination subsystem cannot accept the update within the refresh interval.
-        /// Keep dissemination disabled during rolling upgrades which include silos that do not support this
-        /// namespace. Enable it after every silo has been upgraded and configured consistently.
+        /// When enabled, dissemination replaces per-refresh direct fan-out only for active peers which have recently
+        /// confirmed support for this namespace. Confirmations expire after twice the greater of the anti-entropy
+        /// interval and this namespace's expected update cadence. During rolling or mixed-version operation, active
+        /// peers without a current confirmation continue to receive direct publications. If dissemination is
+        /// unavailable, declines the update, throws, or cannot accept it within the refresh interval, direct
+        /// publication targets all active peers.
         /// </remarks>
         public DisseminationNamespaceOptions Dissemination { get; set; } = new() { ExpectedUpdateCadence = TimeSpan.FromSeconds(5) };
     }

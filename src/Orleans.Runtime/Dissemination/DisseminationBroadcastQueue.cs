@@ -20,6 +20,7 @@ internal sealed partial class DisseminationBroadcastQueue
     private readonly IDisseminationNamespace[] _disseminationNamespaces;
     private readonly FrozenDictionary<DisseminationNamespace, IDisseminationNamespace> _namespaces;
     private readonly ILogger<DisseminationBroadcastQueue> _logger;
+    private readonly Action<SiloAddress, DisseminationBroadcastResponse>? _responseObserver;
     private readonly object _lock = new();
     private readonly Dictionary<SiloAddress, PeerQueuePump> _peers = [];
     private readonly SemaphoreSlim _sendGate;
@@ -31,7 +32,8 @@ internal sealed partial class DisseminationBroadcastQueue
         IInternalGrainFactory grainFactory,
         IOptionsMonitor<DisseminationOptions> options,
         IEnumerable<IDisseminationNamespace> disseminationNamespaces,
-        ILogger<DisseminationBroadcastQueue> logger)
+        ILogger<DisseminationBroadcastQueue> logger,
+        Action<SiloAddress, DisseminationBroadcastResponse>? responseObserver = null)
     {
         _timeProvider = timeProvider;
         _localSilo = localSilo;
@@ -40,6 +42,7 @@ internal sealed partial class DisseminationBroadcastQueue
         _disseminationNamespaces = [.. disseminationNamespaces];
         _namespaces = _disseminationNamespaces.ToFrozenDictionary(static ns => ns.Name);
         _logger = logger;
+        _responseObserver = responseObserver;
         _sendGate = new(Math.Max(1, options.CurrentValue.MaxConcurrentSends));
     }
 
@@ -123,7 +126,7 @@ internal sealed partial class DisseminationBroadcastQueue
     }
 
     public async Task Prune(
-        DisseminationMembershipSnapshot membershipSnapshot,
+        DisseminationMembershipSnapshots membershipSnapshots,
         CancellationToken cancellationToken)
     {
         // Namespace digests are the authoritative inventory, so clean ledger entries can disappear with their keys.
@@ -145,7 +148,7 @@ internal sealed partial class DisseminationBroadcastQueue
             retainedPeers = new(_peers.Count);
             foreach (var (peer, pending) in _peers)
             {
-                if (!_localSilo.Equals(peer) && !membershipSnapshot.ContainsMember(peer))
+                if (!_localSilo.Equals(peer) && !membershipSnapshots.AllMembers.ContainsMember(peer))
                 {
                     (removedPeers ??= []).Add(pending);
                 }
@@ -166,7 +169,7 @@ internal sealed partial class DisseminationBroadcastQueue
 
         foreach (var peer in retainedPeers)
         {
-            peer.PruneKeys(activeKeys);
+            peer.PruneKeys(activeKeys, membershipSnapshots);
         }
 
         if (removedPeers is not null)
@@ -276,6 +279,7 @@ internal sealed partial class DisseminationBroadcastQueue
         public void Notify(IDisseminationNamespace disseminationNamespace, DisseminationKey key)
         {
             ScheduledFlush? scheduled = null;
+            var admissionRejected = false;
             lock (_lock)
             {
                 ObjectDisposedException.ThrowIf(_stopping, this);
@@ -285,37 +289,62 @@ internal sealed partial class DisseminationBroadcastQueue
                 }
 
                 var namespaceState = GetOrCreateNamespaceStateUnsafe(disseminationNamespace);
-                var keyState = namespaceState.GetOrCreateKey(key);
-                // A notification is only a wake-up. The namespace will choose the latest repair when this key is drained.
-                keyState.NotificationGeneration++;
-                _notificationEpoch++;
-                var wasRetrying = _retryAttempt > 0;
-                _retryAttempt = 0;
-                var wasEmpty = DirtyCount == 0;
-                MarkDirtyUnsafe(namespaceState, keyState);
+                if (!namespaceState.TryGetKey(key, out var keyState)
+                    && namespaceState.Keys.Count >= disseminationNamespace.Options.MaxPendingItemCount)
+                {
+                    admissionRejected = true;
+                }
+                else
+                {
+                    keyState ??= namespaceState.AddKey(key);
+                    // A notification is only a wake-up. The namespace will choose the latest repair when this key is drained.
+                    keyState.NotificationGeneration++;
+                    _notificationEpoch++;
+                    var wasRetrying = _retryAttempt > 0;
+                    _retryAttempt = 0;
+                    var wasEmpty = DirtyCount == 0;
+                    MarkDirtyUnsafe(namespaceState, keyState);
 
-                // Filled queues flush immediately; otherwise one timer coalesces all pending namespaces.
-                var currentOptions = _owner._options.CurrentValue;
-                if (disseminationNamespace.Options.Priority == DisseminationPriority.High)
-                {
-                    // High-priority updates skip the coalescing window and pull any pending flush forward.
-                    _flushTimer.Change(TimeSpan.Zero);
-                    _wakeScheduled = true;
-                    scheduled = new(DisseminationBroadcastScheduleReason.Priority, TimeSpan.Zero, _retryAttempt, _notificationEpoch);
+                    // Filled queues flush immediately; otherwise one timer coalesces all pending namespaces.
+                    var currentOptions = _owner._options.CurrentValue;
+                    if (disseminationNamespace.Options.Priority == DisseminationPriority.High)
+                    {
+                        // High-priority updates skip the coalescing window and pull any pending flush forward.
+                        _flushTimer.Change(TimeSpan.Zero);
+                        _wakeScheduled = true;
+                        scheduled = new(DisseminationBroadcastScheduleReason.Priority, TimeSpan.Zero, _retryAttempt, _notificationEpoch);
+                    }
+                    else if (DirtyCount >= currentOptions.MaxBatchItems
+                        || namespaceState.DirtyCount >= disseminationNamespace.Options.MaxPendingItemCount)
+                    {
+                        _flushTimer.Change(TimeSpan.Zero);
+                        _wakeScheduled = true;
+                        scheduled = new(DisseminationBroadcastScheduleReason.Immediate, TimeSpan.Zero, _retryAttempt, _notificationEpoch);
+                    }
+                    else if (wasEmpty || wasRetrying || !_wakeScheduled)
+                    {
+                        var delay = _owner.GetCoalescingDelay(disseminationNamespace.Options.MaxCoalescingDelay);
+                        _flushTimer.Change(delay);
+                        _wakeScheduled = true;
+                        scheduled = new(DisseminationBroadcastScheduleReason.Coalesce, delay, _retryAttempt, _notificationEpoch);
+                    }
                 }
-                else if (DirtyCount >= currentOptions.MaxBatchItems
-                    || namespaceState.DirtyCount >= disseminationNamespace.Options.MaxPendingItemCount)
+            }
+
+            if (admissionRejected)
+            {
+                DisseminationInstruments.OnQueueAdmissionRejected(disseminationNamespace.Name);
+                try
                 {
-                    _flushTimer.Change(TimeSpan.Zero);
-                    _wakeScheduled = true;
-                    scheduled = new(DisseminationBroadcastScheduleReason.Immediate, TimeSpan.Zero, _retryAttempt, _notificationEpoch);
+                    DisseminationEvents.EmitQueueAdmissionRejected(
+                        _owner._localSilo,
+                        Peer,
+                        disseminationNamespace.Name,
+                        disseminationNamespace.Options.MaxPendingItemCount);
                 }
-                else if (wasEmpty || wasRetrying || !_wakeScheduled)
+                catch (Exception exception)
                 {
-                    var delay = _owner.GetCoalescingDelay(disseminationNamespace.Options.MaxCoalescingDelay);
-                    _flushTimer.Change(delay);
-                    _wakeScheduled = true;
-                    scheduled = new(DisseminationBroadcastScheduleReason.Coalesce, delay, _retryAttempt, _notificationEpoch);
+                    LogDebugBroadcastDiagnosticFailed(_owner._logger, exception, Peer);
                 }
             }
 
@@ -357,20 +386,39 @@ internal sealed partial class DisseminationBroadcastQueue
                 }
 
                 // Peer knowledge is evidence-driven and monotonic across acknowledgments, pushes, and anti-entropy.
-                var keyState = GetOrCreateNamespaceStateUnsafe(disseminationNamespace).GetOrCreateKey(key);
-                if (keyState.KnownVersion is not { } knownVersion || version > knownVersion)
+                var namespaceState = GetOrCreateNamespaceStateUnsafe(disseminationNamespace);
+                if (namespaceState.TryGetKey(key, out var keyState) && keyState is not null)
                 {
-                    keyState.KnownVersion = version;
+                    if (keyState.KnownVersion is not { } knownVersion || version > knownVersion)
+                    {
+                        keyState.KnownVersion = version;
+                    }
+                }
+                else
+                {
+                    namespaceState.ObserveKnownVersion(key, version);
                 }
             }
         }
 
-        public void PruneKeys(Dictionary<DisseminationNamespace, HashSet<DisseminationKey>> activeKeys)
+        public void PruneKeys(
+            Dictionary<DisseminationNamespace, HashSet<DisseminationKey>> activeKeys,
+            DisseminationMembershipSnapshots membershipSnapshots)
         {
+            TaskCompletionSource? droppedFlushCompletion = null;
+            var droppedDirtyCount = 0;
             lock (_lock)
             {
                 foreach (var (namespaceName, namespaceState) in _statesByNamespace.ToArray())
                 {
+                    if (!membershipSnapshots.GetSnapshot(namespaceState.Namespace.MembershipScope).ContainsMember(Peer))
+                    {
+                        droppedDirtyCount += namespaceState.DirtyCount;
+                        DirtyCount -= namespaceState.DirtyCount;
+                        _statesByNamespace.Remove(namespaceName);
+                        continue;
+                    }
+
                     activeKeys.TryGetValue(namespaceName, out var namespaceKeys);
                     foreach (var (key, keyState) in namespaceState.Keys.ToArray())
                     {
@@ -382,12 +430,21 @@ internal sealed partial class DisseminationBroadcastQueue
                         }
                     }
 
-                    if (namespaceState.Keys.Count == 0)
+                    namespaceState.PruneKnownVersions(namespaceKeys);
+                    if (namespaceState.Keys.Count == 0 && namespaceState.KnownVersions.Count == 0)
                     {
                         _statesByNamespace.Remove(namespaceName);
                     }
                 }
+
+                if (droppedDirtyCount > 0 && DirtyCount == 0 && !_nextFlushCompletion.Task.IsCompleted)
+                {
+                    droppedFlushCompletion = _nextFlushCompletion;
+                    _nextFlushCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+                }
             }
+
+            droppedFlushCompletion?.TrySetResult();
         }
 
         public async ValueTask FlushAsync(CancellationToken cancellationToken)
@@ -819,6 +876,7 @@ internal sealed partial class DisseminationBroadcastQueue
                     break;
                 }
 
+                _owner._responseObserver?.Invoke(Peer, response);
                 var acknowledgments = CreateAcknowledgmentLookup(response.Acknowledgments);
                 var unsupportedNamespaces = response.UnsupportedNamespaces.ToHashSet();
                 foreach (var sent in sentKeys)
@@ -970,7 +1028,7 @@ internal sealed partial class DisseminationBroadcastQueue
         {
             lock (_lock)
             {
-                if (!TryGetKeyStateUnsafe(work, out _, out var keyState))
+                if (!TryGetKeyStateUnsafe(work, out var namespaceState, out var keyState))
                 {
                     return;
                 }
@@ -981,6 +1039,10 @@ internal sealed partial class DisseminationBroadcastQueue
                 }
 
                 keyState.InFlight = false;
+                if (keyState.NotificationGeneration == work.NotificationGeneration && !keyState.Dirty)
+                {
+                    namespaceState.RetireKey(work.Key, keyState);
+                }
             }
         }
 
@@ -1004,10 +1066,16 @@ internal sealed partial class DisseminationBroadcastQueue
                     : acknowledgedVersion > sent.FromVersion;
                 // Retire only the generation we sent; a newer notification remains queued even if this repair reached its target.
                 if (keyState.NotificationGeneration != sent.Work.NotificationGeneration
-                    || keyState.Dirty
-                    || keyState.KnownVersion >= sent.ResolvedVersion)
+                    || keyState.Dirty)
                 {
                     keyState.InFlight = false;
+                    return new(null, RequiresBackoff: false, madeProgress);
+                }
+
+                if (keyState.KnownVersion >= sent.ResolvedVersion)
+                {
+                    keyState.InFlight = false;
+                    namespaceState.RetireKey(sent.Work.Key, keyState);
                     return new(null, RequiresBackoff: false, madeProgress);
                 }
 
@@ -1039,6 +1107,11 @@ internal sealed partial class DisseminationBroadcastQueue
                 if (keyState.KnownVersion >= sent.ResolvedVersion)
                 {
                     keyState.InFlight = false;
+                    if (keyState.NotificationGeneration == sent.Work.NotificationGeneration && !keyState.Dirty)
+                    {
+                        namespaceState.RetireKey(sent.Work.Key, keyState);
+                    }
+
                     return true;
                 }
 
@@ -1279,17 +1352,52 @@ internal sealed partial class DisseminationBroadcastQueue
 
             public Dictionary<DisseminationKey, PeerKeyState> Keys { get; } = [];
 
+            public Dictionary<DisseminationKey, long> KnownVersions { get; } = [];
+
             public int DirtyCount { get; set; }
 
-            public PeerKeyState GetOrCreateKey(DisseminationKey key)
+            public bool TryGetKey(DisseminationKey key, out PeerKeyState? keyState) =>
+                Keys.TryGetValue(key, out keyState);
+
+            public PeerKeyState AddKey(DisseminationKey key)
             {
-                if (!Keys.TryGetValue(key, out var result))
+                var result = new PeerKeyState();
+                if (KnownVersions.TryGetValue(key, out var knownVersion))
                 {
-                    result = new();
-                    Keys.Add(key, result);
+                    result.KnownVersion = knownVersion;
                 }
 
+                Keys.Add(key, result);
                 return result;
+            }
+
+            public void ObserveKnownVersion(DisseminationKey key, long version)
+            {
+                if (!KnownVersions.TryGetValue(key, out var knownVersion) || version > knownVersion)
+                {
+                    KnownVersions[key] = version;
+                }
+            }
+
+            public void RetireKey(DisseminationKey key, PeerKeyState keyState)
+            {
+                if (keyState.KnownVersion is { } knownVersion)
+                {
+                    ObserveKnownVersion(key, knownVersion);
+                }
+
+                Keys.Remove(key);
+            }
+
+            public void PruneKnownVersions(HashSet<DisseminationKey>? activeKeys)
+            {
+                foreach (var key in KnownVersions.Keys.ToArray())
+                {
+                    if (activeKeys is null || !activeKeys.Contains(key))
+                    {
+                        KnownVersions.Remove(key);
+                    }
+                }
             }
         }
 

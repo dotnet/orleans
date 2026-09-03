@@ -220,6 +220,185 @@ public class MembershipGossiperTests
         Assert.Contains("Direct membership gossip", lateFailure, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task MembershipGossiperStartsDirectGossipBeforeDissemination()
+    {
+        var directStarted = NewBarrier();
+        var releaseDirect = NewBarrier();
+        var directCompleted = NewBarrier();
+        var disseminationStarted = NewBarrier();
+        var releaseDissemination = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var (rig, resolutionOrder) = CreateOrderTrackingTestRig(
+            async _ =>
+            {
+                directStarted.TrySetResult();
+                await releaseDirect.Task;
+                directCompleted.TrySetResult();
+            },
+            async (_, _, _) =>
+            {
+                disseminationStarted.TrySetResult();
+                return await releaseDissemination.Task;
+            });
+        using var disposableRig = rig;
+
+        var snapshot = CreateSnapshot(rig.LocalSilo, rig.RemoteSilo, SiloStatus.Active);
+        var gossipTask = rig.Gossiper.GossipToRemoteSilos(
+            [rig.RemoteSilo],
+            snapshot,
+            rig.LocalSilo,
+            SiloStatus.ShuttingDown,
+            CancellationToken.None);
+
+        await Task.WhenAll(directStarted.Task, disseminationStarted.Task);
+
+        // The system target owning direct delivery is always resolved before the dissemination
+        // service is even considered, regardless of how the two operations subsequently interleave.
+        Assert.Equal(["MembershipSystemTargetResolved", "DisseminationServiceResolved"], resolutionOrder);
+
+        releaseDirect.TrySetResult();
+        releaseDissemination.TrySetResult(true);
+        await gossipTask;
+        await directCompleted.Task;
+
+        await rig.RemoteMembershipService.Received(1).MembershipChangeNotification(snapshot);
+        await rig.DisseminationService.Received(1).Publish(
+            Arg.Any<IDisseminationNamespace>(),
+            DisseminationKey.Default,
+            snapshot.Version.Value,
+            CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task MembershipGossiperDirectDeliveryRemainsAuthoritativeWhenDisseminationFails()
+    {
+        var disseminationFailure = new InvalidOperationException("Simulated dissemination failure.");
+        DisseminationKey? publishedKey = null;
+        long? publishedVersion = null;
+
+        using var rig = CreateTestRig(
+            _ => Task.CompletedTask,
+            (key, version, _) =>
+            {
+                publishedKey = key;
+                publishedVersion = version;
+                throw disseminationFailure;
+            });
+
+        var snapshot = CreateSnapshot(rig.LocalSilo, rig.RemoteSilo, SiloStatus.Active);
+        var gossipTask = rig.Gossiper.GossipToRemoteSilos(
+            [rig.RemoteSilo],
+            snapshot,
+            rig.LocalSilo,
+            SiloStatus.ShuttingDown,
+            CancellationToken.None);
+
+        // Direct delivery succeeds and the overall gossip completes despite the dissemination
+        // publication throwing; direct membership gossip remains authoritative.
+        await gossipTask;
+
+        Assert.Equal(DisseminationKey.Default, publishedKey);
+        Assert.Equal(snapshot.Version.Value, publishedVersion);
+        await rig.RemoteMembershipService.Received(1).MembershipChangeNotification(snapshot);
+        await rig.DisseminationService.Received(1).Publish(
+            Arg.Any<IDisseminationNamespace>(),
+            DisseminationKey.Default,
+            snapshot.Version.Value,
+            CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task MembershipGossiperObservesLateDisseminationFaultWithoutBlockingDirectDelivery()
+    {
+        var directStarted = NewBarrier();
+        var releaseDirect = NewBarrier();
+        var directCompleted = NewBarrier();
+        var disseminationStarted = NewBarrier();
+        var disseminationCompletion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        using var cancellation = new CancellationTokenSource();
+        using var rig = CreateTestRig(
+            async _ =>
+            {
+                directStarted.TrySetResult();
+                await releaseDirect.Task;
+                directCompleted.TrySetResult();
+            },
+            (_, _, _) =>
+            {
+                disseminationStarted.TrySetResult();
+                return new ValueTask<bool>(disseminationCompletion.Task);
+            });
+        var snapshot = CreateSnapshot(rig.LocalSilo, rig.RemoteSilo, SiloStatus.Active);
+
+        var gossipTask = rig.Gossiper.GossipToRemoteSilos(
+            [rig.RemoteSilo],
+            snapshot,
+            rig.LocalSilo,
+            SiloStatus.Stopping,
+            cancellation.Token);
+
+        await Task.WhenAll(directStarted.Task, disseminationStarted.Task);
+
+        // Direct delivery completes fully while dissemination remains unresponsive: direct delivery
+        // is never blocked by the pending dissemination publication.
+        releaseDirect.TrySetResult();
+        await directCompleted.Task;
+        Assert.False(gossipTask.IsCompleted);
+
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => gossipTask);
+        Assert.False(disseminationCompletion.Task.IsCompleted);
+
+        disseminationCompletion.TrySetException(new InvalidOperationException("Late dissemination failure."));
+        var lateFailure = await rig.Logger.WaitForLateFailureAsync(TestContext.Current.CancellationToken);
+        Assert.Contains("Membership dissemination publication", lateFailure, StringComparison.Ordinal);
+        await rig.RemoteMembershipService.Received(1).MembershipChangeNotification(snapshot);
+    }
+
+    [Fact]
+    public async Task MembershipGossiperPreservesEligibilityAndCallerCancellation()
+    {
+        var directStarted = NewBarrier();
+        var releaseDirect = NewBarrier();
+        var directCompleted = NewBarrier();
+
+        using var cancellation = new CancellationTokenSource();
+        using var rig = CreateTestRig(
+            async _ =>
+            {
+                directStarted.TrySetResult();
+                await releaseDirect.Task;
+                directCompleted.TrySetResult();
+            },
+            (_, _, _) => throw new Xunit.Sdk.XunitException("Ineligible membership must not publish via dissemination."));
+        var snapshot = CreateSnapshot(rig.LocalSilo, rig.RemoteSilo, SiloStatus.Dead);
+
+        var gossipTask = rig.Gossiper.GossipToRemoteSilos(
+            [rig.RemoteSilo],
+            snapshot,
+            rig.LocalSilo,
+            SiloStatus.Dead,
+            cancellation.Token);
+
+        await directStarted.Task;
+        cancellation.Cancel();
+
+        var oce = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => gossipTask);
+        Assert.Equal(cancellation.Token, oce.CancellationToken);
+
+        // Eligibility is preserved: an ineligible local status never invokes dissemination, even when
+        // the caller cancels while direct delivery is still in flight.
+        Assert.Equal(0, rig.DisseminationServiceResolutionCount);
+        Assert.Empty(rig.DisseminationService.ReceivedCalls());
+        Assert.False(directCompleted.Task.IsCompleted);
+
+        releaseDirect.TrySetResult();
+        await directCompleted.Task;
+        await rig.RemoteMembershipService.Received(1).MembershipChangeNotification(snapshot);
+    }
+
     private static MembershipGossiperTestRig CreateTestRig(
         Func<MembershipTableSnapshot, Task> directGossip,
         Func<DisseminationKey, long, CancellationToken, ValueTask<bool>> disseminationPublish)
@@ -374,5 +553,112 @@ public class MembershipGossiperTests
 
         public Task<string> WaitForLateFailureAsync(CancellationToken cancellationToken) =>
             _lateFailure.Task.WaitAsync(cancellationToken);
+    }
+
+    private static (MembershipGossiperTestRig Rig, List<string> ResolutionOrder) CreateOrderTrackingTestRig(
+        Func<MembershipTableSnapshot, Task> directGossip,
+        Func<DisseminationKey, long, CancellationToken, ValueTask<bool>> disseminationPublish)
+    {
+        var localSilo = SiloAddress.FromParsableString("127.0.0.1:100@100");
+        var remoteSilo = SiloAddress.FromParsableString("127.0.0.1:200@100");
+        var localSiloDetails = Substitute.For<ILocalSiloDetails>();
+        localSiloDetails.SiloAddress.Returns(localSilo);
+        var remoteMembershipService = Substitute.For<IMembershipService>();
+        remoteMembershipService
+            .MembershipChangeNotification(Arg.Any<MembershipTableSnapshot>())
+            .Returns(call => directGossip(call.ArgAt<MembershipTableSnapshot>(0)));
+        var grainFactory = Substitute.For<IInternalGrainFactory>();
+        grainFactory
+            .GetSystemTarget<IMembershipService>(Constants.MembershipServiceType, Arg.Any<SiloAddress>())
+            .Returns(remoteMembershipService);
+        var membershipManager = Substitute.For<IMembershipManager>();
+        var options = Substitute.For<IOptionsMonitor<ClusterMembershipOptions>>();
+        options.CurrentValue.Returns(new ClusterMembershipOptions
+        {
+            Dissemination = new DisseminationNamespaceOptions { Enabled = true },
+        });
+        var disseminationNamespace = new MembershipDisseminationNamespace(membershipManager, options, serializer: null!);
+        var disseminationService = Substitute.For<IDisseminationService>();
+        disseminationService
+            .Publish(
+                Arg.Any<IDisseminationNamespace>(),
+                Arg.Any<DisseminationKey>(),
+                Arg.Any<long>(),
+                Arg.Any<CancellationToken>())
+            .Returns(call => disseminationPublish(
+                call.ArgAt<DisseminationKey>(1),
+                call.ArgAt<long>(2),
+                call.ArgAt<CancellationToken>(3)));
+
+        // Records the relative order in which the system target that owns direct delivery and the
+        // dissemination service are resolved from the container, independent of scheduler timing.
+        var resolutionOrder = new List<string>();
+        var resolutionLock = new object();
+        void RecordResolution(string label)
+        {
+            lock (resolutionLock)
+            {
+                resolutionOrder.Add(label);
+            }
+        }
+
+        var disseminationServiceResolutionCount = 0;
+        var services = new ServiceCollection();
+        services.AddMetrics();
+        services.AddSingleton<OrleansInstruments>();
+        services.AddSingleton<CatalogInstruments>();
+        services.AddSingleton<SchedulerInstruments>();
+        services.AddSingleton<GrainInstruments>();
+        services.AddSingleton<MessagingInstruments>();
+        services.AddSingleton<MessagingProcessingInstruments>();
+        services.AddSingleton(localSiloDetails);
+        services.AddSingleton(disseminationNamespace);
+        services.AddSingleton<IDisseminationService>(_ =>
+        {
+            disseminationServiceResolutionCount++;
+            RecordResolution("DisseminationServiceResolved");
+            return disseminationService;
+        });
+        services.AddSingleton<MembershipSystemTarget>(serviceProvider =>
+        {
+            RecordResolution("MembershipSystemTargetResolved");
+            var shared = new SystemTargetShared(
+                runtimeClient: null!,
+                localSiloDetails,
+                NullLoggerFactory.Instance,
+                Options.Create(new SchedulingOptions()),
+                grainReferenceActivator: null!,
+                timerRegistry: null!,
+                new ActivationDirectory(serviceProvider.GetRequiredService<CatalogInstruments>()),
+                serviceProvider.GetRequiredService<SchedulerInstruments>(),
+                serviceProvider.GetRequiredService<GrainInstruments>(),
+                serviceProvider.GetRequiredService<MessagingInstruments>(),
+                serviceProvider.GetRequiredService<MessagingProcessingInstruments>());
+            return new MembershipSystemTarget(
+                membershipManager,
+                NullLogger<MembershipSystemTarget>.Instance,
+                grainFactory,
+                serviceProvider.GetRequiredService<MessagingInstruments>(),
+                shared,
+                new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)));
+        });
+        var serviceProvider = services.BuildServiceProvider();
+        var logger = new MembershipGossiperLogger();
+        var gossiper = new MembershipGossiper(
+            serviceProvider,
+            localSiloDetails,
+            logger);
+
+        var rig = new MembershipGossiperTestRig(
+            serviceProvider,
+            gossiper,
+            remoteMembershipService,
+            disseminationService,
+            logger,
+            localSilo,
+            remoteSilo,
+            () => disseminationServiceResolutionCount);
+
+        return (rig, resolutionOrder);
     }
 }
