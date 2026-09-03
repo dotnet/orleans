@@ -63,8 +63,4 @@ The default queue-cache interface behavior maps `Latest` to the existing tokenle
 
 A custom <xref:Orleans.Streams.IAsyncObservable`1> implementation receives equivalent extension-overload compatibility: `Latest` uses its tokenless subscription path, and `EarliestAvailable` reports <xref:System.NotSupportedException> until the observable implements Orleans start-position subscriptions.
 
-## Roll out start-position subscriptions
-
-During a rolling upgrade, first deploy the supporting Orleans version to every silo eligible to host persistent-stream pulling agents. Keep tokenless subscriptions at `Latest` until those silos are upgraded. Then deploy consumers which create subscriptions with explicit start positions and change `InitialSubscriptionStartPosition` as required. This sequence ensures that every pulling agent which receives the subscription understands and applies its requested position.
-
 For delivery guarantees and sequence-token recovery, continue to [Stream delivery, ordering, replay, and recovery](delivery-semantics.md).
