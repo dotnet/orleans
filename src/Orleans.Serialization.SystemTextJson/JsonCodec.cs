@@ -74,7 +74,7 @@ public class JsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilter
         var bufferWriter = new BufferWriterBox<PooledBuffer>(new PooledBuffer());
         try
         {
-            var jsonWriter = new Utf8JsonWriter(bufferWriter, _options.WriterOptions);
+            using var jsonWriter = new Utf8JsonWriter(bufferWriter, _options.WriterOptions);
             JsonSerializer.Serialize(jsonWriter, value, _options.SerializerOptions);
             jsonWriter.Flush();
 
@@ -226,7 +226,7 @@ public class JsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilter
         var bufferWriter = new BufferWriterBox<PooledBuffer>(new PooledBuffer());
         try
         {
-            var jsonWriter = new Utf8JsonWriter(bufferWriter, _options.WriterOptions);
+            using var jsonWriter = new Utf8JsonWriter(bufferWriter, _options.WriterOptions);
             JsonSerializer.Serialize(jsonWriter, input!, _options.SerializerOptions);
             jsonWriter.Flush();
 

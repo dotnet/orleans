@@ -1,5 +1,6 @@
 using System;
 using System.Net;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
@@ -30,16 +31,43 @@ namespace Orleans.Networking.Shared
             this.schedulers = schedulers;
         }
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage(
+            "Reliability",
+            "CA2000:Dispose objects before losing scope",
+            Justification = "Successful binding transfers ownership to the caller; failed binding transfers the listener to DisposeAndThrowAsync.")]
         public ValueTask<IConnectionListener> BindAsync(EndPoint endpoint, CancellationToken cancellationToken = default)
         {
-            if (!(endpoint is IPEndPoint ipEndpoint))
+            ArgumentNullException.ThrowIfNull(endpoint);
+            if (endpoint is not IPEndPoint ipEndpoint)
             {
-                throw new ArgumentNullException(nameof(endpoint));
+                throw new ArgumentException($"The endpoint must be an {nameof(IPEndPoint)}.", nameof(endpoint));
             }
 
             var listener = new SocketConnectionListener(ipEndpoint, this.socketConnectionOptions, this.trace, this.schedulers);
-            listener.Bind();
-            return new ValueTask<IConnectionListener>(listener);
+            try
+            {
+                listener.Bind();
+                return new(listener);
+            }
+            catch (Exception exception)
+            {
+                return DisposeAndThrowAsync(listener, exception);
+            }
+        }
+
+        private static async ValueTask<IConnectionListener> DisposeAndThrowAsync(SocketConnectionListener listener, Exception exception)
+        {
+            try
+            {
+                await listener.DisposeAsync();
+            }
+            catch (Exception disposeException)
+            {
+                exception.Data["Orleans.SocketConnectionListener.DisposeException"] = disposeException;
+            }
+
+            ExceptionDispatchInfo.Throw(exception);
+            return null!;
         }
     }
 }

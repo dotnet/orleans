@@ -62,6 +62,10 @@ internal sealed partial class ServiceLifecycleNotificationStage(ILogger logger, 
 
     public Task WaitAsync(CancellationToken cancellationToken) => _tcs.Task.WaitAsync(cancellationToken);
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Reliability",
+        "CA2000:Dispose objects before losing scope",
+        Justification = "Ownership of the participant is transferred to the lifecycle stage and the returned registration.")]
     public IDisposable Register(Func<object?, CancellationToken, Task> callback, object? state, bool terminateOnError)
     {
         ArgumentNullException.ThrowIfNull(callback);

@@ -652,10 +652,12 @@ dotnet_diagnostic.RS0027.severity = suggestion
 
 # CA1848: Use the LoggerMessage delegates
 # CA1849: Call async methods when in an async method
+# CA2000: Dispose objects before losing scope
 # CA2002: Do not lock on objects with weak identity
 [src/{Orleans.Core.Abstractions,Orleans.Core}/**.cs]
 dotnet_diagnostic.CA1848.severity = warning
 dotnet_diagnostic.CA1849.severity = warning
+dotnet_diagnostic.CA2000.severity = warning
 dotnet_diagnostic.CA2002.severity = warning
 
 # CA1873: Avoid potentially expensive logging
@@ -669,7 +671,11 @@ dotnet_diagnostic.CA1873.severity = warning
 dotnet_diagnostic.CA1848.severity = warning
 dotnet_diagnostic.CA1849.severity = warning
 dotnet_diagnostic.CA1873.severity = warning
+dotnet_diagnostic.CA2000.severity = warning
 dotnet_diagnostic.CA2002.severity = warning
+
+[src/Orleans.Serialization.SystemTextJson/**.cs]
+dotnet_diagnostic.CA2000.severity = warning
 
 # Production source enforces the correctness baseline. Tests, samples, documentation,
 # playgrounds, templates, and tools retain advisory diagnostics during this rollout.
