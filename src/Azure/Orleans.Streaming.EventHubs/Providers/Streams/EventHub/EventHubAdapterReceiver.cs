@@ -355,6 +355,13 @@ internal partial class EventHubAdapterReceiver : IQueueAdapterReceiver, IQueueCa
         return new Cursor(this, streamId, token);
     }
 
+    public IQueueCacheCursor GetCacheCursorAtPosition(
+        StreamId streamId,
+        StreamSubscriptionStartPosition startPosition)
+    {
+        return new Cursor(this, streamId, startPosition);
+    }
+
     public bool IsUnderPressure()
     {
         return this.GetMaxAddCount() <= 0;
@@ -404,9 +411,7 @@ internal partial class EventHubAdapterReceiver : IQueueAdapterReceiver, IQueueCa
                 shutdownExceptions.Add(ex);
             }
 
-            // clear cache and receiver
-            IEventHubQueueCache? localCache = Interlocked.Exchange(ref this.cache, null);
-
+            // clear receiver
             var localReceiver = Interlocked.Exchange(ref this.receiver, null);
 
             // start closing receiver
@@ -428,7 +433,12 @@ internal partial class EventHubAdapterReceiver : IQueueAdapterReceiver, IQueueCa
             // dispose of cache
             try
             {
-                localCache?.Dispose();
+                lock (this.cacheLock)
+                {
+                    var localCache = this.cache;
+                    this.cache = null;
+                    localCache?.Dispose();
+                }
             }
             catch (Exception ex)
             {
@@ -524,6 +534,20 @@ internal partial class EventHubAdapterReceiver : IQueueAdapterReceiver, IQueueCa
             {
                 this.cache = owner.cache;
                 this.cursor = this.cache?.GetCursor(streamId, token);
+            }
+        }
+
+        public Cursor(
+            EventHubAdapterReceiver owner,
+            StreamId streamId,
+            StreamSubscriptionStartPosition startPosition)
+        {
+            this.owner = owner;
+            this.streamId = streamId;
+            lock (owner.cacheLock)
+            {
+                this.cache = owner.cache;
+                this.cursor = this.cache?.GetCursorAtPosition(streamId, startPosition);
             }
         }
 

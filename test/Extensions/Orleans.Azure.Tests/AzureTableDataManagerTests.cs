@@ -64,7 +64,7 @@ namespace Tester.AzureUtils
         public async Task AzureTableDataManager_UpsertTableEntryAsync()
         {
             var data = GenerateNewData();
-            await manager.UpsertTableEntryAsync(data);
+            await manager.UpsertTableEntryAsync(data, TestContext.Current.CancellationToken);
             var tuple = await manager.ReadSingleTableEntryAsync(
                 data.PartitionKey,
                 data.RowKey,
@@ -74,7 +74,7 @@ namespace Tester.AzureUtils
 
             var data2 = data.Clone();
             data2.StringData = "NewData";
-            await manager.UpsertTableEntryAsync(data2);
+            await manager.UpsertTableEntryAsync(data2, TestContext.Current.CancellationToken);
             tuple = await manager.ReadSingleTableEntryAsync(
                 data2.PartitionKey,
                 data2.RowKey,
@@ -103,7 +103,7 @@ namespace Tester.AzureUtils
                 Assert.Equal(TableErrorCode.ResourceNotFound.ToString(), restStatus);
             }
 
-            await manager.UpsertTableEntryAsync(data);
+            await manager.UpsertTableEntryAsync(data, TestContext.Current.CancellationToken);
             var tuple = await manager.ReadSingleTableEntryAsync(
                 data.PartitionKey,
                 data.RowKey,
@@ -164,7 +164,7 @@ namespace Tester.AzureUtils
                 Assert.Equal(HttpStatusCode.NotFound, httpStatusCode);
             }
 
-            string eTag1 = await manager.UpsertTableEntryAsync(data);
+            string eTag1 = await manager.UpsertTableEntryAsync(data, TestContext.Current.CancellationToken);
             await manager.DeleteTableEntryAsync(data, eTag1);
 
             try
@@ -207,7 +207,7 @@ namespace Tester.AzureUtils
                 Assert.Equal(TableErrorCode.ResourceNotFound.ToString(), restStatus);
             }
 
-            string eTag1 = await manager.UpsertTableEntryAsync(data);
+            string eTag1 = await manager.UpsertTableEntryAsync(data, TestContext.Current.CancellationToken);
             var data2 = data.Clone();
             data2.StringData = "NewData";
             await manager.MergeTableEntryAsync(data2, eTag1);
