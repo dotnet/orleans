@@ -21,6 +21,11 @@ namespace Orleans.Runtime.Messaging
         private readonly ConnectionCommon connectionShared;
         private Task? acceptLoopTask;
         private IConnectionListener? listener;
+#if NET9_0_OR_GREATER
+        private readonly Lock connectionDelegateLock = new();
+#else
+        private readonly object connectionDelegateLock = new();
+#endif
         private ConnectionDelegate? connectionDelegate;
 
         protected ConnectionListener(
@@ -51,7 +56,7 @@ namespace Orleans.Runtime.Messaging
             {
                 if (this.connectionDelegate != null) return this.connectionDelegate;
 
-                lock (this)
+                lock (this.connectionDelegateLock)
                 {
                     if (this.connectionDelegate != null) return this.connectionDelegate;
 

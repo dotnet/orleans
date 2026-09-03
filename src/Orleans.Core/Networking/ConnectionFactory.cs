@@ -11,6 +11,11 @@ namespace Orleans.Runtime.Messaging
     {
         private readonly IConnectionFactory connectionFactory;
         private readonly IServiceProvider serviceProvider;
+#if NET9_0_OR_GREATER
+        private readonly Lock connectionDelegateLock = new();
+#else
+        private readonly object connectionDelegateLock = new();
+#endif
         private ConnectionDelegate? connectionDelegate;
 
         protected ConnectionFactory(
@@ -31,7 +36,7 @@ namespace Orleans.Runtime.Messaging
             {
                 if (this.connectionDelegate != null) return this.connectionDelegate;
 
-                lock (this)
+                lock (this.connectionDelegateLock)
                 {
                     if (this.connectionDelegate != null) return this.connectionDelegate;
 
