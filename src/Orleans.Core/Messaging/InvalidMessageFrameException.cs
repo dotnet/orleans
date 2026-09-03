@@ -35,7 +35,7 @@ public sealed class InvalidMessageFrameException : OrleansException
     }
 
     [Obsolete]
-    protected InvalidMessageFrameException(SerializationInfo info, StreamingContext context) : base(info, context)
+    private InvalidMessageFrameException(SerializationInfo info, StreamingContext context) : base(info, context)
     {
     }
 }
