@@ -1,10 +1,10 @@
+using System;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Orleans.Clustering.DynamoDB;
 using Orleans.Configuration;
 using Orleans.Messaging;
 using Orleans.Runtime;
-using System;
-using Microsoft.Extensions.Options;
 
 namespace Orleans.Hosting
 {

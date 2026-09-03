@@ -17,11 +17,11 @@ internal sealed class DynamoDBGrainStorageProviderBuilder : IProviderBuilder<ISi
 {
     public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
     {
+        var configuration = builder.Configuration;
         builder.AddDynamoDBGrainStorage(
             name!,
             (OptionsBuilder<DynamoDBStorageOptions> optionsBuilder) => optionsBuilder.Configure<IServiceProvider>((options, services) =>
             {
-                var configuration = services.GetRequiredService<IConfiguration>();
                 var providerConfiguration = DynamoDBProviderConfiguration.Create(configurationSection, configuration);
                 providerConfiguration.ConfigureClientOptions(options);
 

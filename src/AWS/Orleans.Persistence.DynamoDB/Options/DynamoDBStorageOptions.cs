@@ -99,7 +99,8 @@ namespace Orleans.Configuration
                 options.UseProvisionedThroughput,
                 options.ReadCapacityUnits,
                 options.WriteCapacityUnits,
-                $"DynamoDB grain storage provider '{name}'");
+                $"DynamoDB grain storage provider '{name}'",
+                requireService: false);
         }
     }
 }
