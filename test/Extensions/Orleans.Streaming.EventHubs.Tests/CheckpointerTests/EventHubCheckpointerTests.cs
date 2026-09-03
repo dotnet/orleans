@@ -73,6 +73,15 @@ public class EventHubCheckpointerTests
         }
     }
 
+    private sealed class FailingResetCheckpointer : TestCheckpointer
+    {
+        public override Task Reset(CancellationToken cancellationToken)
+        {
+            _ = base.Reset(cancellationToken);
+            throw new InvalidOperationException("Reset failed");
+        }
+    }
+
     private sealed class TestEventHubQueueCache : IEventHubQueueCache
     {
         private readonly IStreamQueueCheckpointer<string>? checkpointer;
@@ -380,6 +389,25 @@ public class EventHubCheckpointerTests
         cursor.Refresh(refreshToken);
         Assert.Equal(1, replacementCache.GetCursorCount);
         Assert.Null(cursor.GetCurrent(out _));
+    }
+
+    [TestSuite("BVT")]
+    [Fact, TestCategory("BVT")]
+    public async Task GetQueueMessagesAsync_WhenCheckpointRecoveryFails_RethrowsReadFailure()
+    {
+        var checkpointer = new FailingResetCheckpointer
+        {
+            LoadedOffset = "123",
+        };
+        var receiver = await CreateReceiver(
+            checkpointer,
+            eventHubReceiver: new InvalidOffsetEventHubReceiver());
+
+        var exception = await Assert.ThrowsAsync<ArgumentException>(
+            () => receiver.GetQueueMessagesAsync(10, TestContext.Current.CancellationToken));
+
+        Assert.Equal("The supplied offset is invalid.", exception.Message);
+        Assert.Equal(1, checkpointer.ResetCount);
     }
 
     [TestSuite("BVT")]

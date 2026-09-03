@@ -233,9 +233,9 @@ internal partial class EventHubAdapterReceiver : IQueueAdapterReceiver, IQueueCa
                 }
                 catch (Exception recoveryException)
                 {
-                    throw new AggregateException(
-                        "Event Hubs checkpoint recovery failed.",
-                        ex,
+                    LogWarningFailedToRecoverFromInvalidCheckpoint(
+                        this.settings.Hub.EventHubName,
+                        this.settings.Partition,
                         recoveryException);
                 }
             }
@@ -635,4 +635,11 @@ internal partial class EventHubAdapterReceiver : IQueueAdapterReceiver, IQueueCa
         Message = "Failed to read from EventHub partition {EventHubName}-{Partition}"
     )]
     private partial void LogWarningFailedToReadFromEventHubPartition(string eventHubName, string partition, Exception exception);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        EventId = (int)OrleansEventHubErrorCode.FailedPartitionRead,
+        Message = "Failed to recover EventHub partition {EventHubName}-{Partition} from an invalid checkpoint. The original read failure will be rethrown."
+    )]
+    private partial void LogWarningFailedToRecoverFromInvalidCheckpoint(string eventHubName, string partition, Exception exception);
 }
