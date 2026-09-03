@@ -393,6 +393,55 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
     [TestSuite("BVT")]
     [TestProvider("None")]
     [Fact, TestCategory("BVT")]
+    public async Task RefreshStartBarrier_CompletesBeforeReconciliation()
+    {
+        var silo = Assert.Single(fixture.HostedCluster.Silos);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cancellation.CancelAfter(TestConstants.InitTimeout);
+        _ = await fixture.ReminderHarness.WaitForServicesReadyAsync(
+            [silo],
+            TestConstants.InitTimeout,
+            cancellation.Token);
+
+        var reminderTable = silo.ServiceProvider.GetRequiredService<NullReturningReminderTable>();
+        var reminderService = silo.ServiceProvider.GetRequiredService<LocalReminderService>();
+        var readGate = reminderTable.BlockNextRangeRead(cancellation.Token);
+        var schedulerBlocked = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var releaseScheduler = new ManualResetEventSlim();
+        var blockingTask = new Task(() =>
+        {
+            schedulerBlocked.TrySetResult();
+            releaseScheduler.Wait(cancellation.Token);
+        });
+        reminderService.Scheduler.QueueTask(blockingTask);
+        await schedulerBlocked.Task.WaitAsync(cancellation.Token);
+        try
+        {
+            var refreshStarted = reminderService.TestOnlyStartRefresh();
+            Assert.False(refreshStarted.IsCompleted);
+
+            releaseScheduler.Set();
+            await blockingTask.WaitAsync(cancellation.Token);
+            await readGate.WaitUntilBlockedAsync(cancellation.Token);
+            var reconciliationTask = reminderService.TestOnlyWaitForRangeChangeReconciliation(cancellation.Token);
+
+            await refreshStarted.WaitAsync(cancellation.Token);
+            Assert.False(reconciliationTask.IsCompleted);
+
+            readGate.Release();
+            await reconciliationTask.WaitAsync(cancellation.Token);
+        }
+        finally
+        {
+            releaseScheduler.Set();
+            readGate.Release();
+            await blockingTask.WaitAsync(cancellation.Token);
+        }
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
     public async Task RangeChangeBarrier_PropagatesCurrentProviderReadFailure()
     {
         var silo = Assert.Single(fixture.HostedCluster.Silos);
