@@ -1513,7 +1513,7 @@ public class StateManagerTests : JournalingTestBase
     {
         var unsupportedBytes = CreateUnsupportedLegacyCommandVersionRecord(streamId: 128, commandVersion: 1);
         var validBytes = CreatePersistedStringValueBytes("value", "recovered");
-        var storage = new MutableReadStorage(unsupportedBytes);
+        var storage = new MutableReadStorage(blockedReadNumber: 2, unsupportedBytes, validBytes);
         var codec = new TrackingValueCodec<string>(CreateValueCodec<string>());
         var sut = CreateTestSystem(storage: storage);
         var value = new DurableValue<string>("value", sut.Manager, codec);
@@ -1521,6 +1521,8 @@ public class StateManagerTests : JournalingTestBase
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             () => sut.Lifecycle.OnStart(TestContext.Current.CancellationToken)
                 .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
+        var initialization = sut.Manager.InitializeAsync(TestContext.Current.CancellationToken).AsTask();
+        await storage.BlockedReadStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         Assert.Equal(
             "Failed to recover journaling state using journal format key 'orleans-binary'. " +
@@ -1534,9 +1536,8 @@ public class StateManagerTests : JournalingTestBase
         Assert.Empty(storage.Replaces);
         Assert.Empty(storage.OperationLog);
 
-        storage.Bytes = validBytes;
-        await sut.Manager.InitializeAsync(TestContext.Current.CancellationToken).AsTask()
-            .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        storage.AllowBlockedRead.SetResult();
+        await initialization.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         Assert.Equal("recovered", value.Value);
         Assert.Equal(["recovered"], codec.AppliedValues);
@@ -2273,9 +2274,15 @@ public class StateManagerTests : JournalingTestBase
     {
         private readonly object _lock = new();
         private readonly Queue<byte[]> _readSnapshots = [];
+        private readonly int _blockedReadNumber;
         private byte[] _bytes;
+        private int _readCount;
 
-        public MutableReadStorage(params byte[][] readSnapshots)
+        public MutableReadStorage(params byte[][] readSnapshots) : this(blockedReadNumber: 0, readSnapshots)
+        {
+        }
+
+        public MutableReadStorage(int blockedReadNumber, params byte[][] readSnapshots)
         {
             // Recovery retry tests model storage being repaired after a failed read.
             // The sequence makes that repair deterministic instead of racing the manager's retry.
@@ -2290,6 +2297,7 @@ public class StateManagerTests : JournalingTestBase
                 _readSnapshots.Enqueue(readSnapshot.ToArray());
             }
 
+            _blockedReadNumber = blockedReadNumber;
             _bytes = readSnapshots[^1].ToArray();
         }
 
@@ -2320,10 +2328,20 @@ public class StateManagerTests : JournalingTestBase
 
         public bool IsCompactionRequested { get; set; }
 
-        public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
+        public TaskCompletionSource BlockedReadStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource AllowBlockedRead { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public async ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(consumer);
             cancellationToken.ThrowIfCancellationRequested();
+            if (Interlocked.Increment(ref _readCount) == _blockedReadNumber)
+            {
+                BlockedReadStarted.SetResult();
+                await AllowBlockedRead.Task.WaitAsync(cancellationToken);
+            }
+
             byte[] snapshot;
             lock (_lock)
             {
@@ -2339,7 +2357,6 @@ public class StateManagerTests : JournalingTestBase
             }
 
             consumer.Read(snapshot, metadata: null, complete: true);
-            return default;
         }
 
         public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
