@@ -36,6 +36,8 @@ internal sealed partial class ShardExecutor
     /// <param name="options">The durable jobs configuration options.</param>
     /// <param name="overloadDetector">The overload detector for throttling job execution.</param>
     /// <param name="logger">The logger instance.</param>
+    /// <param name="timeProvider">The time provider used to schedule job execution.</param>
+    /// <param name="durableJobsInstruments">The durable jobs metrics instruments.</param>
     public ShardExecutor(
         IInternalGrainFactory grainFactory,
         IOptions<DurableJobsOptions> options,

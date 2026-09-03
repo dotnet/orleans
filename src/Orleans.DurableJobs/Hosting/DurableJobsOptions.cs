@@ -175,17 +175,26 @@ public sealed class DurableJobsOptions
     }
 }
 
+/// <summary>
+/// Validates <see cref="DurableJobsOptions"/> during silo configuration.
+/// </summary>
 public sealed partial class DurableJobsOptionsValidator : IConfigurationValidator
 {
     private readonly ILogger<DurableJobsOptionsValidator> _logger;
     private readonly IOptions<DurableJobsOptions> _options;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="DurableJobsOptionsValidator"/> class.
+    /// </summary>
+    /// <param name="logger">The logger.</param>
+    /// <param name="options">The durable jobs configuration options.</param>
     public DurableJobsOptionsValidator(ILogger<DurableJobsOptionsValidator> logger, IOptions<DurableJobsOptions> options)
     {
         _logger = logger;
         _options = options;
     }
 
+    /// <inheritdoc />
     public void ValidateConfiguration()
     {
         var options = _options.Value;

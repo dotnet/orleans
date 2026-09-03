@@ -42,6 +42,7 @@ internal sealed class JournaledJobShard : IJobShard
     /// Optional duration the operation processor waits for additional mutations to join the batch
     /// after the first one arrives. Use <see cref="TimeSpan.Zero"/> (the default) to disable linger.
     /// </param>
+    /// <param name="durableJobsInstruments">The durable jobs metrics instruments.</param>
     public JournaledJobShard(
         JobShardId shardId,
         DateTimeOffset startTime,
