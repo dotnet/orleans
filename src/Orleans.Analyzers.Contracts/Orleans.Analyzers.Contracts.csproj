@@ -8,6 +8,8 @@
     <Description>C# Analyzers for Microsoft Orleans.</Description>
     <NoPackageAnalysis>true</NoPackageAnalysis>
     <IncludeBuildOutput>false</IncludeBuildOutput>
+    <!-- Analyzer assets are packed outside lib/ref and are not package-validation API surfaces. -->
+    <EnablePackageValidation>false</EnablePackageValidation>
     <DevelopmentDependency>true</DevelopmentDependency>
     <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>

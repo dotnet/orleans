@@ -37,6 +37,7 @@
     <PackageVersion Include="Hyperion" Version="0.12.2" />
     <PackageVersion Include="KubernetesClient" Version="18.0.13" />
     <PackageVersion Include="MessagePack" Version="3.1.7" />
+    <PackageVersion Include="Microsoft.NET.StringTools" Version="17.11.4" />
     <PackageVersion Include="Microsoft.Accordant" Version="0.1.6" />
     <PackageVersion Include="Microsoft.AspNetCore.Connections.Abstractions" Version="8.0.24" />
     <PackageVersion Include="Microsoft.Azure.Cosmos" Version="3.57.0" />

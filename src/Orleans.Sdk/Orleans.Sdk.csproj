@@ -8,6 +8,8 @@
     <NoPackageAnalysis>true</NoPackageAnalysis>
     <IncludeSymbols>false</IncludeSymbols>
     <IncludeSource>false</IncludeSource>
+    <!-- This metapackage contains build assets and dependencies but no API assemblies. -->
+    <EnablePackageValidation>false</EnablePackageValidation>
     <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
     <NoWarn>MSB3277</NoWarn>
     <PackageReadmeFile>README.md</PackageReadmeFile>
