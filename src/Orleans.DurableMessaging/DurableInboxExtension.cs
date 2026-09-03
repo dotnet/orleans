@@ -280,8 +280,8 @@ internal sealed partial class DurableInboxExtension :
                     return DeliveryResult.Backpressured();
                 }
 
-                var handlerContext = new InboxHandlerContext(envelope, _grainContext.GrainId, _outbox, _sessionPool);
-                if (!_durableInbox.TryFindHandler(handlerContext, out _))
+                var selectionContext = new InboxHandlerSelectionContext(envelope, _grainContext.GrainId);
+                if (!_durableInbox.TryFindHandler(selectionContext, out _))
                 {
                     LogRouteNotFound(
                         _logger,
@@ -772,13 +772,13 @@ internal sealed partial class DurableInboxExtension :
             return;
         }
 
-        var context = new InboxHandlerContext(envelope, _grainContext.GrainId, _outbox, _sessionPool);
+        var selectionContext = new InboxHandlerSelectionContext(envelope, _grainContext.GrainId);
         var stateGeneration = Volatile.Read(ref _stateGeneration);
         IInboxHandler? handler = null;
         Exception? handlerException = null;
         try
         {
-            _durableInbox.TryFindHandler(context, out handler);
+            _durableInbox.TryFindHandler(selectionContext, out handler);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -809,6 +809,7 @@ internal sealed partial class DurableInboxExtension :
 
         if (handlerException is null)
         {
+            var context = new InboxHandlerContext(envelope, _grainContext.GrainId, _outbox, _sessionPool);
             Interlocked.Increment(ref _handlerExecutionDepth);
             try
             {

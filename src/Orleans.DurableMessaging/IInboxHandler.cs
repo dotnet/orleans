@@ -64,6 +64,12 @@ public interface IInboxHandler
     /// may call this method multiple times per message when searching for a matching handler.
     /// </para>
     /// <para>
+    /// Selection is read-only. <see cref="IInboxHandlerContext.CreateEnvelope"/>,
+    /// <see cref="IInboxHandlerContext.Send"/>, and <see cref="IInboxHandlerContext.Outbox"/>
+    /// throw when called from this method. Stage journaled effects and outgoing messages from
+    /// <see cref="HandleAsync"/> after selection completes.
+    /// </para>
+    /// <para>
     /// <b>Handler Precedence:</b> When multiple handlers return <c>true</c>, the first registered
     /// handler wins. Register more specific handlers before generic ones to ensure correct dispatch.
     /// </para>
