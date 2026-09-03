@@ -485,6 +485,7 @@ namespace Orleans.Runtime
             Task RunOnActiveStop(CancellationToken ct) => Task.Run(() => OnActiveStop(ct), CancellationToken.None);
         }
 
+        /// <inheritdoc/>
         public async ValueTask DisposeAsync()
         {
             using var cts = new CancellationTokenSource();
@@ -492,6 +493,7 @@ namespace Orleans.Runtime
             await StopAsync(cts.Token).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
         }
 
+        /// <inheritdoc/>
         public void Dispose()
         {
             try

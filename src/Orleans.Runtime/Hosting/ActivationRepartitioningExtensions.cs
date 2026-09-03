@@ -8,6 +8,9 @@ using Orleans.Placement.Repartitioning;
 
 namespace Orleans.Hosting;
 
+/// <summary>
+/// Extensions for configuring activation repartitioning.
+/// </summary>
 public static class ActivationRepartitioningExtensions
 {
     /// <summary>
@@ -17,6 +20,8 @@ public static class ActivationRepartitioningExtensions
     /// Activation repartitioning attempts to optimize grain call locality by collocating activations which communicate frequently,
     /// while keeping the number of activations on each silo approximately equal.
     /// </remarks>
+    /// <param name="builder">The silo builder.</param>
+    /// <returns>The provided silo builder.</returns>
     [Experimental("ORLEANSEXP001")]
     public static ISiloBuilder AddActivationRepartitioner(this ISiloBuilder builder)
         => builder.AddActivationRepartitioner<RebalancerCompatibleRule>();
@@ -29,6 +34,8 @@ public static class ActivationRepartitioningExtensions
     /// while keeping the number of activations on each silo approximately equal.
     /// </remarks>
     /// <typeparam name="TRule">The type of the imbalance rule to use.</typeparam>
+    /// <param name="builder">The silo builder.</param>
+    /// <returns>The provided silo builder.</returns>
     [Experimental("ORLEANSEXP001")]
     public static ISiloBuilder AddActivationRepartitioner<TRule>(this ISiloBuilder builder) where TRule : class, IImbalanceToleranceRule
         => builder

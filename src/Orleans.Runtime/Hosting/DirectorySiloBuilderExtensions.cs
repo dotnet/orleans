@@ -6,6 +6,9 @@ using Orleans.Hosting;
 
 namespace Orleans.Runtime.Hosting
 {
+    /// <summary>
+    /// Extension methods for registering grain directory implementations with a silo.
+    /// </summary>
     public static class DirectorySiloBuilderExtensions
     {
         /// <summary>
