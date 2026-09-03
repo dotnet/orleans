@@ -44,8 +44,17 @@ namespace Orleans.Storage
         RelationalProviderWriteError = RelationalProviderBase + 19
     }
 
+    /// <summary>
+    /// Creates named <see cref="AdoNetGrainStorage"/> providers from registered services and options.
+    /// </summary>
     public static class AdoNetGrainStorageFactory
     {
+        /// <summary>
+        /// Creates an ADO.NET grain storage provider with the specified name.
+        /// </summary>
+        /// <param name="services">The service provider used to resolve dependencies and named options.</param>
+        /// <param name="name">The storage provider name.</param>
+        /// <returns>The configured ADO.NET grain storage provider.</returns>
         public static AdoNetGrainStorage Create(IServiceProvider services, string name)
         {
             var optionsMonitor = services.GetRequiredService<IOptionsMonitor<AdoNetGrainStorageOptions>>();
@@ -55,22 +64,27 @@ namespace Orleans.Storage
     }
 
     /// <summary>
-    /// A storage provider for writing grain state data to relational storage.
+    /// Stores grain state in a relational database using ADO.NET.
     /// </summary>
     /// <remarks>
     /// <para>
     /// Configuration is provided through <see cref="AdoNetGrainStorageOptions"/>.
     /// </para>
     /// <para>
-    /// Required configuration: <c>ConnectionString</c> - The database connection string.
+    /// Configure exactly one of <see cref="AdoNetGrainStorageOptions.ConnectionString"/> or
+    /// <see cref="AdoNetGrainStorageOptions.DataSource"/>.
     /// </para>
     /// <para>
-    /// Optional configuration: <c>Invariant</c> - The ADO.NET provider invariant name (defaults to <c>Microsoft.Data.SqlClient</c>).
+    /// <see cref="AdoNetGrainStorageOptions.Invariant"/> identifies the ADO.NET provider and defaults to
+    /// <c>Microsoft.Data.SqlClient</c>.
     /// </para>
     /// </remarks>
     [DebuggerDisplay("Name = {Name}, ConnectionString = {Storage.ConnectionString}")]
     public partial class AdoNetGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
     {
+        /// <summary>
+        /// Gets or sets the serializer used to convert grain state to and from its stored representation.
+        /// </summary>
         public IGrainStorageSerializer Serializer { get; set; }
 
         /// <summary>
@@ -123,6 +137,14 @@ namespace Orleans.Storage
         private readonly AdoNetGrainStorageOptions options;
         private readonly string name;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="AdoNetGrainStorage"/> class.
+        /// </summary>
+        /// <param name="activatorProvider">The activator used to create empty grain state values.</param>
+        /// <param name="logger">The provider logger.</param>
+        /// <param name="options">The storage provider options.</param>
+        /// <param name="clusterOptions">The cluster options used to scope stored grain state.</param>
+        /// <param name="name">The storage provider name.</param>
         public AdoNetGrainStorage(
             IActivatorProvider activatorProvider,
             ILogger<AdoNetGrainStorage> logger,
@@ -139,6 +161,10 @@ namespace Orleans.Storage
             this.HashPicker = options.Value.HashPicker ?? new StorageHasherPicker(new[] { new OrleansDefaultHasher() });
         }
 
+        /// <summary>
+        /// Registers the provider's initialization and shutdown callbacks with the silo lifecycle.
+        /// </summary>
+        /// <param name="lifecycle">The silo lifecycle.</param>
         public void Participate(ISiloLifecycle lifecycle)
         {
             lifecycle.Subscribe(OptionFormattingUtilities.Name<AdoNetGrainStorage>(this.name), this.options.InitStage, Init, Close);

@@ -12,13 +12,16 @@ using Orleans.Storage;
 namespace Orleans.Hosting
 {
     /// <summary>
-    /// <see cref="IServiceCollection"/> extensions.
+    /// Provides extension methods for registering ADO.NET grain storage with a service collection.
     /// </summary>
     public static class AdoNetGrainStorageServiceCollectionExtensions
     {
         /// <summary>
-        /// Configure silo to use  AdoNet grain storage as the default grain storage. Instructions on configuring your database are available at <see href="http://aka.ms/orleans-sql-scripts"/>.
+        /// Adds ADO.NET grain storage as the default grain storage provider.
         /// </summary>
+        /// <param name="services">The service collection.</param>
+        /// <param name="configureOptions">The delegate used to configure the storage provider.</param>
+        /// <returns>The provided <see cref="IServiceCollection"/>, for chaining.</returns>
         /// <remarks>
         /// Instructions on configuring your database are available at <see href="http://aka.ms/orleans-sql-scripts"/>.
         /// </remarks>
@@ -28,8 +31,12 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure silo to use AdoNet grain storage for grain storage. Instructions on configuring your database are available at <see href="http://aka.ms/orleans-sql-scripts"/>.
+        /// Adds a named ADO.NET grain storage provider.
         /// </summary>
+        /// <param name="services">The service collection.</param>
+        /// <param name="name">The storage provider name.</param>
+        /// <param name="configureOptions">The delegate used to configure the storage provider.</param>
+        /// <returns>The provided <see cref="IServiceCollection"/>, for chaining.</returns>
         /// <remarks>
         /// Instructions on configuring your database are available at <see href="http://aka.ms/orleans-sql-scripts"/>.
         /// </remarks>
@@ -39,8 +46,11 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure silo to use AdoNet grain storage as the default grain storage. Instructions on configuring your database are available at <see href="http://aka.ms/orleans-sql-scripts"/>.
+        /// Adds ADO.NET grain storage as the default grain storage provider.
         /// </summary>
+        /// <param name="services">The service collection.</param>
+        /// <param name="configureOptions">The delegate used to configure the named options builder.</param>
+        /// <returns>The provided <see cref="IServiceCollection"/>, for chaining.</returns>
         /// <remarks>
         /// Instructions on configuring your database are available at <see href="http://aka.ms/orleans-sql-scripts"/>.
         /// </remarks>
@@ -50,8 +60,12 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure silo to use AdoNet grain storage for grain storage. Instructions on configuring your database are available at <see href="http://aka.ms/orleans-sql-scripts"/>.
+        /// Adds a named ADO.NET grain storage provider.
         /// </summary>
+        /// <param name="services">The service collection.</param>
+        /// <param name="name">The storage provider name.</param>
+        /// <param name="configureOptions">The delegate used to configure the named options builder.</param>
+        /// <returns>The provided <see cref="IServiceCollection"/>, for chaining.</returns>
         /// <remarks>
         /// Instructions on configuring your database are available at <see href="http://aka.ms/orleans-sql-scripts"/>.
         /// </remarks>
