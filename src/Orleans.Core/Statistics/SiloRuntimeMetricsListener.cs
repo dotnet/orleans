@@ -8,15 +8,32 @@ using System.Threading;
 namespace Orleans.Runtime;
 
 // Can not use MetricsEventSource because it only supports single listener.
+/// <summary>
+/// Listens for Orleans runtime metrics used to produce silo runtime statistics.
+/// </summary>
 public static class SiloRuntimeMetricsListener
 {
     private static readonly MeterListener MeterListener = new();
 
     private static long _connectedClientCount;
+
+    /// <summary>
+    /// Gets the number of clients currently connected to the silo.
+    /// </summary>
     public static long ConnectedClientCount => _connectedClientCount;
+
     private static long _messageReceivedTotal;
+
+    /// <summary>
+    /// Gets the cumulative size, in bytes, of messages received by the silo.
+    /// </summary>
     public static long MessageReceivedTotal => _messageReceivedTotal;
+
     private static long _messageSentTotal;
+
+    /// <summary>
+    /// Gets the cumulative size, in bytes, of messages sent by the silo.
+    /// </summary>
     public static long MessageSentTotal => _messageSentTotal;
 
     private static readonly string[] MetricNames =
