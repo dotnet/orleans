@@ -66,12 +66,20 @@ namespace Orleans.Serialization
             var dataInterfaceType = string.IsNullOrEmpty(data.InterfaceType)
                 ? default
                 : GrainInterfaceType.Create(data.InterfaceType);
-            universalReference = new UniversalReference(
-                data.GrainId,
-                dataInterfaceType,
-                data.ServiceId!,
-                data.Binding,
-                data.ClusterId);
+            try
+            {
+                universalReference = new UniversalReference(
+                    data.GrainId,
+                    dataInterfaceType,
+                    data.ServiceId!,
+                    data.Binding,
+                    data.ClusterId);
+            }
+            catch (ArgumentException exception)
+            {
+                throw new JsonException("Could not deserialize an invalid universal reference.", exception);
+            }
+
             if (!reader.Read() || reader.TokenType != JsonTokenType.EndArray || universalReference.IsDefault)
             {
                 throw new JsonException($"Could not deserialize {nameof(IAddressable)}.");
