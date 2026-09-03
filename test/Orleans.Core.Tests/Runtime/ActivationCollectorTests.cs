@@ -604,6 +604,8 @@ namespace UnitTests.Runtime
             }
         }
 
+        public bool WasRemovedByCollection { get; set; }
+
         [Fact]
         public void IsMemoryOverloaded_DoesNotQueryStats_WhenNoActivations()
         {
@@ -2166,7 +2168,7 @@ namespace UnitTests.Runtime
         }
 
         [Fact, TestCategory("Activation")]
-        public void ActivationData_CollectionCandidateMarker_RequiresEligibleRemovalPass()
+        public void ActivationData_CollectionCandidateMarker_RequiresSuccessfulRemoval()
         {
             using var fixture = new ActivationDataWorkingSetFixture();
 
@@ -2197,7 +2199,7 @@ namespace UnitTests.Runtime
             }
 
             Assert.True(isCandidateOnRemovalPass);
-            Assert.True(fixture.WasRemovedByCollection);
+            Assert.False(fixture.WasRemovedByCollection);
 
             lock (fixture.Activation)
             {
@@ -2208,7 +2210,7 @@ namespace UnitTests.Runtime
             Assert.Equal(ActivationState.Valid, fixture.Activation.State);
             Assert.True(fixture.Member.IsInWorkingSet);
             Assert.True(fixture.Member.IsIdle);
-            Assert.True(fixture.WasRemovedByCollection);
+            Assert.False(fixture.WasRemovedByCollection);
         }
 
         [Fact, TestCategory("Activation")]
