@@ -7,6 +7,9 @@ using Orleans.Clustering.Firestore;
 
 namespace Orleans.Hosting;
 
+/// <summary>
+/// Provides extension methods for configuring Google Firestore clustering.
+/// </summary>
 public static class FirestoreClusteringExtensions
 {
     /// <summary>

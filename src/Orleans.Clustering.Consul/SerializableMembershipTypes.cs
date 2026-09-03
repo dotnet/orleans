@@ -42,21 +42,39 @@ namespace Orleans.Runtime.Host
         internal ulong LastIndex { get; set; }
 
         //Public properties are serialized to the KV.Value
+        /// <summary>
+        /// Gets or sets the silo host name.
+        /// </summary>
         [JsonProperty]
         public string Hostname { get; set; } = null!;
 
+        /// <summary>
+        /// Gets or sets the silo gateway port.
+        /// </summary>
         [JsonProperty]
         public int ProxyPort { get; set; }
 
+        /// <summary>
+        /// Gets or sets the time when the silo started.
+        /// </summary>
         [JsonProperty]
         public DateTime StartTime { get; set; }
 
+        /// <summary>
+        /// Gets or sets the silo membership status.
+        /// </summary>
         [JsonProperty]
         public SiloStatus Status { get; set; }
 
+        /// <summary>
+        /// Gets or sets the silo name.
+        /// </summary>
         [JsonProperty]
         public string SiloName { get; set; } = null!;
 
+        /// <summary>
+        /// Gets or sets the silos which suspect this silo.
+        /// </summary>
         [JsonProperty]
         public List<SuspectingSilo>? SuspectingSilos { get; set; }
 
@@ -73,9 +91,15 @@ namespace Orleans.Runtime.Host
     [JsonObject]
     public class SuspectingSilo
     {
+        /// <summary>
+        /// Gets or sets the identifier of the suspecting silo.
+        /// </summary>
         [JsonProperty]
         public string Id { get; set; } = null!;
 
+        /// <summary>
+        /// Gets or sets the time when the suspicion was recorded.
+        /// </summary>
         [JsonProperty]
         public DateTime Time { get; set; }
     }

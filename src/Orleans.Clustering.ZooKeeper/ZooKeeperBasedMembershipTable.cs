@@ -56,7 +56,13 @@ namespace Orleans.Runtime.Membership
         /// The root connection string. for eg. "192.168.1.1,192.168.1.2"
         /// </summary>
         private readonly string rootConnectionString;
-        
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ZooKeeperBasedMembershipTable"/> class.
+        /// </summary>
+        /// <param name="logger">The logger.</param>
+        /// <param name="membershipTableOptions">The ZooKeeper clustering options.</param>
+        /// <param name="clusterOptions">The cluster identity options.</param>
         public ZooKeeperBasedMembershipTable(
             ILogger<ZooKeeperBasedMembershipTable> logger, 
             IOptions<ZooKeeperClusteringSiloOptions> membershipTableOptions, 
@@ -333,6 +339,7 @@ namespace Orleans.Runtime.Membership
             return JsonConvert.DeserializeObject<T>(Encoding.UTF8.GetString(data), MembershipSerializerSettings.Instance)!;
         }
 
+        /// <inheritdoc />
         public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
         {
             return UsingZookeeper(async zk =>

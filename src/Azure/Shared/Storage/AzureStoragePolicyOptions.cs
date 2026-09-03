@@ -21,13 +21,23 @@ namespace Orleans.GrainDirectory.AzureStorage
 // No default namespace intentionally to cause compile errors if something is not defined
 #endif
 {
+    /// <summary>
+    /// Configures retry and timeout policies for Azure Storage operations.
+    /// </summary>
     public class AzureStoragePolicyOptions
     {
         private TimeSpan? creationTimeout;
         private TimeSpan? operationTimeout;
         private TimeSpan? maxPauseBetweenOperationRetries;
 
+        /// <summary>
+        /// Gets or sets the maximum number of rows in a bulk update operation.
+        /// </summary>
         public int MaxBulkUpdateRows { get; set; } = 100;
+
+        /// <summary>
+        /// Gets or sets the maximum number of attempts to create a storage resource.
+        /// </summary>
         public int MaxCreationRetries { get; set; } = 60;
 
         // Defaults match Azure Storage SDK retry settings.
@@ -36,6 +46,9 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// </summary>
         public int MaxOperationRetries { get; set; } = 5;
 
+        /// <summary>
+        /// Gets or sets the delay between storage resource creation attempts.
+        /// </summary>
         public TimeSpan PauseBetweenCreationRetries { get; set; } = TimeSpan.FromSeconds(1);
 
         /// <summary>
@@ -59,12 +72,18 @@ namespace Orleans.GrainDirectory.AzureStorage
             }
         }
 
+        /// <summary>
+        /// Gets or sets the timeout for creating a storage resource.
+        /// </summary>
         public TimeSpan CreationTimeout
         {
             get => this.creationTimeout ?? TimeSpan.FromMilliseconds(this.PauseBetweenCreationRetries.TotalMilliseconds * this.MaxCreationRetries * 3);
             set => SetIfValidTimeout(ref this.creationTimeout, value, nameof(CreationTimeout));
         }
 
+        /// <summary>
+        /// Gets or sets the timeout for an Azure Storage operation.
+        /// </summary>
         public TimeSpan OperationTimeout
         {
             get => this.operationTimeout ?? TimeSpan.FromSeconds(100);

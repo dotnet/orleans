@@ -7,6 +7,9 @@ using Microsoft.Extensions.Options;
 
 namespace Orleans.Hosting
 {
+    /// <summary>
+    /// Provides extension methods for configuring DynamoDB clustering.
+    /// </summary>
     public static class AwsUtilsHostingExtensions
     {
         /// <summary>

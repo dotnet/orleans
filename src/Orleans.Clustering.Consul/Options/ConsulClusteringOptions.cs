@@ -41,6 +41,9 @@ namespace Orleans.Configuration
             });
         }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ConsulClusteringOptions"/> class using the default Consul client configuration.
+        /// </summary>
         public ConsulClusteringOptions()
         {
             this.CreateClient = () => new ConsulClient();
@@ -55,17 +58,34 @@ namespace Orleans.Configuration
         }
     }
 
+    /// <summary>
+    /// Validates Consul clustering options.
+    /// </summary>
+    /// <typeparam name="TOptions">The type of options to validate.</typeparam>
     public class ConsulClusteringOptionsValidator<TOptions> : IConfigurationValidator where TOptions : ConsulClusteringOptions
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ConsulClusteringOptionsValidator{TOptions}"/> class.
+        /// </summary>
+        /// <param name="options">The options to validate.</param>
+        /// <param name="name">The configured options name.</param>
         public ConsulClusteringOptionsValidator(TOptions options, string? name = null)
         {
             Options = options;
             Name = name;
         }
 
+        /// <summary>
+        /// Gets the options to validate.
+        /// </summary>
         public TOptions Options { get; }
+
+        /// <summary>
+        /// Gets the configured options name.
+        /// </summary>
         public string? Name { get; }
 
+        /// <inheritdoc />
         public virtual void ValidateConfiguration()
         {
             Options.Validate(Name);

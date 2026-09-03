@@ -1,5 +1,8 @@
 namespace Orleans.Configuration
 {
+    /// <summary>
+    /// Configures ZooKeeper access for client gateway discovery.
+    /// </summary>
     public class ZooKeeperGatewayListProviderOptions
     {
         /// <summary>

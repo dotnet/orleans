@@ -60,6 +60,14 @@ namespace Orleans.Hosting.Kubernetes
         private volatile bool _enableMonitoring;
         private Task _runTask = null!;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="KubernetesClusterAgent"/> class.
+        /// </summary>
+        /// <param name="clusterMembershipService">The Orleans cluster membership service.</param>
+        /// <param name="logger">The logger.</param>
+        /// <param name="options">The Kubernetes hosting options.</param>
+        /// <param name="clusterOptions">The cluster identity options.</param>
+        /// <param name="localSiloDetails">The local silo identity.</param>
         public KubernetesClusterAgent(
             IClusterMembershipService clusterMembershipService,
             ILogger<KubernetesClusterAgent> logger,
@@ -80,6 +88,7 @@ namespace Orleans.Hosting.Kubernetes
             _podName = _options.CurrentValue.PodName!;
         }
 
+        /// <inheritdoc />
         public void Participate(ISiloLifecycle lifecycle)
         {
             lifecycle.Subscribe(
@@ -197,6 +206,11 @@ namespace Orleans.Hosting.Kubernetes
             }
         }
 
+        /// <summary>
+        /// Stops Kubernetes cluster monitoring.
+        /// </summary>
+        /// <param name="cancellationToken">A cancellation token which limits how long shutdown can wait for monitoring to stop.</param>
+        /// <returns>A task representing the shutdown operation.</returns>
         public async Task OnStop(CancellationToken cancellationToken)
         {
             _shutdownToken.Cancel();

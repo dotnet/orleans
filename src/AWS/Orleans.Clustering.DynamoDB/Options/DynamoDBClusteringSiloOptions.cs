@@ -1,5 +1,8 @@
 namespace Orleans.Configuration
 {
+    /// <summary>
+    /// Configures the DynamoDB connection used by a silo for clustering.
+    /// </summary>
     public class DynamoDBClusteringSiloOptions
     {
         /// <summary>

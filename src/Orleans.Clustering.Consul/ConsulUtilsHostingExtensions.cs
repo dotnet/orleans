@@ -7,6 +7,9 @@ using Orleans.Configuration;
 
 namespace Orleans.Hosting
 {
+    /// <summary>
+    /// Provides extension methods for configuring Consul clustering.
+    /// </summary>
     public static class ConsulUtilsHostingExtensions
     {
         /// <summary>

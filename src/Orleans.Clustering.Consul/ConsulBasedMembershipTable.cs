@@ -25,6 +25,12 @@ namespace Orleans.Runtime.Membership
         private readonly string? kvRootFolder;
         private readonly string versionKey;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ConsulBasedMembershipTable"/> class.
+        /// </summary>
+        /// <param name="logger">The logger.</param>
+        /// <param name="membershipTableOptions">The Consul clustering options.</param>
+        /// <param name="clusterOptions">The cluster identity options.</param>
         public ConsulBasedMembershipTable(
             ILogger<ConsulBasedMembershipTable> logger,
             IOptions<ConsulClusteringOptions> membershipTableOptions, 
@@ -52,7 +58,7 @@ namespace Orleans.Runtime.Membership
             return Task.CompletedTask;
         }
 
-
+        /// <inheritdoc />
         public async Task<MembershipTableData> ReadRow(SiloAddress siloAddress)
         {
             var (siloRegistration, tableVersion) = await GetConsulSiloRegistration(siloAddress);
@@ -60,11 +66,21 @@ namespace Orleans.Runtime.Membership
             return AssembleMembershipTableData(tableVersion, siloRegistration);
         }
 
+        /// <inheritdoc />
         public Task<MembershipTableData> ReadAll()
         {
             return ReadAll(this._consulClient, this.clusterId, this.kvRootFolder, this._logger, this.versionKey);
         }
 
+        /// <summary>
+        /// Reads all membership entries for a cluster from Consul.
+        /// </summary>
+        /// <param name="consulClient">The Consul client.</param>
+        /// <param name="clusterId">The cluster identifier.</param>
+        /// <param name="kvRootFolder">The optional root folder containing Orleans keys.</param>
+        /// <param name="logger">The logger.</param>
+        /// <param name="versionKey">The key containing the membership table version, or <see langword="null"/> when no version key is available.</param>
+        /// <returns>The cluster membership entries and table version.</returns>
         public static async Task<MembershipTableData> ReadAll(IConsulClient consulClient, string clusterId, string? kvRootFolder, ILogger logger, string? versionKey)
         {
             var deploymentKVAddresses = await consulClient.KV.List(ConsulSiloRegistrationAssembler.FormatDeploymentKVPrefix(clusterId, kvRootFolder));
@@ -89,6 +105,7 @@ namespace Orleans.Runtime.Membership
             return AssembleMembershipTableData(tableVersion, allSiloRegistrations);
         }
 
+        /// <inheritdoc />
         public async Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion)
         {
             try
@@ -115,6 +132,7 @@ namespace Orleans.Runtime.Membership
             }
         }
 
+        /// <inheritdoc />
         public async Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion)
         {
             //Update Silo Liveness
@@ -142,12 +160,14 @@ namespace Orleans.Runtime.Membership
             }
         }
 
+        /// <inheritdoc />
         public async Task UpdateIAmAlive(MembershipEntry entry)
         {
             var iAmAliveKV = ConsulSiloRegistrationAssembler.ToIAmAliveKVPair(this.clusterId, this.kvRootFolder, entry.SiloAddress, entry.IAmAliveTime);
             await _consulClient.KV.Put(iAmAliveKV);
         }
 
+        /// <inheritdoc />
         public async Task DeleteMembershipTableEntries(string clusterId)
         {
             await _consulClient.KV.DeleteTree(ConsulSiloRegistrationAssembler.FormatDeploymentKVPrefix(this.clusterId, this.kvRootFolder));
@@ -208,6 +228,7 @@ namespace Orleans.Runtime.Membership
             return new MembershipTableData(membershipEntries, tableVersion);
         }
 
+        /// <inheritdoc />
         public async Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
         {
             var allKVs = await _consulClient.KV.List(ConsulSiloRegistrationAssembler.FormatDeploymentKVPrefix(this.clusterId, this.kvRootFolder));

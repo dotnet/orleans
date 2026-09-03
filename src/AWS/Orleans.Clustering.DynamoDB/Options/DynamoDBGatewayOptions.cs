@@ -2,6 +2,9 @@ using Orleans.Clustering.DynamoDB;
 
 namespace Orleans.Configuration
 {
+    /// <summary>
+    /// Configures DynamoDB-backed gateway discovery.
+    /// </summary>
     public class DynamoDBGatewayOptions : DynamoDBClientOptions
     {
         /// <summary>
