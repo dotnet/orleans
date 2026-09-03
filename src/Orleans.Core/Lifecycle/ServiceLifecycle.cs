@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
@@ -25,7 +26,7 @@ public interface IServiceLifecycle
 }
 
 internal sealed class ServiceLifecycle<TLifecycleObservable>(ILogger<ServiceLifecycle<TLifecycleObservable>> logger) :
-    IServiceLifecycle, ILifecycleParticipant<TLifecycleObservable>
+    IServiceLifecycle, ILifecycleParticipant<TLifecycleObservable>, IDisposable
         where TLifecycleObservable : ILifecycleObservable
 {
     private readonly ServiceLifecycleNotificationStage _started = new(logger, "Started");
@@ -35,6 +36,13 @@ internal sealed class ServiceLifecycle<TLifecycleObservable>(ILogger<ServiceLife
     public IServiceLifecycleStage Started => _started;
     public IServiceLifecycleStage Stopping => _stopping;
     public IServiceLifecycleStage Stopped => _stopped;
+
+    public void Dispose()
+    {
+        _started.Dispose();
+        _stopping.Dispose();
+        _stopped.Dispose();
+    }
 
     public void Participate(TLifecycleObservable lifecycle)
     {

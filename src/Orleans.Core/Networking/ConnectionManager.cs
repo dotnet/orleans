@@ -14,6 +14,10 @@ using Orleans.Internal;
 
 namespace Orleans.Runtime.Messaging
 {
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Design",
+        "CA1001:Types that own disposable fields should be disposable",
+        Justification = "The lifecycle adapter invokes the terminal asynchronous Close method, which disposes the cancellation source after all connections quiesce. A canceled host stop preserves it for remaining connection operations.")]
     internal sealed partial class ConnectionManager
     {
         [ThreadStatic]
@@ -288,6 +292,7 @@ namespace Orleans.Runtime.Messaging
             Justification = "Shutdown callbacks must complete synchronously before connections are scanned, while aggregating all callback failures.")]
         public async Task Close(CancellationToken ct)
         {
+            var shutdownCompleted = false;
             try
             {
                 LogDebugShuttingDownConnections(this.logger);
@@ -318,7 +323,11 @@ namespace Orleans.Runtime.Messaging
                         await Task.WhenAll(closeTasks).WaitAsync(ct).SuppressThrowing();
                         if (ct.IsCancellationRequested) break;
                     }
-                    else if (!pendingConnections) break;
+                    else if (!pendingConnections)
+                    {
+                        shutdownCompleted = true;
+                        break;
+                    }
 
                     await Task.Delay(10, ct).SuppressThrowing();
                     if (ct.IsCancellationRequested) break;
@@ -334,6 +343,11 @@ namespace Orleans.Runtime.Messaging
             }
             finally
             {
+                if (shutdownCompleted)
+                {
+                    this.shutdownCancellation.Dispose();
+                }
+
                 this.closedTaskCompletionSource.TrySetResult(0);
             }
         }

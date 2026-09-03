@@ -29,6 +29,7 @@ namespace Orleans.Runtime
         private readonly GatewayManager _gatewayManager;
         private readonly AsyncEnumerable<ClusterManifest> _updates;
         private readonly CancellationTokenSource _shutdownCts = new CancellationTokenSource();
+        private int _disposeState;
         private ClusterManifest _current;
         private Task? _runTask;
 
@@ -237,22 +238,46 @@ namespace Orleans.Runtime
             Justification = "Shutdown must signal cancellation immediately without awaiting callback completion before waiting for the run task.")]
         public async ValueTask DisposeAsync()
         {
-            if (_shutdownCts.IsCancellationRequested)
+            if (Interlocked.Exchange(ref _disposeState, 1) != 0)
             {
                 return;
             }
 
-            _shutdownCts.Cancel();
-            if (_runTask is Task task)
+            try
             {
-                await task.SuppressThrowing();
+                if (!_shutdownCts.IsCancellationRequested)
+                {
+                    _shutdownCts.Cancel();
+                }
+
+                if (_runTask is Task task)
+                {
+                    await task.SuppressThrowing();
+                }
+            }
+            finally
+            {
+                _shutdownCts.Dispose();
             }
         }
 
         /// <inheritdoc />
         public void Dispose()
         {
-            _shutdownCts.Cancel();
+            if (Interlocked.Exchange(ref _disposeState, 1) != 0)
+            {
+                return;
+            }
+
+            try
+            {
+                _shutdownCts.Cancel();
+                _runTask?.SuppressThrowing().GetAwaiter().GetResult();
+            }
+            finally
+            {
+                _shutdownCts.Dispose();
+            }
         }
 
         [LoggerMessage(

@@ -46,7 +46,7 @@ public interface IServiceLifecycleStage
     IDisposable Register(Func<object?, CancellationToken, Task> callback, object? state = null, bool terminateOnError = true);
 }
 
-internal sealed partial class ServiceLifecycleNotificationStage(ILogger logger, string name) : IServiceLifecycleStage
+internal sealed partial class ServiceLifecycleNotificationStage(ILogger logger, string name) : IServiceLifecycleStage, IDisposable
 {
     // We use this so that late registrations can still be executed, otherwise
     // we'd need to rely on the TCS which means we'd need to set it *before* the callbacks
@@ -189,6 +189,8 @@ internal sealed partial class ServiceLifecycleNotificationStage(ILogger logger, 
             LogCancellationCallbackError(logger, ex, name);
         }
     }
+
+    public void Dispose() => _cts.Dispose();
 
     private async Task ExecuteParticipantAsync(StageParticipant participant, CancellationToken cancellationToken)
     {

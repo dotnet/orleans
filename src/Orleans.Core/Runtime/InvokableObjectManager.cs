@@ -13,9 +13,8 @@ using Orleans.Serialization.Invocation;
 
 namespace Orleans
 {
-    internal sealed partial class InvokableObjectManager : IDisposable
+    internal sealed partial class InvokableObjectManager
     {
-        private readonly CancellationTokenSource disposed = new CancellationTokenSource();
         private readonly ConcurrentDictionary<ObserverGrainId, LocalObjectData> localObjects = new ConcurrentDictionary<ObserverGrainId, LocalObjectData>();
 
         private readonly InterfaceToImplementationMappingCache _interfaceToImplementationMapping;
@@ -74,13 +73,6 @@ namespace Orleans
             {
                 LogUnexpectedTargetInRequest(logger, message.TargetGrain, message);
             }
-        }
-
-        public void Dispose()
-        {
-            var tokenSource = this.disposed;
-            Utils.SafeExecute(() => tokenSource?.Cancel(false));
-            Utils.SafeExecute(() => tokenSource?.Dispose());
         }
 
         public sealed partial class LocalObjectData : IGrainContext, IGrainCallCancellationExtension
