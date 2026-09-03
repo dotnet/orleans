@@ -382,29 +382,49 @@ namespace UnitTests.MembershipTests
                 },
                 TimeSpan.FromSeconds(30),
                 TestContext.Current.CancellationToken);
-            var rejectionTask = gatewayEvents.WaitForEventAsync(
-                nameof(GatewayEvents.DeadSiloRequestRejected),
-                diagnosticEvent => diagnosticEvent.Payload is GatewayEvents.DeadSiloRequestRejected rejected
-                    && rejected.ClientId.Equals(clientId)
-                    && rejected.Rejection.Id.Equals(original.Id),
-                TimeSpan.FromSeconds(30),
-                TestContext.Current.CancellationToken);
-
             client.SendRequest(original, destination);
 
             await trackingStoppedTask;
-            var rejected = Assert.IsType<GatewayEvents.DeadSiloRequestRejected>((await rejectionTask).Payload);
-            Assert.Equal(original.TargetSilo, rejected.Rejection.SendingSilo);
             Assert.Equal(1, Volatile.Read(ref retryInserted));
             Assert.Same(retry, Assert.Single(destination.Messages));
             Assert.Equal(1, gateway.TrackedRequestClientCount);
-            Assert.Single(
+            await Task.Yield();
+            Assert.DoesNotContain(
                 gatewayEvents.GetEvents(nameof(GatewayEvents.DeadSiloRequestRejected)),
                 diagnosticEvent => diagnosticEvent.Payload is GatewayEvents.DeadSiloRequestRejected duplicate
                     && duplicate.ClientId.Equals(clientId)
                     && duplicate.Rejection.Id.Equals(original.Id));
 
             client.ClearPendingRequests();
+            Assert.Equal(0, gateway.TrackedRequestClientCount);
+        }
+
+        [Fact, TestCategory("Liveness")]
+        public async Task ThrowingDiagnosticObserverDoesNotInterruptDeadSiloRejection()
+        {
+            var primaryServices = ((InProcessSiloHandle)HostedCluster.Primary!).ServiceProvider;
+            var gateway = primaryServices.GetRequiredService<MessageCenter>().Gateway!;
+            var clientId = Assert.Single(((IConnectedClientCollection)gateway).GetConnectedClientIds());
+            var deadSilo = HostedCluster.SecondarySilos[0];
+            var request = new Message
+            {
+                Id = new CorrelationId(3),
+                Direction = Message.Directions.Request,
+                SendingSilo = HostedCluster.Primary!.SiloAddress,
+                SendingGrain = clientId,
+                TargetSilo = deadSilo.SiloAddress,
+                TargetGrain = GrainId.Create("target", Guid.NewGuid().ToString()),
+            };
+            Assert.True(gateway.TryGetClientState(request, out var client));
+
+            await HostedCluster.KillSiloAsync(deadSilo, TestContext.Current.CancellationToken);
+            await HostedCluster.WaitForLivenessToStabilizeAsync(didKill: true)
+                .WaitAsync(TestContext.Current.CancellationToken);
+
+            using var subscription = GatewayEvents.AllEvents.Subscribe(new ThrowingGatewayEventObserver());
+
+            client.SendRequest(request, new RecordingConnection());
+
             Assert.Equal(0, gateway.TrackedRequestClientCount);
         }
 
@@ -471,6 +491,25 @@ namespace UnitTests.MembershipTests
             protected override void OnReceivedMessage(Message message) => throw new NotSupportedException();
 
             protected override void OnSendMessageFailure(Message message, string error) => throw new NotSupportedException();
+        }
+
+        private sealed class ThrowingGatewayEventObserver : IObserver<GatewayEvents.GatewayEvent>
+        {
+            public void OnCompleted()
+            {
+            }
+
+            public void OnError(Exception error)
+            {
+            }
+
+            public void OnNext(GatewayEvents.GatewayEvent value)
+            {
+                if (value is GatewayEvents.RequestTrackingStopped or GatewayEvents.DeadSiloRequestRejected)
+                {
+                    throw new InvalidOperationException("Test diagnostic observer failure.");
+                }
+            }
         }
     }
 }
