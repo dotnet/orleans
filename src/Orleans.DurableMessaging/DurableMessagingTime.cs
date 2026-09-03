@@ -2,8 +2,13 @@ namespace Orleans.DurableMessaging;
 
 internal static class DurableMessagingTime
 {
-    public static bool IsExpired(DateTimeOffset now, DateTimeOffset timestamp, TimeSpan retention) =>
-        now - timestamp >= retention;
+    public static bool IsExpired(DateTimeOffset now, DateTimeOffset timestamp, TimeSpan retention)
+    {
+        var nowTicks = now.UtcTicks;
+        var timestampTicks = timestamp.UtcTicks;
+        return nowTicks >= timestampTicks
+            && nowTicks - timestampTicks >= retention.Ticks;
+    }
 
     public static DateTimeOffset AddClamped(DateTimeOffset timestamp, TimeSpan duration)
     {
