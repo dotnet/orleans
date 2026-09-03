@@ -1714,7 +1714,7 @@ public class ConfigureAwaitAnalyzerTest : DiagnosticAnalyzerTestBase<ConfigureAw
     }
 
     [Fact]
-    public async Task NonTaskLikeConfigureAwaitMethod_DoesNotReportDiagnostic()
+    public async Task NonTaskLikeConfigureAwaitMethod_ShouldNotTriggerDiagnostic()
     {
         var code = """
                     public class MyGrain : Grain, IMyGrain
@@ -1745,7 +1745,7 @@ public class ConfigureAwaitAnalyzerTest : DiagnosticAnalyzerTestBase<ConfigureAw
     }
 
     [Fact]
-    public async Task ForeignConfigureAwaitOptionsOnTaskPrefixType_DoesNotReportDiagnostic()
+    public async Task ForeignConfigureAwaitOptionsOnTaskPrefixType_ShouldNotTriggerDiagnostic()
     {
         var code = """
                     namespace Foreign
@@ -1788,7 +1788,7 @@ public class ConfigureAwaitAnalyzerTest : DiagnosticAnalyzerTestBase<ConfigureAw
     }
 
     [Fact]
-    public async Task NonConstantBooleanConfigureAwaitArgument_DoesNotReportDiagnostic()
+    public async Task NonConstantBooleanConfigureAwaitArgument_ShouldNotTriggerDiagnostic()
     {
         var code = """
                     public class MyGrain : Grain, IMyGrain
@@ -1811,7 +1811,7 @@ public class ConfigureAwaitAnalyzerTest : DiagnosticAnalyzerTestBase<ConfigureAw
     }
 
     [Fact]
-    public async Task RuntimeCompositeWithCaptureFlagOnRight_DoesNotReportDiagnostic()
+    public async Task RuntimeCompositeWithCaptureFlagOnRight_ShouldNotTriggerDiagnostic()
     {
         var code = """
                     public class MyGrain : Grain, IMyGrain
@@ -1835,7 +1835,7 @@ public class ConfigureAwaitAnalyzerTest : DiagnosticAnalyzerTestBase<ConfigureAw
     }
 
     [Fact]
-    public async Task RuntimeCompositeWithCaptureFlagOnLeft_DoesNotReportDiagnostic()
+    public async Task RuntimeCompositeWithCaptureFlagOnLeft_ShouldNotTriggerDiagnostic()
     {
         var code = """
                     public class MyGrain : Grain, IMyGrain
@@ -1859,7 +1859,7 @@ public class ConfigureAwaitAnalyzerTest : DiagnosticAnalyzerTestBase<ConfigureAw
     }
 
     [Fact]
-    public Task RuntimeConditionalWithoutCaptureFlag_ReportsExactDiagnostic()
+    public Task RuntimeConditionalWithoutCaptureFlag_ShouldTriggerDiagnostic()
     {
         var code = """
                     public class MyGrain : Grain, IMyGrain
@@ -1882,7 +1882,7 @@ public class ConfigureAwaitAnalyzerTest : DiagnosticAnalyzerTestBase<ConfigureAw
     }
 
     [Fact]
-    public async Task DynamicReceiverConfigureAwait_DoesNotReportDiagnostic()
+    public async Task DynamicReceiverConfigureAwait_ShouldNotTriggerDiagnostic()
     {
         var code = """
                     public class MyGrain : Grain, IMyGrain
@@ -1907,7 +1907,7 @@ public class ConfigureAwaitAnalyzerTest : DiagnosticAnalyzerTestBase<ConfigureAw
     }
 
     [Fact]
-    public async Task DelegateValuedConfigureAwaitProperty_DoesNotReportDiagnostic()
+    public async Task DelegateValuedConfigureAwaitProperty_ShouldNotTriggerDiagnostic()
     {
         var code = """
                     public sealed class ConfigureAwaitHolder
@@ -1937,7 +1937,7 @@ public class ConfigureAwaitAnalyzerTest : DiagnosticAnalyzerTestBase<ConfigureAw
     }
 
     [Fact]
-    public async Task TaskPrefixConfigureAwaitWithoutArguments_DoesNotReportDiagnostic()
+    public async Task TaskPrefixConfigureAwaitWithoutArguments_ShouldNotTriggerDiagnostic()
     {
         var code = """
                     namespace System.Threading.Tasks
@@ -1971,7 +1971,7 @@ public class ConfigureAwaitAnalyzerTest : DiagnosticAnalyzerTestBase<ConfigureAw
     }
 
     [Fact]
-    public async Task TaskPrefixConfigureAwaitWithNullArgument_DoesNotReportDiagnostic()
+    public async Task TaskPrefixConfigureAwaitWithNullArgument_ShouldNotTriggerDiagnostic()
     {
         var code = """
                     namespace System.Threading.Tasks
