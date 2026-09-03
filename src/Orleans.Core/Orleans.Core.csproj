@@ -74,6 +74,7 @@
     <InternalsVisibleTo Include="Orleans.Clustering.ZooKeeper.Tests" />
     <InternalsVisibleTo Include="Orleans.CodeGeneration" />
     <InternalsVisibleTo Include="Orleans.CodeGeneration.Build" />
+    <InternalsVisibleTo Include="Orleans.Connections.Security.Tests" />
     <InternalsVisibleTo Include="Orleans.Core.Tests" />
     <InternalsVisibleTo Include="Orleans.Cosmos.Tests" />
     <InternalsVisibleTo Include="Orleans.DefaultCluster.Tests" />
