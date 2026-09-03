@@ -86,7 +86,11 @@ namespace Orleans
         /// <param name="elapsed">The period of time which elapsed before <see cref="OnStart"/> completed once it was initiated.</param>
         protected virtual void PerfMeasureOnStart(int stage, TimeSpan elapsed)
         {
-            LogLifecycleStageStarted(Logger, GetStageName(stage), elapsed);
+            if (Logger.IsEnabled(LogLevel.Trace))
+            {
+                var stageName = GetStageName(stage);
+                LogLifecycleStageStarted(Logger, stageName, elapsed);
+            }
         }
 
         /// <inheritdoc />
@@ -146,7 +150,11 @@ namespace Orleans
         /// <param name="elapsed">The period of time which elapsed before <see cref="OnStop"/> completed once it was initiated.</param>
         protected virtual void PerfMeasureOnStop(int stage, TimeSpan elapsed)
         {
-            LogLifecycleStageStopped(Logger, GetStageName(stage), elapsed);
+            if (Logger.IsEnabled(LogLevel.Trace))
+            {
+                var stageName = GetStageName(stage);
+                LogLifecycleStageStopped(Logger, stageName, elapsed);
+            }
         }
 
         /// <inheritdoc />
@@ -266,6 +274,7 @@ namespace Orleans
         [LoggerMessage(
             EventId = (int)ErrorCode.SiloStartPerfMeasure,
             Level = LogLevel.Trace,
+            SkipEnabledCheck = true,
             Message = "Starting lifecycle stage '{Stage}' took '{Elapsed}'."
         )]
         private static partial void LogLifecycleStageStarted(ILogger logger, string stage, TimeSpan elapsed);
@@ -273,6 +282,7 @@ namespace Orleans
         [LoggerMessage(
             EventId = (int)ErrorCode.SiloStartPerfMeasure,
             Level = LogLevel.Trace,
+            SkipEnabledCheck = true,
             Message = "Stopping lifecycle stage '{Stage}' took '{Elapsed}'."
         )]
         private static partial void LogLifecycleStageStopped(ILogger logger, string stage, TimeSpan elapsed);

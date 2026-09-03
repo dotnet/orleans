@@ -96,6 +96,11 @@ namespace Orleans
         /// <param name="formatter">The options formatter.</param>
         public void LogOption(IOptionFormatter formatter)
         {
+            if (!logger.IsEnabled(LogLevel.Information))
+            {
+                return;
+            }
+
             try
             {
                 var stringBuilder = new StringBuilder();
@@ -103,9 +108,11 @@ namespace Orleans
                 {
                     stringBuilder.AppendLine($"{setting}");
                 }
-                LogInformationOptions(logger, formatter.Name, stringBuilder.ToString());
+
+                var options = stringBuilder.ToString();
+                LogInformationOptions(logger, formatter.Name, options);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 LogErrorOptions(logger, ex, formatter.Name);
                 throw;
@@ -114,6 +121,7 @@ namespace Orleans
 
         [LoggerMessage(
             Level = LogLevel.Information,
+            SkipEnabledCheck = true,
             Message = "Configuration {Name}:\n{Options}"
         )]
         private static partial void LogInformationOptions(ILogger logger, string name, string options);
