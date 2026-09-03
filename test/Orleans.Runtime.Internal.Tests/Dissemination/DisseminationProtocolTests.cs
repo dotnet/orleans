@@ -1741,17 +1741,49 @@ public class DisseminationProtocolTests
             TestContext.Current.CancellationToken);
 
         await protocol.RunAntiEntropyRound(TestContext.Current.CancellationToken);
-        Assert.Empty(transport.AntiEntropyRequests);
+        var capabilityRequest = Assert.Single(transport.AntiEntropyRequests).Request;
+        Assert.Empty(capabilityRequest.Digests);
+        Assert.Equal([ns.Name], capabilityRequest.SupportedNamespaces);
+        transport.AntiEntropyRequests.Clear();
 
         timeProvider.Advance(TimeSpan.FromSeconds(2) - TimeSpan.FromMilliseconds(1));
         await protocol.RunAntiEntropyRound(TestContext.Current.CancellationToken);
-        Assert.Empty(transport.AntiEntropyRequests);
+        capabilityRequest = Assert.Single(transport.AntiEntropyRequests).Request;
+        Assert.Empty(capabilityRequest.Digests);
+        Assert.Equal([ns.Name], capabilityRequest.SupportedNamespaces);
+        transport.AntiEntropyRequests.Clear();
 
         timeProvider.Advance(TimeSpan.FromMilliseconds(1));
         await protocol.RunAntiEntropyRound(TestContext.Current.CancellationToken);
         var request = Assert.Single(transport.AntiEntropyRequests).Request;
         var digest = Assert.Single(request.Digests[ns.Name]);
         Assert.Equal(FakeNamespace.DefaultKey, digest.Key);
+    }
+
+    [Fact]
+    public async Task AntiEntropyCapabilityExchangeConfirmsNamespaceWithoutRepairDigests()
+    {
+        var local = CreateSilo(11113);
+        var peer = CreateSilo(11114);
+        var transport = new FakeTransport(local, peer);
+        var ns = new FakeNamespace(local);
+        transport.ExchangeAntiEntropyHandler = (target, request, _) =>
+        {
+            Assert.Empty(request.Digests);
+            Assert.Equal([ns.Name], request.SupportedNamespaces);
+            return ValueTask.FromResult(new DisseminationAntiEntropyResponse
+            {
+                Sender = target,
+                SupportedNamespaces = [ns.Name],
+            });
+        };
+        var protocol = CreateProtocol(transport, ns);
+
+        Assert.Equal([peer], protocol.GetUnconfirmedPeers(ns));
+
+        await protocol.RunAntiEntropyRound(TestContext.Current.CancellationToken);
+
+        Assert.Empty(protocol.GetUnconfirmedPeers(ns));
     }
 
     [Fact]

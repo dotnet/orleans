@@ -255,6 +255,9 @@ internal sealed class DisseminationAntiEntropyRequest
 
     [Id(1)]
     public required SiloAddress Sender { get; init; }
+
+    [Id(2)]
+    public List<DisseminationNamespace> SupportedNamespaces { get; init; } = [];
 }
 
 [GenerateSerializer, Immutable]
@@ -269,4 +272,10 @@ internal sealed class DisseminationAntiEntropyResponse
     // Truncation means at least one valid repair remains for a later round.
     [Id(2)]
     public bool Truncated { get; init; }
+
+    [Id(3)]
+    public List<DisseminationNamespace> SupportedNamespaces { get; init; } = [];
+
+    [Id(4)]
+    public List<DisseminationNamespace> UnsupportedNamespaces { get; init; } = [];
 }

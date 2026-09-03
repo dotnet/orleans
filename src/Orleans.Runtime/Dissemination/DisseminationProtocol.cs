@@ -207,11 +207,6 @@ internal sealed partial class DisseminationProtocol
 
         // Push traffic suppresses redundant checks; quiet streams are offered to a few random peers.
         var requestDigests = CreateAntiEntropyRequestDigests(_timeProvider.GetTimestamp());
-        if (requestDigests.Count == 0)
-        {
-            return;
-        }
-
         cancellationToken.ThrowIfCancellationRequested();
 
         var requests = CreateAntiEntropyRequests(
@@ -231,12 +226,8 @@ internal sealed partial class DisseminationProtocol
         var responseTasks = requests
             .Select(request => ExchangeAntiEntropyRequest(
                 request.Key,
-                new DisseminationAntiEntropyRequest
-                {
-                    Sender = _localSilo,
-                    Digests = request.Value,
-                },
-                GetDigestCount(request.Value),
+                request.Value,
+                GetDigestCount(request.Value.Digests),
                 exchangeCancellation.Token))
             .ToArray();
         DisseminationAntiEntropyResponse?[] responses;
@@ -258,26 +249,26 @@ internal sealed partial class DisseminationProtocol
         await ApplyAntiEntropyResponses(responses, options, cancellationToken);
     }
 
-    private Dictionary<SiloAddress, Dictionary<DisseminationNamespace, List<DigestEntry>>> CreateAntiEntropyRequests(
+    private Dictionary<SiloAddress, DisseminationAntiEntropyRequest> CreateAntiEntropyRequests(
         DisseminationMembershipSnapshots membershipSnapshots,
         Dictionary<DisseminationNamespace, List<DigestEntry>> requestDigests,
         int peerCount)
     {
-        var result = new Dictionary<SiloAddress, Dictionary<DisseminationNamespace, List<DigestEntry>>>();
-        var digestsByScope = new Dictionary<DisseminationMembershipScope, KeyValuePair<DisseminationNamespace, List<DigestEntry>>[]>();
+        var result = new Dictionary<SiloAddress, DisseminationAntiEntropyRequest>();
+        var namespacesByScope = new Dictionary<DisseminationMembershipScope, IDisseminationNamespace[]>();
         foreach (var scope in Enum.GetValues<DisseminationMembershipScope>())
         {
-            var scopedDigests = requestDigests
-                .Where(entry => _namespaces.TryGetValue(entry.Key, out var disseminationNamespace)
+            var scopedNamespaces = _namespaces.Values
+                .Where(disseminationNamespace => disseminationNamespace.Options.Enabled
                     && disseminationNamespace.MembershipScope == scope)
                 .ToArray();
-            if (scopedDigests.Length > 0)
+            if (scopedNamespaces.Length > 0)
             {
-                digestsByScope.Add(scope, scopedDigests);
+                namespacesByScope.Add(scope, scopedNamespaces);
             }
         }
 
-        if (digestsByScope.Count == 0)
+        if (namespacesByScope.Count == 0)
         {
             return result;
         }
@@ -285,29 +276,38 @@ internal sealed partial class DisseminationProtocol
         // AllMembers is a superset of ActiveMembers. Selecting from the broadest participating
         // projection preserves one global per-round peer budget while still attaching only the
         // namespaces for which each selected peer is eligible.
-        var selectionScope = digestsByScope.ContainsKey(DisseminationMembershipScope.AllMembers)
+        var selectionScope = namespacesByScope.ContainsKey(DisseminationMembershipScope.AllMembers)
             ? DisseminationMembershipScope.AllMembers
             : DisseminationMembershipScope.ActiveMembers;
         foreach (var peer in membershipSnapshots.GetSnapshot(selectionScope).SelectAntiEntropyPeers(peerCount))
         {
-            Dictionary<DisseminationNamespace, List<DigestEntry>>? peerDigests = null;
-            foreach (var (scope, scopedDigests) in digestsByScope)
+            var peerDigests = new Dictionary<DisseminationNamespace, List<DigestEntry>>();
+            var supportedNamespaces = new List<DisseminationNamespace>();
+            foreach (var (scope, scopedNamespaces) in namespacesByScope)
             {
                 if (!membershipSnapshots.GetSnapshot(scope).ContainsMember(peer))
                 {
                     continue;
                 }
 
-                peerDigests ??= [];
-                foreach (var entry in scopedDigests)
+                foreach (var disseminationNamespace in scopedNamespaces)
                 {
-                    peerDigests.Add(entry.Key, entry.Value);
+                    supportedNamespaces.Add(disseminationNamespace.Name);
+                    if (requestDigests.TryGetValue(disseminationNamespace.Name, out var digest))
+                    {
+                        peerDigests.Add(disseminationNamespace.Name, digest);
+                    }
                 }
             }
 
-            if (peerDigests is not null)
+            if (supportedNamespaces.Count > 0)
             {
-                result.Add(peer, peerDigests);
+                result.Add(peer, new DisseminationAntiEntropyRequest
+                {
+                    Sender = _localSilo,
+                    Digests = peerDigests,
+                    SupportedNamespaces = supportedNamespaces,
+                });
             }
         }
 
@@ -437,6 +437,8 @@ internal sealed partial class DisseminationProtocol
                 continue;
             }
 
+            ConfirmPeerNamespaces(response.Sender, response.SupportedNamespaces);
+            RevokePeerNamespaces(response.Sender, response.UnsupportedNamespaces);
             // A response only includes namespaces which produced repairs. Absence is not evidence that an
             // up-to-date or unrelated namespace is unsupported, so confirmations are additive here.
             ConfirmPeerNamespaces(response.Sender, response.Values.Keys);
@@ -499,6 +501,7 @@ internal sealed partial class DisseminationProtocol
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        ConfirmPeerNamespaces(request.Sender, request.SupportedNamespaces);
         ConfirmPeerNamespaces(request.Sender, request.Digests.Keys);
         // Incoming digests are passive evidence for existing peer pumps, not a reason to create new ones.
         foreach (var (namespaceName, entries) in request.Digests)
@@ -531,7 +534,22 @@ internal sealed partial class DisseminationProtocol
                 Sender = _localSilo,
                 Values = [],
                 Truncated = false,
+                UnsupportedNamespaces = [.. request.SupportedNamespaces],
             };
+        }
+
+        var supportedNamespaces = new List<DisseminationNamespace>();
+        var unsupportedNamespaces = new List<DisseminationNamespace>();
+        foreach (var namespaceName in request.SupportedNamespaces)
+        {
+            if (TryGetEnabledNamespace(namespaceName, out _))
+            {
+                supportedNamespaces.Add(namespaceName);
+            }
+            else
+            {
+                unsupportedNamespaces.Add(namespaceName);
+            }
         }
 
         var valueCount = 0;
@@ -663,6 +681,8 @@ internal sealed partial class DisseminationProtocol
             Sender = _localSilo,
             Values = valuesByNamespace,
             Truncated = truncated,
+            SupportedNamespaces = supportedNamespaces,
+            UnsupportedNamespaces = unsupportedNamespaces,
         };
     }
 
