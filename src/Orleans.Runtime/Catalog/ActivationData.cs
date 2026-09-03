@@ -191,7 +191,7 @@ internal sealed partial class ActivationData :
     {
         get
         {
-            lock (this)
+            lock (_lock)
             {
                 return _waitingRequests.Count;
             }
@@ -204,7 +204,7 @@ internal sealed partial class ActivationData :
     {
         get
         {
-            lock (this)
+            lock (_lock)
             {
                 return _runningRequests.Count > 0;
             }
@@ -213,7 +213,7 @@ internal sealed partial class ActivationData :
 
     internal (int WaitingCount, bool IsInactive) GetRequestStatus()
     {
-        lock (this)
+        lock (_lock)
         {
             var waitingCount = _waitingRequests.Count;
             return (waitingCount, waitingCount == 0 && _runningRequests.Count == 0);
