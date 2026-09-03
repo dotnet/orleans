@@ -6,9 +6,18 @@ using System.Linq;
 
 namespace Orleans.Serialization.TestKit
 {
+    /// <summary>
+    /// Provides helpers for creating segmented <see cref="ReadOnlySequence{T}"/> instances.
+    /// </summary>
     [ExcludeFromCodeCoverage]
     public static class ReadOnlySequenceHelper
     {
+        /// <summary>
+        /// Groups a sequence of bytes into arrays containing at most <paramref name="batchSize"/> bytes.
+        /// </summary>
+        /// <param name="sequence">The sequence to divide into batches.</param>
+        /// <param name="batchSize">The maximum number of bytes in each batch.</param>
+        /// <returns>A sequence of byte arrays containing the source bytes in order.</returns>
         public static IEnumerable<byte[]> Batch(this IEnumerable<byte> sequence, int batchSize)
         {
             var batch = new List<byte>(batchSize);
@@ -29,10 +38,25 @@ namespace Orleans.Serialization.TestKit
             }
         }
 
+        /// <summary>
+        /// Creates a read-only sequence whose segments are backed by the provided byte arrays.
+        /// </summary>
+        /// <param name="buffers">The buffers to include as sequence segments.</param>
+        /// <returns>A read-only sequence containing the provided buffers in order.</returns>
         public static ReadOnlySequence<byte> ToReadOnlySequence(this IEnumerable<byte[]> buffers) => CreateReadOnlySequence(buffers.ToArray());
 
+        /// <summary>
+        /// Creates a read-only sequence whose segments are backed by the provided memory regions.
+        /// </summary>
+        /// <param name="buffers">The memory regions to include as sequence segments.</param>
+        /// <returns>A read-only sequence containing the provided memory regions in order.</returns>
         public static ReadOnlySequence<byte> ToReadOnlySequence(this IEnumerable<Memory<byte>> buffers) => ReadOnlyBufferSegment.Create(buffers);
 
+        /// <summary>
+        /// Creates a read-only sequence whose segments are backed by the provided byte arrays.
+        /// </summary>
+        /// <param name="buffers">The buffers to include as sequence segments.</param>
+        /// <returns>A read-only sequence containing the provided buffers in order.</returns>
         public static ReadOnlySequence<byte> CreateReadOnlySequence(params byte[][] buffers)
         {
             if (buffers.Length == 1)

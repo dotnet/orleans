@@ -7,6 +7,9 @@ using System.Linq;
 
 namespace Orleans.Serialization.TestKit
 {
+    /// <summary>
+    /// Provides a buffer writer which stores committed bytes in multiple segments for serialization tests.
+    /// </summary>
     [ExcludeFromCodeCoverage]
     public class TestMultiSegmentBufferWriter : IBufferWriter<byte>, IOutputBuffer
     {
@@ -14,11 +17,16 @@ namespace Orleans.Serialization.TestKit
         private readonly int _maxAllocationSize;
         private byte[] _current = Array.Empty<byte>();
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TestMultiSegmentBufferWriter"/> class.
+        /// </summary>
+        /// <param name="maxAllocationSize">The maximum size of an individual buffer allocation.</param>
         public TestMultiSegmentBufferWriter(int maxAllocationSize)
         {
             _maxAllocationSize = maxAllocationSize;
         }
 
+        /// <inheritdoc/>
         public void Advance(int bytes)
         {
             if (bytes == 0)
@@ -30,6 +38,7 @@ namespace Orleans.Serialization.TestKit
             _current = Array.Empty<byte>();
         }
 
+        /// <inheritdoc/>
         public Memory<byte> GetMemory(int sizeHint = 0)
         {
             if (sizeHint == 0)
@@ -48,6 +57,7 @@ namespace Orleans.Serialization.TestKit
             return _current;
         }
 
+        /// <inheritdoc/>
         public Span<byte> GetSpan(int sizeHint)
         {
             if (sizeHint == 0)
@@ -66,9 +76,14 @@ namespace Orleans.Serialization.TestKit
             return _current;
         }
 
+        /// <inheritdoc/>
         [Pure]
         public ReadOnlySequence<byte> GetReadOnlySequence(int maxSegmentSize) => _committed.SelectMany(b => b).Batch(maxSegmentSize).ToReadOnlySequence();
 
+        /// <summary>
+        /// Returns all committed buffers followed by the current uncommitted buffer.
+        /// </summary>
+        /// <returns>A read-only sequence containing all allocated buffers.</returns>
         public ReadOnlySequence<byte> PeekAllBuffers() => _committed.Concat(new[] { _current }).ToReadOnlySequence();
     }
 }

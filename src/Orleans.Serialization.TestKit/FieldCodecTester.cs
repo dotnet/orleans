@@ -108,6 +108,11 @@ namespace Orleans.Serialization.TestKit
         /// </summary>
         protected virtual Action<Action<TValue>>? ValueProvider { get; }
 
+        /// <summary>
+        /// Creates the value instance to write during serialization tests.
+        /// </summary>
+        /// <param name="input">The value supplied by the test.</param>
+        /// <returns>The value instance to write.</returns>
         [return: NotNullIfNotNull(nameof(input))]
         protected virtual TValue? GetWriteCopy(TValue? input) => input;
 
