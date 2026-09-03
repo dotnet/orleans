@@ -66,7 +66,7 @@ public sealed class SQSAspireLiveStreamTests : TestClusterPerTest
             SqsAspireResourceRole.Silo,
             streamingOnly: true);
         await base.InitializeAsync();
-        _runner = new SingleStreamTestRunner(InternalClient, ProviderName);
+        _runner = new SingleStreamTestRunner(HostedCluster, ProviderName);
     }
 
     [Fact]
