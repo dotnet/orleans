@@ -101,10 +101,9 @@ namespace Orleans.Serialization
             writer.WriteStartArray();
             var reference = val.UniversalReference;
             var shared = val.Shared;
-            if (reference.Binding == shared.DefaultBinding
-                && string.Equals(reference.ServiceId, shared.ServiceId, StringComparison.Ordinal)
-                && (reference.Binding != UniversalReferenceBinding.Cluster
-                    || string.Equals(reference.ClusterId, shared.ClusterId, StringComparison.Ordinal)))
+            if (reference.Binding == UniversalReferenceBinding.Virtual
+                && reference.Binding == shared.DefaultBinding
+                && string.Equals(reference.ServiceId, shared.ServiceId, StringComparison.Ordinal))
             {
                 JsonSerializer.Serialize(writer, reference.GrainId, options);
                 writer.WriteStringValue(val.InterfaceType.ToString());
