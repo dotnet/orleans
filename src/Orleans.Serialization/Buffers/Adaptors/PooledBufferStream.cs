@@ -92,6 +92,9 @@ namespace Orleans.Serialization.Buffers.Adaptors
             }
         }
 
+        /// <summary>
+        /// Returns all rented buffers and resets the stream to an empty state.
+        /// </summary>
         public void Reset()
         {
             foreach (var buffer in _segments)
@@ -163,14 +166,19 @@ namespace Orleans.Serialization.Buffers.Adaptors
             }
         }
 
+        /// <inheritdoc/>
         public override bool CanRead => true;
 
+        /// <inheritdoc/>
         public override bool CanSeek => true;
 
+        /// <inheritdoc/>
         public override bool CanWrite => true;
 
+        /// <inheritdoc/>
         public override long Position { get; set; }
 
+        /// <inheritdoc/>
         public override long Seek(long offset, SeekOrigin origin)
         {
             var newPosition = origin switch
@@ -189,6 +197,7 @@ namespace Orleans.Serialization.Buffers.Adaptors
             return newPosition;
         }
 
+        /// <inheritdoc/>
         public override int Read(byte[] buffer, int offset, int count)
         {
 #if NET5_0_OR_GREATER
@@ -227,6 +236,7 @@ namespace Orleans.Serialization.Buffers.Adaptors
             return totalRead;
         }
 
+        /// <inheritdoc/>
         public override void SetLength(long value)
         {
             if (value == Length)
@@ -288,6 +298,7 @@ namespace Orleans.Serialization.Buffers.Adaptors
             return array;
         }
 
+        /// <inheritdoc/>
         public override void Write(byte[] buffer, int offset, int count)
         {
 #if NET5_0_OR_GREATER
@@ -366,6 +377,7 @@ namespace Orleans.Serialization.Buffers.Adaptors
             Position = _length;
         }
 
+        /// <inheritdoc/>
         public override void Flush() { }
 
         private Memory<byte> GetWriteHead() => _segments[^1].AsMemory((int)(_segments[^1].Length - (_capacity - _length)));

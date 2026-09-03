@@ -780,6 +780,10 @@ public sealed class ArcBufferPage
         InitializeArray(length);
     }
 
+    /// <summary>
+    /// Resizes the backing array to accommodate a large segment.
+    /// </summary>
+    /// <param name="length">The minimum required length, in bytes.</param>
     public void ResizeLargeSegment(int length)
     {
         Debug.Assert(length > ArcBufferPagePool.MinimumPageSize);
@@ -1381,8 +1385,19 @@ public struct ArcBuffer(ArcBufferPage first, int token, int offset, int length) 
     /// </summary>
     private readonly void CheckValidity() => First.CheckValidity(_firstPageToken);
 
+    /// <summary>
+    /// Creates a pinned slice from the specified offset to the end of this buffer.
+    /// </summary>
+    /// <param name="offset">The zero-based offset at which the slice begins.</param>
+    /// <returns>A pinned slice which must be disposed when it is no longer needed.</returns>
     public readonly ArcBuffer Slice(int offset) => Slice(offset, Length - offset);
 
+    /// <summary>
+    /// Creates a pinned slice of the specified length.
+    /// </summary>
+    /// <param name="offset">The zero-based offset at which the slice begins.</param>
+    /// <param name="length">The length of the slice.</param>
+    /// <returns>A pinned slice which must be disposed when it is no longer needed.</returns>
     public readonly ArcBuffer Slice(int offset, int length)
     {
         var result = UnsafeSlice(offset, length);
@@ -1390,6 +1405,12 @@ public struct ArcBuffer(ArcBufferPage first, int token, int offset, int length) 
         return result;
     }
 
+    /// <summary>
+    /// Creates a slice whose lifetime is bounded by this buffer.
+    /// </summary>
+    /// <param name="offset">The zero-based offset at which the slice begins.</param>
+    /// <param name="length">The length of the slice.</param>
+    /// <returns>An unpinned slice which remains valid while this buffer keeps the referenced pages pinned.</returns>
     public readonly ArcBuffer UnsafeSlice(int offset, int length)
     {
 #if NET6_0_OR_GREATER
