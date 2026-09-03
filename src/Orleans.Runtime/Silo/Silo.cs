@@ -500,7 +500,9 @@ namespace Orleans.Runtime
             {
                 using var cts = new CancellationTokenSource();
                 cts.Cancel();
+#pragma warning disable RS0030 // IDisposable requires synchronously completing silo shutdown.
                 StopAsync(cts.Token).Wait();
+#pragma warning restore RS0030
             }
             catch
             {

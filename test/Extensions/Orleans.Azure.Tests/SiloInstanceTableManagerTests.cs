@@ -92,15 +92,15 @@ namespace Tester.AzureUtils
         }
 
         [Fact, TestCategory("Functional")]
-        public void SiloInstanceTable_Op_RegisterSiloInstance()
+        public async Task SiloInstanceTable_Op_RegisterSiloInstance()
         {
-            RegisterSiloInstance();
+            await RegisterSiloInstance();
         }
 
         [Fact, TestCategory("Functional")]
         public async Task SiloInstanceTable_Op_ActivateSiloInstance()
         {
-            RegisterSiloInstance();
+            await RegisterSiloInstance();
 
             await manager.ActivateSiloInstance(myEntry);
         }
@@ -108,7 +108,7 @@ namespace Tester.AzureUtils
         [Fact, TestCategory("Functional")]
         public async Task SiloInstanceTable_Op_UnregisterSiloInstance()
         {
-            RegisterSiloInstance();
+            await RegisterSiloInstance();
 
             await manager.UnregisterSiloInstance(myEntry);
         }
@@ -119,7 +119,7 @@ namespace Tester.AzureUtils
             // Register a silo entry
             await manager.TryCreateTableVersionEntryAsync();
             this.generation = 0;
-            RegisterSiloInstance();
+            await RegisterSiloInstance();
             // and mark it as dead
             await manager.UnregisterSiloInstance(myEntry);
 
@@ -128,7 +128,7 @@ namespace Tester.AzureUtils
             {
                 this.generation = i;
                 this.siloAddress = SiloAddressUtils.NewLocalSiloAddress(generation);
-                var instance = RegisterSiloInstance();
+                var instance = await RegisterSiloInstance();
                 await manager.ActivateSiloInstance(instance);
             }
 
@@ -177,7 +177,7 @@ namespace Tester.AzureUtils
             const string testName = "SiloInstanceTable_Register_CheckData";
             output.WriteLine("Start {0}", testName);
 
-            RegisterSiloInstance();
+            await RegisterSiloInstance();
 
             var data = await FindSiloEntry(siloAddress);
             SiloInstanceTableEntry siloEntry = data.Entity;
@@ -195,7 +195,7 @@ namespace Tester.AzureUtils
         [Fact, TestCategory("Functional")]
         public async Task SiloInstanceTable_Activate_CheckData()
         {
-            RegisterSiloInstance();
+            await RegisterSiloInstance();
 
             await manager.ActivateSiloInstance(myEntry);
 
@@ -216,7 +216,7 @@ namespace Tester.AzureUtils
         [Fact, TestCategory("Functional")]
         public async Task SiloInstanceTable_Unregister_CheckData()
         {
-            RegisterSiloInstance();
+            await RegisterSiloInstance();
 
             await manager.UnregisterSiloInstance(myEntry);
 
@@ -236,7 +236,7 @@ namespace Tester.AzureUtils
         public async Task SiloInstanceTable_FindAllGatewayProxyEndpoints()
         {
             await manager.TryCreateTableVersionEntryAsync();
-            RegisterSiloInstance();
+            await RegisterSiloInstance();
 
             var gateways = await manager.FindAllGatewayProxyEndpoints();
             Assert.Empty(gateways);  // "Number of gateways before Silo.Activate"
@@ -274,7 +274,7 @@ namespace Tester.AzureUtils
             Assert.Equal(SiloInstanceTableEntry.ConstructRowKey(siloAddress), SiloInstanceTableEntry.ConstructRowKey(fromRowKey));
         }
 
-        private SiloInstanceTableEntry RegisterSiloInstance()
+        private async Task<SiloInstanceTableEntry> RegisterSiloInstance()
         {
             string partitionKey = this.clusterId;
             string rowKey = SiloInstanceTableEntry.ConstructRowKey(siloAddress);
@@ -303,7 +303,7 @@ namespace Tester.AzureUtils
 
             output.WriteLine("MyEntry={0}", myEntry);
 
-            manager.RegisterSiloInstance(myEntry);
+            await manager.RegisterSiloInstance(myEntry);
             return myEntry;
         }
 

@@ -886,7 +886,12 @@ internal sealed partial class ActivationData :
         };
     }
 
-    public void Dispose() => DisposeAsync().AsTask().Wait();
+    public void Dispose()
+    {
+#pragma warning disable RS0030 // IDisposable requires synchronously completing activation cleanup.
+        DisposeAsync().AsTask().Wait();
+#pragma warning restore RS0030
+    }
 
     public async ValueTask DisposeAsync()
     {

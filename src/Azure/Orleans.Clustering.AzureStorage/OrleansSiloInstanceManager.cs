@@ -106,11 +106,11 @@ namespace Orleans.AzureUtils
             return (min, max);
         }
 
-        public void RegisterSiloInstance(SiloInstanceTableEntry entry)
+        public Task<string> RegisterSiloInstance(SiloInstanceTableEntry entry)
         {
             entry.Status = INSTANCE_STATUS_CREATED;
             LogRegisterSiloInstance(entry);
-            Task.WaitAll(new Task[] { storage.UpsertTableEntryAsync(entry) });
+            return storage.UpsertTableEntryAsync(entry);
         }
 
         public Task<string> UnregisterSiloInstance(SiloInstanceTableEntry entry)
