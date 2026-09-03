@@ -11,7 +11,7 @@ namespace Orleans.Runtime.ClusterServices;
 internal sealed class ClusterServiceTopology
 {
     private readonly ImmutableArray<(uint Start, int MemberIndex, int PartitionIndex)> _ringBoundaries;
-    private readonly RingRangeCollection[] _rangesByMember;
+    private readonly ImmutableArray<RingRangeCollection> _rangesByMember;
     private readonly ImmutableArray<ImmutableArray<RingRange>> _rangesByMemberPartition;
 
     public ClusterServiceTopology(
@@ -101,13 +101,16 @@ internal sealed class ClusterServiceTopology
         }
 
         var ranges = ImmutableArray.CreateBuilder<ImmutableArray<RingRange>>(Members.Length);
+        var memberRanges = ImmutableArray.CreateBuilder<RingRangeCollection>(Members.Length);
         for (var memberIndex = 0; memberIndex < Members.Length; memberIndex++)
         {
-            ranges.Add(ImmutableArray.CreateRange(rangesByMemberPartition[memberIndex]));
+            var partitionRanges = ImmutableArray.CreateRange(rangesByMemberPartition[memberIndex]);
+            ranges.Add(partitionRanges);
+            memberRanges.Add(RingRangeCollection.Create(partitionRanges));
         }
 
         _rangesByMemberPartition = ranges.ToImmutable();
-        _rangesByMember = new RingRangeCollection[Members.Length];
+        _rangesByMember = memberRanges.ToImmutable();
     }
 
     public ClusterServiceConfiguration Configuration { get; }
@@ -142,13 +145,7 @@ internal sealed class ClusterServiceTopology
             return RingRangeCollection.Empty;
         }
 
-        var result = _rangesByMember[memberIndex];
-        if (result.IsDefault)
-        {
-            result = _rangesByMember[memberIndex] = RingRangeCollection.Create(_rangesByMemberPartition[memberIndex]);
-        }
-
-        return result;
+        return _rangesByMember[memberIndex];
     }
 
     public ImmutableArray<RingRange> GetMemberRangesByPartition(SiloAddress address)
