@@ -22,6 +22,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="LoadTestGrains" />
     <InternalsVisibleTo Include="Orleans.CodeGeneration.Build" />
+    <InternalsVisibleTo Include="Orleans.EventSourcing.Tests" />
     <InternalsVisibleTo Include="Orleans.Runtime" />
     <InternalsVisibleTo Include="Orleans.Runtime.Internal.Tests" />
   </ItemGroup>

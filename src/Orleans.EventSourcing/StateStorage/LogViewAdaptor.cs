@@ -174,8 +174,6 @@ namespace Orleans.EventSourcing.StateStorage
 
                 if (writebit == GlobalStateCache.StateAndMetaData.GetBit(Services.MyClusterId))
                 {
-                    GlobalStateCache = nextglobalstate;
-
                     Services.Log(LogLevel.Debug, "last write ({0} updates) was actually a success {1}", updates.Length, GlobalStateCache);
 
                     batchsuccessfullywritten = true;
