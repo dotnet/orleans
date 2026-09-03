@@ -391,6 +391,9 @@ namespace Orleans.EventSourcing.Common
                 first = false;
             }
 
+            if (first)
+                promise.SetResult(true);
+
             worker.Notify();
 
             return promise.Task;
