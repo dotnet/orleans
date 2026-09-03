@@ -436,8 +436,11 @@ namespace Orleans.Runtime.Messaging
 
                     message.ReleaseDropped("ForwardingFailed");
                 }
+                else
+                {
+                    message.MarkTransferred("MessageCenter.TryForwardRequest");
+                }
 
-                message.MarkTransferred("MessageCenter.TryForwardRequest");
                 message.Release();
             }
         }
