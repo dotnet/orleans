@@ -178,6 +178,7 @@ public sealed class GrainTypeSharedContext
         if (typeof(TComponent) == typeof(GrainCanInterleave))
         {
             InterleavingPredicate = (GrainCanInterleave?)(object?)instance;
+            return;
         }
 
         if (instance == null)
