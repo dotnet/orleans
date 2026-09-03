@@ -253,12 +253,15 @@ namespace Orleans.Runtime.ReminderService
             if (newEtag != null)
             {
                 entry.ETag = newEtag;
-                var reconciliation = ReserveMutationReconciliation(grainId, reminderName);
-                await ReconcilePersistedReminder(
-                    grainId,
-                    reminderName,
-                    ReminderEvents.LocalReminderStopReason.RemovedFromTable,
-                    reconciliation);
+                if (_siloStatusListenerManager.HasProcessedCurrentMembershipVersion)
+                {
+                    var reconciliation = ReserveMutationReconciliation(grainId, reminderName);
+                    await ReconcilePersistedReminder(
+                        grainId,
+                        reminderName,
+                        ReminderEvents.LocalReminderStopReason.RemovedFromTable,
+                        reconciliation);
+                }
 
                 LogDebugRegisterReminder(entry, localTableSequence);
 
