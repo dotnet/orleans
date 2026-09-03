@@ -61,8 +61,7 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
             clusterMembershipService,
             DirectoryMembershipSnapshot.CreateConfiguration(partitionsPerSilo),
             getRingBoundaries,
-            logger,
-            ClusterMembershipSnapshot.Default);
+            logger);
         CurrentView = new(_membership.CurrentView, grainFactory);
         _viewUpdates = new(
             CurrentView,
