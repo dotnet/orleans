@@ -1,12 +1,13 @@
 namespace Orleans.Journaling;
 
 /// <summary>
-/// Observes durable state manager commit and recovery boundaries.
+/// Observes durable state manager write, delete, and recovery boundaries.
 /// </summary>
 /// <remarks>
 /// Each operation uses a stable snapshot of registered observers. Preparation runs before
-/// state capture, completion runs after a successful write boundary, and recovery completion
-/// runs after every registered state has been restored.
+/// state capture, completion runs after every successful write boundary (including no-op writes
+/// which persist no journal bytes), and recovery completion runs after every registered state
+/// has been restored.
 /// </remarks>
 public interface IJournaledStateObserver
 {
@@ -65,7 +66,8 @@ public interface IJournaledStateObserver
     void OnWriteStarted();
 
     /// <summary>
-    /// Called after the write operation completes successfully.
+    /// Called after the write boundary completes successfully, including a no-op write which
+    /// persists no journal bytes.
     /// </summary>
     void OnWriteCompleted();
 
