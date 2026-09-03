@@ -83,8 +83,12 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
 
     public async ValueTask<DirectoryMembershipSnapshot> RefreshViewAsync(MembershipVersion version, CancellationToken cancellationToken)
     {
-        await _owner.RefreshViewAsync(version, cancellationToken);
-        if (CurrentView.Version <= version)
+        if (version == default || CurrentView.Version < version)
+        {
+            await _owner.RefreshViewAsync(version, cancellationToken);
+        }
+
+        if (CurrentView.Version < version)
         {
             await foreach (var view in _viewUpdates.WithCancellation(cancellationToken))
             {

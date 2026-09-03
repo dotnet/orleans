@@ -77,6 +77,12 @@ public sealed class DistributedGrainDirectoryMembershipTests
             controlledMembership.ReleaseActiveUpdate();
 
             Assert.Equal(siloAddress, await primaryTask);
+
+            var refreshCount = controlledMembership.RefreshCount;
+            var currentView = await membership.RefreshViewAsync(membership.CurrentView.Version, timeout.Token);
+
+            Assert.Equal(membership.CurrentView, currentView);
+            Assert.Equal(refreshCount, controlledMembership.RefreshCount);
         }
         finally
         {
@@ -90,6 +96,7 @@ public sealed class DistributedGrainDirectoryMembershipTests
         private readonly TaskCompletionSource _activeUpdateBlocked = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly TaskCompletionSource _releaseActiveUpdate = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private int _hasBlockedActiveUpdate;
+        private int _refreshCount;
 
         public ClusterMembershipSnapshot CurrentSnapshot => inner.CurrentSnapshot;
 
@@ -97,8 +104,13 @@ public sealed class DistributedGrainDirectoryMembershipTests
 
         public Task ActiveUpdateBlocked => _activeUpdateBlocked.Task;
 
-        public ValueTask Refresh(MembershipVersion minimumVersion = default, CancellationToken cancellationToken = default) =>
-            inner.Refresh(minimumVersion, cancellationToken);
+        public int RefreshCount => Volatile.Read(ref _refreshCount);
+
+        public ValueTask Refresh(MembershipVersion minimumVersion = default, CancellationToken cancellationToken = default)
+        {
+            Interlocked.Increment(ref _refreshCount);
+            return inner.Refresh(minimumVersion, cancellationToken);
+        }
 
         public Task<bool> TryKill(SiloAddress siloAddress) => inner.TryKill(siloAddress);
 
