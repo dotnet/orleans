@@ -34,7 +34,13 @@ public class RedisReminderTableSerializationTests
     {
         var creation = new TaskCompletionSource<(IConnectionMultiplexer Multiplexer, bool IsShared)>(
             TaskCreationOptions.RunContinuationsAsynchronously);
+        var disposed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var multiplexer = Substitute.For<IConnectionMultiplexer>();
+        multiplexer.DisposeAsync().Returns(_ =>
+        {
+            disposed.TrySetResult();
+            return ValueTask.CompletedTask;
+        });
         var options = Options.Create(new AdvancedRedisReminderTableOptions
         {
             CreateMultiplexer = _ => creation.Task,
@@ -55,13 +61,7 @@ public class RedisReminderTableSerializationTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => startTask);
 
         creation.SetResult((multiplexer, IsShared: false));
-        for (var attempt = 0; attempt < 100
-            && !multiplexer.ReceivedCalls().Any(call => call.GetMethodInfo().Name == nameof(IAsyncDisposable.DisposeAsync));
-            attempt++)
-        {
-            await Task.Yield();
-        }
-
+        await disposed.Task.WaitAsync(TestContext.Current.CancellationToken);
         await multiplexer.Received(1).DisposeAsync();
     }
 
