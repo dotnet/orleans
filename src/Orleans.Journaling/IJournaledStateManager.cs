@@ -29,6 +29,7 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// </summary>
     /// <param name="observer">The observer.</param>
     /// <remarks>
+    /// Observers must be registered before <see cref="InitializeAsync"/> begins.
     /// Each operation uses a stable snapshot of registered observers.
     /// </remarks>
     void RegisterObserver(IJournaledStateObserver observer) =>
