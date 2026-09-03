@@ -67,7 +67,7 @@ namespace Orleans.Connections.Security.Tests
             var options = new TlsOptions
             {
                 ClientCertificateMode = RemoteCertificateMode.RequireCertificate,
-                LocalClientCertificateSelector = static (_, _, _, _, _) => null!
+                LocalClientCertificateSelector = static (_, _, _, _, _) => null
             };
 
             CreateTlsOptionsValidator(options, isServer: false).ValidateConfiguration();

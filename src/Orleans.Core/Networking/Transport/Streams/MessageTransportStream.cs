@@ -137,7 +137,7 @@ internal sealed class MessageTransportStream(MessageTransport transport, MemoryP
         {
             try
             {
-                await transport.CloseAsync(new OperationCanceledException(token)).ConfigureAwait(false);
+                await transport.CloseAsync(new OperationCanceledException(token), CancellationToken.None).ConfigureAwait(false);
             }
             catch (Exception exception)
             {

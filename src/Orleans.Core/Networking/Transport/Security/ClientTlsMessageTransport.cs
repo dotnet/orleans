@@ -13,7 +13,7 @@ namespace Orleans.Connections.Transport.Security;
 internal sealed class ClientTlsMessageTransport : TlsMessageTransport
 {
     private readonly X509Certificate2? _certificate;
-    private readonly Func<object, string, X509CertificateCollection, X509Certificate?, string[], X509Certificate2>? _certificateSelector;
+    private readonly Func<object, string, X509CertificateCollection, X509Certificate?, string[], X509Certificate2?>? _certificateSelector;
 
     public ClientTlsMessageTransport(MessageTransport transport, TlsOptions options, ILogger logger) : base(transport, options, logger)
     {
