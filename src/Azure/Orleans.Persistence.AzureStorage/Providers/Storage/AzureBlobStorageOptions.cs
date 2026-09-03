@@ -12,6 +12,9 @@ using Orleans.Storage;
 
 namespace Orleans.Configuration
 {
+    /// <summary>
+    /// Configures the Azure Blob grain storage provider.
+    /// </summary>
     public class AzureBlobStorageOptions : IStorageProviderSerializerOptions
     {
         private BlobServiceClient? _blobServiceClient;
@@ -20,6 +23,10 @@ namespace Orleans.Configuration
         /// Container name where grain stage is stored
         /// </summary>
         public string ContainerName { get; set; } = DEFAULT_CONTAINER_NAME;
+
+        /// <summary>
+        /// The default Azure Blob container name used to store grain state.
+        /// </summary>
         public const string DEFAULT_CONTAINER_NAME = "grainstate";
 
         /// <summary>
@@ -36,6 +43,10 @@ namespace Orleans.Configuration
         /// Stage of silo lifecycle where storage should be initialized.  Storage must be initialized prior to use.
         /// </summary>
         public int InitStage { get; set; } = DEFAULT_INIT_STAGE;
+
+        /// <summary>
+        /// The default silo lifecycle stage at which the storage provider is initialized.
+        /// </summary>
         public const int DEFAULT_INIT_STAGE = ServiceLifecycleStage.ApplicationServices;
 
         /// <inheritdoc/>
@@ -141,6 +152,7 @@ namespace Orleans.Configuration
             this.name = name;
         }
 
+        /// <inheritdoc/>
         public void ValidateConfiguration()
         {
             if (this.options.CreateClient is null)

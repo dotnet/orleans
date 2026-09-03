@@ -44,6 +44,7 @@ namespace Orleans.Storage
         /// <param name="logger">The logger.</param>
         /// <param name="grainFactory">The grain factory.</param>
         /// <param name="defaultGrainStorageSerializer">The default grain storage serializer.</param>
+        /// <param name="activatorProvider">The provider used to create grain state instances.</param>
         public MemoryGrainStorage(
             string name,
             MemoryGrainStorageOptions options,

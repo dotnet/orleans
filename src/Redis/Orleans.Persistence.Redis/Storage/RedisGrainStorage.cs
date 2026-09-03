@@ -252,6 +252,7 @@ namespace Orleans.Persistence
             }
         }
 
+        /// <inheritdoc/>
         public void Dispose()
         {
             var connection = _connection;
@@ -271,6 +272,7 @@ namespace Orleans.Persistence
             }
         }
 
+        /// <inheritdoc/>
         public async ValueTask DisposeAsync()
         {
             var connection = _connection;

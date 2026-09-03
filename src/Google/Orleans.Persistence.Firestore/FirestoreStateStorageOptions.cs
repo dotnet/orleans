@@ -4,6 +4,9 @@ using Orleans.Storage;
 
 namespace Orleans.Persistence.Firestore;
 
+/// <summary>
+/// Configures the Google Cloud Firestore grain storage provider.
+/// </summary>
 public class FirestoreStateStorageOptions : FirestoreOptions, IStorageProviderSerializerOptions
 {
     /// <summary>

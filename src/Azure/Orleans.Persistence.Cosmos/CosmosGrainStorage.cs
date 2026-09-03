@@ -7,6 +7,9 @@ using Orleans.Serialization.Serializers;
 
 namespace Orleans.Persistence.Cosmos;
 
+/// <summary>
+/// Stores Orleans grain state in Azure Cosmos DB.
+/// </summary>
 public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
 {
     private const string ANY_ETAG = "*";
@@ -23,6 +26,16 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
     private CosmosClient _client = default!;
     private Container _container = default!;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="CosmosGrainStorage"/> class.
+    /// </summary>
+    /// <param name="name">The storage provider name.</param>
+    /// <param name="options">The storage provider options.</param>
+    /// <param name="loggerFactory">The logger factory.</param>
+    /// <param name="serviceProvider">The service provider.</param>
+    /// <param name="clusterOptions">The cluster options.</param>
+    /// <param name="documentIdProvider">The provider used to create Cosmos DB document identifiers.</param>
+    /// <param name="activatorProvider">The provider used to create grain state instances.</param>
     public CosmosGrainStorage(
         string name,
         CosmosGrainStorageOptions options,
@@ -43,6 +56,7 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
         _partitionKeyPath = _options.PartitionKeyPath;
     }
 
+    /// <inheritdoc/>
     public async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
     {
         var (id, partitionKey) = await _documentIdProvider.GetDocumentIdentifiers(grainType, grainId);
@@ -93,6 +107,7 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
         }
     }
 
+    /// <inheritdoc/>
     public async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
     {
         var (id, partitionKey) = await _documentIdProvider.GetDocumentIdentifiers(grainType, grainId);
@@ -161,6 +176,7 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
         }
     }
 
+    /// <inheritdoc/>
     public async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
     {
         var (id, partitionKey) = await _documentIdProvider.GetDocumentIdentifiers(grainType, grainId);
@@ -246,6 +262,7 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
         }
     }
 
+    /// <inheritdoc/>
     public void Participate(ISiloLifecycle lifecycle)
     {
         lifecycle.Subscribe(OptionFormattingUtilities.Name<CosmosGrainStorage>(_name), _options.InitStage, Init);
@@ -446,8 +463,17 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
     private partial void LogErrorDeletingDatabase(Exception exception);
 }
 
+/// <summary>
+/// Creates configured <see cref="CosmosGrainStorage"/> instances.
+/// </summary>
 public static class CosmosStorageFactory
 {
+    /// <summary>
+    /// Creates a Cosmos DB grain storage provider with the specified name.
+    /// </summary>
+    /// <param name="services">The service provider.</param>
+    /// <param name="name">The storage provider name.</param>
+    /// <returns>The configured grain storage provider.</returns>
     public static CosmosGrainStorage Create(IServiceProvider services, string name)
     {
         var optionsMonitor = services.GetRequiredService<IOptionsMonitor<CosmosGrainStorageOptions>>();

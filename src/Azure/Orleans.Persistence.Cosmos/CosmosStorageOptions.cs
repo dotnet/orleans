@@ -8,6 +8,10 @@ namespace Orleans.Persistence.Cosmos;
 public class CosmosGrainStorageOptions : CosmosOptions
 {
     private const string ORLEANS_STORAGE_CONTAINER = "OrleansStorage";
+
+    /// <summary>
+    /// The default silo lifecycle stage at which the storage provider is initialized.
+    /// </summary>
     public const int DEFAULT_INIT_STAGE = ServiceLifecycleStage.ApplicationServices;
     private const string DEFAULT_PARTITION_KEY_PATH = "/PartitionKey";
 
@@ -28,6 +32,9 @@ public class CosmosGrainStorageOptions : CosmosOptions
     /// </summary>
     public List<string> StateFieldsToIndex { get; set; } = new();
 
+    /// <summary>
+    /// Gets or sets the partition key path for the Cosmos DB container.
+    /// </summary>
     public string PartitionKeyPath { get; set; } = DEFAULT_PARTITION_KEY_PATH;
 
     /// <summary>

@@ -10,6 +10,9 @@ using Orleans.Storage;
 
 namespace Orleans.Hosting
 {
+    /// <summary>
+    /// Provides extension methods for configuring Azure Table grain storage on an Orleans silo.
+    /// </summary>
     public static class AzureTableSiloBuilderExtensions
     {
         /// <summary>
