@@ -42,6 +42,8 @@ jobs:
       uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
         global-json-file: global.json
+    - name: Verify .NET formatter
+      run: dotnet format --version
     - name: Check changed source files
       shell: pwsh
       env:
