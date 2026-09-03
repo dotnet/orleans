@@ -43,30 +43,53 @@ namespace UnitTests.Serialization
 
         [TestSuite("Functional")]
         [TestProvider("None")]
-        [Fact, TestCategory("Functional")]
-        public async Task MessageTest_TtlUpdatedOnAccess()
+        [Theory, TestCategory("Functional")]
+        [InlineData(10_000)]
+        [InlineData(0)]
+        public void MessageTest_TtlUpdatedOnAccess(int initialTimeToLiveMilliseconds)
         {
             var message = this.messageFactory.CreateMessage(null, InvokeMethodOptions.None);
 
-            message.TimeToLive = TimeSpan.FromSeconds(1);
-            await Task.Delay(TimeSpan.FromMilliseconds(500), TestContext.Current.CancellationToken);
-            Assert.InRange(message.TimeToLive.Value, TimeSpan.FromMilliseconds(-1000), TimeSpan.FromMilliseconds(900));
+            message.TimeToLive = TimeSpan.FromMilliseconds(initialTimeToLiveMilliseconds);
+            var expirationTimestamp = message._timeToExpiry.GetRawTimestamp();
+            WaitForTimestamp(expirationTimestamp - initialTimeToLiveMilliseconds + 10);
+
+            var accessStarted = CoarseStopwatch.GetTimestamp();
+            var timeToLive = message.TimeToLive;
+            var accessCompleted = CoarseStopwatch.GetTimestamp();
+
+            Assert.NotNull(timeToLive);
+            Assert.True(timeToLive.Value < TimeSpan.FromMilliseconds(initialTimeToLiveMilliseconds));
+            Assert.InRange(
+                timeToLive.Value,
+                TimeSpan.FromMilliseconds(expirationTimestamp - accessCompleted),
+                TimeSpan.FromMilliseconds(expirationTimestamp - accessStarted));
         }
 
         [TestSuite("Functional")]
         [TestProvider("None")]
-        [Fact, TestCategory("Functional"), TestCategory("Serialization")]
-        public async Task MessageTest_TtlUpdatedOnSerialization()
+        [Theory, TestCategory("Functional"), TestCategory("Serialization")]
+        [InlineData(10_000)]
+        [InlineData(0)]
+        public void MessageTest_TtlUpdatedOnSerialization(int initialTimeToLiveMilliseconds)
         {
             var message = this.messageFactory.CreateMessage(null, InvokeMethodOptions.None);
 
-            message.TimeToLive = TimeSpan.FromSeconds(1);
-            await Task.Delay(TimeSpan.FromMilliseconds(500), TestContext.Current.CancellationToken);
-            var deserializedMessage = RoundTripMessage(message);
+            message.TimeToLive = TimeSpan.FromMilliseconds(initialTimeToLiveMilliseconds);
+            var sourceExpirationTimestamp = message._timeToExpiry.GetRawTimestamp();
+            WaitForTimestamp(sourceExpirationTimestamp - initialTimeToLiveMilliseconds + 10);
+            var deserializedMessage = RoundTripMessage(message, out var serialization, out var deserialization);
+            var deserializedExpirationTimestamp = deserializedMessage._timeToExpiry.GetRawTimestamp();
 
             Assert.NotNull(deserializedMessage.TimeToLive);
-            Assert.InRange(message.TimeToLive.Value, TimeSpan.FromMilliseconds(-1000), TimeSpan.FromMilliseconds(900));
+            Assert.InRange(
+                deserializedExpirationTimestamp,
+                sourceExpirationTimestamp - serialization.Completed + deserialization.Started,
+                sourceExpirationTimestamp - serialization.Started + deserialization.Completed);
         }
+
+        private static void WaitForTimestamp(long timestamp)
+            => Assert.True(SpinWait.SpinUntil(() => CoarseStopwatch.GetTimestamp() >= timestamp, TimeSpan.FromSeconds(1)));
 
         [TestSuite("Functional")]
         [TestProvider("None")]
@@ -157,6 +180,29 @@ namespace UnitTests.Serialization
             var reader = readResult.Buffer;
             var (requiredBytes, _, _) = this.messageSerializer.TryRead(ref reader, out var deserializedMessage);
             Assert.Equal(0, requiredBytes);
+            return deserializedMessage!;
+        }
+
+        private Message RoundTripMessage(
+            Message message,
+            out (long Started, long Completed) serialization,
+            out (long Started, long Completed) deserialization)
+        {
+            var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: 0));
+            var writer = pipe.Writer;
+            var serializationStarted = CoarseStopwatch.GetTimestamp();
+            this.messageSerializer.Write(writer, message);
+            var serializationCompleted = CoarseStopwatch.GetTimestamp();
+            writer.FlushAsync().AsTask().GetAwaiter().GetResult();
+
+            pipe.Reader.TryRead(out var readResult);
+            var reader = readResult.Buffer;
+            var deserializationStarted = CoarseStopwatch.GetTimestamp();
+            var (requiredBytes, _, _) = this.messageSerializer.TryRead(ref reader, out var deserializedMessage);
+            var deserializationCompleted = CoarseStopwatch.GetTimestamp();
+            Assert.Equal(0, requiredBytes);
+            serialization = (serializationStarted, serializationCompleted);
+            deserialization = (deserializationStarted, deserializationCompleted);
             return deserializedMessage!;
         }
 
