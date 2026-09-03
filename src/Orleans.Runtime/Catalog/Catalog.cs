@@ -312,23 +312,25 @@ namespace Orleans.Runtime
             }).WaitAsync(cancellationToken);
         }
 
-        public async Task DeleteActivations(
+        public Task DeleteActivations(
             List<GrainAddress> addresses,
             DeactivationReasonCode reasonCode,
             string reasonText,
             CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var deactivationReason = new DeactivationReason(reasonCode, reasonText);
-            await Parallel.ForEachAsync(addresses, cancellationToken, (activationAddress, cancellationToken) =>
+            foreach (var activationAddress in addresses)
             {
-                if (TryGetGrainContext(activationAddress.GrainId, out var grainContext))
+                if (TryGetGrainContext(activationAddress.GrainId, out var grainContext)
+                    && grainContext.Address.Equals(activationAddress))
                 {
-                    grainContext.Deactivate(deactivationReason, cancellationToken);
-                    return new ValueTask(grainContext.Deactivated);
+                    // Deactivate synchronously makes the exact loser unroutable; teardown and deregistration continue asynchronously.
+                    grainContext.Deactivate(deactivationReason, CancellationToken.None);
                 }
+            }
 
-                return ValueTask.CompletedTask;
-            });
+            return Task.CompletedTask;
         }
 
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
