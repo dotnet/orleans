@@ -41,6 +41,28 @@ public sealed class DurableTaskStorageTests : JournalingTestBase
         Assert.Equal("root/canceled", response.Exception.Data["task"]);
     }
 
+    [Fact]
+    public async Task MutationRejectsStateOwnedByDifferentTaskId()
+    {
+        var sut = CreateTestSystem();
+        var storage = CreateTaskStorage(sut.Manager);
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+        var firstId = TaskId.Parse("root/first");
+        var secondId = TaskId.Parse("root/second");
+        var firstState = storage.GetOrCreateTask(firstId, request: null);
+        var secondState = storage.GetOrCreateTask(secondId, request: null);
+
+        var exception = Assert.Throws<ArgumentException>(
+            () => storage.SetResponse(secondId, firstState, DurableTaskResponse.Completed));
+
+        Assert.Equal("state", exception.ParamName);
+        Assert.Null(secondState.Result);
+        Assert.True(storage.TryGetTask(firstId, out var retainedFirst));
+        Assert.Same(firstState, retainedFirst);
+        Assert.True(storage.TryGetTask(secondId, out var retainedSecond));
+        Assert.Same(secondState, retainedSecond);
+    }
+
     private DurableTaskGrainStorage CreateTaskStorage(IJournaledStateManager manager)
     {
         var tasks = new DurableDictionary<TaskId, DurableTaskState>(

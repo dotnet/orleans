@@ -206,6 +206,49 @@ public sealed class DurableRpcProtocolTests
     }
 
     [Fact]
+    public void InvocationReplayUsesStableRouteScopedMessageIdentity()
+    {
+        var services = new ServiceCollection()
+            .AddSerializer(builder => builder.AddAssembly(typeof(DurableTaskMessageTransport).Assembly))
+            .BuildServiceProvider();
+        var outbox = new RecordingOutbox();
+        var transport = new DurableTaskMessageTransport(
+            outbox,
+            new RecordingJobManager(),
+            services.GetRequiredService<SerializerSessionPool>());
+        var sender = GrainId.Create("caller", "one");
+        var target = GrainId.Create("target", "one");
+        var taskId = TaskId.Parse("root");
+        var request = new TestDurableTaskRequest
+        {
+            Context = new DurableTaskRequestContext
+            {
+                CallerId = sender,
+                TargetId = target,
+                SupportsDurableCompletion = true,
+            },
+        };
+
+        transport.SendInvocation(sender, target, taskId, request);
+        transport.SendInvocation(sender, target, taskId, request);
+        transport.SendCancellation(sender, target, taskId);
+
+        var messages = outbox.Messages.ToArray();
+        Assert.Equal(3, messages.Length);
+        Assert.Equal(messages[0].MessageId, messages[1].MessageId);
+        Assert.NotEqual(messages[0].MessageId, messages[2].MessageId);
+        Assert.Equal(DateTimeOffset.UnixEpoch, messages[0].CreatedAt);
+        Assert.Equal(messages[0].CreatedAt, messages[1].CreatedAt);
+        Assert.Equal(DurableTaskMessageTransport.InvocationRoute, messages[0].RouteKey);
+        Assert.True(messages[0].Data.TryGetBody<DurableTaskInvocationMessage>(out var body));
+        Assert.Equal(taskId, body!.TaskId);
+        var decodedRequest = Assert.IsType<TestDurableTaskRequest>(body.Request);
+        Assert.Equal(sender, decodedRequest.Context!.CallerId);
+        Assert.Equal(target, decodedRequest.Context.TargetId);
+        Assert.True(decodedRequest.Context.SupportsDurableCompletion);
+    }
+
+    [Fact]
     public void CancellationReplayUsesStableRouteScopedMessageIdentity()
     {
         var services = new ServiceCollection()

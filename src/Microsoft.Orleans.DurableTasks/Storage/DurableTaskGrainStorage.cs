@@ -198,7 +198,9 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
         ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
         ArgumentNullException.ThrowIfNull(state);
 
-        if (state is not DurableTaskState result || !_items.ContainsKey(taskId))
+        if (state is not DurableTaskState result
+            || !_items.TryGetValue(taskId, out var current)
+            || !ReferenceEquals(current, result))
         {
             throw new ArgumentException("The provided value does not belong to this storage provider.", nameof(state));
         }

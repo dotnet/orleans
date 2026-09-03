@@ -26,7 +26,14 @@ internal sealed class DurableTaskMessageTransport(
     internal const string ResumeGenerationMetadata = "orleans.durable-rpc.generation";
 
     public void SendInvocation(GrainId sender, GrainId target, TaskId taskId, IDurableTaskRequest request) =>
-        Send(sender, target, taskId, InvocationRoute, new DurableTaskInvocationMessage { TaskId = taskId, Request = request }, replyTo: sender);
+        Send(
+            sender,
+            target,
+            taskId,
+            InvocationRoute,
+            new DurableTaskInvocationMessage { TaskId = taskId, Request = request },
+            replyTo: sender,
+            messageId: CreateStableMessageId(sender, target, taskId, InvocationRoute));
 
     public void SendCompletion(GrainId sender, GrainId target, TaskId taskId, DurableTaskResponse response) =>
         Send(
