@@ -6,8 +6,12 @@ namespace Orleans.Hosting;
 public static class SiloBuilderAdoNetStreamExtensions
 {
     /// <summary>
-    /// Configure silo to use ADO.NET persistent streams.
+    /// Configures the silo to use an ADO.NET stream provider.
     /// </summary>
+    /// <param name="builder">The silo builder.</param>
+    /// <param name="name">The stream provider name.</param>
+    /// <param name="configureOptions">The delegate used to configure the provider.</param>
+    /// <returns>The same <paramref name="builder"/> instance.</returns>
     public static ISiloBuilder AddAdoNetStreams(this ISiloBuilder builder, string name, Action<AdoNetStreamOptions> configureOptions)
     {
         ArgumentNullException.ThrowIfNull(builder);
@@ -18,8 +22,12 @@ public static class SiloBuilderAdoNetStreamExtensions
     }
 
     /// <summary>
-    /// Configure silo to use ADO.NET persistent streams.
+    /// Configures the silo to use an ADO.NET stream provider.
     /// </summary>
+    /// <param name="builder">The silo builder.</param>
+    /// <param name="name">The stream provider name.</param>
+    /// <param name="configure">The delegate used to configure the provider.</param>
+    /// <returns>The same <paramref name="builder"/> instance.</returns>
     public static ISiloBuilder AddAdoNetStreams(this ISiloBuilder builder, string name, Action<SiloAdoNetStreamConfigurator> configure)
     {
         ArgumentNullException.ThrowIfNull(builder);

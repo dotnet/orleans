@@ -576,6 +576,8 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="providerId">The provider identifier.</param>
         /// <param name="queueId">The queue identifier.</param>
         /// <param name="messageId">The message identifier.</param>
+        /// <param name="maxAttempts">The maximum number of delivery attempts before moving the message to dead letters.</param>
+        /// <param name="removalTimeout">The number of seconds to retain the message in dead letters.</param>
         internal Task FailStreamMessageAsync(string serviceId, string providerId, string queueId, long messageId, int maxAttempts, int removalTimeout)
         {
             ArgumentNullException.ThrowIfNull(serviceId);
