@@ -1,4 +1,3 @@
-#nullable enable
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -44,11 +43,19 @@ internal sealed partial class DurableTaskGrainRuntime(
     private readonly HashSet<TaskId> _readyInboxCancellationCommits = [];
     private readonly HashSet<TaskId> _committingInboxCancellationCommits = [];
     private readonly HashSet<TaskId> _inboxCancellationCommitOwners = [];
+#if NET9_0_OR_GREATER
+    private readonly Lock _inboxCancellationLock = new();
+#else
     private readonly object _inboxCancellationLock = new();
+#endif
     private readonly SemaphoreSlim _journalWriteGate = new(1, 1);
     private readonly SemaphoreSlim _responseCommitGate = new(1, 1);
     private readonly SemaphoreSlim _resumePendingGate = new(1, 1);
+#if NET9_0_OR_GREATER
+    private readonly Lock _stopLock = new();
+#else
     private readonly object _stopLock = new();
+#endif
     private Task _recoveryReconciliation = Task.CompletedTask;
     private readonly DurableTaskGrainRuntimeShared _shared = shared;
     private readonly IDurableTaskGrainStorage _storage = storage;
@@ -1226,8 +1233,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     {
         ThrowIfStopping();
         await Volatile.Read(ref _recoveryReconciliation).WaitAsync(cancellationToken);
-        if (durableTask is ISchedulableTask schedulableTask
-            && durableTask is not IDurableTaskRequest)
+        if (durableTask is ISchedulableTask schedulableTask and not IDurableTaskRequest)
         {
             return await ScheduleCustomChildAsync(
                 taskId,
@@ -2245,7 +2251,7 @@ internal sealed partial class DurableTaskGrainRuntime(
                     { } => "Faulted",
                     null => "Pending",
                 },
-                Waiters = taskState.CompletionDestinations.Select(static destination => destination.ToString()).ToList(),
+                Waiters = [.. taskState.CompletionDestinations.Select(static destination => destination.ToString())],
             };
         }
     }

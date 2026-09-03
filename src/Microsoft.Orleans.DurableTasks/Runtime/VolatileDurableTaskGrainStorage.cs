@@ -1,4 +1,3 @@
-#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
@@ -21,7 +20,7 @@ public class VolatileDurableTaskGrainStorage(
     private readonly DeepCopier<Dictionary<TaskId, DurableTaskState>> _storageCopier = storageCopier;
     private readonly DeepCopier<DurableTaskState> _stateCopier = stateCopier;
     private readonly TimeProvider _timeProvider = timeProvider;
-    private readonly ConditionalWeakTable<DurableTaskState, StateOwnership> _stateOwnership = new();
+    private readonly ConditionalWeakTable<DurableTaskState, StateOwnership> _stateOwnership = [];
     private Dictionary<TaskId, DurableTaskState> _workingCopy = [];
     private Dictionary<TaskId, DurableTaskState> _persistedCopy = [];
 

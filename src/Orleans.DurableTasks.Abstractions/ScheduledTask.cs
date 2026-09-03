@@ -264,9 +264,9 @@ internal sealed class CompletedScheduledTask<TResult>(TaskId id, DurableTaskResp
 /// <summary>Provides an awaiter for a scheduled durable task without a result.</summary>
 public readonly struct ScheduledTaskAwaiter : ICriticalNotifyCompletion
 {
-    private readonly ValueTaskAwaiter _awaiter;
+    private readonly TaskAwaiter _awaiter;
     internal ScheduledTaskAwaiter(ScheduledTask task, CancellationToken cancellationToken)
-        => _awaiter = task.WaitAsync(cancellationToken).GetAwaiter();
+        => _awaiter = task.WaitAsync(cancellationToken).AsTask().GetAwaiter();
     /// <inheritdoc />
     public bool IsCompleted => _awaiter.IsCompleted;
     /// <inheritdoc />
@@ -280,9 +280,9 @@ public readonly struct ScheduledTaskAwaiter : ICriticalNotifyCompletion
 /// <summary>Provides an awaiter for a scheduled durable task with a result.</summary>
 public readonly struct ScheduledTaskAwaiter<TResult> : ICriticalNotifyCompletion
 {
-    private readonly ValueTaskAwaiter<DurableTaskResponse> _awaiter;
+    private readonly TaskAwaiter<DurableTaskResponse> _awaiter;
     internal ScheduledTaskAwaiter(ScheduledTask<TResult> task, CancellationToken cancellationToken)
-        => _awaiter = task.WaitAsyncCore(cancellationToken).GetAwaiter();
+        => _awaiter = task.WaitAsyncCore(cancellationToken).AsTask().GetAwaiter();
     /// <inheritdoc />
     public bool IsCompleted => _awaiter.IsCompleted;
     /// <inheritdoc />

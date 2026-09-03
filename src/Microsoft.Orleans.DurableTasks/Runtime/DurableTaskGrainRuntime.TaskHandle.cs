@@ -1,4 +1,3 @@
-#nullable enable
 using System;
 using Orleans.DurableTasks;
 using Orleans.DurableTasks.Protocol;

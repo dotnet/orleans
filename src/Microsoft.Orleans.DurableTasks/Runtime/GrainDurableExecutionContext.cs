@@ -1,4 +1,3 @@
-#nullable enable
 using System;
 using System.Collections.Generic;
 using Orleans.DurableTasks;
@@ -16,7 +15,11 @@ internal sealed class GrainDurableExecutionContext : DurableExecutionContext
     private readonly CancellationToken _shutdownToken;
     private readonly CancellationTokenSource _executionAbortSource;
     private HashSet<string>? _childNames;
+#if NET9_0_OR_GREATER
+    private readonly Lock _idLock = new();
+#else
     private readonly object _idLock = new();
+#endif
 
     public GrainDurableExecutionContext(
         TaskId taskId,
@@ -137,7 +140,11 @@ internal sealed class GrainDurableExecutionContext : DurableExecutionContext
                 return baseId;
             }
 
-            if (!(_childNames ??= new(StringComparer.Ordinal)).Add(name))
+            if (_childNames is null)
+            {
+                _childNames = new([name], StringComparer.Ordinal);
+            }
+            else if (!_childNames.Add(name))
             {
                 return base.CreateChildTaskId(null);
             }
