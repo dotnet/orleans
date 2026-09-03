@@ -45,8 +45,16 @@ public class ReminderTests_Cosmos_Standalone
         var clusterOptions = Options.Create(new ClusterOptions { ClusterId = "TMSLocalTesting", ServiceId = _serviceId });
         var storageOptions = Options.Create(new CosmosReminderTableOptions());
         storageOptions.Value.ConfigureTestDefaults();
+        var retryPipeline = CosmosReadRetryPolicy.CreatePipeline(
+            _loggerFactory.CreateLogger<CosmosReminderTable>(),
+            TimeProvider.System);
 
-        IReminderTable table = new CosmosReminderTable(_loggerFactory, _fixture.Services, storageOptions, clusterOptions);
+        IReminderTable table = new CosmosReminderTable(
+            _loggerFactory,
+            _fixture.Services,
+            storageOptions,
+            clusterOptions,
+            retryPipeline);
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         cancellation.CancelAfter(new ReminderOptions().InitializationTimeout);
         await table.StartAsync(cancellation.Token);
@@ -63,7 +71,15 @@ public class ReminderTests_Cosmos_Standalone
         var clusterOptions = Options.Create(new ClusterOptions { ClusterId = clusterId, ServiceId = _serviceId });
         var storageOptions = Options.Create(new CosmosReminderTableOptions());
         storageOptions.Value.ConfigureTestDefaults();
-        IReminderTable table = new CosmosReminderTable(_loggerFactory, _fixture.Services, storageOptions, clusterOptions);
+        var retryPipeline = CosmosReadRetryPolicy.CreatePipeline(
+            _loggerFactory.CreateLogger<CosmosReminderTable>(),
+            TimeProvider.System);
+        IReminderTable table = new CosmosReminderTable(
+            _loggerFactory,
+            _fixture.Services,
+            storageOptions,
+            clusterOptions,
+            retryPipeline);
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         cancellation.CancelAfter(new ReminderOptions().InitializationTimeout);
         await table.StartAsync(cancellation.Token);

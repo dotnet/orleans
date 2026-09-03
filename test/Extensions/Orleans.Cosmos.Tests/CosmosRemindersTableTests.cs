@@ -36,7 +36,15 @@ public class CosmosRemindersTableTests : ReminderTableTestsBase
 
         var options = new CosmosReminderTableOptions();
         options.ConfigureTestDefaults();
-        return new CosmosReminderTable(loggerFactory, this.ClusterFixture.Services, Options.Create(options), this.clusterOptions);
+        var retryPipeline = CosmosReadRetryPolicy.CreatePipeline(
+            loggerFactory.CreateLogger<CosmosReminderTable>(),
+            TimeProvider.System);
+        return new CosmosReminderTable(
+            loggerFactory,
+            this.ClusterFixture.Services,
+            Options.Create(options),
+            this.clusterOptions,
+            retryPipeline);
     }
 
     protected override Task<string> GetConnectionString()

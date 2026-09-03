@@ -1,6 +1,8 @@
 using System.Net;
 using System.Diagnostics;
 using Orleans.Reminders.Cosmos.Models;
+using Polly;
+using Polly.Registry;
 
 namespace Orleans.Reminders.Cosmos;
 
@@ -15,6 +17,7 @@ internal partial class CosmosReminderTable : IReminderTable
     private readonly IServiceProvider _serviceProvider;
     private readonly Func<ReminderEntity, ReminderEntry> _convertEntityToEntry;
     private readonly ICosmosOperationExecutor _executor;
+    private readonly ResiliencePipeline _readResiliencePipeline;
     private CosmosClient _client = default!;
     private Container _container = default!;
 
@@ -22,7 +25,23 @@ internal partial class CosmosReminderTable : IReminderTable
         ILoggerFactory loggerFactory,
         IServiceProvider serviceProvider,
         IOptions<CosmosReminderTableOptions> options,
-        IOptions<ClusterOptions> clusterOptions)
+        IOptions<ClusterOptions> clusterOptions,
+        ResiliencePipelineProvider<string> resiliencePipelineProvider)
+        : this(
+            loggerFactory,
+            serviceProvider,
+            options,
+            clusterOptions,
+            resiliencePipelineProvider.GetPipeline(CosmosReadRetryPolicy.PipelineKey))
+    {
+    }
+
+    internal CosmosReminderTable(
+        ILoggerFactory loggerFactory,
+        IServiceProvider serviceProvider,
+        IOptions<CosmosReminderTableOptions> options,
+        IOptions<ClusterOptions> clusterOptions,
+        ResiliencePipeline readResiliencePipeline)
     {
         _logger = loggerFactory.CreateLogger<CosmosReminderTable>();
         _serviceProvider = serviceProvider;
@@ -30,6 +49,7 @@ internal partial class CosmosReminderTable : IReminderTable
         _clusterOptions = clusterOptions.Value;
         _convertEntityToEntry = FromEntity;
         _executor = options.Value.OperationExecutor;
+        _readResiliencePipeline = readResiliencePipeline;
     }
 
     public async Task Init()
@@ -322,15 +342,10 @@ internal partial class CosmosReminderTable : IReminderTable
     }
 
     private Task<TResult> ExecuteReadOperation<TResult>(Func<Task<TResult>> operation) =>
-        CosmosReadRetryPolicy.ExecuteAsync(operation, LogReadRetry, static delay => Task.Delay(delay));
-
-    private void LogReadRetry(CosmosException exception, int retry, TimeSpan delay) =>
-        LogWarningReadTimedOut(
-            exception,
-            retry,
-            CosmosReadRetryPolicy.MaxRetries,
-            delay.TotalMilliseconds,
-            exception.ActivityId);
+        _readResiliencePipeline.ExecuteAsync(
+            static async (operation, _) => await operation().ConfigureAwait(false),
+            operation,
+            CancellationToken.None).AsTask();
 
     private ReminderEntry FromEntity(ReminderEntity entity)
     {
@@ -430,15 +445,4 @@ internal partial class CosmosReminderTable : IReminderTable
         Message = "Error deleting Azure Cosmos DB database"
     )]
     private partial void LogErrorDeletingAzureCosmosDBDatabase(Exception ex);
-
-    [LoggerMessage(
-        Level = LogLevel.Warning,
-        Message = "Cosmos DB reminder read timed out. Retrying in {DelayMilliseconds}ms ({Retry}/{MaxRetries}). ActivityId: {ActivityId}"
-    )]
-    private partial void LogWarningReadTimedOut(
-        Exception ex,
-        int retry,
-        int maxRetries,
-        double delayMilliseconds,
-        string activityId);
 }
