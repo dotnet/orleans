@@ -144,7 +144,7 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
         }
     }
 
-    private async ValueTask<DurableJobRunResult> GetJobStatusAsync(
+    private ValueTask<DurableJobRunResult> GetJobStatusAsync(
         (string JobId, long ExecutionGeneration, int DequeueCount) key,
         IJobRunContext context,
         JobAttemptState state,
@@ -158,15 +158,15 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
             {
                 // For the first attempt, to reduce RPC, we wait for the polling interval or half the response timeout for the task to complete.
                 // This saves a back-and-forth for the common case where a job completes quickly.
-                return await LongPollGetJobStatusAsync(key, context, state, attemptCancellationToken);
+                return LongPollGetJobStatusAsync(key, context, state, attemptCancellationToken);
             }
 
-            return DurableJobRunResult.InProgress(_shared.Options.JobStatusPollInterval);
+            return new(DurableJobRunResult.InProgress(_shared.Options.JobStatusPollInterval));
         }
 
         if (state.Task.IsCompletedSuccessfully)
         {
-            return GetSuccessfulResult(key, state, await state.Task);
+            return new(GetSuccessfulResult(key, state));
         }
 
         RemoveJobAttempt(key, state);
@@ -175,10 +175,10 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
         {
             var ex = state.Task.Exception!.InnerException ?? state.Task.Exception;
             LogErrorExecutingDurableJob(_shared.Logger, ex, context.Job.Id, _grain.GrainId);
-            return DurableJobRunResult.Failed(ex);
+            return new(DurableJobRunResult.Failed(ex));
         }
 
-        return await state.Task;
+        return ValueTask.FromCanceled<DurableJobRunResult>(new CancellationToken(canceled: true));
 
         async ValueTask<DurableJobRunResult> LongPollGetJobStatusAsync(
             (string JobId, long ExecutionGeneration, int DequeueCount) key,
@@ -213,15 +213,15 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
                 return await state.Task;
             }
 
-            return GetSuccessfulResult(key, state, await state.Task);
+            return GetSuccessfulResult(key, state);
         }
     }
 
     private DurableJobRunResult GetSuccessfulResult(
         (string JobId, long ExecutionGeneration, int DequeueCount) key,
-        JobAttemptState state,
-        DurableJobRunResult result)
+        JobAttemptState state)
     {
+        var result = state.Task.Result;
         if (result.IsInProgress)
         {
             if (!state.PollRequested)

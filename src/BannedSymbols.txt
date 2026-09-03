@@ -1,4 +1,3 @@
 // Legacy serialization entry points with established Orleans replacements.
-T:Orleans.OrleansConstructorAttribute;Use Orleans.GeneratedActivatorConstructorAttribute.
 T:System.Runtime.Serialization.Formatters.Binary.BinaryFormatter;Use Orleans.Serialization.Serializer for Orleans payloads or System.Text.Json.JsonSerializer for JSON.
 T:System.Runtime.Serialization.IFormatter;Use Orleans.Serialization.Serializer for Orleans payloads or System.Text.Json.JsonSerializer for JSON.
