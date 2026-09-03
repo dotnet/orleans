@@ -66,8 +66,17 @@ namespace Orleans.Streams
         ImplicitOnly,
     }
 
+    /// <summary>
+    /// Provides the stream provider pub/sub control plane for registering producers and consumers and querying subscription state.
+    /// </summary>
     public interface IStreamPubSub // Compare with: IPubSubRendezvousGrain
     {
+        /// <summary>
+        /// Registers a producer for a stream and returns the active consumer registrations which the producer should connect to.
+        /// </summary>
+        /// <param name="streamId">The qualified stream identifier.</param>
+        /// <param name="streamProducer">The identifier of the producer.</param>
+        /// <returns>The active consumer registrations for the stream.</returns>
         Task<ISet<PubSubSubscriptionState>> RegisterProducer(QualifiedStreamId streamId, GrainId streamProducer);
 
         /// <summary>
@@ -80,6 +89,12 @@ namespace Orleans.Streams
         Task<ISet<PubSubSubscriptionState>> RegisterProducer(QualifiedStreamId streamId, GrainId streamProducer, CancellationToken cancellationToken)
             => RegisterProducer(streamId, streamProducer);
 
+        /// <summary>
+        /// Unregisters a producer from a stream.
+        /// </summary>
+        /// <param name="streamId">The qualified stream identifier.</param>
+        /// <param name="streamProducer">The identifier of the producer.</param>
+        /// <returns>A task which represents the operation.</returns>
         Task UnregisterProducer(QualifiedStreamId streamId, GrainId streamProducer);
 
         /// <summary>
@@ -92,6 +107,14 @@ namespace Orleans.Streams
         Task UnregisterProducer(QualifiedStreamId streamId, GrainId streamProducer, CancellationToken cancellationToken)
             => UnregisterProducer(streamId, streamProducer);
 
+        /// <summary>
+        /// Registers a consumer subscription for a stream.
+        /// </summary>
+        /// <param name="subscriptionId">The subscription identifier.</param>
+        /// <param name="streamId">The qualified stream identifier.</param>
+        /// <param name="streamConsumer">The identifier of the consumer.</param>
+        /// <param name="filterData">The serialized filter data associated with the subscription.</param>
+        /// <returns>A task which represents the operation.</returns>
         Task RegisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId, GrainId streamConsumer, string? filterData);
 
         /// <summary>
@@ -106,6 +129,12 @@ namespace Orleans.Streams
         Task RegisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId, GrainId streamConsumer, string? filterData, CancellationToken cancellationToken)
             => RegisterConsumer(subscriptionId, streamId, streamConsumer, filterData);
 
+        /// <summary>
+        /// Unregisters a consumer subscription from a stream.
+        /// </summary>
+        /// <param name="subscriptionId">The subscription identifier.</param>
+        /// <param name="streamId">The qualified stream identifier.</param>
+        /// <returns>A task which represents the operation.</returns>
         Task UnregisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId);
 
         /// <summary>
@@ -118,6 +147,11 @@ namespace Orleans.Streams
         Task UnregisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId, CancellationToken cancellationToken)
             => UnregisterConsumer(subscriptionId, streamId);
 
+        /// <summary>
+        /// Gets the number of registered producers for a stream.
+        /// </summary>
+        /// <param name="streamId">The qualified stream identifier.</param>
+        /// <returns>The number of registered producers.</returns>
         Task<int> ProducerCount(QualifiedStreamId streamId);
 
         /// <summary>
@@ -129,6 +163,11 @@ namespace Orleans.Streams
         Task<int> ProducerCount(QualifiedStreamId streamId, CancellationToken cancellationToken)
             => ProducerCount(streamId);
 
+        /// <summary>
+        /// Gets the number of registered consumers for a stream.
+        /// </summary>
+        /// <param name="streamId">The qualified stream identifier.</param>
+        /// <returns>The number of registered consumers.</returns>
         Task<int> ConsumerCount(QualifiedStreamId streamId);
 
         /// <summary>
@@ -140,6 +179,14 @@ namespace Orleans.Streams
         Task<int> ConsumerCount(QualifiedStreamId streamId, CancellationToken cancellationToken)
             => ConsumerCount(streamId);
 
+        /// <summary>
+        /// Gets active subscriptions for a stream, optionally restricted to a specific consumer.
+        /// </summary>
+        /// <param name="streamId">The qualified stream identifier.</param>
+        /// <param name="streamConsumer">
+        /// The identifier of the consumer whose subscriptions are returned, or the default value to return all subscriptions.
+        /// </param>
+        /// <returns>The matching active subscriptions.</returns>
         Task<List<StreamSubscription>> GetAllSubscriptions(QualifiedStreamId streamId, GrainId streamConsumer = default);
 
         /// <summary>
@@ -152,8 +199,20 @@ namespace Orleans.Streams
         Task<List<StreamSubscription>> GetAllSubscriptions(QualifiedStreamId streamId, GrainId streamConsumer, CancellationToken cancellationToken)
             => GetAllSubscriptions(streamId, streamConsumer);
 
+        /// <summary>
+        /// Creates a subscription identifier for a stream consumer.
+        /// </summary>
+        /// <param name="streamId">The qualified stream identifier.</param>
+        /// <param name="streamConsumer">The identifier of the consumer.</param>
+        /// <returns>The subscription identifier.</returns>
         GuidId CreateSubscriptionId(QualifiedStreamId streamId, GrainId streamConsumer);
 
+        /// <summary>
+        /// Marks a subscription as faulted.
+        /// </summary>
+        /// <param name="streamId">The qualified stream identifier.</param>
+        /// <param name="subscriptionId">The subscription identifier.</param>
+        /// <returns><see langword="true"/> when the subscription is handled by this pub/sub implementation; otherwise, <see langword="false"/>.</returns>
         Task<bool> FaultSubscription(QualifiedStreamId streamId, GuidId subscriptionId);
 
         /// <summary>

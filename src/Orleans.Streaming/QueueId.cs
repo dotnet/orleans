@@ -81,8 +81,20 @@ namespace Orleans.Streams
         /// <inheritdoc/>
         public override int GetHashCode() => HashCode.Combine(queueId, uniformHashCache, queueNamePrefix);
 
+        /// <summary>
+        /// Compares two queue identifiers for equality.
+        /// </summary>
+        /// <param name="left">The first queue identifier.</param>
+        /// <param name="right">The second queue identifier.</param>
+        /// <returns><see langword="true"/> if both identifiers are equal; otherwise, <see langword="false"/>.</returns>
         public static bool operator ==(QueueId left, QueueId right) => left.Equals(right);
 
+        /// <summary>
+        /// Compares two queue identifiers for inequality.
+        /// </summary>
+        /// <param name="left">The first queue identifier.</param>
+        /// <param name="right">The second queue identifier.</param>
+        /// <returns><see langword="true"/> if the identifiers differ; otherwise, <see langword="false"/>.</returns>
         public static bool operator !=(QueueId left, QueueId right) => !(left == right);
 
         /// <inheritdoc/>
