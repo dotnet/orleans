@@ -22,9 +22,14 @@ internal sealed class GrainDirectoryObserver : IObserver<GrainDirectoryEvents.Gr
     private TaskCompletionSource _changed = CreateCompletion();
     private Exception? _error;
 
-    public GrainDirectoryObserver()
+    public GrainDirectoryObserver() : this(GrainDirectoryEvents.AllEvents)
     {
-        _subscription = GrainDirectoryEvents.AllEvents.Subscribe(this);
+    }
+
+    internal GrainDirectoryObserver(IObservable<GrainDirectoryEvents.GrainDirectoryEvent> events)
+    {
+        ArgumentNullException.ThrowIfNull(events);
+        _subscription = events.Subscribe(this);
     }
 
     public static bool CanObserve(IReadOnlyCollection<InProcessSiloHandle> activeSilos) =>
