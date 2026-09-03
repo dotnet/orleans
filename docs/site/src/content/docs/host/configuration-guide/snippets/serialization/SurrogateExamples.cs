@@ -53,7 +53,6 @@ public sealed class MyForeignLibraryValueTypeSurrogateConverter :
 }
 // </surrogate_value_type>
 
-#pragma warning disable CS8618 // The converter populates serialized members after construction.
 // <surrogate_class_with_populator>
 // The foreign type is not sealed, allowing other types to inherit from it.
 public class MyForeignLibraryType
@@ -68,10 +67,9 @@ public class MyForeignLibraryType
     }
 
     public int Num { get; set; }
-    public string String { get; set; }
+    public string String { get; set; } = string.Empty;
     public DateTimeOffset DateTimeOffset { get; set; }
 }
-#pragma warning restore CS8618
 
 // The surrogate is defined as it was in the previous example.
 [GenerateSerializer]

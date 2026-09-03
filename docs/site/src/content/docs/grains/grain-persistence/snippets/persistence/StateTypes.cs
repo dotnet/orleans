@@ -3,19 +3,16 @@ using Orleans.Runtime;
 
 namespace Orleans.Docs.Snippets.Persistence;
 
-#pragma warning disable CS8618 // Grain storage populates persisted members during deserialization.
 // <profile_state>
 [Serializable]
 public class ProfileState
 {
-    public string Name { get; set; }
+    public string Name { get; set; } = string.Empty;
 
     public Date DateOfBirth { get; set; }
 }
 // </profile_state>
-#pragma warning restore CS8618
 
-#pragma warning disable CS8618 // Grain storage populates persisted members during deserialization.
 // <cart_state>
 [Serializable]
 public class CartState
@@ -25,11 +22,10 @@ public class CartState
 
 public class CartItem
 {
-    public string ProductId { get; set; }
+    public string ProductId { get; set; } = string.Empty;
     public int Quantity { get; set; }
 }
 // </cart_state>
-#pragma warning restore CS8618
 
 // Placeholder for Date type used in docs
 public struct Date

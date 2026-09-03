@@ -7,13 +7,12 @@ using System.Reflection;
 
 namespace Orleans.Docs.Snippets.Serialization;
 
-#pragma warning disable CS8618 // MessagePack populates serialized members during deserialization.
 // <messagepack_type_definition>
 [MessagePackObject]
 public class OrderMessage
 {
     [Key(0)]
-    public string OrderId { get; set; }
+    public string OrderId { get; set; } = string.Empty;
 
     [Key(1)]
     public decimal Amount { get; set; }
@@ -22,10 +21,9 @@ public class OrderMessage
     public DateTime CreatedAt { get; set; }
 
     [Key(3)]
-    public List<string> Items { get; set; }
+    public List<string> Items { get; set; } = [];
 }
 // </messagepack_type_definition>
-#pragma warning restore CS8618
 
 // <messagepack_grain_interface>
 public interface IOrderGrain : IGrainWithStringKey
