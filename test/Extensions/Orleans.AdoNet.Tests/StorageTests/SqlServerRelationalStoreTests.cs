@@ -21,26 +21,42 @@ namespace UnitTests.StorageTests.AdoNet
 
         public class Fixture : IAsyncLifetime
         {
+            private readonly Func<bool> _isConnectionStringConfigured;
             private readonly Func<Task<RelationalStorageForTesting>> _storageFactory;
 
             public Fixture() : this(
                 () => RelationalStorageForTesting.SetupInstance(
                     AdoNetInvariantName,
                     TestDatabaseName,
-                    cancellationToken: TestContext.Current.CancellationToken))
+                    cancellationToken: TestContext.Current.CancellationToken),
+                () => RelationalStorageForTesting.IsConnectionStringConfigured(AdoNetInvariantName))
             {
             }
 
             internal Fixture(Func<Task<RelationalStorageForTesting>> storageFactory)
+                : this(storageFactory, static () => true)
+            {
+            }
+
+            internal Fixture(
+                Func<Task<RelationalStorageForTesting>> storageFactory,
+                Func<bool> isConnectionStringConfigured)
             {
                 ArgumentNullException.ThrowIfNull(storageFactory);
+                ArgumentNullException.ThrowIfNull(isConnectionStringConfigured);
                 _storageFactory = storageFactory;
+                _isConnectionStringConfigured = isConnectionStringConfigured;
             }
 
             public RelationalStorageForTesting Storage { get; private set; } = null!;
 
             public async ValueTask InitializeAsync()
             {
+                if (!_isConnectionStringConfigured())
+                {
+                    return;
+                }
+
                 Storage = await _storageFactory();
             }
 
@@ -99,6 +115,23 @@ namespace UnitTests.StorageTests.AdoNet
             var exception = await Assert.ThrowsAsync<InvalidOperationException>(async () => await fixture.InitializeAsync());
 
             Assert.Same(expectedException, exception);
+        }
+
+        [Fact]
+        public async Task ProviderConfigurationIsRequiredForInitialization()
+        {
+            var storageFactoryInvoked = false;
+            var fixture = new SqlServerRelationalStoreTests.Fixture(
+                () =>
+                {
+                    storageFactoryInvoked = true;
+                    throw new InvalidOperationException("Storage initialization should not run.");
+                },
+                static () => false);
+
+            await fixture.InitializeAsync();
+
+            Assert.False(storageFactoryInvoked);
         }
 
         [Fact]

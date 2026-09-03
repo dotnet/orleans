@@ -101,6 +101,10 @@ namespace UnitTests.General
             Assert.SkipWhen(string.IsNullOrEmpty(connectionString), "Connection string not provided.");
         }
 
+        internal static bool IsConnectionStringConfigured(string invariantName)
+            => ConnectionStringsByInvariant.TryGetValue(invariantName, out var connectionString)
+                && !string.IsNullOrEmpty(connectionString);
+
         public static async Task<RelationalStorageForTesting> SetupInstance(
             string invariantName,
             string testDatabaseName,
