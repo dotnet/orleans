@@ -1,4 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
@@ -339,11 +338,12 @@ public static class HostingExamples
     }
     // </silo_metadata_from_configuration>
 
-    [Experimental("ORLEANSEXP003")]
     // <distributed_grain_directory>
     public static void ConfigureDistributedDirectory(ISiloBuilder siloBuilder)
     {
+#pragma warning disable ORLEANSEXP003
         siloBuilder.AddDistributedGrainDirectory();
+#pragma warning restore ORLEANSEXP003
     }
     // </distributed_grain_directory>
 
