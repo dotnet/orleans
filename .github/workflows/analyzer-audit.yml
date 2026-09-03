@@ -12,6 +12,7 @@ on:
     - cron: "0 8 * * 2" # Run the preview audit weekly on Tuesday at 8:00 UTC.
 
 permissions:
+  actions: read
   contents: read
   security-events: write
 
