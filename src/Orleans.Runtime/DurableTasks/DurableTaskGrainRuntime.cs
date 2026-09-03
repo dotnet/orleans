@@ -415,16 +415,24 @@ internal sealed partial class DurableTaskGrainRuntime(
                 $"Task id '{taskId}' is already associated with a different durable task request.");
         }
 
+        if (_storage.TryGetTask(taskId, out var tombstoneState)
+            && tombstoneState.IsCancellationTombstone)
+        {
+            if (tombstoneState.Request is null)
+            {
+                _storage.SetRequest(taskId, tombstoneState, request);
+                _ = _storage.TryGetTask(taskId, out tombstoneState);
+            }
+
+            _storage.SetCancellationTombstone(taskId, tombstoneState!, value: false);
+            _ = _storage.TryGetTask(taskId, out tombstoneState);
+            _storage.SetTaskKind(taskId, tombstoneState!, DurableTaskKind.Local);
+        }
+
         if (_storage.TryGetTask(taskId, out var existingState)
             && existingState.CancellationRequestedAt.HasValue
             && existingState.Result is not { IsCompleted: true })
         {
-            if (existingState.Request is null)
-            {
-                _storage.SetRequest(taskId, existingState, request);
-            }
-            _storage.SetTaskKind(taskId, existingState, DurableTaskKind.Local);
-
             TryRegisterCompletionDestination(taskId, existingState, requestContext.CallerId);
             var canceled = DurableTaskResponse.FromException(new OperationCanceledException());
             await SetResponseAsync(taskId, canceled, cancellationToken);
@@ -992,6 +1000,13 @@ internal sealed partial class DurableTaskGrainRuntime(
         var now = _shared.TimeProvider.GetUtcNow();
         foreach (var (taskId, state) in allTasks)
         {
+            if (state.IsCancellationTombstone)
+            {
+                // An invocation can remain deliverable for the durable messaging lifetime.
+                // Retain cancellation-before-invocation state until that invocation is observed.
+                continue;
+            }
+
             if (state.Result is not { IsCompleted: true })
             {
                 // The task is incomplete.

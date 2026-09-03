@@ -55,7 +55,7 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
             .Where(static action => action is IConfigureGrainContextPerActivation)
             .ToArray();
 
-        foreach (var configure in configureActions)
+        foreach (var configure in configureActions.Where(static action => action is not IConfigureGrainContextPerActivation))
         {
             configure.Configure(this);
         }

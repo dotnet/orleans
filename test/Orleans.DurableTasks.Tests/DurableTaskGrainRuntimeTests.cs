@@ -501,6 +501,7 @@ public class DurableTaskGrainRuntimeTests
         Assert.True(fixture.Storage.TryGetTask(taskId, out var finalState));
         Assert.Same(request, finalState.Request);
         Assert.NotNull(finalState.CancellationRequestedAt);
+        Assert.False(finalState.IsCancellationTombstone);
         Assert.True(finalState.Result!.IsCompleted);
         Assert.IsType<OperationCanceledException>(finalState.Result.Exception);
         Assert.Empty(finalState.CompletionDestinations);
@@ -510,6 +511,35 @@ public class DurableTaskGrainRuntimeTests
         Assert.Equal(taskId, completion.TaskId);
         Assert.IsType<OperationCanceledException>(completion.Response.Exception);
         Assert.Equal(0, fixture.Transport.CommitCount);
+    }
+
+    [Fact]
+    public async Task PruneCompletedTasks_RetainsUnseenCancellationTombstone()
+    {
+        var fixture = CreateFixture();
+        var taskId = TaskId.Create("unseen-cancellation-tombstone");
+        var tombstone = fixture.Storage.GetOrCreateTask(taskId, request: null);
+        fixture.Storage.SetCancellationTombstone(taskId, tombstone, value: true);
+        Assert.True(fixture.Storage.TryGetTask(taskId, out tombstone));
+        fixture.Storage.SetResponse(
+            taskId,
+            tombstone,
+            DurableTaskResponse.FromException(new OperationCanceledException()));
+        fixture.TimeProvider.Advance(TimeSpan.FromDays(2));
+
+        var triggerTaskId = TaskId.Create("trigger-tombstone-prune");
+        var triggerRequest = new RuntimeTestDurableTaskRequest(() => DurableTask.FromResult(1))
+        {
+            Context = new DurableTaskRequestContext { TargetId = fixture.GrainId },
+        };
+        await ((IDurableTaskServer)fixture.Runtime).ScheduleAsync(
+            triggerTaskId,
+            triggerRequest,
+            CancellationToken.None);
+        await fixture.Runtime.GetScheduledTaskHandle(triggerTaskId).WaitAsync(BoundedWait());
+
+        Assert.True(fixture.Storage.TryGetTask(taskId, out var retained));
+        Assert.True(retained.IsCancellationTombstone);
     }
 
     [Fact]
