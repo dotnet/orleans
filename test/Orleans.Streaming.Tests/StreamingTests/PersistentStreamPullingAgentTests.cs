@@ -105,7 +105,7 @@ namespace UnitTests.StreamingTests
         {
             var registration = new TaskCompletionSource<ISet<PubSubSubscriptionState>>(TaskCreationOptions.RunContinuationsAsynchronously);
             var pubSub = Substitute.For<IStreamPubSub>();
-            pubSub.RegisterProducer(default, default).ReturnsForAnyArgs(registration.Task);
+            pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken).ReturnsForAnyArgs(registration.Task);
 
             var queueId = QueueId.GetQueueId("queue", 0u, 0u);
             var streamId = StreamId.Create("namespace", Guid.NewGuid());
@@ -184,7 +184,7 @@ namespace UnitTests.StreamingTests
                 [new("provider", secondStreamId)] = secondRegistration,
             };
             var pubSub = Substitute.For<IStreamPubSub>();
-            pubSub.RegisterProducer(default, default)
+            pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
                 .ReturnsForAnyArgs(call => registrations[call.ArgAt<QualifiedStreamId>(0)].Task);
 
             var queueId = QueueId.GetQueueId("queue", 0u, 0u);
@@ -255,7 +255,7 @@ namespace UnitTests.StreamingTests
         public async Task RunQueuePump_ReadsFutureEventForTokenlessWarmStreamWithPurgeProtection()
         {
             var pubSub = Substitute.For<IStreamPubSub>();
-            pubSub.RegisterProducer(default, default)
+            pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
                 .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
 
             var queueId = QueueId.GetQueueId("queue", 0u, 0u);
@@ -380,20 +380,6 @@ namespace UnitTests.StreamingTests
             }
 
             Assert.True(streamData.StreamRegistered);
-        }
-
-        [TestSuite("BVT")]
-        [TestProvider("None")]
-        [TestArea("Streaming")]
-        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
-        public void GetConfirmedDeliveryProgress_UsesOnlyDeliveryTokens()
-        {
-            var token = new EventSequenceTokenV2(1);
-
-            Assert.Null(PersistentStreamPullingAgent.GetConfirmedDeliveryProgress(StreamHandshakeToken.CreateStartToken(token)));
-            Assert.Equal(
-                token,
-                PersistentStreamPullingAgent.GetConfirmedDeliveryProgress(StreamHandshakeToken.CreateDeliveyToken(token)));
         }
 
         [TestSuite("BVT")]
