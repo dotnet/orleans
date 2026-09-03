@@ -101,13 +101,7 @@ namespace Orleans.Runtime
             LogDebugStartedDeploymentLoadPublisher(_logger);
         }
 
-<<<<<<< HEAD
-        private async Task PublishStatistics(CancellationToken cancellationToken)
-||||||| parent of f658f01d66 (feat(runtime): complete efficient broadcast behaviors)
-        private async Task PublishStatistics()
-=======
-        internal async Task PublishStatistics()
->>>>>>> f658f01d66 (feat(runtime): complete efficient broadcast behaviors)
+        internal async Task PublishStatistics(CancellationToken cancellationToken = default)
         {
             try
             {
@@ -133,11 +127,6 @@ namespace Orleans.Runtime
                 IReadOnlyCollection<SiloAddress> directRecipients = members;
                 if (await TryPublishStatisticsViaDissemination(myStats))
                 {
-<<<<<<< HEAD
-                    await PublishStatisticsDirectly(myStats, members, cancellationToken);
-||||||| parent of f658f01d66 (feat(runtime): complete efficient broadcast behaviors)
-                    await PublishStatisticsDirectly(myStats, members);
-=======
                     try
                     {
                         var dissemination = _serviceProvider.GetService<IDisseminationService>();
@@ -152,10 +141,9 @@ namespace Orleans.Runtime
                     {
                         LogWarningRuntimeStatisticsUpdateFailure1(_logger, exception);
                     }
->>>>>>> f658f01d66 (feat(runtime): complete efficient broadcast behaviors)
                 }
 
-                await PublishStatisticsDirectly(myStats, directRecipients);
+                await PublishStatisticsDirectly(myStats, directRecipients, cancellationToken);
                 DeploymentLoadPublisherEvents.EmitClusterRefreshed(_siloDetails.SiloAddress, _periodicStats);
             }
             catch (OperationCanceledException exception) when (exception.CancellationToken == cancellationToken)
