@@ -126,6 +126,11 @@ internal sealed class AdoNetQueueAdapterReceiver : IQueueAdapterReceiver, IQueue
     public IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken? token)
         => _inner.GetCacheCursor(streamId, token);
 
+    public IQueueCacheCursor GetCacheCursorAtPosition(
+        StreamId streamId,
+        StreamSubscriptionStartPosition startPosition)
+        => _inner.GetCacheCursorAtPosition(streamId, startPosition);
+
     public bool IsUnderPressure() => _inner.IsUnderPressure();
 
     public void UpdateDeliveryProgress(StreamSequenceToken? earliestSubscriptionToken, DateTime utcNow)

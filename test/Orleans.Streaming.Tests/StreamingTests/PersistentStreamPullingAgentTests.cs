@@ -395,6 +395,41 @@ namespace UnitTests.StreamingTests
             }
         }
 
+        private sealed class CacheMissRecoveryQueueCache(StreamSequenceToken purgedToken) : IQueueCache
+        {
+            private readonly List<IBatchContainer> messages = [];
+
+            public int GetMaxAddCount() => 1000;
+
+            public void AddToCache(IList<IBatchContainer> messages) => this.messages.AddRange(messages);
+
+            public bool TryPurgeFromCache(out IList<IBatchContainer> purgedItems)
+            {
+                purgedItems = null!;
+                return false;
+            }
+
+            public IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken? token)
+            {
+                if (Equals(token, purgedToken))
+                {
+                    throw new QueueCacheMissException("The safe restart token was purged.");
+                }
+
+                return new ScriptedQueueCursor(messages, streamId, token);
+            }
+
+            public IQueueCacheCursor GetCacheCursorAtPosition(
+                StreamId streamId,
+                StreamSubscriptionStartPosition startPosition)
+            {
+                Assert.Equal(StreamSubscriptionStartPosition.EarliestAvailable, startPosition);
+                return new ScriptedQueueCursor(messages, streamId, token: null);
+            }
+
+            public bool IsUnderPressure() => false;
+        }
+
         private static PersistentStreamPullingAgent CreateAgent(
             IStreamPubSub? pubSub,
             QueueId queueId,
@@ -1443,6 +1478,50 @@ namespace UnitTests.StreamingTests
             var cursor = Assert.IsAssignableFrom<IQueueCacheCursor>(consumerData.Cursor);
             Assert.True(cursor.MoveNext());
             Assert.Equal(nextToken, Assert.IsType<TestBatchContainer>(cursor.GetCurrent(out _)).SequenceToken);
+            await accessor.Shutdown();
+        }
+
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public async Task RecoveryCursorSeedsAcknowledgedProgressWithoutPendingDelivery()
+        {
+            var quietStreamId = StreamId.Create("namespace", Guid.NewGuid());
+            var busyStreamId = StreamId.Create("namespace", Guid.NewGuid());
+            var quietQualifiedId = new QualifiedStreamId("provider", quietStreamId);
+            var safeToken = new EventSequenceTokenV2(1);
+            var processedToken = new EventSequenceTokenV2(2);
+            var scannedToken = new EventSequenceTokenV2(3);
+            var nextQuietToken = new EventSequenceTokenV2(4);
+            var queueCache = new CacheMissRecoveryQueueCache(safeToken);
+            queueCache.AddToCache(
+            [
+                new TestBatchContainer(quietStreamId, processedToken),
+                new TestBatchContainer(busyStreamId, scannedToken),
+                new TestBatchContainer(quietStreamId, nextQuietToken),
+            ]);
+            var (accessor, _, streamData) = await CreateInitializedAgentWithStream(
+                quietQualifiedId,
+                processedToken,
+                queueCache,
+                new StreamPullingAgentOptions());
+            var consumerData = streamData.AddConsumer(
+                GuidId.GetGuidId(Guid.NewGuid()),
+                quietQualifiedId,
+                new ImmediateConsumer(),
+                filterData: null,
+                now: DateTime.UtcNow);
+            consumerData.LastProcessedToken = processedToken;
+            consumerData.LastSafePartitionToken = safeToken;
+
+            using var cursor = accessor.GetRecoveryCursor(consumerData);
+
+            Assert.True(cursor.MoveNext());
+            var current = cursor.GetCurrent(out _);
+            Assert.NotNull(current);
+            Assert.Equal(nextQuietToken, current.SequenceToken);
+            Assert.Equal(scannedToken, Assert.IsAssignableFrom<IQueueCacheCursorProgress>(cursor).SafeSequenceToken);
             await accessor.Shutdown();
         }
 
@@ -3261,7 +3340,7 @@ namespace UnitTests.StreamingTests
 
             var exception = Assert.Throws<ArgumentOutOfRangeException>(() => CreateAgent(pubSub: null, queueId, options: options));
 
-            Assert.Equal(nameof(options.DeliveryProgressUpdateInterval), exception.ParamName);
+            Assert.Equal(nameof(options), exception.ParamName);
         }
 
         public enum SubscriptionStartTokenSource
