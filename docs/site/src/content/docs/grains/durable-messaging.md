@@ -148,11 +148,14 @@ provisional application state or compete with another activation for the same ow
 The Journaling implementation must provide
 <xref:Orleans.Journaling.IJournaledStateManager.RevertPendingChangesAsync*> and accept
 <xref:Orleans.Journaling.IJournaledStateManager.RegisterObserver*> so Durable Messaging
-receives commit and recovery notifications. It also provides the built-in request-time
-mutation guard used to reject handler commits and deletes before enqueue. Activation
-rejects custom state managers which lack either capability. Use shared,
-production-grade storage for multi-silo deployments. In-memory Durable Jobs and journal
-storage are suitable only for development and tests.
+receives commit and recovery notifications. It must also provide the built-in
+request-time mutation guard used to reject handler commits and deletes before enqueue.
+Durable Messaging validates observer registration and the mutation guard when the
+activation is constructed. Retry and failure paths rely on
+<xref:Orleans.Journaling.IJournaledStateManager.RevertPendingChangesAsync*> and surface
+its failure if rollback is unavailable. Use shared, production-grade storage for
+multi-silo deployments. In-memory Durable Jobs and journal storage are suitable only for
+development and tests.
 
 Durable Messaging uses the `orleans-binary` journal format. Inbox, outbox, ownership,
 and durable RPC state contain Orleans-polymorphic values whose recovery contract is

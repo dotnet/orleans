@@ -279,7 +279,7 @@ namespace Orleans.DurableTasks.Runtime
 {
     [GenerateSerializer]
     [SuppressReferenceTracking]
-    [Alias("DurableTaskState")]
+    [Alias("Orleans.DurableTasks.Runtime.DurableTaskState")]
     public partial class DurableTaskState : Protocol.IDurableTaskState
     {
         [Id(13)]

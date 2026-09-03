@@ -7,7 +7,7 @@ using Orleans.Runtime;
 namespace Orleans.DurableTasks.Runtime;
 
 [GenerateSerializer, SuppressReferenceTracking]
-[Alias("DurableTaskState")]
+[Alias("Orleans.DurableTasks.Runtime.DurableTaskState")]
 public class DurableTaskState : IDurableTaskState
 {
     /// <inheritdoc cref="IDurableTaskState.Result"/>
