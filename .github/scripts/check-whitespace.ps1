@@ -20,8 +20,7 @@ $diffArguments = @(
     'diff'
     '--name-only'
     '--diff-filter=ACMR'
-    $BaseCommit
-    $HeadCommit
+    "$BaseCommit...$HeadCommit"
     '--'
     '*.cs'
     '*.vb'
