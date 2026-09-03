@@ -28,11 +28,19 @@ namespace Orleans.Serialization.TestKit
         /// <inheritdoc/>
         public void Advance(int bytes) => _written += bytes;
 
-        /// <inheritdoc/>
+        /// <summary>
+        /// Gets the unwritten portion of the fixed output buffer.
+        /// </summary>
+        /// <param name="sizeHint">The requested minimum size. This fixed-buffer implementation does not allocate additional capacity.</param>
+        /// <returns>The memory available for writing.</returns>
         [Pure]
         public readonly Memory<byte> GetMemory(int sizeHint = 0) => _buffer.AsMemory()[_written..];
 
-        /// <inheritdoc/>
+        /// <summary>
+        /// Gets the unwritten portion of the fixed output buffer.
+        /// </summary>
+        /// <param name="sizeHint">The requested minimum size. This fixed-buffer implementation does not allocate additional capacity.</param>
+        /// <returns>The span available for writing.</returns>
         [Pure]
         public readonly Span<byte> GetSpan(int sizeHint) => _buffer.AsSpan()[_written..];
 

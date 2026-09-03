@@ -41,6 +41,7 @@ public static class SiloRuntimeMetricsListener
         // orleans
         InstrumentNames.GATEWAY_CONNECTED_CLIENTS,
         InstrumentNames.MESSAGING_RECEIVED_MESSAGES_SIZE,
+        InstrumentNames.MESSAGING_SENT_MESSAGES_SIZE,
     };
 
     static SiloRuntimeMetricsListener()

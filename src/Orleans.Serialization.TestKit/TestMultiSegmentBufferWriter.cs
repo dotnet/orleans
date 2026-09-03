@@ -38,7 +38,11 @@ namespace Orleans.Serialization.TestKit
             _current = Array.Empty<byte>();
         }
 
-        /// <inheritdoc/>
+        /// <summary>
+        /// Gets writable memory, capped by the configured maximum allocation size.
+        /// </summary>
+        /// <param name="sizeHint">The requested minimum size before applying the allocation cap.</param>
+        /// <returns>The memory available for writing.</returns>
         public Memory<byte> GetMemory(int sizeHint = 0)
         {
             if (sizeHint == 0)
@@ -57,7 +61,11 @@ namespace Orleans.Serialization.TestKit
             return _current;
         }
 
-        /// <inheritdoc/>
+        /// <summary>
+        /// Gets a writable span, capped by the configured maximum allocation size.
+        /// </summary>
+        /// <param name="sizeHint">The requested minimum size before applying the allocation cap.</param>
+        /// <returns>The span available for writing.</returns>
         public Span<byte> GetSpan(int sizeHint)
         {
             if (sizeHint == 0)

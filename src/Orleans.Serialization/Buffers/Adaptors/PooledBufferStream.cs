@@ -185,7 +185,7 @@ namespace Orleans.Serialization.Buffers.Adaptors
             {
                 SeekOrigin.Begin => offset,
                 SeekOrigin.Current => Position + offset,
-                SeekOrigin.End => Length - offset,
+                SeekOrigin.End => Length + offset,
                 _ => throw new ArgumentOutOfRangeException(nameof(origin))
             };
 

@@ -164,7 +164,12 @@ namespace Orleans.Serialization.Invocation
         /// </summary>
         public TResult? TypedResult { get => _result; set => _result = value; }
 
-        /// <inheritdoc/>
+        /// <summary>
+        /// Gets the exception associated with the response.
+        /// </summary>
+        /// <remarks>
+        /// Typed responses do not contain exceptions. Setting this property throws <see cref="InvalidOperationException"/>.
+        /// </remarks>
         public override Exception? Exception
         {
             get => null;
