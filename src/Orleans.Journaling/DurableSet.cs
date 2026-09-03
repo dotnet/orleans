@@ -105,9 +105,9 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IJournaledState, IDurableS
 
     IEnumerator IEnumerable.GetEnumerator() => _items.GetEnumerator();
 
-    protected bool ApplyAdd(T item) => _items.Add(item);
-    protected bool ApplyRemove(T item) => _items.Remove(item);
-    protected void ApplyClear() => _items.Clear();
+    private bool ApplyAdd(T item) => _items.Add(item);
+    private bool ApplyRemove(T item) => _items.Remove(item);
+    private void ApplyClear() => _items.Clear();
     void IDurableSetCommandHandler<T>.ApplyAdd(T item) => ApplyAdd(item);
     void IDurableSetCommandHandler<T>.ApplyRemove(T item) => ApplyRemove(item);
     void IDurableSetCommandHandler<T>.ApplyClear() => ApplyClear();

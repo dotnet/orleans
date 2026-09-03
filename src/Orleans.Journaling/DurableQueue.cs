@@ -103,10 +103,10 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IJournaledState, IDura
 
     IEnumerator IEnumerable.GetEnumerator() => _items.GetEnumerator();
 
-    protected void ApplyEnqueue(T item) => _items.Enqueue(item);
-    protected T ApplyDequeue() => _items.Dequeue();
-    protected bool ApplyTryDequeue([MaybeNullWhen(false)] out T value) => _items.TryDequeue(out value);
-    protected void ApplyClear() => _items.Clear();
+    private void ApplyEnqueue(T item) => _items.Enqueue(item);
+    private T ApplyDequeue() => _items.Dequeue();
+    private bool ApplyTryDequeue([MaybeNullWhen(false)] out T value) => _items.TryDequeue(out value);
+    private void ApplyClear() => _items.Clear();
     void IDurableQueueCommandHandler<T>.ApplyEnqueue(T item) => ApplyEnqueue(item);
     void IDurableQueueCommandHandler<T>.ApplyDequeue() => _ = ApplyDequeue();
     void IDurableQueueCommandHandler<T>.ApplyClear() => ApplyClear();

@@ -129,11 +129,11 @@ internal sealed class DurableList<T> : IDurableList<T>, IJournaledState, IDurabl
 
     IEnumerator IEnumerable.GetEnumerator() => _items.GetEnumerator();
 
-    protected void ApplyAdd(T item) => _items.Add(item);
-    protected void ApplySet(int index, T item) => _items[index] = item;
-    protected void ApplyInsert(int index, T item) => _items.Insert(index, item);
-    protected void ApplyRemoveAt(int index) => _items.RemoveAt(index);
-    protected void ApplyClear() => _items.Clear();
+    private void ApplyAdd(T item) => _items.Add(item);
+    private void ApplySet(int index, T item) => _items[index] = item;
+    private void ApplyInsert(int index, T item) => _items.Insert(index, item);
+    private void ApplyRemoveAt(int index) => _items.RemoveAt(index);
+    private void ApplyClear() => _items.Clear();
     void IDurableListCommandHandler<T>.ApplyAdd(T item) => ApplyAdd(item);
     void IDurableListCommandHandler<T>.ApplySet(int index, T item) => ApplySet(index, item);
     void IDurableListCommandHandler<T>.ApplyInsert(int index, T item) => ApplyInsert(index, item);
