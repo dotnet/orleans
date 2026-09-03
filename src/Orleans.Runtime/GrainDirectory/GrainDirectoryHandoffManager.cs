@@ -21,6 +21,7 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly IClusterMembershipService clusterMembershipService;
         private readonly IInternalGrainFactory grainFactory;
         private readonly ILogger logger;
+        private readonly object _lock = new();
         private readonly Queue<(string name, object state, Func<GrainDirectoryHandoffManager, object, Task> action)> pendingOperations = new();
         private readonly AsyncLock executorLock = new AsyncLock();
 
@@ -40,7 +41,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         internal void ProcessSiloAddEvent(SiloAddress addedSilo)
         {
-            lock (this)
+            lock (_lock)
             {
                 LogDebugProcessingSiloAddEvent(logger, addedSilo);
 
@@ -218,7 +219,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         private void EnqueueOperation(string name, object state, Func<GrainDirectoryHandoffManager, object, Task> action)
         {
-            lock (this)
+            lock (_lock)
             {
                 this.pendingOperations.Enqueue((name, state, action));
                 if (this.pendingOperations.Count <= 2)
@@ -236,7 +237,7 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     // Get the next operation, or exit if there are none.
                     (string Name, object State, Func<GrainDirectoryHandoffManager, object, Task> Action) op;
-                    lock (this)
+                    lock (_lock)
                     {
                         if (this.pendingOperations.Count == 0) break;
 
@@ -246,7 +247,7 @@ namespace Orleans.Runtime.GrainDirectory
                     try
                     {
                         await op.Action(this, op.State);
-                        lock (this)
+                        lock (_lock)
                         {
                             this.pendingOperations.Dequeue();
                         }
@@ -266,7 +267,7 @@ namespace Orleans.Runtime.GrainDirectory
                         }
 
                         // Keep retrying failed handoff work, but let later queued operations make progress.
-                        lock (this)
+                        lock (_lock)
                         {
                             this.pendingOperations.Dequeue();
                             this.pendingOperations.Enqueue(op);

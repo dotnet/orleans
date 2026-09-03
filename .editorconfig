@@ -674,6 +674,12 @@ dotnet_diagnostic.CA1873.severity = warning
 dotnet_diagnostic.CA2000.severity = warning
 dotnet_diagnostic.CA2002.severity = warning
 
+[src/Orleans.Runtime/Catalog/GrainLifecycle.cs]
+dotnet_diagnostic.CA2002.severity = warning
+
+[src/Orleans.Runtime/GrainDirectory/GrainDirectoryHandoffManager.cs]
+dotnet_diagnostic.CA2002.severity = warning
+
 [src/Orleans.Serialization.SystemTextJson/**.cs]
 dotnet_diagnostic.CA2000.severity = warning
 
