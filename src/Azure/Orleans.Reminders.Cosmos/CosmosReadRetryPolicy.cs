@@ -1,4 +1,5 @@
 using System.Net;
+using Microsoft.Azure.Cosmos;
 
 namespace Orleans.Reminders.Cosmos;
 
