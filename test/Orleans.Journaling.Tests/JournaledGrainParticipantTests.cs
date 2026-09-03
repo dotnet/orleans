@@ -24,7 +24,7 @@ public sealed class JournaledGrainParticipantTests(JournaledGrainParticipantFixt
         await grain.SetValues("one", "two");
         Assert.Equal(new[] { "one", "two" }, await grain.GetValues());
 
-        await grain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
+        await grain.Cast<IGrainManagementExtension>().DeactivateOnIdle(TestContext.Current.CancellationToken);
 
         Assert.NotEqual(activationId, await grain.GetActivationId());
         Assert.Equal(new[] { "one", "two" }, await grain.GetValues());

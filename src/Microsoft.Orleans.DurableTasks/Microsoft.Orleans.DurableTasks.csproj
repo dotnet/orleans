@@ -11,7 +11,7 @@
     <AnalysisLevel>preview</AnalysisLevel>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
-    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
+    <NoWarn>$(NoWarn);IDE0028;IDE0130;IDE0240;IDE0305;IDE0330;ORLEANSEXP005</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

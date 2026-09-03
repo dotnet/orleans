@@ -223,6 +223,10 @@ internal sealed class CompletedScheduledTask<TResult>(TaskId id, DurableTaskResp
 public readonly struct ScheduledTaskAwaiter : ICriticalNotifyCompletion
 {
     private readonly ValueTaskAwaiter _awaiter;
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Reliability",
+        "CA2012:Use ValueTasks correctly",
+        Justification = "The wrapper stores the ValueTask awaiter and consumes it exactly once through the awaiter contract.")]
     internal ScheduledTaskAwaiter(ScheduledTask task, CancellationToken cancellationToken)
         => _awaiter = task.WaitAsync(cancellationToken).GetAwaiter();
     /// <inheritdoc />
@@ -239,6 +243,10 @@ public readonly struct ScheduledTaskAwaiter : ICriticalNotifyCompletion
 public readonly struct ScheduledTaskAwaiter<TResult> : ICriticalNotifyCompletion
 {
     private readonly ValueTaskAwaiter<DurableTaskResponse> _awaiter;
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Reliability",
+        "CA2012:Use ValueTasks correctly",
+        Justification = "The wrapper stores the ValueTask awaiter and consumes it exactly once through the awaiter contract.")]
     internal ScheduledTaskAwaiter(ScheduledTask<TResult> task, CancellationToken cancellationToken)
         => _awaiter = task.WaitAsyncCore(cancellationToken).GetAwaiter();
     /// <inheritdoc />
