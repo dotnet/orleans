@@ -318,6 +318,18 @@ public sealed class SQSStreamProviderBuilderTests
             "ServiceEndpoint values must be absolute HTTP or HTTPS URIs"
         },
         {
+            "ServiceNotAbsoluteHttp",
+            ["Service", "localhost:9324"],
+            [],
+            "service endpoint values must be absolute HTTP or HTTPS URIs"
+        },
+        {
+            "ConnectionStringServiceNotAbsoluteHttp",
+            ["ConnectionString", "Service=localhost:9324"],
+            [],
+            "service endpoint values must be absolute HTTP or HTTPS URIs"
+        },
+        {
             "ConnectionStringDuplicateService",
             ["ConnectionString", "Service=us-east-1;Service=us-west-2"],
             [],
