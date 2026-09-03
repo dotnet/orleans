@@ -186,6 +186,7 @@ internal sealed partial class ActivationWorkingSet : IActivationWorkingSet, ILif
                     {
                         if (status is not null)
                         {
+                            status.WasRemovedByCollection = true;
                             status.IsInWorkingSet = false;
                             status.IsIdle = false;
                         }
@@ -336,6 +337,8 @@ internal interface IActivationWorkingSetMemberStatus : IActivationWorkingSetMemb
     bool IsInWorkingSet { get; set; }
 
     bool IsIdle { get; set; }
+
+    bool WasRemovedByCollection { get; set; }
 }
 
 /// <summary>

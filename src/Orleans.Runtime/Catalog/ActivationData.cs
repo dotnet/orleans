@@ -1129,7 +1129,6 @@ internal sealed partial class ActivationData :
         {
             var inactive = IsInactive && _idleDuration.ElapsedMilliseconds > IdlenessLowerBound;
 
-            WasRemovedByCollection = wouldRemove && inactive;
             return inactive;
         }
     }
@@ -1151,6 +1150,12 @@ internal sealed partial class ActivationData :
     {
         get => IsIdleInWorkingSet;
         set => IsIdleInWorkingSet = value;
+    }
+
+    bool IActivationWorkingSetMemberStatus.WasRemovedByCollection
+    {
+        get => WasRemovedByCollection;
+        set => WasRemovedByCollection = value;
     }
 
     private async Task RunMessageLoop()
