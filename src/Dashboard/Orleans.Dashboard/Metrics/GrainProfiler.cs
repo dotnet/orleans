@@ -22,7 +22,7 @@ internal sealed partial class GrainProfiler(
     IOptions<GrainProfilerOptions> options) : IGrainProfiler, ILifecycleParticipant<ISiloLifecycle>
 {
     private ConcurrentDictionary<string, SiloGrainTraceEntry> _grainTrace = new();
-    private Timer _timer = null!;
+    private Timer? _timer;
     private string? _siloAddress;
     private bool _isEnabled;
     private IDashboardGrain? _dashboardGrain;
@@ -37,15 +37,17 @@ internal sealed partial class GrainProfiler(
 
     private Task OnStart(CancellationToken cancellationToken)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        _timer = new Timer(ProcessStats, null, 1 * 1000, 1 * 1000);
+        if (!cancellationToken.IsCancellationRequested)
+        {
+            _timer = new Timer(ProcessStats, null, 1 * 1000, 1 * 1000);
+        }
+
         return Task.CompletedTask;
     }
 
-    private Task OnStop(CancellationToken cancellationToken)
+    private Task OnStop(CancellationToken _)
     {
-        _timer.Dispose();
-        cancellationToken.ThrowIfCancellationRequested();
+        _timer?.Dispose();
         return Task.CompletedTask;
     }
 

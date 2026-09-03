@@ -666,7 +666,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
             try
             {
                 var siloControl = cluster.InternalClient!.GetSystemTarget<ISiloControl>(Constants.SiloControlType, silo.SiloAddress);
-                var report = await siloControl.GetDetailedGrainReport(grainId, cancellationToken).WaitAsync(cancellationToken);
+                var report = await siloControl.GetDetailedGrainReport(grainId, cancellationToken);
                 output.WriteLine(report.ToString());
             }
             catch (Exception exception) when (!cancellationToken.IsCancellationRequested)

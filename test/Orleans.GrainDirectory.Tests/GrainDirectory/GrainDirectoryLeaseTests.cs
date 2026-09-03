@@ -491,7 +491,7 @@ public class GrainDirectoryLeaseTests
             timeout.Token);
         Assert.Equal(SiloStatus.Active, initialView.ClusterMembershipSnapshot.GetSiloStatus(victim.SiloAddress));
 
-        await cluster.KillSiloAsync(victim, cancellationToken).WaitAsync(cancellationToken);
+        await cluster.KillSiloAsync(victim, cancellationToken);
         await cluster.WaitForLivenessToStabilizeAsync(didKill: true).WaitAsync(cancellationToken);
         var deadMembership = membership.CurrentSnapshot;
         Assert.Equal(SiloStatus.Dead, deadMembership.GetSiloStatus(victim.SiloAddress));
