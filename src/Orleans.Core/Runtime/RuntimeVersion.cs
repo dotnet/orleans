@@ -6,7 +6,8 @@ namespace Orleans.Runtime
     internal static class RuntimeVersion
     {
         /// <summary>
-        /// The full version string of the Orleans runtime, eg: '2012.5.9.51607 Build:12345 Timestamp: 20120509-185359'
+        /// The informational version of the Orleans runtime and its build configuration,
+        /// or the assembly version when informational version metadata is unavailable.
         /// </summary>
         public static string Current => GetVersion(typeof(RuntimeVersion).Assembly);
 
