@@ -6046,7 +6046,7 @@ public class DisseminationProtocolTests
     }
 
     [Fact]
-    public async Task AuthoritativeAntiEntropyResponseReplacesPeerNamespaceConfirmations()
+    public async Task AntiEntropyResponseRetainsUnrelatedPeerNamespaceConfirmations()
     {
         var local = CreateSilo(31009);
         var peer = CreateSilo(31010);
@@ -6083,12 +6083,12 @@ public class DisseminationProtocolTests
         await protocol.RunAntiEntropyRound(TestContext.Current.CancellationToken);
 
         Assert.Empty(protocol.GetUnconfirmedPeers(first));
-        Assert.Equal([peer], protocol.GetUnconfirmedPeers(second));
+        Assert.Empty(protocol.GetUnconfirmedPeers(second));
         Assert.Equal(2, first.GetVersion(FakeNamespace.DefaultKey));
     }
 
     [Fact]
-    public async Task PeerNamespaceConfirmationExpiresAfterTwiceMaximumCadence()
+    public async Task PeerNamespaceConfirmationPersistsUntilExplicitRevocationOrRemoval()
     {
         var local = CreateSilo(31011);
         var peer = CreateSilo(31012);
@@ -6109,11 +6109,8 @@ public class DisseminationProtocolTests
             },
             TestContext.Current.CancellationToken);
 
-        timeProvider.Advance(TimeSpan.FromSeconds(14) - TimeSpan.FromTicks(1));
+        timeProvider.Advance(TimeSpan.FromDays(1));
         Assert.Empty(protocol.GetUnconfirmedPeers(ns));
-
-        timeProvider.Advance(TimeSpan.FromTicks(1));
-        Assert.Equal([peer], protocol.GetUnconfirmedPeers(ns));
     }
 
     [Fact]
@@ -6829,6 +6826,101 @@ public class DisseminationProtocolTests
     }
 
     [Fact]
+    public void LoadNotificationAllowsNewerIncarnationAndReleasesTerminalGeneration()
+    {
+        var harness = CreatePhase5DeploymentLoadPublisherHarness();
+        var notifications = new List<Phase5Notification>();
+        harness.Publisher.SubscribeToStatisticsChangeEvents(new Phase5StatisticsListener(
+            onUpdate: (silo, statistics) => notifications.Add(Phase5Notification.Update(silo, statistics)),
+            onRemove: silo => notifications.Add(Phase5Notification.Removal(silo))));
+        var terminated = harness.ActiveOne;
+        var restarted = SiloAddress.New(terminated.Endpoint, terminated.Generation + 1);
+
+        Assert.Equal(
+            DisseminationApplyResult.Applied,
+            harness.Publisher.ApplyDisseminatedRuntimeStatistics(terminated, CreatePhase5Statistics(10)));
+        notifications.Clear();
+        harness.StatusOracle.SetStatus(terminated, SiloStatus.Dead);
+        harness.Publisher.OnSiloStatusChange(terminated, SiloStatus.Dead);
+        harness.StatusOracle.SetStatus(restarted, SiloStatus.Active);
+
+        var result = harness.Publisher.ApplyDisseminatedRuntimeStatistics(
+            restarted,
+            CreatePhase5Statistics(20));
+
+        Assert.Equal(DisseminationApplyResult.Applied, result);
+        Assert.Equal(20, harness.Publisher.PeriodicStatistics[restarted].ActivationCount);
+        Assert.Equal(
+            [
+                Phase5Notification.Removal(terminated),
+                Phase5Notification.Update(restarted, CreatePhase5Statistics(20)),
+            ],
+            notifications);
+    }
+
+    [Fact]
+    public void LoadNotificationCleansOlderGenerationAfterNewerTermination()
+    {
+        var harness = CreatePhase5DeploymentLoadPublisherHarness();
+        var notifications = new List<Phase5Notification>();
+        harness.Publisher.SubscribeToStatisticsChangeEvents(new Phase5StatisticsListener(
+            onUpdate: (silo, statistics) => notifications.Add(Phase5Notification.Update(silo, statistics)),
+            onRemove: silo => notifications.Add(Phase5Notification.Removal(silo))));
+        var older = harness.ActiveOne;
+        var newer = SiloAddress.New(older.Endpoint, older.Generation + 1);
+        harness.StatusOracle.SetStatus(older, SiloStatus.Active);
+        harness.StatusOracle.SetStatus(newer, SiloStatus.Active);
+        Assert.Equal(
+            DisseminationApplyResult.Applied,
+            harness.Publisher.ApplyDisseminatedRuntimeStatistics(older, CreatePhase5Statistics(10)));
+        Assert.Equal(
+            DisseminationApplyResult.Applied,
+            harness.Publisher.ApplyDisseminatedRuntimeStatistics(newer, CreatePhase5Statistics(20)));
+
+        harness.StatusOracle.SetStatus(newer, SiloStatus.Dead);
+        harness.Publisher.OnSiloStatusChange(newer, SiloStatus.Dead);
+        harness.StatusOracle.SetStatus(older, SiloStatus.Dead);
+        harness.Publisher.OnSiloStatusChange(older, SiloStatus.Dead);
+
+        Assert.False(harness.Publisher.PeriodicStatistics.ContainsKey(older));
+        Assert.False(harness.Publisher.PeriodicStatistics.ContainsKey(newer));
+        Assert.Contains(Phase5Notification.Removal(older), notifications);
+        Assert.Contains(Phase5Notification.Removal(newer), notifications);
+    }
+
+    [Fact]
+    public void LoadNotificationBoundsRetainedTerminalEndpoints()
+    {
+        var harness = CreatePhase5DeploymentLoadPublisherHarness();
+        const int retainedEndpointLimit = 4096;
+        for (var i = 0; i <= retainedEndpointLimit; i++)
+        {
+            var silo = CreateSilo(40000 + i);
+            harness.StatusOracle.SetStatus(silo, SiloStatus.Dead);
+            harness.Publisher.OnSiloStatusChange(silo, SiloStatus.Dead);
+        }
+
+        Assert.Equal(retainedEndpointLimit, harness.Publisher.RetainedTerminatedSiloEndpointCount);
+        Assert.Equal(retainedEndpointLimit, harness.Publisher.RetainedTerminatedSiloOrderCount);
+    }
+
+    [Fact]
+    public void LoadNotificationCompactsRepeatedEndpointGenerations()
+    {
+        var harness = CreatePhase5DeploymentLoadPublisherHarness();
+        var endpoint = harness.ActiveOne.Endpoint;
+        for (var generation = 1; generation <= 5000; generation++)
+        {
+            var silo = SiloAddress.New(endpoint, generation);
+            harness.StatusOracle.SetStatus(silo, SiloStatus.Dead);
+            harness.Publisher.OnSiloStatusChange(silo, SiloStatus.Dead);
+        }
+
+        Assert.Equal(1, harness.Publisher.RetainedTerminatedSiloEndpointCount);
+        Assert.Equal(1, harness.Publisher.RetainedTerminatedSiloOrderCount);
+    }
+
+    [Fact]
     public async Task LoadNotificationCallbacksRunOutsideStatisticsLock()
     {
         var harness = CreatePhase5DeploymentLoadPublisherHarness();
@@ -7340,6 +7432,40 @@ public class DisseminationProtocolTests
         Assert.Equal(7, ns.GetVersion(validKey));
     }
 
+    [Fact]
+    public async Task ReceiveBroadcastContinuesWhenApplyDiagnosticObserverThrows()
+    {
+        var sender = CreateSilo(33014);
+        var local = CreateSilo(33015);
+        var transport = new FakeTransport(local, sender);
+        var failedKey = new DisseminationKey("throws");
+        var validKey = new DisseminationKey("valid");
+        var ns = new Phase6ThrowingNamespace(local, failedKey)
+        {
+            Failure = static (_, _) => throw new InvalidOperationException("phase 6 apply failure"),
+        };
+        var logger = new Phase6ProtocolLogger();
+        var protocol = CreatePhase6Protocol(transport, ns, logger);
+        using var subscription = DisseminationEvents.Listener.Subscribe(
+            new ThrowingApplyObserver(ns.Name, failedKey, local, sender),
+            static name => name == "Dissemination.ValueApply");
+
+        var response = await protocol.ReceiveBroadcast(
+            CreateBroadcastBatch(
+                sender,
+                ns.CreateItem(sender, failedKey, sequence: 8),
+                ns.CreateItem(sender, validKey, sequence: 9)),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal([failedKey, validKey], ns.ApplyAttempts);
+        Assert.Equal(9, ns.GetVersion(validKey));
+        Assert.Equal(9, response.Acknowledgments[ns.Name].Single(entry => entry.Key == validKey).Version);
+        Assert.Contains(
+            logger.Entries,
+            entry => entry.EventId.Name == "LogDebugDisseminationDiagnosticFailed"
+                && Equals(entry.State["Namespace"], ns.Name));
+    }
+
     private static DisseminationProtocol CreatePhase6Protocol(
         FakeTransport transport,
         IDisseminationNamespace disseminationNamespace,
@@ -7486,6 +7612,33 @@ public class DisseminationProtocolTests
         Microsoft.Extensions.Logging.EventId EventId,
         Exception Exception,
         Dictionary<string, object?> State);
+
+    private sealed class ThrowingApplyObserver(
+        DisseminationNamespace namespaceName,
+        DisseminationKey key,
+        SiloAddress localSilo,
+        SiloAddress sender) : IObserver<KeyValuePair<string, object?>>
+    {
+        public void OnNext(KeyValuePair<string, object?> value)
+        {
+            if (value.Value is DisseminationValueEvent apply
+                && apply.Namespace == namespaceName
+                && apply.Key == key
+                && Equals(apply.LocalSilo, localSilo)
+                && Equals(apply.Peer, sender))
+            {
+                throw new InvalidOperationException("Diagnostic observer failure.");
+            }
+        }
+
+        public void OnCompleted()
+        {
+        }
+
+        public void OnError(Exception error)
+        {
+        }
+    }
 }
 
 #if NET10_0_OR_GREATER

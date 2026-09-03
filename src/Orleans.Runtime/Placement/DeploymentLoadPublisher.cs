@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Net;
 using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -21,6 +22,7 @@ namespace Orleans.Runtime
     /// </summary>
     internal sealed partial class DeploymentLoadPublisher : SystemTarget, IDeploymentLoadPublisher, ISiloStatusListener, ILifecycleParticipant<ISiloLifecycle>
     {
+        private const int MaxRetainedTerminatedSiloEndpoints = 4096;
         private readonly ILocalSiloDetails _siloDetails;
         private readonly ISiloStatusOracle _siloStatusOracle;
         private readonly IInternalGrainFactory _grainFactory;
@@ -33,7 +35,9 @@ namespace Orleans.Runtime
         private readonly object _statisticsUpdateLock = new();
         private readonly Queue<SiloAddress> _statisticsNotificationOrder = new();
         private readonly Dictionary<SiloAddress, StatisticsNotification> _pendingStatisticsNotifications = new();
-        private readonly HashSet<SiloAddress> _terminatedSilos = new();
+        private readonly Dictionary<IPEndPoint, int> _terminatedSiloGenerations = new();
+        private readonly LinkedList<IPEndPoint> _terminatedSiloGenerationOrder = new();
+        private readonly Dictionary<IPEndPoint, LinkedListNode<IPEndPoint>> _terminatedSiloGenerationNodes = new();
         private readonly TimeSpan _statisticsRefreshTime;
         private readonly List<ISiloStatisticsChangeListener> _siloStatisticsChangeListeners;
         private readonly ILogger _logger;
@@ -181,7 +185,7 @@ namespace Orleans.Runtime
         {
             lock (_statisticsUpdateLock)
             {
-                if (_terminatedSilos.Contains(siloAddress)
+                if (IsTerminatedGenerationUnsafe(siloAddress)
                     || _siloStatusOracle.GetApproximateSiloStatus(siloAddress) != SiloStatus.Active)
                 {
                     return true;
@@ -193,6 +197,28 @@ namespace Orleans.Runtime
 
         internal IReadOnlyCollection<SiloAddress> GetActiveSilosForStatisticsDigest() =>
             _siloStatusOracle.GetApproximateSiloStatuses(onlyActive: true).Keys;
+
+        internal int RetainedTerminatedSiloEndpointCount
+        {
+            get
+            {
+                lock (_statisticsUpdateLock)
+                {
+                    return _terminatedSiloGenerations.Count;
+                }
+            }
+        }
+
+        internal int RetainedTerminatedSiloOrderCount
+        {
+            get
+            {
+                lock (_statisticsUpdateLock)
+                {
+                    return _terminatedSiloGenerationOrder.Count;
+                }
+            }
+        }
 
         internal async Task<bool> TryPublishStatisticsViaDissemination(SiloRuntimeStatistics myStats)
         {
@@ -263,11 +289,13 @@ namespace Orleans.Runtime
             bool drainNotifications;
             lock (_statisticsUpdateLock)
             {
-                if (_terminatedSilos.Contains(siloAddress)
+                if (IsTerminatedGenerationUnsafe(siloAddress)
                     || _siloStatusOracle.GetApproximateSiloStatus(siloAddress) != SiloStatus.Active)
                 {
                     return DisseminationApplyResult.Rejected;
                 }
+
+                ClearOlderTerminatedGenerationUnsafe(siloAddress);
 
                 if (_periodicStats.TryGetValue(siloAddress, out var old))
                 {
@@ -471,12 +499,27 @@ namespace Orleans.Runtime
             bool drainNotifications;
             lock (_statisticsUpdateLock)
             {
-                if (!_terminatedSilos.Add(updatedSilo))
+                var hasNewerTombstone = _terminatedSiloGenerations.TryGetValue(updatedSilo.Endpoint, out var generation)
+                    && generation >= updatedSilo.Generation;
+                if (!hasNewerTombstone)
+                {
+                    _terminatedSiloGenerations[updatedSilo.Endpoint] = updatedSilo.Generation;
+                    if (_terminatedSiloGenerationNodes.Remove(updatedSilo.Endpoint, out var existingNode))
+                    {
+                        _terminatedSiloGenerationOrder.Remove(existingNode);
+                    }
+
+                    _terminatedSiloGenerationNodes[updatedSilo.Endpoint] =
+                        _terminatedSiloGenerationOrder.AddLast(updatedSilo.Endpoint);
+                    TrimTerminatedSiloGenerationsUnsafe();
+                }
+
+                var removed = _periodicStats.TryRemove(updatedSilo, out _);
+                if (!removed && !_pendingStatisticsNotifications.ContainsKey(updatedSilo))
                 {
                     return;
                 }
 
-                _periodicStats.TryRemove(updatedSilo, out _);
                 drainNotifications = EnqueueStatisticsNotificationUnsafe(new(updatedSilo, Statistics: null));
             }
 
@@ -489,6 +532,34 @@ namespace Orleans.Runtime
         private readonly record struct StatisticsNotification(
             SiloAddress SiloAddress,
             SiloRuntimeStatistics? Statistics);
+
+        private bool IsTerminatedGenerationUnsafe(SiloAddress siloAddress) =>
+            _terminatedSiloGenerations.TryGetValue(siloAddress.Endpoint, out var generation)
+            && generation >= siloAddress.Generation;
+
+        private void ClearOlderTerminatedGenerationUnsafe(SiloAddress siloAddress)
+        {
+            if (_terminatedSiloGenerations.TryGetValue(siloAddress.Endpoint, out var generation)
+                && generation < siloAddress.Generation)
+            {
+                _terminatedSiloGenerations.Remove(siloAddress.Endpoint);
+                if (_terminatedSiloGenerationNodes.Remove(siloAddress.Endpoint, out var node))
+                {
+                    _terminatedSiloGenerationOrder.Remove(node);
+                }
+            }
+        }
+
+        private void TrimTerminatedSiloGenerationsUnsafe()
+        {
+            while (_terminatedSiloGenerations.Count > MaxRetainedTerminatedSiloEndpoints
+                && _terminatedSiloGenerationOrder.First is { } candidate)
+            {
+                _terminatedSiloGenerationOrder.RemoveFirst();
+                _terminatedSiloGenerationNodes.Remove(candidate.Value);
+                _terminatedSiloGenerations.Remove(candidate.Value);
+            }
+        }
 
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle observer)
         {

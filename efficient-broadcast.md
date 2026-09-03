@@ -83,10 +83,10 @@ scope; Active-only namespace digests are attached only when the selected peer is
 
 Queue acceptance does not prove that a peer understands a namespace. Inbound namespace traffic,
 broadcast acknowledgments, and authoritative anti-entropy responses provide support evidence;
-explicit unsupported responses revoke it. Confirmation is per peer and namespace and expires after
-twice the greater of the anti-entropy interval and the namespace's expected update cadence.
+explicit unsupported responses revoke it. Confirmation is per peer and namespace and remains valid
+for that silo generation until the peer rejects the namespace or leaves the eligible membership set.
 
-After a deployment-load update is accepted for dissemination, recently confirmed Active peers use
+After a deployment-load update is accepted for dissemination, confirmed Active peers use
 the dissemination path and unconfirmed Active peers still receive the existing direct system-target
 update. If dissemination is disabled or unavailable, returns false, throws, or does not accept the
 update within one deployment-load refresh interval, the publisher directly fans out to every Active

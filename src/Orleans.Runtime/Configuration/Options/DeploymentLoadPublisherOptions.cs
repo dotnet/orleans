@@ -22,9 +22,9 @@ namespace Orleans.Configuration
         /// </summary>
         /// <remarks>
         /// When enabled, dissemination replaces per-refresh direct fan-out only for active peers which have recently
-        /// confirmed support for this namespace. Confirmations expire after twice the greater of the anti-entropy
-        /// interval and this namespace's expected update cadence. During rolling or mixed-version operation, active
-        /// peers without a current confirmation continue to receive direct publications. If dissemination is
+        /// confirmed support for this namespace. Confirmation remains valid for that silo generation until the peer
+        /// explicitly rejects the namespace or leaves the eligible membership set. During rolling or mixed-version
+        /// operation, active peers without confirmation continue to receive direct publications. If dissemination is
         /// unavailable, declines the update, throws, or cannot accept it within the refresh interval, direct
         /// publication targets all active peers.
         /// </remarks>

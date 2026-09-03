@@ -437,7 +437,9 @@ internal sealed partial class DisseminationProtocol
                 continue;
             }
 
-            ReplacePeerNamespaceConfirmations(response.Sender, response.Values.Keys);
+            // A response only includes namespaces which produced repairs. Absence is not evidence that an
+            // up-to-date or unrelated namespace is unsupported, so confirmations are additive here.
+            ConfirmPeerNamespaces(response.Sender, response.Values.Keys);
             foreach (var (namespaceName, values) in response.Values)
             {
                 if (!TryGetEnabledNamespace(namespaceName, out var disseminationNamespace))
@@ -831,8 +833,6 @@ internal sealed partial class DisseminationProtocol
         var membershipSnapshots = _membership.CurrentSnapshots;
         PrunePeerNamespaceConfirmations(membershipSnapshots.AllMembers);
         var participants = membershipSnapshots.GetSnapshot(disseminationNamespace.MembershipScope).Members;
-        var now = _timeProvider.GetTimestamp();
-        var confirmationTtl = GetPeerNamespaceConfirmationTtl(disseminationNamespace);
         lock (_peerSupportLock)
         {
             List<SiloAddress>? result = null;
@@ -844,8 +844,7 @@ internal sealed partial class DisseminationProtocol
                 }
 
                 if (!_confirmedPeerNamespaces.TryGetValue(peer, out var namespaces)
-                    || !namespaces.TryGetValue(disseminationNamespace.Name, out var confirmedAt)
-                    || _timeProvider.GetElapsedTime(confirmedAt, now) >= confirmationTtl)
+                    || !namespaces.ContainsKey(disseminationNamespace.Name))
                 {
                     (result ??= []).Add(peer);
                 }
@@ -897,40 +896,6 @@ internal sealed partial class DisseminationProtocol
         }
     }
 
-    private void ReplacePeerNamespaceConfirmations(
-        SiloAddress peer,
-        IEnumerable<DisseminationNamespace> namespaceNames)
-    {
-        if (Equals(peer, _localSilo)
-            || !_membership.CurrentSnapshots.AllMembers.ContainsMember(peer))
-        {
-            return;
-        }
-
-        var now = _timeProvider.GetTimestamp();
-        var replacements = new Dictionary<DisseminationNamespace, long>();
-        foreach (var namespaceName in namespaceNames)
-        {
-            if (_namespaces.TryGetValue(namespaceName, out var disseminationNamespace)
-                && disseminationNamespace.Options.Enabled)
-            {
-                replacements[namespaceName] = now;
-            }
-        }
-
-        lock (_peerSupportLock)
-        {
-            if (replacements.Count == 0)
-            {
-                _confirmedPeerNamespaces.Remove(peer);
-            }
-            else
-            {
-                _confirmedPeerNamespaces[peer] = replacements;
-            }
-        }
-    }
-
     private void RevokePeerNamespaces(
         SiloAddress peer,
         IEnumerable<DisseminationNamespace> namespaceNames)
@@ -965,18 +930,6 @@ internal sealed partial class DisseminationProtocol
                 _confirmedPeerNamespaces.Remove(peer);
             }
         }
-    }
-
-    private TimeSpan GetPeerNamespaceConfirmationTtl(
-        IDisseminationNamespace disseminationNamespace)
-    {
-        var cadence = _options.CurrentValue.Overlay.AntiEntropyInterval;
-        if (disseminationNamespace.Options.ExpectedUpdateCadence > cadence)
-        {
-            cadence = disseminationNamespace.Options.ExpectedUpdateCadence;
-        }
-
-        return cadence + cadence;
     }
 
     private void RecordValueUpdate(DisseminationNamespace namespaceName, DisseminationKey key, long version)
@@ -1179,7 +1132,15 @@ internal sealed partial class DisseminationProtocol
 
     private void EmitApplyResult(DisseminationNamespace namespaceName, DisseminationBroadcastValue item, SiloAddress sender, DisseminationApplyResult result)
     {
-        DisseminationEvents.EmitValue(namespaceName, item.Value, _localSilo, sender, result, item.Value.Payload.Length);
+        try
+        {
+            DisseminationEvents.EmitValue(namespaceName, item.Value, _localSilo, sender, result, item.Value.Payload.Length);
+        }
+        catch (Exception exception)
+        {
+            LogDebugDisseminationDiagnosticFailed(_logger, exception, namespaceName, item.Value.Key);
+        }
+
         DisseminationInstruments.OnValueApplied(namespaceName, result);
     }
 
@@ -1242,5 +1203,14 @@ internal sealed partial class DisseminationProtocol
         Level = LogLevel.Debug,
         Message = "Failed to apply dissemination value from {Sender} for namespace {Namespace}, key {Key}, version {Version}.")]
     private static partial void LogDebugDisseminationValueApplyFailed(ILogger logger, Exception exception, SiloAddress sender, DisseminationNamespace @namespace, DisseminationKey key, long version);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Dissemination apply diagnostic failed for namespace {Namespace}, key {Key}.")]
+    private static partial void LogDebugDisseminationDiagnosticFailed(
+        ILogger logger,
+        Exception exception,
+        DisseminationNamespace @namespace,
+        DisseminationKey key);
 
 }
