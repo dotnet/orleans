@@ -237,6 +237,31 @@ public sealed class UniversalReferenceSerializationTests(TestEnvironmentFixture 
         Assert.Equal(
             "A cluster-bound universal reference must specify a non-empty ClusterId.",
             exception.Message);
+        Assert.IsAssignableFrom<ArgumentException>(exception.InnerException);
+    }
+
+    [Theory]
+    [InlineData(
+        """{"Id":{"Type":"test.grain","Key":"1"},"Interface":"test.interface","ServiceId":" ","Binding":0}""",
+        "Could not deserialize an invalid universal reference.")]
+    [InlineData(
+        """{"Id":{"Type":"test.grain","Key":"1"},"Interface":"test.interface","ServiceId":"service","Binding":0,"ClusterId":"unexpected"}""",
+        "Could not deserialize an invalid universal reference.")]
+    [InlineData(
+        """{"Id":{"Type":"test.grain","Key":"1"},"Interface":"test.interface","ServiceId":"service","Binding":255}""",
+        "Unknown universal reference binding '255'.")]
+    public void NewtonsoftJsonReader_InvalidUniversalReferenceThrowsJsonSerializationException(
+        string json,
+        string expectedMessage)
+    {
+        var exception = Assert.Throws<JsonSerializationException>(
+            () => NewtonsoftSerializer.Deserialize(typeof(IAddressable), json));
+
+        Assert.Equal(expectedMessage, exception.Message);
+        if (!expectedMessage.StartsWith("Unknown", StringComparison.Ordinal))
+        {
+            Assert.IsAssignableFrom<ArgumentException>(exception.InnerException);
+        }
     }
 
     [Fact]
