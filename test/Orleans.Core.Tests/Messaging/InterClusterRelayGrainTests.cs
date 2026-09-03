@@ -18,6 +18,17 @@ namespace UnitTests.Messaging;
 public sealed class InterClusterRelayGrainTests
 {
     [Fact]
+    public void Relay_UsesStableBuiltInGrainType()
+    {
+        var attribute = typeof(InterClusterRelayGrain).GetCustomAttribute<GrainTypeAttribute>();
+
+        Assert.NotNull(attribute);
+        Assert.Equal(
+            GrainType.Create("interclusterrelay"),
+            attribute.GetGrainType(null!, typeof(InterClusterRelayGrain)));
+    }
+
+    [Fact]
     public async Task Relay_ForwardsRequestAndSourceIdentityToReceiver()
     {
         var source = new ClusterIdentity("service", "source");
