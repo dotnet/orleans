@@ -180,6 +180,7 @@ public sealed class DynamoDBGrainStorageProviderBuilderTests
     public void Configure_RegistersNamedOptionsValidatorAndKeyedStorageDescriptor()
     {
         var (builder, _) = ConfigureBuilder(
+            (nameof(DynamoDBStorageOptions.Service), "us-east-1"),
             (nameof(DynamoDBStorageOptions.TableName), "named-table"),
             (nameof(DynamoDBStorageOptions.ServiceId), "named-service"));
         var storageDescriptor = Assert.Single(
@@ -307,6 +308,7 @@ public sealed class DynamoDBGrainStorageProviderBuilderTests
 
     private static DynamoDBStorageOptions CreateValidOptions() => new()
     {
+        Service = "us-east-1",
         TableName = "valid-table",
         UseProvisionedThroughput = true,
         ReadCapacityUnits = 11,
