@@ -331,6 +331,10 @@ internal sealed partial class AsyncEnumerableGrainExtension : IAsyncEnumerableGr
         Timer.Dispose();
     }
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Performance",
+        "CA1849:Call async methods when in an async method",
+        Justification = "Cancellation callbacks must run synchronously on the current grain scheduler before awaiting MoveNext completion.")]
     private async ValueTask DisposeEnumeratorAsync(EnumeratorState enumerator)
     {
         try

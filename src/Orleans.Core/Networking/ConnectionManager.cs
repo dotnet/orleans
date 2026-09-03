@@ -282,6 +282,10 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage(
+            "Performance",
+            "CA1849:Call async methods when in an async method",
+            Justification = "Shutdown callbacks must complete synchronously before connections are scanned, while aggregating all callback failures.")]
         public async Task Close(CancellationToken ct)
         {
             try
