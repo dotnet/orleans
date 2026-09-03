@@ -57,10 +57,9 @@ namespace Orleans.Streams
             Task<bool> ReadFromQueueWithCancellation(QueueId myQueueId, IQueueAdapterReceiver? receiver, int maxCacheAddCount, CancellationToken cancellationToken);
             Task RegisterStream(QualifiedStreamId streamId, StreamSequenceToken firstToken, DateTime now);
             Task<bool> DoHandshakeWithConsumer(StreamConsumerData consumerData, StreamSequenceToken? cacheToken);
+            IQueueCacheCursor GetRecoveryCursor(StreamConsumerData consumerData);
             Task RunConsumerCursor(StreamConsumerData consumerData);
             Task<IReadOnlyDictionary<QualifiedStreamId, StreamConsumerCollection>> GetPubSubCache();
-            Task<bool> DoHandshakeWithConsumer(StreamConsumerData consumerData, StreamSequenceToken? cacheToken);
-            Task RunConsumerCursor(StreamConsumerData consumerData);
             Task RunQueuePump(QueueId myQueueId, CancellationToken cancellationToken);
             Task Shutdown();
         }
@@ -94,7 +93,7 @@ namespace Orleans.Streams
             if (options.DeliveryProgressUpdateInterval <= TimeSpan.Zero)
             {
                 throw new ArgumentOutOfRangeException(
-                    nameof(options.DeliveryProgressUpdateInterval),
+                    nameof(options),
                     options.DeliveryProgressUpdateInterval,
                     "The delivery progress update interval must be greater than zero.");
             }
@@ -139,17 +138,14 @@ namespace Orleans.Streams
         Task<bool> ITestAccessor.DoHandshakeWithConsumer(StreamConsumerData consumerData, StreamSequenceToken? cacheToken)
             => this.RunOrQueueTaskResult(() => DoHandshakeWithConsumer(consumerData, cacheToken)).Unwrap();
 
+        IQueueCacheCursor ITestAccessor.GetRecoveryCursor(StreamConsumerData consumerData)
+            => GetRecoveryCursor(consumerData);
+
         Task ITestAccessor.RunConsumerCursor(StreamConsumerData consumerData)
             => this.RunOrQueueTask(() => RunConsumerCursor(consumerData));
 
         Task<IReadOnlyDictionary<QualifiedStreamId, StreamConsumerCollection>> ITestAccessor.GetPubSubCache()
             => this.RunOrQueueTaskResult(() => (IReadOnlyDictionary<QualifiedStreamId, StreamConsumerCollection>)new Dictionary<QualifiedStreamId, StreamConsumerCollection>(pubSubCache));
-
-        Task<bool> ITestAccessor.DoHandshakeWithConsumer(StreamConsumerData consumerData, StreamSequenceToken? cacheToken)
-            => this.RunOrQueueTaskResult(() => DoHandshakeWithConsumer(consumerData, cacheToken)).Unwrap();
-
-        Task ITestAccessor.RunConsumerCursor(StreamConsumerData consumerData)
-            => this.RunOrQueueTask(() => RunConsumerCursor(consumerData));
 
         Task ITestAccessor.RunQueuePump(QueueId myQueueId, CancellationToken cancellationToken)
             => this.RunOrQueueTask(() => RunQueuePump(myQueueId, cancellationToken));
@@ -667,24 +663,14 @@ namespace Orleans.Streams
         {
             if (consumerData.LastProcessedToken is { } lastProcessedToken)
             {
-                var result = queueCache!.TryGetCacheCursor(consumerData.StreamId, lastProcessedToken);
-                if (result.Kind == QueueCacheCursorResultKind.CacheMiss)
+                try
+                {
+                    return GetCursorAfterProcessedToken(consumerData, lastProcessedToken);
+                }
+                catch (QueueCacheMissException)
                 {
                     return GetCacheCursorOrThrow(consumerData.StreamId, null);
                 }
-
-                if (result.Kind != QueueCacheCursorResultKind.Success)
-                {
-                    throw new InvalidOperationException($"Unexpected cursor result: {result.Kind}.");
-                }
-
-                var cursor = result.Cursor!;
-                if (!TryAdvanceRecoveryCursor(cursor, lastProcessedToken, out consumerData.PendingBatch))
-                {
-                    return GetCacheCursorOrThrow(consumerData.StreamId, null);
-                }
-
-                return cursor;
             }
 
             if (consumerData.LastToken is StartPositionToken startPositionToken)
@@ -695,28 +681,19 @@ namespace Orleans.Streams
             if (consumerData.LastToken is StartToken or DeliveryToken
                 && consumerData.LastToken.Token is { } handshakeSequenceToken)
             {
-                var result = queueCache!.TryGetCacheCursor(consumerData.StreamId, handshakeSequenceToken);
-                if (result.Kind == QueueCacheCursorResultKind.CacheMiss)
+                try
+                {
+                    if (consumerData.LastToken is DeliveryToken
+                        || SubscriptionMarker.IsImplicitSubscription(consumerData.SubscriptionId.Guid))
+                    {
+                        return GetCursorAfterProcessedToken(consumerData, handshakeSequenceToken);
+                    }
+                    return GetCacheCursorOrThrow(consumerData.StreamId, handshakeSequenceToken);
+                }
+                catch (QueueCacheMissException)
                 {
                     return GetCacheCursorOrThrow(consumerData.StreamId, null);
                 }
-
-                if (result.Kind != QueueCacheCursorResultKind.Success)
-                {
-                    throw new InvalidOperationException($"Unexpected cursor result: {result.Kind}.");
-                }
-
-                var cursor = result.Cursor!;
-                if (consumerData.LastToken is DeliveryToken
-                    || SubscriptionMarker.IsImplicitSubscription(consumerData.SubscriptionId.Guid))
-                {
-                    if (!TryAdvanceRecoveryCursor(cursor, handshakeSequenceToken, out consumerData.PendingBatch))
-                    {
-                        return GetCacheCursorOrThrow(consumerData.StreamId, null);
-                    }
-                }
-
-                return cursor;
             }
 
             return GetCacheCursorOrThrow(consumerData.StreamId, null);
@@ -813,6 +790,52 @@ namespace Orleans.Streams
             }
         }
 
+        private IQueueCacheCursor GetCursorAfterProcessedToken(
+            StreamConsumerData consumerData,
+            StreamSequenceToken processedToken)
+        {
+            var restartToken = consumerData.LastSafePartitionToken ?? processedToken;
+            IQueueCacheCursor cursor;
+            try
+            {
+                cursor = GetCacheCursorOrThrow(consumerData.StreamId, restartToken);
+            }
+            catch (QueueCacheMissException)
+            {
+                try
+                {
+                    cursor = GetCacheCursorAtStartPosition(
+                        consumerData.StreamId,
+                        StreamHandshakeToken.CreateStartPositionToken(StreamSubscriptionStartPosition.EarliestAvailable),
+                        latestBoundary: null);
+                }
+                catch (NotSupportedException)
+                {
+                    cursor = GetCacheCursorOrThrow(consumerData.StreamId, null);
+                }
+            }
+
+            if (cursor is IQueueCacheCursorProgress progressCursor)
+            {
+                progressCursor.SetDeliveredThrough(processedToken);
+            }
+            else
+            {
+                if (!Equals(restartToken, processedToken))
+                {
+                    cursor.Dispose();
+                    cursor = GetCacheCursorOrThrow(consumerData.StreamId, processedToken);
+                }
+
+                if (!TryAdvanceRecoveryCursor(cursor, processedToken, out consumerData.PendingBatch))
+                {
+                    return GetCacheCursorOrThrow(consumerData.StreamId, null);
+                }
+            }
+
+            return cursor;
+        }
+
         private IQueueCacheCursor GetCacheMissRecoveryCursor(StreamConsumerData consumerData)
         {
             var result = queueCache!.TryGetCacheCursorAtPosition(
@@ -827,7 +850,10 @@ namespace Orleans.Streams
             };
         }
 
-        public Task RemoveSubscriber(GuidId subscriptionId, QualifiedStreamId streamId, CancellationToken cancellationToken)
+        public Task RemoveSubscriber(
+            GuidId subscriptionId,
+            QualifiedStreamId streamId,
+            CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             RemoveSubscriber_Impl(subscriptionId, streamId);
