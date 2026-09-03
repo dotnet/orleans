@@ -112,17 +112,9 @@ namespace Orleans.Reminders.DynamoDB
             int readCapacityUnits,
             int writeCapacityUnits,
             string providerName,
-            bool requireService = true,
             bool reportSpecificCapacity = false)
         {
-            if (requireService)
-            {
-                ValidateClientOptions(options, providerName);
-            }
-            else
-            {
-                ValidateCredentials(options, providerName);
-            }
+            ValidateClientOptions(options, providerName);
 
             if (string.IsNullOrWhiteSpace(tableName))
             {
