@@ -1352,6 +1352,8 @@ namespace UnitTests.Runtime
                 }
             }
 
+            public bool WasRemovedByCollection { get; set; }
+
             public bool IsCandidateForRemoval(bool wouldRemove)
             {
                 Assert.True(Monitor.IsEntered(this));
