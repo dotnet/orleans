@@ -6,7 +6,7 @@
 //     the code is regenerated.
 // </auto-generated>
 //------------------------------------------------------------------------------
-namespace Orleans.Runtime.DurableTasks
+namespace Orleans.Hosting
 {
     public static partial class DurableTaskHostingExtensions
     {

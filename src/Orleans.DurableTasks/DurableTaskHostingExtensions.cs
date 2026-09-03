@@ -7,9 +7,10 @@ using Orleans.DurableMessaging;
 using Orleans.DurableTasks;
 using Orleans.Hosting;
 using Orleans.Journaling;
+using Orleans.Runtime.DurableTasks;
 using Orleans.Serialization.Configuration;
 
-namespace Orleans.Runtime.DurableTasks;
+namespace Orleans.Hosting;
 
 public static class DurableTaskHostingExtensions
 {
