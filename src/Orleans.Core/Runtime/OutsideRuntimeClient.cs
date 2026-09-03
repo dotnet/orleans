@@ -404,7 +404,7 @@ namespace Orleans
                 }
                 else
                 {
-                    this.logger.LogWarning(exception, "Failed to send one-way call to cluster {ClusterId}.", targetCluster.ClusterId);
+                    LogWarningFailedToSendOneWayCall(this.logger, exception, targetCluster.ClusterId);
                 }
             }
         }
@@ -430,7 +430,7 @@ namespace Orleans
                 }
                 else
                 {
-                    this.logger.LogWarning(exception, "Failed to resolve the target cluster for one-way call to {GrainId}.", target.GrainId);
+                    LogWarningFailedToResolveOneWayCall(this.logger, exception, target.GrainId);
                 }
             }
             finally
@@ -722,6 +722,24 @@ namespace Orleans
             Message = "Error while processing callback expiry."
         )]
         private static partial void LogErrorWhileProcessingCallbackExpiry(ILogger logger, Exception ex);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Failed to send one-way call to cluster {ClusterId}."
+        )]
+        private static partial void LogWarningFailedToSendOneWayCall(
+            ILogger logger,
+            Exception exception,
+            string clusterId);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Failed to resolve the target cluster for one-way call to {GrainId}."
+        )]
+        private static partial void LogWarningFailedToResolveOneWayCall(
+            ILogger logger,
+            Exception exception,
+            GrainId grainId);
 
         [LoggerMessage(
             Level = LogLevel.Debug,
