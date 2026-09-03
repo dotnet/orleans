@@ -491,19 +491,26 @@ namespace Orleans.Runtime
 
             CallbackData? callbackData;
             bool found = callbacks.TryRemove((message.TargetGrain, message.Id), out callbackData);
-            if (found)
+            try
             {
-                // IMPORTANT: we do not schedule the response callback via the scheduler, since the only thing it does
-                // is to resolve/break the resolver. The continuations/waits that are based on this resolution will be scheduled as work items.
-                callbackData!.DoCallback(message);
-                message.MarkTransferred("InsideRuntimeClient.ReceiveResponse:AfterDoCallback");
-                message.Release();
+                if (found)
+                {
+                    // IMPORTANT: we do not schedule the response callback via the scheduler, since the only thing it does
+                    // is to resolve/break the resolver. The continuations/waits that are based on this resolution will be scheduled as work items.
+                    callbackData!.DoCallback(message);
+                }
+                else
+                {
+                    LogDebugNoCallbackForResponse(this.logger, message);
+                }
             }
-            else
+            catch (Exception exception)
             {
-                LogDebugNoCallbackForResponse(this.logger, message);
-                message.MarkTransferred("InsideRuntimeClient.ReceiveResponse:NoCallbackNotFound");
-                message.Release();
+                LogErrorProcessingResponse(this.logger, exception, message);
+            }
+            finally
+            {
+                message.ReleaseDropped("ResponseHandled");
             }
 
         }
@@ -746,6 +753,11 @@ namespace Orleans.Runtime
             EventId = (int)ErrorCode.Dispatcher_NoCallbackForResp,
             Message = "No callback for response message {Message}")]
         private static partial void LogDebugNoCallbackForResponse(ILogger logger, Message message);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Error processing response message '{Message}'.")]
+        private static partial void LogErrorProcessingResponse(ILogger logger, Exception exception, Message message);
 
         [LoggerMessage(
             Level = LogLevel.Debug,

@@ -187,8 +187,8 @@ namespace Orleans.Messaging
                 var connection = connectionTask.Result;
                 if (connection is null) return;
 
-                connection.Send(msg);
                 LogSendingMessage(msg, connection.RemoteEndPoint);
+                connection.Send(msg);
             }
             else
             {
@@ -203,9 +203,8 @@ namespace Orleans.Messaging
                         // If the connection returned is null then the message was already rejected due to a failure.
                         if (connection is null) return;
 
-                        connection.Send(message);
-
                         LogSendingMessage(message, connection.RemoteEndPoint);
+                        connection.Send(message);
                     }
                     catch (Exception exception)
                     {
