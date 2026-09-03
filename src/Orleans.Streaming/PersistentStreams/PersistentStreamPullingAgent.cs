@@ -57,7 +57,6 @@ namespace Orleans.Streams
             Task<bool> DoHandshakeWithConsumer(StreamConsumerData consumerData, StreamSequenceToken? cacheToken);
             Task RunConsumerCursor(StreamConsumerData consumerData);
             Task RunQueuePump(QueueId myQueueId, CancellationToken cancellationToken);
-            Task RunConsumerCursor(StreamConsumerData consumerData);
             Task Shutdown();
         }
 
