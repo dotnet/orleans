@@ -343,7 +343,7 @@ internal partial class CosmosReminderTable : IReminderTable
 
     private Task<TResult> ExecuteReadOperation<TResult>(Func<Task<TResult>> operation) =>
         _readResiliencePipeline.ExecuteAsync(
-            static async (operation, _) => await operation().ConfigureAwait(false),
+            static (operation, _) => new ValueTask<TResult>(operation()),
             operation,
             CancellationToken.None).AsTask();
 

@@ -1,6 +1,7 @@
 using System.Net;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Time.Testing;
 using Orleans.Reminders.Cosmos;
 using Polly;
 using Xunit;
@@ -48,6 +49,48 @@ public class CosmosReadRetryPolicyTests
 
         Assert.Same(exception, actual);
         Assert.Equal(CosmosReadRetryPolicy.MaxRetryAttempts + 1, attempts);
+    }
+
+    [Fact]
+    public async Task Pipeline_PersistentRequestTimeout_UsesDefaultLinearBackoff()
+    {
+        var exception = CreateCosmosException(HttpStatusCode.RequestTimeout);
+        var timeProvider = new FakeTimeProvider();
+        var attemptTimes = new List<DateTimeOffset>();
+        var attempts = Enumerable.Range(0, CosmosReadRetryPolicy.MaxRetryAttempts + 1)
+            .Select(_ => new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously))
+            .ToArray();
+        var pipeline = CosmosReadRetryPolicy.CreatePipeline(
+            NullLogger<CosmosReminderTable>.Instance,
+            timeProvider);
+
+        var execution = pipeline.ExecuteAsync<int>(
+            _ =>
+            {
+                var attempt = attemptTimes.Count;
+                attemptTimes.Add(timeProvider.GetUtcNow());
+                attempts[attempt].SetResult();
+                return ValueTask.FromException<int>(exception);
+            },
+            TestContext.Current.CancellationToken).AsTask();
+
+        await attempts[0].Task.WaitAsync(TestContext.Current.CancellationToken);
+        timeProvider.Advance(TimeSpan.FromMilliseconds(99));
+        Assert.False(attempts[1].Task.IsCompleted);
+        timeProvider.Advance(TimeSpan.FromMilliseconds(1));
+        await attempts[1].Task.WaitAsync(TestContext.Current.CancellationToken);
+
+        timeProvider.Advance(TimeSpan.FromMilliseconds(199));
+        Assert.False(attempts[2].Task.IsCompleted);
+        timeProvider.Advance(TimeSpan.FromMilliseconds(1));
+        await attempts[2].Task.WaitAsync(TestContext.Current.CancellationToken);
+
+        var actual = await Assert.ThrowsAsync<CosmosException>(() => execution);
+
+        Assert.Same(exception, actual);
+        Assert.Equal(
+            [TimeSpan.Zero, TimeSpan.FromMilliseconds(100), TimeSpan.FromMilliseconds(300)],
+            attemptTimes.Select(time => time - attemptTimes[0]));
     }
 
     [Fact]

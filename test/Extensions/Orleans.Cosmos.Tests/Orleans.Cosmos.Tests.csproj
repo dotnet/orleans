@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <PackageReference Include="Azure.Identity" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
     <PackageReference Include="System.Diagnostics.PerformanceCounter" />
   </ItemGroup>
 
