@@ -304,6 +304,9 @@ internal sealed class LogViewAdaptor<TLogView, TLogEntry> : PrimaryBasedLogViewA
                     return true;
                 }
 
+                // A journal batch can include durable state outside the event log. Recovery reverted the
+                // complete batch, while the protocol can only replay its event submissions, so retrying
+                // here would split an atomic user operation. Reactivation reloads one consistent batch.
                 _terminalFailure = exception;
                 _grain.DeactivateOnIdle();
                 throw;
