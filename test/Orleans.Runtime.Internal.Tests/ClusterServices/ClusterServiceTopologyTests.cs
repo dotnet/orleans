@@ -52,6 +52,30 @@ public sealed class ClusterServiceTopologyTests
             print: static values => $"values=[{string.Join(',', values)}]");
     }
 
+    [Fact]
+    public void DuplicateBoundary_KeepsLastOwnerOfFollowingRange()
+    {
+        var members = CreateMembers(3);
+        var snapshot = CreateSnapshot(members, [0, 1, 2]);
+        var configuration = CreateConfiguration();
+        var baseline = new ClusterServiceTopology(
+            snapshot,
+            configuration,
+            (silo, _) => [silo == members[0] ? 5u : silo == members[1] ? 10u : 20u]);
+        var collision = new ClusterServiceTopology(
+            snapshot,
+            configuration,
+            (silo, _) => [silo == members[2] ? 20u : 10u]);
+
+        Assert.True(baseline.TryGetOwner(15, out var baselineOwner));
+        Assert.True(collision.TryGetOwner(15, out var collisionOwner));
+        Assert.Equal(members[1], baselineOwner.SiloAddress);
+        Assert.Equal(baselineOwner.SiloAddress, collisionOwner.SiloAddress);
+        Assert.True(collision.GetRange(members[0], 0).IsEmpty);
+        Assert.True(collision.GetRange(members[1], 0).Contains(15));
+        Assert.Equal(2, collision.RangeOwners.Count);
+    }
+
     private static void VerifyTopologyProjection(int[] values)
     {
         var memberCount = 1 + (int)((uint)values[0] % 6);

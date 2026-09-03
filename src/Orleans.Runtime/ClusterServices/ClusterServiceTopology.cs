@@ -74,7 +74,7 @@ internal sealed class ClusterServiceTopology
         {
             if (boundaries[index].Hash == boundaries[index - 1].Hash)
             {
-                boundaries.RemoveAt(index);
+                boundaries.RemoveAt(index - 1);
             }
             else
             {
