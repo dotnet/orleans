@@ -112,8 +112,13 @@ namespace UnitTests.StreamingTests
             var pubSubGrain = this.fixture.GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamId.ToString());
             using var observer = StreamingDiagnosticObserver.Create(fixture.HostedCluster);
 
-            await pubSubGrain.RegisterConsumer(subscriptionId, streamId, default, null!);
-            await pubSubGrain.UnregisterConsumer(subscriptionId, streamId);
+            await pubSubGrain.RegisterConsumer(
+                subscriptionId,
+                streamId,
+                default,
+                null!,
+                TestContext.Current.CancellationToken);
+            await pubSubGrain.UnregisterConsumer(subscriptionId, streamId, TestContext.Current.CancellationToken);
 
             var unregistered = await observer.WaitForSubscriptionUnregisteredAsync(
                 streamId.StreamId,
@@ -122,7 +127,7 @@ namespace UnitTests.StreamingTests
                 TestContext.Current.CancellationToken);
             Assert.Equal(streamId.StreamId, unregistered.StreamId);
             Assert.Equal(subscriptionId.Guid, unregistered.SubscriptionId);
-            Assert.Equal(0, await pubSubGrain.ConsumerCount(streamId));
+            Assert.Equal(0, await pubSubGrain.ConsumerCount(streamId, TestContext.Current.CancellationToken));
         }
 
         /// <summary>
