@@ -126,7 +126,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
             try
             {
                 var call = caller.ProxyCallVersion2MethodAfterBarrier(target, observer);
-                await barrier.Entered.WaitAsync(TimeSpan.FromSeconds(30));
+                await barrier.Entered.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
 
                 await ManagementGrain.SetCompatibilityStrategy(interfaceType, StrictVersionCompatible.Singleton);
                 barrier.Release();
@@ -186,19 +186,19 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
             try
             {
                 var blockingCall = target.WaitForRelease(targetObserver);
-                await targetBarrier.Entered.WaitAsync(TimeSpan.FromSeconds(30));
+                await targetBarrier.Entered.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
 
                 var call = caller.ProxyCallCancellableVersion2MethodAfterBarrier(target, callerObserver, cancellation.Token);
-                await callerBarrier.Entered.WaitAsync(TimeSpan.FromSeconds(30));
+                await callerBarrier.Entered.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
 
                 cancellation.Cancel();
                 callerBarrier.Release();
 
                 await Assert.ThrowsAnyAsync<OperationCanceledException>(
-                    () => call.WaitAsync(TimeSpan.FromSeconds(30)));
+                    () => call.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken));
 
                 targetBarrier.Release();
-                await blockingCall.WaitAsync(TimeSpan.FromSeconds(30));
+                await blockingCall.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
             }
             finally
             {
@@ -232,13 +232,13 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
             try
             {
                 var call = caller.ProxyCallVersion2OneWayMethodAfterBarrier(target, callerObserver, deliveryObserver);
-                await callerBarrier.Entered.WaitAsync(TimeSpan.FromSeconds(30));
+                await callerBarrier.Entered.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
 
                 await ManagementGrain.SetCompatibilityStrategy(interfaceType, StrictVersionCompatible.Singleton);
                 callerBarrier.Release();
 
-                await call.WaitAsync(TimeSpan.FromSeconds(30));
-                await deliveryBarrier.Entered.WaitAsync(TimeSpan.FromSeconds(30));
+                await call.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+                await deliveryBarrier.Entered.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
             }
             finally
             {
