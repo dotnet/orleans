@@ -9,8 +9,8 @@ internal sealed partial class DisseminationSystemTarget : SystemTarget, IDissemi
 {
     private readonly DisseminationProtocol _protocol;
     private readonly IOptionsMonitor<DisseminationOptions> _options;
+    private readonly TimeProvider _timeProvider;
     private readonly ILogger<DisseminationProtocol> _logger;
-    private readonly PeriodicTimer _timer;
     private readonly CancellationTokenSource _shutdownCts = new();
     private Task? _antiEntropyTask;
 
@@ -27,9 +27,9 @@ internal sealed partial class DisseminationSystemTarget : SystemTarget, IDissemi
         : base(Constants.DisseminationSystemTargetType, shared)
     {
         _options = options;
+        _timeProvider = timeProvider;
         _logger = logger;
         _protocol = new DisseminationProtocol(localSiloDetails, grainFactory, membership, options, disseminationNamespaces, timeProvider, logger, broadcastQueueLogger);
-        _timer = new PeriodicTimer(_options.CurrentValue.Overlay.AntiEntropyInterval, timeProvider);
         shared.ActivationDirectory.RecordNewTarget(this);
     }
 
@@ -80,9 +80,7 @@ internal sealed partial class DisseminationSystemTarget : SystemTarget, IDissemi
 
     private async Task StopAsync(CancellationToken cancellationToken)
     {
-        // Cancel the anti-entropy loop before disposing its timer so a pending wakeup cannot race timer disposal.
         await _shutdownCts.CancelAsync();
-        _timer.Dispose();
         try
         {
             await this.RunOrQueueTask(() => _protocol.StopAsync(cancellationToken));
@@ -117,9 +115,12 @@ internal sealed partial class DisseminationSystemTarget : SystemTarget, IDissemi
         var cancellationToken = _shutdownCts.Token;
         try
         {
-            while (await _timer.WaitForNextTickAsync(cancellationToken))
+            while (true)
             {
-                _timer.Period = _options.CurrentValue.Overlay.AntiEntropyInterval;
+                await Task.Delay(
+                    _options.CurrentValue.Overlay.AntiEntropyInterval,
+                    _timeProvider,
+                    cancellationToken);
                 try
                 {
                     await _protocol.RunAntiEntropyRound(cancellationToken);
@@ -133,10 +134,6 @@ internal sealed partial class DisseminationSystemTarget : SystemTarget, IDissemi
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             // Expected during silo shutdown.
-        }
-        catch (ObjectDisposedException) when (cancellationToken.IsCancellationRequested)
-        {
-            // The anti-entropy timer was disposed during shutdown after cancellation was requested.
         }
     }
 
