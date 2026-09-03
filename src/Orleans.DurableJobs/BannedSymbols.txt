@@ -1,4 +1,4 @@
-// Durable Jobs provides a keyed TimeProvider and uses asynchronous coordination.
+# Durable Jobs provides a keyed TimeProvider and uses asynchronous coordination.
 P:System.DateTime.Now;Use the injected Durable Jobs TimeProvider.
 P:System.DateTime.UtcNow;Use the injected Durable Jobs TimeProvider.
 M:System.Threading.Tasks.Task.Wait;Await the task.
