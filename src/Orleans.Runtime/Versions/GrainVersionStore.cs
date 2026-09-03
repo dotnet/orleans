@@ -27,52 +27,84 @@ namespace Orleans.Runtime.Versions
             this.IsEnabled = false;
         }
 
-        public async Task SetCompatibilityStrategy(CompatibilityStrategy strategy)
+        public Task SetCompatibilityStrategy(CompatibilityStrategy strategy)
+            => SetCompatibilityStrategy(strategy, CancellationToken.None);
+
+        public async Task SetCompatibilityStrategy(CompatibilityStrategy strategy, CancellationToken cancellationToken)
         {
             ThrowIfNotEnabled();
-            await StoreGrain.SetCompatibilityStrategy(strategy);
+            await StoreGrain.SetCompatibilityStrategy(strategy, cancellationToken);
         }
 
-        public async Task SetSelectorStrategy(VersionSelectorStrategy strategy)
+        public Task SetSelectorStrategy(VersionSelectorStrategy strategy)
+            => SetSelectorStrategy(strategy, CancellationToken.None);
+
+        public async Task SetSelectorStrategy(VersionSelectorStrategy strategy, CancellationToken cancellationToken)
         {
             ThrowIfNotEnabled();
-            await StoreGrain.SetSelectorStrategy(strategy);
+            await StoreGrain.SetSelectorStrategy(strategy, cancellationToken);
         }
 
-        public async Task SetCompatibilityStrategy(GrainInterfaceType interfaceType, CompatibilityStrategy strategy)
+        public Task SetCompatibilityStrategy(GrainInterfaceType interfaceType, CompatibilityStrategy strategy)
+            => SetCompatibilityStrategy(interfaceType, strategy, CancellationToken.None);
+
+        public async Task SetCompatibilityStrategy(
+            GrainInterfaceType interfaceType,
+            CompatibilityStrategy strategy,
+            CancellationToken cancellationToken)
         {
             ThrowIfNotEnabled();
-            await StoreGrain.SetCompatibilityStrategy(interfaceType, strategy);
+            await StoreGrain.SetCompatibilityStrategy(interfaceType, strategy, cancellationToken);
         }
 
-        public async Task SetSelectorStrategy(GrainInterfaceType interfaceType, VersionSelectorStrategy strategy)
+        public Task SetSelectorStrategy(GrainInterfaceType interfaceType, VersionSelectorStrategy strategy)
+            => SetSelectorStrategy(interfaceType, strategy, CancellationToken.None);
+
+        public async Task SetSelectorStrategy(
+            GrainInterfaceType interfaceType,
+            VersionSelectorStrategy strategy,
+            CancellationToken cancellationToken)
         {
             ThrowIfNotEnabled();
-            await StoreGrain.SetSelectorStrategy(interfaceType, strategy);
+            await StoreGrain.SetSelectorStrategy(interfaceType, strategy, cancellationToken);
         }
 
-        public async Task<Dictionary<GrainInterfaceType, CompatibilityStrategy>> GetCompatibilityStrategies()
+        public Task<Dictionary<GrainInterfaceType, CompatibilityStrategy>> GetCompatibilityStrategies()
+            => GetCompatibilityStrategies(CancellationToken.None);
+
+        public async Task<Dictionary<GrainInterfaceType, CompatibilityStrategy>> GetCompatibilityStrategies(
+            CancellationToken cancellationToken)
         {
             ThrowIfNotEnabled();
-            return await StoreGrain.GetCompatibilityStrategies();
+            return await StoreGrain.GetCompatibilityStrategies(cancellationToken);
         }
 
-        public async Task<Dictionary<GrainInterfaceType, VersionSelectorStrategy>> GetSelectorStrategies()
+        public Task<Dictionary<GrainInterfaceType, VersionSelectorStrategy>> GetSelectorStrategies()
+            => GetSelectorStrategies(CancellationToken.None);
+
+        public async Task<Dictionary<GrainInterfaceType, VersionSelectorStrategy>> GetSelectorStrategies(
+            CancellationToken cancellationToken)
         {
             ThrowIfNotEnabled();
-            return await StoreGrain.GetSelectorStrategies();
+            return await StoreGrain.GetSelectorStrategies(cancellationToken);
         }
 
-        public async Task<CompatibilityStrategy?> GetCompatibilityStrategy()
+        public Task<CompatibilityStrategy?> GetCompatibilityStrategy()
+            => GetCompatibilityStrategy(CancellationToken.None);
+
+        public async Task<CompatibilityStrategy?> GetCompatibilityStrategy(CancellationToken cancellationToken)
         {
             ThrowIfNotEnabled();
-            return await StoreGrain.GetCompatibilityStrategy();
+            return await StoreGrain.GetCompatibilityStrategy(cancellationToken);
         }
 
-        public async Task<VersionSelectorStrategy?> GetSelectorStrategy()
+        public Task<VersionSelectorStrategy?> GetSelectorStrategy()
+            => GetSelectorStrategy(CancellationToken.None);
+
+        public async Task<VersionSelectorStrategy?> GetSelectorStrategy(CancellationToken cancellationToken)
         {
             ThrowIfNotEnabled();
-            return await StoreGrain.GetSelectorStrategy();
+            return await StoreGrain.GetSelectorStrategy(cancellationToken);
         }
 
         private void ThrowIfNotEnabled()

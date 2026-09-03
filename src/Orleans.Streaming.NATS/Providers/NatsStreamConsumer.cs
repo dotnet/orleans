@@ -86,7 +86,8 @@ internal sealed partial class NatsStreamConsumer(
 
         await foreach (var msg in this._consumer.FetchNoWaitAsync(
                                new NatsJSFetchOpts { MaxMsgs = batchCount, Expires = TimeSpan.FromSeconds(10) },
-                               serializer: serializer)
+                               serializer: serializer,
+                               cancellationToken: cancellationToken)
                            .WithCancellation(cancellationToken))
         {
             var streamMessage = msg.Data;

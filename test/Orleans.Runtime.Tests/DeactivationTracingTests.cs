@@ -229,7 +229,7 @@ namespace UnitTests.General
                 _ = await grain.GetActivityId();
                 Started.Clear();
 
-                await grain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
+                await grain.Cast<IGrainManagementExtension>().DeactivateOnIdle(TestContext.Current.CancellationToken);
 
                 _ = await grain.GetActivityId();
 
@@ -682,7 +682,7 @@ namespace UnitTests.General
         {
             _state.State!.WasDeactivated = true;
             _state.State.DeactivationReason = reason.ToString();
-            await _state.WriteStateAsync();
+            await _state.WriteStateAsync(CancellationToken.None);
         }
     }
 

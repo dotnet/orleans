@@ -1,3 +1,4 @@
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.EventSourcing;
 using Orleans.Runtime;
@@ -10,6 +11,7 @@ namespace Orleans.SystemTargetInterfaces
     /// </summary>
     internal interface ILogConsistencyProtocolGateway : ISystemTarget
     {
-        Task<ILogConsistencyProtocolMessage?> RelayMessage(GrainId id, ILogConsistencyProtocolMessage payload);
+        [Alias("C86A1066")]
+        Task<ILogConsistencyProtocolMessage?> RelayMessage(GrainId id, ILogConsistencyProtocolMessage payload, CancellationToken cancellationToken = default);
     }
 }

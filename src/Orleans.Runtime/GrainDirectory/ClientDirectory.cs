@@ -114,7 +114,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
 
                     // Ask the remote directory for updates to our view.
                     var versionVector = _table.ToImmutableDictionary(e => e.Key, e => e.Value.Version);
-                    var delta = await remoteDirectory.GetClientRoutes(versionVector);
+                    var delta = await remoteDirectory.GetClientRoutes(versionVector, _stoppingCts.Token);
 
                     // If updates were found, update our view
                     if (delta is not null && delta.Count > 0)
@@ -183,8 +183,11 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
         }
     }
 
-    public Task OnUpdateClientRoutes(ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId> ConnectedClients, long Version)> update)
+    public Task OnUpdateClientRoutes(
+        ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId> ConnectedClients, long Version)> update,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         UpdateRoutingTable(update);
         if (ShouldPublish())
         {
@@ -199,8 +202,11 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
         return Task.CompletedTask;
     }
 
-    public Task<ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId> ConnectedClients, long Version)>> GetClientRoutes(ImmutableDictionary<SiloAddress, long> knownRoutes)
+    public Task<ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId> ConnectedClients, long Version)>> GetClientRoutes(
+        ImmutableDictionary<SiloAddress, long> knownRoutes,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         EnsureRefreshed();
 
         // Return a collection containing all missing or out-dated routes, based on the known-routes version vector provided by the caller.
@@ -208,6 +214,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
         var resultBuilder = ImmutableDictionary.CreateBuilder<SiloAddress, (ImmutableHashSet<GrainId> ConnectedClients, long Version)>();
         foreach (var entry in table)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var silo = entry.Key;
             var routes = entry.Value;
             var version = routes.Version;
@@ -575,7 +582,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
             Task publishTask;
             try
             {
-                publishTask = remote.OnUpdateClientRoutes(update);
+                publishTask = remote.OnUpdateClientRoutes(update, _stoppingCts.Token);
             }
             catch (Exception exception)
             {

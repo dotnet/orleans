@@ -65,7 +65,8 @@ namespace Orleans.Runtime.Providers
         public async Task<IPersistentStreamPullingManager> InitializePullingAgents(
             string streamProviderName,
             IQueueAdapterFactory adapterFactory,
-            IQueueAdapter queueAdapter)
+            IQueueAdapter queueAdapter,
+            CancellationToken cancellationToken)
         {
             IStreamQueueBalancer queueBalancer = CreateQueueBalancer(streamProviderName);
             (var deliveryProvider, var queueReaderProvider) = CreateBackoffProviders(streamProviderName);
@@ -93,7 +94,7 @@ namespace Orleans.Runtime.Providers
             var pullingAgentManager = manager.AsReference<IPersistentStreamPullingManager>();
 
             // Need to call it as a grain reference though.
-            await pullingAgentManager.Initialize();
+            await pullingAgentManager.Initialize(cancellationToken);
             return pullingAgentManager;
         }
 

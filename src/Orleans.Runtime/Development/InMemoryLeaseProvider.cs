@@ -2,6 +2,7 @@ using Orleans.LeaseProviders;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Orleans.Runtime.Development
@@ -68,7 +69,8 @@ namespace Orleans.Runtime.Development
         /// Forgets about all leases.  Used to simulate loss of this grain or to force rebalance of queues
         /// </summary>
         /// <returns></returns>
-        Task Reset();
+        [Alias("847FCE12")]
+        Task Reset(CancellationToken cancellationToken = default);
     }
 
     /// <summary>
@@ -99,8 +101,9 @@ namespace Orleans.Runtime.Development
             return Task.FromResult(acquiredLeases.Select(lease => Renew(category, lease)).ToArray());
         }
 
-        public Task Reset()
+        public Task Reset(CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             this.leases.Clear();
             return Task.CompletedTask;
         }

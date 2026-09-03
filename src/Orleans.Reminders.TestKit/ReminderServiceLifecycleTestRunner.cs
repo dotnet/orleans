@@ -779,13 +779,13 @@ public abstract class ReminderServiceLifecycleTestRunner
         string name,
         CancellationToken cancellationToken)
     {
-        var row = await _harness.ReminderTable.ReadRow(grainId, name).WaitAsync(cancellationToken);
+        var row = await _harness.ReminderTable.ReadRow(grainId, name, cancellationToken).WaitAsync(cancellationToken);
         if (row is null)
         {
             return;
         }
 
-        if (!await _harness.ReminderTable.RemoveRow(grainId, name, row.ETag!).WaitAsync(cancellationToken))
+        if (!await _harness.ReminderTable.RemoveRow(grainId, name, row.ETag!, cancellationToken).WaitAsync(cancellationToken))
         {
             Fail(guarantee, "scenario cleanup remove")
                 .WithIdentity(grainId, name)
@@ -823,7 +823,7 @@ public abstract class ReminderServiceLifecycleTestRunner
         string name,
         CancellationToken cancellationToken)
     {
-        var row = await _harness.ReminderTable.ReadRow(grainId, name).WaitAsync(cancellationToken);
+        var row = await _harness.ReminderTable.ReadRow(grainId, name, cancellationToken).WaitAsync(cancellationToken);
         if (row is null)
         {
             Fail(guarantee, "ReadRow")
@@ -842,7 +842,7 @@ public abstract class ReminderServiceLifecycleTestRunner
         string name,
         CancellationToken cancellationToken)
     {
-        var row = await _harness.ReminderTable.ReadRow(grainId, name).WaitAsync(cancellationToken);
+        var row = await _harness.ReminderTable.ReadRow(grainId, name, cancellationToken).WaitAsync(cancellationToken);
         if (row is not null)
         {
             Fail(guarantee, "cleanup")

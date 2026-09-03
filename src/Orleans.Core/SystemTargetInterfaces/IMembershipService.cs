@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 
@@ -11,15 +12,18 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="snapshot">Snapshot of the membership table</param>
         /// <returns></returns>
-        Task MembershipChangeNotification(MembershipTableSnapshot snapshot);
+        [Alias("22A02D46")]
+        Task MembershipChangeNotification(MembershipTableSnapshot snapshot, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Ping request from another silo that probes the liveness of the recipient silo.
         /// </summary>
         /// <param name="pingNumber">A unique sequence number for ping message, to facilitate testing and debugging.</param>
-        Task Ping(int pingNumber);
+        [Alias("39AB7071")]
+        Task Ping(int pingNumber, CancellationToken cancellationToken = default);
 
-        Task<IndirectProbeResponse> ProbeIndirectly(SiloAddress target, TimeSpan probeTimeout, int probeNumber);
+        [Alias("0F85FAAF")]
+        Task<IndirectProbeResponse> ProbeIndirectly(SiloAddress target, TimeSpan probeTimeout, int probeNumber, CancellationToken cancellationToken = default);
     }
 
     /// <summary>

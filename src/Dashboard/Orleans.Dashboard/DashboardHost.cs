@@ -24,34 +24,34 @@ internal sealed partial class DashboardHost(
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         await Task.WhenAll(
-            ActivateDashboardGrainAsync(),
-            ActivateSiloGrainAsync(),
+            ActivateDashboardGrainAsync(cancellationToken),
+            ActivateSiloGrainAsync(cancellationToken),
             StartOpenTelemetryConsumerAsync()).ConfigureAwait(false);
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
-    private async Task ActivateSiloGrainAsync()
+    private async Task ActivateSiloGrainAsync(CancellationToken cancellationToken)
     {
         try
         {
             var siloGrain = siloGrainClient.GrainService(localSiloDetails.SiloAddress);
-            await siloGrain.SetVersion(GetOrleansVersion(), GetHostVersion()).ConfigureAwait(false);
+            await siloGrain.SetVersion(GetOrleansVersion(), GetHostVersion(), cancellationToken).ConfigureAwait(false);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
         {
             LogWarningActivateSiloGrainServiceStartupFailed(logger, ex);
         }
     }
 
-    private async Task ActivateDashboardGrainAsync()
+    private async Task ActivateDashboardGrainAsync(CancellationToken cancellationToken)
     {
         try
         {
             var dashboardGrain = grainFactory.GetGrain<IDashboardGrain>(0);
-            await dashboardGrain.InitializeAsync().ConfigureAwait(false);
+            await dashboardGrain.InitializeAsync(cancellationToken).ConfigureAwait(false);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
         {
             LogWarningActivateDashboardGrainStartupFailed(logger, ex);
         }

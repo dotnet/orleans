@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Orleans.CodeGenerator.SyntaxGeneration;
@@ -25,6 +26,52 @@ internal static class GeneratedCodeUtilities
 
     internal static string CreateHashedMethodId(IMethodSymbol methodSymbol)
         => MethodIdProvider.Create(methodSymbol);
+
+    internal static string? GetMethodId(
+        LibraryTypes libraryTypes,
+        IMethodSymbol method)
+    {
+        return GetId(libraryTypes, method)?.ToString(CultureInfo.InvariantCulture)
+            ?? GetAlias(libraryTypes, method);
+    }
+
+    internal static string? GetClaimedGeneratedMethodId(
+        LibraryTypes libraryTypes,
+        IMethodSymbol method,
+        INamedTypeSymbol containingInterface,
+        bool isExtension)
+    {
+        if (GetId(libraryTypes, method) is not { } methodId)
+        {
+            return null;
+        }
+
+        foreach (var candidate in containingInterface.GetMembers().OfType<IMethodSymbol>()
+            .Concat(containingInterface.AllInterfaces.SelectMany(static interfaceType => interfaceType.GetMembers().OfType<IMethodSymbol>())))
+        {
+            if (SymbolEqualityComparer.Default.Equals(candidate.OriginalDefinition, method.OriginalDefinition))
+            {
+                continue;
+            }
+
+            if (isExtension
+                && !SymbolEqualityComparer.Default.Equals(
+                    candidate.OriginalDefinition.ContainingType,
+                    method.OriginalDefinition.ContainingType))
+            {
+                continue;
+            }
+
+            var generatedMethodId = CreateHashedMethodId(candidate.OriginalDefinition);
+            if (uint.TryParse(generatedMethodId, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var generatedId)
+                && generatedId == methodId)
+            {
+                return generatedMethodId;
+            }
+        }
+
+        return null;
+    }
 
     internal static string? GetAlias(LibraryTypes libraryTypes, ISymbol symbol) => (string?)symbol.GetAttribute(libraryTypes.AliasAttribute)?.ConstructorArguments.First().Value;
 

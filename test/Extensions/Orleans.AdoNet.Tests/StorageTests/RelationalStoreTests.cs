@@ -122,7 +122,7 @@ namespace UnitTests.StorageTests.AdoNet
                     //Here one second is added to the task timeout limit in order to account for the delays.
                     //The delays are mainly in the underlying ADO.NET libraries and database.
                     var task = sut.Storage.ReadAsync<int>(sut.CancellationTestQuery, tokenSource.Token);
-                    if(!task.Wait(timeoutLimit.Add(TimeSpan.FromSeconds(2))))
+                    if(!task.Wait(timeoutLimit.Add(TimeSpan.FromSeconds(2)), testCancellationToken))
                     {
                         Assert.Fail(string.Format("Timeout limit {0} ms exceeded.", timeoutLimit.TotalMilliseconds));
                     }

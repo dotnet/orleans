@@ -100,8 +100,9 @@ namespace Orleans.Streams
             shared.ActivationDirectory.RecordNewTarget(this);
         }
 
-        public async Task Initialize()
+        public async Task Initialize(CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             LogInfoInit();
 
             await this.queueBalancer.Initialize(this.adapterFactory.GetStreamQueueMapper());
@@ -114,7 +115,7 @@ namespace Orleans.Streams
             managerState = RunState.Initialized;
         }
 
-        public async Task Stop()
+        public async Task Stop(CancellationToken cancellationToken)
         {
             var balancer = this.queueBalancer;
             if (balancer is null)
@@ -122,7 +123,7 @@ namespace Orleans.Streams
                 return;
             }
 
-            await StopAgents();
+            await StopAgents(cancellationToken);
             if (queuePrintTimer != null)
             {
                 queuePrintTimer.Dispose();
@@ -132,25 +133,27 @@ namespace Orleans.Streams
             await balancer.Shutdown();
         }
 
-        public async Task StartAgents()
+        public async Task StartAgents(CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             managerState = RunState.AgentsStarted;
             List<QueueId> myQueues = queueBalancer.GetMyQueues().ToList();
             var previousQueues = CaptureAgentQueuesIfDiagnosticsEnabled();
 
             LogInfoStarting(myQueues.Count, new(myQueues));
-            await AddNewQueues(myQueues, true);
+            await AddNewQueues(myQueues, true, CancellationToken.None);
             EmitAgentQueueChange(previousQueues);
             LogInfoStarted();
             EmitPullingAgentManagerState();
         }
 
-        public async Task StopAgents()
+        public async Task StopAgents(CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             managerState = RunState.AgentsStopped;
             List<QueueId> queuesToRemove = queuesToAgentsMap.Keys.ToList();
             LogInfoStopping(queuesToRemove.Count, new(queuesToRemove));
-            await RemoveQueues(queuesToRemove);
+            await RemoveQueues(queuesToRemove, CancellationToken.None);
             EmitAgentQueueChange(queuesToRemove);
             LogInfoStopped();
         }
@@ -269,7 +272,7 @@ namespace Orleans.Streams
         /// <param name="myQueues"></param>
         /// <param name="failOnInit"></param>
         /// <returns></returns>
-        private async Task AddNewQueues(IEnumerable<QueueId> myQueues, bool failOnInit)
+        private async Task AddNewQueues(IEnumerable<QueueId> myQueues, bool failOnInit, CancellationToken cancellationToken = default)
         {
             // Create agents for queues in range that we don't yet have.
             // First create them and store in local queuesToAgentsMap.
@@ -277,6 +280,7 @@ namespace Orleans.Streams
             var agents = new List<PersistentStreamPullingAgent>();
             foreach (var queueId in myQueues)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (queuesToAgentsMap.ContainsKey(queueId))
                 {
                     continue;
@@ -327,9 +331,13 @@ namespace Orleans.Streams
                 var initTasks = new List<Task>();
                 foreach (var agent in agents)
                 {
-                    initTasks.Add(InitAgent(agent));
+                    initTasks.Add(InitAgent(agent, cancellationToken));
                 }
                 await Task.WhenAll(initTasks);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch
             {
@@ -346,7 +354,7 @@ namespace Orleans.Streams
             }
         }
 
-        private async Task InitAgent(PersistentStreamPullingAgent agent)
+        private async Task InitAgent(PersistentStreamPullingAgent agent, CancellationToken cancellationToken)
         {
             // Init the agent only after it was registered locally.
             var agentGrainRef = agent.AsReference<IPersistentStreamPullingAgent>();
@@ -354,7 +362,11 @@ namespace Orleans.Streams
             // Need to call it as a grain reference.
             try
             {
-                await agentGrainRef.Initialize();
+                await agentGrainRef.Initialize(cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception exc)
             {
@@ -362,7 +374,7 @@ namespace Orleans.Streams
             }
         }
 
-        private async Task RemoveQueues(List<QueueId> queuesToRemove)
+        private async Task RemoveQueues(List<QueueId> queuesToRemove, CancellationToken cancellationToken = default)
         {
             if (queuesToRemove.Count == 0)
             {
@@ -374,6 +386,7 @@ namespace Orleans.Streams
             var removeTasks = new List<Task>();
             foreach (var queueId in queuesToRemove)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!queuesToAgentsMap.Remove(queueId, out var agent))
                 {
                     continue;
@@ -381,7 +394,7 @@ namespace Orleans.Streams
 
                 agents.Add(agent);
                 deactivatedAgents[queueId] = agent;
-                var task = OrleansTaskExtentions.SafeExecute(() => agent.RunOrQueueTask(agent.Shutdown));
+                var task = OrleansTaskExtentions.SafeExecute(() => agent.RunOrQueueTask(() => agent.Shutdown(cancellationToken)));
                 task = task.LogException(logger, ErrorCode.PersistentStreamPullingManager_11,
                     $"PersistentStreamPullingAgent {agent.QueueId} failed to Shutdown.");
                 removeTasks.Add(task);
@@ -389,6 +402,10 @@ namespace Orleans.Streams
             try
             {
                 await Task.WhenAll(removeTasks);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch
             {
@@ -411,8 +428,9 @@ namespace Orleans.Streams
             StreamingEvents.EmitPullingAgentManagerState(streamProviderName, Silo, queuesToAgentsMap.Keys, NumberRunningAgents);
         }
 
-        public async Task<object?> ExecuteCommand(PersistentStreamProviderCommand command, object? arg)
+        public async Task<object?> ExecuteCommand(PersistentStreamProviderCommand command, object? arg, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             latestCommandNumber++;
             int commandSeqNumber = latestCommandNumber;
 
@@ -428,7 +446,7 @@ namespace Orleans.Streams
                 {
                     case PersistentStreamProviderCommand.StartAgents:
                     case PersistentStreamProviderCommand.StopAgents:
-                        await QueueCommandForExecution(command, commandSeqNumber);
+                        await QueueCommandForExecution(command, commandSeqNumber, cancellationToken);
                         return null;
                     case PersistentStreamProviderCommand.GetAgentsState:
                         return managerState;
@@ -451,7 +469,7 @@ namespace Orleans.Streams
         // Start and Stop commands are composite commands that take multiple turns.
         // Ee don't wnat them to interleave with other concurrent Start/Stop commands, as well as not with QueueDistributionChangeNotification.
         // Therefore, we serialize them all via the same nonReentrancyGuarantor.
-        private Task QueueCommandForExecution(PersistentStreamProviderCommand command, int commandSeqNumber)
+        private Task QueueCommandForExecution(PersistentStreamProviderCommand command, int commandSeqNumber, CancellationToken cancellationToken)
         {
             return nonReentrancyGuarantor.AddNext(() =>
             {
@@ -466,9 +484,9 @@ namespace Orleans.Streams
                 switch (command)
                 {
                     case PersistentStreamProviderCommand.StartAgents:
-                        return StartAgents();
+                        return StartAgents(cancellationToken);
                     case PersistentStreamProviderCommand.StopAgents:
-                        return StopAgents();
+                        return StopAgents(cancellationToken);
                     default:
                         throw new OrleansException($"PullingAgentManager got unsupported command {command}");
                 }

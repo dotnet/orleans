@@ -37,7 +37,7 @@ namespace UnitTests
         public async Task TestGetGrainsTypes()
         {
             var dashboardGrain = _cluster.GrainFactory!.GetGrain<IDashboardGrain>(1); // This fixture deploys the client.
-            var types = await dashboardGrain.GetGrainTypes();
+            var types = await dashboardGrain.GetGrainTypes(cancellationToken: TestContext.Current.CancellationToken);
 
             Assert.Contains("TestGrains.TestStateInMemoryGrain", types.Value);
         }
@@ -48,7 +48,10 @@ namespace UnitTests
             var dashboardGrain = _cluster.GrainFactory!.GetGrain<IDashboardGrain>(1); // This fixture deploys the client.
             var stateGrain = _cluster.GrainFactory!.GetGrain<ITestStateInMemoryGrain>(123); // This fixture deploys the client.
 
-            var immutableState = await dashboardGrain.GetGrainState("123", "TestGrains.TestStateInMemoryGrain");
+            var immutableState = await dashboardGrain.GetGrainState(
+                "123",
+                "TestGrains.TestStateInMemoryGrain",
+                TestContext.Current.CancellationToken);
 
             dynamic state = JObject.Parse(immutableState.Value);
 
@@ -67,7 +70,10 @@ namespace UnitTests
                 Counter = 5,
                 CurrentDateTime = DateTime.UtcNow
             });
-            var immutableState = await dashboardGrain.GetGrainState("123", "TestGrains.TestStateGrain");
+            var immutableState = await dashboardGrain.GetGrainState(
+                "123",
+                "TestGrains.TestStateGrain",
+                TestContext.Current.CancellationToken);
 
             dynamic state = JObject.Parse(immutableState.Value);
 

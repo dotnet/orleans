@@ -79,10 +79,10 @@ namespace Orleans.Runtime.Messaging
             lifecycle.Subscribe(nameof(GatewayConnectionListener), ServiceLifecycleStage.RuntimeInitialize - 1, this);
             lifecycle.Subscribe(nameof(GatewayConnectionListener), ServiceLifecycleStage.Active, RunStart);
 
-            Task RunStart(CancellationToken ct) => Task.Run(Start);
+            Task RunStart(CancellationToken ct) => Task.Run(Start, CancellationToken.None);
         }
 
-        Task ILifecycleObserver.OnStart(CancellationToken ct) => Task.Run(BindAsync);
-        Task ILifecycleObserver.OnStop(CancellationToken ct) => Task.Run(() => StopAsync(ct));
+        Task ILifecycleObserver.OnStart(CancellationToken ct) => Task.Run(BindAsync, CancellationToken.None);
+        Task ILifecycleObserver.OnStop(CancellationToken ct) => Task.Run(() => StopAsync(ct), CancellationToken.None);
     }
 }

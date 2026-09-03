@@ -17,6 +17,14 @@ namespace Orleans.Streams
         Task Initialize(TimeSpan timeout);
 
         /// <summary>
+        /// Initializes this receiver.
+        /// </summary>
+        /// <param name="timeout">The timeout for this operation.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <returns>A <see cref="Task"/> representing the operation.</returns>
+        Task Initialize(TimeSpan timeout, CancellationToken cancellationToken) => Initialize(timeout);
+
+        /// <summary>
         /// Retrieves batches from a message queue.
         /// </summary>
         /// <param name="maxCount">
@@ -64,5 +72,13 @@ namespace Orleans.Streams
         /// </summary>
         /// <returns>A <see cref="Task"/> representing the operation.</returns>
         Task Shutdown(TimeSpan timeout);
+
+        /// <summary>
+        /// Shuts down this receiver and cleans up.
+        /// </summary>
+        /// <param name="timeout">The timeout for this operation.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <returns>A <see cref="Task"/> representing the operation.</returns>
+        Task Shutdown(TimeSpan timeout, CancellationToken cancellationToken) => Shutdown(timeout);
     }
 }

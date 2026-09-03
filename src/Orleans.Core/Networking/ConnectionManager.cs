@@ -320,7 +320,8 @@ namespace Orleans.Runtime.Messaging
                     }
                     else if (!pendingConnections) break;
 
-                    await Task.Delay(10);
+                    await Task.Delay(10, ct).SuppressThrowing();
+                    if (ct.IsCancellationRequested) break;
                     if (++cycles > 100 && cycles % 500 == 0 && this.ConnectionCount is var remaining and > 0)
                     {
                         LogWarningWaitingForConnectionsToTerminate(this.logger, remaining);

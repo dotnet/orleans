@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
@@ -28,7 +29,17 @@ public static class GrainReminderExtensions
     /// There is no special one-shot reminder value for <paramref name="period"/>. Register a valid positive period and then unregister the reminder when the first callback fires.
     /// </remarks>
     public static Task<IGrainReminder> RegisterOrUpdateReminder(this Grain grain, string reminderName, TimeSpan dueTime, TimeSpan period)
-        => RegisterOrUpdateReminder(grain is IRemindable, grain?.GrainContext, reminderName, dueTime, period);
+        => RegisterOrUpdateReminder(grain is IRemindable, grain?.GrainContext, reminderName, dueTime, period, CancellationToken.None);
+
+    /// <summary>Registers or updates a reminder.</summary>
+    /// <param name="grain">The grain instance.</param>
+    /// <param name="reminderName">The reminder name.</param>
+    /// <param name="dueTime">The due time.</param>
+    /// <param name="period">The period.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>The reminder.</returns>
+    public static Task<IGrainReminder> RegisterOrUpdateReminder(this Grain grain, string reminderName, TimeSpan dueTime, TimeSpan period, CancellationToken cancellationToken)
+        => RegisterOrUpdateReminder(grain is IRemindable, grain?.GrainContext, reminderName, dueTime, period, cancellationToken);
 
     /// <summary>
     /// Registers a persistent, reliable reminder to send regular notifications (reminders) to the grain.
@@ -46,15 +57,31 @@ public static class GrainReminderExtensions
     /// There is no special one-shot reminder value for <paramref name="period"/>. Register a valid positive period and then unregister the reminder when the first callback fires.
     /// </remarks>
     public static Task<IGrainReminder> RegisterOrUpdateReminder(this IGrainBase grain, string reminderName, TimeSpan dueTime, TimeSpan period)
-        => RegisterOrUpdateReminder(grain is IRemindable, grain?.GrainContext, reminderName, dueTime, period);
+        => RegisterOrUpdateReminder(grain is IRemindable, grain?.GrainContext, reminderName, dueTime, period, CancellationToken.None);
 
-    private static Task<IGrainReminder> RegisterOrUpdateReminder(bool remindable, IGrainContext? grainContext, string reminderName, TimeSpan dueTime, TimeSpan period)
+    /// <summary>Registers or updates a reminder.</summary>
+    /// <param name="grain">The grain instance.</param>
+    /// <param name="reminderName">The reminder name.</param>
+    /// <param name="dueTime">The due time.</param>
+    /// <param name="period">The period.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>The reminder.</returns>
+    public static Task<IGrainReminder> RegisterOrUpdateReminder(this IGrainBase grain, string reminderName, TimeSpan dueTime, TimeSpan period, CancellationToken cancellationToken)
+        => RegisterOrUpdateReminder(grain is IRemindable, grain?.GrainContext, reminderName, dueTime, period, cancellationToken);
+
+    private static Task<IGrainReminder> RegisterOrUpdateReminder(
+        bool remindable,
+        IGrainContext? grainContext,
+        string reminderName,
+        TimeSpan dueTime,
+        TimeSpan period,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(grainContext, "grain");
         if (string.IsNullOrWhiteSpace(reminderName)) throw new ArgumentNullException(nameof(reminderName));
         if (!remindable) throw new InvalidOperationException($"Grain {grainContext.GrainId} is not '{nameof(IRemindable)}'. A grain should implement {nameof(IRemindable)} to use the persistent reminder service");
 
-        return GetReminderRegistry(grainContext).RegisterOrUpdateReminder(grainContext.GrainId, reminderName, dueTime, period);
+        return GetReminderRegistry(grainContext).RegisterOrUpdateReminder(grainContext.GrainId, reminderName, dueTime, period, cancellationToken);
     }
 
     /// <summary>
@@ -63,7 +90,15 @@ public static class GrainReminderExtensions
     /// <param name="grain">The grain instance.</param>
     /// <param name="reminder">Reminder to unregister.</param>
     /// <returns>Completion promise for this operation.</returns>
-    public static Task UnregisterReminder(this Grain grain, IGrainReminder reminder) => UnregisterReminder(grain?.GrainContext, reminder);
+    public static Task UnregisterReminder(this Grain grain, IGrainReminder reminder) => UnregisterReminder(grain?.GrainContext, reminder, CancellationToken.None);
+
+    /// <summary>Unregisters a previously registered reminder.</summary>
+    /// <param name="grain">The grain instance.</param>
+    /// <param name="reminder">The reminder.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>A task representing the operation.</returns>
+    public static Task UnregisterReminder(this Grain grain, IGrainReminder reminder, CancellationToken cancellationToken)
+        => UnregisterReminder(grain?.GrainContext, reminder, cancellationToken);
 
     /// <summary>
     /// Unregisters a previously registered reminder.
@@ -71,12 +106,20 @@ public static class GrainReminderExtensions
     /// <param name="grain">The grain instance.</param>
     /// <param name="reminder">Reminder to unregister.</param>
     /// <returns>Completion promise for this operation.</returns>
-    public static Task UnregisterReminder(this IGrainBase grain, IGrainReminder reminder) => UnregisterReminder(grain?.GrainContext, reminder);
+    public static Task UnregisterReminder(this IGrainBase grain, IGrainReminder reminder) => UnregisterReminder(grain?.GrainContext, reminder, CancellationToken.None);
 
-    private static Task UnregisterReminder(IGrainContext? grainContext, IGrainReminder reminder)
+    /// <summary>Unregisters a previously registered reminder.</summary>
+    /// <param name="grain">The grain instance.</param>
+    /// <param name="reminder">The reminder.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>A task representing the operation.</returns>
+    public static Task UnregisterReminder(this IGrainBase grain, IGrainReminder reminder, CancellationToken cancellationToken)
+        => UnregisterReminder(grain?.GrainContext, reminder, cancellationToken);
+
+    private static Task UnregisterReminder(IGrainContext? grainContext, IGrainReminder reminder, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(grainContext, "grain");
-        return GetReminderRegistry(grainContext).UnregisterReminder(grainContext.GrainId, reminder);
+        return GetReminderRegistry(grainContext).UnregisterReminder(grainContext.GrainId, reminder, cancellationToken);
     }
 
     /// <summary>
@@ -85,7 +128,15 @@ public static class GrainReminderExtensions
     /// <param name="grain">The grain instance.</param>
     /// <param name="reminderName">Reminder to return</param>
     /// <returns>Promise for Reminder handle.</returns>
-    public static Task<IGrainReminder?> GetReminder(this Grain grain, string reminderName) => GetReminder(grain?.GrainContext, reminderName);
+    public static Task<IGrainReminder?> GetReminder(this Grain grain, string reminderName) => GetReminder(grain?.GrainContext, reminderName, CancellationToken.None);
+
+    /// <summary>Returns a previously registered reminder.</summary>
+    /// <param name="grain">The grain instance.</param>
+    /// <param name="reminderName">The reminder name.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>The reminder.</returns>
+    public static Task<IGrainReminder?> GetReminder(this Grain grain, string reminderName, CancellationToken cancellationToken)
+        => GetReminder(grain?.GrainContext, reminderName, cancellationToken);
 
     /// <summary>
     /// Returns a previously registered reminder.
@@ -93,32 +144,56 @@ public static class GrainReminderExtensions
     /// <param name="grain">A grain.</param>
     /// <param name="reminderName">Reminder to return</param>
     /// <returns>Promise for Reminder handle.</returns>
-    public static Task<IGrainReminder?> GetReminder(this IGrainBase grain, string reminderName) => GetReminder(grain?.GrainContext, reminderName);
+    public static Task<IGrainReminder?> GetReminder(this IGrainBase grain, string reminderName) => GetReminder(grain?.GrainContext, reminderName, CancellationToken.None);
 
-    private static Task<IGrainReminder?> GetReminder(IGrainContext? grainContext, string reminderName)
+    /// <summary>Returns a previously registered reminder.</summary>
+    /// <param name="grain">The grain instance.</param>
+    /// <param name="reminderName">The reminder name.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>The reminder.</returns>
+    public static Task<IGrainReminder?> GetReminder(this IGrainBase grain, string reminderName, CancellationToken cancellationToken)
+        => GetReminder(grain?.GrainContext, reminderName, cancellationToken);
+
+    private static Task<IGrainReminder?> GetReminder(IGrainContext? grainContext, string reminderName, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(grainContext, "grain");
         if (string.IsNullOrWhiteSpace(reminderName)) throw new ArgumentNullException(nameof(reminderName));
 
-        return GetReminderRegistry(grainContext).GetReminder(grainContext.GrainId, reminderName);
+        return GetReminderRegistry(grainContext).GetReminder(grainContext.GrainId, reminderName, cancellationToken);
     }
 
     /// <summary>
     /// Returns a list of all reminders registered by the grain.
     /// </summary>
+    /// <param name="grain">The grain instance.</param>
     /// <returns>Promise for list of Reminders registered for this grain.</returns>
-    public static Task<List<IGrainReminder>> GetReminders(this Grain grain) => GetReminders(grain?.GrainContext);
+    public static Task<List<IGrainReminder>> GetReminders(this Grain grain) => GetReminders(grain?.GrainContext, CancellationToken.None);
+
+    /// <summary>Returns all reminders registered by the grain.</summary>
+    /// <param name="grain">The grain instance.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>The reminders.</returns>
+    public static Task<List<IGrainReminder>> GetReminders(this Grain grain, CancellationToken cancellationToken)
+        => GetReminders(grain?.GrainContext, cancellationToken);
 
     /// <summary>
     /// Returns a list of all reminders registered by the grain.
     /// </summary>
+    /// <param name="grain">The grain instance.</param>
     /// <returns>Promise for list of Reminders registered for this grain.</returns>
-    public static Task<List<IGrainReminder>> GetReminders(this IGrainBase grain) => GetReminders(grain?.GrainContext);
+    public static Task<List<IGrainReminder>> GetReminders(this IGrainBase grain) => GetReminders(grain?.GrainContext, CancellationToken.None);
 
-    private static Task<List<IGrainReminder>> GetReminders(IGrainContext? grainContext)
+    /// <summary>Returns all reminders registered by the grain.</summary>
+    /// <param name="grain">The grain instance.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>The reminders.</returns>
+    public static Task<List<IGrainReminder>> GetReminders(this IGrainBase grain, CancellationToken cancellationToken)
+        => GetReminders(grain?.GrainContext, cancellationToken);
+
+    private static Task<List<IGrainReminder>> GetReminders(IGrainContext? grainContext, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(grainContext, "grain");
-        return GetReminderRegistry(grainContext).GetReminders(grainContext.GrainId);
+        return GetReminderRegistry(grainContext).GetReminders(grainContext.GrainId, cancellationToken);
     }
 
     /// <summary>

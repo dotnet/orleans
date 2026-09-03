@@ -19,7 +19,11 @@ internal sealed class SiloMetadataSystemTarget : SystemTarget, ISiloMetadataSyst
         shared.ActivationDirectory.RecordNewTarget(this);
     }
 
-    public Task<SiloMetadata> GetSiloMetadata() => Task.FromResult(_siloMetadata);
+    public Task<SiloMetadata> GetSiloMetadata(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(_siloMetadata);
+    }
     void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
     {
         // We don't participate in any lifecycle stages: activating this instance is all that is necessary.

@@ -34,9 +34,9 @@ namespace TestGrains
 
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            await this.RegisterOrUpdateReminder("Frequent", TimeSpan.Zero, TimeSpan.FromMinutes(1));
-            await this.RegisterOrUpdateReminder("Daily", TimeSpan.Zero, TimeSpan.FromDays(1));
-            await this.RegisterOrUpdateReminder("Weekly", TimeSpan.Zero, TimeSpan.FromDays(7));
+            await this.RegisterOrUpdateReminder("Frequent", TimeSpan.Zero, TimeSpan.FromMinutes(1), cancellationToken);
+            await this.RegisterOrUpdateReminder("Daily", TimeSpan.Zero, TimeSpan.FromDays(1), cancellationToken);
+            await this.RegisterOrUpdateReminder("Weekly", TimeSpan.Zero, TimeSpan.FromDays(7), cancellationToken);
         }
 
         public Task ReceiveReminder(string reminderName, TickStatus status)

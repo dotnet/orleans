@@ -207,8 +207,8 @@ public sealed class IdealizedReminderTableTests : ReminderTableTestRunner
             NewEntry(grainId, "operation-log"),
             nameof(Oracle_Operations_RecordSequenceIdentityAndOutcome),
             TestContext.Current.CancellationToken);
-        _ = await ReminderTable.ReadRow(grainId, "operation-log").WaitAsync(TestContext.Current.CancellationToken);
-        var removed = await ReminderTable.RemoveRow(grainId, "operation-log", "not-the-current-etag").WaitAsync(TestContext.Current.CancellationToken);
+        _ = await ReminderTable.ReadRow(grainId, "operation-log", TestContext.Current.CancellationToken);
+        var removed = await ReminderTable.RemoveRow(grainId, "operation-log", "not-the-current-etag", TestContext.Current.CancellationToken);
 
         Assert.False(removed);
 
@@ -252,7 +252,7 @@ public sealed class IdealizedReminderTableTests : ReminderTableTestRunner
         Assert.Equal(new[] { "etag-000001", "etag-000002", "etag-000003", "etag-000004" }, etags);
 
         // Removing and re-adding must not recycle an ETag.
-        Assert.True(await ReminderTable.RemoveRow(grainId, "etag-sequence-0", etags[0]).WaitAsync(TestContext.Current.CancellationToken));
+        Assert.True(await ReminderTable.RemoveRow(grainId, "etag-sequence-0", etags[0], TestContext.Current.CancellationToken));
         var reAdded = await UpsertAsync(
             NewEntry(grainId, "etag-sequence-0"),
             nameof(Oracle_ETags_AreMonotonicAndNeverReused),
@@ -278,18 +278,18 @@ public sealed class IdealizedReminderTableTests : ReminderTableTestRunner
         Assert.False(_oracle.IsAvailable);
 
         await Assert.ThrowsAsync<ReminderTableUnavailableException>(
-            () => ReminderTable.ReadRow(grainId, "outage").WaitAsync(TestContext.Current.CancellationToken));
+            () => ReminderTable.ReadRow(grainId, "outage", TestContext.Current.CancellationToken));
         await Assert.ThrowsAsync<ReminderTableUnavailableException>(
-            () => ReminderTable.ReadRows(0, 0).WaitAsync(TestContext.Current.CancellationToken));
+            () => ReminderTable.ReadRows(0, 0, TestContext.Current.CancellationToken));
         await Assert.ThrowsAsync<ReminderTableUnavailableException>(
-            () => ReminderTable.UpsertRow(NewEntry(grainId, "outage-2")).WaitAsync(TestContext.Current.CancellationToken));
+            () => ReminderTable.UpsertRow(NewEntry(grainId, "outage-2"), TestContext.Current.CancellationToken));
 
         // The outage is recorded so a test can assert on what the reminder service attempted while storage was down.
         Assert.Equal(3, _oracle.Operations.Count(operation => operation.Failure == nameof(ReminderTableUnavailableException)));
 
         // Durable state survives the outage: it was an availability failure, not a deletion.
         _oracle.SetAvailable(true);
-        var recovered = await ReminderTable.ReadRow(grainId, "outage").WaitAsync(TestContext.Current.CancellationToken);
+        var recovered = await ReminderTable.ReadRow(grainId, "outage", TestContext.Current.CancellationToken);
         Assert.NotNull(recovered);
         Assert.Equal(etag, recovered.ETag);
         Assert.Null(_oracle.Find(grainId, "outage-2"));
@@ -302,20 +302,20 @@ public sealed class IdealizedReminderTableTests : ReminderTableTestRunner
         _oracle.InjectFailure(ReminderTableOperationKind.UpsertRow, count: 2, () => new InvalidOperationException("transient store failure"));
 
         var first = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => ReminderTable.UpsertRow(NewEntry(grainId, "injected-failure")).WaitAsync(TestContext.Current.CancellationToken));
+            () => ReminderTable.UpsertRow(NewEntry(grainId, "injected-failure"), TestContext.Current.CancellationToken));
         Assert.Equal("transient store failure", first.Message);
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => ReminderTable.UpsertRow(NewEntry(grainId, "injected-failure")).WaitAsync(TestContext.Current.CancellationToken));
+            () => ReminderTable.UpsertRow(NewEntry(grainId, "injected-failure"), TestContext.Current.CancellationToken));
 
         // The third attempt is not affected, and the failures did not create partial state.
-        var etag = await ReminderTable.UpsertRow(NewEntry(grainId, "injected-failure")).WaitAsync(TestContext.Current.CancellationToken);
+        var etag = await ReminderTable.UpsertRow(NewEntry(grainId, "injected-failure"), TestContext.Current.CancellationToken);
         Assert.NotNull(etag);
         Assert.Equal("etag-000001", etag);
         Assert.Equal(2, _oracle.Operations.Count(operation => operation.Failure == nameof(InvalidOperationException)));
         Assert.Single(_oracle.Snapshot());
 
         // Reads were never targeted, so they were never failed.
-        Assert.NotNull(await ReminderTable.ReadRow(grainId, "injected-failure").WaitAsync(TestContext.Current.CancellationToken));
+        Assert.NotNull(await ReminderTable.ReadRow(grainId, "injected-failure", TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -325,7 +325,7 @@ public sealed class IdealizedReminderTableTests : ReminderTableTestRunner
         _oracle.InjectFailure(ReminderTableOperationKind.ReadRow, count: 2);
 
         _oracle.ClearInjectedFailures();
-        var result = await ReminderTable.ReadRow(grainId, "missing").WaitAsync(TestContext.Current.CancellationToken);
+        var result = await ReminderTable.ReadRow(grainId, "missing", TestContext.Current.CancellationToken);
 
         Assert.Null(result);
         Assert.Single(_oracle.Operations, operation =>
@@ -349,7 +349,7 @@ public sealed class IdealizedReminderTableTests : ReminderTableTestRunner
         cancellation.CancelAfter(TestConstants.InitTimeout);
         await using var gate = _oracle.BlockNext(ReminderTableOperationKind.ReadRange);
 
-        var rangeRead = ReminderTable.ReadRows(0, 0);
+        var rangeRead = ReminderTable.ReadRows(0, 0, cancellation.Token);
         await gate.WaitUntilBlockedAsync(cancellation.Token);
         Assert.False(rangeRead.IsCompleted);
 
@@ -376,7 +376,7 @@ public sealed class IdealizedReminderTableTests : ReminderTableTestRunner
         cancellation.CancelAfter(TestConstants.InitTimeout);
         var gate = _oracle.BlockNext(ReminderTableOperationKind.ReadRow);
 
-        var read = ReminderTable.ReadRow(grainId, "missing");
+        var read = ReminderTable.ReadRow(grainId, "missing", cancellation.Token);
         await gate.WaitUntilBlockedAsync(cancellation.Token);
         Assert.False(read.IsCompleted);
 
@@ -408,7 +408,7 @@ public sealed class IdealizedReminderTableTests : ReminderTableTestRunner
                 TestContext.Current.CancellationToken);
             Assert.NotEqual(original, updated);
 
-            var stale = await ReminderTable.ReadRow(grainId, "stale-snapshot").WaitAsync(TestContext.Current.CancellationToken);
+            var stale = await ReminderTable.ReadRow(grainId, "stale-snapshot", TestContext.Current.CancellationToken);
             Assert.NotNull(stale);
             Assert.Equal(original, stale.ETag);
             Assert.Equal(BaseTime.Ticks, stale.StartAt.Ticks);
@@ -417,7 +417,7 @@ public sealed class IdealizedReminderTableTests : ReminderTableTestRunner
             Assert.Equal(updated, _oracle.Find(grainId, "stale-snapshot")!.ETag);
         }
 
-        var live = await ReminderTable.ReadRow(grainId, "stale-snapshot").WaitAsync(TestContext.Current.CancellationToken);
+        var live = await ReminderTable.ReadRow(grainId, "stale-snapshot", TestContext.Current.CancellationToken);
         Assert.NotNull(live);
         Assert.Equal(BaseTime.AddMinutes(20).Ticks, live.StartAt.Ticks);
         Assert.Equal(TimeSpan.FromMinutes(9), live.Period);

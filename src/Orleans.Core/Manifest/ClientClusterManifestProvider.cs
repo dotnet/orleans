@@ -138,7 +138,7 @@ namespace Orleans.Runtime
 
                     try
                     {
-                        var updateResult = await GetClusterManifestUpdate(provider, gatewayVersion).WaitAsync(_shutdownCts.Token);
+                        var updateResult = await GetClusterManifestUpdate(provider, gatewayVersion, _shutdownCts.Token);
                         if (updateResult is null)
                         {
                             // There was no newer cluster manifest, so wait for the next refresh interval and try again.
@@ -204,20 +204,27 @@ namespace Orleans.Runtime
             }
         }
 
-        private async Task<ClusterManifestUpdate?> GetClusterManifestUpdate(IClusterManifestSystemTarget provider, MajorMinorVersion previousVersion)
+        private async Task<ClusterManifestUpdate?> GetClusterManifestUpdate(
+            IClusterManifestSystemTarget provider,
+            MajorMinorVersion previousVersion,
+            CancellationToken cancellationToken)
         {
             try
             {
                 // First, attempt to call the new API, which provides more information.
                 // This returns null if there is no newer cluster manifest.
-                return await provider.GetClusterManifestUpdate(previousVersion);
+                return await provider.GetClusterManifestUpdate(previousVersion, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception exception)
             {
                 LogFailedToFetchClusterManifestUpdate(_logger, exception, provider);
 
                 // If the provider does not support the new API, fall back to the old one.
-                var manifest = await provider.GetClusterManifest();
+                var manifest = await provider.GetClusterManifest(cancellationToken);
                 var result = new ClusterManifestUpdate(manifest.Version, manifest.Silos, includesAllActiveServers: true);
                 return result;
             }

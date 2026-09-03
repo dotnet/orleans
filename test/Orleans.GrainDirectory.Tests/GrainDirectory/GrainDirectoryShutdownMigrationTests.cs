@@ -205,7 +205,7 @@ public sealed class ShutdownMigrationGrain : Grain, IShutdownMigrationGrain, IGr
             GrainContext.Migrate(new()
             {
                 [IPlacementDirector.PlacementHintKey] = GrainContext.Address.SiloAddress!
-            });
+            }, cancellationToken);
         }
 
         await base.OnDeactivateAsync(reason, cancellationToken);

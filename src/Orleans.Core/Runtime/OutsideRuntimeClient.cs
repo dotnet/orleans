@@ -148,7 +148,7 @@ namespace Orleans
         {
             // Deliberately avoid capturing the current synchronization context during startup and execute on the default scheduler.
             // This helps to avoid any issues (such as deadlocks) caused by executing with the client's synchronization context/scheduler.
-            await Task.Run(() => this.StartInternal(cancellationToken)).ConfigureAwait(false);
+            await Task.Run(() => this.StartInternal(cancellationToken), CancellationToken.None).ConfigureAwait(false);
 
             LogStartedClient(logger, CurrentActivationAddress, _localClientDetails.ClientId);
         }

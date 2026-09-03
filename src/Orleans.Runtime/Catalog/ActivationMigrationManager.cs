@@ -23,7 +23,10 @@ internal interface IActivationMigrationManagerSystemTarget : ISystemTarget
     /// <summary>
     /// Accepts migrating grains on a best-effort basis.
     /// </summary>
-    ValueTask AcceptMigratingGrains([Immutable] List<GrainMigrationPackage> migratingGrains);
+    [Alias("29E9E63F")]
+    ValueTask AcceptMigratingGrains(
+        [Immutable] List<GrainMigrationPackage> migratingGrains,
+        CancellationToken cancellationToken = default);
 }
 
 [GenerateSerializer, Immutable]
@@ -99,12 +102,15 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
         }
     }
 
-    public async ValueTask AcceptMigratingGrains(List<GrainMigrationPackage> migratingGrains)
+    public async ValueTask AcceptMigratingGrains(
+        List<GrainMigrationPackage> migratingGrains,
+        CancellationToken cancellationToken = default)
     {
         var activations = new List<ActivationData>();
         var currentActivity = Activity.Current;
         foreach (var package in migratingGrains)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             // If the activation does not exist, create it and provide it with the migration context while doing so.
             // If the activation already exists or cannot be created, it is too late to perform migration, so ignore the request.
             var context = _catalog.GetOrCreateActivation(package.GrainId, requestContextData: null, package.MigrationContext);
@@ -142,7 +148,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
             }
 
             // Wait a short amount of time and poll the activations again.
-            await Task.Delay(5);
+            await Task.Delay(5, cancellationToken);
         }
     }
 
@@ -219,7 +225,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
                     }
 
                     // Attempt to migrate the batch.
-                    await remote.AcceptMigratingGrains(batch).AsTask().WaitAsync(_shuttingDownCts.Token);
+                    await remote.AcceptMigratingGrains(batch, _shuttingDownCts.Token);
 
                     foreach (var item in items)
                     {

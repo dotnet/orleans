@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -74,7 +75,7 @@ internal sealed partial class SiloGrainService : GrainService, ISiloGrainService
         {
             var siloAddress = SiloAddress.FromParsableString(this.GetPrimaryKeyString());
 
-            var results = (await managementGrain.GetRuntimeStatistics([siloAddress])).FirstOrDefault();
+            var results = (await managementGrain.GetRuntimeStatistics([siloAddress], CancellationToken.None)).FirstOrDefault();
 
             _statistics.Enqueue(results);
 
@@ -94,16 +95,22 @@ internal sealed partial class SiloGrainService : GrainService, ISiloGrainService
         }
     }
 
-    public Task SetVersion(string orleans, string host)
+    public Task SetVersion(
+        string orleans,
+        string host,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         _versionOrleans = orleans;
         _versionHost = host;
 
         return Task.CompletedTask;
     }
 
-    public Task<Immutable<Dictionary<string, string?>>> GetExtendedProperties()
+    public Task<Immutable<Dictionary<string, string?>>> GetExtendedProperties(
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var results = new Dictionary<string, string?>
         {
             ["hostVersion"] = _versionHost,
@@ -113,8 +120,11 @@ internal sealed partial class SiloGrainService : GrainService, ISiloGrainService
         return Task.FromResult(results.AsImmutable());
     }
 
-    public Task ReportCounters(Immutable<StatCounter[]> reportCounters)
+    public Task ReportCounters(
+        Immutable<StatCounter[]> reportCounters,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         foreach (var counter in reportCounters.Value)
         {
             if (!string.IsNullOrWhiteSpace(counter.Name))
@@ -126,23 +136,28 @@ internal sealed partial class SiloGrainService : GrainService, ISiloGrainService
         return Task.CompletedTask;
     }
 
-    public Task<Immutable<SiloRuntimeStatistics?[]>> GetRuntimeStatistics()
+    public Task<Immutable<SiloRuntimeStatistics?[]>> GetRuntimeStatistics(
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         return Task.FromResult(_statistics.ToArray().AsImmutable());
     }
 
-    public Task<Immutable<StatCounter[]>> GetCounters()
+    public Task<Immutable<StatCounter[]>> GetCounters(CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         return Task.FromResult(_counters.Values.OrderBy(x => x.Name).ToArray().AsImmutable());
     }
 
-    public Task<Immutable<LifecycleStageInfo[]>> GetLifecycleStages()
+    public Task<Immutable<LifecycleStageInfo[]>> GetLifecycleStages(CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         return Task.FromResult(LifecycleStageInspector.GetStages(_siloLifecycle).AsImmutable());
     }
 
-    public Task Enable(bool enabled)
+    public Task Enable(bool enabled, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         _profiler.Enable(enabled);
 
         return Task.CompletedTask;

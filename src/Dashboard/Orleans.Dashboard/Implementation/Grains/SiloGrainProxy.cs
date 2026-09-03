@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
 using Orleans.Dashboard.Core;
@@ -23,19 +24,37 @@ internal sealed class SiloGrainProxy : Grain, ISiloGrainProxy
         _siloMetadata = new Dictionary<string, string>(siloMetadataCache?.GetSiloMetadata(siloAddress).Metadata ?? ImmutableDictionary<string, string>.Empty);
     }
 
-    public Task SetVersion(string orleans, string host) => _siloGrainService.SetVersion(orleans, host);
+    public Task SetVersion(
+        string orleans,
+        string host,
+        CancellationToken cancellationToken = default) =>
+        _siloGrainService.SetVersion(orleans, host, cancellationToken);
 
-    public Task ReportCounters(Immutable<StatCounter[]> stats) => _siloGrainService.ReportCounters(stats);
+    public Task ReportCounters(
+        Immutable<StatCounter[]> stats,
+        CancellationToken cancellationToken = default) =>
+        _siloGrainService.ReportCounters(stats, cancellationToken);
 
-    public Task Enable(bool enabled) => _siloGrainService.Enable(enabled);
+    public Task Enable(bool enabled, CancellationToken cancellationToken = default) =>
+        _siloGrainService.Enable(enabled, cancellationToken);
 
-    public Task<Immutable<Dictionary<string, string?>>> GetExtendedProperties() => _siloGrainService.GetExtendedProperties();
+    public Task<Immutable<Dictionary<string, string?>>> GetExtendedProperties(
+        CancellationToken cancellationToken = default) =>
+        _siloGrainService.GetExtendedProperties(cancellationToken);
 
-    public Task<Immutable<Dictionary<string, string>>> GetMetadata() => Task.FromResult(_siloMetadata.AsImmutable());
+    public Task<Immutable<Dictionary<string, string>>> GetMetadata(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(_siloMetadata.AsImmutable());
+    }
 
-    public Task<Immutable<SiloRuntimeStatistics?[]>> GetRuntimeStatistics() => _siloGrainService.GetRuntimeStatistics();
+    public Task<Immutable<SiloRuntimeStatistics?[]>> GetRuntimeStatistics(
+        CancellationToken cancellationToken = default) =>
+        _siloGrainService.GetRuntimeStatistics(cancellationToken);
 
-    public Task<Immutable<StatCounter[]>> GetCounters() => _siloGrainService.GetCounters();
+    public Task<Immutable<StatCounter[]>> GetCounters(CancellationToken cancellationToken = default) =>
+        _siloGrainService.GetCounters(cancellationToken);
 
-    public Task<Immutable<LifecycleStageInfo[]>> GetLifecycleStages() => _siloGrainService.GetLifecycleStages();
+    public Task<Immutable<LifecycleStageInfo[]>> GetLifecycleStages(CancellationToken cancellationToken = default) =>
+        _siloGrainService.GetLifecycleStages(cancellationToken);
 }

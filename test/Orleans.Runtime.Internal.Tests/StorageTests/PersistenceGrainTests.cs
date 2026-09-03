@@ -132,7 +132,10 @@ namespace UnitTests.StorageTests
             //request InitCount on providers on all silos in this cluster
             IManagementGrain mgmtGrain = this.HostedCluster.GrainFactory!.GetGrain<IManagementGrain>(0);
             object?[] replies = await mgmtGrain.SendControlCommandToProvider<MockStorageProvider>(
-               MockStorageProviderName1, (int)MockStorageProvider.Commands.InitCount, null);
+               MockStorageProviderName1,
+               (int)MockStorageProvider.Commands.InitCount,
+               null,
+               TestContext.Current.CancellationToken);
 
             Assert.Contains(1, replies); // StorageProvider #Init
         }

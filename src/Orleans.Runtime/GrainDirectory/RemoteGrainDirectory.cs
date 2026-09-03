@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.GrainDirectory;
@@ -32,8 +33,9 @@ namespace Orleans.Runtime.GrainDirectory
             return router.RegisterAsync(address, previousAddress, hopCount);
         }
 
-        public Task RegisterMany(List<GrainAddress> addresses)
+        public Task RegisterMany(List<GrainAddress> addresses, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (addresses == null || addresses.Count == 0)
             {
                 throw new ArgumentException("Addresses cannot be an empty list or null");
@@ -44,7 +46,8 @@ namespace Orleans.Runtime.GrainDirectory
 
             LogRegisterMany(addresses.Count);
 
-            return Task.WhenAll(addresses.Select(addr => router.RegisterAsync(addr, previousAddress: null, 1)));
+            return Task.WhenAll(addresses.Select(addr => router.RegisterAsync(addr, previousAddress: null, 1)))
+                .WaitAsync(cancellationToken);
         }
 
         public Task UnregisterAsync(GrainAddress address, UnregistrationCause cause, int hopCount)
@@ -67,7 +70,9 @@ namespace Orleans.Runtime.GrainDirectory
             return router.LookupAsync(grainId, hopCount);
         }
 
-        public Task<List<AddressAndTag>> LookUpMany(List<(GrainId GrainId, int Version)> grainAndETagList)
+        public Task<List<AddressAndTag>> LookUpMany(
+            List<(GrainId GrainId, int Version)> grainAndETagList,
+            CancellationToken cancellationToken = default)
         {
             router.DirectoryInstruments.ValidationsCacheReceived.Add(1);
             LogLookUpMany(grainAndETagList.Count);
@@ -76,6 +81,7 @@ namespace Orleans.Runtime.GrainDirectory
 
             foreach (var tuple in grainAndETagList)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 int curGen = partition.GetGrainETag(tuple.GrainId);
                 if (curGen == tuple.Version || curGen == GrainInfo.NO_ETAG)
                 {
@@ -102,8 +108,11 @@ namespace Orleans.Runtime.GrainDirectory
             return Task.FromResult(result);
         }
 
-        public Task AcceptSplitPartition(List<GrainAddress> singleActivations)
+        public Task AcceptSplitPartition(
+            List<GrainAddress> singleActivations,
+            CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             router.HandoffManager.AcceptExistingRegistrations(singleActivations);
             return Task.CompletedTask;
         }

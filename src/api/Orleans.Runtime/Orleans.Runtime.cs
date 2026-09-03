@@ -533,6 +533,12 @@ namespace Orleans.Persistence.FileStorage
 
         public System.Threading.Tasks.Task ClearStateAsync<T>(string stateName, Runtime.GrainId grainId, IGrainState<T> grainState) { throw null; }
 
+        System.Threading.Tasks.Task Storage.IGrainStorage.ClearStateAsync<T>(string stateName, Runtime.GrainId grainId, IGrainState<T> grainState, System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        System.Threading.Tasks.Task Storage.IGrainStorage.ReadStateAsync<T>(string stateName, Runtime.GrainId grainId, IGrainState<T> grainState, System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        System.Threading.Tasks.Task Storage.IGrainStorage.WriteStateAsync<T>(string stateName, Runtime.GrainId grainId, IGrainState<T> grainState, System.Threading.CancellationToken cancellationToken) { throw null; }
+
         public void Participate(Runtime.ISiloLifecycle lifecycle) { }
 
         public System.Threading.Tasks.Task ReadStateAsync<T>(string stateName, Runtime.GrainId grainId, IGrainState<T> grainState) { throw null; }

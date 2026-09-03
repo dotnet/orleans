@@ -26,7 +26,10 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
         var fields = GetFieldDeclarations(invokableMethodInfo, fieldDescriptions);
         var (ctor, ctorArgs) = GenerateConstructor(generatedClassName, invokableMethodInfo, baseClassType);
         var accessibility = GetAccessibility(method);
-        var compoundTypeAliases = GetCompoundTypeAliasAttributeArguments(invokableMethodInfo, invokableMethodInfo.Key);
+        var compoundTypeAliases = GetCompoundTypeAliasAttributeArguments(
+            invokableMethodInfo,
+            invokableMethodInfo.Key,
+            includeGeneratedMethodId: !IsGeneratedMethodIdExplicitlyClaimed(invokableMethodInfo));
 
         List<INamedTypeSymbol> serializationHooks = new();
         if (baseClassType.GetAttributes(LibraryTypes.SerializationCallbacksAttribute, out var hookAttributes))
@@ -202,16 +205,60 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
         return Attribute(LibraryTypes.CompoundTypeAliasAttribute.ToNameSyntax()).AddArgumentListArguments(args);
     }
 
-    internal static List<CompoundTypeAliasComponent[]> GetCompoundTypeAliasAttributeArguments(InvokableMethodDescription methodDescription, InvokableMethodId invokableId)
+    internal bool IsGeneratedMethodIdExplicitlyClaimed(InvokableMethodDescription methodDescription)
     {
-        var result = new List<CompoundTypeAliasComponent[]>(2);
+        var containingInterface = methodDescription.ContainingInterface;
+        foreach (var method in containingInterface.GetMembers().OfType<IMethodSymbol>()
+            .Concat(containingInterface.AllInterfaces.SelectMany(static interfaceType => interfaceType.GetMembers().OfType<IMethodSymbol>())))
+        {
+            if (SymbolEqualityComparer.Default.Equals(method.OriginalDefinition, methodDescription.Method.OriginalDefinition))
+            {
+                continue;
+            }
+
+            if (methodDescription.ProxyBase.IsExtension
+                && !SymbolEqualityComparer.Default.Equals(
+                    method.OriginalDefinition.ContainingType,
+                    methodDescription.Method.OriginalDefinition.ContainingType))
+            {
+                continue;
+            }
+
+            var explicitMethodId = GeneratedCodeUtilities.GetMethodId(LibraryTypes, method.OriginalDefinition);
+            var claimedGeneratedMethodId = GeneratedCodeUtilities.GetClaimedGeneratedMethodId(
+                LibraryTypes,
+                method.OriginalDefinition,
+                containingInterface,
+                methodDescription.ProxyBase.IsExtension);
+            if (string.Equals(explicitMethodId, methodDescription.GeneratedMethodId, StringComparison.Ordinal)
+                || string.Equals(claimedGeneratedMethodId, methodDescription.GeneratedMethodId, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    internal static List<CompoundTypeAliasComponent[]> GetCompoundTypeAliasAttributeArguments(
+        InvokableMethodDescription methodDescription,
+        InvokableMethodId invokableId,
+        bool includeGeneratedMethodId = true)
+    {
+        var result = new List<CompoundTypeAliasComponent[]>(1);
         var containingInterface = methodDescription.ContainingInterface;
         if (methodDescription.HasAlias)
         {
-            result.Add(GetCompoundTypeAliasComponents(invokableId, containingInterface, methodDescription.MethodId));
+            result.Add(GetCompoundTypeAliasComponents(
+                invokableId,
+                containingInterface,
+                methodDescription.ClaimedGeneratedMethodId ?? methodDescription.MethodId));
+        }
+        else if (includeGeneratedMethodId)
+        {
+            result.Add(GetCompoundTypeAliasComponents(invokableId, containingInterface, methodDescription.GeneratedMethodId));
         }
 
-        result.Add(GetCompoundTypeAliasComponents(invokableId, containingInterface, methodDescription.GeneratedMethodId));
         return result;
     }
 

@@ -1,4 +1,5 @@
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Dashboard.Metrics.Details;
@@ -21,7 +22,7 @@ internal sealed class MembershipTableSiloDetailsProvider : ISiloDetailsProvider
         //default implementation uses managementgrain details
         var grain = grainFactory.GetGrain<IManagementGrain>(0);
 
-        var hosts = await grain.GetDetailedHosts(true);
+        var hosts = await grain.GetDetailedHosts(true, CancellationToken.None);
 
         return hosts.Select(x => new SiloDetails
         {

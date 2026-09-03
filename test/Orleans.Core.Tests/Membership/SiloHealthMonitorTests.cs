@@ -121,7 +121,7 @@ namespace NonSilo.Tests.Membership
                         timerCall.Completion.TrySetResult(false);
                     }
                 }
-            }).Ignore();
+            }, CancellationToken.None).Ignore();
 
             await stopTask;
             _timerCalls.Writer.TryComplete();

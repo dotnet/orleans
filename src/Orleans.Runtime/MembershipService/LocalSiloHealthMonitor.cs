@@ -669,7 +669,7 @@ namespace Orleans.Runtime.MembershipService
 
         public Task OnStart(CancellationToken ct)
         {
-            _runTask = Task.Run(this.Run);
+            _runTask = Task.Run(this.Run, CancellationToken.None);
             _isActive = true;
             return Task.CompletedTask;
         }

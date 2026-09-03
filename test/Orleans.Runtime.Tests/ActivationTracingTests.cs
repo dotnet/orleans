@@ -326,7 +326,7 @@ namespace UnitTests.General
 
                 // Trigger migration with a placement hint to coerce the placement director to use the target silo
                 RequestContext.Set(IPlacementDirector.PlacementHintKey, targetHost);
-                await grain.Cast<IGrainManagementExtension>().MigrateOnIdle();
+                await grain.Cast<IGrainManagementExtension>().MigrateOnIdle(TestContext.Current.CancellationToken);
 
                 // Verify the state was preserved (this also waits for migration to complete)
                 var newState = await grain.GetState();
@@ -402,7 +402,7 @@ namespace UnitTests.General
 
                 // Trigger migration with a placement hint
                 RequestContext.Set(IPlacementDirector.PlacementHintKey, targetHost);
-                await grain.Cast<IGrainManagementExtension>().MigrateOnIdle();
+                await grain.Cast<IGrainManagementExtension>().MigrateOnIdle(TestContext.Current.CancellationToken);
 
                 // Verify the state was preserved (this also waits for migration to complete)
                 var newState = await grain.GetState();
@@ -468,7 +468,7 @@ namespace UnitTests.General
 
                 // Trigger migration with a placement hint
                 RequestContext.Set(IPlacementDirector.PlacementHintKey, targetHost);
-                await grain.Cast<IGrainManagementExtension>().MigrateOnIdle();
+                await grain.Cast<IGrainManagementExtension>().MigrateOnIdle(TestContext.Current.CancellationToken);
 
                 // Wait for migration to complete
                 GrainAddress newAddress;
@@ -541,7 +541,7 @@ namespace UnitTests.General
 
                 // Trigger migration with a placement hint to coerce the placement director to use the target silo
                 RequestContext.Set(IPlacementDirector.PlacementHintKey, targetHost);
-                await grain.Cast<IGrainManagementExtension>().MigrateOnIdle();
+                await grain.Cast<IGrainManagementExtension>().MigrateOnIdle(TestContext.Current.CancellationToken);
 
                 // Make a call to ensure grain is activated on target silo
                 // Note: State won't be preserved since grain doesn't participate in migration

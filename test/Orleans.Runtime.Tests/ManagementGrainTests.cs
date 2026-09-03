@@ -70,7 +70,9 @@ namespace UnitTests.Management
             }
 
             var numberOfActiveSilos = 1 + HostedCluster.SecondarySilos.Count; // Primary + secondaries
-            Dictionary<SiloAddress, SiloStatus> siloStatuses = await mgmtGrain.GetHosts(true);
+            Dictionary<SiloAddress, SiloStatus> siloStatuses = await mgmtGrain.GetHosts(
+                true,
+                TestContext.Current.CancellationToken);
             Assert.NotNull(siloStatuses);
             Assert.Equal(numberOfActiveSilos, siloStatuses.Count);
         }
@@ -90,7 +92,9 @@ namespace UnitTests.Management
             }
 
             var numberOfActiveSilos = 1 + HostedCluster.SecondarySilos.Count; // Primary + secondaries
-            var siloStatuses = await mgmtGrain.GetDetailedHosts(true);
+            var siloStatuses = await mgmtGrain.GetDetailedHosts(
+                true,
+                TestContext.Current.CancellationToken);
             Assert.NotNull(siloStatuses);
             Assert.Equal(numberOfActiveSilos, siloStatuses.Length);
         }

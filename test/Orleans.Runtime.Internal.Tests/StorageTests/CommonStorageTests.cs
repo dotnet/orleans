@@ -160,7 +160,7 @@ namespace UnitTests.StorageTests.Relational
                     {
                         await Store_WriteRead(grainTypeName, grainData.GrainId, grainData.GrainState);
                         return 0;
-                    });
+                    }, ct);
 
                     var versionAfter = grainData.GrainState.ETag;
                     Assert.NotEqual(versionBefore, versionAfter);

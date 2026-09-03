@@ -35,8 +35,9 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc />
-        public Task CancelRemoteToken(Guid tokenId)
+        public Task CancelRemoteToken(Guid tokenId, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (!_cancellationTokens.TryGetValue(tokenId, out var entry))
             {
                 LogCancellationFailed(tokenId);

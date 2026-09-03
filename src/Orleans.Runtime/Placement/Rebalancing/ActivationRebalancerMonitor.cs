@@ -91,7 +91,7 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
 
                     try
                     {
-                        _latestReport = await _rebalancerGrain.GetReport().AsTask().WaitAsync(ct);
+                        _latestReport = await _rebalancerGrain.GetReport(ct);
                     }
                     catch (OperationCanceledException oce) when (oce.CancellationToken == ct) { }
                     catch (Exception ex)
@@ -148,8 +148,9 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
         return _latestReport;
     }
 
-    public Task Report(RebalancingReport report)
+    public Task Report(RebalancingReport report, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         _latestReport = report;
         _lastHeartbeatTimestamp = _timeProvider.GetTimestamp();
 

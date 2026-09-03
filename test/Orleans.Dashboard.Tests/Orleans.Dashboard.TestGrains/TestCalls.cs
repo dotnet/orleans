@@ -31,7 +31,7 @@ namespace TestGrains
                     {
                         var testGrain = client.GetGrain<ITestGrain>(random.Next(500));
 
-                        await Task.Delay(2000);
+                        await Task.Delay(2000, cancellationToken);
 
                         await testGrain.ExampleMethod1();
                         await testGrain.ExampleMethod2();
@@ -47,7 +47,7 @@ namespace TestGrains
                         // Grain might throw exception to test error rate.
                     }
                 }
-            });
+            }, CancellationToken.None);
         }
     }
 }

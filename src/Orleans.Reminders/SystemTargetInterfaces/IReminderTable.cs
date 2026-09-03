@@ -38,6 +38,14 @@ namespace Orleans
         Task<ReminderTableData> ReadRows(GrainId grainId);
 
         /// <summary>
+        /// Reads the reminder table entries associated with the specified grain.
+        /// </summary>
+        /// <param name="grainId">The grain ID.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <returns>The reminder table entries associated with the specified grain.</returns>
+        Task<ReminderTableData> ReadRows(GrainId grainId, CancellationToken cancellationToken) => ReadRows(grainId);
+
+        /// <summary>
         /// Returns all rows that have their <see cref="GrainId.GetUniformHashCode"/> in the range (begin, end].
         /// If begin is greater or equal to end, returns all entries with hash greater begin or hash less or equal to end.
         /// </summary>
@@ -45,6 +53,15 @@ namespace Orleans
         /// <param name="end">The inclusive upper bound.</param>
         /// <returns>The reminder table entries which fall within the specified range.</returns>
         Task<ReminderTableData> ReadRows(uint begin, uint end);
+
+        /// <summary>
+        /// Returns all rows whose grain hash is in the specified range.
+        /// </summary>
+        /// <param name="begin">The exclusive lower bound.</param>
+        /// <param name="end">The inclusive upper bound.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <returns>The reminder table entries which fall within the specified range.</returns>
+        Task<ReminderTableData> ReadRows(uint begin, uint end, CancellationToken cancellationToken) => ReadRows(begin, end);
 
         /// <summary>
         /// Reads the specified entry.
@@ -55,11 +72,28 @@ namespace Orleans
         Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName);
 
         /// <summary>
+        /// Reads the specified entry.
+        /// </summary>
+        /// <param name="grainId">The grain ID.</param>
+        /// <param name="reminderName">Name of the reminder.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <returns>The reminder table entry.</returns>
+        Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName, CancellationToken cancellationToken) => ReadRow(grainId, reminderName);
+
+        /// <summary>
         /// Upserts the specified entry.
         /// </summary>
         /// <param name="entry">The entry.</param>
         /// <returns>The row's new ETag.</returns>
         Task<string?> UpsertRow(ReminderEntry entry);
+
+        /// <summary>
+        /// Upserts the specified entry.
+        /// </summary>
+        /// <param name="entry">The entry.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <returns>The row's new ETag.</returns>
+        Task<string?> UpsertRow(ReminderEntry entry, CancellationToken cancellationToken) => UpsertRow(entry);
 
         /// <summary>
         /// Removes a row from the table.
@@ -71,10 +105,27 @@ namespace Orleans
         Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag);
 
         /// <summary>
+        /// Removes a row from the table.
+        /// </summary>
+        /// <param name="grainId">The grain ID.</param>
+        /// <param name="reminderName">The reminder name.</param>
+        /// <param name="eTag">The ETag.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <returns><see langword="true"/> if the row was removed; otherwise, <see langword="false"/>.</returns>
+        Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag, CancellationToken cancellationToken) => RemoveRow(grainId, reminderName, eTag);
+
+        /// <summary>
         /// Clears the table.
         /// </summary>
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>
         Task TestOnlyClearTable();
+
+        /// <summary>
+        /// Clears the table.
+        /// </summary>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
+        Task TestOnlyClearTable(CancellationToken cancellationToken) => TestOnlyClearTable();
 
         /// <summary>
         /// Stops the reminder table.
@@ -89,17 +140,23 @@ namespace Orleans
     /// </summary>
     internal interface IReminderTableGrain : IGrainWithIntegerKey
     {
-        Task<ReminderTableData> ReadRows(GrainId grainId);
+        [Alias("EEEF6FCA")]
+        Task<ReminderTableData> ReadRows(GrainId grainId, CancellationToken cancellationToken = default);
 
-        Task<ReminderTableData> ReadRows(uint begin, uint end);
+        [Alias("13558B55")]
+        Task<ReminderTableData> ReadRows(uint begin, uint end, CancellationToken cancellationToken = default);
 
-        Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName);
+        [Alias("ECA791DE")]
+        Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName, CancellationToken cancellationToken = default);
 
-        Task<string?> UpsertRow(ReminderEntry entry);
+        [Alias("873299B5")]
+        Task<string?> UpsertRow(ReminderEntry entry, CancellationToken cancellationToken = default);
 
-        Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag);
+        [Alias("FF391E0B")]
+        Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag, CancellationToken cancellationToken = default);
 
-        Task TestOnlyClearTable();
+        [Alias("8EBE0523")]
+        Task TestOnlyClearTable(CancellationToken cancellationToken = default);
     }
 
     /// <summary>

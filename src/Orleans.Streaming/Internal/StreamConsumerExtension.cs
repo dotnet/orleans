@@ -118,13 +118,14 @@ namespace Orleans.Streams
             return allStreamObservers.TryRemove(subscriptionId, out _);
         }
 
-        public Task<StreamHandshakeToken?> DeliverImmutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken)
+        public Task<StreamHandshakeToken?> DeliverImmutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken, CancellationToken cancellationToken)
         {
-            return DeliverMutable(subscriptionId, streamId, item, currentToken, handshakeToken);
+            return DeliverMutable(subscriptionId, streamId, item, currentToken, handshakeToken, cancellationToken);
         }
 
-        public async Task<StreamHandshakeToken?> DeliverMutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken)
+        public async Task<StreamHandshakeToken?> DeliverMutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             LogTraceDeliverItem(new(item), subscriptionId);
             if (allStreamObservers.TryGetValue(subscriptionId, out var observer))
             {
@@ -154,8 +155,9 @@ namespace Orleans.Streams
             return default;
         }
 
-        public async Task<StreamHandshakeToken?> DeliverBatch(GuidId subscriptionId, QualifiedStreamId streamId, IBatchContainer batch, StreamHandshakeToken? handshakeToken)
+        public async Task<StreamHandshakeToken?> DeliverBatch(GuidId subscriptionId, QualifiedStreamId streamId, IBatchContainer batch, StreamHandshakeToken? handshakeToken, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             LogTraceDeliverBatch(batch, subscriptionId);
 
             if (allStreamObservers.TryGetValue(subscriptionId, out var observer))
@@ -186,8 +188,9 @@ namespace Orleans.Streams
             return default;
         }
 
-        public Task CompleteStream(GuidId subscriptionId)
+        public Task CompleteStream(GuidId subscriptionId, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             LogTraceCompleteStream(subscriptionId);
 
             if (allStreamObservers.TryGetValue(subscriptionId, out var observer))
@@ -202,8 +205,9 @@ namespace Orleans.Streams
             return Task.CompletedTask;
         }
 
-        public Task ErrorInStream(GuidId subscriptionId, Exception exc)
+        public Task ErrorInStream(GuidId subscriptionId, Exception exc, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             LogTraceErrorInStream(subscriptionId, exc);
 
             if (allStreamObservers.TryGetValue(subscriptionId, out var observer))
@@ -219,8 +223,9 @@ namespace Orleans.Streams
             return Task.CompletedTask;
         }
 
-        public Task<StreamHandshakeToken?> GetSequenceToken(GuidId subscriptionId)
+        public Task<StreamHandshakeToken?> GetSequenceToken(GuidId subscriptionId, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             return Task.FromResult(allStreamObservers.TryGetValue(subscriptionId, out var observer) ? observer.GetSequenceToken() : null);
         }
 

@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
 
@@ -11,12 +12,12 @@ internal interface IActivationRebalancerWorker : IGrainWithIntegerKey
     /// Returns the most recent rebalancing report.
     /// </summary>
     /// <remarks>Acts also as a way to wake up the rebalancer, if its deactivated.</remarks>
-    [AlwaysInterleave, Alias("GetReport")] ValueTask<RebalancingReport> GetReport();
+    [AlwaysInterleave, Alias("GetReport")] ValueTask<RebalancingReport> GetReport(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Resumes rebalancing if its suspended, otherwise its a no-op.
     /// </summary>
-    [Alias("ResumeRebalancing")] Task ResumeRebalancing();
+    [Alias("ResumeRebalancing")] Task ResumeRebalancing(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Suspends rebalancing if its running, otherwise its a no-op.
@@ -25,5 +26,5 @@ internal interface IActivationRebalancerWorker : IGrainWithIntegerKey
     /// The amount of time to suspend the rebalancer.
     /// <para><see langword="null"/> means suspend indefinitely.</para>
     /// </param>
-    [Alias("SuspendRebalancing")] Task SuspendRebalancing(TimeSpan? duration);
+    [Alias("SuspendRebalancing")] Task SuspendRebalancing(TimeSpan? duration, CancellationToken cancellationToken = default);
 }

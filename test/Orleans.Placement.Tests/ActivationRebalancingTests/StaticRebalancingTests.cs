@@ -21,7 +21,7 @@ public class StaticRebalancingTests(RebalancerFixture fixture, ITestOutputHelper
         var tasks = new List<Task>();
         using var rebalancerEvents = RebalancerDiagnosticObserver.Create(Cluster);
         var rebalancer = Cluster.Client!.GetGrain<IActivationRebalancerWorker>(0);
-        var rebalancerHost = (await rebalancer.GetReport()).Host;
+        var rebalancerHost = (await rebalancer.GetReport(cancellationToken)).Host;
 
         AddTestActivations(tasks, Silo1, 300);
         AddTestActivations(tasks, Silo2, 30);
@@ -31,7 +31,7 @@ public class StaticRebalancingTests(RebalancerFixture fixture, ITestOutputHelper
         await Task.WhenAll(tasks);
         rebalancerEvents.Clear();
 
-        var stats = await MgmtGrain.GetDetailedGrainStatistics();
+        var stats = await MgmtGrain.GetDetailedGrainStatistics(null, null, cancellationToken);
 
         var initialSilo1Activations = GetActivationCount(stats, Silo1);
         var initialSilo2Activations = GetActivationCount(stats, Silo2);
@@ -55,7 +55,7 @@ public class StaticRebalancingTests(RebalancerFixture fixture, ITestOutputHelper
             .WaitForCycleCountAsync(rebalancerHost, observedCycles)
             .WaitAsync(cancellationToken);
 
-        stats = await MgmtGrain.GetDetailedGrainStatistics();
+        stats = await MgmtGrain.GetDetailedGrainStatistics(null, null, cancellationToken);
         silo1Activations = GetActivationCount(stats, Silo1);
         silo2Activations = GetActivationCount(stats, Silo2);
         silo3Activations = GetActivationCount(stats, Silo3);

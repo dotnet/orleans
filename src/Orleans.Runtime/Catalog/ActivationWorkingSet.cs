@@ -179,7 +179,7 @@ namespace Orleans.Runtime
             Task StartMonitoring(CancellationToken ct)
             {
                 using var _ = new ExecutionContextSuppressor();
-                _runTask = Task.Run(MonitorWorkingSet);
+                _runTask = Task.Run(MonitorWorkingSet, CancellationToken.None);
                 return Task.CompletedTask;
             }
 

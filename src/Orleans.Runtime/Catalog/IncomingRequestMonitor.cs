@@ -47,7 +47,7 @@ namespace Orleans.Runtime
 
             Task StartMonitoring(CancellationToken ct)
             {
-                _runTask = Task.Run(this.Run);
+                _runTask = Task.Run(this.Run, CancellationToken.None);
                 return Task.CompletedTask;
             }
 

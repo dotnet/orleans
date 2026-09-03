@@ -403,8 +403,12 @@ namespace Orleans
                 // Migration is not supported. Do nothing: the contract is that this method attempts migration, but does not guarantee it will occur.
             }
 
-            ValueTask IGrainCallCancellationExtension.CancelRequestAsync(GrainId senderGrainId, CorrelationId messageId)
+            ValueTask IGrainCallCancellationExtension.CancelRequestAsync(
+                GrainId senderGrainId,
+                CorrelationId messageId,
+                CancellationToken cancellationToken)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!TryCancelRequest())
                 {
                     // The message being canceled may not have arrived yet, so retry a few times.
@@ -418,7 +422,7 @@ namespace Orleans
                     var attemptsRemaining = 3;
                     do
                     {
-                        await Task.Delay(1_000);
+                        await Task.Delay(1_000, cancellationToken);
 
                         if (TryCancelRequest())
                         {

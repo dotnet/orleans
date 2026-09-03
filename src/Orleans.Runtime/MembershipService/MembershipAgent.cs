@@ -227,7 +227,7 @@ namespace Orleans.Runtime.MembershipService
                 Exception exception;
                 try
                 {
-                    await siloProber.Probe(silo, 0).WaitAsync(timeout, cancellationToken);
+                    await siloProber.Probe(silo, 0, cancellationToken).WaitAsync(timeout, cancellationToken);
                     return true;
                 }
                 catch (OperationCanceledException)
@@ -318,8 +318,8 @@ namespace Orleans.Runtime.MembershipService
                     this.iAmAliveTimer.Dispose();
                     this.cancellation.Cancel();
                     await Task.WhenAny(
-                        Task.Run(() => this.BecomeDead()),
-                        Task.Delay(TimeSpan.FromMinutes(1)));
+                        Task.Run(() => this.BecomeDead(), CancellationToken.None),
+                        Task.Delay(TimeSpan.FromMinutes(1), CancellationToken.None));
                 }
 
                 lifecycle.Subscribe(
@@ -332,7 +332,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 async Task AfterRuntimeGrainServicesStart(CancellationToken ct)
                 {
-                    await Task.Run(() => this.BecomeJoining());
+                    await Task.Run(() => this.BecomeJoining(), CancellationToken.None);
                 }
 
                 Task AfterRuntimeGrainServicesStop(CancellationToken ct) => Task.CompletedTask;
@@ -347,7 +347,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 async Task OnValidateInitialConnectivityStart(CancellationToken ct)
                 {
-                    await Task.Run(() => this.ValidateInitialConnectivity(ct));
+                    await Task.Run(() => this.ValidateInitialConnectivity(ct), CancellationToken.None);
                 }
 
                 Task OnValidateInitialConnectivityStop(CancellationToken ct) => Task.CompletedTask;
@@ -364,8 +364,8 @@ namespace Orleans.Runtime.MembershipService
 
                 async Task OnBecomeActiveStart(CancellationToken ct)
                 {
-                    await Task.Run(() => this.BecomeActive());
-                    tasks.Add(Task.Run(() => this.UpdateIAmAlive()));
+                    await Task.Run(() => this.BecomeActive(), CancellationToken.None);
+                    tasks.Add(Task.Run(() => this.UpdateIAmAlive(), CancellationToken.None));
                 }
 
                 async Task OnBecomeActiveStop(CancellationToken ct)
@@ -376,17 +376,17 @@ namespace Orleans.Runtime.MembershipService
 
                     if (ct.IsCancellationRequested)
                     {
-                        await Task.Run(() => this.BecomeStopping());
+                        await Task.Run(() => this.BecomeStopping(), CancellationToken.None);
                     }
                     else
                     {
                         // Allow some minimum time for graceful shutdown.
-                        var gracePeriod = Task.WhenAll(Task.Delay(ClusterMembershipOptions.ClusteringShutdownGracePeriod), cancellationTask);
+                        var gracePeriod = Task.WhenAll(Task.Delay(ClusterMembershipOptions.ClusteringShutdownGracePeriod, CancellationToken.None), cancellationTask);
                         var task = await Task.WhenAny(gracePeriod, this.BecomeShuttingDown());
                         if (ReferenceEquals(task, gracePeriod))
                         {
                             LogWarningGracefulShutdownAborted(this.log);
-                            await Task.Run(() => this.BecomeStopping());
+                            await Task.Run(() => this.BecomeStopping(), CancellationToken.None);
                         }
                         else
                         {

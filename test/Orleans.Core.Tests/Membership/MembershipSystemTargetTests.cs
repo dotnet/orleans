@@ -28,7 +28,11 @@ namespace NonSilo.Tests.Membership
             using var rig = CreateTestRig(healthStatus);
             var startTimestamp = rig.TimeProvider.GetTimestamp();
 
-            var responseTask = rig.Target.ProbeIndirectly(targetSilo, probeTimeout, ProbeNumber);
+            var responseTask = rig.Target.ProbeIndirectly(
+                targetSilo,
+                probeTimeout,
+                ProbeNumber,
+                TestContext.Current.CancellationToken);
             await rig.PingEntered.Task;
 
             Assert.False(responseTask.IsCompleted);
@@ -49,7 +53,9 @@ namespace NonSilo.Tests.Membership
             rig.GrainFactory.Received(1).GetSystemTarget<IMembershipService>(
                 Constants.MembershipServiceType,
                 targetSilo);
-            await rig.RemoteMembershipService.Received(1).Ping(ProbeNumber);
+            await rig.RemoteMembershipService.Received(1).Ping(
+                ProbeNumber,
+                Arg.Any<CancellationToken>());
             Assert.Same(rig.Target, rig.ActivationDirectory.FindTarget(rig.Target.GrainId));
         }
 
@@ -65,7 +71,11 @@ namespace NonSilo.Tests.Membership
 
             try
             {
-                var responseTask = rig.Target.ProbeIndirectly(targetSilo, probeTimeout, ProbeNumber);
+                var responseTask = rig.Target.ProbeIndirectly(
+                    targetSilo,
+                    probeTimeout,
+                    ProbeNumber,
+                    TestContext.Current.CancellationToken);
                 await rig.PingEntered.Task;
 
                 Assert.Empty(rig.LocalHealthMonitor.ReceivedCalls());
@@ -86,7 +96,9 @@ namespace NonSilo.Tests.Membership
                 rig.GrainFactory.Received(1).GetSystemTarget<IMembershipService>(
                     Constants.MembershipServiceType,
                     targetSilo);
-                await rig.RemoteMembershipService.Received(1).Ping(ProbeNumber);
+                await rig.RemoteMembershipService.Received(1).Ping(
+                    ProbeNumber,
+                    Arg.Any<CancellationToken>());
             }
             finally
             {

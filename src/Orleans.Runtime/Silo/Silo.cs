@@ -325,7 +325,7 @@ namespace Orleans.Runtime
                 while (!this.SystemStatus.Equals(SystemStatus.Terminated))
                 {
                     LogDebugSiloStopStillInProgress(logger);
-                    await Task.Delay(pause).ConfigureAwait(false);
+                    await Task.Delay(pause, cancellationToken).ConfigureAwait(false);
                 }
 
                 await this.SiloTerminated.ConfigureAwait(false);
@@ -474,15 +474,15 @@ namespace Orleans.Runtime
             // Stage callbacks are dispatched onto the thread pool so that any blocking
             // work in the silo start/stop paths does not stall the lifecycle scheduler.
             static Task NoOpStart(CancellationToken ct) => Task.CompletedTask;
-            Task RunOnRuntimeInitializeStart(CancellationToken ct) => Task.Run(() => OnRuntimeInitializeStart(ct));
-            Task RunOnRuntimeInitializeStop(CancellationToken ct) => Task.Run(() => OnRuntimeInitializeStop(ct));
-            Task RunOnRuntimeServicesStart(CancellationToken ct) => Task.Run(() => OnRuntimeServicesStart(ct));
-            Task RunOnRuntimeServicesStop(CancellationToken ct) => Task.Run(() => OnRuntimeServicesStop(ct));
-            Task RunOnRuntimeGrainServicesStart(CancellationToken ct) => Task.Run(() => OnRuntimeGrainServicesStart(ct));
-            Task RunOnBecomeActiveStart(CancellationToken ct) => Task.Run(() => OnBecomeActiveStart(ct));
-            Task RunOnBecomeActiveStop(CancellationToken ct) => Task.Run(() => OnBecomeActiveStop(ct));
-            Task RunOnActiveStart(CancellationToken ct) => Task.Run(() => OnActiveStart(ct));
-            Task RunOnActiveStop(CancellationToken ct) => Task.Run(() => OnActiveStop(ct));
+            Task RunOnRuntimeInitializeStart(CancellationToken ct) => Task.Run(() => OnRuntimeInitializeStart(ct), CancellationToken.None);
+            Task RunOnRuntimeInitializeStop(CancellationToken ct) => Task.Run(() => OnRuntimeInitializeStop(ct), CancellationToken.None);
+            Task RunOnRuntimeServicesStart(CancellationToken ct) => Task.Run(() => OnRuntimeServicesStart(ct), CancellationToken.None);
+            Task RunOnRuntimeServicesStop(CancellationToken ct) => Task.Run(() => OnRuntimeServicesStop(ct), CancellationToken.None);
+            Task RunOnRuntimeGrainServicesStart(CancellationToken ct) => Task.Run(() => OnRuntimeGrainServicesStart(ct), CancellationToken.None);
+            Task RunOnBecomeActiveStart(CancellationToken ct) => Task.Run(() => OnBecomeActiveStart(ct), CancellationToken.None);
+            Task RunOnBecomeActiveStop(CancellationToken ct) => Task.Run(() => OnBecomeActiveStop(ct), CancellationToken.None);
+            Task RunOnActiveStart(CancellationToken ct) => Task.Run(() => OnActiveStart(ct), CancellationToken.None);
+            Task RunOnActiveStop(CancellationToken ct) => Task.Run(() => OnActiveStop(ct), CancellationToken.None);
         }
 
         public async ValueTask DisposeAsync()

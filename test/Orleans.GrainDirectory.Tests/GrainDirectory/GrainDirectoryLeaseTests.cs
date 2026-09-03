@@ -491,7 +491,7 @@ public class GrainDirectoryLeaseTests
             timeout.Token);
         Assert.Equal(SiloStatus.Active, initialView.ClusterMembershipSnapshot.GetSiloStatus(victim.SiloAddress));
 
-        await cluster.KillSiloAsync(victim).WaitAsync(cancellationToken);
+        await cluster.KillSiloAsync(victim, cancellationToken);
         await cluster.WaitForLivenessToStabilizeAsync(didKill: true).WaitAsync(cancellationToken);
         var deadMembership = membership.CurrentSnapshot;
         Assert.Equal(SiloStatus.Dead, deadMembership.GetSiloStatus(victim.SiloAddress));
@@ -522,7 +522,7 @@ public class GrainDirectoryLeaseTests
         {
             var partition = cluster.InternalClient!.GetSystemTarget<IGrainDirectoryTestHooks>(
                 GrainDirectoryPartition.CreateGrainId(silo.SiloAddress, partitionIndex).GrainId);
-            partitionWaits[partitionIndex] = partition.WaitForMembershipVersionAsync(view.Version).AsTask();
+            partitionWaits[partitionIndex] = partition.WaitForMembershipVersionAsync(view.Version, cancellationToken).AsTask();
         }
 
         await Task.WhenAll(partitionWaits).WaitAsync(cancellationToken);
@@ -793,7 +793,7 @@ public class GrainDirectoryLeaseTests
         var cleanupTasks = Enumerable.Range(0, membership.PartitionsPerSilo)
             .Select(partitionIndex => cluster.InternalClient!.GetSystemTarget<IGrainDirectoryTestHooks>(
                     GrainDirectoryPartition.CreateGrainId(silo.SiloAddress, partitionIndex).GrainId)
-                .CleanupExpiredLeasesAsync()
+            .CleanupExpiredLeasesAsync(cancellationToken)
                 .AsTask())
             .ToArray();
 

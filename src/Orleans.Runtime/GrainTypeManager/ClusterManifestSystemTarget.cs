@@ -1,3 +1,4 @@
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Metadata;
 
@@ -24,9 +25,17 @@ namespace Orleans.Runtime
             shared.ActivationDirectory.RecordNewTarget(this);
         }
 
-        public ValueTask<ClusterManifest> GetClusterManifest() => new(_clusterManifestProvider.Current);
-        public ValueTask<ClusterManifestUpdate?> GetClusterManifestUpdate(MajorMinorVersion version)
+        public ValueTask<ClusterManifest> GetClusterManifest(CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            return new(_clusterManifestProvider.Current);
+        }
+
+        public ValueTask<ClusterManifestUpdate?> GetClusterManifestUpdate(
+            MajorMinorVersion version,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
             var manifest = _clusterManifestProvider.Current;
 
             // Only return an updated manifest if it is newer than the provided version.
@@ -45,6 +54,7 @@ namespace Orleans.Runtime
                 var includesAllActiveServers = true;
                 foreach (var server in membershipSnapshot.Members)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     if (server.Value.Status == SiloStatus.Active)
                     {
                         if (!manifest.Silos.ContainsKey(server.Key))
@@ -61,7 +71,11 @@ namespace Orleans.Runtime
             return new (_cachedUpdate);
         }
 
-        public ValueTask<GrainManifest> GetSiloManifest() => new(_siloManifest);
+        public ValueTask<GrainManifest> GetSiloManifest(CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return new(_siloManifest);
+        }
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
         {
             // We don't participate in any lifecycle stages: activating this instance is all that is necessary.

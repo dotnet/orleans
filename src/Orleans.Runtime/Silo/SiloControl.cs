@@ -84,34 +84,37 @@ namespace Orleans.Runtime
             shared.ActivationDirectory.RecordNewTarget(this);
         }
 
-        public Task Ping(string message)
+        public Task Ping(string message, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             LogInformationPing();
             return Task.CompletedTask;
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2001:AvoidCallingProblematicMethods", MessageId = "System.GC.Collect")]
-        public Task ForceGarbageCollection()
+        public Task ForceGarbageCollection(CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             LogInformationForceGarbageCollection();
             GC.Collect();
             return Task.CompletedTask;
         }
 
-        public Task ForceActivationCollection(TimeSpan ageLimit)
+        public Task ForceActivationCollection(TimeSpan ageLimit, CancellationToken cancellationToken = default)
         {
             LogInformationForceActivationCollection();
-            return _activationCollector.CollectActivations(ageLimit, CancellationToken.None);
+            return _activationCollector.CollectActivations(ageLimit, cancellationToken);
         }
 
-        public Task ForceRuntimeStatisticsCollection()
+        public Task ForceRuntimeStatisticsCollection(CancellationToken cancellationToken = default)
         {
             LogDebugForceRuntimeStatisticsCollection();
-            return this.deploymentLoadPublisher.RefreshClusterStatistics();
+            return this.deploymentLoadPublisher.RefreshClusterStatistics(cancellationToken);
         }
 
-        public Task<SiloRuntimeStatistics> GetRuntimeStatistics()
+        public Task<SiloRuntimeStatistics> GetRuntimeStatistics(CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             LogDebugGetRuntimeStatistics();
             var activationCount = this.activationDirectory.Count;
             var stats = new SiloRuntimeStatistics(
@@ -123,14 +126,16 @@ namespace Orleans.Runtime
             return Task.FromResult(stats);
         }
 
-        public Task<List<Tuple<GrainId, string, int>>> GetGrainStatistics()
+        public Task<List<Tuple<GrainId, string, int>>> GetGrainStatistics(CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             LogInformationGetGrainStatistics();
             var counts = new Dictionary<string, Dictionary<GrainId, int>>();
             lock (activationDirectory)
             {
                 foreach (var activation in activationDirectory)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     var data = activation.Value;
                     if (data == null || data.GrainInstance == null) continue;
 
@@ -155,20 +160,26 @@ namespace Orleans.Runtime
                 .ToList());
         }
 
-        public Task<List<DetailedGrainStatistic>> GetDetailedGrainStatistics(string[]? types = null)
+        public Task<List<DetailedGrainStatistic>> GetDetailedGrainStatistics(
+            string[]? types = null,
+            CancellationToken cancellationToken = default)
         {
-            var stats = GetDetailedGrainStatisticsCore(types);
+            var stats = GetDetailedGrainStatisticsCore(types, cancellationToken);
             return Task.FromResult(stats);
         }
 
-        public Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics()
+        public Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics(CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             return Task.FromResult(_grainCountStatistics.GetSimpleGrainStatistics().Select(p =>
                 new SimpleGrainStatistic { SiloAddress = this.localSiloDetails.SiloAddress, GrainType = p.Key, ActivationCount = (int)p.Value }).ToArray());
         }
 
-        public async Task<DetailedGrainReport> GetDetailedGrainReport(GrainId grainId)
+        public async Task<DetailedGrainReport> GetDetailedGrainReport(
+            GrainId grainId,
+            CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             string? grainClassName;
             try
             {
@@ -196,7 +207,9 @@ namespace Orleans.Runtime
             {
                 var grainLocator = services.GetRequiredService<GrainLocator>();
                 grainLocator.TryLookupInCache(grainId, out localCacheActivationAddress);
-                localDirectoryActivationAddress = await ((DistributedGrainDirectory.ITestHooks)distributedGrainDirectory).GetLocalRecord(grainId);
+                localDirectoryActivationAddress = await ((DistributedGrainDirectory.ITestHooks)distributedGrainDirectory)
+                    .GetLocalRecord(grainId)
+                    .WaitAsync(cancellationToken);
                 primaryForGrain = ((DistributedGrainDirectory.ITestHooks)distributedGrainDirectory).GetPrimaryForGrain(grainId);
             }
             else if (dir is null && services.GetService<ILocalGrainDirectory>() is { } localGrainDirectory)
@@ -221,13 +234,19 @@ namespace Orleans.Runtime
             return report;
         }
 
-        public Task<int> GetActivationCount()
+        public Task<int> GetActivationCount(CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             return Task.FromResult(this.activationDirectory.Count);
         }
 
-        public Task<object?> SendControlCommandToProvider<T>(string providerName, int command, object? arg) where T : IControllable
+        public Task<object?> SendControlCommandToProvider<T>(
+            string providerName,
+            int command,
+            object? arg,
+            CancellationToken cancellationToken = default) where T : IControllable
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var t = services
                     .GetKeyedServices<IControllable>(providerName);
             var controllable = services
@@ -240,42 +259,71 @@ namespace Orleans.Runtime
                 throw new ArgumentException($"Could not find a controllable service for type {typeof(IControllable).FullName} and name {providerName}.");
             }
 
-            return controllable.ExecuteCommand(command, arg);
+            return controllable.ExecuteCommand(command, arg).WaitAsync(cancellationToken);
         }
 
         public Task SetCompatibilityStrategy(CompatibilityStrategy strategy)
+            => SetCompatibilityStrategy(strategy, CancellationToken.None);
+
+        public Task SetCompatibilityStrategy(
+            CompatibilityStrategy strategy,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             this.compatibilityDirectorManager.SetStrategy(strategy);
             this.cachedVersionSelectorManager.ResetCache();
             return Task.CompletedTask;
         }
 
         public Task SetSelectorStrategy(VersionSelectorStrategy strategy)
+            => SetSelectorStrategy(strategy, CancellationToken.None);
+
+        public Task SetSelectorStrategy(
+            VersionSelectorStrategy strategy,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             this.selectorManager.SetSelector(strategy);
             this.cachedVersionSelectorManager.ResetCache();
             return Task.CompletedTask;
         }
 
         public Task SetCompatibilityStrategy(GrainInterfaceType interfaceId, CompatibilityStrategy strategy)
+            => SetCompatibilityStrategy(interfaceId, strategy, CancellationToken.None);
+
+        public Task SetCompatibilityStrategy(
+            GrainInterfaceType interfaceId,
+            CompatibilityStrategy strategy,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             this.compatibilityDirectorManager.SetStrategy(interfaceId, strategy);
             this.cachedVersionSelectorManager.ResetCache();
             return Task.CompletedTask;
         }
 
         public Task SetSelectorStrategy(GrainInterfaceType interfaceType, VersionSelectorStrategy strategy)
+            => SetSelectorStrategy(interfaceType, strategy, CancellationToken.None);
+
+        public Task SetSelectorStrategy(
+            GrainInterfaceType interfaceType,
+            VersionSelectorStrategy strategy,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             this.selectorManager.SetSelector(interfaceType, strategy);
             this.cachedVersionSelectorManager.ResetCache();
             return Task.CompletedTask;
         }
 
-        public Task<List<GrainId>> GetActiveGrains(GrainType grainType)
+        public Task<List<GrainId>> GetActiveGrains(
+            GrainType grainType,
+            CancellationToken cancellationToken = default)
         {
             var results = new List<GrainId>();
             foreach (var pair in activationDirectory)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (grainType.Equals(pair.Key.Type))
                 {
                     results.Add(pair.Key);
@@ -284,7 +332,10 @@ namespace Orleans.Runtime
             return Task.FromResult(results);
         }
 
-        public Task MigrateRandomActivations(SiloAddress target, int count)
+        public Task MigrateRandomActivations(
+            SiloAddress target,
+            int count,
+            CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(target);
             ArgumentOutOfRangeException.ThrowIfNegative(count);
@@ -299,6 +350,7 @@ namespace Orleans.Runtime
             var remainingCount = count;
             foreach (var (grainId, grainContext) in activationDirectory)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!_migratabilityChecker.IsMigratable(grainId.Type, ImmovableKind.Rebalancer))
                 {
                     continue;
@@ -309,19 +361,22 @@ namespace Orleans.Runtime
                     break;
                 }
 
-                grainContext.Migrate(migrationContext);
+                grainContext.Migrate(migrationContext, cancellationToken);
             }
 
             return Task.CompletedTask;
         }
 
-        private List<DetailedGrainStatistic> GetDetailedGrainStatisticsCore(string[]? types = null)
+        private List<DetailedGrainStatistic> GetDetailedGrainStatisticsCore(
+            string[]? types,
+            CancellationToken cancellationToken)
         {
             var stats = new List<DetailedGrainStatistic>();
             lock (activationDirectory)
             {
                 foreach (var activation in activationDirectory)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     var data = activation.Value;
                     if (data == null || data.GrainInstance == null) continue;
 

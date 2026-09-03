@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.Serialization;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Orleans
@@ -15,7 +16,19 @@ namespace Orleans
         /// <param name="reminderName">Name of this Reminder</param>
         /// <param name="status">Status of this Reminder tick</param>
         /// <returns>Completion promise which the grain will resolve when it has finished processing this Reminder tick.</returns>
+        [Alias("ReceiveReminder")]
         Task ReceiveReminder(string reminderName, Runtime.TickStatus status);
+
+        /// <summary>
+        /// Receive a new Reminder.
+        /// </summary>
+        /// <param name="reminderName">Name of this Reminder</param>
+        /// <param name="status">Status of this Reminder tick</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <returns>Completion promise which the grain will resolve when it has finished processing this Reminder tick.</returns>
+        [Alias("6461BF2F")]
+        Task ReceiveReminder(string reminderName, Runtime.TickStatus status, CancellationToken cancellationToken)
+            => ReceiveReminder(reminderName, status);
     }
 
     namespace Runtime

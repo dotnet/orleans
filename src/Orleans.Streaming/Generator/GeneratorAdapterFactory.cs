@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -206,15 +207,22 @@ namespace Orleans.Providers.Streams.Generator
             }
 
             public Task Initialize(TimeSpan timeout)
+                => Initialize(timeout, CancellationToken.None);
+
+            public Task Initialize(TimeSpan timeout, CancellationToken cancellationToken)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 this.receiverMonitor?.TrackInitialization(true, TimeSpan.MinValue, null);
                 return Task.CompletedTask;
             }
 
             public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
+                => await GetQueueMessagesAsync(maxCount, CancellationToken.None);
+
+            public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount, CancellationToken cancellationToken)
             {
                 var watch = Stopwatch.StartNew();
-                await Task.Delay(Random.Shared.Next(1,MaxDelayMs));
+                await Task.Delay(Random.Shared.Next(1,MaxDelayMs), cancellationToken);
                 List<IBatchContainer> batches;
                 if (QueueGenerator == null || !QueueGenerator.TryReadEvents(DateTime.UtcNow, maxCount, out batches))
                 {
@@ -232,12 +240,20 @@ namespace Orleans.Providers.Streams.Generator
             }
 
             public Task MessagesDeliveredAsync(IList<IBatchContainer> messages)
+                => MessagesDeliveredAsync(messages, CancellationToken.None);
+
+            public Task MessagesDeliveredAsync(IList<IBatchContainer> messages, CancellationToken cancellationToken)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 return Task.CompletedTask;
             }
 
             public Task Shutdown(TimeSpan timeout)
+                => Shutdown(timeout, CancellationToken.None);
+
+            public Task Shutdown(TimeSpan timeout, CancellationToken cancellationToken)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 this.receiverMonitor?.TrackShutdown(true, TimeSpan.MinValue, null);
                 return Task.CompletedTask;
             }

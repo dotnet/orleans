@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.BroadcastChannel.Diagnostics;
@@ -21,6 +22,17 @@ namespace Orleans.BroadcastChannel
         /// </summary>
         /// <param name="item">The element to publish.</param>
         Task Publish([DisallowNull] T item);
+
+        /// <summary>
+        /// Publish an element to the channel.
+        /// </summary>
+        /// <param name="item">The element to publish.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        Task Publish([DisallowNull] T item, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Publish(item);
+        }
     }
 
     /// <inheritdoc />
@@ -55,8 +67,12 @@ namespace Orleans.BroadcastChannel
         }
 
         /// <inheritdoc />
-        public async Task Publish([DisallowNull] T item)
+        public Task Publish([DisallowNull] T item) => Publish(item, default);
+
+        /// <inheritdoc />
+        public async Task Publish([DisallowNull] T item, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var subscribers = _subscriberTable.GetImplicitSubscribers(_channelId, _grainFactory);
 
             if (subscribers.Count == 0)
@@ -73,7 +89,7 @@ namespace Orleans.BroadcastChannel
             {
                 foreach (var sub in subscribers)
                 {
-                    PublishToSubscriber(sub.Value, item).Ignore();
+                    PublishToSubscriber(sub.Value, item, cancellationToken).Ignore();
                 }
             }
             else
@@ -81,11 +97,15 @@ namespace Orleans.BroadcastChannel
                 var tasks = new List<Task>();
                 foreach (var sub in subscribers)
                 {
-                    tasks.Add(PublishToSubscriber(sub.Value, item));
+                    tasks.Add(PublishToSubscriber(sub.Value, item, cancellationToken));
                 }
                 try
                 {
                     await Task.WhenAll(tasks);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
                 }
                 catch (Exception)
                 {
@@ -94,11 +114,14 @@ namespace Orleans.BroadcastChannel
             }
         }
 
-        private async Task PublishToSubscriber(IBroadcastChannelConsumerExtension consumer, T item)
+        private async Task PublishToSubscriber(
+            IBroadcastChannelConsumerExtension consumer,
+            T item,
+            CancellationToken cancellationToken)
         {
             try
             {
-                await consumer.OnPublished(_channelId, item!);
+                await consumer.OnPublished(_channelId, item!, cancellationToken);
             }
             catch (Exception ex)
             {

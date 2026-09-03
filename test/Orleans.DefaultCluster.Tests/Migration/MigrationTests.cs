@@ -39,7 +39,7 @@ namespace DefaultCluster.Tests.General
                 {
                     // Trigger migration without setting a placement hint, so the grain placement provider will be
                     // free to select any location including the existing one.
-                    await grain.Cast<IGrainManagementExtension>().MigrateOnIdle();
+                    await grain.Cast<IGrainManagementExtension>().MigrateOnIdle(TestContext.Current.CancellationToken);
                     await grain.SetState(expectedState);
                     newAddress = await grain.GetGrainAddress();
                 } while (originalAddress == newAddress);
@@ -99,7 +99,7 @@ namespace DefaultCluster.Tests.General
 
                 // Trigger migration, setting a placement hint to coerce the placement director to use the target silo
                 RequestContext.Set(IPlacementDirector.PlacementHintKey, targetHost);
-                await grain.Cast<IGrainManagementExtension>().MigrateOnIdle();
+                await grain.Cast<IGrainManagementExtension>().MigrateOnIdle(TestContext.Current.CancellationToken);
 
                 GrainAddress newAddress;
                 do
@@ -140,8 +140,8 @@ namespace DefaultCluster.Tests.General
 
                 // Trigger migration, setting a placement hint to coerce the placement director to use the target silo
                 RequestContext.Set(IPlacementDirector.PlacementHintKey, targetHost);
-                var migrateA = a.Cast<IGrainManagementExtension>().MigrateOnIdle();
-                var migrateB = b.Cast<IGrainManagementExtension>().MigrateOnIdle();
+                var migrateA = a.Cast<IGrainManagementExtension>().MigrateOnIdle(TestContext.Current.CancellationToken);
+                var migrateB = b.Cast<IGrainManagementExtension>().MigrateOnIdle(TestContext.Current.CancellationToken);
                 await migrateA;
                 await migrateB;
 
@@ -188,7 +188,7 @@ namespace DefaultCluster.Tests.General
 
                 // Trigger migration, setting a placement hint to coerce the placement director to use the target silo
                 RequestContext.Set(IPlacementDirector.PlacementHintKey, targetHost);
-                await grain.Cast<IGrainManagementExtension>().MigrateOnIdle();
+                await grain.Cast<IGrainManagementExtension>().MigrateOnIdle(TestContext.Current.CancellationToken);
 
                 GrainAddress newAddress;
                 do
@@ -223,7 +223,7 @@ namespace DefaultCluster.Tests.General
 
                 // Trigger migration, setting a placement hint to coerce the placement director to use the target silo
                 RequestContext.Set(IPlacementDirector.PlacementHintKey, targetHost);
-                await grain.Cast<IGrainManagementExtension>().MigrateOnIdle();
+                await grain.Cast<IGrainManagementExtension>().MigrateOnIdle(TestContext.Current.CancellationToken);
 
                 GrainAddress newAddress;
                 do
@@ -272,7 +272,7 @@ namespace DefaultCluster.Tests.General
             // Also, tell the grain to fail to dehydrate (by stuffing some data into the request context which tells it to throw)
             RequestContext.Set("fail_dehydrate", true);
             RequestContext.Set(IPlacementDirector.PlacementHintKey, targetHost);
-            await grain.Cast<IGrainManagementExtension>().MigrateOnIdle();
+            await grain.Cast<IGrainManagementExtension>().MigrateOnIdle(TestContext.Current.CancellationToken);
 
             // The grain should have lost its state during the failed migration.
             var newState = await grain.GetState();
@@ -298,7 +298,7 @@ namespace DefaultCluster.Tests.General
             // Also, tell the grain to fail to rehydrate (by stuffing some data into the rehydration context which tells it to throw)
             RequestContext.Set("fail_rehydrate", true);
             RequestContext.Set(IPlacementDirector.PlacementHintKey, targetHost);
-            await grain.Cast<IGrainManagementExtension>().MigrateOnIdle();
+            await grain.Cast<IGrainManagementExtension>().MigrateOnIdle(TestContext.Current.CancellationToken);
 
             var newAddress = await grain.GetGrainAddress();
             Assert.Equal(targetHost, newAddress.SiloAddress);

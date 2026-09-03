@@ -313,9 +313,15 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
 
         foreach (var proxy in proxyInterfaces)
         {
+            var explicitlyClaimedMethodIds = new HashSet<(TypeRef InterfaceType, TypeRef OriginalInterfaceType, string MethodId)>(
+                proxy.Methods.SelectMany(method => GetExplicitlyClaimedMethodIds(proxy, method)));
             foreach (var method in proxy.Methods)
             {
-                var metadata = CreateGeneratedInvokableMetadata(proxy, method, generatedInvokableActivatorMetadataNames);
+                var metadata = CreateGeneratedInvokableMetadata(
+                    proxy,
+                    method,
+                    generatedInvokableActivatorMetadataNames,
+                    explicitlyClaimedMethodIds);
                 var key = metadata.TypeSyntax.ToString();
                 if (generatedInvokableMetadataNames.Contains(metadata.MetadataName) && seen.Add(key))
                 {
@@ -385,14 +391,15 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
     private static GeneratedInvokableMetadata CreateGeneratedInvokableMetadata(
         ProxyInterfaceModel proxy,
         MethodModel method,
-        HashSet<string> generatedInvokableActivatorMetadataNames)
+        HashSet<string> generatedInvokableActivatorMetadataNames,
+        HashSet<(TypeRef InterfaceType, TypeRef OriginalInterfaceType, string MethodId)> explicitlyClaimedMethodIds)
     {
         var generatedNamespace = method.ContainingInterfaceGeneratedNamespace;
         var name = GetGeneratedInvokableClassName(proxy, method);
         var genericArity = method.ContainingInterfaceTypeParameterCount + method.TypeParameters.Length;
         var typeSyntax = CreateGeneratedTypeSyntax(generatedNamespace, name, genericArity);
         var targetType = new TypeRef(typeSyntax.ToString());
-        var aliases = CreateGeneratedInvokableAliases(proxy, method, targetType);
+        var aliases = CreateGeneratedInvokableAliases(proxy, method, targetType, explicitlyClaimedMethodIds);
         var codecTypeSyntax = GetCodecTypeName(generatedNamespace, name, genericArity);
         var copierTypeSyntax = GetCopierTypeName(generatedNamespace, name, genericArity);
         var metadataName = GetGeneratedInvokableMetadataName(generatedNamespace, name, genericArity);
@@ -426,17 +433,52 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
     private static ImmutableArray<CompoundTypeAliasModel> CreateGeneratedInvokableAliases(
         ProxyInterfaceModel proxy,
         MethodModel method,
-        TypeRef targetType)
+        TypeRef targetType,
+        HashSet<(TypeRef InterfaceType, TypeRef OriginalInterfaceType, string MethodId)> explicitlyClaimedMethodIds)
     {
-        var result = ImmutableArray.CreateBuilder<CompoundTypeAliasModel>(2);
+        var result = ImmutableArray.CreateBuilder<CompoundTypeAliasModel>(3);
         if (!string.Equals(method.MethodId, method.GeneratedMethodId, StringComparison.Ordinal))
         {
             result.Add(CreateGeneratedInvokableAlias(proxy, method, method.MethodId, targetType));
         }
 
-        result.Add(CreateGeneratedInvokableAlias(proxy, method, method.GeneratedMethodId, targetType));
+        if (method.ClaimedGeneratedMethodId is { } claimedGeneratedMethodId
+            && !string.Equals(claimedGeneratedMethodId, method.MethodId, StringComparison.Ordinal)
+            && !string.Equals(claimedGeneratedMethodId, method.GeneratedMethodId, StringComparison.Ordinal))
+        {
+            result.Add(CreateGeneratedInvokableAlias(proxy, method, claimedGeneratedMethodId, targetType));
+        }
+
+        if (!explicitlyClaimedMethodIds.Contains(GetInvokableAliasKey(proxy, method, method.GeneratedMethodId)))
+        {
+            result.Add(CreateGeneratedInvokableAlias(proxy, method, method.GeneratedMethodId, targetType));
+        }
         return result.ToImmutable();
     }
+
+    private static IEnumerable<(TypeRef InterfaceType, TypeRef OriginalInterfaceType, string MethodId)> GetExplicitlyClaimedMethodIds(
+        ProxyInterfaceModel proxy,
+        MethodModel method)
+    {
+        if (method.HasAlias)
+        {
+            yield return GetInvokableAliasKey(proxy, method, method.MethodId);
+        }
+
+        if (method.ClaimedGeneratedMethodId is { } claimedGeneratedMethodId)
+        {
+            yield return GetInvokableAliasKey(proxy, method, claimedGeneratedMethodId);
+        }
+    }
+
+    private static (TypeRef InterfaceType, TypeRef OriginalInterfaceType, string MethodId) GetInvokableAliasKey(
+        ProxyInterfaceModel proxy,
+        MethodModel method,
+        string methodId) =>
+        (
+            method.ContainingInterfaceType,
+            proxy.ProxyBase.IsExtension ? method.OriginalContainingInterfaceType : default,
+            methodId);
 
     private static CompoundTypeAliasModel CreateGeneratedInvokableAlias(
         ProxyInterfaceModel proxy,

@@ -65,14 +65,26 @@ namespace UnitTests.StreamingTests
 
             await ValidateAgentsState(StreamLifecycleOptions.RunState.AgentsStarted);
 
-            await mgmt.SendControlCommandToProvider<PersistentStreamProvider>(adapterName, (int)PersistentStreamProviderCommand.StartAgents);
+            await mgmt.SendControlCommandToProvider<PersistentStreamProvider>(
+                adapterName,
+                (int)PersistentStreamProviderCommand.StartAgents,
+                null,
+                TestContext.Current.CancellationToken);
             await ValidateAgentsState(StreamLifecycleOptions.RunState.AgentsStarted);
 
-            await mgmt.SendControlCommandToProvider<PersistentStreamProvider>(adapterName, (int)PersistentStreamProviderCommand.StopAgents);
+            await mgmt.SendControlCommandToProvider<PersistentStreamProvider>(
+                adapterName,
+                (int)PersistentStreamProviderCommand.StopAgents,
+                null,
+                TestContext.Current.CancellationToken);
             await ValidateAgentsState(StreamLifecycleOptions.RunState.AgentsStopped);
 
 
-            await mgmt.SendControlCommandToProvider<PersistentStreamProvider>(adapterName, (int)PersistentStreamProviderCommand.StartAgents);
+            await mgmt.SendControlCommandToProvider<PersistentStreamProvider>(
+                adapterName,
+                (int)PersistentStreamProviderCommand.StartAgents,
+                null,
+                TestContext.Current.CancellationToken);
             await ValidateAgentsState(StreamLifecycleOptions.RunState.AgentsStarted);
 
         }

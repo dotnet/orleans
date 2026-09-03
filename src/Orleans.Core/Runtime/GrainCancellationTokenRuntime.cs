@@ -63,7 +63,7 @@ namespace Orleans.Runtime
              ICancellationSourcesExtension tokenExtension)
         {
             await AsyncExecutorWithRetries.ExecuteWithRetries(
-                i => tokenExtension.CancelRemoteToken(id),
+                i => tokenExtension.CancelRemoteToken(id, CancellationToken.None),
                 MaxNumCancelErrorTries,
                 _cancelCallRetryExceptionFilter,
                 _cancelCallMaxWaitTime,

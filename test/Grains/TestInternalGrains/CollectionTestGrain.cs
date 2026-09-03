@@ -102,9 +102,9 @@ namespace UnitTests.Grains
             counter++;
             int tmpCounter = counter;
             Logger().LogInformation("Start TimerCallback {Counter}, staticCounter {StaticCounter}.", tmpCounter, staticCounter);
-            await Task.Delay(delayPeriod);
+            await Task.Delay(delayPeriod, cancellationToken);
             Logger().LogInformation("After first delay TimerCallback {Counter}, staticCounter {StaticCounter}.", tmpCounter, staticCounter);
-            await Task.Delay(delayPeriod);
+            await Task.Delay(delayPeriod, cancellationToken);
             Logger().LogInformation("After second delay TimerCallback {Counter}, staticCounter {StaticCounter}.", tmpCounter, staticCounter);
         }
     }

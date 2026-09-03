@@ -1,3 +1,4 @@
+using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Immutable;
 using Orleans.Runtime;
@@ -14,35 +15,42 @@ internal interface IActivationRepartitionerSystemTarget : ISystemTarget
         => grainFactory.GetGrain<IActivationRepartitionerSystemTarget>(SystemTargetGrainId.Create(Constants.ActivationRepartitionerType, targetSilo).GrainId);
 
     [ResponseTimeout("00:10:00")]
-    ValueTask TriggerExchangeRequest();
+    [Alias("A6EE4757")]
+    ValueTask TriggerExchangeRequest(CancellationToken cancellationToken = default);
 
     [ResponseTimeout("00:10:00")]
-    ValueTask<AcceptExchangeResponse> AcceptExchangeRequest(AcceptExchangeRequest request);
+    [Alias("9D8EDC44")]
+    ValueTask<AcceptExchangeResponse> AcceptExchangeRequest(AcceptExchangeRequest request, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// For use in testing only!
     /// </summary>
-    ValueTask ResetCounters();
+    [Alias("21852A09")]
+    ValueTask ResetCounters(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// For use in testing only!
     /// </summary>
-    ValueTask<int> GetActivationCount();
+    [Alias("9FB525F3")]
+    ValueTask<int> GetActivationCount(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// For use in testing only!
     /// </summary>
-    ValueTask SetActivationCountOffset(int activationCountOffset);
+    [Alias("135356E5")]
+    ValueTask SetActivationCountOffset(int activationCountOffset, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// For diagnostics only.
     /// </summary>
-    ValueTask<ImmutableArray<(Edge, ulong)>> GetGrainCallFrequencies();
+    [Alias("C4497899")]
+    ValueTask<ImmutableArray<(Edge, ulong)>> GetGrainCallFrequencies(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// For use in testing only! Flushes buffered messages.
     /// </summary>
-    ValueTask FlushBuffers();
+    [Alias("11731652")]
+    ValueTask FlushBuffers(CancellationToken cancellationToken = default);
 }
 
 // We use a readonly struct so that we can fully decouple the message-passing and potentially modifications to the Silo fields.

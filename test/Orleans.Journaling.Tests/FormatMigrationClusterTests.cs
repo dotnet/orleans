@@ -60,7 +60,7 @@ public sealed class FormatMigrationClusterTests
             Assert.Equal(1, await grain.GetCounter());
 
             await grain.SetTestValues("json", 2);
-            await grain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
+            await grain.Cast<IGrainManagementExtension>().DeactivateOnIdle(TestContext.Current.CancellationToken);
 
             grain = cluster.Client.GetGrain<ITestDurableGrain>(grainId);
             Assert.Equal("json", await grain.GetName());

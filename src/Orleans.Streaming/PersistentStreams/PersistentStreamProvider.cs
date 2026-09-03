@@ -125,11 +125,11 @@ namespace Orleans.Providers.Streams.Common
                 var siloRuntime = this.runtime as ISiloSideStreamProviderRuntime;
                 if (siloRuntime != null)
                 {
-                    this.pullingAgentManager = await siloRuntime.InitializePullingAgents(this.Name, this.adapterFactory, this.queueAdapter);
+                    this.pullingAgentManager = await siloRuntime.InitializePullingAgents(this.Name, this.adapterFactory, this.queueAdapter, token);
 
                     // TODO: No support yet for DeliveryDisabled, only Stopped and Started
                     if (this.lifeCycleOptions.StartupState == StreamLifecycleOptions.RunState.AgentsStarted)
-                        await pullingAgentManager.StartAgents();
+                        await pullingAgentManager.StartAgents(token);
                 }
             }
             stateManager.CommitState();
@@ -147,7 +147,7 @@ namespace Orleans.Providers.Streams.Common
             var manager = this.pullingAgentManager;
             if (manager != null)
             {
-                var stopTask = manager.Stop();
+                var stopTask = manager.Stop(CancellationToken.None);
                 try
                 {
                     await stopTask.WaitAsync(token);

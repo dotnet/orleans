@@ -296,6 +296,13 @@ namespace Orleans.EventSourcing
             await LogViewAdaptor.PreOnActivate();
         }
 
+        /// <inheritdoc/>
+        Task ILogConsistencyProtocolParticipant.PreActivateProtocolParticipant(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return LogViewAdaptor.PreOnActivate();
+        }
+
         /// <summary>
         /// Notify log view adaptor of activation (called after user-level OnActivate)
         /// </summary>
@@ -304,12 +311,28 @@ namespace Orleans.EventSourcing
             await LogViewAdaptor.PostOnActivate();
         }
 
+        /// <inheritdoc/>
+        Task ILogConsistencyProtocolParticipant.PostActivateProtocolParticipant(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return LogViewAdaptor.PostOnActivate();
+        }
+
         /// <summary>
         /// Notify log view adaptor of deactivation
         /// </summary>
         Task ILogConsistencyProtocolParticipant.DeactivateProtocolParticipant()
         {
             return LogViewAdaptor.PostOnDeactivate();
+        }
+
+        /// <inheritdoc/>
+        Task ILogConsistencyProtocolParticipant.DeactivateProtocolParticipant(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return LogViewAdaptor is ICancellationAwareLogViewAdaptor cancellationAware
+                ? cancellationAware.PostOnDeactivate(cancellationToken)
+                : LogViewAdaptor.PostOnDeactivate().WaitAsync(cancellationToken);
         }
 
         /// <summary>

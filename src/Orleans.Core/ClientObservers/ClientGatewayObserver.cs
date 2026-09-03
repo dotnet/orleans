@@ -1,3 +1,4 @@
+using System.Threading;
 using Orleans.Messaging;
 using Orleans.Runtime;
 
@@ -12,7 +13,9 @@ namespace Orleans.ClientObservers
         /// Signals a client that it should stop sending messages to the specified gateway.
         /// </summary>
         /// <param name="gateway">The gateway</param>
-        void StopSendingToGateway(SiloAddress gateway);
+        /// <param name="cancellationToken">The cancellation token.</param>
+        [Alias("AFB768FD")]
+        void StopSendingToGateway(SiloAddress gateway, CancellationToken cancellationToken = default);
     }
 
     /// <summary>
@@ -36,7 +39,11 @@ namespace Orleans.ClientObservers
         }
 
         /// <inheritdoc />
-        public void StopSendingToGateway(SiloAddress gateway) => this.gatewayManager.MarkAsUnavailableForSend(gateway);
+        public void StopSendingToGateway(SiloAddress gateway, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            this.gatewayManager.MarkAsUnavailableForSend(gateway);
+        }
 
         internal override ObserverGrainId GetObserverGrainId(ClientGrainId clientId) => ObserverGrainId.Create(clientId, ScopedId);
 

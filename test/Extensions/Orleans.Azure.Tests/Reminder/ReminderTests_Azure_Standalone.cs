@@ -64,12 +64,12 @@ namespace Tester.AzureUtils.TimerTests
             IReminderTable table = new AzureBasedReminderTable(this.loggerFactory, clusterOptions, storageOptions);
             await table.StartAsync(TestContext.Current.CancellationToken);
 
-            ReminderEntry[] rows = (await GetAllRows(table)).ToArray();
+            ReminderEntry[] rows = (await GetAllRows(table, TestContext.Current.CancellationToken)).ToArray();
             Assert.Empty(rows); // "The reminder table (sid={0}, did={1}) was not empty.", ServiceId, clusterId);
 
             ReminderEntry expected = NewReminderEntry();
-            await table.UpsertRow(expected);
-            rows = (await GetAllRows(table)).ToArray();
+            await table.UpsertRow(expected, TestContext.Current.CancellationToken);
+            rows = (await GetAllRows(table, TestContext.Current.CancellationToken)).ToArray();
 
             Assert.Single(rows); // "The reminder table (sid={0}, did={1}) did not contain the correct number of rows (1).", ServiceId, clusterId);
             ReminderEntry actual = rows[0];
@@ -107,7 +107,7 @@ namespace Tester.AzureUtils.TimerTests
                 Task<bool> promise = Task.Run(
                     async () =>
                     {
-                        await reminderTable.UpsertRow(e);
+                        await reminderTable.UpsertRow(e, cancellationToken);
                         this.output.WriteLine("Done " + capture);
                         return true;
                     },
@@ -143,9 +143,11 @@ namespace Tester.AzureUtils.TimerTests
             return string.Format("ReminderTest.{0}", Guid.NewGuid());
         }
 
-        private static async Task<IEnumerable<ReminderEntry>> GetAllRows(IReminderTable table)
+        private static async Task<IEnumerable<ReminderEntry>> GetAllRows(
+            IReminderTable table,
+            CancellationToken cancellationToken)
         {
-            var data = await table.ReadRows(0, 0xffffffff);
+            var data = await table.ReadRows(0, 0xffffffff, cancellationToken);
             Assert.NotNull(data);
             return data.Reminders;
         }

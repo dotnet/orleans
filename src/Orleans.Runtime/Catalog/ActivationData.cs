@@ -1773,7 +1773,7 @@ internal sealed partial class ActivationData :
                 }
                 if (!success)
                 {
-                    Deactivate(new(DeactivationReasonCode.DirectoryFailure, registrationException, "Failed to register activation in grain directory."));
+                    Deactivate(new(DeactivationReasonCode.DirectoryFailure, registrationException, "Failed to register activation in grain directory."), cancellationToken);
                     activationMetrics.DirectoryRegistrationFailed(registrationException, cancellationToken.IsCancellationRequested);
 
                     // Activation failed.
@@ -2147,16 +2147,24 @@ internal sealed partial class ActivationData :
         }
     }
 
-    ValueTask IGrainManagementExtension.DeactivateOnIdle()
+    ValueTask IGrainManagementExtension.DeactivateOnIdle() =>
+        ((IGrainManagementExtension)this).DeactivateOnIdle(default);
+
+    ValueTask IGrainManagementExtension.DeactivateOnIdle(CancellationToken cancellationToken)
     {
-        Deactivate(new(DeactivationReasonCode.ApplicationRequested, $"{nameof(IGrainManagementExtension.DeactivateOnIdle)} was called."), CancellationToken.None);
+        cancellationToken.ThrowIfCancellationRequested();
+        Deactivate(new(DeactivationReasonCode.ApplicationRequested, $"{nameof(IGrainManagementExtension.DeactivateOnIdle)} was called."), cancellationToken);
         return default;
     }
 
-    async ValueTask IGrainManagementExtension.MigrateOnIdle()
+    ValueTask IGrainManagementExtension.MigrateOnIdle() =>
+        ((IGrainManagementExtension)this).MigrateOnIdle(default);
+
+    async ValueTask IGrainManagementExtension.MigrateOnIdle(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var requestContextData = RequestContext.CallContextData?.Value.Values;
-        var selectedAddress = await PlaceMigratingGrainAsync(requestContextData, CancellationToken.None);
+        var selectedAddress = await PlaceMigratingGrainAsync(requestContextData, cancellationToken);
         if (selectedAddress is null)
         {
             return;
@@ -2165,7 +2173,7 @@ internal sealed partial class ActivationData :
         // Only migrate if a different silo was selected.
         ForwardingAddress = selectedAddress;
         LogDebugMigrating(_shared.Logger, GrainId, ForwardingAddress);
-        Migrate(requestContextData, cancellationToken: CancellationToken.None);
+        Migrate(requestContextData, cancellationToken);
     }
 
     private async ValueTask<SiloAddress?> PlaceMigratingGrainAsync(Dictionary<string, object>? requestContextData, CancellationToken cancellationToken)
@@ -2173,7 +2181,8 @@ internal sealed partial class ActivationData :
         try
         {
             var placementService = _shared.Runtime.ServiceProvider.GetRequiredService<PlacementService>();
-            var selectedAddress = await placementService.PlaceGrainAsync(GrainId, requestContextData, PlacementStrategy);
+            var selectedAddress = await placementService.PlaceGrainAsync(GrainId, requestContextData, PlacementStrategy)
+                .WaitAsync(cancellationToken);
 
             if (selectedAddress is null)
             {
@@ -2190,6 +2199,10 @@ internal sealed partial class ActivationData :
             }
 
             return selectedAddress;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception exception)
         {
@@ -2242,11 +2255,20 @@ internal sealed partial class ActivationData :
         return tracker.IsReentrantSectionActive(reentrancyId);
     }
 
-    ValueTask IGrainCallCancellationExtension.CancelRequestAsync(GrainId senderGrainId, CorrelationId messageId)
-        => this.RunOrQueueTask(static state => state.self.CancelRequestAsyncCore(state.senderGrainId, state.messageId), (self: this, senderGrainId, messageId));
+    ValueTask IGrainCallCancellationExtension.CancelRequestAsync(
+        GrainId senderGrainId,
+        CorrelationId messageId,
+        CancellationToken cancellationToken)
+        => this.RunOrQueueTask(
+            static state => state.self.CancelRequestAsyncCore(state.senderGrainId, state.messageId, state.cancellationToken),
+            (self: this, senderGrainId, messageId, cancellationToken));
 
-    private ValueTask CancelRequestAsyncCore(GrainId senderGrainId, CorrelationId messageId)
+    private ValueTask CancelRequestAsyncCore(
+        GrainId senderGrainId,
+        CorrelationId messageId,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (!TryCancelRequest())
         {
             // The message being canceled may not have arrived yet, so retry a few times.
@@ -2260,7 +2282,7 @@ internal sealed partial class ActivationData :
             var attemptsRemaining = 3;
             do
             {
-                await Task.Delay(1_000);
+                await Task.Delay(1_000, cancellationToken);
             } while (!TryCancelRequest() && --attemptsRemaining > 0);
         }
 

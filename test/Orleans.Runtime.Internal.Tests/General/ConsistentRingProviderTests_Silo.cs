@@ -282,7 +282,7 @@ namespace UnitTests.General
             var tableGrainId = ((GrainReference)tableGrain).GrainId;
 
             // Ping the grain to make sure it is active.
-            await tableGrain.ReadRows(tableGrainId).WaitAsync(cancellationToken);
+            await tableGrain.ReadRows(tableGrainId, cancellationToken);
 
             (SiloAddress reminderTableGrainPrimaryDirectoryAddress, SiloAddress reminderGrainActivationSiloAddress) =
                 await GetReminderTableGrainAddresses(tableGrainId, cancellationToken);

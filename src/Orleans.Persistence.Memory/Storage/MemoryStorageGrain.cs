@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Storage.Internal;
@@ -22,14 +23,27 @@ namespace Orleans.Storage
         }
 
         public Task<IGrainState<T>?> ReadStateAsync<T>(string grainStoreKey)
+            => ReadStateAsync<T>(grainStoreKey, CancellationToken.None);
+
+        public Task<IGrainState<T>?> ReadStateAsync<T>(
+            string grainStoreKey,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             LogDebugReadState(grainStoreKey);
             _store.TryGetValue(grainStoreKey, out var entry);
             return Task.FromResult((IGrainState<T>?)entry);
         }
 
         public Task<string> WriteStateAsync<T>(string grainStoreKey, IGrainState<T> grainState)
+            => WriteStateAsync(grainStoreKey, grainState, CancellationToken.None);
+
+        public Task<string> WriteStateAsync<T>(
+            string grainStoreKey,
+            IGrainState<T> grainState,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             LogDebugWriteState(grainStoreKey, grainState.ETag);
             var currentETag = GetETagFromStorage<T>(grainStoreKey);
             ValidateEtag(currentETag, grainState.ETag, grainStoreKey, "Update");
@@ -40,7 +54,14 @@ namespace Orleans.Storage
         }
 
         public Task DeleteStateAsync<T>(string grainStoreKey, string? etag)
+            => DeleteStateAsync<T>(grainStoreKey, etag, CancellationToken.None);
+
+        public Task DeleteStateAsync<T>(
+            string grainStoreKey,
+            string? etag,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             LogDebugDeleteState(grainStoreKey, etag);
 
             var currentETag = GetETagFromStorage<T>(grainStoreKey);

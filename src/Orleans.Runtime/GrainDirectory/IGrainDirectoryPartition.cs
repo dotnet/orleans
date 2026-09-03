@@ -65,19 +65,21 @@ internal interface IGrainDirectoryClient : ISystemTarget
 internal interface IGrainDirectoryTestHooks : ISystemTarget
 {
     [Alias("CheckIntegrityAsync")]
-    ValueTask CheckIntegrityAsync();
+    ValueTask CheckIntegrityAsync(CancellationToken cancellationToken = default);
 
     [Alias("RecoverAndCheckIntegrityAsync")]
-    ValueTask RecoverAndCheckIntegrityAsync();
+    ValueTask RecoverAndCheckIntegrityAsync(CancellationToken cancellationToken = default);
 
     [Alias("WaitForMembershipVersionAsync")]
-    ValueTask WaitForMembershipVersionAsync(MembershipVersion version);
+    ValueTask WaitForMembershipVersionAsync(MembershipVersion version, CancellationToken cancellationToken = default);
 
     [Alias("CheckActivationsAsync")]
-    ValueTask<Immutable<List<GrainId>>> CheckActivationsAsync(Immutable<List<GrainAddress>> activations);
+    ValueTask<Immutable<List<GrainId>>> CheckActivationsAsync(
+        Immutable<List<GrainAddress>> activations,
+        CancellationToken cancellationToken = default);
 
     [Alias("CleanupExpiredLeasesAsync")]
-    ValueTask<GrainDirectoryLeaseCleanupResult> CleanupExpiredLeasesAsync();
+    ValueTask<GrainDirectoryLeaseCleanupResult> CleanupExpiredLeasesAsync(CancellationToken cancellationToken = default);
 }
 
 [GenerateSerializer, Immutable, Alias("GrainDirectoryLeaseCleanupResult")]

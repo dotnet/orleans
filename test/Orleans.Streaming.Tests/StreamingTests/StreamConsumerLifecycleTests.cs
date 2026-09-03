@@ -203,8 +203,8 @@ public class StreamConsumerLifecycleTests
         var batchStartToken = new EventSequenceTokenV2(40, 4);
         var itemHandle = fixture.Register(itemSubscriptionId, itemObserver, token: itemStartToken);
         var batchHandle = fixture.Register(batchSubscriptionId, batchObserver, token: batchStartToken);
-        var itemHandshake = await fixture.Extension.GetSequenceToken(itemSubscriptionId);
-        var batchHandshake = await fixture.Extension.GetSequenceToken(batchSubscriptionId);
+        var itemHandshake = await fixture.Extension.GetSequenceToken(itemSubscriptionId, TestContext.Current.CancellationToken);
+        var batchHandshake = await fixture.Extension.GetSequenceToken(batchSubscriptionId, TestContext.Current.CancellationToken);
         var deliveredItemToken = new EventSequenceTokenV2(31, 5);
         var deliveredBatchToken = new EventSequenceTokenV2(41, 6);
         var batch = new TestBatchContainer(fixture.Stream.StreamId, deliveredBatchToken, 71);
@@ -215,14 +215,16 @@ public class StreamConsumerLifecycleTests
             fixture.Stream.InternalStreamId,
             61,
             deliveredItemToken,
-            itemHandshake);
+            itemHandshake,
+            TestContext.Current.CancellationToken);
         await fixture.Extension.DeliverBatch(
             batchSubscriptionId,
             fixture.Stream.InternalStreamId,
             batch,
-            batchHandshake);
-        await fixture.Extension.CompleteStream(itemSubscriptionId);
-        await fixture.Extension.ErrorInStream(batchSubscriptionId, streamError);
+            batchHandshake,
+            TestContext.Current.CancellationToken);
+        await fixture.Extension.CompleteStream(itemSubscriptionId, TestContext.Current.CancellationToken);
+        await fixture.Extension.ErrorInStream(batchSubscriptionId, streamError, TestContext.Current.CancellationToken);
 
         Assert.Same(itemStartToken, Assert.IsType<StartToken>(itemHandshake).Token);
         Assert.Same(batchStartToken, Assert.IsType<StartToken>(batchHandshake).Token);
@@ -246,11 +248,15 @@ public class StreamConsumerLifecycleTests
             fixture.Stream.InternalStreamId,
             62,
             new EventSequenceTokenV2(32),
-            handshakeToken: null));
-        await fixture.Extension.CompleteStream(itemSubscriptionId);
-        await fixture.Extension.ErrorInStream(itemSubscriptionId, new InvalidOperationException("dropped"));
+            handshakeToken: null,
+            cancellationToken: TestContext.Current.CancellationToken));
+        await fixture.Extension.CompleteStream(itemSubscriptionId, TestContext.Current.CancellationToken);
+        await fixture.Extension.ErrorInStream(
+            itemSubscriptionId,
+            new InvalidOperationException("dropped"),
+            TestContext.Current.CancellationToken);
 
-        Assert.Null(await fixture.Extension.GetSequenceToken(itemSubscriptionId));
+        Assert.Null(await fixture.Extension.GetSequenceToken(itemSubscriptionId, TestContext.Current.CancellationToken));
         Assert.Equal([61], itemObserver.Items);
         Assert.Equal(1, itemObserver.CompletionCalls);
         Assert.Empty(itemObserver.Errors);

@@ -73,7 +73,7 @@ internal sealed class DashboardGrain : Grain, IDashboardGrain
                 if (timeSinceLastQuery > _grainProfilerOptions.DeactivationTime && _isEnabled)
                 {
                     _isEnabled = false;
-                    await BroadcaseEnabled();
+                    await BroadcaseEnabled(default);
                 }
             }, new() { DueTime = interval, Period = interval, Interleave = true, KeepAlive = true });
         }
@@ -81,36 +81,41 @@ internal sealed class DashboardGrain : Grain, IDashboardGrain
         return base.OnActivateAsync(cancellationToken);
     }
 
-    private Task EnsureIsActive()
+    private Task EnsureIsActive(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         _lastQuery = DateTime.UtcNow;
 
         if (!_isEnabled)
         {
             _isEnabled = true;
-            _ = BroadcaseEnabled();
+            _ = BroadcaseEnabled(default);
         }
 
         return Task.CompletedTask;
     }
 
-    private async Task BroadcaseEnabled()
+    private async Task BroadcaseEnabled(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (_grainProfilerOptions.TraceAlways)
         {
             return;
         }
 
-        var silos = await _siloDetailsProvider.GetSiloDetails();
+        var silos = await _siloDetailsProvider.GetSiloDetails().WaitAsync(cancellationToken);
 
         foreach (var siloAddress in silos.Select(x => x.SiloAddress))
         {
-            await _siloGrainClient.GrainService(SiloAddress.FromParsableString(siloAddress)).Enable(_isEnabled);
+            await _siloGrainClient
+                .GrainService(SiloAddress.FromParsableString(siloAddress))
+                .Enable(_isEnabled, cancellationToken);
         }
     }
 
-    private async Task EnsureCountersAreUpToDate()
+    private async Task EnsureCountersAreUpToDate(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (_isUpdating)
         {
             return;
@@ -127,11 +132,11 @@ internal sealed class DashboardGrain : Grain, IDashboardGrain
         try
         {
             var metricsGrain = GrainFactory.GetGrain<IManagementGrain>(0);
-            var activationCountTask = metricsGrain.GetTotalActivationCount();
-            var simpleGrainStatsTask = metricsGrain.GetSimpleGrainStatistics();
+            var activationCountTask = metricsGrain.GetTotalActivationCount(cancellationToken);
+            var simpleGrainStatsTask = metricsGrain.GetSimpleGrainStatistics(cancellationToken);
             var siloDetailsTask = _siloDetailsProvider.GetSiloDetails();
 
-            await Task.WhenAll(activationCountTask, simpleGrainStatsTask, siloDetailsTask);
+            await Task.WhenAll(activationCountTask, simpleGrainStatsTask, siloDetailsTask).WaitAsync(cancellationToken);
 
             RecalculateCounters(activationCountTask.Result, siloDetailsTask.Result, simpleGrainStatsTask.Result);
 
@@ -184,10 +189,12 @@ internal sealed class DashboardGrain : Grain, IDashboardGrain
         .ToArray();
     }
 
-    public async Task<Immutable<DashboardCounters>> GetCounters(string[]? exclusions)
+    public async Task<Immutable<DashboardCounters>> GetCounters(
+        string[]? exclusions,
+        CancellationToken cancellationToken = default)
     {
-        await EnsureIsActive();
-        await EnsureCountersAreUpToDate();
+        await EnsureIsActive(cancellationToken);
+        await EnsureCountersAreUpToDate(cancellationToken);
 
         var simpleGrainStats = exclusions != null && exclusions.Length > 0
             ? [.. _counters.SimpleGrainStats.Where(x => !exclusions.Any(f => x.GrainType.StartsWith(f, StringComparison.OrdinalIgnoreCase)))]
@@ -206,34 +213,41 @@ internal sealed class DashboardGrain : Grain, IDashboardGrain
     }
 
     public async Task<Immutable<Dictionary<string, Dictionary<string, GrainTraceEntry>>>> GetGrainTracing(
-        string grain)
+        string grain,
+        CancellationToken cancellationToken = default)
     {
-        await EnsureIsActive();
-        await EnsureCountersAreUpToDate();
+        await EnsureIsActive(cancellationToken);
+        await EnsureCountersAreUpToDate(cancellationToken);
 
         return _history.QueryGrain(grain).AsImmutable();
     }
 
-    public async Task<Immutable<Dictionary<string, GrainTraceEntry>>> GetClusterTracing()
+    public async Task<Immutable<Dictionary<string, GrainTraceEntry>>> GetClusterTracing(
+        CancellationToken cancellationToken = default)
     {
-        await EnsureIsActive();
-        await EnsureCountersAreUpToDate();
+        await EnsureIsActive(cancellationToken);
+        await EnsureCountersAreUpToDate(cancellationToken);
 
         return _history.QueryAll().AsImmutable();
     }
 
-    public async Task<Immutable<Dictionary<string, GrainTraceEntry>>> GetSiloTracing(string address)
+    public async Task<Immutable<Dictionary<string, GrainTraceEntry>>> GetSiloTracing(
+        string address,
+        CancellationToken cancellationToken = default)
     {
-        await EnsureIsActive();
-        await EnsureCountersAreUpToDate();
+        await EnsureIsActive(cancellationToken);
+        await EnsureCountersAreUpToDate(cancellationToken);
 
         return _history.QuerySilo(address).AsImmutable();
     }
 
-    public async Task<Immutable<Dictionary<string, GrainMethodAggregate[]>>> TopGrainMethods(int take, string[]? exclusions)
+    public async Task<Immutable<Dictionary<string, GrainMethodAggregate[]>>> TopGrainMethods(
+        int take,
+        string[]? exclusions,
+        CancellationToken cancellationToken = default)
     {
-        await EnsureIsActive();
-        await EnsureCountersAreUpToDate();
+        await EnsureIsActive(cancellationToken);
+        await EnsureCountersAreUpToDate(cancellationToken);
 
         var values = _history.AggregateByGrainMethod(exclusions).ToList();
 
@@ -263,19 +277,29 @@ internal sealed class DashboardGrain : Grain, IDashboardGrain
         return result.AsImmutable();
     }
 
-    public Task InitializeAsync() =>
-        // just used to activate the grain
-        Task.CompletedTask;
-
-    public Task SubmitTracing(string siloAddress, Immutable<SiloGrainTraceEntry[]> grainTrace)
+    public Task InitializeAsync(CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.CompletedTask;
+    }
+
+    public Task SubmitTracing(
+        string siloAddress,
+        Immutable<SiloGrainTraceEntry[]> grainTrace,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         _history.Add(DateTime.UtcNow, siloAddress, grainTrace.Value);
 
         return Task.CompletedTask;
     }
 
-    public async Task<Immutable<string>> GetGrainState(string? id, string? grainType)
+    public async Task<Immutable<string>> GetGrainState(
+        string? id,
+        string? grainType,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var result = new ExpandoObject();
 
         try
@@ -326,10 +350,14 @@ internal sealed class DashboardGrain : Grain, IDashboardGrain
                                 if (resultProperty == null)
                                     continue;
 
-                                await task;
+                                await task.WaitAsync(cancellationToken);
 
                                 result.TryAdd(method.Name, resultProperty.GetValue(task));
                             }
+                        }
+                        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                        {
+                            throw;
                         }
                         catch
                         {
@@ -337,11 +365,19 @@ internal sealed class DashboardGrain : Grain, IDashboardGrain
                         }
                     }
                 }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
                 catch
                 {
                     // Because we got all the interfaces some errors with boxing and unboxing may happen when try to get the grain
                 }
             }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -354,8 +390,11 @@ internal sealed class DashboardGrain : Grain, IDashboardGrain
         }).AsImmutable();
     }
 
-    public Task<Immutable<string[]>> GetGrainTypes(string[]? exclusions)
+    public Task<Immutable<string[]>> GetGrainTypes(
+        string[]? exclusions,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         return Task.FromResult(_typeManifestOptions.InterfaceImplementations
             .Where(s => s.GetInterfaces().Any(i => i == typeof(IGrain) || i == typeof(ISystemTarget)))
             .Where(s => exclusions == null || !exclusions.Any(e => s.FullName!.StartsWith(e, StringComparison.OrdinalIgnoreCase)))

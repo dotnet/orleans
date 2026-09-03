@@ -106,7 +106,7 @@ namespace Orleans.Runtime.Messaging
                     if (client.Value.IsConnected)
                     {
                         var observer = ClientGatewayObserver.GetObserver(grainFactory, client.Key);
-                        observer.StopSendingToGateway(this.gatewayAddress);
+                        observer.StopSendingToGateway(this.gatewayAddress, CancellationToken.None);
                     }
                 }
             }

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -88,13 +89,19 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
         var res = new List<MemberDeclarationSyntax>();
         foreach (var methodDescription in interfaceDescription.Methods)
         {
-            res.Add(CreateProxyMethod(methodDescription));
+            var forwardingMethod = interfaceDescription.Methods.FirstOrDefault(
+                candidate => IsCancellationCompatibilityOverload(methodDescription, candidate));
+            res.Add(CreateProxyMethod(methodDescription, forwardingMethod));
         }
         return [.. res];
 
-        MethodDeclarationSyntax CreateProxyMethod(ProxyMethodDescription methodDescription)
+        MethodDeclarationSyntax CreateProxyMethod(
+            ProxyMethodDescription methodDescription,
+            ProxyMethodDescription? forwardingMethod)
         {
-            var (isAsync, body) = CreateAsyncProxyMethodBody(fieldDescriptions, methodDescription);
+            var (isAsync, body) = forwardingMethod is null
+                ? CreateAsyncProxyMethodBody(fieldDescriptions, methodDescription)
+                : (false, CreateCompatibilityForwardingBody(methodDescription, forwardingMethod));
             var method = methodDescription.Method;
             var declaration = MethodDeclaration(method.ReturnType.ToTypeSyntax(methodDescription.TypeParameterSubstitutions), method.Name.EscapeIdentifier())
                 .AddParameterListParameters([.. method.Parameters.Select((p, i) => GetParameterSyntax(i, p, methodDescription.TypeParameterSubstitutions))])
@@ -115,6 +122,157 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
             }
 
             return declaration;
+        }
+
+        bool IsCancellationCompatibilityOverload(
+            ProxyMethodDescription legacyMethod,
+            ProxyMethodDescription candidate)
+        {
+            if (ReferenceEquals(legacyMethod, candidate)
+                || !string.Equals(legacyMethod.Method.Name, candidate.Method.Name, StringComparison.Ordinal)
+                || candidate.Method.TypeParameters.Length != legacyMethod.Method.TypeParameters.Length
+                || !HaveEquivalentMethodConstraints(legacyMethod.Method, candidate.Method)
+                || candidate.Method.Parameters.Length != legacyMethod.Method.Parameters.Length + 1
+                || !AreEquivalentMethodTypes(legacyMethod.Method.ReturnType, candidate.Method.ReturnType)
+                || !SymbolEqualityComparer.Default.Equals(
+                    candidate.Method.Parameters[candidate.Method.Parameters.Length - 1].Type,
+                    LibraryTypes.CancellationToken)
+                || !string.Equals(candidate.MethodId, legacyMethod.GeneratedMethodId, StringComparison.Ordinal)
+                    && !string.Equals(candidate.InvokableMethod.ClaimedGeneratedMethodId, legacyMethod.GeneratedMethodId, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            if (legacyMethod.InvokableMethod.ProxyBase.IsExtension
+                && !SymbolEqualityComparer.Default.Equals(
+                    legacyMethod.Method.OriginalDefinition.ContainingType,
+                    candidate.Method.OriginalDefinition.ContainingType))
+            {
+                return false;
+            }
+
+            for (var i = 0; i < legacyMethod.Method.Parameters.Length; i++)
+            {
+                var legacyParameter = legacyMethod.Method.Parameters[i];
+                var candidateParameter = candidate.Method.Parameters[i];
+                if (legacyParameter.RefKind != candidateParameter.RefKind
+                    || !AreEquivalentMethodTypes(legacyParameter.Type, candidateParameter.Type))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        static bool HaveEquivalentMethodConstraints(IMethodSymbol legacyMethod, IMethodSymbol candidateMethod)
+        {
+            for (var i = 0; i < legacyMethod.TypeParameters.Length; i++)
+            {
+                var legacyParameter = legacyMethod.TypeParameters[i];
+                var candidateParameter = candidateMethod.TypeParameters[i];
+                if (legacyParameter.HasConstructorConstraint != candidateParameter.HasConstructorConstraint
+                    || legacyParameter.HasNotNullConstraint != candidateParameter.HasNotNullConstraint
+                    || legacyParameter.HasReferenceTypeConstraint != candidateParameter.HasReferenceTypeConstraint
+                    || legacyParameter.ReferenceTypeConstraintNullableAnnotation != candidateParameter.ReferenceTypeConstraintNullableAnnotation
+                    || legacyParameter.HasUnmanagedTypeConstraint != candidateParameter.HasUnmanagedTypeConstraint
+                    || legacyParameter.HasValueTypeConstraint != candidateParameter.HasValueTypeConstraint
+                    || legacyParameter.ConstraintTypes.Length != candidateParameter.ConstraintTypes.Length
+                    || !HaveEquivalentConstraintTypes(legacyParameter.ConstraintTypes, candidateParameter.ConstraintTypes))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        static bool HaveEquivalentConstraintTypes(
+            ImmutableArray<ITypeSymbol> legacyConstraints,
+            ImmutableArray<ITypeSymbol> candidateConstraints)
+        {
+            var matched = new bool[candidateConstraints.Length];
+            foreach (var legacyConstraint in legacyConstraints)
+            {
+                var match = -1;
+                for (var i = 0; i < candidateConstraints.Length; i++)
+                {
+                    if (!matched[i] && AreEquivalentMethodTypes(legacyConstraint, candidateConstraints[i]))
+                    {
+                        match = i;
+                        break;
+                    }
+                }
+
+                if (match < 0)
+                {
+                    return false;
+                }
+
+                matched[match] = true;
+            }
+
+            return true;
+        }
+
+        static bool AreEquivalentMethodTypes(ITypeSymbol legacyType, ITypeSymbol candidateType)
+        {
+            if (legacyType is ITypeParameterSymbol legacyTypeParameter
+                && candidateType is ITypeParameterSymbol candidateTypeParameter)
+            {
+                return legacyTypeParameter.TypeParameterKind == candidateTypeParameter.TypeParameterKind
+                    && legacyTypeParameter.Ordinal == candidateTypeParameter.Ordinal
+                    && (legacyTypeParameter.TypeParameterKind == TypeParameterKind.Method
+                        || SymbolEqualityComparer.Default.Equals(
+                            legacyTypeParameter.ContainingSymbol,
+                            candidateTypeParameter.ContainingSymbol));
+            }
+
+            if (legacyType is IArrayTypeSymbol legacyArray && candidateType is IArrayTypeSymbol candidateArray)
+            {
+                return legacyArray.Rank == candidateArray.Rank
+                    && AreEquivalentMethodTypes(legacyArray.ElementType, candidateArray.ElementType);
+            }
+
+            if (legacyType is IPointerTypeSymbol legacyPointer && candidateType is IPointerTypeSymbol candidatePointer)
+            {
+                return AreEquivalentMethodTypes(legacyPointer.PointedAtType, candidatePointer.PointedAtType);
+            }
+
+            if (legacyType is INamedTypeSymbol legacyNamed && candidateType is INamedTypeSymbol candidateNamed)
+            {
+                return SymbolEqualityComparer.Default.Equals(legacyNamed.OriginalDefinition, candidateNamed.OriginalDefinition)
+                    && legacyNamed.TypeArguments.Length == candidateNamed.TypeArguments.Length
+                    && legacyNamed.TypeArguments.Zip(candidateNamed.TypeArguments, AreEquivalentMethodTypes).All(static equivalent => equivalent);
+            }
+
+            return SymbolEqualityComparer.Default.Equals(legacyType, candidateType);
+        }
+
+        static BlockSyntax CreateCompatibilityForwardingBody(
+            ProxyMethodDescription legacyMethod,
+            ProxyMethodDescription cancellationMethod)
+        {
+            SimpleNameSyntax methodName = cancellationMethod.MethodTypeParameters.Count > 0
+                ? GenericName(
+                    Identifier(cancellationMethod.Method.Name.EscapeIdentifier()),
+                    TypeArgumentList(SeparatedList<TypeSyntax>(
+                        legacyMethod.MethodTypeParameters.Select(static parameter => (TypeSyntax)IdentifierName(parameter.Name)))))
+                : IdentifierName(cancellationMethod.Method.Name.EscapeIdentifier());
+            var target = ParenthesizedExpression(
+                CastExpression(
+                    cancellationMethod.Method.ContainingType.ToTypeSyntax(cancellationMethod.TypeParameterSubstitutions),
+                    ThisExpression()));
+            var arguments = legacyMethod.Method.Parameters
+                .Select((_, index) => Argument(IdentifierName($"arg{index}")))
+                .Append(Argument(ParseExpression("global::System.Threading.CancellationToken.None")));
+            var invocation = InvocationExpression(
+                MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, target, methodName),
+                ArgumentList(SeparatedList(arguments)));
+
+            return legacyMethod.Method.ReturnsVoid
+                ? Block(ExpressionStatement(invocation))
+                : Block(ReturnStatement(invocation));
         }
     }
 

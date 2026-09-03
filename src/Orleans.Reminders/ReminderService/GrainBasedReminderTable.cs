@@ -34,21 +34,24 @@ namespace Orleans.Runtime.ReminderService
             return Task.CompletedTask;
         }
 
-        public Task TestOnlyClearTable()
+        public Task TestOnlyClearTable(CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             LogDebugTestOnlyClearTable();
             _reminderTable.Clear();
             return Task.CompletedTask;
         }
 
-        public Task<ReminderTableData> ReadRows(GrainId grainId)
+        public Task<ReminderTableData> ReadRows(GrainId grainId, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var result = _reminderTable.TryGetValue(grainId, out var reminders) ? new ReminderTableData(reminders.Values) : new();
             return Task.FromResult(result);
         }
 
-        public Task<ReminderTableData> ReadRows(uint begin, uint end)
+        public Task<ReminderTableData> ReadRows(uint begin, uint end, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var range = RangeFactory.CreateRange(begin, end);
 
             var list = new List<ReminderEntry>();
@@ -63,8 +66,9 @@ namespace Orleans.Runtime.ReminderService
             return Task.FromResult(result);
         }
 
-        public Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName)
+        public Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             ReminderEntry? result = null;
             if (_reminderTable.TryGetValue(grainId, out var reminders))
             {
@@ -83,8 +87,9 @@ namespace Orleans.Runtime.ReminderService
             return Task.FromResult(result);
         }
 
-        public Task<string?> UpsertRow(ReminderEntry entry)
+        public Task<string?> UpsertRow(ReminderEntry entry, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             entry.ETag = Guid.NewGuid().ToString();
             var d = CollectionsMarshal.GetValueRefOrAddDefault(_reminderTable, entry.GrainId, out _) ??= new();
             ref var entryRef = ref CollectionsMarshal.GetValueRefOrAddDefault(d, entry.ReminderName, out _);
@@ -96,8 +101,9 @@ namespace Orleans.Runtime.ReminderService
             return Task.FromResult<string?>(entry.ETag);
         }
 
-        public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag)
+        public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             LogDebugRemoveRow(grainId, reminderName, eTag);
             if (_reminderTable.TryGetValue(grainId, out var data)
                 && data.TryGetValue(reminderName, out var e)

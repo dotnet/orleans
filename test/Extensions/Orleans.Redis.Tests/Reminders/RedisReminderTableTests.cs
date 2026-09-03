@@ -143,7 +143,7 @@ namespace Tester.Redis.Reminders
         [Fact]
         public async Task RemindersTable_Redis_Upsert_IgnoresNewtonsoftDefaultSettings()
         {
-            await RemindersTable.TestOnlyClearTable();
+            await RemindersTable.TestOnlyClearTable(TestContext.Current.CancellationToken);
 
             var previousDefaultSettings = JsonConvert.DefaultSettings;
             JsonConvert.DefaultSettings = CreateHostileJsonSettings;
@@ -158,11 +158,11 @@ namespace Tester.Redis.Reminders
                     StartAt = new DateTime(2026, 05, 13, 18, 55, 08, DateTimeKind.Utc).AddTicks(8620861)
                 };
 
-                reminder.ETag = await RemindersTable.UpsertRow(reminder);
+                reminder.ETag = await RemindersTable.UpsertRow(reminder, TestContext.Current.CancellationToken);
                 reminder.StartAt = reminder.StartAt.AddMinutes(5);
-                reminder.ETag = await RemindersTable.UpsertRow(reminder);
+                reminder.ETag = await RemindersTable.UpsertRow(reminder, TestContext.Current.CancellationToken);
 
-                var rows = await RemindersTable.ReadRows(grainId);
+                var rows = await RemindersTable.ReadRows(grainId, TestContext.Current.CancellationToken);
                 var matchingRows = rows.Reminders.Where(row => row.ReminderName == reminder.ReminderName).ToArray();
 
                 var row = Assert.Single(matchingRows);
@@ -172,7 +172,7 @@ namespace Tester.Redis.Reminders
             finally
             {
                 JsonConvert.DefaultSettings = previousDefaultSettings;
-                await RemindersTable.TestOnlyClearTable();
+                await RemindersTable.TestOnlyClearTable(TestContext.Current.CancellationToken);
             }
         }
 

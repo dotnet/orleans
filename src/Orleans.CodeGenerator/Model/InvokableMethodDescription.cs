@@ -2,7 +2,6 @@ using Microsoft.CodeAnalysis;
 using Orleans.CodeGenerator.SyntaxGeneration;
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
 
 namespace Orleans.CodeGenerator;
 
@@ -20,7 +19,12 @@ internal sealed class InvokableMethodDescription : IEquatable<InvokableMethodDes
         Key = invokableId;
         ContainingInterface = containingType;
         GeneratedMethodId = GeneratedCodeUtilities.CreateHashedMethodId(Method);
-        MethodId = GenerationContext.GetId(Method)?.ToString(CultureInfo.InvariantCulture) ?? GenerationContext.GetAlias(Method) ?? GeneratedMethodId;
+        MethodId = GeneratedCodeUtilities.GetMethodId(GenerationContext.LibraryTypes, Method) ?? GeneratedMethodId;
+        ClaimedGeneratedMethodId = GeneratedCodeUtilities.GetClaimedGeneratedMethodId(
+            GenerationContext.LibraryTypes,
+            Method,
+            containingType,
+            ProxyBase.IsExtension);
 
         MethodTypeParameters = new List<(string Name, ITypeParameterSymbol Parameter)>();
 
@@ -195,6 +199,11 @@ internal sealed class InvokableMethodDescription : IEquatable<InvokableMethodDes
     /// Gets the method identifier.
     /// </summary>
     public string MethodId { get; }
+
+    /// <summary>
+    /// Gets the generated method identifier which is claimed by this method's numeric identifier, if any.
+    /// </summary>
+    public string? ClaimedGeneratedMethodId { get; }
 
     public List<(string Name, ITypeParameterSymbol Parameter)> AllTypeParameters { get; }
     public List<(string Name, ITypeParameterSymbol Parameter)> MethodTypeParameters { get; }

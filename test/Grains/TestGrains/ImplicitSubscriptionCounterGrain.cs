@@ -132,7 +132,7 @@ namespace UnitTests.Grains
 
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            await Task.Delay(10_000);
+            await Task.Delay(10_000, cancellationToken);
             await base.OnActivateAsync(cancellationToken);
         }
     }

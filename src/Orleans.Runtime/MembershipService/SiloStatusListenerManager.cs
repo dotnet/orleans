@@ -227,7 +227,7 @@ internal sealed partial class SiloStatusListenerManager : ILifecycleParticipant<
 
         Task OnStart(CancellationToken ct)
         {
-            task = Task.Run(ProcessMembershipUpdates);
+            task = Task.Run(ProcessMembershipUpdates, CancellationToken.None);
             return Task.CompletedTask;
         }
 

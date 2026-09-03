@@ -20,6 +20,7 @@ internal sealed record class MethodModel(
     int ContainingInterfaceTypeParameterCount,
     string GeneratedMethodId,
     string MethodId,
+    string? ClaimedGeneratedMethodId,
     long? ResponseTimeoutTicks,
     EquatableArray<CustomInitializerModel> CustomInitializerMethods,
     bool IsCancellable)

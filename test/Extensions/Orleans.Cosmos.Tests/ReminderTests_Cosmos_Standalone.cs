@@ -72,7 +72,7 @@ public class ReminderTests_Cosmos_Standalone
         Assert.Empty(rows); // "The reminder table (sid={0}, did={1}) was not empty.", ServiceId, clusterId);
 
         ReminderEntry expected = NewReminderEntry();
-        await table.UpsertRow(expected).WaitAsync(testCancellationToken);
+        await table.UpsertRow(expected, testCancellationToken);
         rows = (await GetAllRows(table, testCancellationToken)).ToArray();
 
         Assert.Single(rows); // "The reminder table (sid={0}, did={1}) did not contain the correct number of rows (1).", ServiceId, clusterId);
@@ -110,7 +110,7 @@ public class ReminderTests_Cosmos_Standalone
             int capture = i;
             Task<bool> promise = Task.Run(async () =>
             {
-                await reminderTable.UpsertRow(e).WaitAsync(cancellationToken);
+                await reminderTable.UpsertRow(e, cancellationToken);
                 _output.WriteLine("Done " + capture);
                 return true;
             }, cancellationToken);
@@ -149,7 +149,7 @@ public class ReminderTests_Cosmos_Standalone
         IReminderTable table,
         CancellationToken cancellationToken)
     {
-        ReminderTableData data = await table.ReadRows(0, 0xffffffff).WaitAsync(cancellationToken);
+        ReminderTableData data = await table.ReadRows(0, 0xffffffff, cancellationToken);
         Assert.NotNull(data);
         return data.Reminders;
     }

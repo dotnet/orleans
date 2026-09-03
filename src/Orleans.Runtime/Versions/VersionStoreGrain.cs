@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Providers;
 using Orleans.Versions.Compatibility;
@@ -8,14 +9,14 @@ namespace Orleans.Runtime.Versions
 {
     internal interface IVersionStoreGrain : IGrainWithStringKey
     {
-        Task<Dictionary<GrainInterfaceType, CompatibilityStrategy>> GetCompatibilityStrategies();
-        Task<Dictionary<GrainInterfaceType, VersionSelectorStrategy>> GetSelectorStrategies();
-        Task<CompatibilityStrategy?> GetCompatibilityStrategy();
-        Task<VersionSelectorStrategy?> GetSelectorStrategy();
-        Task SetCompatibilityStrategy(CompatibilityStrategy strategy);
-        Task SetSelectorStrategy(VersionSelectorStrategy strategy);
-        Task SetCompatibilityStrategy(GrainInterfaceType interfaceType, CompatibilityStrategy strategy);
-        Task SetSelectorStrategy(GrainInterfaceType interfaceType, VersionSelectorStrategy strategy);
+        [Alias("7261373F")] Task<Dictionary<GrainInterfaceType, CompatibilityStrategy>> GetCompatibilityStrategies(CancellationToken cancellationToken = default);
+        [Alias("743D88ED")] Task<Dictionary<GrainInterfaceType, VersionSelectorStrategy>> GetSelectorStrategies(CancellationToken cancellationToken = default);
+        [Alias("67EF9A39")] Task<CompatibilityStrategy?> GetCompatibilityStrategy(CancellationToken cancellationToken = default);
+        [Alias("8A72848A")] Task<VersionSelectorStrategy?> GetSelectorStrategy(CancellationToken cancellationToken = default);
+        [Alias("67A0B5AA")] Task SetCompatibilityStrategy(CompatibilityStrategy strategy, CancellationToken cancellationToken = default);
+        [Alias("E7532DE3")] Task SetSelectorStrategy(VersionSelectorStrategy strategy, CancellationToken cancellationToken = default);
+        [Alias("1B7F13C8")] Task SetCompatibilityStrategy(GrainInterfaceType interfaceType, CompatibilityStrategy strategy, CancellationToken cancellationToken = default);
+        [Alias("3E6DDE3E")] Task SetSelectorStrategy(GrainInterfaceType interfaceType, VersionSelectorStrategy strategy, CancellationToken cancellationToken = default);
     }
 
     [GenerateSerializer]
@@ -34,49 +35,69 @@ namespace Orleans.Runtime.Versions
     [StorageProvider(ProviderName = ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME)]
     internal class VersionStoreGrain : Grain<VersionStoreGrainState>, IVersionStoreGrain
     {
-        public async Task SetCompatibilityStrategy(CompatibilityStrategy strategy)
+        public async Task SetCompatibilityStrategy(
+            CompatibilityStrategy strategy,
+            CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             this.State!.CompatibilityOverride = strategy; // Grain state is initialized before grain calls are dispatched.
             await this.WriteStateAsync();
         }
 
-        public async Task SetSelectorStrategy(VersionSelectorStrategy strategy)
+        public async Task SetSelectorStrategy(
+            VersionSelectorStrategy strategy,
+            CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             this.State!.SelectorOverride = strategy; // Grain state is initialized before grain calls are dispatched.
             await this.WriteStateAsync();
         }
 
-        public async Task SetCompatibilityStrategy(GrainInterfaceType ifaceId, CompatibilityStrategy strategy)
+        public async Task SetCompatibilityStrategy(
+            GrainInterfaceType ifaceId,
+            CompatibilityStrategy strategy,
+            CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             this.State!.CompatibilityStrategies[ifaceId] = strategy; // Grain state is initialized before grain calls are dispatched.
             await this.WriteStateAsync();
         }
 
-        public async Task SetSelectorStrategy(GrainInterfaceType ifaceId, VersionSelectorStrategy strategy)
+        public async Task SetSelectorStrategy(
+            GrainInterfaceType ifaceId,
+            VersionSelectorStrategy strategy,
+            CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             this.State!.VersionSelectorStrategies[ifaceId] = strategy; // Grain state is initialized before grain calls are dispatched.
             await this.WriteStateAsync();
         }
 
         public bool IsEnabled { get; }
 
-        public Task<Dictionary<GrainInterfaceType, CompatibilityStrategy>> GetCompatibilityStrategies()
+        public Task<Dictionary<GrainInterfaceType, CompatibilityStrategy>> GetCompatibilityStrategies(
+            CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             return Task.FromResult(this.State!.CompatibilityStrategies); // Grain state is initialized before grain calls are dispatched.
         }
 
-        public Task<Dictionary<GrainInterfaceType, VersionSelectorStrategy>> GetSelectorStrategies()
+        public Task<Dictionary<GrainInterfaceType, VersionSelectorStrategy>> GetSelectorStrategies(
+            CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             return Task.FromResult(this.State!.VersionSelectorStrategies); // Grain state is initialized before grain calls are dispatched.
         }
 
-        public Task<CompatibilityStrategy?> GetCompatibilityStrategy()
+        public Task<CompatibilityStrategy?> GetCompatibilityStrategy(CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             return Task.FromResult(this.State!.CompatibilityOverride); // Grain state is initialized before grain calls are dispatched.
         }
 
-        public Task<VersionSelectorStrategy?> GetSelectorStrategy()
+        public Task<VersionSelectorStrategy?> GetSelectorStrategy(CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             return Task.FromResult(this.State!.SelectorOverride); // Grain state is initialized before grain calls are dispatched.
         }
     }

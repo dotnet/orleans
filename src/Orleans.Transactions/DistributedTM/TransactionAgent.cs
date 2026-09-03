@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Threading.Tasks;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Transactions.Abstractions;
 
@@ -100,7 +101,7 @@ namespace Orleans.Transactions
                 foreach (KeyValuePair<ParticipantId, AccessCounter> resource in resources)
                 {
                     tasks.Add(resource.Key.Reference.AsReference<ITransactionalResourceExtension>()
-                                   .CommitReadOnly(resource.Key.Name, transactionInfo.TransactionId, resource.Value, transactionInfo.TimeStamp));
+                                   .CommitReadOnly(resource.Key.Name, transactionInfo.TransactionId, resource.Value, transactionInfo.TimeStamp, CancellationToken.None));
                 }
 
                 // wait for all responses
@@ -138,7 +139,7 @@ namespace Orleans.Transactions
                 try
                 {
                     await Task.WhenAll(resources.Select(r => r.Key.Reference.AsReference<ITransactionalResourceExtension>()
-                                .Abort(r.Key.Name, transactionInfo.TransactionId)));
+                                .Abort(r.Key.Name, transactionInfo.TransactionId, CancellationToken.None)));
                 }
                 catch (Exception ex)
                 {
@@ -237,7 +238,7 @@ namespace Orleans.Transactions
 
             // send one-way abort messages to release the locks and roll back any updates
             await Task.WhenAll(participants.Select(p => p.Reference.AsReference<ITransactionalResourceExtension>()
-                 .Abort(p.Name, transactionInfo.TransactionId)));
+                 .Abort(p.Name, transactionInfo.TransactionId, CancellationToken.None)));
         }
 
         private void CollateParticipants(Dictionary<ParticipantId, AccessCounter> participants, out List<ParticipantId>? writers, out List<KeyValuePair<ParticipantId, AccessCounter>>? resources, out KeyValuePair<ParticipantId, AccessCounter>? manager)
@@ -435,7 +436,7 @@ namespace Orleans.Transactions
             DateTime timeStamp,
             ParticipantId transactionManager)
             => participant.Reference.AsReference<ITransactionalResourceExtension>()
-                .Prepare(participant.Name, transactionId, accessCount, timeStamp, transactionManager)
+                .Prepare(participant.Name, transactionId, accessCount, timeStamp, transactionManager, CancellationToken.None)
                 .Ignore();
 
         public Task<TransactionalStatus> PrepareAndCommit(
@@ -452,7 +453,8 @@ namespace Orleans.Transactions
                     accessCount,
                     timeStamp,
                     writeResources,
-                    totalParticipants);
+                    totalParticipants,
+                    CancellationToken.None);
 
         public Task Cancel(
             ParticipantId participant,
@@ -460,6 +462,6 @@ namespace Orleans.Transactions
             DateTime timeStamp,
             TransactionalStatus status)
             => participant.Reference.AsReference<ITransactionalResourceExtension>()
-                .Cancel(participant.Name, transactionId, timeStamp, status);
+                .Cancel(participant.Name, transactionId, timeStamp, status, CancellationToken.None);
     }
 }

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Streams.Core;
@@ -7,24 +8,34 @@ namespace Orleans.Streams
 {
     internal interface IPubSubRendezvousGrain : IGrainWithStringKey
     {
-        Task<ISet<PubSubSubscriptionState>> RegisterProducer(QualifiedStreamId streamId, GrainId streamProducer);
+        [Alias("B5FFB7F3")]
+        Task<ISet<PubSubSubscriptionState>> RegisterProducer(QualifiedStreamId streamId, GrainId streamProducer, CancellationToken cancellationToken = default);
 
-        Task UnregisterProducer(QualifiedStreamId streamId, GrainId streamProducer);
+        [Alias("C017B47D")]
+        Task UnregisterProducer(QualifiedStreamId streamId, GrainId streamProducer, CancellationToken cancellationToken = default);
 
-        Task RegisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId, GrainId streamConsumer, string? filterData);
+        [Alias("5E7E20BC")]
+        Task RegisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId, GrainId streamConsumer, string? filterData, CancellationToken cancellationToken = default);
 
-        Task UnregisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId);
+        [Alias("974334B6")]
+        Task UnregisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId, CancellationToken cancellationToken = default);
 
-        Task<int> ProducerCount(QualifiedStreamId streamId);
+        [Alias("29B61035")]
+        Task<int> ProducerCount(QualifiedStreamId streamId, CancellationToken cancellationToken = default);
 
-        Task<int> ConsumerCount(QualifiedStreamId streamId);
+        [Alias("5F72C5CF")]
+        Task<int> ConsumerCount(QualifiedStreamId streamId, CancellationToken cancellationToken = default);
 
-        Task<PubSubSubscriptionState[]> DiagGetConsumers(QualifiedStreamId streamId);
+        [Alias("8A033955")]
+        Task<PubSubSubscriptionState[]> DiagGetConsumers(QualifiedStreamId streamId, CancellationToken cancellationToken = default);
 
-        Task Validate();
+        [Alias("20AA72BF")]
+        Task Validate(CancellationToken cancellationToken = default);
 
-        Task<List<StreamSubscription>> GetAllSubscriptions(QualifiedStreamId streamId, GrainId streamConsumer = default);
+        [Alias("7DBE84FA")]
+        Task<List<StreamSubscription>> GetAllSubscriptions(QualifiedStreamId streamId, GrainId streamConsumer = default, CancellationToken cancellationToken = default);
 
-        Task FaultSubscription(GuidId subscriptionId);
+        [Alias("2821FCF5")]
+        Task FaultSubscription(GuidId subscriptionId, CancellationToken cancellationToken = default);
     }
 }

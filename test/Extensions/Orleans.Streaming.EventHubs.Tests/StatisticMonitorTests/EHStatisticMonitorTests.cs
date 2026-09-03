@@ -96,14 +96,18 @@ namespace ServiceBus.Tests.MonitorTests
                 cancellationToken: TestContext.Current.CancellationToken);
             var randomStreamPlacementArg = new EHStreamProviderForMonitorTestsAdapterFactory.StreamRandomPlacementArg(streamId, this.seed.Next(100));
             await mgmtGrain.SendControlCommandToProvider<PersistentStreamProvider>(StreamProviderName,
-                (int)EHStreamProviderForMonitorTestsAdapterFactory.Commands.Randomly_Place_Stream_To_Queue, randomStreamPlacementArg);
+                (int)EHStreamProviderForMonitorTestsAdapterFactory.Commands.Randomly_Place_Stream_To_Queue,
+                randomStreamPlacementArg,
+                TestContext.Current.CancellationToken);
             await TestingUtils.WaitUntilAsync(
                 (lastTry, cancellationToken) => CheckMonitorCounters(mgmtGrain, requireCachePressure: false, lastTry, cancellationToken),
                 timeout,
                 cancellationToken: TestContext.Current.CancellationToken);
 
             await mgmtGrain.SendControlCommandToProvider<PersistentStreamProvider>(StreamProviderName,
-                (int)EHStreamProviderForMonitorTestsAdapterFactory.QueryCommands.ChangeCachePressure, null);
+                (int)EHStreamProviderForMonitorTestsAdapterFactory.QueryCommands.ChangeCachePressure,
+                null,
+                TestContext.Current.CancellationToken);
             await TestingUtils.WaitUntilAsync(
                 (lastTry, cancellationToken) => CheckMonitorCounters(mgmtGrain, requireCachePressure: true, lastTry, cancellationToken),
                 timeout,
@@ -113,7 +117,7 @@ namespace ServiceBus.Tests.MonitorTests
         private static async Task<bool> CheckReceiversInitialized(IManagementGrain mgmtGrain, bool lastTry, CancellationToken cancellationToken)
         {
             var receiverMonitorCounters = await mgmtGrain.SendControlCommandToProvider<PersistentStreamProvider>(StreamProviderName,
-                (int)EHStreamProviderForMonitorTestsAdapterFactory.QueryCommands.GetReceiverMonitorCallCounters, null).WaitAsync(cancellationToken);
+                (int)EHStreamProviderForMonitorTestsAdapterFactory.QueryCommands.GetReceiverMonitorCallCounters, null, cancellationToken);
             var ready = receiverMonitorCounters.Length > 0
                 && receiverMonitorCounters.All(callCounter =>
                     ((EventHubReceiverMonitorCounters)callCounter!).TrackInitializationCallCounter == ehPartitionCountPerSilo);
@@ -139,11 +143,11 @@ namespace ServiceBus.Tests.MonitorTests
             CancellationToken cancellationToken)
         {
             var receiverMonitorCounters = await mgmtGrain.SendControlCommandToProvider<PersistentStreamProvider>(StreamProviderName,
-                (int)EHStreamProviderForMonitorTestsAdapterFactory.QueryCommands.GetReceiverMonitorCallCounters, null).WaitAsync(cancellationToken);
+                (int)EHStreamProviderForMonitorTestsAdapterFactory.QueryCommands.GetReceiverMonitorCallCounters, null, cancellationToken);
             var cacheMonitorCounters = await mgmtGrain.SendControlCommandToProvider<PersistentStreamProvider>(StreamProviderName,
-                (int)EHStreamProviderForMonitorTestsAdapterFactory.QueryCommands.GetCacheMonitorCallCounters, null).WaitAsync(cancellationToken);
+                (int)EHStreamProviderForMonitorTestsAdapterFactory.QueryCommands.GetCacheMonitorCallCounters, null, cancellationToken);
             var objectPoolMonitorCounters = await mgmtGrain.SendControlCommandToProvider<PersistentStreamProvider>(StreamProviderName,
-                (int)EHStreamProviderForMonitorTestsAdapterFactory.QueryCommands.GetObjectPoolMonitorCallCounters, null).WaitAsync(cancellationToken);
+                (int)EHStreamProviderForMonitorTestsAdapterFactory.QueryCommands.GetObjectPoolMonitorCallCounters, null, cancellationToken);
 
             var ready = receiverMonitorCounters.Length > 0
                 && receiverMonitorCounters.All(callCounter => ReceiverMonitorCallCountersAreExpected((EventHubReceiverMonitorCounters)callCounter!))

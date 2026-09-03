@@ -16,6 +16,7 @@ using Orleans.Dashboard.Metrics;
 using Orleans.Dashboard.Metrics.Details;
 using Orleans.Dashboard.Model;
 using System.Diagnostics.CodeAnalysis;
+using System.Threading;
 using Orleans.Dashboard.Core;
 using Microsoft.AspNetCore.Mvc;
 using Orleans.Configuration.Internal;
@@ -137,11 +138,14 @@ public static class ServiceCollectionExtensions
             new { version = typeof(EmbeddedAssetProvider).Assembly.GetName().Version?.ToString() },
             jsonOptions));
 
-        group.MapGet("/DashboardCounters", async (string[] exclude, [FromServices] IDashboardClient client) =>
+        group.MapGet("/DashboardCounters", async (
+            string[] exclude,
+            [FromServices] IDashboardClient client,
+            CancellationToken cancellationToken) =>
         {
             try
             {
-                var result = await client.DashboardCounters(SanitizeExclusionFilters(exclude));
+                var result = await client.DashboardCounters(SanitizeExclusionFilters(exclude), cancellationToken);
                 return Results.Json(result.Value, jsonOptions);
             }
             catch (SiloUnavailableException)
@@ -150,11 +154,13 @@ public static class ServiceCollectionExtensions
             }
         });
 
-        group.MapGet("/ClusterStats", async ([FromServices] IDashboardClient client) =>
+        group.MapGet("/ClusterStats", async (
+            [FromServices] IDashboardClient client,
+            CancellationToken cancellationToken) =>
         {
             try
             {
-                var result = await client.ClusterStats();
+                var result = await client.ClusterStats(cancellationToken);
                 return Results.Json(result.Value, jsonOptions);
             }
             catch (SiloUnavailableException)
@@ -163,14 +169,24 @@ public static class ServiceCollectionExtensions
             }
         });
 
-        group.MapGet("/Reminders", async ([FromServices] IDashboardClient client) => await GetRemindersPage(1, client, jsonOptions));
-        group.MapGet("/Reminders/{page:int}", async (int page, [FromServices] IDashboardClient client) => await GetRemindersPage(page, client, jsonOptions));
+        group.MapGet("/Reminders", async (
+            [FromServices] IDashboardClient client,
+            CancellationToken cancellationToken) =>
+            await GetRemindersPage(1, client, jsonOptions, cancellationToken));
+        group.MapGet("/Reminders/{page:int}", async (
+            int page,
+            [FromServices] IDashboardClient client,
+            CancellationToken cancellationToken) =>
+            await GetRemindersPage(page, client, jsonOptions, cancellationToken));
 
-        group.MapGet("/HistoricalStats/{*path}", async (string path, [FromServices] IDashboardClient client) =>
+        group.MapGet("/HistoricalStats/{*path}", async (
+            string path,
+            [FromServices] IDashboardClient client,
+            CancellationToken cancellationToken) =>
         {
             try
             {
-                var result = await client.HistoricalStats(path);
+                var result = await client.HistoricalStats(path, cancellationToken);
                 return Results.Json(result.Value, jsonOptions);
             }
             catch (SiloUnavailableException)
@@ -179,11 +195,14 @@ public static class ServiceCollectionExtensions
             }
         });
 
-        group.MapGet("/SiloProperties/{*address}", async (string address, [FromServices] IDashboardClient client) =>
+        group.MapGet("/SiloProperties/{*address}", async (
+            string address,
+            [FromServices] IDashboardClient client,
+            CancellationToken cancellationToken) =>
         {
             try
             {
-                var result = await client.SiloProperties(address);
+                var result = await client.SiloProperties(address, cancellationToken);
                 return Results.Json(result.Value, jsonOptions);
             }
             catch (SiloUnavailableException)
@@ -192,11 +211,14 @@ public static class ServiceCollectionExtensions
             }
         });
 
-        group.MapGet("/SiloMetadata/{*address}", async (string address, [FromServices] IDashboardClient client) =>
+        group.MapGet("/SiloMetadata/{*address}", async (
+            string address,
+            [FromServices] IDashboardClient client,
+            CancellationToken cancellationToken) =>
         {
             try
             {
-                var result = await client.SiloMetadata(address);
+                var result = await client.SiloMetadata(address, cancellationToken);
                 return Results.Json(result.Value, jsonOptions);
             }
             catch (SiloUnavailableException)
@@ -205,11 +227,14 @@ public static class ServiceCollectionExtensions
             }
         });
 
-        group.MapGet("/SiloStats/{*address}", async (string address, [FromServices] IDashboardClient client) =>
+        group.MapGet("/SiloStats/{*address}", async (
+            string address,
+            [FromServices] IDashboardClient client,
+            CancellationToken cancellationToken) =>
         {
             try
             {
-                var result = await client.SiloStats(address);
+                var result = await client.SiloStats(address, cancellationToken);
                 return Results.Json(result.Value, jsonOptions);
             }
             catch (SiloUnavailableException)
@@ -218,11 +243,14 @@ public static class ServiceCollectionExtensions
             }
         });
 
-        group.MapGet("/SiloCounters/{*address}", async (string address, [FromServices] IDashboardClient client) =>
+        group.MapGet("/SiloCounters/{*address}", async (
+            string address,
+            [FromServices] IDashboardClient client,
+            CancellationToken cancellationToken) =>
         {
             try
             {
-                var result = await client.GetCounters(address);
+                var result = await client.GetCounters(address, cancellationToken);
                 return Results.Json(result.Value, jsonOptions);
             }
             catch (SiloUnavailableException)
@@ -231,11 +259,14 @@ public static class ServiceCollectionExtensions
             }
         });
 
-        group.MapGet("/GrainStats/{*grainName}", async (string grainName, [FromServices] IDashboardClient client) =>
+        group.MapGet("/GrainStats/{*grainName}", async (
+            string grainName,
+            [FromServices] IDashboardClient client,
+            CancellationToken cancellationToken) =>
         {
             try
             {
-                var result = await client.GrainStats(grainName);
+                var result = await client.GrainStats(grainName, cancellationToken);
                 return Results.Json(result.Value, jsonOptions);
             }
             catch (SiloUnavailableException)
@@ -244,11 +275,17 @@ public static class ServiceCollectionExtensions
             }
         });
 
-        group.MapGet("/TopGrainMethods", async (string[] exclude, [FromServices] IDashboardClient client) =>
+        group.MapGet("/TopGrainMethods", async (
+            string[] exclude,
+            [FromServices] IDashboardClient client,
+            CancellationToken cancellationToken) =>
         {
             try
             {
-                var result = await client.TopGrainMethods(take: 5, SanitizeExclusionFilters(exclude));
+                var result = await client.TopGrainMethods(
+                    take: 5,
+                    exclusions: SanitizeExclusionFilters(exclude),
+                    cancellationToken: cancellationToken);
                 return Results.Json(result.Value, jsonOptions);
             }
             catch (SiloUnavailableException)
@@ -263,7 +300,7 @@ public static class ServiceCollectionExtensions
             {
                 context.Request.Query.TryGetValue("grainId", out var grainId);
                 context.Request.Query.TryGetValue("grainType", out var grainType);
-                var result = await client.GetGrainState(grainId, grainType);
+                var result = await client.GetGrainState(grainId, grainType, context.RequestAborted);
                 return Results.Json(result.Value, jsonOptions);
             }
             catch (SiloUnavailableException)
@@ -272,11 +309,13 @@ public static class ServiceCollectionExtensions
             }
         });
 
-        group.MapGet("/LifecycleStages", async ([FromServices] IDashboardClient client) =>
+        group.MapGet("/LifecycleStages", async (
+            [FromServices] IDashboardClient client,
+            CancellationToken cancellationToken) =>
         {
             try
             {
-                var result = await client.GetLifecycleStages();
+                var result = await client.GetLifecycleStages(cancellationToken);
                 return Results.Json(result.Value, jsonOptions);
             }
             catch (SiloUnavailableException)
@@ -285,11 +324,14 @@ public static class ServiceCollectionExtensions
             }
         });
 
-        group.MapGet("/GrainTypes", async (string[] exclude, [FromServices] IDashboardClient client) =>
+        group.MapGet("/GrainTypes", async (
+            string[] exclude,
+            [FromServices] IDashboardClient client,
+            CancellationToken cancellationToken) =>
         {
             try
             {
-                var result = await client.GetGrainTypes(SanitizeExclusionFilters(exclude));
+                var result = await client.GetGrainTypes(SanitizeExclusionFilters(exclude), cancellationToken);
                 return Results.Json(result.Value, jsonOptions);
             }
             catch (SiloUnavailableException)
@@ -313,16 +355,24 @@ public static class ServiceCollectionExtensions
         return group;
     }
 
-    private static async Task<IResult> GetRemindersPage(int page, IDashboardClient client, JsonSerializerOptions jsonOptions)
+    private static async Task<IResult> GetRemindersPage(
+        int page,
+        IDashboardClient client,
+        JsonSerializerOptions jsonOptions,
+        CancellationToken cancellationToken)
     {
         try
         {
-            var result = await client.GetReminders(page, 50);
+            var result = await client.GetReminders(page, 50, cancellationToken);
             return Results.Json(result.Value, jsonOptions);
         }
         catch (SiloUnavailableException)
         {
             return CreateUnavailableResult(true);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch
         {

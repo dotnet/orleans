@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
 using Orleans.Dashboard.Core;
@@ -21,14 +22,18 @@ internal sealed class DashboardRemindersGrain : Grain, IDashboardRemindersGrain
         _reminderTable = serviceProvider.GetService(typeof(IReminderTable)) as IReminderTable;
     }
 
-    public async Task<Immutable<ReminderResponse>> GetReminders(int pageNumber, int pageSize)
+    public async Task<Immutable<ReminderResponse>> GetReminders(
+        int pageNumber,
+        int pageSize,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (_reminderTable == null)
         {
             return EmptyReminders;
         }
 
-        var reminderData = await _reminderTable.ReadRows(0, 0xffffffff);
+        var reminderData = await _reminderTable.ReadRows(0, 0xffffffff, cancellationToken);
 
         if(!reminderData.Reminders.Any())
         {

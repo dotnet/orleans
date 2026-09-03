@@ -26,7 +26,9 @@ namespace Orleans.EventSourcing.Common
     /// <typeparam name="TLogView">The user-defined view of the log</typeparam>
     /// <typeparam name="TLogEntry">The type of the log entries</typeparam>
     /// <typeparam name="TSubmissionEntry">The type of submission entries stored in pending queue</typeparam>
-    public abstract class PrimaryBasedLogViewAdaptor<TLogView, TLogEntry, TSubmissionEntry> : ILogViewAdaptor<TLogView, TLogEntry>
+    public abstract class PrimaryBasedLogViewAdaptor<TLogView, TLogEntry, TSubmissionEntry> :
+        ILogViewAdaptor<TLogView, TLogEntry>,
+        ICancellationAwareLogViewAdaptor
     where TLogView : class, new()
         where TLogEntry : class
         where TSubmissionEntry : SubmissionEntry<TLogEntry>
@@ -220,14 +222,20 @@ namespace Orleans.EventSourcing.Common
         }
 
         /// <inheritdoc/>
-        public virtual async Task PostOnDeactivate()
+        public virtual Task PostOnDeactivate() => PostOnDeactivateCore(CancellationToken.None);
+
+        Task ICancellationAwareLogViewAdaptor.PostOnDeactivate(CancellationToken cancellationToken) =>
+            PostOnDeactivateCore(cancellationToken);
+
+        private async Task PostOnDeactivateCore(CancellationToken cancellationToken)
         {
             Services.Log(LogLevel.Trace, "Deactivation Started");
 
             while (!worker.IsIdle())
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.ForceYielding);
-                await worker.WaitForCurrentWorkToBeServiced();
+                await worker.WaitForCurrentWorkToBeServiced().WaitAsync(cancellationToken);
             }
 
             Services.Log(LogLevel.Trace, "Deactivation Complete");

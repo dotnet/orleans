@@ -376,7 +376,13 @@ namespace Orleans.Providers
 
     public partial interface IMemoryStreamQueueGrain : IGrainWithGuidKey, IGrain, Runtime.IAddressable
     {
+        [Alias("7A8F8C1A")]
+        System.Threading.Tasks.Task<System.Collections.Generic.List<MemoryMessageData>> Dequeue(int maxCount, System.Threading.CancellationToken cancellationToken);
+        [Alias("Dequeue")]
         System.Threading.Tasks.Task<System.Collections.Generic.List<MemoryMessageData>> Dequeue(int maxCount);
+        [Alias("74D60341")]
+        System.Threading.Tasks.Task Enqueue(MemoryMessageData data, System.Threading.CancellationToken cancellationToken);
+        [Alias("Enqueue")]
         System.Threading.Tasks.Task Enqueue(MemoryMessageData data);
     }
 
@@ -465,7 +471,11 @@ namespace Orleans.Providers
 
     public partial class MemoryStreamQueueGrain : Grain, IMemoryStreamQueueGrain, IGrainWithGuidKey, IGrain, Runtime.IAddressable, Runtime.IGrainMigrationParticipant
     {
+        public System.Threading.Tasks.Task<System.Collections.Generic.List<MemoryMessageData>> Dequeue(int maxCount, System.Threading.CancellationToken cancellationToken) { throw null; }
+
         public System.Threading.Tasks.Task<System.Collections.Generic.List<MemoryMessageData>> Dequeue(int maxCount) { throw null; }
+
+        public System.Threading.Tasks.Task Enqueue(MemoryMessageData data, System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public System.Threading.Tasks.Task Enqueue(MemoryMessageData data) { throw null; }
 
@@ -1649,10 +1659,12 @@ namespace Orleans.Streams
         System.Threading.Tasks.Task<System.Collections.Generic.IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount, System.Threading.CancellationToken cancellationToken);
         [System.Obsolete("Use the overload which accepts a CancellationToken.")]
         System.Threading.Tasks.Task<System.Collections.Generic.IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount);
+        System.Threading.Tasks.Task Initialize(System.TimeSpan timeout, System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.Task Initialize(System.TimeSpan timeout);
         System.Threading.Tasks.Task MessagesDeliveredAsync(System.Collections.Generic.IList<IBatchContainer> messages, System.Threading.CancellationToken cancellationToken);
         [System.Obsolete("Use the overload which accepts a CancellationToken.")]
         System.Threading.Tasks.Task MessagesDeliveredAsync(System.Collections.Generic.IList<IBatchContainer> messages);
+        System.Threading.Tasks.Task Shutdown(System.TimeSpan timeout, System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.Task Shutdown(System.TimeSpan timeout);
     }
 
@@ -1739,14 +1751,22 @@ namespace Orleans.Streams
 
     public partial interface IStreamPubSub
     {
+        System.Threading.Tasks.Task<int> ConsumerCount(Runtime.QualifiedStreamId streamId, System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.Task<int> ConsumerCount(Runtime.QualifiedStreamId streamId);
         Runtime.GuidId CreateSubscriptionId(Runtime.QualifiedStreamId streamId, Runtime.GrainId streamConsumer);
+        System.Threading.Tasks.Task<bool> FaultSubscription(Runtime.QualifiedStreamId streamId, Runtime.GuidId subscriptionId, System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.Task<bool> FaultSubscription(Runtime.QualifiedStreamId streamId, Runtime.GuidId subscriptionId);
+        System.Threading.Tasks.Task<System.Collections.Generic.List<Core.StreamSubscription>> GetAllSubscriptions(Runtime.QualifiedStreamId streamId, Runtime.GrainId streamConsumer, System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.Task<System.Collections.Generic.List<Core.StreamSubscription>> GetAllSubscriptions(Runtime.QualifiedStreamId streamId, Runtime.GrainId streamConsumer = default);
+        System.Threading.Tasks.Task<int> ProducerCount(Runtime.QualifiedStreamId streamId, System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.Task<int> ProducerCount(Runtime.QualifiedStreamId streamId);
+        System.Threading.Tasks.Task RegisterConsumer(Runtime.GuidId subscriptionId, Runtime.QualifiedStreamId streamId, Runtime.GrainId streamConsumer, string? filterData, System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.Task RegisterConsumer(Runtime.GuidId subscriptionId, Runtime.QualifiedStreamId streamId, Runtime.GrainId streamConsumer, string? filterData);
+        System.Threading.Tasks.Task<System.Collections.Generic.ISet<PubSubSubscriptionState>> RegisterProducer(Runtime.QualifiedStreamId streamId, Runtime.GrainId streamProducer, System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.Task<System.Collections.Generic.ISet<PubSubSubscriptionState>> RegisterProducer(Runtime.QualifiedStreamId streamId, Runtime.GrainId streamProducer);
+        System.Threading.Tasks.Task UnregisterConsumer(Runtime.GuidId subscriptionId, Runtime.QualifiedStreamId streamId, System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.Task UnregisterConsumer(Runtime.GuidId subscriptionId, Runtime.QualifiedStreamId streamId);
+        System.Threading.Tasks.Task UnregisterProducer(Runtime.QualifiedStreamId streamId, Runtime.GrainId streamProducer, System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.Task UnregisterProducer(Runtime.QualifiedStreamId streamId, Runtime.GrainId streamProducer);
     }
 
@@ -2333,6 +2353,22 @@ namespace OrleansCodeGen.Orleans.Providers
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_Invokable_IMemoryStreamQueueGrain_GrainReference_3A7DD0D5 : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IMemoryStreamQueueGrain_GrainReference_3A7DD0D5>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_IMemoryStreamQueueGrain_GrainReference_3A7DD0D5 instance) { }
+
+        public Invokable_IMemoryStreamQueueGrain_GrainReference_3A7DD0D5 ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, Invokable_IMemoryStreamQueueGrain_GrainReference_3A7DD0D5 instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IMemoryStreamQueueGrain_GrainReference_3A7DD0D5 value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_Invokable_IMemoryStreamQueueGrain_GrainReference_74D60341 : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IMemoryStreamQueueGrain_GrainReference_74D60341>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public Codec_Invokable_IMemoryStreamQueueGrain_GrainReference_74D60341(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -2361,6 +2397,24 @@ namespace OrleansCodeGen.Orleans.Providers
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
 
         public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IMemoryStreamQueueGrain_GrainReference_7A8F8C1A value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_Invokable_IMemoryStreamQueueGrain_GrainReference_7AA146BA : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IMemoryStreamQueueGrain_GrainReference_7AA146BA>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public Codec_Invokable_IMemoryStreamQueueGrain_GrainReference_7AA146BA(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_IMemoryStreamQueueGrain_GrainReference_7AA146BA instance) { }
+
+        public Invokable_IMemoryStreamQueueGrain_GrainReference_7AA146BA ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, Invokable_IMemoryStreamQueueGrain_GrainReference_7AA146BA instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IMemoryStreamQueueGrain_GrainReference_7AA146BA value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
@@ -2403,6 +2457,14 @@ namespace OrleansCodeGen.Orleans.Providers
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_Invokable_IMemoryStreamQueueGrain_GrainReference_3A7DD0D5 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IMemoryStreamQueueGrain_GrainReference_3A7DD0D5>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public Invokable_IMemoryStreamQueueGrain_GrainReference_3A7DD0D5 DeepCopy(Invokable_IMemoryStreamQueueGrain_GrainReference_3A7DD0D5 original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_Invokable_IMemoryStreamQueueGrain_GrainReference_74D60341 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IMemoryStreamQueueGrain_GrainReference_74D60341>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
         public Copier_Invokable_IMemoryStreamQueueGrain_GrainReference_74D60341(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -2416,6 +2478,16 @@ namespace OrleansCodeGen.Orleans.Providers
     public sealed partial class Copier_Invokable_IMemoryStreamQueueGrain_GrainReference_7A8F8C1A : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IMemoryStreamQueueGrain_GrainReference_7A8F8C1A>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
         public Invokable_IMemoryStreamQueueGrain_GrainReference_7A8F8C1A DeepCopy(Invokable_IMemoryStreamQueueGrain_GrainReference_7A8F8C1A original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_Invokable_IMemoryStreamQueueGrain_GrainReference_7AA146BA : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IMemoryStreamQueueGrain_GrainReference_7AA146BA>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public Copier_Invokable_IMemoryStreamQueueGrain_GrainReference_7AA146BA(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public Invokable_IMemoryStreamQueueGrain_GrainReference_7AA146BA DeepCopy(Invokable_IMemoryStreamQueueGrain_GrainReference_7AA146BA original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
@@ -2441,7 +2513,46 @@ namespace OrleansCodeGen.Orleans.Providers
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Providers.IMemoryStreamQueueGrain), "74D60341" })]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Providers.IMemoryStreamQueueGrain), "7A8F8C1A" })]
+    public sealed partial class Invokable_IMemoryStreamQueueGrain_GrainReference_3A7DD0D5 : global::Orleans.Runtime.TaskRequest<System.Collections.Generic.List<global::Orleans.Providers.MemoryMessageData>>
+    {
+        public int arg0;
+        public System.Threading.CancellationToken arg1;
+        public override bool IsCancellable { get { throw null; } }
+
+        public override void Dispose() { }
+
+        public override string GetActivityName() { throw null; }
+
+        public override object GetArgument(int index) { throw null; }
+
+        public override int GetArgumentCount() { throw null; }
+
+        public override System.Threading.CancellationToken GetCancellationToken() { throw null; }
+
+        public override string GetInterfaceName() { throw null; }
+
+        public override System.Type GetInterfaceType() { throw null; }
+
+        public override System.Reflection.MethodInfo GetMethod() { throw null; }
+
+        public override string GetMethodName() { throw null; }
+
+        public override object GetTarget() { throw null; }
+
+        protected override System.Threading.Tasks.Task<System.Collections.Generic.List<global::Orleans.Providers.MemoryMessageData>> InvokeInner() { throw null; }
+
+        public override void SetArgument(int index, object value) { }
+
+        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
+
+        public override bool TryCancel() { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Providers.IMemoryStreamQueueGrain), "Enqueue" })]
     public sealed partial class Invokable_IMemoryStreamQueueGrain_GrainReference_74D60341 : global::Orleans.Runtime.TaskRequest
     {
         public global::Orleans.Providers.MemoryMessageData arg0;
@@ -2473,7 +2584,7 @@ namespace OrleansCodeGen.Orleans.Providers
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Providers.IMemoryStreamQueueGrain), "7A8F8C1A" })]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Providers.IMemoryStreamQueueGrain), "Dequeue" })]
     public sealed partial class Invokable_IMemoryStreamQueueGrain_GrainReference_7A8F8C1A : global::Orleans.Runtime.TaskRequest<System.Collections.Generic.List<global::Orleans.Providers.MemoryMessageData>>
     {
         public int arg0;
@@ -2500,6 +2611,45 @@ namespace OrleansCodeGen.Orleans.Providers
         public override void SetArgument(int index, object value) { }
 
         public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Providers.IMemoryStreamQueueGrain), "74D60341" })]
+    public sealed partial class Invokable_IMemoryStreamQueueGrain_GrainReference_7AA146BA : global::Orleans.Runtime.TaskRequest
+    {
+        public global::Orleans.Providers.MemoryMessageData arg0;
+        public System.Threading.CancellationToken arg1;
+        public override bool IsCancellable { get { throw null; } }
+
+        public override void Dispose() { }
+
+        public override string GetActivityName() { throw null; }
+
+        public override object GetArgument(int index) { throw null; }
+
+        public override int GetArgumentCount() { throw null; }
+
+        public override System.Threading.CancellationToken GetCancellationToken() { throw null; }
+
+        public override string GetInterfaceName() { throw null; }
+
+        public override System.Type GetInterfaceType() { throw null; }
+
+        public override System.Reflection.MethodInfo GetMethod() { throw null; }
+
+        public override string GetMethodName() { throw null; }
+
+        public override object GetTarget() { throw null; }
+
+        protected override System.Threading.Tasks.Task InvokeInner() { throw null; }
+
+        public override void SetArgument(int index, object value) { }
+
+        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
+
+        public override bool TryCancel() { throw null; }
     }
 }
 

@@ -39,7 +39,10 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
             Assert.Equal(2, await grainV2.GetVersion());
             Assert.Equal(1, await grainV1.GetVersion());
 
-            await ManagementGrain.SetCompatibilityStrategy(ifaceId, StrictVersionCompatible.Singleton);
+            await ManagementGrain.SetCompatibilityStrategy(
+                ifaceId,
+                StrictVersionCompatible.Singleton,
+                TestContext.Current.CancellationToken);
 
             // Current policy "StrictVersionCompatible" -> Downgrade mandatory
             Assert.Equal(1, await grainV1.ProxyGetVersion(grainV2));
@@ -54,7 +57,10 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
             }
             
             // Fallback to AllVersionsCompatible
-            await ManagementGrain.SetCompatibilityStrategy(ifaceId, null!);
+            await ManagementGrain.SetCompatibilityStrategy(
+                ifaceId,
+                null!,
+                TestContext.Current.CancellationToken);
 
             // Now we should activate only v2
             for (var i = 102; i < 202; i++)
@@ -86,7 +92,10 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
                 Assert.Equal(2, await grain.GetVersion());
             }
 
-            await ManagementGrain.SetSelectorStrategy(ifaceId, MinimumVersion.Singleton);
+            await ManagementGrain.SetSelectorStrategy(
+                ifaceId,
+                MinimumVersion.Singleton,
+                TestContext.Current.CancellationToken);
 
             // Don't touch to existing activation
             Assert.Equal(1, await grainV1.GetVersion());
@@ -118,7 +127,9 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
             Assert.Equal(1, await grainV1[1].GetVersion());
 
             // Change default to backward compatible
-            await ManagementGrain.SetCompatibilityStrategy(BackwardCompatible.Singleton);
+            await ManagementGrain.SetCompatibilityStrategy(
+                BackwardCompatible.Singleton,
+                TestContext.Current.CancellationToken);
 
             await StartSiloV2();
 
@@ -130,7 +141,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
             Assert.Equal(2, await grainV1[0].GetVersion());
 
             // Change default to backward compatible
-            await ManagementGrain.SetCompatibilityStrategy(null!);
+            await ManagementGrain.SetCompatibilityStrategy(null!, TestContext.Current.CancellationToken);
 
             // Should not provoke upgrade
             Assert.Equal(1, await grainV2.ProxyGetVersion(grainV1[1]));
@@ -151,7 +162,9 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
             await StartSiloV2();
 
             // Change default to minimum version
-            await ManagementGrain.SetSelectorStrategy(MinimumVersion.Singleton);
+            await ManagementGrain.SetSelectorStrategy(
+                MinimumVersion.Singleton,
+                TestContext.Current.CancellationToken);
 
             // But only activate V1
             for (int i = 0; i < 100; i++)
@@ -161,7 +174,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
             }
 
             // Change default to latest version
-            await ManagementGrain.SetSelectorStrategy(null!);
+            await ManagementGrain.SetSelectorStrategy(null!, TestContext.Current.CancellationToken);
 
             // Don't touch to existing activation
             for (int i = 0; i < 100; i++)

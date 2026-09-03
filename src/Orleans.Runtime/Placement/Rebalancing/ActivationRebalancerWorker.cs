@@ -158,16 +158,22 @@ internal sealed partial class ActivationRebalancerWorker(
             => _siloStatistics[address] = new(statistics.EnvironmentStatistics.FilteredMemoryUsageBytes, statistics.ActivationCount));
     }
 
-    public ValueTask<RebalancingReport> GetReport() => new(BuildReport());
-
-    public async Task ResumeRebalancing()
+    public ValueTask<RebalancingReport> GetReport(CancellationToken cancellationToken = default)
     {
-        StartSession();
-        await ReportAllMonitors(CancellationToken.None);
+        cancellationToken.ThrowIfCancellationRequested();
+        return new(BuildReport());
     }
 
-    public async Task SuspendRebalancing(TimeSpan? duration)
+    public async Task ResumeRebalancing(CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        StartSession();
+        await ReportAllMonitors(cancellationToken);
+    }
+
+    public async Task SuspendRebalancing(TimeSpan? duration, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         StopSession(StopReason.RebalancerSuspended, duration);
         
         if (duration.HasValue)
@@ -179,7 +185,7 @@ internal sealed partial class ActivationRebalancerWorker(
             LogSuspended();
         }
 
-        await ReportAllMonitors(CancellationToken.None);
+        await ReportAllMonitors(cancellationToken);
     }
 
     private async Task ReportAllMonitors(CancellationToken cancellationToken)
@@ -190,7 +196,7 @@ internal sealed partial class ActivationRebalancerWorker(
         foreach (var silo in siloStatusOracle.GetActiveSilos())
         {
             tasks.Add(grainFactory.GetSystemTarget<IActivationRebalancerMonitor>
-                (Constants.ActivationRebalancerMonitorType, silo).Report(report));
+                (Constants.ActivationRebalancerMonitorType, silo).Report(report, cancellationToken));
         }
 
         await Task.WhenAll(tasks).WaitAsync(cancellationToken);
@@ -360,7 +366,7 @@ internal sealed partial class ActivationRebalancerWorker(
 
             migrationTasks.Add(grainFactory
                 .GetSystemTarget<ISiloControl>(Constants.SiloControlType, highSilo)
-                .MigrateRandomActivations(lowSilo, delta));
+                .MigrateRandomActivations(lowSilo, delta, cancellationToken));
 
             activationsMigrated += delta;
             UpdateStatistics(lowSilo, highSilo, delta);

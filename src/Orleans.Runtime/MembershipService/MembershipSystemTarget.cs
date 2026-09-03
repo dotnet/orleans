@@ -33,18 +33,24 @@ namespace Orleans.Runtime.MembershipService
             shared.ActivationDirectory.RecordNewTarget(this);
         }
 
-        public Task Ping(int pingNumber) => Task.CompletedTask;
+        public Task Ping(int pingNumber, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.CompletedTask;
+        }
 
-        public async Task MembershipChangeNotification(MembershipTableSnapshot snapshot)
+        public async Task MembershipChangeNotification(
+            MembershipTableSnapshot snapshot,
+            CancellationToken cancellationToken = default)
         {
             if (snapshot.Version != MembershipVersion.MinValue)
             {
-                await this.membershipManager.ProcessGossipSnapshot(snapshot, CancellationToken.None);
+                await this.membershipManager.ProcessGossipSnapshot(snapshot, cancellationToken);
             }
             else
             {
                 LogTraceReceivedGossipMembershipChangeNotificationWithMinValue(this.log);
-                await ReadTable();
+                await ReadTable(cancellationToken);
             }
         }
 
@@ -79,7 +85,11 @@ namespace Orleans.Runtime.MembershipService
             return workItem.Task;
         }
 
-        public async Task<IndirectProbeResponse> ProbeIndirectly(SiloAddress target, TimeSpan probeTimeout, int probeNumber)
+        public async Task<IndirectProbeResponse> ProbeIndirectly(
+            SiloAddress target,
+            TimeSpan probeTimeout,
+            int probeNumber,
+            CancellationToken cancellationToken = default)
         {
             var probeTimer = TimeProviderValueStopwatch.StartNew(_timeProvider);
             var succeeded = false;
@@ -89,7 +99,7 @@ namespace Orleans.Runtime.MembershipService
                 var probeTask = this.ProbeInternal(target, probeNumber);
                 try
                 {
-                    await probeTask.WaitAsync(probeTimeout, _timeProvider);
+                    await probeTask.WaitAsync(probeTimeout, _timeProvider, cancellationToken);
                 }
                 catch (TimeoutException exception)
                 {
@@ -98,6 +108,10 @@ namespace Orleans.Runtime.MembershipService
                 }
 
                 succeeded = true;
+            }
+            catch (OperationCanceledException exception) when (exception.CancellationToken == cancellationToken)
+            {
+                throw;
             }
             catch (Exception exception)
             {
@@ -148,7 +162,7 @@ namespace Orleans.Runtime.MembershipService
             try
             {
                 var remoteOracle = this.grainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipServiceType, silo);
-                await remoteOracle.MembershipChangeNotification(snapshot);
+                await remoteOracle.MembershipChangeNotification(snapshot, CancellationToken.None);
             }
             catch (Exception exception)
             {
@@ -156,11 +170,15 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        private async Task ReadTable()
+        private async Task ReadTable(CancellationToken cancellationToken)
         {
             try
             {
-                await this.membershipManager.Refresh(null, CancellationToken.None);
+                await this.membershipManager.Refresh(null, cancellationToken);
+            }
+            catch (OperationCanceledException exception) when (exception.CancellationToken == cancellationToken)
+            {
+                throw;
             }
             catch (Exception exception)
             {

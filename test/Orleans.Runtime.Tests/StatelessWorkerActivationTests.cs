@@ -166,22 +166,28 @@ public class StatelessWorkerActivationTests : IClassFixture<StatelessWorkerActiv
         var workerGrain = _fixture.GrainFactory.GetGrain<IStatelessWorkerGrain>(0);
         var mgmt = _fixture.GrainFactory.GetGrain<IManagementGrain>(0);
         
-        var numActivations = await mgmt.GetGrainActivationCount((GrainReference)workerGrain);
+        var numActivations = await mgmt.GetGrainActivationCount(
+            (GrainReference)workerGrain,
+            TestContext.Current.CancellationToken);
         Assert.Equal(0, numActivations);
         
         // Activate grain with a dummy call
         await workerGrain.DummyCall();
         
-        numActivations = await mgmt.GetGrainActivationCount((GrainReference)workerGrain);
+        numActivations = await mgmt.GetGrainActivationCount(
+            (GrainReference)workerGrain,
+            TestContext.Current.CancellationToken);
         Assert.Equal(1, numActivations);
         
         // Force immediate activation collection to trigger deactivation
         // TimeSpan.Zero means collect all idle activations immediately
-        await mgmt.ForceActivationCollection(TimeSpan.Zero);
+        await mgmt.ForceActivationCollection(TimeSpan.Zero, TestContext.Current.CancellationToken);
         
         // The activation count for the stateless worker grain should become 0 again
         await Until(
-            async () => await mgmt.GetGrainActivationCount((GrainReference)workerGrain) == 0,
+            async () => await mgmt.GetGrainActivationCount(
+                (GrainReference)workerGrain,
+                TestContext.Current.CancellationToken) == 0,
             "the activation count to reach 0",
             5_000
         );

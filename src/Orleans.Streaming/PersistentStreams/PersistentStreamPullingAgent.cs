@@ -51,6 +51,7 @@ namespace Orleans.Streams
         internal interface ITestAccessor
         {
             Task<bool> ReadFromQueue(QueueId myQueueId, IQueueAdapterReceiver? receiver, int maxCacheAddCount);
+            Task<bool> ReadFromQueueWithCancellation(QueueId myQueueId, IQueueAdapterReceiver? receiver, int maxCacheAddCount, CancellationToken cancellationToken);
             Task RegisterStream(QualifiedStreamId streamId, StreamSequenceToken firstToken, DateTime now);
             Task<IReadOnlyDictionary<QualifiedStreamId, StreamConsumerCollection>> GetPubSubCache();
             Task<bool> DoHandshakeWithConsumer(StreamConsumerData consumerData, StreamSequenceToken? cacheToken);
@@ -102,10 +103,17 @@ namespace Orleans.Streams
         Task<bool> ITestAccessor.ReadFromQueue(QueueId myQueueId, IQueueAdapterReceiver? receiver, int maxCacheAddCount)
             => this.RunOrQueueTaskResult(() => ReadFromQueue(myQueueId, receiver, maxCacheAddCount, CancellationToken.None)).Unwrap();
 
+        Task<bool> ITestAccessor.ReadFromQueueWithCancellation(
+            QueueId myQueueId,
+            IQueueAdapterReceiver? receiver,
+            int maxCacheAddCount,
+            CancellationToken cancellationToken)
+            => this.RunOrQueueTaskResult(() => ReadFromQueue(myQueueId, receiver, maxCacheAddCount, cancellationToken)).Unwrap();
+
         Task ITestAccessor.RegisterStream(QualifiedStreamId streamId, StreamSequenceToken firstToken, DateTime now)
             => this.RunOrQueueTaskResult(() =>
             {
-                RegisterStream(streamId, firstToken, now);
+                RegisterStream(streamId, firstToken, now, CancellationToken.None);
 
                 if (pubSubCache.TryGetValue(streamId, out var streamData) && streamData.RegistrationTask is { } registrationTask)
                 {
@@ -127,7 +135,7 @@ namespace Orleans.Streams
         Task ITestAccessor.RunQueuePump(QueueId myQueueId, CancellationToken cancellationToken)
             => this.RunOrQueueTask(() => RunQueuePump(myQueueId, cancellationToken));
 
-        Task ITestAccessor.Shutdown() => this.RunOrQueueTask(() => Shutdown());
+        Task ITestAccessor.Shutdown() => this.RunOrQueueTask(() => Shutdown(CancellationToken.None));
 
         /// <summary>
         /// Take responsibility for a new queues that was assigned to me via a new range.
@@ -140,8 +148,9 @@ namespace Orleans.Streams
         ///     Same applies to shutdown.
         /// </summary>
         /// <returns></returns>
-        public Task Initialize()
+        public Task Initialize(CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             LogInfoInit(GetType().Name, GrainId, Silo, new(QueueId));
 
             _activePumpTask = Task.CompletedTask;
@@ -202,7 +211,7 @@ namespace Orleans.Streams
             {
                 try
                 {
-                    await receiver.Initialize(this.options.InitQueueTimeout);
+                    await receiver.Initialize(this.options.InitQueueTimeout, cancellationToken);
                     StreamingEvents.EmitQueueReceiverInitialized(streamProviderName, Silo, QueueId);
                 }
                 catch (Exception exception)
@@ -213,8 +222,9 @@ namespace Orleans.Streams
             }
         }
 
-        public async Task Shutdown()
+        public async Task Shutdown(CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             // Stop pulling from queues that are not in my range anymore.
             LogInfoShutdown(GetType().Name, new(QueueId));
 
@@ -247,7 +257,7 @@ namespace Orleans.Streams
                 this.receiver = null;
                 if (localReceiver != null)
                 {
-                    var task = OrleansTaskExtentions.SafeExecute(() => localReceiver.Shutdown(this.options.InitQueueTimeout));
+                    var task = OrleansTaskExtentions.SafeExecute(() => localReceiver.Shutdown(this.options.InitQueueTimeout, cancellationToken));
                     task = task.LogException(logger, ErrorCode.PersistentStreamPullingAgent_07,
                         $"QueueAdapterReceiver {QueueId} failed to Shutdown.");
                     await task;
@@ -278,7 +288,7 @@ namespace Orleans.Streams
                 tuple.Value.DisposeAll(logger);
                 var streamId = tuple.Key;
                 LogInfoUnregisterProducer(streamId);
-                unregisterTasks.Add(pubSub.UnregisterProducer(streamId, GrainId));
+                unregisterTasks.Add(pubSub.UnregisterProducer(streamId, GrainId, cancellationToken));
             }
 
             try
@@ -296,8 +306,10 @@ namespace Orleans.Streams
             GuidId subscriptionId,
             QualifiedStreamId streamId,
             GrainId streamConsumer,
-            string? filterData)
+            string? filterData,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             LogDebugAddSubscriber(streamId, streamConsumer);
             // cannot await here because explicit consumers trigger this call, so it could cause a deadlock.
             AddSubscriber_Impl(subscriptionId, streamId, streamConsumer, filterData, null)
@@ -375,7 +387,8 @@ namespace Orleans.Streams
                          // Do not retry if the agent is shutting down, or if the exception is ClientNotAvailableException
                          (exception, i) => exception is not ClientNotAvailableException && !IsShutdown,
                          this.options.MaxEventDeliveryTime,
-                         deliveryBackoffProvider);
+                         deliveryBackoffProvider,
+                         cancellationToken: CancellationToken.None);
 
                     effectiveHandshakeToken = requestedHandshakeToken;
                     if (effectiveHandshakeToken is null && ShouldApplyInitialSubscriptionStartPosition(consumerData))
@@ -541,8 +554,9 @@ namespace Orleans.Streams
             return queueCache!.GetCacheCursor(consumerData.StreamId, null);
         }
 
-        public Task RemoveSubscriber(GuidId subscriptionId, QualifiedStreamId streamId)
+        public Task RemoveSubscriber(GuidId subscriptionId, QualifiedStreamId streamId, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             RemoveSubscriber_Impl(subscriptionId, streamId);
             return Task.CompletedTask;
         }
@@ -704,11 +718,6 @@ namespace Orleans.Streams
             // Retrieve one multiBatch from the queue. Every multiBatch has an IEnumerable of IBatchContainers, each IBatchContainer may have multiple events.
             IList<IBatchContainer>? multiBatch = await rcvr.GetQueueMessagesAsync(maxCacheAddCount, cancellationToken);
 
-            if (IsShutdown || cancellationToken.IsCancellationRequested)
-            {
-                return false;
-            }
-
             // Receivers built against older Orleans versions can still return null.
             if (multiBatch is null || multiBatch.Count == 0) return false; // queue is empty. Exit the loop. Will attempt again in the next timer callback.
 
@@ -727,27 +736,22 @@ namespace Orleans.Streams
                 .Where(m => m is not null)
                 .GroupBy(container => container.StreamId))
             {
-                if (IsShutdown || cancellationToken.IsCancellationRequested)
-                {
-                    return false;
-                }
-
                 var streamId = new QualifiedStreamId(queueAdapter.Name, group.Key);
                 StreamSequenceToken startToken = group.First().SequenceToken;
                 if (pubSubCache.TryGetValue(streamId, out var streamData))
                 {
                     streamData.RefreshActivity(now);
-                    StartInactiveCursors(streamData, startToken);
+                    StartInactiveCursors(streamData, startToken, CancellationToken.None);
                 }
                 else
                 {
                     // Run registration in the background so that cold-stream pubsub
                     // calls do not stall message delivery for other streams on the same queue.
-                    RegisterStream(streamId, startToken, now);
+                    RegisterStream(streamId, startToken, now, CancellationToken.None);
                 }
             }
 
-            return true;
+            return !IsShutdown && !cancellationToken.IsCancellationRequested;
         }
 
         private void CleanupPubSubCache(DateTime now)
@@ -831,9 +835,13 @@ namespace Orleans.Streams
             return difference < 0 || difference == 0 && current.EventIndex < other.EventIndex;
         }
 
-        private void RegisterStream(QualifiedStreamId streamId, StreamSequenceToken firstToken, DateTime now)
+        private void RegisterStream(
+            QualifiedStreamId streamId,
+            StreamSequenceToken firstToken,
+            DateTime now,
+            CancellationToken cancellationToken)
         {
-            if (IsShutdown)
+            if (IsShutdown || cancellationToken.IsCancellationRequested)
             {
                 return;
             }
@@ -854,14 +862,14 @@ namespace Orleans.Streams
 
                 try
                 {
-                    if (IsShutdown)
+                    if (IsShutdown || cancellationToken.IsCancellationRequested)
                     {
                         return;
                     }
 
-                    var subscribers = await RegisterAsStreamProducer(streamId);
+                    var subscribers = await RegisterAsStreamProducer(streamId, cancellationToken);
 
-                    if (IsShutdown)
+                    if (IsShutdown || cancellationToken.IsCancellationRequested)
                     {
                         return;
                     }
@@ -887,6 +895,10 @@ namespace Orleans.Streams
                         await Task.WhenAll(addSubscriptionTasks);
                     }
                 }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    RemoveCanceledRegistration();
+                }
                 catch (Exception exception)
                 {
                     FailRegistration(exception);
@@ -896,6 +908,17 @@ namespace Orleans.Streams
                     streamData.RegistrationTask = null;
                     pinCursor?.Dispose();
                 }
+            }
+
+            void RemoveCanceledRegistration()
+            {
+                if (pubSubCache.TryGetValue(streamId, out var cachedStreamData)
+                    && ReferenceEquals(cachedStreamData, streamData))
+                {
+                    pubSubCache.Remove(streamId);
+                }
+
+                streamData.DisposeAll(logger);
             }
 
             void FailRegistration(Exception exception)
@@ -931,7 +954,7 @@ namespace Orleans.Streams
             }
         }
 
-        private void StartInactiveCursors(StreamConsumerCollection streamData, StreamSequenceToken startToken)
+        private void StartInactiveCursors(StreamConsumerCollection streamData, StreamSequenceToken startToken, CancellationToken cancellationToken)
         {
             foreach (StreamConsumerData consumerData in streamData.AllConsumers())
             {
@@ -947,7 +970,7 @@ namespace Orleans.Streams
                     if (consumerData.State == StreamConsumerDataState.Inactive)
                     {
                         // wake up inactive consumers
-                        RunConsumerCursor(consumerData).Ignore();
+                        RunConsumerCursor(consumerData, cancellationToken).Ignore();
                     }
                 }
                 else
@@ -961,7 +984,7 @@ namespace Orleans.Streams
             }
         }
 
-        private async Task RunConsumerCursor(StreamConsumerData consumerData)
+        private async Task RunConsumerCursor(StreamConsumerData consumerData, CancellationToken cancellationToken = default)
         {
             TagList? tags = null;
             try
@@ -972,7 +995,7 @@ namespace Orleans.Streams
 
                 consumerData.State = StreamConsumerDataState.Active;
                 var deliveredAny = false;
-                while (!IsShutdown && consumerData.Cursor is not null)
+                while (!IsShutdown && !cancellationToken.IsCancellationRequested && consumerData.Cursor is not null)
                 {
                     var batchCursor = options.BatchContainerBatchSize > 1
                         ? consumerData.Cursor as IQueueCacheCursorBatchDelivery
@@ -1029,12 +1052,13 @@ namespace Orleans.Streams
                         {
                             var batch = nextBatch.Batch;
                             StreamHandshakeToken? newToken = await AsyncExecutorWithRetries.ExecuteWithRetries(
-                                i => DeliverBatchToConsumer(consumerData, batch),
+                                i => DeliverBatchToConsumer(consumerData, batch, cancellationToken),
                                 AsyncExecutorWithRetries.INFINITE_RETRIES,
                                 // Do not retry if the agent is shutting down, or if the exception is ClientNotAvailableException
                                 (exception, i) => exception is not ClientNotAvailableException && !IsShutdown,
                                 this.options.MaxEventDeliveryTime,
-                                deliveryBackoffProvider);
+                                deliveryBackoffProvider,
+                                cancellationToken: cancellationToken);
                             if (newToken is not null)
                             {
                                 consumerData.LastToken = newToken;
@@ -1142,10 +1166,15 @@ namespace Orleans.Streams
                             true,
                             batch,
                             batch?.SequenceToken,
-                            forceFaultSubscription);
+                            forceFaultSubscription,
+                            cancellationToken);
                         if (faultedSubscription) return;
                     }
                 }
+                consumerData.State = StreamConsumerDataState.Inactive;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
                 consumerData.State = StreamConsumerDataState.Inactive;
             }
             catch (Exception exc)
@@ -1220,11 +1249,14 @@ namespace Orleans.Streams
             return default;
         }
 
-        private async Task<StreamHandshakeToken?> DeliverBatchToConsumer(StreamConsumerData consumerData, IBatchContainer batch)
+        private async Task<StreamHandshakeToken?> DeliverBatchToConsumer(
+            StreamConsumerData consumerData,
+            IBatchContainer batch,
+            CancellationToken cancellationToken)
         {
             try
             {
-                StreamHandshakeToken? newToken = await ContextualizedDeliverBatchToConsumer(consumerData, batch);
+                StreamHandshakeToken? newToken = await ContextualizedDeliverBatchToConsumer(consumerData, batch, cancellationToken);
                 consumerData.LastToken = StreamHandshakeToken.CreateDeliveyToken(batch.SequenceToken); // this is the currently delivered token
                 consumerData.StartPositionIsProviderDefault = false;
                 StreamingEvents.EmitMessageDelivered(streamProviderName, consumerData, batch, Silo);
@@ -1241,13 +1273,21 @@ namespace Orleans.Streams
         /// <summary>
         /// Add call context for batch delivery call, then clear context immediately, without giving up turn.
         /// </summary>
-        private static Task<StreamHandshakeToken?> ContextualizedDeliverBatchToConsumer(StreamConsumerData consumerData, IBatchContainer batch)
+        private static Task<StreamHandshakeToken?> ContextualizedDeliverBatchToConsumer(
+            StreamConsumerData consumerData,
+            IBatchContainer batch,
+            CancellationToken cancellationToken)
         {
             bool isRequestContextSet = batch.ImportRequestContext();
             try
             {
                 var handshakeToken = consumerData.StartPositionIsProviderDefault ? null : consumerData.LastToken;
-                return consumerData.StreamConsumer.DeliverBatch(consumerData.SubscriptionId, consumerData.StreamId, batch, handshakeToken);
+                return consumerData.StreamConsumer.DeliverBatch(
+                    consumerData.SubscriptionId,
+                    consumerData.StreamId,
+                    batch,
+                    handshakeToken,
+                    cancellationToken);
             }
             finally
             {
@@ -1260,13 +1300,17 @@ namespace Orleans.Streams
         }
 
 
-        private static async Task DeliverErrorToConsumer(StreamConsumerData consumerData, Exception exc, IBatchContainer? batch)
+        private static async Task DeliverErrorToConsumer(
+            StreamConsumerData consumerData,
+            Exception exc,
+            IBatchContainer? batch,
+            CancellationToken cancellationToken)
         {
             Task errorDeliveryTask;
             bool isRequestContextSet = batch != null && batch.ImportRequestContext();
             try
             {
-                errorDeliveryTask = consumerData.StreamConsumer.ErrorInStream(consumerData.SubscriptionId, exc);
+                errorDeliveryTask = consumerData.StreamConsumer.ErrorInStream(consumerData.SubscriptionId, exc, cancellationToken);
             }
             finally
             {
@@ -1284,18 +1328,19 @@ namespace Orleans.Streams
             bool isDeliveryError,
             IBatchContainer? batch,
             StreamSequenceToken? token,
-            bool forceFaultSubscription = false)
+            bool forceFaultSubscription = false,
+            CancellationToken cancellationToken = default)
         {
             // for loss of client, we just remove the subscription
             if (exceptionOccured is ClientNotAvailableException)
             {
                 LogWarningConsumerIsDead(consumerData.StreamConsumer, consumerData.StreamId);
-                pubSub.UnregisterConsumer(consumerData.SubscriptionId, consumerData.StreamId).Ignore();
+                pubSub.UnregisterConsumer(consumerData.SubscriptionId, consumerData.StreamId, cancellationToken).Ignore();
                 return true;
             }
 
             // notify consumer about the error or that the data is not available.
-            await DeliverErrorToConsumer(consumerData, exceptionOccured, batch).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
+            await DeliverErrorToConsumer(consumerData, exceptionOccured, batch, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
             // record that there was a delivery failure
             if (isDeliveryError)
             {
@@ -1316,10 +1361,13 @@ namespace Orleans.Streams
                 {
                     // notify consumer of faulted subscription, if we can.
                     await DeliverErrorToConsumer(
-                        consumerData, new FaultedSubscriptionException(consumerData.SubscriptionId, consumerData.StreamId), batch).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
+                        consumerData,
+                        new FaultedSubscriptionException(consumerData.SubscriptionId, consumerData.StreamId),
+                        batch,
+                        cancellationToken).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
 
                     // mark subscription as faulted.
-                    await pubSub.FaultSubscription(consumerData.StreamId, consumerData.SubscriptionId);
+                    await pubSub.FaultSubscription(consumerData.StreamId, consumerData.SubscriptionId, cancellationToken);
                 }
                 finally
                 {
@@ -1331,12 +1379,16 @@ namespace Orleans.Streams
             return false;
         }
 
-        private static async Task<ISet<PubSubSubscriptionState>> PubsubRegisterProducer(IStreamPubSub pubSub, QualifiedStreamId streamId,
-            GrainId meAsStreamProducer, ILogger logger)
+        private static async Task<ISet<PubSubSubscriptionState>> PubsubRegisterProducer(
+            IStreamPubSub pubSub,
+            QualifiedStreamId streamId,
+            GrainId meAsStreamProducer,
+            ILogger logger,
+            CancellationToken cancellationToken)
         {
             try
             {
-                var streamData = await pubSub.RegisterProducer(streamId, meAsStreamProducer);
+                var streamData = await pubSub.RegisterProducer(streamId, meAsStreamProducer, cancellationToken);
                 return streamData;
             }
             catch (Exception e)
@@ -1346,21 +1398,23 @@ namespace Orleans.Streams
             }
         }
 
-        private async Task<ISet<PubSubSubscriptionState>> RegisterAsStreamProducer(QualifiedStreamId streamId)
+        private async Task<ISet<PubSubSubscriptionState>> RegisterAsStreamProducer(
+            QualifiedStreamId streamId,
+            CancellationToken cancellationToken)
         {
             if (pubSub == null) throw new NullReferenceException("Found pubSub reference not set up correctly in RetrieveNewStream");
-            if (IsShutdown)
+            if (IsShutdown || cancellationToken.IsCancellationRequested)
             {
                 return new HashSet<PubSubSubscriptionState>();
             }
 
-            ISet<PubSubSubscriptionState> subscribers = null!; // Always assigned by the retry lambda before ExecuteWithRetries returns successfully (it retries until success or throws).
-            await AsyncExecutorWithRetries.ExecuteWithRetries(
-                async i => { subscribers = await PubsubRegisterProducer(pubSub, streamId, GrainId, logger); },
+            var subscribers = await AsyncExecutorWithRetries.ExecuteWithRetries(
+                i => PubsubRegisterProducer(pubSub, streamId, GrainId, logger, cancellationToken),
                 AsyncExecutorWithRetries.INFINITE_RETRIES,
-                (exception, i) => !IsShutdown,
+                (exception, i) => !IsShutdown && !cancellationToken.IsCancellationRequested,
                 Timeout.InfiniteTimeSpan,
-                deliveryBackoffProvider);
+                deliveryBackoffProvider,
+                cancellationToken: cancellationToken);
 
             return subscribers;
         }

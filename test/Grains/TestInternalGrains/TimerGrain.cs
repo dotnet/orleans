@@ -311,7 +311,7 @@ namespace UnitTestGrains
                     Assert.NotNull(timer[0]);
                     timer[0].Dispose();
                     Assert.True(ct.IsCancellationRequested);
-                    var delay = Task.Delay(TimeSpan.FromMilliseconds(100), timeProvider);
+                    var delay = Task.Delay(TimeSpan.FromMilliseconds(100), timeProvider, CancellationToken.None);
                     TimerGrainCallbackEvents.EmitDelayScheduled(context.GrainId);
                     await delay;
                     tcs.TrySetResult();
@@ -542,7 +542,7 @@ namespace UnitTestGrains
             CheckReentrancy(step, expectedTickId);
 
             LogStatus("Before Delay", timerName);
-            var delay = Task.Delay(TimerGrainTestConstants.CallbackDelay, _timeProvider);
+            var delay = Task.Delay(TimerGrainTestConstants.CallbackDelay, _timeProvider, cancellationToken);
             TimerGrainCallbackEvents.EmitDelayScheduled(_context.GrainId);
             await delay;
             step = "After Delay";
@@ -1007,7 +1007,7 @@ namespace UnitTestGrains
                     Assert.NotNull(timer[0]);
                     timer[0].Dispose();
                     Assert.True(ct.IsCancellationRequested);
-                    var delay = Task.Delay(TimeSpan.FromMilliseconds(100), _timeProvider);
+                    var delay = Task.Delay(TimeSpan.FromMilliseconds(100), _timeProvider, CancellationToken.None);
                     TimerGrainCallbackEvents.EmitDelayScheduled(context.GrainId);
                     await delay;
                     tcs.TrySetResult();
@@ -1422,7 +1422,7 @@ namespace UnitTestGrains
             CheckReentrancy(step, expectedTickId);
 
             LogStatus("Before Delay", timerName);
-            var delay = Task.Delay(TimerGrainTestConstants.CallbackDelay, _timeProvider);
+            var delay = Task.Delay(TimerGrainTestConstants.CallbackDelay, _timeProvider, cancellationToken);
             TimerGrainCallbackEvents.EmitDelayScheduled(_context.GrainId);
             await delay;
             step = "After Delay";

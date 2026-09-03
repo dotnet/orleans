@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Net;
+using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -155,6 +157,31 @@ public class ClusterManifestProviderTests
             await lifecycle.OnStop(TestContext.Current.CancellationToken);
             membership.Dispose();
         }
+    }
+
+    [Fact]
+    public async Task ClientProvider_UpdateCancellation_DoesNotFetchLegacyManifest()
+    {
+        var provider = (ClientClusterManifestProvider)RuntimeHelpers.GetUninitializedObject(
+            typeof(ClientClusterManifestProvider));
+        var remoteProvider = Substitute.For<IClusterManifestSystemTarget>();
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cancellation.Cancel();
+        remoteProvider
+            .GetClusterManifestUpdate(default, cancellation.Token)
+            .Returns(_ => new ValueTask<ClusterManifestUpdate?>(
+                Task.FromCanceled<ClusterManifestUpdate?>(cancellation.Token)));
+        var method = typeof(ClientClusterManifestProvider).GetMethod(
+            "GetClusterManifestUpdate",
+            BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var task = (Task<ClusterManifestUpdate?>)method.Invoke(
+            provider,
+            [remoteProvider, default(MajorMinorVersion), cancellation.Token])!;
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => task);
+
+        var call = Assert.Single(remoteProvider.ReceivedCalls());
+        Assert.Equal(nameof(IClusterManifestSystemTarget.GetClusterManifestUpdate), call.GetMethodInfo().Name);
     }
 
     [Fact]
@@ -551,7 +578,11 @@ public class ClusterManifestProviderTests
 
     private sealed class TestSiloManifestSystemTarget(GrainManifest manifest) : ISiloManifestSystemTarget
     {
-        public ValueTask<GrainManifest> GetSiloManifest() => new(manifest);
+        public ValueTask<GrainManifest> GetSiloManifest(CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return new(manifest);
+        }
     }
 
     private sealed class BlockingVersionSelector : IVersionSelector

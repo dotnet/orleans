@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Metadata;
 
@@ -13,13 +14,15 @@ namespace Orleans.Runtime
         /// Gets the current cluster manifest.
         /// </summary>
         /// <returns>The current cluster manifest.</returns>
-        ValueTask<ClusterManifest> GetClusterManifest();
+        [Alias("40D39F85")]
+        ValueTask<ClusterManifest> GetClusterManifest(CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Gets an updated cluster manifest if newer than the provided <paramref name="previousVersion"/>.
         /// </summary>
         /// <returns>The current cluster manifest, or <see langword="null"/> if it is not newer than the provided version.</returns>
-        ValueTask<ClusterManifestUpdate?> GetClusterManifestUpdate(MajorMinorVersion previousVersion);
+        [Alias("4EFCA109")]
+        ValueTask<ClusterManifestUpdate?> GetClusterManifestUpdate(MajorMinorVersion previousVersion, CancellationToken cancellationToken = default);
     }
 
     /// <summary>

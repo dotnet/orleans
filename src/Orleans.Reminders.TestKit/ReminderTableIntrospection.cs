@@ -20,7 +20,7 @@ public enum ReminderTableOperationKind
     /// <summary><see cref="IReminderTable.StopAsync"/>.</summary>
     Stop,
 
-    /// <summary><see cref="IReminderTable.ReadRow"/>.</summary>
+    /// <summary><see cref="IReminderTable.ReadRow(GrainId, string)"/>.</summary>
     ReadRow,
 
     /// <summary><see cref="IReminderTable.ReadRows(GrainId)"/>.</summary>
@@ -29,13 +29,13 @@ public enum ReminderTableOperationKind
     /// <summary><see cref="IReminderTable.ReadRows(uint, uint)"/>.</summary>
     ReadRange,
 
-    /// <summary><see cref="IReminderTable.UpsertRow"/>.</summary>
+    /// <summary><see cref="IReminderTable.UpsertRow(ReminderEntry)"/>.</summary>
     UpsertRow,
 
-    /// <summary><see cref="IReminderTable.RemoveRow"/>.</summary>
+    /// <summary><see cref="IReminderTable.RemoveRow(GrainId, string, string)"/>.</summary>
     RemoveRow,
 
-    /// <summary><see cref="IReminderTable.TestOnlyClearTable"/>.</summary>
+    /// <summary><see cref="IReminderTable.TestOnlyClearTable()"/>.</summary>
     ClearTable
 }
 
