@@ -68,7 +68,7 @@ namespace Orleans.EventSourcing
         { }
 
         [Obsolete]
-        protected ProtocolTransportException(SerializationInfo info, StreamingContext context)
+        private ProtocolTransportException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         { }
 
