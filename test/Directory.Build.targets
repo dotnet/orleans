@@ -5,5 +5,12 @@
   </PropertyGroup>
   
   <Import Project="$(_ParentDirectoryBuildTargetsPath)" Condition="Exists('$(_ParentDirectoryBuildTargetsPath)')"/>
-  
-  </Project>
+
+  <ItemGroup Condition="'@(PackageReference->WithMetadataValue('Identity', 'NSubstitute'))' != ''">
+    <PackageReference Include="NSubstitute.Analyzers.CSharp">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+</Project>
