@@ -650,11 +650,14 @@ dotnet_diagnostic.RS0026.severity = suggestion
 # RS0027: API with optional parameter(s) should have the most parameters amongst its public overloads
 dotnet_diagnostic.RS0027.severity = suggestion
 
+# CA1848: Use the LoggerMessage delegates
 # CA1849: Call async methods when in an async method
 [src/{Orleans.Core.Abstractions,Orleans.Core}/**.cs]
+dotnet_diagnostic.CA1848.severity = warning
 dotnet_diagnostic.CA1849.severity = warning
 
 [src/Orleans.Runtime/Networking/**.cs]
+dotnet_diagnostic.CA1848.severity = warning
 dotnet_diagnostic.CA1849.severity = warning
 
 # Production source enforces the correctness baseline. Tests, samples, documentation,
