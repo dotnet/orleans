@@ -1,0 +1,173 @@
+name: Static analysis audit
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  schedule:
+    - cron: "0 8 * * 2" # Run the preview audit weekly on Tuesday at 8:00 UTC.
+
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+
+jobs:
+  analyzers:
+    name: Roslyn analyzers (net10.0, ${{ github.event_name == 'schedule' && 'preview' || 'stable' }})
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 360
+    env:
+      ANALYSIS_LEVEL: ${{ github.event_name == 'schedule' && 'preview' || '10.0' }}
+      RESULTS_DIRECTORY: Artifacts/AnalyzerAudit/Roslyn
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - name: Setup Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "24.x"
+      - name: Setup .NET
+        uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
+        with:
+          global-json-file: global.json
+      - name: Create net10.0 source solution
+        shell: pwsh
+        run: |
+          $auditSolution = Join-Path $env:RUNNER_TEMP 'AnalyzerAudit.slnx'
+          dotnet new sln --name AnalyzerAudit --format slnx --output $env:RUNNER_TEMP
+
+          $projects = dotnet sln Orleans.slnx list |
+            Select-Object -Skip 2 |
+            Where-Object { $_ -match '^src[\\/].+\.csproj$' }
+
+          $net10Projects = foreach ($project in $projects) {
+            $propertiesJson = dotnet msbuild $project -nologo `
+              -getProperty:TargetFramework `
+              -getProperty:TargetFrameworks
+            $properties = ($propertiesJson -join [Environment]::NewLine) | ConvertFrom-Json
+
+            $targetFrameworks = @($properties.Properties.TargetFramework)
+            $targetFrameworks += $properties.Properties.TargetFrameworks -split ';'
+            if ($targetFrameworks -contains 'net10.0') {
+              $project
+            }
+          }
+
+          if ($net10Projects.Count -eq 0) {
+            throw 'No net10.0 source projects were found.'
+          }
+
+          dotnet sln $auditSolution add --include-references false $net10Projects
+          "AUDIT_SOLUTION=$auditSolution" | Out-File -FilePath $env:GITHUB_ENV -Append
+      - name: Run Roslyn analyzer audit
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force $env:RESULTS_DIRECTORY | Out-Null
+          dotnet build $env:AUDIT_SOLUTION `
+            --framework net10.0 `
+            --configuration Release `
+            --no-incremental `
+            -bl:$env:RESULTS_DIRECTORY/analyzer-audit.binlog `
+            -p:AnalyzerAuditAnalysisLevel=$env:ANALYSIS_LEVEL `
+            -p:AnalyzerAuditResultsDirectory="$env:GITHUB_WORKSPACE/$env:RESULTS_DIRECTORY/Sarif" `
+            -p:CustomBeforeMicrosoftCommonTargets="$env:GITHUB_WORKSPACE/.github/scripts/analyzer-audit.targets" `
+            -p:TreatWarningsAsErrors=false `
+            -p:WarningsAsErrors=
+      - name: Prepare Roslyn analyzer results
+        if: always()
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          ./.github/scripts/merge-analyzer-sarif.ps1 `
+            -InputDirectory "$env:RESULTS_DIRECTORY/Sarif" `
+            -OutputFile "$env:RESULTS_DIRECTORY/roslyn-analyzers.sarif" `
+            -AutomationIdPrefix 'roslyn-analyzers-net10'
+      - name: Upload Roslyn analyzer results
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: analyzer-audit-net10-${{ github.event_name == 'schedule' && 'preview' || 'stable' }}
+          retention-days: 1
+          if-no-files-found: warn
+          path: ${{ env.RESULTS_DIRECTORY }}
+      - name: Publish Roslyn analyzer results
+        if: always()
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@c10b8064de6f491fea524254123dbe5e09572f13 # v4
+        with:
+          category: roslyn-analyzers-net10-${{ github.event_name == 'schedule' && 'preview' || 'stable' }}
+          sarif_file: ${{ env.RESULTS_DIRECTORY }}/roslyn-analyzers.sarif
+
+  compatibility:
+    name: Compatibility analyzers (net10.0 core runtime)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 180
+    env:
+      RESULTS_DIRECTORY: Artifacts/AnalyzerAudit/Compatibility
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - name: Setup .NET
+        uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
+        with:
+          global-json-file: global.json
+      - name: Create core runtime solution
+        shell: pwsh
+        run: |
+          $auditSolution = Join-Path $env:RUNNER_TEMP 'CompatibilityAudit.slnx'
+          dotnet new sln --name CompatibilityAudit --format slnx --output $env:RUNNER_TEMP
+          dotnet sln $auditSolution add --include-references false `
+            src/Orleans.Core.Abstractions/Orleans.Core.Abstractions.csproj `
+            src/Orleans.Serialization.Abstractions/Orleans.Serialization.Abstractions.csproj `
+            src/Orleans.Serialization/Orleans.Serialization.csproj `
+            src/Orleans.Core/Orleans.Core.csproj `
+            src/Orleans.Runtime/Orleans.Runtime.csproj
+          "AUDIT_SOLUTION=$auditSolution" | Out-File -FilePath $env:GITHUB_ENV -Append
+      - name: Run compatibility analyzer audit
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force $env:RESULTS_DIRECTORY | Out-Null
+          dotnet build $env:AUDIT_SOLUTION `
+            --framework net10.0 `
+            --configuration Release `
+            --no-incremental `
+            -bl:$env:RESULTS_DIRECTORY/compatibility-audit.binlog `
+            -p:AnalysisLevel=10.0 `
+            -p:EnableCompatibilityAnalyzerAudit=true `
+            -p:AnalyzerAuditResultsDirectory="$env:GITHUB_WORKSPACE/$env:RESULTS_DIRECTORY/Sarif" `
+            -p:CustomBeforeMicrosoftCommonTargets="$env:GITHUB_WORKSPACE/.github/scripts/analyzer-audit.targets" `
+            -p:TreatWarningsAsErrors=false `
+            -p:WarningsAsErrors=
+      - name: Prepare compatibility analyzer results
+        if: always()
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          ./.github/scripts/merge-analyzer-sarif.ps1 `
+            -InputDirectory "$env:RESULTS_DIRECTORY/Sarif" `
+            -OutputFile "$env:RESULTS_DIRECTORY/compatibility-analyzers.sarif" `
+            -AutomationIdPrefix 'compatibility-analyzers-net10-core-runtime'
+      - name: Upload compatibility analyzer results
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: compatibility-analyzer-audit-net10
+          retention-days: 1
+          if-no-files-found: warn
+          path: ${{ env.RESULTS_DIRECTORY }}
+      - name: Publish compatibility analyzer results
+        if: always()
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@c10b8064de6f491fea524254123dbe5e09572f13 # v4
+        with:
+          category: compatibility-analyzers-net10-core-runtime
+          sarif_file: ${{ env.RESULTS_DIRECTORY }}/compatibility-analyzers.sarif

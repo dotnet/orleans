@@ -1,0 +1,25 @@
+<Project>
+  <PropertyGroup Condition="'$(AnalyzerAuditAnalysisLevel)' != '' and '$(TargetFramework)' == 'net10.0'">
+    <AnalysisLevel>$(AnalyzerAuditAnalysisLevel)</AnalysisLevel>
+    <AnalysisMode>All</AnalysisMode>
+    <AnalysisModeSecurity>All</AnalysisModeSecurity>
+    <AnalysisModeReliability>All</AnalysisModeReliability>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(EnableCompatibilityAnalyzerAudit)' == 'true' and '$(TargetFramework)' == 'net10.0'">
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    <EnableAotAnalyzer>true</EnableAotAnalyzer>
+    <EnableSingleFileAnalyzer>true</EnableSingleFileAnalyzer>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(AnalyzerAuditResultsDirectory)' != '' and '$(TargetFramework)' == 'net10.0'">
+    <ErrorLog>$(AnalyzerAuditResultsDirectory)/$(MSBuildProjectName)-$(TargetFramework).sarif,version=2.1</ErrorLog>
+  </PropertyGroup>
+
+  <Target
+    Name="CreateAnalyzerAuditResultsDirectory"
+    BeforeTargets="CoreCompile"
+    Condition="'$(AnalyzerAuditResultsDirectory)' != '' and '$(TargetFramework)' == 'net10.0'">
+    <MakeDir Directories="$(AnalyzerAuditResultsDirectory)" />
+  </Target>
+</Project>
