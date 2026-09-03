@@ -11,7 +11,11 @@
   <PropertyGroup>
     <CompatibilityTargetFrameworks>netstandard2.0</CompatibilityTargetFrameworks>
     <DefaultTargetFrameworks>net8.0;net10.0</DefaultTargetFrameworks>
-    <!-- Update this after each stable Orleans release. New packages disable validation until their first baseline is released. -->
+    <!--
+      Package validation checks the packed API and framework assets against the latest release.
+      Update this after each stable Orleans release and remove suppressions made obsolete by that baseline.
+      See CONTRIBUTING.md for the intentional-breaking-change workflow.
+    -->
     <OrleansPackageValidationBaselineVersion>10.3.1</OrleansPackageValidationBaselineVersion>
   </PropertyGroup>
 

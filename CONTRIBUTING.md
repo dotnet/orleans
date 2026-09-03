@@ -20,6 +20,24 @@ dotnet build Orleans.slnx -bl
 
 The `Orleans.slnx` solution includes the source projects under `src` and the test projects under `test`. On Windows, `Build.cmd` additionally restores, builds, and packs the solution, placing packages in `Artifacts/<Configuration>`.
 
+### Package compatibility
+
+Packing validates API-bearing Orleans packages against the latest released package baseline. This catches binary breaking changes, dropped target frameworks, and inconsistent assets across target frameworks in the produced NuGet package. The generated API-diff workflow remains the reviewable source representation of the public API; package validation enforces compatibility on the actual package.
+
+When a binary breaking change is intentional:
+
+1. Confirm that the change and its migration impact are appropriate for the planned release.
+1. Generate package-specific suppressions:
+
+   ```console
+   dotnet pack <project> --configuration Release /p:GenerateCompatibilitySuppressionFile=true
+   ```
+
+1. Review the generated `CompatibilitySuppressions.xml` beside the project and retain only entries for the approved break. Commit that file with the implementation and explain the compatibility impact in the pull request.
+1. After a release containing the break becomes the repository baseline, remove suppressions which that baseline makes obsolete.
+
+Use `PackageValidationBaselineFrameworkToIgnore` in the package project for an intentional target-framework removal. A package awaiting its first release can set `EnablePackageValidation` to `false` with a comment explaining that it has no released baseline; enable validation after its first release. Keep exceptions package-specific instead of adding compatibility diagnostics to a shared `NoWarn`.
+
 ### Run tests
 
 Run the full test suite for the current .NET target with:
