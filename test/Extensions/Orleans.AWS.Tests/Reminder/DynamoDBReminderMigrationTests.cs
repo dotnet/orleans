@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+using System.Globalization;
 using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
 using Amazon.Runtime;
@@ -7,7 +9,6 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Reminders.DynamoDB;
 using Orleans.Runtime;
-using System.Collections.Immutable;
 using TestExtensions;
 using Xunit;
 
@@ -236,8 +237,8 @@ public sealed class DynamoDBReminderMigrationTests
             foreach (var entry in entries)
             {
                 var actual = Assert.Single(v2Items, item => item["GrainReference"].S == entry.GrainId.ToString());
-                Assert.Equal(entry.StartAt, DateTime.Parse(actual["StartTime"].S));
-                Assert.Equal(entry.Period, TimeSpan.Parse(actual["Period"].S));
+                Assert.Equal(entry.StartAt, DateTime.Parse(actual["StartTime"].S, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind));
+                Assert.Equal(entry.Period, TimeSpan.Parse(actual["Period"].S, CultureInfo.InvariantCulture));
             }
         }
         finally
@@ -301,7 +302,7 @@ public sealed class DynamoDBReminderMigrationTests
             var actual = Assert.Single(v2Items);
             Assert.Equal(updated.GrainId.ToString(), actual["GrainReference"].S);
             Assert.Equal(updatedEtag, Scalar(actual["ETag"]));
-            Assert.Equal(updated.StartAt, DateTime.Parse(actual["StartTime"].S));
+            Assert.Equal(updated.StartAt, DateTime.Parse(actual["StartTime"].S, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind));
         }
         finally
         {
