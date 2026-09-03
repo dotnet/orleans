@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)playground\PaymentWorkflowApp\PaymentWorkflowApp.csproj" />
     <ProjectReference Include="$(SourceRoot)playground\WorkflowsApp\WorkflowsApp.Service\WorkflowsApp.Service.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
     <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestExtensions\TestExtensions.csproj" />

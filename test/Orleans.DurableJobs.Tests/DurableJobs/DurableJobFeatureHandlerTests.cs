@@ -254,6 +254,43 @@ public class DurableJobFeatureHandlerTests
     }
 
     [Fact]
+    public async Task ExecutionLifetime_StartDoesNotInvokeFactoryWhileHoldingLifetimeLock()
+    {
+        var lifetime = new DurableJobExecutionLifetime();
+        var factoryEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFactory = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var start = Task.Run(() =>
+        {
+            _ = lifetime.Start(_ =>
+            {
+                factoryEntered.SetResult();
+                releaseFactory.Task.GetAwaiter().GetResult();
+                return Task.FromResult(DurableJobRunResult.Completed);
+            });
+        }, TestContext.Current.CancellationToken);
+
+        await factoryEntered.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        var deactivation = Task.Run(lifetime.OnDeactivationRequested, TestContext.Current.CancellationToken);
+        Task? stop = null;
+        try
+        {
+            await deactivation.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            stop = lifetime.OnStop(TestContext.Current.CancellationToken);
+            await Task.Yield();
+            Assert.False(stop.IsCompleted);
+        }
+        finally
+        {
+            releaseFactory.TrySetResult();
+        }
+
+        await start.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        await Assert.IsAssignableFrom<Task>(stop).WaitAsync(
+            TimeSpan.FromSeconds(10),
+            TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
     public async Task ExecutionLifetime_OnStopDrainsNonCooperativeHandlerAndStopsAdmission()
     {
         var lifetime = new DurableJobExecutionLifetime();

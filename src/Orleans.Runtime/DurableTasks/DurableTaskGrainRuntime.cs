@@ -34,7 +34,9 @@ internal sealed partial class DurableTaskGrainRuntime(
     private readonly IDurableTaskTurnIsolation? _turnIsolation = turnIsolation;
 
     private readonly CancellationTokenSource _deactivationCts = new();
+    private readonly CancellationTokenSource _drainCommitCts = new();
     private readonly SemaphoreSlim _stopLock = new(1, 1);
+    private ITimer? _drainCommitTimer;
     private int _admissionStopped;
     private int _runtimeStateDisposed;
 
@@ -56,7 +58,15 @@ internal sealed partial class DurableTaskGrainRuntime(
 
     internal void OnDeactivationRequested()
     {
-        _ = Interlocked.Exchange(ref _admissionStopped, 1);
+        if (Interlocked.Exchange(ref _admissionStopped, 1) == 0)
+        {
+            _drainCommitTimer = _shared.TimeProvider.CreateTimer(
+                static state => ((CancellationTokenSource)state!).Cancel(),
+                _drainCommitCts,
+                _shared.DeactivationDrainTimeout,
+                Timeout.InfiniteTimeSpan);
+        }
+
         _ = _deactivationCts.CancelAsync();
     }
 
@@ -825,10 +835,10 @@ internal sealed partial class DurableTaskGrainRuntime(
                 || response is { IsCompleted: true, Status: not DurableTaskStatus.Canceled }
                 || _storage.TryGetTask(context.TaskId, out var taskState) && taskState.CancellationRequestedAt.HasValue)
             {
-                await SetResponseAsync(context.TaskId, response, _deactivationCts.Token);
+                await SetResponseAsync(context.TaskId, response, _drainCommitCts.Token);
             }
         }
-        catch (Exception exception) when (!_deactivationCts.IsCancellationRequested)
+        catch (Exception exception) when (!_drainCommitCts.IsCancellationRequested)
         {
             _shared.GrainContextAccessor.GrainContext.Deactivate(
                 new DeactivationReason(
@@ -846,7 +856,15 @@ internal sealed partial class DurableTaskGrainRuntime(
 
     internal async Task StopAsync(CancellationToken cancellationToken)
     {
-        _ = Interlocked.Exchange(ref _admissionStopped, 1);
+        if (Interlocked.Exchange(ref _admissionStopped, 1) == 0)
+        {
+            _drainCommitTimer = _shared.TimeProvider.CreateTimer(
+                static state => ((CancellationTokenSource)state!).Cancel(),
+                _drainCommitCts,
+                _shared.DeactivationDrainTimeout,
+                Timeout.InfiniteTimeSpan);
+        }
+
         await _stopLock.WaitAsync(CancellationToken.None);
         try
         {
@@ -909,6 +927,9 @@ internal sealed partial class DurableTaskGrainRuntime(
 
             await _deactivationCts.CancelAsync();
             _deactivationCts.Dispose();
+            _drainCommitTimer?.Dispose();
+            await _drainCommitCts.CancelAsync();
+            _drainCommitCts.Dispose();
             _runningRequests.Clear();
             _executionContexts.Clear();
             _taskHandles.Clear();

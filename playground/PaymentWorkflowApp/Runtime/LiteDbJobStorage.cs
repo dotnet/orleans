@@ -5,15 +5,30 @@ using Orleans.Serialization;
 
 namespace PaymentWorkflowApp.Runtime;
 
-public sealed class LiteDbJobStorage(Serializer<JobTaskState> serializer, DeepCopier<JobTaskState> copier) : IJobStorage, IDisposable
+public sealed class LiteDbJobStorage : IJobStorage, IDisposable
 {
-    private readonly Serializer<JobTaskState> _serializer = serializer;
-    private readonly DeepCopier<JobTaskState> _copier = copier;
+    private readonly Serializer<JobTaskState> _serializer;
+    private readonly DeepCopier<JobTaskState> _copier;
     private readonly object _lock = new();
 
-    private readonly LiteDatabase _db = new(@"jobs.db");
+    private readonly LiteDatabase _db;
     private readonly HashSet<TaskId> _removed = [];
     private Dictionary<TaskId, JobTaskState> _workingCopy = [];
+
+    public LiteDbJobStorage(Serializer<JobTaskState> serializer, DeepCopier<JobTaskState> copier)
+        : this(serializer, copier, @"jobs.db")
+    {
+    }
+
+    public LiteDbJobStorage(
+        Serializer<JobTaskState> serializer,
+        DeepCopier<JobTaskState> copier,
+        string databasePath)
+    {
+        _serializer = serializer;
+        _copier = copier;
+        _db = new(databasePath);
+    }
 
     public IEnumerable<(TaskId Id, JobTaskState State)> Tasks
     {
@@ -31,17 +46,20 @@ public sealed class LiteDbJobStorage(Serializer<JobTaskState> serializer, DeepCo
         lock (_lock)
         {
             _workingCopy[taskId] = CopyState(state);
+            _removed.Remove(taskId);
         }
     }
     public bool RemoveTask(TaskId taskId)
     {
         lock (_lock)
         {
-            if (_workingCopy.Remove(taskId))
+            var removed = _workingCopy.Remove(taskId);
+            if (removed)
             {
-                return _removed.Add(taskId);
+                _removed.Add(taskId);
             }
-            return false;
+
+            return removed;
         }
     }
 
@@ -67,6 +85,7 @@ public sealed class LiteDbJobStorage(Serializer<JobTaskState> serializer, DeepCo
             var collection = _db.GetCollection<JobEntity>("jobs");
 
             _workingCopy = [];
+            _removed.Clear();
             foreach (var entry in collection.FindAll())
             {
                 var taskId = TaskId.Parse(entry.Id ?? throw new InvalidDataException("The stored job id is missing."));

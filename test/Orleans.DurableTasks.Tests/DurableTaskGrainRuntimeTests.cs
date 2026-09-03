@@ -2105,6 +2105,41 @@ public class DurableTaskGrainRuntimeTests
     }
 
     [Fact]
+    public async Task StopAsync_SuccessfulExecutionFinishingDuringDrainPersistsCompletion()
+    {
+        var storage = new RpcTestDurableTaskGrainStorage();
+        var grainContext = new TestGrainContext(GrainId.Create("test-grain", "successful-drain"));
+        var runtime = RpcTestRuntimeFactory.Create(storage, grainContext);
+        var taskId = TaskId.Create("successful-drain");
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var request = new RuntimeTestDurableTaskRequest(() => CompleteAfterReleaseAsync())
+        {
+            Context = new DurableTaskRequestContext { TargetId = grainContext.GrainId },
+        };
+        await ((IDurableTaskServer)runtime).ScheduleAsync(taskId, request, CancellationToken.None);
+        await started.Task.WaitAsync(BoundedWait());
+        storage.BlockNextWrite = true;
+
+        runtime.OnDeactivationRequested();
+        var stop = runtime.StopAsync(BoundedWait());
+        release.SetResult();
+        await storage.WriteStarted.Task.WaitAsync(BoundedWait());
+        storage.AllowWrite.SetResult();
+        await stop.WaitAsync(BoundedWait());
+
+        Assert.True(storage.TryGetTask(taskId, out var state));
+        Assert.Equal(42, state.Result?.GetResult<int>());
+
+        async DurableTask<int> CompleteAfterReleaseAsync()
+        {
+            started.SetResult();
+            await release.Task;
+            return 42;
+        }
+    }
+
+    [Fact]
     public async Task StopAsync_StopsAdmissionHandsOffPendingRequestAndPreventsOldActivationFromOutlivingStop()
     {
         var fixture = CreateFixture();

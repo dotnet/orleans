@@ -250,7 +250,7 @@ internal sealed class DurableJobExecutionLifetime : ILifecycleObserver, IActivat
     public Task<TResult> Start<TResult>(Func<CancellationToken, Task<TResult>> factory)
     {
         ArgumentNullException.ThrowIfNull(factory);
-        Task<TResult> task;
+        var reservation = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         lock (_sync)
         {
             if (_admissionStopped)
@@ -258,24 +258,36 @@ internal sealed class DurableJobExecutionLifetime : ILifecycleObserver, IActivat
                 throw new OperationCanceledException("The durable job activation is stopping.");
             }
 
+            _executions.Add(reservation.Task);
+        }
+
+        Task<TResult> task;
+        try
+        {
             task = factory(_shutdown.Token);
-            _executions.Add(task);
+        }
+        catch
+        {
+            CompleteReservation();
+            throw;
         }
 
         _ = task.ContinueWith(
-            static (completed, state) =>
-            {
-                var owner = (DurableJobExecutionLifetime)state!;
-                lock (owner._sync)
-                {
-                    owner._executions.Remove(completed);
-                }
-            },
-            this,
+            static (_, state) => ((Action)state!)(),
+            (Action)CompleteReservation,
             CancellationToken.None,
             TaskContinuationOptions.ExecuteSynchronously,
             TaskScheduler.Default);
         return task;
+
+        void CompleteReservation()
+        {
+            reservation.TrySetResult();
+            lock (_sync)
+            {
+                _executions.Remove(reservation.Task);
+            }
+        }
     }
 
     public Task OnStart(CancellationToken cancellationToken = default)

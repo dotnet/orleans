@@ -31,6 +31,23 @@ public class ActivationDataMigrationTests(ActivationDataMigrationTests.Fixture f
     }
 
     [Fact]
+    public async Task Deactivate_InvokesParticipantOutsideActivationMonitor()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var activation = await GetActivation(cancellationToken);
+        var participant = new MonitorCheckingParticipant(activation);
+        activation.SetComponent<IActivationDeactivationParticipant>(participant);
+
+        activation.Deactivate(
+            new DeactivationReason(DeactivationReasonCode.RuntimeRequested, "test"),
+            cancellationToken);
+
+        Assert.True(participant.WasCalled);
+        Assert.False(participant.WasActivationMonitorEntered);
+        await activation.Deactivated.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+    }
+
+    [Fact]
     public async Task TryStartMigration_ReturnsFalse_WhenActivationIsInvalid()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -120,5 +137,19 @@ public class ActivationDataMigrationTests(ActivationDataMigrationTests.Fixture f
         {
             builder.Options.InitialSilosCount = 1;
         }
+    }
+
+    private sealed class MonitorCheckingParticipant(ActivationData activation) : IActivationDeactivationParticipant
+    {
+        public bool WasCalled { get; private set; }
+        public bool WasActivationMonitorEntered { get; private set; }
+
+        public void OnDeactivationRequested()
+        {
+            WasCalled = true;
+            WasActivationMonitorEntered = Monitor.IsEntered(activation);
+        }
+
+        public Task OnDeactivatingAsync(CancellationToken cancellationToken) => Task.CompletedTask;
     }
 }
