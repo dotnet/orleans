@@ -77,6 +77,10 @@ namespace Orleans.Runtime
             return _initialized.Task;
         }
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage(
+            "Performance",
+            "CA1849:Call async methods when in an async method",
+            Justification = "Shutdown must signal cancellation immediately without awaiting callback completion before observing the host stop token.")]
         public async Task StopAsync(CancellationToken cancellationToken)
         {
             try
@@ -220,6 +224,10 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc />
+        [System.Diagnostics.CodeAnalysis.SuppressMessage(
+            "Performance",
+            "CA1849:Call async methods when in an async method",
+            Justification = "Shutdown must signal cancellation immediately without awaiting callback completion before waiting for the run task.")]
         public async ValueTask DisposeAsync()
         {
             if (_shutdownCts.IsCancellationRequested)

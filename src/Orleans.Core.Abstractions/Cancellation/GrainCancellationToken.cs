@@ -86,11 +86,14 @@ namespace Orleans
         /// <returns>
         /// A <see cref="Task"/> representing the operation.
         /// </returns>
+        [System.Diagnostics.CodeAnalysis.SuppressMessage(
+            "Performance",
+            "CA1849:Call async methods when in an async method",
+            Justification = "Cancellation callbacks must execute synchronously on the current Orleans scheduler context before remote propagation.")]
         internal Task Cancel()
         {
             if (_cancellationTokenRuntime == null)
             {
-                // Wrap in task
                 try
                 {
                     _cancellationTokenSource.Cancel();
@@ -98,9 +101,7 @@ namespace Orleans
                 }
                 catch (Exception exception)
                 {
-                    var completion = new TaskCompletionSource<object>();
-                    completion.TrySetException(exception);
-                    return completion.Task;
+                    return Task.FromException(exception);
                 }
             }
 

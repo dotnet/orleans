@@ -99,7 +99,7 @@ namespace Orleans.Internal
             // We got done before the timeout, or were able to complete before this code ran, return the result
             if (taskToComplete == completedTask)
             {
-                timeoutCancellationTokenSource.Cancel();
+                await timeoutCancellationTokenSource.CancelAsync();
                 // Await this so as to propagate the exception correctly
                 await taskToComplete;
                 return;
@@ -133,7 +133,7 @@ namespace Orleans.Internal
             // We got done before the timeout, or were able to complete before this code ran, return the result
             if (taskToComplete == completedTask)
             {
-                timeoutCancellationTokenSource.Cancel();
+                await timeoutCancellationTokenSource.CancelAsync();
                 // Await this so as to propagate the exception correctly
                 return await taskToComplete;
             }
