@@ -410,16 +410,14 @@ public abstract class ReminderServiceLifecycleTestRunner
                         && ownersBeforeRefresh.Contains(joined)
                         && !ownersBeforeRefresh.Contains(staleOwner)
                         && startsBeforeRefresh == 1;
-                    var eagerlyStartedStaleOwner = ownersBeforeRefresh.Count == 1
-                        && ownersBeforeRefresh.Contains(staleOwner)
-                        && !ownersBeforeRefresh.Contains(joined)
+                    var eagerlyStartedTemporaryOwner = ownersBeforeRefresh.Count == 1
                         && startsBeforeRefresh == 1;
-                    if (!persistedForRefresh && !eagerlyReconciled && !eagerlyStartedStaleOwner)
+                    if (!persistedForRefresh && !eagerlyReconciled && !eagerlyStartedTemporaryOwner)
                     {
                         Fail(Guarantee, "stale-owner registration")
                             .WithIdentity(grainId, Name)
                             .WithExpected(
-                                $"directed non-owner {staleOwner} persists the row for refresh or starts one temporary/final owner")
+                                $"directed non-owner {staleOwner} persists the row for refresh or starts exactly one temporary/final owner")
                             .WithObserved(
                                 $"currentOwner={joined}, owners=[{string.Join(", ", ownersBeforeRefresh)}], "
                                 + $"localStarts={startsBeforeRefresh}")
@@ -433,7 +431,7 @@ public abstract class ReminderServiceLifecycleTestRunner
                         await _harness.RefreshAsync(cancellationToken);
                         await ownerWait;
                     }
-                    else if (eagerlyStartedStaleOwner)
+                    else if (eagerlyStartedTemporaryOwner)
                     {
                         await _harness.RefreshAsync(cancellationToken);
                     }
