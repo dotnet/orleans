@@ -473,20 +473,34 @@ namespace Orleans.Reminders.DynamoDB
         /// <inheritdoc/>
         public async Task StopAsync(CancellationToken cancellationToken = default)
         {
-            if (heartbeatCancellation is null)
+            var cancellation = heartbeatCancellation;
+            if (cancellation is null)
             {
                 return;
             }
 
-            await heartbeatCancellation.CancelAsync();
-            if (heartbeatTask is not null)
+            var task = heartbeatTask;
+            try
             {
-                await heartbeatTask.WaitAsync(cancellationToken);
+                await cancellation.CancelAsync();
+                if (task is not null)
+                {
+                    await task.WaitAsync(cancellationToken);
+                }
             }
+            finally
+            {
+                cancellation.Dispose();
+                if (ReferenceEquals(heartbeatCancellation, cancellation))
+                {
+                    heartbeatCancellation = null;
+                }
 
-            heartbeatCancellation.Dispose();
-            heartbeatCancellation = null;
-            heartbeatTask = null;
+                if (ReferenceEquals(heartbeatTask, task))
+                {
+                    heartbeatTask = null;
+                }
+            }
         }
 
         [LoggerMessage(
