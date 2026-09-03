@@ -856,7 +856,7 @@ public sealed class ArcBufferPage
     /// <summary>
     /// Gets the next node.
     /// </summary>
-    public ArcBufferPage? Next { get; protected set; }
+    public ArcBufferPage? Next { get; private set; }
 
     /// <summary>
     /// Gets the current page version.
