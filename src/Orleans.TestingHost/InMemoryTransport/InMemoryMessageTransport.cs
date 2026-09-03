@@ -178,7 +178,11 @@ internal class InMemoryMessageTransport : MessageTransportBase
 
         static void OnClosed(object? state)
         {
-            if (state is not TaskCompletionSource completion) throw new ArgumentException(nameof(state));
+            if (state is not TaskCompletionSource completion)
+            {
+                throw new ArgumentException("Expected a task completion source.", nameof(state));
+            }
+
             completion.TrySetResult();
         }
     }

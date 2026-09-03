@@ -147,8 +147,9 @@ internal sealed class TcpMessageTransportListener : MessageTransportListener
         return null;
     }
 
-    private void UnbindCore()
+    private async ValueTask UnbindCoreAsync()
     {
+        Socket? listenSocket;
         lock (_lifecycleLock)
         {
             if (_disposed)
@@ -156,19 +157,18 @@ internal sealed class TcpMessageTransportListener : MessageTransportListener
                 return;
             }
 
-            _closingCts.Cancel();
-            _listenSocket?.Dispose();
+            listenSocket = _listenSocket;
         }
+
+        await _closingCts.CancelAsync().ConfigureAwait(false);
+        listenSocket?.Dispose();
     }
 
-    public override ValueTask UnbindAsync(CancellationToken cancellationToken)
-    {
-        UnbindCore();
-        return default;
-    }
+    public override ValueTask UnbindAsync(CancellationToken cancellationToken) => UnbindCoreAsync();
 
     public override async ValueTask DisposeAsync()
     {
+        Socket? listenSocket;
         lock (_lifecycleLock)
         {
             if (_disposed)
@@ -177,11 +177,12 @@ internal sealed class TcpMessageTransportListener : MessageTransportListener
             }
 
             _disposed = true;
-            _closingCts.Cancel();
-            _listenSocket?.Dispose();
-            _closingCts.Dispose();
+            listenSocket = _listenSocket;
         }
 
+        await _closingCts.CancelAsync().ConfigureAwait(false);
+        listenSocket?.Dispose();
+        _closingCts.Dispose();
         await base.DisposeAsync();
         GC.SuppressFinalize(this);
     }

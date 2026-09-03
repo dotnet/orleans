@@ -10,7 +10,7 @@ namespace Orleans.Connections.Transport.Security;
 /// <summary>
 /// Message transport listener which configures transports for TLS.
 /// </summary>
-internal sealed class TlsMessageTransportListener(
+internal sealed partial class TlsMessageTransportListener(
     MessageTransportListener innerListener,
     IOptionsMonitor<TlsOptions> tlsOptions,
     ILoggerFactory loggerFactory) : MessageTransportListener
@@ -53,7 +53,7 @@ internal sealed class TlsMessageTransportListener(
                 }
                 catch (Exception disposeException)
                 {
-                    _logger.LogWarning(disposeException, "Exception disposing inner transport after TLS transport creation failed.");
+                    LogInnerTransportDisposalFailure(_logger, disposeException);
                 }
 
                 if (cancellationToken.IsCancellationRequested || !_innerListener.IsValid)
@@ -61,7 +61,7 @@ internal sealed class TlsMessageTransportListener(
                     return null;
                 }
 
-                _logger.LogWarning(exception, "Rejected a connection because TLS transport creation failed.");
+                LogTlsTransportCreationFailure(_logger, exception);
             }
         }
     }
@@ -81,4 +81,10 @@ internal sealed class TlsMessageTransportListener(
         await _innerListener.DisposeAsync();
         await base.DisposeAsync();
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Exception disposing inner transport after TLS transport creation failed.")]
+    private static partial void LogInnerTransportDisposalFailure(ILogger logger, Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Rejected a connection because TLS transport creation failed.")]
+    private static partial void LogTlsTransportCreationFailure(ILogger logger, Exception exception);
 }

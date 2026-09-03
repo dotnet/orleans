@@ -1197,11 +1197,13 @@ public struct ArcBuffer(ArcBufferPage first, int token, int offset, int length) 
 #if NET6_0_OR_GREATER
         ArgumentOutOfRangeException.ThrowIfLessThan(length, 0);
         ArgumentOutOfRangeException.ThrowIfLessThan(offset, 0);
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(length + offset, Length);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(offset, Length);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(length, Length - offset);
 #else
         if (length < 0) throw new ArgumentOutOfRangeException(nameof(length), "Length must be greater than or equal to 0.");
         if (offset < 0) throw new ArgumentOutOfRangeException(nameof(offset), "Offset must be greater than or equal to 0.");
-        if (length + offset > Length) throw new ArgumentOutOfRangeException($"{nameof(length)} + {nameof(offset)}", "Length plus offset must be less than or equal to the length of the buffer.");
+        if (offset > Length) throw new ArgumentOutOfRangeException(nameof(offset), "Offset must be less than or equal to the length of the buffer.");
+        if (length > Length - offset) throw new ArgumentOutOfRangeException(nameof(length), "Length plus offset must be less than or equal to the length of the buffer.");
 #endif
 
         CheckValidity();

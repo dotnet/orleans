@@ -21,7 +21,7 @@ using Orleans.Runtime.Utilities;
 
 namespace Orleans.Connections.Transport.Sockets;
 
-internal sealed class SocketMessageTransport : MessageTransportBase
+internal sealed partial class SocketMessageTransport : MessageTransportBase
 {
     private static readonly bool IsWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
     private static readonly bool IsMacOS = RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
@@ -95,7 +95,7 @@ internal sealed class SocketMessageTransport : MessageTransportBase
             }
             catch (Exception ex)
             {
-                _logger.LogError(0, ex, $"Unexpected exception in {nameof(SocketMessageTransport)}.{nameof(ProcessReads)}.");
+                LogProcessReadsFailure(_logger, ex);
             }
 
             try
@@ -104,7 +104,7 @@ internal sealed class SocketMessageTransport : MessageTransportBase
             }
             catch (Exception ex)
             {
-                _logger.LogError(0, ex, $"Unexpected exception in {nameof(SocketMessageTransport)}.{nameof(ProcessWrites)}.");
+                LogProcessWritesFailure(_logger, ex);
             }
 
             _socketReceiver.Dispose();
@@ -113,14 +113,14 @@ internal sealed class SocketMessageTransport : MessageTransportBase
         catch (Exception ex)
         {
             _shutdownReason ??= ex;
-            _logger.LogError(0, ex, $"Unexpected exception in {nameof(SocketMessageTransport)}.{nameof(ProcessConnectionAsync)}.");
+            LogProcessConnectionFailure(_logger, ex);
         }
         finally
         {
             Shutdown();
 
-            _connectionClosingCts.Cancel();
-            _connectionClosedCts.Cancel();
+            await _connectionClosingCts.CancelAsync().ConfigureAwait(false);
+            await _connectionClosedCts.CancelAsync().ConfigureAwait(false);
         }
     }
 
@@ -268,7 +268,7 @@ internal sealed class SocketMessageTransport : MessageTransportBase
         }
 
         // Signal loops to stop
-        _connectionClosingCts.Cancel();
+        await _connectionClosingCts.CancelAsync().ConfigureAwait(false);
         _readSignal.Signal();
         _writeSignal.Signal();
 
@@ -276,7 +276,7 @@ internal sealed class SocketMessageTransport : MessageTransportBase
         if (_processingTask is null)
         {
             Shutdown();
-            _connectionClosedCts.Cancel();
+            await _connectionClosedCts.CancelAsync().ConfigureAwait(false);
             return;
         }
 
@@ -301,7 +301,7 @@ internal sealed class SocketMessageTransport : MessageTransportBase
         Shutdown();
 
         // Signal that we're closing if not already done
-        _connectionClosingCts.Cancel();
+        await _connectionClosingCts.CancelAsync().ConfigureAwait(false);
         _readSignal.Signal();
         _writeSignal.Signal();
 
@@ -313,7 +313,7 @@ internal sealed class SocketMessageTransport : MessageTransportBase
         {
             _socketReceiver.Dispose();
             _socketSender.Dispose();
-            _connectionClosedCts.Cancel();
+            await _connectionClosedCts.CancelAsync().ConfigureAwait(false);
         }
 
         await base.DisposeAsync().ConfigureAwait(false);
@@ -402,7 +402,7 @@ exit:
         finally
         {
             _shutdownReason ??= error;
-            _connectionClosingCts.Cancel();
+            await _connectionClosingCts.CancelAsync().ConfigureAwait(false);
 
             if (isGracefulTermination)
             {
@@ -714,7 +714,7 @@ RefreshRequestQueue:
         finally
         {
             _shutdownReason ??= error;
-            _connectionClosingCts.Cancel();
+            await _connectionClosingCts.CancelAsync().ConfigureAwait(false);
             _readSignal.Signal();
 
             var requestError = _shutdownReason ?? new ConnectionClosedException();
@@ -852,4 +852,13 @@ RefreshRequestQueue:
     }
 
     public override string ToString() => $"Socket(Remote: {_remoteEndpointString}, Local: {_localEndpointString})";
+
+    [LoggerMessage(0, LogLevel.Error, $"Unexpected exception in {nameof(SocketMessageTransport)}.{nameof(ProcessReads)}.")]
+    private static partial void LogProcessReadsFailure(ILogger logger, Exception exception);
+
+    [LoggerMessage(0, LogLevel.Error, $"Unexpected exception in {nameof(SocketMessageTransport)}.{nameof(ProcessWrites)}.")]
+    private static partial void LogProcessWritesFailure(ILogger logger, Exception exception);
+
+    [LoggerMessage(0, LogLevel.Error, $"Unexpected exception in {nameof(SocketMessageTransport)}.{nameof(ProcessConnectionAsync)}.")]
+    private static partial void LogProcessConnectionFailure(ILogger logger, Exception exception);
 }

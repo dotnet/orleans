@@ -14,7 +14,7 @@ using System.Threading.Tasks;
 
 namespace Orleans.Connections.Transport.Streams;
 
-internal abstract class StreamMessageTransport : MessageTransportBase
+internal abstract partial class StreamMessageTransport : MessageTransportBase
 {
     private readonly ILogger _logger;
     private readonly SingleWaiterAutoResetEvent _writerSignal = new();
@@ -58,7 +58,7 @@ internal abstract class StreamMessageTransport : MessageTransportBase
         }
 
         // Signal loops to stop
-        _connectionClosingCts.Cancel();
+        await _connectionClosingCts.CancelAsync().ConfigureAwait(false);
         _readerSignal.Signal();
         _writerSignal.Signal();
 
@@ -66,7 +66,7 @@ internal abstract class StreamMessageTransport : MessageTransportBase
         if (_runTask is null)
         {
             DisposeStream();
-            _connectionClosedCts.Cancel();
+            await _connectionClosedCts.CancelAsync().ConfigureAwait(false);
             return;
         }
 
@@ -116,7 +116,7 @@ internal abstract class StreamMessageTransport : MessageTransportBase
         DisposeStream();
 
         // Signal that we're closing if not already done
-        _connectionClosingCts.Cancel();
+        await _connectionClosingCts.CancelAsync().ConfigureAwait(false);
         _readerSignal.Signal();
         _writerSignal.Signal();
 
@@ -126,7 +126,7 @@ internal abstract class StreamMessageTransport : MessageTransportBase
         }
         else
         {
-            _connectionClosedCts.Cancel();
+            await _connectionClosedCts.CancelAsync().ConfigureAwait(false);
         }
 
         await base.DisposeAsync().ConfigureAwait(false);
@@ -190,10 +190,10 @@ internal abstract class StreamMessageTransport : MessageTransportBase
         }
         finally
         {
-            _connectionClosingCts.Cancel();
+            await _connectionClosingCts.CancelAsync().ConfigureAwait(false);
             _readerSignal.Signal();
             _writerSignal.Signal();
-            _connectionClosedCts.Cancel();
+            await _connectionClosedCts.CancelAsync().ConfigureAwait(false);
         }
 
         void FailPendingRequests(Exception exception)
@@ -233,7 +233,7 @@ internal abstract class StreamMessageTransport : MessageTransportBase
         }
         finally
         {
-            _connectionClosedCts.Cancel();
+            await _connectionClosedCts.CancelAsync().ConfigureAwait(false);
         }
     }
 
@@ -292,7 +292,7 @@ gracefulTermination:
         finally
         {
             _shutdownReason ??= error;
-            _connectionClosingCts.Cancel();
+            await _connectionClosingCts.CancelAsync().ConfigureAwait(false);
 
             lock (_readsLock)
             {
@@ -327,7 +327,7 @@ gracefulTermination:
             // Only log unexpected errors (not when we intentionally disposed the stream)
             if (error is not null && !_streamDisposed)
             {
-                _logger.LogError(0, error, $"Unexpected exception in {nameof(StreamMessageTransport)}.{nameof(ProcessReads)}.");
+                LogProcessReadsFailure(_logger, error);
             }
         }
 
@@ -375,7 +375,7 @@ gracefulTermination:
         finally
         {
             _shutdownReason ??= error;
-            _connectionClosingCts.Cancel();
+            await _connectionClosingCts.CancelAsync().ConfigureAwait(false);
             _readerSignal.Signal();
             var requestError = _shutdownReason ?? new ConnectionClosedException();
             operation?.SetException(requestError);
@@ -383,7 +383,7 @@ gracefulTermination:
             // Only log unexpected errors (not when we intentionally disposed the stream)
             if (error is not null && !_streamDisposed)
             {
-                _logger.LogError(0, error, $"Unexpected exception in {nameof(StreamMessageTransport)}.{nameof(ProcessWrites)}.");
+                LogProcessWritesFailure(_logger, error);
             }
 
             lock (_writesLock)
@@ -394,6 +394,7 @@ gracefulTermination:
                     operation.SetException(requestError);
                 }
             }
+
         }
 
         bool TryDequeue([NotNullWhen(true)] out WriteRequest? operation)
@@ -404,4 +405,10 @@ gracefulTermination:
             }
         }
     }
+
+    [LoggerMessage(0, LogLevel.Error, $"Unexpected exception in {nameof(StreamMessageTransport)}.{nameof(ProcessReads)}.")]
+    private static partial void LogProcessReadsFailure(ILogger logger, Exception exception);
+
+    [LoggerMessage(0, LogLevel.Error, $"Unexpected exception in {nameof(StreamMessageTransport)}.{nameof(ProcessWrites)}.")]
+    private static partial void LogProcessWritesFailure(ILogger logger, Exception exception);
 }
