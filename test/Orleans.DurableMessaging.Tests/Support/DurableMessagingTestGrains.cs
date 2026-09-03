@@ -199,14 +199,25 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
         return Task.CompletedTask;
     }
 
-    public Task<DuplicateRouteRegistrationResult> RegisterDuplicateExactRouteHandlersAsync(string route)
+    public async Task<DuplicateRouteRegistrationResult> RegisterDuplicateExactRouteHandlersAsync(string route)
     {
         var first = new CountingHandler(() => _firstExactRouteHandlerCalls++);
         var replacement = new CountingHandler(() => _replacementExactRouteHandlerCalls++);
         _inbox.RegisterHandler(route, first);
         var exception = GetDuplicateRegistrationException(route, replacement);
-        var retained = _inbox.TryGetHandler(route, out var cached) && ReferenceEquals(first, cached);
-        return Task.FromResult(new DuplicateRouteRegistrationResult(exception.Message, retained));
+        var retained = false;
+        var exactContext = new RouteLookupContext(this.GetGrainId(), route);
+        if (_inbox.TryGetHandler(route, out var cached)
+            && cached.CanHandle(exactContext)
+            && !cached.CanHandle(new RouteLookupContext(this.GetGrainId(), $"{route}/child")))
+        {
+            await cached.HandleAsync(exactContext, CancellationToken.None);
+            retained = _firstExactRouteHandlerCalls == 1 && _replacementExactRouteHandlerCalls == 0;
+            _firstExactRouteHandlerCalls = 0;
+            _replacementExactRouteHandlerCalls = 0;
+        }
+
+        return new DuplicateRouteRegistrationResult(exception.Message, retained);
     }
 
     public Task<RouteLookupValidationResult> ValidateRouteLookupAsync(string? route)
@@ -471,6 +482,27 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
             onCall();
             return default;
         }
+    }
+
+    private sealed class RouteLookupContext(GrainId grainId, string routeKey) : IInboxHandlerContext
+    {
+        public DurableEnvelope Envelope { get; } = new()
+        {
+            MessageId = Guid.NewGuid(),
+            SenderId = grainId,
+            ReceiverId = grainId,
+            RouteKey = routeKey,
+            Data = null!,
+            CreatedAt = DateTimeOffset.UnixEpoch
+        };
+
+        public GrainId GrainId { get; } = grainId;
+
+        public IDurableOutbox Outbox => throw new NotSupportedException();
+
+        public DurableEnvelopeBuilder CreateEnvelope() => throw new NotSupportedException();
+
+        public void Send(DurableEnvelope envelope) => throw new NotSupportedException();
     }
 
     private InvalidOperationException GetDuplicateRegistrationException(string route, IInboxHandler replacement)
