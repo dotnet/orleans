@@ -2,10 +2,14 @@
 
 namespace Orleans.Transactions.TestKit
 {
+    /// <summary>
+    /// Coordinates read-then-write transaction patterns used to verify exclusive locking behavior.
+    /// </summary>
     [StatelessWorker]
     [Reentrant]
     public class ExclusiveLockCoordinatorGrain : Grain, IExclusiveLockCoordinatorGrain
     {
+        /// <inheritdoc/>
         public async Task ReadThenWrite(ITransactionTestGrain grain, int value)
         {
             await grain.Get();
@@ -13,6 +17,7 @@ namespace Orleans.Transactions.TestKit
             await grain.Add(value);
         }
 
+        /// <inheritdoc/>
         public async Task ReadThenWriteWithExclusiveLock(IExclusiveLockTransactionTestGrain grain, int value)
         {
             await grain.Get();

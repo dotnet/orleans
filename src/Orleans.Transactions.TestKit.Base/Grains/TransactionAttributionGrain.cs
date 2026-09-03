@@ -5,56 +5,84 @@ using System.Threading.Tasks;
 
 namespace Orleans.Transactions.TestKit
 {
+    /// <summary>
+    /// Records transaction attribution for a grain call with no explicit transaction option.
+    /// </summary>
     public class NoAttributionGrain : Grain, INoAttributionGrain
     {
+        /// <inheritdoc/>
         public Task<List<string?>?[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers)
         {
             return AttributionGrain.GetNestedTransactionIds(tier, tiers);
         }
     }
 
+    /// <summary>
+    /// Records transaction attribution for a grain call which suppresses the ambient transaction.
+    /// </summary>
     public class SuppressAttributionGrain : Grain, ISuppressAttributionGrain
     {
+        /// <inheritdoc/>
         public Task<List<string?>?[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers)
         {
             return AttributionGrain.GetNestedTransactionIds(tier, tiers);
         }
     }
 
+    /// <summary>
+    /// Records transaction attribution for a grain call which joins or creates a transaction.
+    /// </summary>
     public class CreateOrJoinAttributionGrain : Grain, ICreateOrJoinAttributionGrain
     {
+        /// <inheritdoc/>
         public Task<List<string?>?[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers)
         {
             return AttributionGrain.GetNestedTransactionIds(tier, tiers);
         }
     }
 
+    /// <summary>
+    /// Records transaction attribution for a grain call which creates a new transaction.
+    /// </summary>
     public class CreateAttributionGrain : Grain, ICreateAttributionGrain
     {
+        /// <inheritdoc/>
         public Task<List<string?>?[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers)
         {
             return AttributionGrain.GetNestedTransactionIds(tier, tiers);
         }
     }
 
+    /// <summary>
+    /// Records transaction attribution for a grain call which requires and joins an ambient transaction.
+    /// </summary>
     public class JoinAttributionGrain : Grain, IJoinAttributionGrain
     {
+        /// <inheritdoc/>
         public Task<List<string?>?[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers)
         {
             return AttributionGrain.GetNestedTransactionIds(tier, tiers);
         }
     }
 
+    /// <summary>
+    /// Records transaction attribution for a grain call which supports an ambient transaction.
+    /// </summary>
     public class SupportedAttributionGrain : Grain, ISupportedAttributionGrain
     {
+        /// <inheritdoc/>
         public Task<List<string?>?[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers)
         {
             return AttributionGrain.GetNestedTransactionIds(tier, tiers);
         }
     }
 
+    /// <summary>
+    /// Records transaction attribution for a grain call which rejects an ambient transaction.
+    /// </summary>
     public class NotAllowedAttributionGrain : Grain, INotAllowedAttributionGrain
     {
+        /// <inheritdoc/>
         public Task<List<string?>?[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers)
         {
             return AttributionGrain.GetNestedTransactionIds(tier, tiers);

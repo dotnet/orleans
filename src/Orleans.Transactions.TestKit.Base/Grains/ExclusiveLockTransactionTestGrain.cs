@@ -4,13 +4,25 @@ using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions.TestKit
 {
+    /// <summary>
+    /// Implements transactional integer-state operations with exclusive locking on reads.
+    /// </summary>
     [Reentrant]
     public partial class ExclusiveLockTransactionTestGrain : Grain, IExclusiveLockTransactionTestGrain
     {
         private readonly ITransactionalState<GrainData> data;
         private readonly ILoggerFactory loggerFactory;
+
+        /// <summary>
+        /// The logger for this grain activation.
+        /// </summary>
         protected ILogger logger = null!;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ExclusiveLockTransactionTestGrain"/> class.
+        /// </summary>
+        /// <param name="data">The transactional state.</param>
+        /// <param name="loggerFactory">The logger factory.</param>
         public ExclusiveLockTransactionTestGrain(
             [TransactionalState("data", TransactionTestConstants.TransactionStore)]
             ITransactionalState<GrainData> data,
@@ -20,12 +32,14 @@ namespace Orleans.Transactions.TestKit
             this.loggerFactory = loggerFactory;
         }
 
+        /// <inheritdoc/>
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             this.logger = this.loggerFactory.CreateLogger(this.GetGrainId().ToString());
             return base.OnActivateAsync(cancellationToken);
         }
 
+        /// <inheritdoc/>
         public async Task Set(int newValue)
         {
             await data.PerformUpdate(state =>
@@ -36,6 +50,7 @@ namespace Orleans.Transactions.TestKit
             });
         }
 
+        /// <inheritdoc/>
         public async Task<int[]> Add(int numberToAdd)
         {
             var result = await data.PerformUpdate(state =>
@@ -48,6 +63,7 @@ namespace Orleans.Transactions.TestKit
             return new int[] { result };
         }
 
+        /// <inheritdoc/>
         public async Task<int[]> Get()
         {
             var result = await data.PerformRead(state =>
