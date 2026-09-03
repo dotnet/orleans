@@ -20,9 +20,11 @@ namespace Orleans.Serialization
     [RegisterSerializer]
     public sealed class FSharpUnitCodec : IFieldCodec<Unit>
     {
+        /// <inheritdoc/>
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [AllowNull] Type expectedType, [AllowNull] Unit value) where TBufferWriter : IBufferWriter<byte> =>
             ReferenceCodec.WriteNullReference(ref writer, fieldIdDelta);
 
+        /// <inheritdoc/>
         [return: MaybeNull]
         public Unit ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
@@ -151,7 +153,7 @@ namespace Orleans.Serialization
     /// <summary>
     /// Serializer for <see cref="FSharpValueOption{T}"/>.
     /// </summary>
-    /// <typeparam name="T"></typeparam>
+    /// <typeparam name="T">The underlying value type.</typeparam>
     [RegisterSerializer]
     public class FSharpValueOptionCodec<T> : IFieldCodec<FSharpValueOption<T>>
     {
@@ -246,6 +248,8 @@ namespace Orleans.Serialization
     /// <summary>
     /// Serializer for <see cref="FSharpChoice{T1, T2}"/>.
     /// </summary>
+    /// <typeparam name="T1">The first choice type.</typeparam>
+    /// <typeparam name="T2">The second choice type.</typeparam>
     [RegisterSerializer]
     public class FSharpChoiceCodec<T1, T2> : IFieldCodec<FSharpChoice<T1, T2>>, IDerivedTypeCodec
     {
@@ -285,6 +289,7 @@ namespace Orleans.Serialization
             writer.WriteEndObject();
         }
 
+        /// <inheritdoc/>
         [return: MaybeNull]
         FSharpChoice<T1, T2> IFieldCodec<FSharpChoice<T1, T2>>.ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
@@ -321,19 +326,29 @@ namespace Orleans.Serialization
             return result;
         }
     }
-    
+    /// <summary>
+    /// Copier for <see cref="FSharpChoice{T1, T2}"/>.
+    /// </summary>
+    /// <typeparam name="T1">The first choice type.</typeparam>
+    /// <typeparam name="T2">The second choice type.</typeparam>
     [RegisterCopier]
     public class FSharpChoiceCopier<T1, T2> : IDeepCopier<FSharpChoice<T1, T2>>, IDerivedTypeCopier
     {
         private readonly IDeepCopier<T1> _copier1;
         private readonly IDeepCopier<T2> _copier2;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="FSharpChoiceCopier{T1, T2}"/> class.
+        /// </summary>
+        /// <param name="copier1">The copier for <typeparamref name="T1"/>.</param>
+        /// <param name="copier2">The copier for <typeparamref name="T2"/>.</param>
         public FSharpChoiceCopier(IDeepCopier<T1> copier1, IDeepCopier<T2> copier2)
         {
             _copier1 = copier1;
             _copier2 = copier2;
         }
 
+        /// <inheritdoc/>
         public FSharpChoice<T1, T2> DeepCopy(FSharpChoice<T1, T2> input, CopyContext context)
         {
             if (context.TryGetCopy(input, out FSharpChoice<T1, T2>? result))
@@ -352,6 +367,12 @@ namespace Orleans.Serialization
         }
     }
 
+    /// <summary>
+    /// Serializer for <see cref="FSharpChoice{T1, T2, T3}"/>.
+    /// </summary>
+    /// <typeparam name="T1">The first choice type.</typeparam>
+    /// <typeparam name="T2">The second choice type.</typeparam>
+    /// <typeparam name="T3">The third choice type.</typeparam>
     [RegisterSerializer]
     public class FSharpChoiceCodec<T1, T2, T3> : IFieldCodec<FSharpChoice<T1, T2, T3>>, IDerivedTypeCodec
     {
@@ -363,6 +384,12 @@ namespace Orleans.Serialization
         private readonly IFieldCodec<T2> _item2Codec;
         private readonly IFieldCodec<T3> _item3Codec;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="FSharpChoiceCodec{T1, T2, T3}"/> class.
+        /// </summary>
+        /// <param name="item1Codec">The codec for <typeparamref name="T1"/>.</param>
+        /// <param name="item2Codec">The codec for <typeparamref name="T2"/>.</param>
+        /// <param name="item3Codec">The codec for <typeparamref name="T3"/>.</param>
         public FSharpChoiceCodec(
             IFieldCodec<T1> item1Codec,
             IFieldCodec<T2> item2Codec,
@@ -373,6 +400,7 @@ namespace Orleans.Serialization
             _item3Codec = OrleansGeneratedCodeHelper.UnwrapService(this, item3Codec);
         }
 
+        /// <inheritdoc/>
         void IFieldCodec<FSharpChoice<T1, T2, T3>>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [AllowNull] Type expectedType, [AllowNull] FSharpChoice<T1, T2, T3> value)
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
@@ -392,6 +420,7 @@ namespace Orleans.Serialization
             writer.WriteEndObject();
         }
 
+        /// <inheritdoc/>
         [return: MaybeNull]
         FSharpChoice<T1, T2, T3> IFieldCodec<FSharpChoice<T1, T2, T3>>.ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
@@ -429,7 +458,12 @@ namespace Orleans.Serialization
             return result;
         }
     }
-    
+    /// <summary>
+    /// Copier for <see cref="FSharpChoice{T1, T2, T3}"/>.
+    /// </summary>
+    /// <typeparam name="T1">The first choice type.</typeparam>
+    /// <typeparam name="T2">The second choice type.</typeparam>
+    /// <typeparam name="T3">The third choice type.</typeparam>
     [RegisterCopier]
     public class FSharpChoiceCopier<T1, T2, T3> : IDeepCopier<FSharpChoice<T1, T2, T3>>, IDerivedTypeCopier
     {
@@ -437,6 +471,12 @@ namespace Orleans.Serialization
         private readonly IDeepCopier<T2> _copier2;
         private readonly IDeepCopier<T3> _copier3;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="FSharpChoiceCopier{T1, T2, T3}"/> class.
+        /// </summary>
+        /// <param name="copier1">The copier for <typeparamref name="T1"/>.</param>
+        /// <param name="copier2">The copier for <typeparamref name="T2"/>.</param>
+        /// <param name="copier3">The copier for <typeparamref name="T3"/>.</param>
         public FSharpChoiceCopier(
             IDeepCopier<T1> copier1,
             IDeepCopier<T2> copier2,
@@ -447,6 +487,7 @@ namespace Orleans.Serialization
             _copier3 = copier3;
         }
 
+        /// <inheritdoc/>
         public FSharpChoice<T1, T2, T3> DeepCopy(FSharpChoice<T1, T2, T3> input, CopyContext context)
         {
             if (context.TryGetCopy(input, out FSharpChoice<T1, T2, T3>? result))
@@ -466,6 +507,13 @@ namespace Orleans.Serialization
         }
     }
 
+    /// <summary>
+    /// Serializer for <see cref="FSharpChoice{T1, T2, T3, T4}"/>.
+    /// </summary>
+    /// <typeparam name="T1">The first choice type.</typeparam>
+    /// <typeparam name="T2">The second choice type.</typeparam>
+    /// <typeparam name="T3">The third choice type.</typeparam>
+    /// <typeparam name="T4">The fourth choice type.</typeparam>
     [RegisterSerializer]
     public class FSharpChoiceCodec<T1, T2, T3, T4> : IFieldCodec<FSharpChoice<T1, T2, T3, T4>>, IDerivedTypeCodec
     {
@@ -479,6 +527,13 @@ namespace Orleans.Serialization
         private readonly IFieldCodec<T3> _item3Codec;
         private readonly IFieldCodec<T4> _item4Codec;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="FSharpChoiceCodec{T1, T2, T3, T4}"/> class.
+        /// </summary>
+        /// <param name="item1Codec">The codec for <typeparamref name="T1"/>.</param>
+        /// <param name="item2Codec">The codec for <typeparamref name="T2"/>.</param>
+        /// <param name="item3Codec">The codec for <typeparamref name="T3"/>.</param>
+        /// <param name="item4Codec">The codec for <typeparamref name="T4"/>.</param>
         public FSharpChoiceCodec(
             IFieldCodec<T1> item1Codec,
             IFieldCodec<T2> item2Codec,
@@ -491,6 +546,7 @@ namespace Orleans.Serialization
             _item4Codec = OrleansGeneratedCodeHelper.UnwrapService(this, item4Codec);
         }
 
+        /// <inheritdoc/>
         void IFieldCodec<FSharpChoice<T1, T2, T3, T4>>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [AllowNull] Type expectedType, [AllowNull] FSharpChoice<T1, T2, T3, T4> value)
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
@@ -511,6 +567,7 @@ namespace Orleans.Serialization
             writer.WriteEndObject();
         }
 
+        /// <inheritdoc/>
         [return: MaybeNull]
         FSharpChoice<T1, T2, T3, T4> IFieldCodec<FSharpChoice<T1, T2, T3, T4>>.ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
@@ -549,7 +606,13 @@ namespace Orleans.Serialization
             return result;
         }
     }
-    
+    /// <summary>
+    /// Copier for <see cref="FSharpChoice{T1, T2, T3, T4}"/>.
+    /// </summary>
+    /// <typeparam name="T1">The first choice type.</typeparam>
+    /// <typeparam name="T2">The second choice type.</typeparam>
+    /// <typeparam name="T3">The third choice type.</typeparam>
+    /// <typeparam name="T4">The fourth choice type.</typeparam>
     [RegisterCopier]
     public class FSharpChoiceCopier<T1, T2, T3, T4> : IDeepCopier<FSharpChoice<T1, T2, T3, T4>>, IDerivedTypeCopier
     {
@@ -558,6 +621,13 @@ namespace Orleans.Serialization
         private readonly IDeepCopier<T3> _copier3;
         private readonly IDeepCopier<T4> _copier4;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="FSharpChoiceCopier{T1, T2, T3, T4}"/> class.
+        /// </summary>
+        /// <param name="copier1">The copier for <typeparamref name="T1"/>.</param>
+        /// <param name="copier2">The copier for <typeparamref name="T2"/>.</param>
+        /// <param name="copier3">The copier for <typeparamref name="T3"/>.</param>
+        /// <param name="copier4">The copier for <typeparamref name="T4"/>.</param>
         public FSharpChoiceCopier(
             IDeepCopier<T1> copier1,
             IDeepCopier<T2> copier2,
@@ -570,6 +640,7 @@ namespace Orleans.Serialization
             _copier4 = copier4;
         }
 
+        /// <inheritdoc/>
         public FSharpChoice<T1, T2, T3, T4> DeepCopy(FSharpChoice<T1, T2, T3, T4> input, CopyContext context)
         {
             if (context.TryGetCopy(input, out FSharpChoice<T1, T2, T3, T4>? result))
@@ -590,6 +661,14 @@ namespace Orleans.Serialization
         }
     }
 
+    /// <summary>
+    /// Serializer for <see cref="FSharpChoice{T1, T2, T3, T4, T5}"/>.
+    /// </summary>
+    /// <typeparam name="T1">The first choice type.</typeparam>
+    /// <typeparam name="T2">The second choice type.</typeparam>
+    /// <typeparam name="T3">The third choice type.</typeparam>
+    /// <typeparam name="T4">The fourth choice type.</typeparam>
+    /// <typeparam name="T5">The fifth choice type.</typeparam>
     [RegisterSerializer]
     public class FSharpChoiceCodec<T1, T2, T3, T4, T5> : IFieldCodec<FSharpChoice<T1, T2, T3, T4, T5>>, IDerivedTypeCodec
     {
@@ -605,6 +684,14 @@ namespace Orleans.Serialization
         private readonly IFieldCodec<T4> _item4Codec;
         private readonly IFieldCodec<T5> _item5Codec;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="FSharpChoiceCodec{T1, T2, T3, T4, T5}"/> class.
+        /// </summary>
+        /// <param name="item1Codec">The codec for <typeparamref name="T1"/>.</param>
+        /// <param name="item2Codec">The codec for <typeparamref name="T2"/>.</param>
+        /// <param name="item3Codec">The codec for <typeparamref name="T3"/>.</param>
+        /// <param name="item4Codec">The codec for <typeparamref name="T4"/>.</param>
+        /// <param name="item5Codec">The codec for <typeparamref name="T5"/>.</param>
         public FSharpChoiceCodec(
             IFieldCodec<T1> item1Codec,
             IFieldCodec<T2> item2Codec,
@@ -619,6 +706,7 @@ namespace Orleans.Serialization
             _item5Codec = OrleansGeneratedCodeHelper.UnwrapService(this, item5Codec);
         }
 
+        /// <inheritdoc/>
         void IFieldCodec<FSharpChoice<T1, T2, T3, T4, T5>>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [AllowNull] Type expectedType, [AllowNull] FSharpChoice<T1, T2, T3, T4, T5> value)
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
@@ -640,6 +728,7 @@ namespace Orleans.Serialization
             writer.WriteEndObject();
         }
 
+        /// <inheritdoc/>
         [return: MaybeNull]
         FSharpChoice<T1, T2, T3, T4, T5> IFieldCodec<FSharpChoice<T1, T2, T3, T4, T5>>.ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
@@ -679,7 +768,14 @@ namespace Orleans.Serialization
             return result;
         }
     }
-    
+    /// <summary>
+    /// Copier for <see cref="FSharpChoice{T1, T2, T3, T4, T5}"/>.
+    /// </summary>
+    /// <typeparam name="T1">The first choice type.</typeparam>
+    /// <typeparam name="T2">The second choice type.</typeparam>
+    /// <typeparam name="T3">The third choice type.</typeparam>
+    /// <typeparam name="T4">The fourth choice type.</typeparam>
+    /// <typeparam name="T5">The fifth choice type.</typeparam>
     [RegisterCopier]
     public class FSharpChoiceCopier<T1, T2, T3, T4, T5> : IDeepCopier<FSharpChoice<T1, T2, T3, T4, T5>>, IDerivedTypeCopier
     {
@@ -689,6 +785,14 @@ namespace Orleans.Serialization
         private readonly IDeepCopier<T4> _copier4;
         private readonly IDeepCopier<T5> _copier5;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="FSharpChoiceCopier{T1, T2, T3, T4, T5}"/> class.
+        /// </summary>
+        /// <param name="copier1">The copier for <typeparamref name="T1"/>.</param>
+        /// <param name="copier2">The copier for <typeparamref name="T2"/>.</param>
+        /// <param name="copier3">The copier for <typeparamref name="T3"/>.</param>
+        /// <param name="copier4">The copier for <typeparamref name="T4"/>.</param>
+        /// <param name="copier5">The copier for <typeparamref name="T5"/>.</param>
         public FSharpChoiceCopier(
             IDeepCopier<T1> copier1,
             IDeepCopier<T2> copier2,
@@ -703,6 +807,7 @@ namespace Orleans.Serialization
             _copier5 = copier5;
         }
 
+        /// <inheritdoc/>
         public FSharpChoice<T1, T2, T3, T4, T5> DeepCopy(FSharpChoice<T1, T2, T3, T4, T5> input, CopyContext context)
         {
             if (context.TryGetCopy(input, out FSharpChoice<T1, T2, T3, T4, T5>? result))
@@ -724,6 +829,15 @@ namespace Orleans.Serialization
         }
     }
 
+    /// <summary>
+    /// Serializer for <see cref="FSharpChoice{T1, T2, T3, T4, T5, T6}"/>.
+    /// </summary>
+    /// <typeparam name="T1">The first choice type.</typeparam>
+    /// <typeparam name="T2">The second choice type.</typeparam>
+    /// <typeparam name="T3">The third choice type.</typeparam>
+    /// <typeparam name="T4">The fourth choice type.</typeparam>
+    /// <typeparam name="T5">The fifth choice type.</typeparam>
+    /// <typeparam name="T6">The sixth choice type.</typeparam>
     [RegisterSerializer]
     public class FSharpChoiceCodec<T1, T2, T3, T4, T5, T6> : IFieldCodec<FSharpChoice<T1, T2, T3, T4, T5, T6>>, IDerivedTypeCodec
     {
@@ -741,6 +855,15 @@ namespace Orleans.Serialization
         private readonly IFieldCodec<T5> _item5Codec;
         private readonly IFieldCodec<T6> _item6Codec;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="FSharpChoiceCodec{T1, T2, T3, T4, T5, T6}"/> class.
+        /// </summary>
+        /// <param name="item1Codec">The codec for <typeparamref name="T1"/>.</param>
+        /// <param name="item2Codec">The codec for <typeparamref name="T2"/>.</param>
+        /// <param name="item3Codec">The codec for <typeparamref name="T3"/>.</param>
+        /// <param name="item4Codec">The codec for <typeparamref name="T4"/>.</param>
+        /// <param name="item5Codec">The codec for <typeparamref name="T5"/>.</param>
+        /// <param name="item6Codec">The codec for <typeparamref name="T6"/>.</param>
         public FSharpChoiceCodec(
             IFieldCodec<T1> item1Codec,
             IFieldCodec<T2> item2Codec,
@@ -757,6 +880,7 @@ namespace Orleans.Serialization
             _item6Codec = OrleansGeneratedCodeHelper.UnwrapService(this, item6Codec);
         }
 
+        /// <inheritdoc/>
         void IFieldCodec<FSharpChoice<T1, T2, T3, T4, T5, T6>>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [AllowNull] Type expectedType, [AllowNull] FSharpChoice<T1, T2, T3, T4, T5, T6> value)
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
@@ -779,6 +903,7 @@ namespace Orleans.Serialization
             writer.WriteEndObject();
         }
 
+        /// <inheritdoc/>
         [return: MaybeNull]
         FSharpChoice<T1, T2, T3, T4, T5, T6> IFieldCodec<FSharpChoice<T1, T2, T3, T4, T5, T6>>.ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
@@ -819,7 +944,15 @@ namespace Orleans.Serialization
             return result;
         }
     }
-    
+    /// <summary>
+    /// Copier for <see cref="FSharpChoice{T1, T2, T3, T4, T5, T6}"/>.
+    /// </summary>
+    /// <typeparam name="T1">The first choice type.</typeparam>
+    /// <typeparam name="T2">The second choice type.</typeparam>
+    /// <typeparam name="T3">The third choice type.</typeparam>
+    /// <typeparam name="T4">The fourth choice type.</typeparam>
+    /// <typeparam name="T5">The fifth choice type.</typeparam>
+    /// <typeparam name="T6">The sixth choice type.</typeparam>
     [RegisterCopier]
     public class FSharpChoiceCopier<T1, T2, T3, T4, T5, T6> : IDeepCopier<FSharpChoice<T1, T2, T3, T4, T5, T6>>, IDerivedTypeCopier
     {
@@ -830,6 +963,15 @@ namespace Orleans.Serialization
         private readonly IDeepCopier<T5> _copier5;
         private readonly IDeepCopier<T6> _copier6;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="FSharpChoiceCopier{T1, T2, T3, T4, T5, T6}"/> class.
+        /// </summary>
+        /// <param name="copier1">The copier for <typeparamref name="T1"/>.</param>
+        /// <param name="copier2">The copier for <typeparamref name="T2"/>.</param>
+        /// <param name="copier3">The copier for <typeparamref name="T3"/>.</param>
+        /// <param name="copier4">The copier for <typeparamref name="T4"/>.</param>
+        /// <param name="copier5">The copier for <typeparamref name="T5"/>.</param>
+        /// <param name="copier6">The copier for <typeparamref name="T6"/>.</param>
         public FSharpChoiceCopier(
             IDeepCopier<T1> copier1,
             IDeepCopier<T2> copier2,
@@ -846,6 +988,7 @@ namespace Orleans.Serialization
             _copier6 = copier6;
         }
 
+        /// <inheritdoc/>
         public FSharpChoice<T1, T2, T3, T4, T5, T6> DeepCopy(FSharpChoice<T1, T2, T3, T4, T5, T6> input, CopyContext context)
         {
             if (context.TryGetCopy(input, out FSharpChoice<T1, T2, T3, T4, T5, T6>? result))
@@ -868,36 +1011,64 @@ namespace Orleans.Serialization
         }
     }
 
+    /// <summary>
+    /// Serializer for <see cref="FSharpRef{T}"/>.
+    /// </summary>
+    /// <typeparam name="T">The referenced value type.</typeparam>
     [RegisterSerializer]
     public class FSharpRefCodec<T> : GeneralizedReferenceTypeSurrogateCodec<FSharpRef<T>, FSharpRefSurrogate<T>>
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="FSharpRefCodec{T}"/> class.
+        /// </summary>
+        /// <param name="surrogateSerializer">The serializer for the surrogate representation.</param>
         public FSharpRefCodec(IValueSerializer<FSharpRefSurrogate<T>> surrogateSerializer) : base(surrogateSerializer)
         {
         }
 
+        /// <inheritdoc/>
         public override FSharpRef<T> ConvertFromSurrogate(ref FSharpRefSurrogate<T> surrogate)
         {
             return new FSharpRef<T>(surrogate.Value);
         }
 
+        /// <inheritdoc/>
         public override void ConvertToSurrogate(FSharpRef<T> value, ref FSharpRefSurrogate<T> surrogate)
         {
             surrogate.Value = value.Value;
         }
     }
 
+    /// <summary>
+    /// Surrogate representation of an <see cref="FSharpRef{T}"/>.
+    /// </summary>
+    /// <typeparam name="T">The referenced value type.</typeparam>
     [GenerateSerializer]
     public struct FSharpRefSurrogate<T>
     {
+        /// <summary>
+        /// Gets or sets the referenced value.
+        /// </summary>
         [Id(0)]
         public T Value { get; set; }
     }
 
+    /// <summary>
+    /// Copier for <see cref="FSharpRef{T}"/>.
+    /// </summary>
+    /// <typeparam name="T">The referenced value type.</typeparam>
     [RegisterCopier]
     public class FSharpRefCopier<T> : IDeepCopier<FSharpRef<T>>
     {
         private readonly IDeepCopier<T> _copier;
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="FSharpRefCopier{T}"/> class.
+        /// </summary>
+        /// <param name="copier">The copier for <typeparamref name="T"/>.</param>
         public FSharpRefCopier(IDeepCopier<T> copier) => _copier = copier;
+
+        /// <inheritdoc/>
         public FSharpRef<T> DeepCopy(FSharpRef<T> input, CopyContext context)
         {
             if (context.TryGetCopy<FSharpRef<T>>(input, out var result))
@@ -916,13 +1087,22 @@ namespace Orleans.Serialization
         }
     }
 
+    /// <summary>
+    /// Serializer for <see cref="FSharpList{T}"/>.
+    /// </summary>
+    /// <typeparam name="T">The list element type.</typeparam>
     [RegisterSerializer]
     public class FSharpListCodec<T> : GeneralizedReferenceTypeSurrogateCodec<FSharpList<T>, FSharpListSurrogate<T>>
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="FSharpListCodec{T}"/> class.
+        /// </summary>
+        /// <param name="surrogateSerializer">The serializer for the surrogate representation.</param>
         public FSharpListCodec(IValueSerializer<FSharpListSurrogate<T>> surrogateSerializer) : base(surrogateSerializer)
         {
         }
 
+        /// <inheritdoc/>
         [return: MaybeNull]
         public override FSharpList<T> ConvertFromSurrogate(ref FSharpListSurrogate<T> surrogate)
         {
@@ -931,6 +1111,7 @@ namespace Orleans.Serialization
             return ListModule.OfSeq(surrogate.Value);
         }
 
+        /// <inheritdoc/>
         public override void ConvertToSurrogate(FSharpList<T> value, ref FSharpListSurrogate<T> surrogate)
         {
             if (value is null) return;
@@ -939,19 +1120,36 @@ namespace Orleans.Serialization
         }
     }
 
+    /// <summary>
+    /// Surrogate representation of an <see cref="FSharpList{T}"/>.
+    /// </summary>
+    /// <typeparam name="T">The list element type.</typeparam>
     [GenerateSerializer]
     public struct FSharpListSurrogate<T>
     {
+        /// <summary>
+        /// Gets or sets the list elements.
+        /// </summary>
         [Id(0)]
         public List<T>? Value { get; set; }
     }
 
+    /// <summary>
+    /// Copier for <see cref="FSharpList{T}"/>.
+    /// </summary>
+    /// <typeparam name="T">The list element type.</typeparam>
     [RegisterCopier]
     public class FSharpListCopier<T> : IDeepCopier<FSharpList<T>>
     {
         private readonly IDeepCopier<T> _copier;
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="FSharpListCopier{T}"/> class.
+        /// </summary>
+        /// <param name="copier">The copier for <typeparamref name="T"/>.</param>
         public FSharpListCopier(IDeepCopier<T> copier) => _copier = copier;
 
+        /// <inheritdoc/>
         public FSharpList<T> DeepCopy(FSharpList<T> input, CopyContext context)
         {
             if (context.TryGetCopy<FSharpList<T>>(input, out var result))
@@ -973,13 +1171,22 @@ namespace Orleans.Serialization
         }
     }
 
+    /// <summary>
+    /// Serializer for <see cref="FSharpSet{T}"/>.
+    /// </summary>
+    /// <typeparam name="T">The set element type.</typeparam>
     [RegisterSerializer]
     public class FSharpSetCodec<T> : GeneralizedReferenceTypeSurrogateCodec<FSharpSet<T>, FSharpSetSurrogate<T>>
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="FSharpSetCodec{T}"/> class.
+        /// </summary>
+        /// <param name="surrogateSerializer">The serializer for the surrogate representation.</param>
         public FSharpSetCodec(IValueSerializer<FSharpSetSurrogate<T>> surrogateSerializer) : base(surrogateSerializer)
         {
         }
 
+        /// <inheritdoc/>
         [return: MaybeNull]
         public override FSharpSet<T> ConvertFromSurrogate(ref FSharpSetSurrogate<T> surrogate)
         {
@@ -987,6 +1194,7 @@ namespace Orleans.Serialization
             return new FSharpSet<T>(surrogate.Value);
         }
 
+        /// <inheritdoc/>
         public override void ConvertToSurrogate(FSharpSet<T> value, ref FSharpSetSurrogate<T> surrogate)
         {
             if (value is null) return;
@@ -994,19 +1202,36 @@ namespace Orleans.Serialization
         }
     }
 
+    /// <summary>
+    /// Surrogate representation of an <see cref="FSharpSet{T}"/>.
+    /// </summary>
+    /// <typeparam name="T">The set element type.</typeparam>
     [GenerateSerializer]
     public struct FSharpSetSurrogate<T>
     {
+        /// <summary>
+        /// Gets or sets the set elements.
+        /// </summary>
         [Id(0)]
         public List<T>? Value { get; set; }
     }
 
+    /// <summary>
+    /// Copier for <see cref="FSharpSet{T}"/>.
+    /// </summary>
+    /// <typeparam name="T">The set element type.</typeparam>
     [RegisterCopier]
     public class FSharpSetCopier<T> : IDeepCopier<FSharpSet<T>>
     {
         private readonly IDeepCopier<T> _copier;
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="FSharpSetCopier{T}"/> class.
+        /// </summary>
+        /// <param name="copier">The copier for <typeparamref name="T"/>.</param>
         public FSharpSetCopier(IDeepCopier<T> copier) => _copier = copier;
 
+        /// <inheritdoc/>
         public FSharpSet<T> DeepCopy(FSharpSet<T> input, CopyContext context)
         {
             if (context.TryGetCopy<FSharpSet<T>>(input, out var result))
@@ -1028,13 +1253,23 @@ namespace Orleans.Serialization
         }
     }
 
+    /// <summary>
+    /// Serializer for <see cref="FSharpMap{TKey, TValue}"/>.
+    /// </summary>
+    /// <typeparam name="TKey">The map key type.</typeparam>
+    /// <typeparam name="TValue">The map value type.</typeparam>
     [RegisterSerializer]
     public class FSharpMapCodec<TKey, TValue> : GeneralizedReferenceTypeSurrogateCodec<FSharpMap<TKey, TValue>, FSharpMapSurrogate<TKey, TValue>>
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="FSharpMapCodec{TKey, TValue}"/> class.
+        /// </summary>
+        /// <param name="surrogateSerializer">The serializer for the surrogate representation.</param>
         public FSharpMapCodec(IValueSerializer<FSharpMapSurrogate<TKey, TValue>> surrogateSerializer) : base(surrogateSerializer)
         {
         }
 
+        /// <inheritdoc/>
         [return: MaybeNull]
         public override FSharpMap<TKey, TValue> ConvertFromSurrogate(ref FSharpMapSurrogate<TKey, TValue> surrogate)
         {
@@ -1043,6 +1278,7 @@ namespace Orleans.Serialization
             return new FSharpMap<TKey, TValue>(surrogate.Value);
         }
 
+        /// <inheritdoc/>
         public override void ConvertToSurrogate(FSharpMap<TKey, TValue> value, ref FSharpMapSurrogate<TKey, TValue> surrogate)
         {
             if (value is null) return;
@@ -1052,25 +1288,44 @@ namespace Orleans.Serialization
         }
     }
 
+    /// <summary>
+    /// Surrogate representation of an <see cref="FSharpMap{TKey, TValue}"/>.
+    /// </summary>
+    /// <typeparam name="TKey">The map key type.</typeparam>
+    /// <typeparam name="TValue">The map value type.</typeparam>
     [GenerateSerializer]
     public struct FSharpMapSurrogate<TKey, TValue>
     {
+        /// <summary>
+        /// Gets or sets the map entries.
+        /// </summary>
         [Id(0)]
         public List<Tuple<TKey, TValue>>? Value { get; set; }
     }
 
+    /// <summary>
+    /// Copier for <see cref="FSharpMap{TKey, TValue}"/>.
+    /// </summary>
+    /// <typeparam name="TKey">The map key type.</typeparam>
+    /// <typeparam name="TValue">The map value type.</typeparam>
     [RegisterCopier]
     public class FSharpMapCopier<TKey, TValue> : IDeepCopier<FSharpMap<TKey, TValue>>
     {
         private readonly IDeepCopier<TKey> _keyCopier;
         private readonly IDeepCopier<TValue> _valueCopier;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="FSharpMapCopier{TKey, TValue}"/> class.
+        /// </summary>
+        /// <param name="keyCopier">The copier for <typeparamref name="TKey"/>.</param>
+        /// <param name="valueCopier">The copier for <typeparamref name="TValue"/>.</param>
         public FSharpMapCopier(IDeepCopier<TKey> keyCopier, IDeepCopier<TValue> valueCopier)
         {
             _keyCopier = keyCopier;
             _valueCopier = valueCopier;
         }
 
+        /// <inheritdoc/>
         public FSharpMap<TKey, TValue> DeepCopy(FSharpMap<TKey, TValue> input, CopyContext context)
         {
             if (context.TryGetCopy<FSharpMap<TKey, TValue>>(input, out var result))
@@ -1092,6 +1347,11 @@ namespace Orleans.Serialization
         }
     }
 
+    /// <summary>
+    /// Serializer for <see cref="FSharpResult{T, TError}"/>.
+    /// </summary>
+    /// <typeparam name="T">The result value type.</typeparam>
+    /// <typeparam name="TError">The error value type.</typeparam>
     [RegisterSerializer]
     public class FSharpResultCodec<T, TError> : IFieldCodec<FSharpResult<T, TError>>, IDerivedTypeCodec
     {
@@ -1101,12 +1361,18 @@ namespace Orleans.Serialization
         private readonly IFieldCodec<T> _item1Codec;
         private readonly IFieldCodec<TError> _item2Codec;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="FSharpResultCodec{T, TError}"/> class.
+        /// </summary>
+        /// <param name="item1Codec">The codec for <typeparamref name="T"/>.</param>
+        /// <param name="item2Codec">The codec for <typeparamref name="TError"/>.</param>
         public FSharpResultCodec(IFieldCodec<T> item1Codec, IFieldCodec<TError> item2Codec)
         {
             _item1Codec = OrleansGeneratedCodeHelper.UnwrapService(this, item1Codec);
             _item2Codec = OrleansGeneratedCodeHelper.UnwrapService(this, item2Codec);
         }
 
+        /// <inheritdoc/>
         void IFieldCodec<FSharpResult<T, TError>>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [AllowNull] Type expectedType, FSharpResult<T, TError> value)
         {
             ReferenceCodec.MarkValueField(writer.Session);
@@ -1124,6 +1390,7 @@ namespace Orleans.Serialization
             writer.WriteEndObject();
         }
 
+        /// <inheritdoc/>
         FSharpResult<T, TError> IFieldCodec<FSharpResult<T, TError>>.ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             field.EnsureWireTypeTagDelimited();
@@ -1152,19 +1419,29 @@ namespace Orleans.Serialization
             return result;
         }
     }
-    
+    /// <summary>
+    /// Copier for <see cref="FSharpResult{T, TError}"/>.
+    /// </summary>
+    /// <typeparam name="T">The result value type.</typeparam>
+    /// <typeparam name="TError">The error value type.</typeparam>
     [RegisterCopier]
     public class FSharpResultCopier<T, TError> : IDeepCopier<FSharpResult<T, TError>>, IDerivedTypeCopier
     {
         private readonly IDeepCopier<T> _copier1;
         private readonly IDeepCopier<TError> _copier2;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="FSharpResultCopier{T, TError}"/> class.
+        /// </summary>
+        /// <param name="copier1">The copier for <typeparamref name="T"/>.</param>
+        /// <param name="copier2">The copier for <typeparamref name="TError"/>.</param>
         public FSharpResultCopier(IDeepCopier<T> copier1, IDeepCopier<TError> copier2)
         {
             _copier1 = copier1;
             _copier2 = copier2;
         }
 
+        /// <inheritdoc/>
         public FSharpResult<T, TError> DeepCopy(FSharpResult<T, TError> input, CopyContext context)
         {
             if (input.IsError)
