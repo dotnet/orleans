@@ -174,7 +174,7 @@ public sealed class GrainDirectoryPartitionTests
     }
 
     [Fact]
-    public void RecoverEntry_PreservesNewestRegistrationRegardlessOfResponseOrder()
+    public void RecoverEntry_PreservesNewestRegistrationAndReportsDuplicateRegardlessOfResponseOrder()
     {
         var grainId = GrainId.Create("recovery-test", "grain");
         var oldRegistration = new GrainAddress
@@ -193,15 +193,109 @@ public sealed class GrainDirectoryPartitionTests
         };
 
         Dictionary<GrainId, GrainAddress> oldThenNew = [];
-        GrainDirectoryPartition.RecoverEntry(oldThenNew, oldRegistration);
-        GrainDirectoryPartition.RecoverEntry(oldThenNew, newRegistration);
+        var oldThenNewInitialDuplicate = GrainDirectoryPartition.RecoverEntry(oldThenNew, oldRegistration);
+        var oldThenNewDuplicate = GrainDirectoryPartition.RecoverEntry(oldThenNew, newRegistration);
 
         Dictionary<GrainId, GrainAddress> newThenOld = [];
-        GrainDirectoryPartition.RecoverEntry(newThenOld, newRegistration);
-        GrainDirectoryPartition.RecoverEntry(newThenOld, oldRegistration);
+        var newThenOldInitialDuplicate = GrainDirectoryPartition.RecoverEntry(newThenOld, newRegistration);
+        var newThenOldDuplicate = GrainDirectoryPartition.RecoverEntry(newThenOld, oldRegistration);
 
+        Assert.Null(oldThenNewInitialDuplicate);
+        Assert.Equal(oldRegistration, oldThenNewDuplicate);
         Assert.Equal(newRegistration, oldThenNew[grainId]);
+        Assert.Null(newThenOldInitialDuplicate);
+        Assert.Equal(oldRegistration, newThenOldDuplicate);
         Assert.Equal(newRegistration, newThenOld[grainId]);
+    }
+
+    [Fact]
+    public void RemoveRecoveredWinners_DoesNotDeactivateWinnerReobservedAtNewerVersion()
+    {
+        var grainId = GrainId.Create("recovery-test", "grain");
+        var activationId = ActivationId.NewId();
+        var initialRegistration = new GrainAddress
+        {
+            GrainId = grainId,
+            ActivationId = activationId,
+            SiloAddress = TestSiloAddress,
+            MembershipVersion = new MembershipVersion(1),
+        };
+        var intermediateRegistration = new GrainAddress
+        {
+            GrainId = grainId,
+            ActivationId = ActivationId.NewId(),
+            SiloAddress = ReplacementSiloAddress,
+            MembershipVersion = new MembershipVersion(2),
+        };
+        var finalRegistration = new GrainAddress
+        {
+            GrainId = grainId,
+            ActivationId = activationId,
+            SiloAddress = TestSiloAddress,
+            MembershipVersion = new MembershipVersion(3),
+        };
+        Dictionary<GrainId, GrainAddress> directory = [];
+        Dictionary<SiloAddress, List<GrainAddress>> duplicateActivations = [];
+
+        AddDuplicate(GrainDirectoryPartition.RecoverEntry(directory, initialRegistration));
+        AddDuplicate(GrainDirectoryPartition.RecoverEntry(directory, intermediateRegistration));
+        AddDuplicate(GrainDirectoryPartition.RecoverEntry(directory, finalRegistration));
+        GrainDirectoryPartition.RemoveRecoveredWinners(directory, duplicateActivations);
+
+        Assert.Same(finalRegistration, directory[grainId]);
+        Assert.Empty(duplicateActivations[TestSiloAddress]);
+        Assert.Equal([intermediateRegistration], duplicateActivations[ReplacementSiloAddress]);
+
+        void AddDuplicate(GrainAddress? duplicate)
+        {
+            if (duplicate?.SiloAddress is not { } siloAddress)
+            {
+                return;
+            }
+
+            if (!duplicateActivations.TryGetValue(siloAddress, out var duplicates))
+            {
+                duplicateActivations[siloAddress] = duplicates = [];
+            }
+
+            duplicates.Add(duplicate);
+        }
+    }
+
+    [Fact]
+    public void RecoverEntry_RefreshesMembershipVersionForSameActivation()
+    {
+        var grainId = GrainId.Create("recovery-test", "grain");
+        var activationId = ActivationId.NewId();
+        var initialRegistration = new GrainAddress
+        {
+            GrainId = grainId,
+            ActivationId = activationId,
+            SiloAddress = TestSiloAddress,
+            MembershipVersion = new MembershipVersion(1),
+        };
+        var refreshedRegistration = new GrainAddress
+        {
+            GrainId = grainId,
+            ActivationId = activationId,
+            SiloAddress = TestSiloAddress,
+            MembershipVersion = new MembershipVersion(3),
+        };
+        var intermediateRegistration = new GrainAddress
+        {
+            GrainId = grainId,
+            ActivationId = ActivationId.NewId(),
+            SiloAddress = ReplacementSiloAddress,
+            MembershipVersion = new MembershipVersion(2),
+        };
+        Dictionary<GrainId, GrainAddress> directory = [];
+
+        Assert.Null(GrainDirectoryPartition.RecoverEntry(directory, initialRegistration));
+        Assert.Null(GrainDirectoryPartition.RecoverEntry(directory, refreshedRegistration));
+        var duplicate = GrainDirectoryPartition.RecoverEntry(directory, intermediateRegistration);
+
+        Assert.Same(refreshedRegistration, directory[grainId]);
+        Assert.Equal(intermediateRegistration, duplicate);
     }
 
     private static void AssertRanges(RingRange previousOwnerRange, RingRange addedRange, params RingRange[] expected)

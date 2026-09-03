@@ -18,6 +18,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
 {
     private const float MaxActivationQueryRangePercent = 5f;
     private const int MaxActivationQueryRangeCount = 32;
+    private const int DuplicateActivationCleanupBatchSize = 1_000;
     private static readonly IBackoffProvider ClusterMemberRetryBackoff = new ExponentialBackoff(
         TimeSpan.FromMilliseconds(100),
         TimeSpan.FromSeconds(5),
@@ -793,6 +794,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         var stopwatch = ValueStopwatch.StartNew();
         GrainRuntime.CheckRuntimeContext(this);
         LogDebugRecoveringActivations(_logger, addedRange, current.Version);
+        Dictionary<SiloAddress, List<GrainAddress>>? duplicateActivations = null;
 
         await foreach (var activations in GetRegisteredActivations(current, addedRange, isValidation: false))
         {
@@ -801,8 +803,23 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
             {
                 DebugAssertOwnership(current, entry.GrainId);
                 LogTraceRecoveredEntry(_logger, entry, current.Version);
-                RecoverEntry(_directory, entry);
+                if (RecoverEntry(_directory, entry) is { SiloAddress: { } siloAddress } duplicate)
+                {
+                    duplicateActivations ??= [];
+                    if (!duplicateActivations.TryGetValue(siloAddress, out var duplicates))
+                    {
+                        duplicateActivations[siloAddress] = duplicates = [];
+                    }
+
+                    duplicates.Add(duplicate);
+                }
             }
+        }
+
+        if (duplicateActivations is not null)
+        {
+            RemoveRecoveredWinners(_directory, duplicateActivations);
+            await DeactivateDuplicateActivationsAsync(duplicateActivations);
         }
 
         _directoryInstruments.RangeRecoveryCount.Add(1);
@@ -810,17 +827,75 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         LogDebugCompletedRecoveringActivations(_logger, addedRange, current.Version, stopwatch.Elapsed);
     }
 
-    internal static void RecoverEntry(Dictionary<GrainId, GrainAddress> directory, GrainAddress recovered)
+    internal static GrainAddress? RecoverEntry(Dictionary<GrainId, GrainAddress> directory, GrainAddress recovered)
     {
         // During a rolling upgrade, LocalGrainDirectory does not participate in DistributedGrainDirectory's
         // recovery-registration barrier and can report an activation superseded in a newer membership view.
         // This is the only expected case where recovery returns different registrations for one grain. Preserve
         // the newest view while retaining recovery's existing last-response tie-breaking within the same view.
-        if (!directory.TryGetValue(recovered.GrainId, out var existing)
-            || recovered.MembershipVersion >= existing.MembershipVersion)
+        if (!directory.TryGetValue(recovered.GrainId, out var existing))
         {
             directory[recovered.GrainId] = recovered;
+            return null;
         }
+
+        if (recovered.Equals(existing))
+        {
+            if (recovered.MembershipVersion > existing.MembershipVersion)
+            {
+                directory[recovered.GrainId] = recovered;
+            }
+
+            return null;
+        }
+
+        if (recovered.MembershipVersion >= existing.MembershipVersion)
+        {
+            directory[recovered.GrainId] = recovered;
+            return existing;
+        }
+
+        return recovered;
+    }
+
+    internal static void RemoveRecoveredWinners(
+        Dictionary<GrainId, GrainAddress> directory,
+        Dictionary<SiloAddress, List<GrainAddress>> duplicateActivations)
+    {
+        foreach (var duplicates in duplicateActivations.Values)
+        {
+            duplicates.RemoveAll(candidate =>
+                directory.TryGetValue(candidate.GrainId, out var winner)
+                && candidate.Equals(winner));
+        }
+    }
+
+    private async Task DeactivateDuplicateActivationsAsync(
+        Dictionary<SiloAddress, List<GrainAddress>> duplicateActivations)
+    {
+        var tasks = duplicateActivations
+            .Where(static pair => pair.Value.Count > 0)
+            .Select(async pair =>
+            {
+                var catalog = _grainFactory.GetSystemTarget<ICatalog>(Constants.CatalogType, pair.Key);
+                foreach (var batch in pair.Value.Chunk(DuplicateActivationCleanupBatchSize))
+                {
+                    await InvokeOnClusterMember(
+                        pair.Key,
+                        async cancellationToken =>
+                        {
+                            await catalog.DeleteActivations(
+                                [.. batch],
+                                DeactivationReasonCode.DuplicateActivation,
+                                "This grain has been activated elsewhere").WaitAsync(cancellationToken);
+                            return true;
+                        },
+                        false,
+                        nameof(ICatalog.DeleteActivations));
+                }
+            });
+
+        await Task.WhenAll(tasks);
     }
 
     private async IAsyncEnumerable<List<GrainAddress>> GetRegisteredActivations(DirectoryMembershipSnapshot current, RingRange range, bool isValidation)
