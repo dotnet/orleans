@@ -562,6 +562,12 @@ namespace Orleans.Transactions.DynamoDB
                 Dictionary<string, AttributeValue>? conditionValues = null,
                 string extraExpression = "", Dictionary<string, AttributeValue>? extraExpressionValues = null)
         {
+            ArgumentNullException.ThrowIfNull(fields);
+            if (fields.Count == 0)
+            {
+                throw new ArgumentException("At least one field is required.", nameof(fields));
+            }
+
             var expressionAttributeValues = new Dictionary<string, AttributeValue>();
 
             var updateExpression = new StringBuilder();
