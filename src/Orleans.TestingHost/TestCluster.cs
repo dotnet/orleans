@@ -1236,7 +1236,9 @@ namespace Orleans.TestingHost
                 return;
             }
 
+#pragma warning disable RS0030 // IDisposable requires synchronously completing test cluster cleanup.
             DisposeAsync().AsTask().Wait();
+#pragma warning restore RS0030
         }
 
         private static async Task DisposeAsync(IDisposable? value)

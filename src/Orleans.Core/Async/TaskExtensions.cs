@@ -65,23 +65,6 @@ namespace Orleans.Internal
 
         internal static string ToString(this Task? t) => t == null ? "null" : $"[Id={t.Id}, Status={t.Status}]";
 
-        public static void WaitWithThrow(this Task task, TimeSpan timeout)
-        {
-            if (!task.Wait(timeout))
-            {
-                throw new TimeoutException($"Task.WaitWithThrow has timed out after {timeout}.");
-            }
-        }
-
-        internal static T WaitForResultWithThrow<T>(this Task<T> task, TimeSpan timeout)
-        {
-            if (!task.Wait(timeout))
-            {
-                throw new TimeoutException($"Task<T>.WaitForResultWithThrow has timed out after {timeout}.");
-            }
-            return task.Result;
-        }
-
         /// <summary>
         /// This will apply a timeout delay to the task, allowing us to exit early
         /// </summary>

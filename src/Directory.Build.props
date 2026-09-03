@@ -17,6 +17,10 @@
     <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers"
                       PrivateAssets="all"
                       IncludeAssets="runtime; build; native; contentfiles; analyzers; buildtransitive" />
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)BannedSymbols.txt"
+                     Condition="Exists('$(MSBuildThisFileDirectory)BannedSymbols.txt')" />
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)BannedSymbols.$(TargetFramework).txt"
+                     Condition="Exists('$(MSBuildThisFileDirectory)BannedSymbols.$(TargetFramework).txt')" />
     <AdditionalFiles Include="$(MSBuildProjectDirectory)\BannedSymbols.txt"
                      Condition="Exists('$(MSBuildProjectDirectory)\BannedSymbols.txt')" />
     <AdditionalFiles Include="$(MSBuildProjectDirectory)\BannedSymbols.$(TargetFramework).txt"
