@@ -420,6 +420,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class PooledBufferCodec : IFieldCodec<PooledBuffer>
     {
+        /// <inheritdoc />
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] PooledBuffer value) where TBufferWriter : IBufferWriter<byte>
         {
             ReferenceCodec.MarkValueField(writer.Session);
@@ -434,6 +435,7 @@ namespace Orleans.Serialization.Codecs
             value.Reset();
         }
 
+        /// <inheritdoc />
         [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public PooledBuffer ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
@@ -474,7 +476,10 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class PooledBufferCopier : IDeepCopier<PooledBuffer>, IOptionalDeepCopier
     {
+        /// <inheritdoc />
         public PooledBuffer DeepCopy(PooledBuffer input, CopyContext context) => input;
+
+        /// <inheritdoc />
         public bool IsShallowCopyable() => true;
     }
 }

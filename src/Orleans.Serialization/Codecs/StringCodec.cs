@@ -43,7 +43,10 @@ namespace Orleans.Serialization.Codecs
         /// <summary>
         /// Reads the raw string content.
         /// </summary>
+        /// <typeparam name="TInput">The reader input type.</typeparam>
+        /// <param name="reader">The reader.</param>
         /// <param name="numBytes">Encoded string length in bytes.</param>
+        /// <returns>The decoded string.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static string ReadRaw<TInput>(ref Reader<TInput> reader, uint numBytes)
         {
@@ -106,6 +109,8 @@ namespace Orleans.Serialization.Codecs
         /// <summary>
         /// Writes the raw string content.
         /// </summary>
+        /// <typeparam name="TBufferWriter">The buffer writer type.</typeparam>
+        /// <param name="writer">The writer.</param>
         /// <param name="value">String to be encoded.</param>
         /// <param name="numBytes">Encoded string length in bytes.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

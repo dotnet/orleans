@@ -75,12 +75,18 @@ namespace Orleans.Serialization.Codecs
         private readonly IDeepCopier<TKey>? _keyCopier;
         private readonly IDeepCopier<TValue>? _valueCopier;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ImmutableSortedDictionaryCopier{TKey, TValue}"/> class.
+        /// </summary>
+        /// <param name="keyCopier">The key copier.</param>
+        /// <param name="valueCopier">The value copier.</param>
         public ImmutableSortedDictionaryCopier(IDeepCopier<TKey> keyCopier, IDeepCopier<TValue> valueCopier)
         {
             _keyCopier = OrleansGeneratedCodeHelper.GetOptionalCopier(keyCopier);
             _valueCopier = OrleansGeneratedCodeHelper.GetOptionalCopier(valueCopier);
         }
 
+        /// <inheritdoc />
         public bool IsShallowCopyable() => _keyCopier is null && _valueCopier is null;
 
         /// <inheritdoc/>

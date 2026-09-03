@@ -104,6 +104,7 @@ public sealed class CollectionCodec<T> : IFieldCodec<Collection<T>>, IBaseCodec<
 
     private void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
 
+    /// <inheritdoc />
     public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, Collection<T> value) where TBufferWriter : IBufferWriter<byte>
     {
         if (value.Count > 0)
@@ -118,6 +119,7 @@ public sealed class CollectionCodec<T> : IFieldCodec<Collection<T>>, IBaseCodec<
         }
     }
 
+    /// <inheritdoc />
     public void Deserialize<TInput>(ref Reader<TInput> reader, Collection<T> value)
     {
         // If the value has some values added by the constructor, clear them.
