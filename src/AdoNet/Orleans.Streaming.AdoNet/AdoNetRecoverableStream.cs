@@ -14,6 +14,8 @@ internal sealed partial class AdoNetRecoverableStream(
     private AdoNetStreamPartitionState? _partition;
     private long _readOffset;
     private Task<AdoNetStreamPartitionState>? _acquisitionTask;
+    private DataNotAvailableException? _retentionFailure;
+    private long? _pendingHardDeletedThrough;
 
     internal Task AcquisitionCompletion => Volatile.Read(ref _acquisitionTask) ?? Task.CompletedTask;
 
@@ -96,6 +98,11 @@ internal sealed partial class AdoNetRecoverableStream(
         int maxCount,
         CancellationToken cancellationToken)
     {
+        if (Volatile.Read(ref _retentionFailure) is { } retentionFailure)
+        {
+            throw retentionFailure;
+        }
+
         var messages = await queries.ReadStreamMessagesAsync(
             serviceId,
             providerId,
@@ -128,6 +135,21 @@ internal sealed partial class AdoNetRecoverableStream(
                 cleanup.Checkpoint);
         }
 
+        var readThrough = messages.Count > 0 ? messages[^1].MessageId : _readOffset;
+        if (cleanup.HardDeletedThroughMessageId is { } hardDeletedThrough
+            && hardDeletedThrough > readThrough)
+        {
+            var failure = new DataNotAvailableException(
+                $"ADO.NET stream partition '{serviceId}/{providerId}/{queueId}' lost unread retained records after "
+                + $"message {readThrough}: hard retention deleted through message {hardDeletedThrough}.");
+            var retainedFailure = Interlocked.CompareExchange(ref _retentionFailure, failure, comparand: null) ?? failure;
+            throw retainedFailure;
+        }
+
+        _pendingHardDeletedThrough = cleanup.HardDeletedThroughMessageId is { } deletedThrough
+            && deletedThrough > _readOffset
+                ? deletedThrough
+                : null;
         return messages as IReadOnlyList<AdoNetStreamMessage> ?? messages.ToList();
     }
 
@@ -137,6 +159,26 @@ internal sealed partial class AdoNetRecoverableStream(
         {
             _readOffset = messages[^1].MessageId;
         }
+
+        if (_pendingHardDeletedThrough is { } hardDeletedThrough
+            && hardDeletedThrough <= _readOffset)
+        {
+            _pendingHardDeletedThrough = null;
+        }
+    }
+
+    public void MessagesAddFailed(IReadOnlyList<AdoNetStreamMessage> messages)
+    {
+        if (_pendingHardDeletedThrough is not { } hardDeletedThrough)
+        {
+            return;
+        }
+
+        var failure = new DataNotAvailableException(
+            $"ADO.NET stream partition '{serviceId}/{providerId}/{queueId}' could not retain hard-deleted records "
+            + $"through message {hardDeletedThrough} because cache admission failed before the read offset advanced.");
+        Interlocked.CompareExchange(ref _retentionFailure, failure, comparand: null);
+        _pendingHardDeletedThrough = null;
     }
 
     public Task Shutdown(CancellationToken cancellationToken)

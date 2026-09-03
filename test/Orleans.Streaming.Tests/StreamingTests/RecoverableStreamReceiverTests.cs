@@ -325,6 +325,60 @@ public sealed class RecoverableStreamReceiverTests
     }
 
     [Fact]
+    public void Cache_EarliestAvailableReturnsOldestMatchingRecord()
+    {
+        var streamId = StreamId.Create("namespace", Guid.NewGuid());
+        var otherStreamId = StreamId.Create("namespace", Guid.NewGuid());
+        var cache = new RecoverableStreamQueueCache<TestQueueMessage>(
+            100,
+            new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(4 * 1024)),
+            new TestDataAdapter(),
+            new NoOpEvictionStrategy(),
+            NullLogger.Instance);
+        _ = cache.Add(
+        [
+            new TestQueueMessage(otherStreamId, 1, "other"),
+            new TestQueueMessage(streamId, 2, "first"),
+            new TestQueueMessage(streamId, 3, "second"),
+        ],
+        DateTime.UnixEpoch);
+
+        using var cursor = cache.GetCacheCursorAtPosition(
+            streamId,
+            StreamSubscriptionStartPosition.EarliestAvailable);
+
+        Assert.True(cursor.MoveNext());
+        Assert.Equal("first", Assert.IsType<TestBatchContainer>(cursor.GetCurrent(out _)).Payload);
+        Assert.Equal(1, Assert.IsAssignableFrom<IQueueCacheCursorProgress>(cursor).SafeSequenceToken?.SequenceNumber);
+    }
+
+    [Fact]
+    public void Cache_EarliestAvailableQuietStreamScansUnrelatedRecords()
+    {
+        var quietStreamId = StreamId.Create("namespace", Guid.NewGuid());
+        var busyStreamId = StreamId.Create("namespace", Guid.NewGuid());
+        var cache = new RecoverableStreamQueueCache<TestQueueMessage>(
+            100,
+            new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(4 * 1024)),
+            new TestDataAdapter(),
+            new NoOpEvictionStrategy(),
+            NullLogger.Instance);
+        _ = cache.Add(
+        [
+            new TestQueueMessage(busyStreamId, 1, "first"),
+            new TestQueueMessage(busyStreamId, 2, "second"),
+        ],
+        DateTime.UnixEpoch);
+
+        using var cursor = cache.GetCacheCursorAtPosition(
+            quietStreamId,
+            StreamSubscriptionStartPosition.EarliestAvailable);
+
+        Assert.False(cursor.MoveNext());
+        Assert.Equal(2, Assert.IsAssignableFrom<IQueueCacheCursorProgress>(cursor).SafeSequenceToken?.SequenceNumber);
+    }
+
+    [Fact]
     public void CachePressure_BlocksUnsafeTimePurgeUntilDeliveryProgressAdvances()
     {
         var streamId = StreamId.Create("namespace", Guid.NewGuid());
