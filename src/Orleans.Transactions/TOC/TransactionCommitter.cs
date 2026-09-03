@@ -15,7 +15,7 @@ using Orleans.Transactions.TOC;
 namespace Orleans.Transactions
 {
     /// <summary>
-    /// Enlists commit operations for a service in the current transaction and applies them after the transaction commits.
+    /// Enlists service operations as storage preconditions which execute during commit before the durable commit decision.
     /// </summary>
     /// <typeparam name="TService">The service type which receives committed operations.</typeparam>
     public partial class TransactionCommitter<TService> : ITransactionCommitter<TService>, ILifecycleParticipant<IGrainLifecycle>

@@ -36,7 +36,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         public int MaxBulkUpdateRows { get; set; } = 100;
 
         /// <summary>
-        /// Gets or sets the maximum number of attempts to create or connect to the table during initialization.
+        /// Gets or sets the legacy creation retry count used to calculate the default <see cref="CreationTimeout"/>.
         /// </summary>
         public int MaxCreationRetries { get; set; } = 60;
 
@@ -47,7 +47,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         public int MaxOperationRetries { get; set; } = 5;
 
         /// <summary>
-        /// Gets or sets the delay between attempts to create or connect to the table.
+        /// Gets or sets the legacy creation retry delay used to calculate the default <see cref="CreationTimeout"/>.
         /// </summary>
         public TimeSpan PauseBetweenCreationRetries { get; set; } = TimeSpan.FromSeconds(1);
 
@@ -73,7 +73,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         }
 
         /// <summary>
-        /// Gets or sets the timeout for creating or connecting to the table.
+        /// Gets or sets the timeout value included in table-creation timeout diagnostics.
         /// </summary>
         /// <remarks>
         /// The default is three times the product of <see cref="PauseBetweenCreationRetries"/> and <see cref="MaxCreationRetries"/>.

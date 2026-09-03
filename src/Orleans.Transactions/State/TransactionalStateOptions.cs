@@ -8,7 +8,7 @@ namespace Orleans.Configuration
     public class TransactionalStateOptions
     {
         /// <summary>
-        /// Gets or sets the maximum duration that a transaction group can retain the state lock.
+        /// Gets or sets the base duration that a transaction group retains the state lock. The effective duration is at least the transaction timeout.
         /// </summary>
         public TimeSpan LockTimeout { get; set; } = DefaultLockTimeout;
 
@@ -54,8 +54,9 @@ namespace Orleans.Configuration
         private static TimeSpan DefaultConfirmationRetryDelay => TimeSpan.FromSeconds(30);
 
         /// <summary>
-        /// Gets or sets the maximum number of attempts to confirm a committed transaction.
+        /// Gets or sets the legacy confirmation retry limit retained for configuration compatibility.
         /// </summary>
+        /// <remarks>The runtime retries confirmation until it succeeds or the activation is canceled.</remarks>
         public static int ConfirmationRetryLimit { get; set; } = DefaultConfirmationRetryLimit;
 
         /// <summary>

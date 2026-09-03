@@ -40,7 +40,11 @@ namespace Orleans.Streaming.EventHubs.Testing
         {
             return Task.FromResult(EventHubConstants.StartOfStream);
         }
-        /// <inheritdoc />
+        /// <summary>
+        /// Ignores a checkpoint update because generated-event streams do not persist checkpoints.
+        /// </summary>
+        /// <param name="offset">The ignored offset.</param>
+        /// <param name="utcNow">The ignored update time.</param>
         public void Update(string offset, DateTime utcNow)
         {
         }

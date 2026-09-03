@@ -76,7 +76,7 @@ namespace Orleans
     public enum TransactionOption
     {
         /// <summary>
-        /// Executes without a transaction and does not propagate an ambient transaction.
+        /// Executes grain calls without propagating an ambient transaction. Delegate execution rejects an existing ambient transaction.
         /// </summary>
         Suppress,
 

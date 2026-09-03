@@ -45,7 +45,7 @@ namespace Orleans.Connections.Security
         }
 
         /// <summary>
-        /// Gets or sets a value indicating whether the client must provide a certificate.
+        /// Gets or sets a value indicating whether TLS authentication requests a client certificate.
         /// </summary>
         public bool ClientCertificateRequired
         {

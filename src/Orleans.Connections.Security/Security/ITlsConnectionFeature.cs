@@ -17,7 +17,7 @@ namespace Orleans.Connections.Security
         /// <summary>
         /// Asynchronously retrieves the remote endpoint's certificate, if any.
         /// </summary>
-        /// <param name="cancellationToken">A token which can cancel the operation.</param>
+        /// <param name="cancellationToken">The cancellation token associated with the request.</param>
         /// <returns>A task which returns the remote endpoint's certificate, or <see langword="null"/> if none is available.</returns>
         Task<X509Certificate2?> GetRemoteCertificateAsync(CancellationToken cancellationToken);
     }

@@ -49,7 +49,7 @@ namespace Orleans.Runtime.ReminderService
         /// <summary>
         /// Connects to Azure Table Storage and creates the reminder table if it does not exist.
         /// </summary>
-        /// <param name="cancellationToken">The token used to cancel initialization and retry delays.</param>
+        /// <param name="cancellationToken">The token used to cancel lifecycle-lock acquisition and delays between initialization attempts.</param>
         /// <returns>A task representing the initialization operation.</returns>
         public async Task StartAsync(CancellationToken cancellationToken)
         {

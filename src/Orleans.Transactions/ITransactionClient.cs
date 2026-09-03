@@ -9,7 +9,7 @@ namespace Orleans;
 public interface ITransactionClient
 {
     /// <summary>
-    /// Executes a delegate using the specified transaction option and commits the transaction if the delegate completes successfully.
+    /// Executes a delegate using the specified transaction option. A newly created transaction commits when the delegate completes successfully; a joined transaction records this participant's commit vote.
     /// </summary>
     /// <param name="transactionOption">The transaction creation, joining, or suppression behavior.</param>
     /// <param name="transactionDelegate">The delegate to execute.</param>
@@ -27,7 +27,7 @@ public interface ITransactionClient
     Task RunTransaction(TransactionOption transactionOption, Func<Task<bool>> transactionDelegate);
 
     /// <summary>
-    /// Executes a delegate using the specified transaction option and commits the transaction if the delegate completes successfully.
+    /// Executes a delegate using the specified transaction option. A newly created transaction commits when the delegate completes successfully; a joined transaction records this participant's commit vote.
     /// </summary>
     /// <param name="transactionOption">The transaction creation, joining, or suppression behavior.</param>
     /// <param name="transactionDelegate">The delegate to execute.</param>

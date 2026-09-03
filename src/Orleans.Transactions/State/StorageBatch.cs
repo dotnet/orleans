@@ -31,7 +31,7 @@ namespace Orleans.Transactions
         void Read(DateTime timestamp);
 
         /// <summary>
-        /// Cancels the prepared state version with the specified sequence number.
+        /// Cancels the prepared state version with the specified sequence number and excludes that version and later prepared versions from the batch.
         /// </summary>
         /// <param name="sequenceNumber">The sequence number to cancel.</param>
         void Cancel(long sequenceNumber);

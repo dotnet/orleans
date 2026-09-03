@@ -52,14 +52,19 @@ namespace Orleans.Streaming.EventHubs.Testing
             this.ehGeneratorOptions = options;
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// Configures the generated-event receiver factory and initializes common adapter state.
+        /// </summary>
+        /// <remarks>This provider generates events locally and does not create an Event Hubs client.</remarks>
         public override void Init()
         {
             this.EventHubReceiverFactory = this.EHGeneratorReceiverFactory;
             base.Init();
         }
 
-        /// <inheritdoc/>
+        /// <summary>
+        /// Performs no initialization because generated-event streams do not connect to Event Hubs.
+        /// </summary>
         protected override void InitEventHubClient()
         {
             //do nothing, EventDataGeneratorStreamProvider doesn't need connection with EventHubClient
