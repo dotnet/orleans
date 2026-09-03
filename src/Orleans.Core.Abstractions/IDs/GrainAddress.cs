@@ -40,11 +40,16 @@ namespace Orleans.Runtime
         [Id(3)]
         public MembershipVersion MembershipVersion { get; init; } = MembershipVersion.MinValue;
 
+        /// <summary>
+        /// Gets a value indicating whether the grain, activation, and silo identifiers are all specified.
+        /// </summary>
         [JsonIgnore]
         public bool IsComplete => !_grainId.IsDefault && !_activationId.IsDefault && SiloAddress != null;
 
+        /// <inheritdoc />
         public override bool Equals(object? obj) => Equals(obj as GrainAddress);
 
+        /// <inheritdoc />
         public bool Equals(GrainAddress? other)
         {
             if (ReferenceEquals(this, other)) return true;
@@ -75,8 +80,10 @@ namespace Orleans.Runtime
                 && (address.SiloAddress is null || address.SiloAddress.Equals(other.SiloAddress));
         }
 
+        /// <inheritdoc />
         public override int GetHashCode() => HashCode.Combine(SiloAddress, _grainId, _activationId);
 
+        /// <inheritdoc />
         public override string ToString() => $"[{nameof(GrainAddress)} GrainId {_grainId}, ActivationId: {_activationId}, SiloAddress: {SiloAddress}]";
 
         string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString();
@@ -84,6 +91,10 @@ namespace Orleans.Runtime
         bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
             => destination.TryWrite($"[{nameof(GrainAddress)} GrainId {_grainId}, ActivationId: {_activationId}, SiloAddress: {SiloAddress}]", out charsWritten);
 
+        /// <summary>
+        /// Returns a string representation which includes the grain, activation, silo, and membership version.
+        /// </summary>
+        /// <returns>A detailed string representation of this grain address.</returns>
         public string ToFullString() => $"[{nameof(GrainAddress)} GrainId {_grainId}, ActivationId: {_activationId}, SiloAddress: {SiloAddress}, MembershipVersion: {MembershipVersion}]";
 
         internal static GrainAddress NewActivationAddress(SiloAddress silo, GrainId grain) => GetAddress(silo, grain, ActivationId.NewId());

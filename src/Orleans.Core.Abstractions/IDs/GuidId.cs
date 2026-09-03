@@ -112,9 +112,11 @@ namespace Orleans.Runtime
     /// </summary>
     public sealed class GuidIdConverter : JsonConverter<GuidId>
     {
+        /// <inheritdoc />
         public override GuidId? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
             => ReadCore(ref reader);
 
+        /// <inheritdoc />
         public override void Write(Utf8JsonWriter writer, GuidId value, JsonSerializerOptions options)
         {
             Span<byte> buffer = stackalloc byte[32];
@@ -126,6 +128,7 @@ namespace Orleans.Runtime
             writer.WriteStringValue(buffer[..written]);
         }
 
+        /// <inheritdoc />
         public override GuidId ReadAsPropertyName(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
             => ReadCore(ref reader);
 
@@ -149,6 +152,7 @@ namespace Orleans.Runtime
             return GuidId.GetGuidId(value);
         }
 
+        /// <inheritdoc />
         public override void WriteAsPropertyName(Utf8JsonWriter writer, [DisallowNull] GuidId value, JsonSerializerOptions options)
         {
             Span<byte> buffer = stackalloc byte[32];

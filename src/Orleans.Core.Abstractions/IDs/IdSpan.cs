@@ -175,6 +175,12 @@ namespace Orleans.Runtime
         /// </returns>
         public override string ToString() => _value is null ? "" : Encoding.UTF8.GetString(_value);
 
+        /// <summary>
+        /// Formats the UTF-8 encoded identifier into the provided character span.
+        /// </summary>
+        /// <param name="destination">The span in which to write the formatted identifier.</param>
+        /// <param name="charsWritten">When this method returns, contains the number of characters written to <paramref name="destination"/>.</param>
+        /// <returns><see langword="true"/> if the destination was large enough; otherwise, <see langword="false"/>.</returns>
         public bool TryFormat(Span<char> destination, out int charsWritten)
         {
             if (_value is null)

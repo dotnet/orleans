@@ -8,6 +8,9 @@ using System.Text;
 
 namespace Orleans.Runtime
 {
+    /// <summary>
+    /// Represents an identifier using the legacy Orleans grain identity encoding.
+    /// </summary>
     [Serializable, GenerateSerializer, Immutable]
     public sealed class LegacyGrainId : IEquatable<LegacyGrainId>, IComparable<LegacyGrainId>
     {
@@ -21,12 +24,24 @@ namespace Orleans.Runtime
         [Id(0)]
         internal readonly UniqueKey Key;
 
+        /// <summary>
+        /// Gets the category encoded in this identifier.
+        /// </summary>
         public UniqueKey.Category Category => Key.IdCategory;
 
+        /// <summary>
+        /// Gets a value indicating whether this identifier represents a system target.
+        /// </summary>
         public bool IsSystemTarget => Key.IsSystemTargetKey;
 
+        /// <summary>
+        /// Gets a value indicating whether this identifier represents a grain.
+        /// </summary>
         public bool IsGrain => Category == UniqueKey.Category.Grain || Category == UniqueKey.Category.KeyExtGrain;
 
+        /// <summary>
+        /// Gets a value indicating whether this identifier represents a client.
+        /// </summary>
         public bool IsClient => Category == UniqueKey.Category.Client;
 
         internal LegacyGrainId(UniqueKey key)
@@ -34,13 +49,26 @@ namespace Orleans.Runtime
             this.Key = key;
         }
 
+        /// <summary>
+        /// Converts a legacy grain identifier to its <see cref="GrainId"/> representation.
+        /// </summary>
+        /// <param name="legacy">The legacy grain identifier to convert.</param>
+        /// <returns>The equivalent <see cref="GrainId"/>.</returns>
         public static implicit operator GrainId(LegacyGrainId legacy) => legacy.ToGrainId();
 
+        /// <summary>
+        /// Creates a grain identifier with a randomly generated primary key.
+        /// </summary>
+        /// <returns>A new legacy grain identifier.</returns>
         public static LegacyGrainId NewId()
         {
             return FindOrCreateGrainId(UniqueKey.NewKey(Guid.NewGuid(), UniqueKey.Category.Grain));
         }
 
+        /// <summary>
+        /// Creates a client identifier with a randomly generated primary key.
+        /// </summary>
+        /// <returns>A new legacy client identifier.</returns>
         public static LegacyGrainId NewClientId()
         {
             return NewClientId(Guid.NewGuid());
@@ -105,31 +133,51 @@ namespace Orleans.Runtime
             return FindOrCreateGrainId(UniqueKey.NewGrainServiceKey(systemGrainId, typeData));
         }
 
+        /// <summary>
+        /// Gets the GUID primary key.
+        /// </summary>
         public Guid PrimaryKey
         {
             get { return GetPrimaryKey(); }
         }
 
+        /// <summary>
+        /// Gets the integer primary key.
+        /// </summary>
         public long PrimaryKeyLong
         {
             get { return GetPrimaryKeyLong(); }
         }
 
+        /// <summary>
+        /// Gets the string primary key extension, or an empty string if this identifier has no key extension.
+        /// </summary>
         public string PrimaryKeyString
         {
             get { return GetPrimaryKeyString(); }
         }
 
+        /// <summary>
+        /// Gets a detailed string representation of this identifier.
+        /// </summary>
         public string IdentityString
         {
             get { return ToDetailedString(); }
         }
 
+        /// <summary>
+        /// Gets a value indicating whether the primary key is encoded as a <see cref="long"/>.
+        /// </summary>
         public bool IsLongKey
         {
             get { return Key.IsLongKey; }
         }
 
+        /// <summary>
+        /// Gets the integer primary key and its optional key extension.
+        /// </summary>
+        /// <param name="keyExt">When this method returns, contains the key extension, or <see langword="null"/> if none is present.</param>
+        /// <returns>The integer primary key.</returns>
         public long GetPrimaryKeyLong(out string? keyExt)
         {
             return Key.PrimaryKeyToLong(out keyExt);
@@ -140,6 +188,11 @@ namespace Orleans.Runtime
             return Key.PrimaryKeyToLong();
         }
 
+        /// <summary>
+        /// Gets the GUID primary key and its optional key extension.
+        /// </summary>
+        /// <param name="keyExt">When this method returns, contains the key extension, or <see langword="null"/> if none is present.</param>
+        /// <returns>The GUID primary key.</returns>
         public Guid GetPrimaryKey(out string? keyExt)
         {
             return Key.PrimaryKeyToGuid(out keyExt);
@@ -156,6 +209,9 @@ namespace Orleans.Runtime
             return key ?? string.Empty;
         }
 
+        /// <summary>
+        /// Gets the legacy grain type code.
+        /// </summary>
         public int TypeCode => Key.BaseTypeCode;
 
         private static GrainType GetGrainType(UniqueKey key)
@@ -180,11 +236,21 @@ namespace Orleans.Runtime
             return buf;
         }
 
+        /// <summary>
+        /// Creates the <see cref="GrainType"/> representation of a legacy grain type code.
+        /// </summary>
+        /// <param name="typeCode">The legacy grain type code.</param>
+        /// <returns>The corresponding grain type.</returns>
         public static GrainType CreateGrainTypeForGrain(int typeCode)
         {
             return new GrainType(CreateGrainType(GrainTypePrefix.LegacyGrainPrefixBytes, (ulong)typeCode));
         }
 
+        /// <summary>
+        /// Creates the <see cref="GrainType"/> representation of a legacy system target type code.
+        /// </summary>
+        /// <param name="typeCode">The legacy system target type code.</param>
+        /// <returns>The corresponding grain type.</returns>
         public static GrainType CreateGrainTypeForSystemTarget(int typeCode)
         {
             return new GrainType(CreateGrainType(GrainTypePrefix.SystemTargetPrefixBytes, (ulong)typeCode));
@@ -195,17 +261,32 @@ namespace Orleans.Runtime
             return new IdSpan(grainKeyInternCache.FindOrCreate(Key, k => Encoding.UTF8.GetBytes($"{k.N0:X16}{k.N1:X16}{(k.HasKeyExt ? "+" : null)}{k.KeyExt}")));
         }
 
+        /// <summary>
+        /// Converts this legacy identifier to its <see cref="GrainId"/> representation.
+        /// </summary>
+        /// <returns>The equivalent <see cref="GrainId"/>.</returns>
         public GrainId ToGrainId()
         {
             return new GrainId(GetGrainType(Key), this.GetGrainKey());
         }
 
+        /// <summary>
+        /// Attempts to convert a <see cref="GrainId"/> which uses the legacy grain identifier encoding.
+        /// </summary>
+        /// <param name="id">The grain identifier to convert.</param>
+        /// <param name="legacyId">When this method returns <see langword="true"/>, contains the converted legacy identifier.</param>
+        /// <returns><see langword="true"/> if <paramref name="id"/> uses the legacy encoding; otherwise, <see langword="false"/>.</returns>
         public static bool TryConvertFromGrainId(GrainId id, [NotNullWhen(true)] out LegacyGrainId? legacyId)
         {
             legacyId = FromGrainIdInternal(id);
             return legacyId is not null;
         }
 
+        /// <summary>
+        /// Converts a <see cref="GrainId"/> which uses the legacy grain identifier encoding.
+        /// </summary>
+        /// <param name="id">The grain identifier to convert.</param>
+        /// <returns>The converted legacy identifier.</returns>
         public static LegacyGrainId FromGrainId(GrainId id)
         {
             return FromGrainIdInternal(id) ?? ThrowNotLegacyGrainId(id);
@@ -252,11 +333,13 @@ namespace Orleans.Runtime
             return grainIdInternCache.FindOrCreate(key, k => new LegacyGrainId(k));
         }
 
+        /// <inheritdoc />
         public bool Equals(LegacyGrainId? other)
         {
             return other != null && Key.Equals(other.Key);
         }
 
+        /// <inheritdoc />
         public override bool Equals(object? obj)
         {
             var o = obj as LegacyGrainId;
@@ -264,6 +347,7 @@ namespace Orleans.Runtime
         }
 
         // Keep compiler happy -- it does not like classes to have Equals(...) without GetHashCode() methods
+        /// <inheritdoc />
         public override int GetHashCode()
         {
             return Key.GetHashCode();
@@ -279,6 +363,7 @@ namespace Orleans.Runtime
             return Key.GetUniformHashCode();
         }
 
+        /// <inheritdoc />
         public override string ToString()
         {
             return ToStringImpl(false);
@@ -332,6 +417,11 @@ namespace Orleans.Runtime
             return detailed ? string.Format("{0}-0x{1, 8:X8}", fullString, GetUniformHashCode()) : fullString;
         }
 
+        /// <summary>
+        /// Determines whether a type uses one of the legacy grain key interfaces.
+        /// </summary>
+        /// <param name="type">The type to inspect.</param>
+        /// <returns><see langword="true"/> if the type implements a legacy grain key interface; otherwise, <see langword="false"/>.</returns>
         public static bool IsLegacyGrainType(Type type)
         {
             return typeof(IGrainWithGuidKey).IsAssignableFrom(type)
@@ -341,6 +431,11 @@ namespace Orleans.Runtime
                 || typeof(IGrainWithIntegerCompoundKey).IsAssignableFrom(type);
         }
 
+        /// <summary>
+        /// Determines whether a type uses a legacy compound grain key interface.
+        /// </summary>
+        /// <param name="type">The type to inspect.</param>
+        /// <returns><see langword="true"/> if the type implements a legacy compound grain key interface; otherwise, <see langword="false"/>.</returns>
         public static bool IsLegacyKeyExtGrainType(Type type)
         {
             return typeof(IGrainWithGuidCompoundKey).IsAssignableFrom(type)
@@ -381,6 +476,11 @@ namespace Orleans.Runtime
             return FindOrCreateGrainId(key);
         }
 
+        /// <summary>
+        /// Gets a non-negative hash code reduced modulo the specified value.
+        /// </summary>
+        /// <param name="umod">The modulus.</param>
+        /// <returns>The hash code in the range from zero through <paramref name="umod"/> minus one.</returns>
         public uint GetHashCode_Modulo(uint umod)
         {
             int key = Key.GetHashCode();
@@ -389,6 +489,7 @@ namespace Orleans.Runtime
             return checked((uint)key);
         }
 
+        /// <inheritdoc />
         public int CompareTo(LegacyGrainId? other)
         {
             if (other is null) return 1; // null is less than any non-null instance
