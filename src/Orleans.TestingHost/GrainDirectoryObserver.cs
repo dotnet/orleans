@@ -28,6 +28,7 @@ internal sealed class GrainDirectoryObserver : IObserver<GrainDirectoryEvents.Gr
 
     internal GrainDirectoryObserver(IObservable<GrainDirectoryEvents.GrainDirectoryEvent> events)
     {
+        ArgumentNullException.ThrowIfNull(events);
         _subscription = events.Subscribe(this);
     }
 

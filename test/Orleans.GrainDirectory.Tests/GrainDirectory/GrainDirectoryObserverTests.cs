@@ -23,6 +23,14 @@ public sealed class GrainDirectoryObserverTests
     private static readonly RingRange OperationRange = RingRange.FromPoint(0x1234_5678);
 
     [Fact]
+    public void Constructor_NullEventSource_ThrowsArgumentNullException()
+    {
+        var exception = Assert.Throws<ArgumentNullException>(() => new GrainDirectoryObserver(null!));
+
+        Assert.Equal("events", exception.ParamName);
+    }
+
+    [Fact]
     public async Task WaitForConvergenceAsync_ReturnsTrueOnlyAfterLocalAndEveryTargetPartitionAreObserved()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
