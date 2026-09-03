@@ -1,5 +1,6 @@
 using System;
 using System.Net;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
@@ -30,7 +31,11 @@ namespace Orleans.Networking.Shared
             this.schedulers = schedulers;
         }
 
-        public async ValueTask<IConnectionListener> BindAsync(EndPoint endpoint, CancellationToken cancellationToken = default)
+        [System.Diagnostics.CodeAnalysis.SuppressMessage(
+            "Reliability",
+            "CA2000:Dispose objects before losing scope",
+            Justification = "Successful binding transfers ownership to the caller; failed binding transfers the listener to DisposeAndThrowAsync.")]
+        public ValueTask<IConnectionListener> BindAsync(EndPoint endpoint, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(endpoint);
             if (endpoint is not IPEndPoint ipEndpoint)
@@ -42,13 +47,19 @@ namespace Orleans.Networking.Shared
             try
             {
                 listener.Bind();
-                return listener;
+                return new(listener);
             }
-            catch
+            catch (Exception exception)
             {
-                await listener.DisposeAsync();
-                throw;
+                return DisposeAndThrowAsync(listener, exception);
             }
+        }
+
+        private static async ValueTask<IConnectionListener> DisposeAndThrowAsync(SocketConnectionListener listener, Exception exception)
+        {
+            await listener.DisposeAsync();
+            ExceptionDispatchInfo.Throw(exception);
+            return null!;
         }
     }
 }
