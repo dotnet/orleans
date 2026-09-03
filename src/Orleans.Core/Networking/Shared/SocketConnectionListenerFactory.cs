@@ -30,7 +30,7 @@ namespace Orleans.Networking.Shared
             this.schedulers = schedulers;
         }
 
-        public ValueTask<IConnectionListener> BindAsync(EndPoint endpoint, CancellationToken cancellationToken = default)
+        public async ValueTask<IConnectionListener> BindAsync(EndPoint endpoint, CancellationToken cancellationToken = default)
         {
             if (!(endpoint is IPEndPoint ipEndpoint))
             {
@@ -38,8 +38,16 @@ namespace Orleans.Networking.Shared
             }
 
             var listener = new SocketConnectionListener(ipEndpoint, this.socketConnectionOptions, this.trace, this.schedulers);
-            listener.Bind();
-            return new ValueTask<IConnectionListener>(listener);
+            try
+            {
+                listener.Bind();
+                return listener;
+            }
+            catch
+            {
+                await listener.DisposeAsync();
+                throw;
+            }
         }
     }
 }

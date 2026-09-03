@@ -61,6 +61,10 @@ namespace Orleans
         /// Acquires the lock asynchronously.
         /// </summary>
         /// <returns>An <see cref="IDisposable"/> which must be used to release the lock.</returns>
+        [System.Diagnostics.CodeAnalysis.SuppressMessage(
+            "Reliability",
+            "CA2000:Dispose objects before losing scope",
+            Justification = "Ownership of each LockReleaser is transferred to the caller through the returned ValueTask.")]
         public ValueTask<IDisposable> LockAsync()
         {
             Task wait = semaphore.WaitAsync();

@@ -81,7 +81,7 @@ namespace Orleans.Runtime
         {
             try
             {
-                _shutdownCts.Cancel();
+                await _shutdownCts.CancelAsync();
 
                 if (_runTask is { } task)
                 {
@@ -227,7 +227,7 @@ namespace Orleans.Runtime
                 return;
             }
 
-            _shutdownCts.Cancel();
+            await _shutdownCts.CancelAsync();
             if (_runTask is Task task)
             {
                 await task.SuppressThrowing();

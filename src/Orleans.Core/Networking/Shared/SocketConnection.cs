@@ -119,8 +119,8 @@ namespace Orleans.Networking.Shared
         // Only called after connection middleware is complete which means the ConnectionClosed token has fired.
         public override async ValueTask DisposeAsync()
         {
-            Transport.Input.Complete();
-            Transport.Output.Complete();
+            await Transport.Input.CompleteAsync();
+            await Transport.Output.CompleteAsync();
 
             if (_processingTask != null)
             {
@@ -172,7 +172,7 @@ namespace Orleans.Networking.Shared
             finally
             {
                 // If Shutdown() has already bee called, assume that was the reason ProcessReceives() exited.
-                Input.Complete(_shutdownReason ?? error);
+                await Input.CompleteAsync(_shutdownReason ?? error);
 
                 FireConnectionClosed();
 
@@ -259,7 +259,7 @@ namespace Orleans.Networking.Shared
                 Shutdown(shutdownReason);
 
                 // Complete the output after disposing the socket
-                Output.Complete(unexpectedError);
+                await Output.CompleteAsync(unexpectedError);
 
                 // Cancel any pending flushes so that the input loop is un-paused
                 Input.CancelPendingFlush();

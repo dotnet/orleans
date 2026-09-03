@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -11,6 +12,8 @@ namespace Orleans.Internal
     /// </summary>
     internal static class OrleansTaskExtentions
     {
+        private static readonly ConcurrentDictionary<ErrorCode, Action<ILogger, string, Exception?>> LogExceptionDelegates = new();
+
         public static ConfiguredTaskAwaitable SuppressThrowing(this ValueTask task) => task.AsTask().ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
         public static ConfiguredTaskAwaitable SuppressThrowing(this Task task) => task.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
 
@@ -34,8 +37,10 @@ namespace Orleans.Internal
             }
             catch (Exception exc)
             {
-                // TODO: pending on https://github.com/dotnet/runtime/issues/110570
-                logger.LogError((int)errorCode, exc, "{Message}", message);
+                var log = LogExceptionDelegates.GetOrAdd(
+                    errorCode,
+                    static code => LoggerMessage.Define<string>(LogLevel.Error, new EventId((int)code), "{Message}"));
+                log(logger, message, exc);
                 throw;
             }
         }
@@ -99,7 +104,7 @@ namespace Orleans.Internal
             // We got done before the timeout, or were able to complete before this code ran, return the result
             if (taskToComplete == completedTask)
             {
-                timeoutCancellationTokenSource.Cancel();
+                await timeoutCancellationTokenSource.CancelAsync();
                 // Await this so as to propagate the exception correctly
                 await taskToComplete;
                 return;
@@ -133,7 +138,7 @@ namespace Orleans.Internal
             // We got done before the timeout, or were able to complete before this code ran, return the result
             if (taskToComplete == completedTask)
             {
-                timeoutCancellationTokenSource.Cancel();
+                await timeoutCancellationTokenSource.CancelAsync();
                 // Await this so as to propagate the exception correctly
                 return await taskToComplete;
             }

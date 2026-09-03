@@ -11,6 +11,7 @@ namespace Orleans.Statistics;
 internal sealed class EnvironmentStatisticsProvider : IEnvironmentStatisticsProvider, IDisposable
 {
     private const float OneKiloByte = 1024f;
+    private static readonly IMeterFactory MeterFactory = new DirectMeterFactory();
 
     private long _availableMemoryBytes;
     private long _maximumAvailableMemoryBytes;
@@ -27,7 +28,7 @@ internal sealed class EnvironmentStatisticsProvider : IEnvironmentStatisticsProv
     private readonly DualModeKalmanFilter _memoryUsageFilter = new();
 
     public EnvironmentStatisticsProvider()
-        : this(new OrleansInstruments(new DirectMeterFactory()))
+        : this(new OrleansInstruments(MeterFactory))
     {
     }
 

@@ -610,6 +610,10 @@ namespace Orleans.Runtime
     [SerializerTransparent]
     public abstract class Request : RequestBase
     {
+        [System.Diagnostics.CodeAnalysis.SuppressMessage(
+            "Performance",
+            "CA1849:Call async methods when in an async method",
+            Justification = "GetResult is called only after IsCompleted and must consume a completed ValueTask source without allocating.")]
         public sealed override ValueTask<Response> Invoke()
         {
             try
@@ -749,6 +753,10 @@ namespace Orleans.Runtime
     public abstract class TaskRequest : RequestBase
     {
         /// <inheritdoc/>
+        [System.Diagnostics.CodeAnalysis.SuppressMessage(
+            "Performance",
+            "CA1849:Call async methods when in an async method",
+            Justification = "GetResult is called only after IsCompleted, so it observes completion without blocking or allocating.")]
         public sealed override ValueTask<Response> Invoke()
         {
             try

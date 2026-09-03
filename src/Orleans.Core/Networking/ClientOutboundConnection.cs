@@ -77,7 +77,11 @@ namespace Orleans.Runtime.Messaging
                     });
 
                 var preamble = await connectionPreambleHelper.Read(this.Context);
-                LogInformationEstablishedConnection(this.Log, preamble.SiloAddress, preamble.NetworkProtocolVersion.ToString());
+                if (this.Log.IsEnabled(LogLevel.Information))
+                {
+                    var protocolVersion = preamble.NetworkProtocolVersion.ToString();
+                    LogInformationEstablishedConnection(this.Log, preamble.SiloAddress, protocolVersion);
+                }
 
                 if (preamble.ClusterId != myClusterId)
                 {
@@ -170,6 +174,7 @@ namespace Orleans.Runtime.Messaging
 
         [LoggerMessage(
             Level = LogLevel.Information,
+            SkipEnabledCheck = true,
             Message = "Established connection to {Silo} with protocol version {ProtocolVersion}"
         )]
         private static partial void LogInformationEstablishedConnection(ILogger logger, SiloAddress? silo, string protocolVersion);

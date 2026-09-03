@@ -43,43 +43,51 @@ namespace Orleans.Networking.Shared
                 throw new InvalidOperationException("Transport already bound");
             }
 
-            var listenSocket = new Socket(EndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp)
+            Socket? listenSocket = new Socket(EndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp)
             {
                 LingerState = new LingerOption(true, 0),
                 NoDelay = true
             };
 
-            listenSocket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
-            if (_options.KeepAlive)
-            {
-                listenSocket.EnableKeepAlive(
-                    timeSeconds: _options.KeepAliveTimeSeconds,
-                    intervalSeconds: _options.KeepAliveIntervalSeconds,
-                    retryCount: _options.KeepAliveRetryCount);
-            }
-
-            listenSocket.EnableFastPath();
-
-            // Kestrel expects IPv6Any to bind to both IPv6 and IPv4
-            if (EndPoint is IPEndPoint ip && Equals(ip.Address, IPAddress.IPv6Any))
-            {
-                listenSocket.DualMode = true;
-            }
-
             try
             {
-                listenSocket.Bind(EndPoint);
+                listenSocket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+                if (_options.KeepAlive)
+                {
+                    listenSocket.EnableKeepAlive(
+                        timeSeconds: _options.KeepAliveTimeSeconds,
+                        intervalSeconds: _options.KeepAliveIntervalSeconds,
+                        retryCount: _options.KeepAliveRetryCount);
+                }
+
+                listenSocket.EnableFastPath();
+
+                // Kestrel expects IPv6Any to bind to both IPv6 and IPv4
+                if (EndPoint is IPEndPoint ip && Equals(ip.Address, IPAddress.IPv6Any))
+                {
+                    listenSocket.DualMode = true;
+                }
+
+                try
+                {
+                    listenSocket.Bind(EndPoint);
+                }
+                catch (SocketException e) when (e.SocketErrorCode == SocketError.AddressAlreadyInUse)
+                {
+                    throw new AddressInUseException(e.Message, e);
+                }
+
+                EndPoint = listenSocket.LocalEndPoint!;
+
+                listenSocket.Listen(512);
+
+                _listenSocket = listenSocket;
+                listenSocket = null;
             }
-            catch (SocketException e) when (e.SocketErrorCode == SocketError.AddressAlreadyInUse)
+            finally
             {
-                throw new AddressInUseException(e.Message, e);
+                listenSocket?.Dispose();
             }
-
-            EndPoint = listenSocket.LocalEndPoint!;
-
-            listenSocket.Listen(512);
-
-            _listenSocket = listenSocket;
         }
 
         public async ValueTask<ConnectionContext?> AcceptAsync(CancellationToken cancellationToken = default)
@@ -88,21 +96,29 @@ namespace Orleans.Networking.Shared
             {
                 try
                 {
-                    var acceptSocket = await _listenSocket!.AcceptAsync();
-                    acceptSocket.NoDelay = _options.NoDelay;
-                    if (_options.KeepAlive)
+                    Socket? acceptSocket = await _listenSocket!.AcceptAsync();
+                    try
                     {
-                        acceptSocket.EnableKeepAlive(
-                            timeSeconds: _options.KeepAliveTimeSeconds,
-                            intervalSeconds: _options.KeepAliveIntervalSeconds,
-                            retryCount: _options.KeepAliveRetryCount);
+                        acceptSocket.NoDelay = _options.NoDelay;
+                        if (_options.KeepAlive)
+                        {
+                            acceptSocket.EnableKeepAlive(
+                                timeSeconds: _options.KeepAliveTimeSeconds,
+                                intervalSeconds: _options.KeepAliveIntervalSeconds,
+                                retryCount: _options.KeepAliveRetryCount);
+                        }
+
+                        var connection = new SocketConnection(acceptSocket, _memoryPool, _schedulers.GetScheduler(), _trace);
+
+                        connection.Start();
+                        acceptSocket = null;
+
+                        return connection;
                     }
-
-                    var connection = new SocketConnection(acceptSocket, _memoryPool, _schedulers.GetScheduler(), _trace);
-
-                    connection.Start();
-
-                    return connection;
+                    finally
+                    {
+                        acceptSocket?.Dispose();
+                    }
                 }
                 catch (ObjectDisposedException)
                 {

@@ -138,7 +138,12 @@ namespace Orleans.Runtime.Messaging
 
                 this.Send(rejection);
 
-                LogDebugRejectingObsoleteRequest(this.Log, msg.TargetSilo?.ToString() ?? "null", this.LocalSiloAddress.ToString(), msg);
+                if (this.Log.IsEnabled(LogLevel.Debug))
+                {
+                    var targetSilo = msg.TargetSilo?.ToString() ?? "null";
+                    var siloAddress = this.LocalSiloAddress.ToString();
+                    LogDebugRejectingObsoleteRequest(this.Log, targetSilo, siloAddress, msg);
+                }
             }
         }
 
@@ -319,6 +324,7 @@ namespace Orleans.Runtime.Messaging
 
         [LoggerMessage(
             Level = LogLevel.Debug,
+            SkipEnabledCheck = true,
             Message = "Rejecting an obsolete request; target was {TargetSilo}, but this silo is {SiloAddress}. The rejected message is {Message}."
         )]
         private static partial void LogDebugRejectingObsoleteRequest(ILogger logger, string targetSilo, string siloAddress, Message message);

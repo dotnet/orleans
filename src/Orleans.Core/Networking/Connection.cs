@@ -356,7 +356,7 @@ namespace Orleans.Runtime.Messaging
             }
             finally
             {
-                _transport!.Input.Complete();
+                await _transport!.Input.CompleteAsync();
                 this.StartClosing(error);
             }
         }
@@ -421,7 +421,7 @@ namespace Orleans.Runtime.Messaging
             }
             finally
             {
-                _transport!.Output.Complete();
+                await _transport!.Output.CompleteAsync();
                 this.StartClosing(error);
             }
         }

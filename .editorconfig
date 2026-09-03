@@ -627,3 +627,23 @@ dotnet_diagnostic.RS0026.severity = suggestion
 
 # RS0027: API with optional parameter(s) should have the most parameters amongst its public overloads
 dotnet_diagnostic.RS0027.severity = suggestion
+
+# Core runtime performance and reliability diagnostics.
+[src/{Orleans.Core.Abstractions,Orleans.Core}/**.cs]
+dotnet_diagnostic.CA1848.severity = warning
+dotnet_diagnostic.CA1849.severity = warning
+dotnet_diagnostic.CA1873.severity = warning
+dotnet_diagnostic.CA2000.severity = warning
+dotnet_diagnostic.CA2002.severity = warning
+
+# Networking is the synchronization and transport boundary in Orleans.Runtime.
+[src/Orleans.Runtime/Networking/**.cs]
+dotnet_diagnostic.CA1848.severity = warning
+dotnet_diagnostic.CA1849.severity = warning
+dotnet_diagnostic.CA1873.severity = warning
+dotnet_diagnostic.CA2000.severity = warning
+dotnet_diagnostic.CA2002.severity = warning
+
+# The System.Text.Json codec directly owns disposable writer resources.
+[src/Orleans.Serialization.SystemTextJson/**.cs]
+dotnet_diagnostic.CA2000.severity = warning
