@@ -32,9 +32,10 @@ namespace Orleans.Networking.Shared
 
         public async ValueTask<IConnectionListener> BindAsync(EndPoint endpoint, CancellationToken cancellationToken = default)
         {
-            if (!(endpoint is IPEndPoint ipEndpoint))
+            ArgumentNullException.ThrowIfNull(endpoint);
+            if (endpoint is not IPEndPoint ipEndpoint)
             {
-                throw new ArgumentNullException(nameof(endpoint));
+                throw new ArgumentException($"The endpoint must be an {nameof(IPEndPoint)}.", nameof(endpoint));
             }
 
             var listener = new SocketConnectionListener(ipEndpoint, this.socketConnectionOptions, this.trace, this.schedulers);
