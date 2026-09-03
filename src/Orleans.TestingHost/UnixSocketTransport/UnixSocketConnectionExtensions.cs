@@ -7,8 +7,16 @@ using Orleans.Runtime.Messaging;
 
 namespace Orleans.TestingHost.UnixSocketTransport;
 
+/// <summary>
+/// Extension methods for configuring the Orleans Unix domain socket transport.
+/// </summary>
 public static class UnixSocketConnectionExtensions
 {
+    /// <summary>
+    /// Configures silo and gateway connections to use Unix domain sockets.
+    /// </summary>
+    /// <param name="siloBuilder">The silo builder.</param>
+    /// <returns>The provided silo builder.</returns>
     public static ISiloBuilder UseUnixSocketConnection(this ISiloBuilder siloBuilder)
     {
         siloBuilder.ConfigureServices(services =>
@@ -21,6 +29,11 @@ public static class UnixSocketConnectionExtensions
         return siloBuilder;
     }
 
+    /// <summary>
+    /// Configures client connections to use Unix domain sockets.
+    /// </summary>
+    /// <param name="clientBuilder">The client builder.</param>
+    /// <returns>The provided client builder.</returns>
     public static IClientBuilder UseUnixSocketConnection(this IClientBuilder clientBuilder)
     {
         clientBuilder.ConfigureServices(services =>

@@ -15,11 +15,34 @@ namespace Orleans.TestingHost
     /// </summary>
     public static class StandaloneSiloHost
     {
+        /// <summary>
+        /// The standard output prefix which precedes the silo address.
+        /// </summary>
         public const string SiloAddressLog = "#### SILO ";
+
+        /// <summary>
+        /// The standard output prefix which precedes the gateway address.
+        /// </summary>
         public const string GatewayAddressLog = "#### GATEWAY ";
+
+        /// <summary>
+        /// The standard output message which indicates that the silo has started.
+        /// </summary>
         public const string StartedLog = "#### STARTED";
+
+        /// <summary>
+        /// The standard input command which requests that the silo shut down.
+        /// </summary>
         public const string ShutdownCommand = "#### SHUTDOWN";
 
+        /// <summary>
+        /// Runs a standalone silo process.
+        /// </summary>
+        /// <param name="args">
+        /// The command-line arguments. The first argument is the identifier of the process to monitor, and the second is the
+        /// serialized silo configuration.
+        /// </param>
+        /// <returns>A task which completes when the silo has shut down.</returns>
         public static async Task Main(string[] args)
         {
             if (args.Length < 2)

@@ -881,6 +881,11 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// Creates and starts an in-process silo.
+    /// </summary>
+    /// <param name="siloOptions">The silo options.</param>
+    /// <returns>A handle to the started silo.</returns>
     public Task<InProcessSiloHandle> CreateSiloAsync(InProcessTestSiloSpecificOptions siloOptions)
         => CreateSiloAsync(siloOptions, CancellationToken.None);
 
