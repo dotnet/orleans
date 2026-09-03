@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Threading;
@@ -66,7 +67,7 @@ namespace Orleans.Storage
 
             try
             {
-                var initMsg = string.Format("Init: Name={0} ServiceId={1} Table={2} DeleteStateOnClear={3}",
+                var initMsg = string.Format(CultureInfo.CurrentCulture, "Init: Name={0} ServiceId={1} Table={2} DeleteStateOnClear={3}",
                         this.name, this.options.ServiceId, this.options.TableName, this.options.DeleteStateOnClear);
 
                 LogInformationInitializingDynamoDBGrainStorage(logger, this.name, initMsg);
@@ -139,7 +140,7 @@ namespace Orleans.Storage
                     {
                         GrainType = fields[GRAIN_TYPE_PROPERTY_NAME].S,
                         GrainReference = fields[GRAIN_REFERENCE_PROPERTY_NAME].S,
-                        ETag = int.Parse(fields[ETAG_PROPERTY_NAME].N),
+                        ETag = int.Parse(fields[ETAG_PROPERTY_NAME].N, NumberStyles.Integer, CultureInfo.InvariantCulture),
                         State = fields.TryGetValue(BINARY_STATE_PROPERTY_NAME, out var propertyName) ? propertyName.B?.ToArray() : null,
                     };
                 }).ConfigureAwait(false);
@@ -149,7 +150,7 @@ namespace Orleans.Storage
                 var loadedState = ConvertFromStorageFormat<T>(record);
                 grainState.RecordExists = loadedState != null;
                 grainState.State = loadedState ?? CreateInstance<T>();
-                grainState.ETag = record.ETag.ToString();
+                grainState.ETag = record.ETag.ToString(CultureInfo.InvariantCulture);
             }
             else
             {
@@ -189,7 +190,7 @@ namespace Orleans.Storage
             var fields = new Dictionary<string, AttributeValue>();
             if (this.options.TimeToLive.HasValue)
             {
-                fields.Add(GRAIN_TTL_PROPERTY_NAME, new AttributeValue { N = ((DateTimeOffset)DateTime.UtcNow.Add(this.options.TimeToLive.Value)).ToUnixTimeSeconds().ToString() });
+                fields.Add(GRAIN_TTL_PROPERTY_NAME, new AttributeValue { N = ((DateTimeOffset)DateTime.UtcNow.Add(this.options.TimeToLive.Value)).ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture) });
             }
 
             if (record.State != null && record.State.Length > 0)
@@ -205,10 +206,10 @@ namespace Orleans.Storage
             if (clear)
             {
                 int currentEtag;
-                int.TryParse(grainState.ETag, out currentEtag);
+                int.TryParse(grainState.ETag, NumberStyles.Integer, CultureInfo.InvariantCulture, out currentEtag);
                 newEtag = currentEtag;
                 newEtag++;
-                fields.Add(ETAG_PROPERTY_NAME, new AttributeValue { N = newEtag.ToString() });
+                fields.Add(ETAG_PROPERTY_NAME, new AttributeValue { N = newEtag.ToString(CultureInfo.InvariantCulture) });
 
                 if (string.IsNullOrWhiteSpace(grainState.ETag))
                 {
@@ -224,7 +225,7 @@ namespace Orleans.Storage
                         { GRAIN_REFERENCE_PROPERTY_NAME, new AttributeValue(record.GrainReference) },
                         { GRAIN_TYPE_PROPERTY_NAME, new AttributeValue(record.GrainType) }
                     };
-                    var conditionalValues = new Dictionary<string, AttributeValue> { { CURRENT_ETAG_ALIAS, new AttributeValue { N = currentEtag.ToString() } } };
+                    var conditionalValues = new Dictionary<string, AttributeValue> { { CURRENT_ETAG_ALIAS, new AttributeValue { N = currentEtag.ToString(CultureInfo.InvariantCulture) } } };
                     var expression = $"{ETAG_PROPERTY_NAME} = {CURRENT_ETAG_ALIAS}";
                     await this.storage.UpsertEntryAsync(this.options.TableName, keys, fields, expression, conditionalValues).ConfigureAwait(false);
                 }
@@ -245,17 +246,17 @@ namespace Orleans.Storage
                 keys.Add(GRAIN_TYPE_PROPERTY_NAME, new AttributeValue(record.GrainType));
 
                 int currentEtag;
-                int.TryParse(grainState.ETag, out currentEtag);
+                int.TryParse(grainState.ETag, NumberStyles.Integer, CultureInfo.InvariantCulture, out currentEtag);
                 newEtag = currentEtag;
                 newEtag++;
-                fields.Add(ETAG_PROPERTY_NAME, new AttributeValue { N = newEtag.ToString() });
+                fields.Add(ETAG_PROPERTY_NAME, new AttributeValue { N = newEtag.ToString(CultureInfo.InvariantCulture) });
 
-                var conditionalValues = new Dictionary<string, AttributeValue> { { CURRENT_ETAG_ALIAS, new AttributeValue { N = currentEtag.ToString() } } };
+                var conditionalValues = new Dictionary<string, AttributeValue> { { CURRENT_ETAG_ALIAS, new AttributeValue { N = currentEtag.ToString(CultureInfo.InvariantCulture) } } };
                 var expression = $"{ETAG_PROPERTY_NAME} = {CURRENT_ETAG_ALIAS}";
                 await this.storage.UpsertEntryAsync(this.options.TableName, keys, fields, expression, conditionalValues).ConfigureAwait(false);
             }
 
-            grainState.ETag = newEtag.ToString();
+            grainState.ETag = newEtag.ToString(CultureInfo.InvariantCulture);
             grainState.RecordExists = !clear;
         }
 
@@ -274,7 +275,14 @@ namespace Orleans.Storage
             LogTraceClearingGrainState(logger, grainType, partitionKey, grainId, grainState.ETag, this.options.DeleteStateOnClear, this.options.TableName);
 
             string rowKey = AWSUtils.ValidateDynamoDBRowKey(grainType);
-            var record = new GrainStateRecord { GrainReference = partitionKey, ETag = string.IsNullOrWhiteSpace(grainState.ETag) ? 0 : int.Parse(grainState.ETag), GrainType = rowKey };
+            var record = new GrainStateRecord
+            {
+                GrainReference = partitionKey,
+                ETag = string.IsNullOrWhiteSpace(grainState.ETag)
+                    ? 0
+                    : int.Parse(grainState.ETag, NumberStyles.Integer, CultureInfo.InvariantCulture),
+                GrainType = rowKey
+            };
 
             var operation = "Clearing";
             try
@@ -291,7 +299,7 @@ namespace Orleans.Storage
                     Dictionary<string, AttributeValue>? conditionalValues = null;
                     if (!string.IsNullOrWhiteSpace(grainState.ETag))
                     {
-                        conditionalValues = new Dictionary<string, AttributeValue> { { CURRENT_ETAG_ALIAS, new AttributeValue { N = record.ETag.ToString() } } };
+                        conditionalValues = new Dictionary<string, AttributeValue> { { CURRENT_ETAG_ALIAS, new AttributeValue { N = record.ETag.ToString(CultureInfo.InvariantCulture) } } };
                         expression = $"{ETAG_PROPERTY_NAME} = {CURRENT_ETAG_ALIAS}";
                     }
 
@@ -341,11 +349,11 @@ namespace Orleans.Storage
             catch (Exception exc)
             {
                 var sb = new StringBuilder();
-                sb.AppendFormat("Unable to convert from storage format GrainStateEntity.Data={0}", entity.State);
+                sb.AppendFormat(CultureInfo.CurrentCulture, "Unable to convert from storage format GrainStateEntity.Data={0}", entity.State);
 
                 if (dataValue != null)
                 {
-                    sb.Append($"Data Value={dataValue} Type={dataValue.GetType()}");
+                    sb.AppendFormat(CultureInfo.CurrentCulture, "Data Value={0} Type={1}", dataValue, dataValue.GetType());
                 }
 
                 var message = sb.ToString();
@@ -367,7 +375,7 @@ namespace Orleans.Storage
 
             var pkSize = GRAIN_REFERENCE_PROPERTY_NAME.Length + entity.GrainReference.Length;
             var rkSize = GRAIN_TYPE_PROPERTY_NAME.Length + entity.GrainType.Length;
-            var versionSize = ETAG_PROPERTY_NAME.Length + entity.ETag.ToString().Length;
+            var versionSize = ETAG_PROPERTY_NAME.Length + entity.ETag.ToString(CultureInfo.InvariantCulture).Length;
 
             if ((pkSize + rkSize + versionSize + dataSize) > MAX_DATA_SIZE)
             {

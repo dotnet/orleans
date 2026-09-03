@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using Amazon.DynamoDBv2.Model;
@@ -66,7 +67,7 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
         {
             (key, states) = await LoadSnapshotAsync().ConfigureAwait(false);
 
-            if (string.IsNullOrEmpty(key.ETag.ToString()))
+            if (!key.ETag.HasValue)
             {
                 LogDebugLoadedV0Fresh(this.partitionKey);
                 this.requiresReload = false;
@@ -130,7 +131,7 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
                 ? this.ConvertFromStorageFormat<TransactionalStateMetaData>(this.key.Metadata)
                 : new TransactionalStateMetaData();
             this.requiresReload = false;
-            return new TransactionalStorageLoadResponse<TState>(this.key.ETag.ToString(), committedState, this.key.CommittedSequenceId, metadata, PrepareRecordsToRecover);
+            return new TransactionalStorageLoadResponse<TState>(this.key.ETag.Value.ToString(CultureInfo.InvariantCulture), committedState, this.key.CommittedSequenceId, metadata, PrepareRecordsToRecover);
         }
         catch (Exception ex)
         {
@@ -152,7 +153,7 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
 
         try
         {
-            var keyETag = key.ETag?.ToString();
+            var keyETag = key.ETag?.ToString(CultureInfo.InvariantCulture);
             if ((!string.IsNullOrWhiteSpace(keyETag) || !string.IsNullOrWhiteSpace(expectedETag)) &&
                 keyETag != expectedETag)
             {
@@ -187,7 +188,7 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
                         ConditionExpression = $"{DynamoDBTransactionalStateConstants.ETAG_PROPERTY_NAME} = {DynamoDBTransactionalStateConstants.CURRENT_ETAG_ALIAS}",
                         ExpressionAttributeValues = new Dictionary<string, AttributeValue>
                         {
-                            [DynamoDBTransactionalStateConstants.CURRENT_ETAG_ALIAS] = new AttributeValue { N = entity.ETag.ToString() }
+                            [DynamoDBTransactionalStateConstants.CURRENT_ETAG_ALIAS] = new AttributeValue { N = entity.ETag!.Value.ToString(CultureInfo.InvariantCulture) }
                         }
                     };
 
@@ -213,7 +214,7 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
                         {
                             // overwrite with new pending state
                             StateEntity existing = states[pos].Value;
-                            var currentETag = existing.ETag.ToString();
+                            var currentETag = existing.ETag!.Value.ToString(CultureInfo.InvariantCulture);
                             existing.TransactionId = s.TransactionId;
                             existing.TransactionTimestamp = s.TimeStamp;
                             existing.TransactionManager = this.ConvertToStorageFormat(s.TransactionManager);
@@ -288,7 +289,7 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
                         ConditionExpression = $"ETag = {DynamoDBTransactionalStateConstants.CURRENT_ETAG_ALIAS}",
                         ExpressionAttributeValues = new Dictionary<string, AttributeValue>
                         {
-                            [DynamoDBTransactionalStateConstants.CURRENT_ETAG_ALIAS] = new AttributeValue { N = stateToDelete.Value.ETag.ToString() }
+                            [DynamoDBTransactionalStateConstants.CURRENT_ETAG_ALIAS] = new AttributeValue { N = stateToDelete.Value.ETag!.Value.ToString(CultureInfo.InvariantCulture) }
                         }
                     };
                     await batchOperation.Add(
@@ -307,7 +308,7 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
 
             this.requiresReload = false;
             LogDebugStoredETag(this.partitionKey, this.key.CommittedSequenceId, this.key.ETag);
-            return key.ETag!.Value.ToString();
+            return key.ETag!.Value.ToString(CultureInfo.InvariantCulture);
         }
         catch (InconsistentStateException)
         {
@@ -364,8 +365,8 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
 
         throw new InconsistentStateException(
             "Could not load a consistent DynamoDB transactional state snapshot.",
-            storedEtag: keyBefore.ETag?.ToString() ?? "null",
-            currentEtag: keyAfter.ETag?.ToString() ?? "null");
+            storedEtag: keyBefore.ETag?.ToString(CultureInfo.InvariantCulture) ?? "null",
+            currentEtag: keyAfter.ETag?.ToString(CultureInfo.InvariantCulture) ?? "null");
     }
 
     /// <summary>
@@ -551,7 +552,7 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
                     $"{DynamoDBTransactionalStateConstants.ETAG_PROPERTY_NAME} = {DynamoDBTransactionalStateConstants.CURRENT_ETAG_ALIAS}";
                 keyPut.ExpressionAttributeValues = new Dictionary<string, AttributeValue>
                 {
-                    [DynamoDBTransactionalStateConstants.CURRENT_ETAG_ALIAS] = new AttributeValue { N = currentETag.Value.ToString() }
+                    [DynamoDBTransactionalStateConstants.CURRENT_ETAG_ALIAS] = new AttributeValue { N = currentETag.Value.ToString(CultureInfo.InvariantCulture) }
                 };
             }
             else
@@ -591,7 +592,7 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
                 throw new InconsistentStateException(
                     conflictMessage,
                     storedEtag: "Unknown",
-                    currentEtag: currentETag?.ToString() ?? "null",
+                    currentEtag: currentETag?.ToString(CultureInfo.InvariantCulture) ?? "null",
                     exception);
             }
             catch
@@ -708,7 +709,7 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
 
     private readonly struct StatesLogRecord(List<KeyValuePair<long, StateEntity>> states)
     {
-        public override string ToString() => string.Join(",", states.Select(s => s.Key.ToString("x16")));
+        public override string ToString() => string.Join(",", states.Select(s => s.Key.ToString("x16", CultureInfo.InvariantCulture)));
     }
 
     [LoggerMessage(
