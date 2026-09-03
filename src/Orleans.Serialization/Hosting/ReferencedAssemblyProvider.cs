@@ -134,9 +134,7 @@ namespace Orleans.Serialization.Internal
         /// <param name="assembly">
         /// The assembly whose dependency context is inspected, or <see langword="null"/> to use the entry assembly.
         /// </param>
-#if NET5_0_OR_GREATER
         [RequiresAssemblyFiles("Dependency-context discovery reads assembly files. Use GetRelevantAssemblies for single-file-compatible discovery.")]
-#endif
         public static void AddFromDependencyContext(HashSet<Assembly> parts, Assembly? assembly = null)
         {
             assembly ??= Assembly.GetEntryAssembly();

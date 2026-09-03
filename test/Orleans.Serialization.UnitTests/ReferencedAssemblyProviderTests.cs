@@ -1,9 +1,16 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+#if NET10_0_OR_GREATER
+using System.IO;
+#endif
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
+#if NET10_0_OR_GREATER
+using System.Reflection.Metadata;
+using System.Reflection.PortableExecutable;
+#endif
 using Orleans.Serialization.Internal;
 
 namespace Orleans.Serialization.UnitTests;
@@ -48,6 +55,34 @@ public sealed class ReferencedAssemblyProviderTests
         Assert.Contains(nameof(ReferencedAssemblyProvider.GetRelevantAssemblies), attribute!.Message);
     }
 
+#if NET10_0_OR_GREATER
+    [Fact]
+    public void NetStandardAssetDependencyContextDiscoveryExposesAssemblyFileRequirement()
+    {
+        var assemblyPath = Path.Combine(
+            AppContext.BaseDirectory,
+            "TestAssets",
+            "Orleans.Serialization.dll");
+        using var stream = File.OpenRead(assemblyPath);
+        using var peReader = new PEReader(stream);
+        var metadata = peReader.GetMetadataReader();
+        var providerType = metadata.TypeDefinitions
+            .Select(metadata.GetTypeDefinition)
+            .Single(type =>
+                metadata.GetString(type.Namespace) == "Orleans.Serialization.Internal"
+                && metadata.GetString(type.Name) == nameof(ReferencedAssemblyProvider));
+        var method = providerType.GetMethods()
+            .Select(metadata.GetMethodDefinition)
+            .Single(method => metadata.GetString(method.Name) == nameof(ReferencedAssemblyProvider.AddFromDependencyContext));
+        var attributeNames = method.GetCustomAttributes()
+            .Select(handle => GetAttributeTypeName(metadata, metadata.GetCustomAttribute(handle)));
+
+        Assert.Contains(
+            "System.Diagnostics.CodeAnalysis.RequiresAssemblyFilesAttribute",
+            attributeNames);
+    }
+#endif
+
     private static Assembly CreateApplicationPartAssembly(string referencedAssemblyName)
     {
         var name = new AssemblyName($"ReferencedAssemblyProviderTests_{Guid.NewGuid():N}");
@@ -57,4 +92,29 @@ public sealed class ReferencedAssemblyProviderTests
         assembly.DefineDynamicModule("Main");
         return assembly;
     }
+
+#if NET10_0_OR_GREATER
+    private static string GetAttributeTypeName(MetadataReader metadata, CustomAttribute attribute)
+    {
+        var typeHandle = attribute.Constructor.Kind switch
+        {
+            HandleKind.MemberReference => metadata.GetMemberReference((MemberReferenceHandle)attribute.Constructor).Parent,
+            HandleKind.MethodDefinition => metadata.GetMethodDefinition((MethodDefinitionHandle)attribute.Constructor).GetDeclaringType(),
+            _ => throw new InvalidOperationException($"Unsupported attribute constructor handle: {attribute.Constructor.Kind}."),
+        };
+
+        return typeHandle.Kind switch
+        {
+            HandleKind.TypeDefinition => GetTypeName(metadata, metadata.GetTypeDefinition((TypeDefinitionHandle)typeHandle)),
+            HandleKind.TypeReference => GetTypeName(metadata, metadata.GetTypeReference((TypeReferenceHandle)typeHandle)),
+            _ => throw new InvalidOperationException($"Unsupported attribute type handle: {typeHandle.Kind}."),
+        };
+    }
+
+    private static string GetTypeName(MetadataReader metadata, TypeDefinition type)
+        => $"{metadata.GetString(type.Namespace)}.{metadata.GetString(type.Name)}";
+
+    private static string GetTypeName(MetadataReader metadata, TypeReference type)
+        => $"{metadata.GetString(type.Namespace)}.{metadata.GetString(type.Name)}";
+#endif
 }
