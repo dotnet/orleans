@@ -44,7 +44,7 @@ internal class UnixDomainSocketMessageTransportListener : MessageTransportListen
     public override FeatureCollection Features { get; } = new FeatureCollection();
 
     /// <inheritdoc/>
-    public override bool IsValid => _listenerOptions.Get(ListenerName).Enabled;
+    public override bool IsValid => Socket.OSSupportsUnixDomainSockets && _listenerOptions.Get(ListenerName).Enabled;
 
     /// <inheritdoc/>
     public override string ListenerName { get; }

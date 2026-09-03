@@ -255,6 +255,10 @@ namespace Orleans
             }
         }
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage(
+            "Reliability",
+            "CA2000:Dispose objects before losing scope",
+            Justification = "Ownership of the response message is transferred to the message center.")]
         public void SendResponse(Message request, Response response)
         {
             ThrowIfDisposed();
@@ -265,6 +269,10 @@ namespace Orleans
             MessageCenter!.SendMessage(message);
         }
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage(
+            "Reliability",
+            "CA2000:Dispose objects before losing scope",
+            Justification = "Ownership of the request message is transferred to callback tracking or the message center.")]
         public void SendRequest(GrainReference target, IInvokable request, IResponseCompletionSource? context, InvokeMethodOptions options)
         {
             ThrowIfDisposed();

@@ -224,6 +224,10 @@ namespace Orleans.Runtime.Messaging
                 }
             }
 
+            [System.Diagnostics.CodeAnalysis.SuppressMessage(
+                "Reliability",
+                "CA2000:Dispose objects before losing scope",
+                Justification = "Each dequeued message is transferred to the write request or handled by the rejection/reroute path.")]
             void IThreadPoolWorkItem.Execute()
             {
                 var writeRequest = _connection._shared.MessageHandlerShared.GetSendMessageHandler(_connection);
@@ -287,6 +291,10 @@ namespace Orleans.Runtime.Messaging
             _startedClosing.TrySetResult();
         }
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage(
+            "Reliability",
+            "CA2000:Dispose objects before losing scope",
+            Justification = "Ownership of the read request is transferred to the transport, or Reset returns it to the pool.")]
         public void EnqueueRead()
         {
             var request = _shared.MessageHandlerShared.GetReceiveMessageHandler();
@@ -317,6 +325,10 @@ namespace Orleans.Runtime.Messaging
             }, (this, message, error), preferLocal: true);
         }
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage(
+            "Reliability",
+            "CA2000:Dispose objects before losing scope",
+            Justification = "Ownership of the response message is transferred to the local message dispatcher.")]
         private void OnMessageSerializationFailure(Message message, Exception exception)
         {
             LogErrorExceptionSerializingMessage(Log, exception, message, this);

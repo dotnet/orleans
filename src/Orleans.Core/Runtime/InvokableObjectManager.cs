@@ -218,6 +218,10 @@ namespace Orleans
                 }
             }
 
+            [System.Diagnostics.CodeAnalysis.SuppressMessage(
+                "Reliability",
+                "CA2000:Dispose objects before losing scope",
+                Justification = "Each dequeued message is transferred to ProcessMessageAsync, which completes or rejects the request.")]
             private async Task LocalObjectMessagePumpAsync()
             {
                 while (TryDequeueMessage(out var message))

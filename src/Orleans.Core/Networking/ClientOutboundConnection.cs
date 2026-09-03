@@ -139,6 +139,10 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage(
+            "Reliability",
+            "CA2000:Dispose objects before losing scope",
+            Justification = "Ownership of the rejection message is transferred to the local message dispatcher.")]
         internal void SendRejection(Message msg, Message.RejectionTypes rejectionType, string reason)
         {
             MessagingMetrics.OnRejectedMessage(msg);

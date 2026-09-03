@@ -367,6 +367,10 @@ namespace Orleans.Messaging
             this.messageHandler = handler;
         }
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage(
+            "Reliability",
+            "CA2000:Dispose objects before losing scope",
+            Justification = "Ownership of the rejection message is transferred to the local message dispatcher.")]
         public void RejectMessage(Message msg, string reason, Exception? exc = null)
         {
             if (!Running)
