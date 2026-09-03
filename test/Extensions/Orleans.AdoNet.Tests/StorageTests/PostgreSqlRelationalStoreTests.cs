@@ -24,6 +24,11 @@ namespace UnitTests.StorageTests.AdoNet
 
             public async ValueTask InitializeAsync()
             {
+                if (!RelationalStorageForTesting.IsConnectionStringConfigured(AdoNetInvariantName))
+                {
+                    return;
+                }
+
                 Storage = await RelationalStorageForTesting.SetupInstance(
                     AdoNetInvariantName,
                     TestDatabaseName,
