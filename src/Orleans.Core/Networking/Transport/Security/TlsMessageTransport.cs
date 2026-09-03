@@ -14,7 +14,7 @@ namespace Orleans.Connections.Transport.Security;
 /// <summary>
 /// <see cref="MessageTransport"/> which encrypts and decrypts all data using TLS.
 /// </summary>
-internal abstract class TlsMessageTransport : StreamMessageTransport
+internal abstract partial class TlsMessageTransport : StreamMessageTransport
 {
     private readonly MessageTransport _innerTransport;
     private readonly TlsOptions _options;
@@ -128,14 +128,14 @@ internal abstract class TlsMessageTransport : StreamMessageTransport
             }
             catch (OperationCanceledException ex)
             {
-                _logger?.LogWarning(2, ex, "Authentication timed out");
+                LogAuthenticationTimedOut(_logger, ex);
                 await _sslStream.DisposeAsync().ConfigureAwait(false);
                 await _innerTransport.CloseAsync(ex).ConfigureAwait(false);
                 throw;
             }
             catch (Exception ex)
             {
-                _logger?.LogWarning(1, ex, "Authentication failed");
+                LogAuthenticationFailed(_logger, ex);
                 await _sslStream.DisposeAsync().ConfigureAwait(false);
                 await _innerTransport.CloseAsync(ex).ConfigureAwait(false);
                 throw;
@@ -220,4 +220,10 @@ internal abstract class TlsMessageTransport : StreamMessageTransport
     }
 
     public override string ToString() => $"Tls({_innerTransport})";
+
+    [LoggerMessage(2, LogLevel.Warning, "Authentication timed out")]
+    private static partial void LogAuthenticationTimedOut(ILogger logger, Exception exception);
+
+    [LoggerMessage(1, LogLevel.Warning, "Authentication failed")]
+    private static partial void LogAuthenticationFailed(ILogger logger, Exception exception);
 }

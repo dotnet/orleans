@@ -10,7 +10,7 @@ using System.Diagnostics;
 
 namespace Orleans.Runtime.Messaging;
 
-internal sealed class MessageReadRequest(MessageHandlerShared shared) : ReadRequest, IThreadPoolWorkItem, IDisposable
+internal sealed partial class MessageReadRequest(MessageHandlerShared shared) : ReadRequest, IThreadPoolWorkItem, IDisposable
 {
     internal readonly MessageHandlerShared Shared = shared;
 
@@ -161,20 +161,13 @@ internal sealed class MessageReadRequest(MessageHandlerShared shared) : ReadRequ
         {
             if (message is null)
             {
-                Shared.ConnectionTrace.LogWarning(
-                    exception,
-                    "Exception reading message from connection {Connection}",
-                    connection);
+                LogExceptionReadingConnection(Shared.ConnectionTrace, exception, connection);
 
                 connection.OnReadCompleted(exception);
                 return;
             }
 
-            Shared.ConnectionTrace.LogWarning(
-                exception,
-                "Exception reading message {Message} from connection {Connection}",
-                message,
-                connection);
+            LogExceptionReadingMessage(Shared.ConnectionTrace, exception, message, connection);
 
             // The message body was not successfully decoded, but the headers were.
             Shared.MessagingInstruments.OnRejectedMessage(message);
@@ -212,4 +205,10 @@ internal sealed class MessageReadRequest(MessageHandlerShared shared) : ReadRequ
         }
     }
     public void Dispose() => Reset();
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Exception reading message from connection {Connection}")]
+    private static partial void LogExceptionReadingConnection(ILogger logger, Exception exception, Connection connection);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Exception reading message {Message} from connection {Connection}")]
+    private static partial void LogExceptionReadingMessage(ILogger logger, Exception exception, Message message, Connection connection);
 }

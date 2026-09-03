@@ -11,7 +11,7 @@ namespace Orleans.Connections.Transport.Security;
 /// <summary>
 /// Message transport factory which configures transports for TLS.
 /// </summary>
-internal sealed class TlsMessageTransportConnector(
+internal sealed partial class TlsMessageTransportConnector(
     MessageTransportConnector innerTransportFactory,
     IOptionsMonitor<TlsOptions> tlsOptions,
     ILoggerFactory loggerFactory) : MessageTransportConnector
@@ -45,7 +45,7 @@ internal sealed class TlsMessageTransportConnector(
             }
             catch (Exception disposeException)
             {
-                _logger.LogWarning(disposeException, "Exception disposing inner transport after TLS transport creation failed.");
+                LogInnerTransportDisposalFailure(_logger, disposeException);
             }
 
             throw;
@@ -54,4 +54,7 @@ internal sealed class TlsMessageTransportConnector(
 
     /// <inheritdoc/>
     public override ValueTask DisposeAsync() => _innerConnector.DisposeAsync();
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Exception disposing inner transport after TLS transport creation failed.")]
+    private static partial void LogInnerTransportDisposalFailure(ILogger logger, Exception exception);
 }

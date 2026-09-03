@@ -17,7 +17,7 @@ using Orleans.Runtime.Internal;
 
 namespace Orleans.Runtime.Messaging;
 
-internal abstract class ConnectionListener
+internal abstract partial class ConnectionListener
 {
     private readonly ConnectionManager _connectionManager;
     private readonly ConnectionCommon _connectionShared;
@@ -115,7 +115,7 @@ internal abstract class ConnectionListener
         }
         catch (Exception exception)
         {
-            TransportTrace.LogCritical(exception, $"Exception in AcceptAsync for listener {listener}");
+            LogAcceptFailure(TransportTrace, exception, listener);
         }
     }
 
@@ -129,7 +129,7 @@ internal abstract class ConnectionListener
             }
 
             await Task.WhenAll(_listeners.Select(listener => listener.UnbindAsync(cancellationToken).AsTask())).ConfigureAwait(false);
-            _shutdownCancellation.Cancel();
+            await _shutdownCancellation.CancelAsync().ConfigureAwait(false);
 
             if (_acceptLoopTask is not null)
             {
@@ -152,7 +152,7 @@ internal abstract class ConnectionListener
         }
         catch (Exception exception)
         {
-            TransportTrace.LogWarning(exception, "Exception during shutdown");
+            LogShutdownFailure(TransportTrace, exception);
         }
     }
 
@@ -174,11 +174,11 @@ internal abstract class ConnectionListener
             try
             {
                 await connection.RunAsync();
-                TransportTrace.LogInformation("Connection {Connection} terminated", connection);
+                LogConnectionTerminated(TransportTrace, connection);
             }
             catch (Exception exception)
             {
-                TransportTrace.LogInformation(exception, "Connection {Connection} terminated with an exception", connection);
+                LogConnectionTerminatedWithException(TransportTrace, exception, connection);
             }
             finally
             {
@@ -196,4 +196,16 @@ internal abstract class ConnectionListener
 
         return null;
     }
+
+    [LoggerMessage(Level = LogLevel.Critical, Message = "Exception in AcceptAsync for listener {Listener}")]
+    private static partial void LogAcceptFailure(ILogger logger, Exception exception, MessageTransportListener listener);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Exception during shutdown")]
+    private static partial void LogShutdownFailure(ILogger logger, Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Connection {Connection} terminated")]
+    private static partial void LogConnectionTerminated(ILogger logger, Connection connection);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Connection {Connection} terminated with an exception")]
+    private static partial void LogConnectionTerminatedWithException(ILogger logger, Exception exception, Connection connection);
 }

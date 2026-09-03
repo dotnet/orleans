@@ -8,7 +8,7 @@ using System.Collections.Generic;
 
 namespace Orleans.Runtime.Messaging;
 
-internal sealed class MessageWriteRequest : WriteRequest
+internal sealed partial class MessageWriteRequest : WriteRequest
 {
     private const int LargeMessageSize = 8 * 1024;
     private const int SendPageSize = 32 * 1024;
@@ -92,7 +92,7 @@ internal sealed class MessageWriteRequest : WriteRequest
 
     public override void SetException(Exception error)
     {
-        _shared.ConnectionTrace.LogError(error, "Error sending messages {Messages}", _messages);
+        LogErrorSendingMessages(_shared.ConnectionTrace, error, _messages);
         var connection = _connection ?? throw new InvalidOperationException("The write request has no owning connection.");
         foreach (var (message, _, _) in _messages)
         {
@@ -115,4 +115,7 @@ internal sealed class MessageWriteRequest : WriteRequest
         _connection = null;
         _shared.Return(this);
     }
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Error sending messages {Messages}")]
+    private static partial void LogErrorSendingMessages(ILogger logger, Exception error, object messages);
 }
