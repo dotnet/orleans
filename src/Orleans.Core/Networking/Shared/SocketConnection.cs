@@ -22,12 +22,12 @@ namespace Orleans.Networking.Shared
         [System.Diagnostics.CodeAnalysis.SuppressMessage(
             "Usage",
             "CA2213:Disposable fields should be disposed",
-            Justification = "The receive helper remains active for the connection processing lifetime and is disposed after both I/O loops complete.")]
+            Justification = "StartAsync joins both I/O loops and unconditionally disposes the receive helper in its finally block.")]
         private readonly SocketReceiver _receiver;
         [System.Diagnostics.CodeAnalysis.SuppressMessage(
             "Usage",
             "CA2213:Disposable fields should be disposed",
-            Justification = "The send helper remains active for the connection processing lifetime and is disposed after both I/O loops complete.")]
+            Justification = "StartAsync joins both I/O loops and unconditionally disposes the send helper in its finally block.")]
         private readonly SocketSender _sender;
         private readonly CancellationTokenSource _connectionClosedTokenSource = new CancellationTokenSource();
 
@@ -96,22 +96,20 @@ namespace Orleans.Networking.Shared
 
         private async Task StartAsync()
         {
+            var receiveTask = DoReceive();
+            var sendTask = DoSend();
             try
             {
-                // Spawn send and receive logic
-                var receiveTask = DoReceive();
-                var sendTask = DoSend();
-
-                // Now wait for both to complete
-                await receiveTask;
-                await sendTask;
-
-                _receiver.Dispose();
-                _sender.Dispose();
+                await Task.WhenAll(receiveTask, sendTask);
             }
             catch (Exception ex)
             {
                 LogErrorUnexpectedExceptionInStartAsync(_trace, ex);
+            }
+            finally
+            {
+                _receiver.Dispose();
+                _sender.Dispose();
             }
         }
 
