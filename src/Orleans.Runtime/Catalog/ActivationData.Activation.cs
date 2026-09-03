@@ -102,7 +102,7 @@ internal sealed partial class ActivationData
             {
                 context.TryAddValue(GrainAddressMigrationContextKey, Address);
             }
-            
+
             Activity? dehydrateSpan = null;
             try
             {
@@ -204,7 +204,7 @@ internal sealed partial class ActivationData
                         activation.PreviousRegistration is not null);
                     var previousRegistration = activation.PreviousRegistration;
                     var verifiedRecoveryMembershipVersion = 0L;
-                    
+
                     try
                     {
                         while (true)
