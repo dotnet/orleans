@@ -5,6 +5,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.DurableJobs;
 using Orleans.DurableMessaging.Configuration;
@@ -89,7 +90,7 @@ internal sealed partial class DurableInboxExtension :
         IDurableOutbox outbox,
         ILocalDurableJobManager jobManager,
         IDurableJobHandlerRegistry jobHandlers,
-        TimeProvider timeProvider,
+        [FromKeyedServices(DurableJobTimeProviderNames.DurableJobs)] TimeProvider timeProvider,
         DurableInboxOptions options,
         DurableMessagingCommitCoordinator? commitCoordinator = null,
         IDurableInboxFaultInjector? faultInjector = null,

@@ -77,7 +77,7 @@ public static class DurableMessagingExtensions
                 sp.GetRequiredService<IDurableOutbox>(),
                 sp.GetRequiredService<ILocalDurableJobManager>(),
                 sp.GetRequiredService<IDurableJobHandlerRegistry>(),
-                sp.GetRequiredService<TimeProvider>(),
+                sp.GetRequiredKeyedService<TimeProvider>(DurableJobTimeProviderNames.DurableJobs),
                 options,
                 sp.GetRequiredService<DurableMessagingCommitCoordinator>(),
                 sp.GetService<IDurableInboxFaultInjector>(),
@@ -102,7 +102,7 @@ public static class DurableMessagingExtensions
                 sp.GetRequiredService<DurableMessagingInstruments>(),
                 sp.GetServices<IInboxHandler>(),
                 options.MaxCapacity,
-                sp.GetRequiredService<TimeProvider>());
+                sp.GetRequiredKeyedService<TimeProvider>(DurableJobTimeProviderNames.DurableJobs));
         });
 
         services.TryAddKeyedScoped<IDurableOutbox, DurableOutbox>("outbox");

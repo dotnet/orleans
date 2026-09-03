@@ -1,9 +1,11 @@
 using System;
+using System.Reflection;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.DurableMessaging;
 using Orleans.DurableMessaging.Configuration;
+using Orleans.DurableJobs;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using Xunit;
@@ -124,6 +126,24 @@ public class DurableMessagingHostingTests : IClassFixture<DurableMessagingHostin
             () => serviceProvider.GetRequiredService<IOptions<DurableInboxOptions>>().Value);
 
         Assert.Contains("MaxCapacity must be greater than zero.", exception.Message);
+    }
+
+    [Theory]
+    [InlineData(typeof(DurableInbox))]
+    [InlineData(typeof(DurableInboxExtension))]
+    [InlineData(typeof(DurableOutbox))]
+    [InlineData(typeof(DurableMessageScheduler))]
+    public void DurableMessagingComponents_UseDurableJobsTimeProvider(Type componentType)
+    {
+        var timeProviderParameters = componentType
+            .GetConstructors(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+            .SelectMany(static constructor => constructor.GetParameters())
+            .Where(static parameter => parameter.ParameterType == typeof(TimeProvider));
+
+        Assert.Contains(
+            timeProviderParameters,
+            parameter => parameter.GetCustomAttribute<FromKeyedServicesAttribute>()?.Key
+                is DurableJobTimeProviderNames.DurableJobs);
     }
 
     /// <summary>

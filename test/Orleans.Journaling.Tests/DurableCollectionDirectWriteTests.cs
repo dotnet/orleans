@@ -275,6 +275,24 @@ public sealed class DurableCollectionDirectWriteTests
         Assert.Empty(dictionary);
     }
 
+    [Fact]
+    public void Dictionary_RejectsDisposableStructWithoutResourceIdentity()
+    {
+        using var writer = new TestJournalStreamWriter();
+        var dictionary = new DurableDictionary<int, UnidentifiedDisposable>(
+            "dictionary",
+            new TestJournalManager(writer),
+            new DirectDictionaryCodec<int, UnidentifiedDisposable>());
+        var counter = new DisposalCounter();
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => dictionary.Add(1, new UnidentifiedDisposable(counter)));
+
+        Assert.Contains(nameof(IJournaledResourceOwner), exception.Message, StringComparison.Ordinal);
+        Assert.Equal(0, counter.Count);
+        Assert.Empty(dictionary);
+    }
+
     private sealed class TestJournalManager(TestJournalStreamWriter writer) : IJournaledStateManager
     {
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => default;
@@ -522,6 +540,16 @@ public sealed class DurableCollectionDirectWriteTests
         public int DisposeCount { get; private set; }
 
         public void Dispose() => DisposeCount++;
+    }
+
+    private sealed class DisposalCounter
+    {
+        public int Count;
+    }
+
+    private readonly struct UnidentifiedDisposable(DisposalCounter counter) : IDisposable
+    {
+        public void Dispose() => counter.Count++;
     }
 
     private sealed class ArcBufferOwner : IDisposable

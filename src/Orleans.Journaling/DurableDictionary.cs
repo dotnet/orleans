@@ -135,7 +135,20 @@ internal class DurableDictionary<K, V> :
 
     private void WriteSet(K key, V value)
     {
+        ValidateDisposableValue(value);
         _codec.WriteSet(key, value, GetWriter());
+    }
+
+    private static void ValidateDisposableValue(V value)
+    {
+        if (typeof(V).IsValueType
+            && value is IDisposable
+            && value is not IJournaledResourceOwner)
+        {
+            throw new InvalidOperationException(
+                $"Disposable value type '{typeof(V)}' must implement {nameof(IJournaledResourceOwner)} "
+                + "so journaled ownership can identify shared resource copies.");
+        }
     }
 
     protected virtual void OnSet(K key, V value) { }
@@ -162,6 +175,7 @@ internal class DurableDictionary<K, V> :
 
     private void ApplySet(K key, V value)
     {
+        ValidateDisposableValue(value);
         if (_items.TryGetValue(key, out var previous) && !ReferenceEquals(previous, value))
         {
             _items[key] = value;

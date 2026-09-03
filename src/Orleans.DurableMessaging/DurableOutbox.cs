@@ -101,7 +101,7 @@ internal sealed partial class DurableOutbox :
         [FromKeyedServices("outbox-job-id")] IDurableValue<string> jobId,
         ILocalDurableJobManager jobManager,
         IDurableJobHandlerRegistry jobHandlers,
-        TimeProvider timeProvider,
+        [FromKeyedServices(DurableJobTimeProviderNames.DurableJobs)] TimeProvider timeProvider,
         IOptions<DurableInboxOptions> options)
         : base(key, manager, shared, serviceProvider)
     {

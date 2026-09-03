@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.DurableJobs;
 using Orleans.Journaling;
 using Orleans.Runtime;
 using Orleans.Serialization.TypeSystem;
@@ -59,7 +60,7 @@ internal sealed class DurableInbox : IDurableInbox, ILifecycleObserver, IActivat
         DurableMessagingInstruments instruments,
         IEnumerable<IInboxHandler> handlers,
         int capacity,
-        TimeProvider timeProvider)
+        [FromKeyedServices(DurableJobTimeProviderNames.DurableJobs)] TimeProvider timeProvider)
         : this(inbox, processed, capacity, timeProvider)
     {
         ArgumentNullException.ThrowIfNull(serviceProvider);
