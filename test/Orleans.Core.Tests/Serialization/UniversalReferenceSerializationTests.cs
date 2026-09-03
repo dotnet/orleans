@@ -280,6 +280,33 @@ public sealed class UniversalReferenceSerializationTests(TestEnvironmentFixture 
     }
 
     [Fact]
+    public void SystemTextJsonRoundTrip_LocalClusterReference_UsesUniversalLayout()
+    {
+        var bindingResolver = environment.Services.GetRequiredService<UniversalReferenceBindingResolver>();
+        var interfaceType = environment.Services
+            .GetRequiredService<GrainInterfaceTypeResolver>()
+            .GetGrainInterfaceType(typeof(ISiloControl));
+        var siloAddress = SiloAddress.New(IPAddress.Loopback, 30_002, generation: 12);
+        var grainId = SystemTargetGrainId.Create(Constants.SiloControlType, siloAddress, "local-json").GrainId;
+        var reference = UniversalReference.CreateCluster(
+            grainId,
+            interfaceType,
+            bindingResolver.ServiceId,
+            bindingResolver.ClusterId);
+        var source = (IAddressable)ReferenceActivator.CreateReference(reference);
+
+        var (json, actual) = SystemTextJsonRoundTrip<IAddressable>(source);
+
+        Assert.StartsWith("[{", json, StringComparison.Ordinal);
+        Assert.Contains("\"binding\":1", json, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            $"\"clusterId\":\"{bindingResolver.ClusterId}\"",
+            json,
+            StringComparison.OrdinalIgnoreCase);
+        AssertAddressable(reference, actual);
+    }
+
+    [Fact]
     public void SystemTextJsonReader_LegacyTwoElementArray_UsesLocalDefaultBinding()
     {
         var source = CreateUntypedReference(71, UniversalReferenceBinding.Virtual).GetUniversalReference();
