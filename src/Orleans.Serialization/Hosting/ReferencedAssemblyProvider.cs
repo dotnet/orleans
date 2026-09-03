@@ -11,8 +11,15 @@ using System.Runtime.Loader;
 
 namespace Orleans.Serialization.Internal
 {
+    /// <summary>
+    /// Discovers assemblies which contain Orleans serialization application parts.
+    /// </summary>
     public static class ReferencedAssemblyProvider
     {
+        /// <summary>
+        /// Gets the loaded assemblies which contain Orleans serialization application parts.
+        /// </summary>
+        /// <returns>The assemblies which contain Orleans serialization application parts.</returns>
         public static IEnumerable<Assembly> GetRelevantAssemblies()
         {
             var parts = new HashSet<Assembly>();
@@ -31,6 +38,11 @@ namespace Orleans.Serialization.Internal
             return parts;
         }
 
+        /// <summary>
+        /// Adds an assembly and its referenced Orleans serialization application parts to a collection.
+        /// </summary>
+        /// <param name="parts">The collection to add assemblies to.</param>
+        /// <param name="assembly">The assembly to inspect.</param>
         public static void AddAssembly(HashSet<Assembly> parts, Assembly assembly)
         {
             if (assembly == null)
@@ -58,6 +70,11 @@ namespace Orleans.Serialization.Internal
         }
 
 #if NETCOREAPP3_1_OR_GREATER
+        /// <summary>
+        /// Adds Orleans serialization application parts from an assembly load context to a collection.
+        /// </summary>
+        /// <param name="parts">The collection to add assemblies to.</param>
+        /// <param name="context">The assembly load context to inspect.</param>
         public static void AddFromAssemblyLoadContext(HashSet<Assembly> parts, AssemblyLoadContext context)
         {
             if (context is null)
@@ -71,6 +88,13 @@ namespace Orleans.Serialization.Internal
             }
         }
 
+        /// <summary>
+        /// Adds Orleans serialization application parts from the load context containing an assembly to a collection.
+        /// </summary>
+        /// <param name="parts">The collection to add assemblies to.</param>
+        /// <param name="assembly">
+        /// The assembly whose load context is inspected, or <see langword="null"/> to use the assembly containing this type.
+        /// </param>
         public static void AddFromAssemblyLoadContext(HashSet<Assembly> parts, Assembly? assembly = null)
         {
             assembly ??= typeof(ReferencedAssemblyProvider).Assembly;
@@ -89,6 +113,13 @@ namespace Orleans.Serialization.Internal
         }
 #endif
 
+        /// <summary>
+        /// Adds Orleans serialization application parts from an assembly's dependency context to a collection.
+        /// </summary>
+        /// <param name="parts">The collection to add assemblies to.</param>
+        /// <param name="assembly">
+        /// The assembly whose dependency context is inspected, or <see langword="null"/> to use the entry assembly.
+        /// </param>
         public static void AddFromDependencyContext(HashSet<Assembly> parts, Assembly? assembly = null)
         {
             assembly ??= Assembly.GetEntryAssembly();

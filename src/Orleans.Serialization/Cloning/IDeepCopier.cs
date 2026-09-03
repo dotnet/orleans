@@ -81,6 +81,7 @@ namespace Orleans.Serialization.Cloning
         /// <summary>
         /// Returns true if the type is shallow-copyable.
         /// </summary>
+        /// <returns><see langword="true"/> if the type is shallow-copyable; otherwise, <see langword="false"/>.</returns>
         bool IsShallowCopyable();
     }
 
@@ -98,6 +99,7 @@ namespace Orleans.Serialization.Cloning
     /// </summary>
     public class ShallowCopier<T> : IOptionalDeepCopier, IDeepCopier<T>
     {
+        /// <inheritdoc/>
         public bool IsShallowCopyable() => true;
 
         /// <summary>Returns the input value.</summary>

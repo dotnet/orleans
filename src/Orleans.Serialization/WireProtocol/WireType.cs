@@ -6,7 +6,7 @@ namespace Orleans.Serialization.WireProtocol
     public enum WireType : uint
     {
         /// <summary>
-        /// A variable-length integer vlaue.
+        /// A variable-length integer value.
         /// </summary>
         /// <remarks>        
         /// Followed by a variable-length integer. 
@@ -52,6 +52,10 @@ namespace Orleans.Serialization.WireProtocol
         /// Followed by 8 bytes.
         /// </remarks>        
         Reference = 0b110 << 5, // Followed by a VarInt reference to a previously defined object. Note that the SchemaType and type specification must still be included.
+
+        /// <summary>
+        /// A control tag whose remaining bits contain an <see cref="ExtendedWireType"/> value.
+        /// </summary>
         Extended = 0b111 << 5, // This is a control tag. The schema type and embedded field id are invalid. The remaining 5 bits are used for control information.
     }
 }

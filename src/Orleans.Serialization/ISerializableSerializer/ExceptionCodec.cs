@@ -331,6 +331,13 @@ namespace Orleans.Serialization
             return DeserializeException(ref reader, field);
         }
 
+        /// <summary>
+        /// Deserializes an exception value.
+        /// </summary>
+        /// <typeparam name="TInput">The reader input type.</typeparam>
+        /// <param name="reader">The reader.</param>
+        /// <param name="field">The field header for the exception value.</param>
+        /// <returns>The deserialized exception.</returns>
         public Exception DeserializeException<TInput>(ref Reader<TInput> reader, Field field)
         {
             field.EnsureWireTypeTagDelimited();

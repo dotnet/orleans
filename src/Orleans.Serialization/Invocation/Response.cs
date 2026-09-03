@@ -43,15 +43,27 @@ namespace Orleans.Serialization.Invocation
         /// </summary>
         public static Response Completed => CompletedResponse.Instance;
 
-        /// <inheritdoc />
+        /// <summary>
+        /// Gets or sets the untyped result value.
+        /// </summary>
         public abstract object? Result { get; set; }
 
+        /// <summary>
+        /// Gets the result type when the response represents a simple typed result.
+        /// </summary>
+        /// <returns>The result type, or <see langword="null"/> when the response does not represent a simple typed result.</returns>
         public virtual Type? GetSimpleResultType() => null;
 
-        /// <inheritdoc />
+        /// <summary>
+        /// Gets or sets the exception represented by this response.
+        /// </summary>
         public abstract Exception? Exception { get; set; }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// Gets the result as the specified type.
+        /// </summary>
+        /// <typeparam name="T">The requested result type.</typeparam>
+        /// <returns>The result.</returns>
         [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public abstract T GetResult<T>();
 
@@ -147,22 +159,29 @@ namespace Orleans.Serialization.Invocation
         [Id(0)]
         private TResult? _result;
 
+        /// <summary>
+        /// Gets or sets the typed result value.
+        /// </summary>
         public TResult? TypedResult { get => _result; set => _result = value; }
 
+        /// <inheritdoc/>
         public override Exception? Exception
         {
             get => null;
             set => throw new InvalidOperationException($"Cannot set {nameof(Exception)} property for type {nameof(Response<TResult>)}");
         }
 
+        /// <inheritdoc/>
         public override object? Result
         {
             get => _result;
             set => _result = (TResult?)value;
         }
 
+        /// <inheritdoc/>
         public override Type GetSimpleResultType() => typeof(TResult);
 
+        /// <inheritdoc/>
         public override T GetResult<T>()
         {
             if (typeof(TResult).IsValueType && typeof(T).IsValueType && typeof(T) == typeof(TResult))
@@ -171,12 +190,14 @@ namespace Orleans.Serialization.Invocation
             return (T)(object)_result!;
         }
 
+        /// <inheritdoc/>
         public override void Dispose()
         {
             _result = default;
             ResponsePool.Return(this);
         }
 
+        /// <inheritdoc/>
         public override string ToString() => _result?.ToString() ?? "[null]";
     }
 
@@ -185,7 +206,21 @@ namespace Orleans.Serialization.Invocation
     /// </summary>
     public abstract class ResponseCodec
     {
+        /// <summary>
+        /// Writes a response without a containing field header.
+        /// </summary>
+        /// <typeparam name="TBufferWriter">The buffer writer type.</typeparam>
+        /// <param name="writer">The writer.</param>
+        /// <param name="value">The response to write.</param>
         public abstract void WriteRaw<TBufferWriter>(ref Writer<TBufferWriter> writer, object value) where TBufferWriter : IBufferWriter<byte>;
+
+        /// <summary>
+        /// Reads a response without a containing field header.
+        /// </summary>
+        /// <typeparam name="TInput">The reader input type.</typeparam>
+        /// <param name="reader">The reader.</param>
+        /// <param name="field">The field header for the response content.</param>
+        /// <returns>The response.</returns>
         public abstract object ReadRaw<TInput>(ref Reader<TInput> reader, scoped ref Field field);
     }
 
@@ -283,8 +318,15 @@ namespace Orleans.Serialization.Invocation
         public Response<TResult> Create() => ResponsePool.Get<TResult>();
     }
 
+    /// <summary>
+    /// Extension methods for working with invocation responses.
+    /// </summary>
     public static class ResponseExtensions
     {
+        /// <summary>
+        /// Throws the exception represented by a response, when present.
+        /// </summary>
+        /// <param name="response">The response to inspect.</param>
         public static void ThrowIfExceptionResponse(this Response response)
         {
             if (response.Exception is { } exception)

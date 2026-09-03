@@ -71,6 +71,13 @@ namespace Orleans.Serialization.Serializers
             return reader.DeserializeUnexpectedType<TInput, TField>(ref field);
         }
 
+        /// <summary>
+        /// Reads a value whose runtime type is known to be <typeparamref name="TField"/>.
+        /// </summary>
+        /// <typeparam name="TInput">The reader input type.</typeparam>
+        /// <param name="reader">The reader.</param>
+        /// <param name="field">The field header.</param>
+        /// <returns>The deserialized value.</returns>
         [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public TField ReadValueSealed<TInput>(ref Reader<TInput> reader, Field field)
         {
