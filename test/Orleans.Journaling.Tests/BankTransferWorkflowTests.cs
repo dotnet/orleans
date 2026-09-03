@@ -139,7 +139,7 @@ public class BankTransferWorkflowTests : IClassFixture<BankTransferWorkflowTests
 
         // Deactivate transfer grain mid-transfer
         var activationIdBefore = await transferGrain.GetActivationId();
-        await transferGrain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
+        await transferGrain.Cast<IGrainManagementExtension>().DeactivateOnIdle(TestContext.Current.CancellationToken);
 
         // Wait for grain reactivation (new activation id) and transfer completion
         await TestHelpers.WaitUntilAsync(
@@ -261,9 +261,9 @@ public class BankTransferWorkflowTests : IClassFixture<BankTransferWorkflowTests
             message: "Transfer did not start processing");
 
         // Deactivate all grains to force state reload
-        await sourceAccount.Cast<IGrainManagementExtension>().DeactivateOnIdle();
-        await destinationAccount.Cast<IGrainManagementExtension>().DeactivateOnIdle();
-        await transferGrain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
+        await sourceAccount.Cast<IGrainManagementExtension>().DeactivateOnIdle(TestContext.Current.CancellationToken);
+        await destinationAccount.Cast<IGrainManagementExtension>().DeactivateOnIdle(TestContext.Current.CancellationToken);
+        await transferGrain.Cast<IGrainManagementExtension>().DeactivateOnIdle(TestContext.Current.CancellationToken);
 
         // Wait for transfer to complete after reactivation
         await TestHelpers.WaitUntilAsync(
@@ -560,7 +560,7 @@ public class AccountGrain : DurableGrain, IAccountGrain
                 context.Send(confirmation);
             }
 
-            await _grain.WriteStateAsync();
+            await _grain.WriteStateAsync(cancellationToken);
         }
     }
 
@@ -601,7 +601,7 @@ public class AccountGrain : DurableGrain, IAccountGrain
                 context.Send(confirmation);
             }
 
-            await _grain.WriteStateAsync();
+            await _grain.WriteStateAsync(cancellationToken);
         }
     }
 }
@@ -722,7 +722,7 @@ public class TransferGrain : DurableGrain, ITransferGrain
             {
                 // Debit failed (e.g., insufficient funds)
                 _grain._status.Value = TransferStatus.Failed;
-                await _grain.WriteStateAsync();
+                await _grain.WriteStateAsync(cancellationToken);
                 return;
             }
 
@@ -746,7 +746,7 @@ public class TransferGrain : DurableGrain, ITransferGrain
                 .Build();
 
             _grain._outbox.Send(creditEnvelope);
-            await _grain.WriteStateAsync();
+            await _grain.WriteStateAsync(cancellationToken);
         }
     }
 
@@ -778,7 +778,7 @@ public class TransferGrain : DurableGrain, ITransferGrain
                 _grain._status.Value = TransferStatus.Failed;
             }
 
-            await _grain.WriteStateAsync();
+            await _grain.WriteStateAsync(cancellationToken);
         }
     }
 }

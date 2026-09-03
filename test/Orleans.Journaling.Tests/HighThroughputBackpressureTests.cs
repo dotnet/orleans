@@ -474,7 +474,7 @@ public class FloodSenderGrain : DurableGrain, IFloodSenderGrain
         public async ValueTask HandleAsync(FloodMessageAck message, IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             _grain._acknowledgedCount.Value++;
-            await _grain.WriteStateAsync();
+            await _grain.WriteStateAsync(cancellationToken);
         }
     }
 }
@@ -579,7 +579,7 @@ public class FloodReceiverGrain : DurableGrain, IFloodReceiverGrain
                 context.Send(ackEnvelope);
             }
 
-            await _grain.WriteStateAsync();
+            await _grain.WriteStateAsync(cancellationToken);
         }
     }
 }

@@ -176,7 +176,7 @@ public class DurableRpcIntegrationTests : IClassFixture<DurableRpcIntegrationTes
 
         // Deactivate request grain after request was processed
         var activationIdBefore = await requestGrain.GetActivationId();
-        await requestGrain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
+        await requestGrain.Cast<IGrainManagementExtension>().DeactivateOnIdle(TestContext.Current.CancellationToken);
 
         // Wait for grain to be reactivated (new activation id)
         await TestHelpers.WaitUntilAsync(
@@ -534,7 +534,7 @@ public class RequestGrain : DurableGrain, IRequestGrain
         public async ValueTask HandleAsync(WorkResponse message, IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             _grain._receivedResponse.Value = message;
-            await _grain.WriteStateAsync();
+            await _grain.WriteStateAsync(cancellationToken);
         }
     }
 }
@@ -594,7 +594,7 @@ public class WorkerGrain(IDurableInbox inbox) : DurableGrain, IWorkerGrain
                 context.Send(response);
             }
 
-            await _grain.WriteStateAsync();
+            await _grain.WriteStateAsync(cancellationToken);
         }
     }
 }
@@ -668,7 +668,7 @@ public class OrchestratorGrain(IDurableInbox inbox, IDurableOutbox outbox) : Dur
         public async ValueTask HandleAsync(WorkResponse message, IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             _grain._completedTasks.Add(message);
-            await _grain.WriteStateAsync();
+            await _grain.WriteStateAsync(cancellationToken);
         }
     }
 }
@@ -702,7 +702,7 @@ public class RouteKeyHandlerGrain(IDurableInbox inbox) : DurableGrain, IRouteKey
         protected override async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             _grain._processedCount++;
-            await _grain.WriteStateAsync();
+            await _grain.WriteStateAsync(cancellationToken);
         }
     }
 }
@@ -746,7 +746,7 @@ public class RoutePrefixHandlerGrain(IDurableInbox inbox) : DurableGrain, IRoute
                 _grain._capturedOperations.Add(operation);
             }
 
-            await _grain.WriteStateAsync();
+            await _grain.WriteStateAsync(cancellationToken);
         }
     }
 }
@@ -786,7 +786,7 @@ public class HandlerPrecedenceGrain(IDurableInbox inbox) : DurableGrain, IHandle
         protected override async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             _grain._specificHandlerCount++;
-            await _grain.WriteStateAsync();
+            await _grain.WriteStateAsync(cancellationToken);
         }
     }
 
@@ -802,7 +802,7 @@ public class HandlerPrecedenceGrain(IDurableInbox inbox) : DurableGrain, IHandle
         protected override async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             _grain._prefixHandlerCount++;
-            await _grain.WriteStateAsync();
+            await _grain.WriteStateAsync(cancellationToken);
         }
     }
 }

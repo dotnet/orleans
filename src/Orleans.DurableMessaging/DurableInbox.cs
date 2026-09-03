@@ -134,17 +134,13 @@ internal sealed class DurableInbox : IDurableInbox, ILifecycleObserver, IActivat
     {
         var key = (senderId, messageId);
 
-        if (_inbox.ContainsKey(key))
+        var removed = _inbox.Remove(key);
+        if (removed)
         {
-            var removed = _inbox.Remove(key);
-            if (removed)
-            {
-                _instruments?.OnInboxDepthChanged(-1);
-            }
-            return removed;
+            _instruments?.OnInboxDepthChanged(-1);
         }
 
-        return false;
+        return removed;
     }
 
     /// <summary>

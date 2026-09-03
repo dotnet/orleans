@@ -459,7 +459,7 @@ public class MultiSiloReceiverGrain : DurableGrain, IMultiSiloReceiverGrain
             // Store message with correlation key
             _grain._lastReceivedMessage.Value = message with { CorrelationKey = context.Envelope.CorrelationKey };
             _grain._receivedCount.Value++;
-            await _grain.WriteStateAsync();
+            await _grain.WriteStateAsync(cancellationToken);
         }
     }
 }
@@ -525,7 +525,7 @@ public class MultiSiloBidirectionalGrain : DurableGrain, IMultiSiloBidirectional
         public async ValueTask HandleAsync(MultiSiloTestMessage message, IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             _grain._receivedMessages.Add(message.Content);
-            await _grain.WriteStateAsync();
+            await _grain.WriteStateAsync(cancellationToken);
         }
     }
 }
@@ -611,7 +611,7 @@ public class MultiSiloOrchestratorGrain : DurableGrain, IMultiSiloOrchestratorGr
         public async ValueTask HandleAsync(MultiSiloTaskResult result, IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             _grain._completedTasks.Add(result with { CorrelationKey = context.Envelope.CorrelationKey });
-            await _grain.WriteStateAsync();
+            await _grain.WriteStateAsync(cancellationToken);
         }
     }
 }
@@ -691,7 +691,7 @@ public class MultiSiloWorkerGrain : DurableGrain, IMultiSiloWorkerGrain
                 _grain._outbox.Send(responseEnvelope);
             }
 
-            await _grain.WriteStateAsync();
+            await _grain.WriteStateAsync(cancellationToken);
         }
     }
 }
