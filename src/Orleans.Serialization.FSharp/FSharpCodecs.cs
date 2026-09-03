@@ -326,11 +326,17 @@ namespace Orleans.Serialization
             return result;
         }
     }
+<<<<<<< HEAD
     /// <summary>
     /// Copier for <see cref="FSharpChoice{T1, T2}"/>.
     /// </summary>
     /// <typeparam name="T1">The first choice type.</typeparam>
     /// <typeparam name="T2">The second choice type.</typeparam>
+||||||| parent of 82a763ec4 (style: format solution whitespace)
+    
+=======
+
+>>>>>>> 82a763ec4 (style: format solution whitespace)
     [RegisterCopier]
     public class FSharpChoiceCopier<T1, T2> : IDeepCopier<FSharpChoice<T1, T2>>, IDerivedTypeCopier
     {
@@ -458,12 +464,18 @@ namespace Orleans.Serialization
             return result;
         }
     }
+<<<<<<< HEAD
     /// <summary>
     /// Copier for <see cref="FSharpChoice{T1, T2, T3}"/>.
     /// </summary>
     /// <typeparam name="T1">The first choice type.</typeparam>
     /// <typeparam name="T2">The second choice type.</typeparam>
     /// <typeparam name="T3">The third choice type.</typeparam>
+||||||| parent of 82a763ec4 (style: format solution whitespace)
+    
+=======
+
+>>>>>>> 82a763ec4 (style: format solution whitespace)
     [RegisterCopier]
     public class FSharpChoiceCopier<T1, T2, T3> : IDeepCopier<FSharpChoice<T1, T2, T3>>, IDerivedTypeCopier
     {
@@ -606,6 +618,7 @@ namespace Orleans.Serialization
             return result;
         }
     }
+<<<<<<< HEAD
     /// <summary>
     /// Copier for <see cref="FSharpChoice{T1, T2, T3, T4}"/>.
     /// </summary>
@@ -613,6 +626,11 @@ namespace Orleans.Serialization
     /// <typeparam name="T2">The second choice type.</typeparam>
     /// <typeparam name="T3">The third choice type.</typeparam>
     /// <typeparam name="T4">The fourth choice type.</typeparam>
+||||||| parent of 82a763ec4 (style: format solution whitespace)
+    
+=======
+
+>>>>>>> 82a763ec4 (style: format solution whitespace)
     [RegisterCopier]
     public class FSharpChoiceCopier<T1, T2, T3, T4> : IDeepCopier<FSharpChoice<T1, T2, T3, T4>>, IDerivedTypeCopier
     {
@@ -768,6 +786,7 @@ namespace Orleans.Serialization
             return result;
         }
     }
+<<<<<<< HEAD
     /// <summary>
     /// Copier for <see cref="FSharpChoice{T1, T2, T3, T4, T5}"/>.
     /// </summary>
@@ -776,6 +795,11 @@ namespace Orleans.Serialization
     /// <typeparam name="T3">The third choice type.</typeparam>
     /// <typeparam name="T4">The fourth choice type.</typeparam>
     /// <typeparam name="T5">The fifth choice type.</typeparam>
+||||||| parent of 82a763ec4 (style: format solution whitespace)
+    
+=======
+
+>>>>>>> 82a763ec4 (style: format solution whitespace)
     [RegisterCopier]
     public class FSharpChoiceCopier<T1, T2, T3, T4, T5> : IDeepCopier<FSharpChoice<T1, T2, T3, T4, T5>>, IDerivedTypeCopier
     {
@@ -944,6 +968,7 @@ namespace Orleans.Serialization
             return result;
         }
     }
+<<<<<<< HEAD
     /// <summary>
     /// Copier for <see cref="FSharpChoice{T1, T2, T3, T4, T5, T6}"/>.
     /// </summary>
@@ -953,6 +978,11 @@ namespace Orleans.Serialization
     /// <typeparam name="T4">The fourth choice type.</typeparam>
     /// <typeparam name="T5">The fifth choice type.</typeparam>
     /// <typeparam name="T6">The sixth choice type.</typeparam>
+||||||| parent of 82a763ec4 (style: format solution whitespace)
+    
+=======
+
+>>>>>>> 82a763ec4 (style: format solution whitespace)
     [RegisterCopier]
     public class FSharpChoiceCopier<T1, T2, T3, T4, T5, T6> : IDeepCopier<FSharpChoice<T1, T2, T3, T4, T5, T6>>, IDerivedTypeCopier
     {
@@ -1419,11 +1449,17 @@ namespace Orleans.Serialization
             return result;
         }
     }
+<<<<<<< HEAD
     /// <summary>
     /// Copier for <see cref="FSharpResult{T, TError}"/>.
     /// </summary>
     /// <typeparam name="T">The result value type.</typeparam>
     /// <typeparam name="TError">The error value type.</typeparam>
+||||||| parent of 82a763ec4 (style: format solution whitespace)
+    
+=======
+
+>>>>>>> 82a763ec4 (style: format solution whitespace)
     [RegisterCopier]
     public class FSharpResultCopier<T, TError> : IDeepCopier<FSharpResult<T, TError>>, IDerivedTypeCopier
     {

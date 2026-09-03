@@ -286,7 +286,7 @@ internal static class ProxySourceOutputGenerator
         var invokableOwners = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var entry in proxyEntries.OrderBy(static entry => entry.HintName, StringComparer.Ordinal))
         {
-                foreach (var invokable in GetGeneratedInvokables(proxyContext, entry.Description))
+            foreach (var invokable in GetGeneratedInvokables(proxyContext, entry.Description))
             {
                 if (!invokableOwners.TryGetValue(invokable.MetadataName, out _))
                 {

@@ -97,7 +97,7 @@ namespace Orleans.Runtime
         /// </summary>
         [Id(0)]
         public MembershipVersion Version { get; }
-        
+
         /// <summary>
         /// Gets the membership entries contained in this snapshot.
         /// </summary>
@@ -231,7 +231,7 @@ namespace Orleans.Runtime
             charsWritten = written;
             return true;
 
-        fail:
+fail:
             charsWritten = 0;
             return false;
 

@@ -21,7 +21,7 @@ namespace UnitTests.OrleansRuntime.Streams
             public FixedSizeBuffer Allocate()
             {
                 Allocated++;
-                return new FixedSizeBuffer(TestBlockSize) {Pool = this};
+                return new FixedSizeBuffer(TestBlockSize) { Pool = this };
             }
 
             public void Free(FixedSizeBuffer resource)

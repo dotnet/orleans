@@ -78,7 +78,7 @@ namespace Orleans.TestingHost.Utils
         /// <param name="delayOnFail">The time to delay next call upon failure</param>
         /// <returns>A task representing the operation.</returns>
         /// <exception cref="TimeoutException">The predicate did not succeed before the timeout elapsed.</exception>
-        public static Task WaitUntilAsync(Func<bool,Task<bool>> predicate, TimeSpan timeout, TimeSpan? delayOnFail = null)
+        public static Task WaitUntilAsync(Func<bool, Task<bool>> predicate, TimeSpan timeout, TimeSpan? delayOnFail = null)
             => WaitUntilAsync(predicate, timeout, delayOnFail, TimeProvider.System);
 
         internal static Task WaitUntilAsync(

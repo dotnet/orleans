@@ -26,7 +26,7 @@ namespace Orleans.Transactions.TestKit
         /// <param name="faultInjection">The fault to inject, or <see langword="null"/> to perform the operation without a controlled fault.</param>
         /// <returns>A task representing the operation.</returns>
         [Transaction(TransactionOption.Create)]
-        Task MultiGrainAddAndFaultInjection(List<IFaultInjectionTransactionTestGrain> grains, int numberToAdd, 
+        Task MultiGrainAddAndFaultInjection(List<IFaultInjectionTransactionTestGrain> grains, int numberToAdd,
             FaultInjectionControl? faultInjection = null);
     }
 

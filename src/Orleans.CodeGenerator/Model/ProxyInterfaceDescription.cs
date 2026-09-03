@@ -108,7 +108,7 @@ internal class ProxyInterfaceDescription : IEquatable<ProxyInterfaceDescription>
 
     public string Name { get; }
     public INamedTypeSymbol InterfaceType { get; }
-    public List<ProxyMethodDescription> Methods => field ??= GetMethods(); 
+    public List<ProxyMethodDescription> Methods => field ??= GetMethods();
     public string GeneratedNamespace { get; }
     public List<(string Name, ITypeParameterSymbol Parameter)> TypeParameters { get; }
     public INamedTypeSymbol ProxyBaseType { get; }
@@ -191,7 +191,7 @@ internal class ProxyInterfaceDescription : IEquatable<ProxyInterfaceDescription>
                 throw new OrleansGeneratorDiagnosticAnalysisException(diagnostic);
             }
         }
-        
+
         static void ValidateNonGenericInvokeAsync(LibraryTypes l, INamedTypeSymbol baseClass)
         {
             var found = false;

@@ -50,7 +50,7 @@ public abstract partial class Grain : IGrainBase, IAddressable
     /// </summary>
     // ! The runtime ensures that this is not null and Unit testing frameworks must make sure that this is not null.
     protected Grain() : this(RuntimeContext.Current!, grainRuntime: null)
-    {}
+    { }
 
     /// <summary>
     /// Grain implementers do NOT have to expose this constructor but can choose to do so.

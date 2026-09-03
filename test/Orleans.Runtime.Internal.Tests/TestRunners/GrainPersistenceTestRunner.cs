@@ -323,12 +323,12 @@ public abstract class GrainPersistenceTestsRunner : OrleansTestingBase
         val3 = await grain3.DoRead();
         Assert.Equal(expected3, val3);  // "Value after Re-Read - 3"
     }
-    
+
     [Fact, TestCategory("Functional")]
     public async Task Grain_GrainStorage_SiloRestart()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        if (!IsDurableStorage) 
+        if (!IsDurableStorage)
         {
             throw Xunit.Sdk.SkipException.ForSkip("This provider does not persist state, so cannot survive a silo restart.");
         }

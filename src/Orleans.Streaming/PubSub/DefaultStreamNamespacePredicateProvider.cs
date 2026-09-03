@@ -8,7 +8,7 @@ namespace Orleans.Streams
     /// Default implementation of <see cref="IStreamNamespacePredicateProvider"/> for internally supported stream predicates.
     /// </summary>
     public class DefaultStreamNamespacePredicateProvider : IStreamNamespacePredicateProvider
-    {  
+    {
         /// <inheritdoc/>
         public bool TryGetPredicate(string predicatePattern, [MaybeNullWhen(false)] out IStreamNamespacePredicate predicate)
         {

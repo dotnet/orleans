@@ -266,7 +266,7 @@ namespace Orleans
             /// <inheritdoc />
             public bool? IsTypeNameAllowed(string typeName, string assemblyName)
             {
-                if (assemblyName is { Length: > 0} && assemblyName.Contains("Orleans"))
+                if (assemblyName is { Length: > 0 } && assemblyName.Contains("Orleans"))
                 {
                     return true;
                 }

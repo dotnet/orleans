@@ -139,7 +139,7 @@ namespace Orleans.Streaming.EventHubs
                 this.checkpointer = await this.checkpointerFactory(
                     this.settings.Partition,
                     cancellationToken);
-                if(this.cache != null)
+                if (this.cache != null)
                 {
                     this.cache.Dispose();
                     this.cache = null;

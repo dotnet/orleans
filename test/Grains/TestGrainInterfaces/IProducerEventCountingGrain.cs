@@ -1,4 +1,4 @@
-﻿namespace UnitTests.GrainInterfaces
+namespace UnitTests.GrainInterfaces
 {
     /// <summary>
     /// Stream producer grain that sends a single event at a time (when told, see SendEvent) and tracks the number of events sent

@@ -16,7 +16,7 @@ namespace UnitTests.StorageTests.Relational
     [TestSuite("Functional")]
     [TestProvider("SqlServer")]
     [TestArea("Persistence")]
-    public class SqlServerStorageTests: RelationalStorageTests, IClassFixture<CommonFixture>
+    public class SqlServerStorageTests : RelationalStorageTests, IClassFixture<CommonFixture>
     {
         /// <summary>
         /// The storage invariant, storage ID, or ADO.NET invariant for this test set.

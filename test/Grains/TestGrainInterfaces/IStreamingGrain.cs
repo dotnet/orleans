@@ -91,5 +91,5 @@ namespace UnitTests.GrainInterfaces
         Task<int> ItemsConsumed { get; }
         Task<int> ConsumerCount { get; }
         string ProviderName { get; }
-    }    
+    }
 }

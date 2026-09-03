@@ -111,30 +111,44 @@ namespace Orleans
     /// </summary>
     public enum TransactionOptionAlias
     {
+<<<<<<< HEAD
         /// <summary>
         /// Maps to <see cref="TransactionOption.Supported"/>.
         /// </summary>
-        Suppress     = TransactionOption.Supported,
+        Suppress = TransactionOption.Supported,
 
         /// <summary>
         /// Maps to <see cref="TransactionOption.CreateOrJoin"/>.
         /// </summary>
-        Required     = TransactionOption.CreateOrJoin,
+        Required = TransactionOption.CreateOrJoin,
 
         /// <summary>
         /// Maps to <see cref="TransactionOption.Create"/>.
         /// </summary>
-        RequiresNew  = TransactionOption.Create,
+        RequiresNew = TransactionOption.Create,
 
         /// <summary>
         /// Maps to <see cref="TransactionOption.Join"/>.
         /// </summary>
-        Mandatory    = TransactionOption.Join,
+        Mandatory = TransactionOption.Join,
 
         /// <summary>
         /// Maps to <see cref="TransactionOption.NotAllowed"/>.
         /// </summary>
+        Never = TransactionOption.NotAllowed,
+||||||| parent of 82a763ec4 (style: format solution whitespace)
+        Suppress     = TransactionOption.Supported,
+        Required     = TransactionOption.CreateOrJoin,
+        RequiresNew  = TransactionOption.Create,
+        Mandatory    = TransactionOption.Join,
         Never        = TransactionOption.NotAllowed,
+=======
+        Suppress = TransactionOption.Supported,
+        Required = TransactionOption.CreateOrJoin,
+        RequiresNew = TransactionOption.Create,
+        Mandatory = TransactionOption.Join,
+        Never = TransactionOption.NotAllowed,
+>>>>>>> 82a763ec4 (style: format solution whitespace)
     }
 
     /// <summary>
@@ -379,7 +393,7 @@ namespace Orleans
         /// <inheritdoc/>
         public override void Dispose()
         {
-           TransactionInfo = null;
+            TransactionInfo = null;
         }
 
         void IOnDeserialized.OnDeserialized(DeserializationContext context)

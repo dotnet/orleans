@@ -105,28 +105,28 @@ namespace Orleans.Analyzers
                     isFieldOrAutoProperty = true;
                     break;
                 case PropertyDeclarationSyntax property:
-                {
-                    bool hasBody = property.ExpressionBody is not null;
-                    var accessors = property.AccessorList?.Accessors;
-                    if (!hasBody && accessors.HasValue)
                     {
-                        foreach (var accessor in accessors)
+                        bool hasBody = property.ExpressionBody is not null;
+                        var accessors = property.AccessorList?.Accessors;
+                        if (!hasBody && accessors.HasValue)
                         {
-                            if (accessor.ExpressionBody is not null || accessor.Body is not null)
+                            foreach (var accessor in accessors)
                             {
-                                hasBody = true;
-                                break;
+                                if (accessor.ExpressionBody is not null || accessor.Body is not null)
+                                {
+                                    hasBody = true;
+                                    break;
+                                }
                             }
                         }
-                    }
 
-                    if (!hasBody)
-                    {
-                        isFieldOrAutoProperty = true;
-                    }
+                        if (!hasBody)
+                        {
+                            isFieldOrAutoProperty = true;
+                        }
 
-                    break;
-                }
+                        break;
+                    }
             }
 
             return isFieldOrAutoProperty;

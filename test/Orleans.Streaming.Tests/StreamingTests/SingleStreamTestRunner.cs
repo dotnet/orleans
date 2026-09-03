@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -521,7 +521,7 @@ public class SingleStreamTestRunner
     private async Task<bool> CheckCounters(ProducerProxy producer, ConsumerProxy consumer, bool assertAreEqual = true)
     {
         var consumerCount = await consumer.ConsumerCount;
-        Assert.NotEqual(0,  consumerCount);  // "no consumers were detected."
+        Assert.NotEqual(0, consumerCount);  // "no consumers were detected."
         _ = await producer.ProducerCount;
         var numProduced = await producer.ExpectedItemsProduced;
         var expectConsumed = numProduced * consumerCount;
@@ -534,7 +534,7 @@ public class SingleStreamTestRunner
             numConsumed);
         if (assertAreEqual)
         {
-            Assert.Equal(expectConsumed,  numConsumed); // String.Format("expectConsumed = {0}, numConsumed = {1}", expectConsumed, numConsumed));
+            Assert.Equal(expectConsumed, numConsumed); // String.Format("expectConsumed = {0}, numConsumed = {1}", expectConsumed, numConsumed));
             return true;
         }
         else
@@ -582,15 +582,15 @@ public class SingleStreamTestRunner
         }
         var expectActivationCount = 0;
         logger.LogInformation(
-            "Test {TestNumber} CheckGrainsDeactivated: {Type}ActivationCount = {ActivationCount}, Expected{Type}ActivationCount = {ExpectActivationCount}", 
-            testNumber, 
-            str, 
-            activationCount, 
+            "Test {TestNumber} CheckGrainsDeactivated: {Type}ActivationCount = {ActivationCount}, Expected{Type}ActivationCount = {ExpectActivationCount}",
+            testNumber,
+            str,
+            activationCount,
             str,
             expectActivationCount);
         if (assertAreEqual)
         {
-            Assert.Equal(expectActivationCount,  activationCount); // String.Format("Expected{0}ActivationCount = {1}, {0}ActivationCount = {2}", str, expectActivationCount, activationCount));
+            Assert.Equal(expectActivationCount, activationCount); // String.Format("Expected{0}ActivationCount = {1}, {0}ActivationCount = {2}", str, expectActivationCount, activationCount));
         }
         return expectActivationCount == activationCount;
     }

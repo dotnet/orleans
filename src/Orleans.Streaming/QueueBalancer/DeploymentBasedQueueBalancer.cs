@@ -30,6 +30,7 @@ namespace Orleans.Streams
         private string _name;
         private bool isStarting;
 
+<<<<<<< HEAD
         /// <summary>
         /// Initializes a new instance of the <see cref="DeploymentBasedQueueBalancer"/> class.
         /// </summary>
@@ -38,13 +39,17 @@ namespace Orleans.Streams
         /// <param name="options">The queue balancer options.</param>
         /// <param name="services">The service provider.</param>
         /// <param name="logger">The logger.</param>
+||||||| parent of 82a763ec4 (style: format solution whitespace)
+        
+=======
+>>>>>>> 82a763ec4 (style: format solution whitespace)
         public DeploymentBasedQueueBalancer(
             ISiloStatusOracle siloStatusOracle,
             IDeploymentConfiguration deploymentConfig,
             DeploymentBasedQueueBalancerOptions options,
             IServiceProvider services,
             ILogger<DeploymentBasedQueueBalancer> logger)
-            : base (services, logger)
+            : base(services, logger)
         {
             this.siloStatusOracle = siloStatusOracle ?? throw new ArgumentNullException(nameof(siloStatusOracle));
             this.deploymentConfig = deploymentConfig ?? throw new ArgumentNullException(nameof(deploymentConfig));
@@ -157,8 +162,8 @@ namespace Orleans.Streams
             return new BestFitBalancer<string, QueueId>(allSiloNames, allQueues);
         }
 
-        private static HashSet<QueueId> GetQueuesOfImmatureSilos(ISiloStatusOracle siloStatusOracle, 
-            ConcurrentDictionary<SiloAddress, bool> immatureSilos, 
+        private static HashSet<QueueId> GetQueuesOfImmatureSilos(ISiloStatusOracle siloStatusOracle,
+            ConcurrentDictionary<SiloAddress, bool> immatureSilos,
             Dictionary<string, List<QueueId>> idealDistribution)
         {
             HashSet<QueueId> queuesOfImmatureSilos = new HashSet<QueueId>();

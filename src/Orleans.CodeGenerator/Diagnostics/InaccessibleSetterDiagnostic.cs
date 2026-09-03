@@ -7,10 +7,16 @@ namespace Orleans.CodeGenerator.Diagnostics;
 /// </summary>
 public static class InaccessibleSetterDiagnostic
 {
+<<<<<<< HEAD
     /// <summary>
     /// The diagnostic identifier.
     /// </summary>
+    public const string RuleId = DiagnosticRuleId.InaccessibleSetter;
+||||||| parent of 82a763ec4 (style: format solution whitespace)
     public const string RuleId = DiagnosticRuleId.InaccessibleSetter; 
+=======
+    public const string RuleId = DiagnosticRuleId.InaccessibleSetter;
+>>>>>>> 82a763ec4 (style: format solution whitespace)
     private const string Category = "Usage";
     private static readonly LocalizableString Title = new LocalizableResourceString(nameof(Resources.InaccessibleSetterTitle), Resources.ResourceManager, typeof(Resources));
     private static readonly LocalizableString MessageFormat = new LocalizableResourceString(nameof(Resources.InaccessibleSetterMessageFormat), Resources.ResourceManager, typeof(Resources));

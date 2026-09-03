@@ -70,7 +70,7 @@ namespace TestGrains
 
         public Task Edit(Guid guid, string text)
         {
-            RaiseEvent(new EditedEvent() { Guid = guid, Text = text});
+            RaiseEvent(new EditedEvent() { Guid = guid, Text = text });
             return Task.CompletedTask;
         }
     }

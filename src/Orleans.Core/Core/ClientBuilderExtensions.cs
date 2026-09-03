@@ -196,7 +196,7 @@ namespace Orleans.Hosting
             string serviceId = ClusterOptions.DevelopmentServiceId,
             string clusterId = ClusterOptions.DevelopmentClusterId)
         {
-            return builder.UseLocalhostClustering(new [] {gatewayPort}, serviceId, clusterId);
+            return builder.UseLocalhostClustering(new[] { gatewayPort }, serviceId, clusterId);
         }
 
         /// <summary>

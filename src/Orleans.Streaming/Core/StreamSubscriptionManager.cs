@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Orleans.Streams.Core
 {
-    internal class StreamSubscriptionManager: IStreamSubscriptionManager
+    internal class StreamSubscriptionManager : IStreamSubscriptionManager
     {
         private readonly string type;
         private readonly IStreamPubSub streamPubSub;

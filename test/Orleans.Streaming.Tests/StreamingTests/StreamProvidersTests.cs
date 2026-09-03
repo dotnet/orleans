@@ -99,7 +99,7 @@ namespace UnitTests.Streaming
             }
 
             output.WriteLine("..... Silos restarted");
-            
+
             var activeSilos = this.HostedCluster.GetActiveSilos().ToArray();
             Assert.True(activeSilos.Length > 0);
 

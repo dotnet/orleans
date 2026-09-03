@@ -34,7 +34,7 @@ public class ServiceLifecycleTests
         bool terminateOnError = true)
     {
         var tcs = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
-    
+
         var registration = stage.Register((s, ct) =>
         {
             try
@@ -46,13 +46,13 @@ public class ServiceLifecycleTests
             {
                 // We set the exception on the TCS so the test can inspect the specific failure of this callback.
                 tcs.TrySetException(ex);
-    
+
                 // We rethrow so the LifecycleSubject behaves according to TerminateOnError.
                 throw;
             }
             return Task.CompletedTask;
         }, state, terminateOnError);
-    
+
         return (tcs.Task, registration);
     }
 

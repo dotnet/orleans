@@ -289,7 +289,7 @@ namespace Orleans.Serialization
             writer.WriteStartObject(fieldIdDelta, expectedType, typeof(ExceptionCodec));
             SerializeException(ref writer, (Exception)value);
             writer.WriteEndObject();
-       }
+        }
 
         /// <inheritdoc />
         [return: System.Diagnostics.CodeAnalysis.MaybeNull]

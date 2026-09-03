@@ -68,7 +68,7 @@ namespace Orleans.Runtime
             lifecycle.AddMigrationParticipant(this);
         }
 
-        public Task OnStart(CancellationToken cancellationToken = default) 
+        public Task OnStart(CancellationToken cancellationToken = default)
         {
             if (cancellationToken.IsCancellationRequested)
             {

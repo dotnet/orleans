@@ -28,7 +28,7 @@ namespace Orleans.Transactions.Tests
         public async Task AllSupportedAttributesFromOutsideTransactionTest()
         {
             ITransactionAttributionGrain top = this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid());
-            List<ITransactionAttributionGrain>[] tiers = 
+            List<ITransactionAttributionGrain>[] tiers =
             {
                 new List<ITransactionAttributionGrain>(new[] {
                     this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid()),

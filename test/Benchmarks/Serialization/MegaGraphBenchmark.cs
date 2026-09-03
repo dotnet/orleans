@@ -35,7 +35,7 @@ public class MegaGraphBenchmark
         {
             Value[i.ToString(CultureInfo.InvariantCulture)] = i;
         }
-        
+
         var services = new ServiceCollection()
             .AddSerializer()
             .BuildServiceProvider();

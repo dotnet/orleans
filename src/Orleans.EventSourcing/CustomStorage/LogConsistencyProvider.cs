@@ -26,10 +26,15 @@ namespace Orleans.EventSourcing.CustomStorage
         /// <inheritdoc/>
         public bool UsesStorageProvider => false;
 
+<<<<<<< HEAD
         /// <summary>
         /// Initializes a new instance of the <see cref="LogConsistencyProvider"/> class.
         /// </summary>
         /// <param name="options">The provider configuration.</param>
+||||||| parent of 82a763ec4 (style: format solution whitespace)
+        
+=======
+>>>>>>> 82a763ec4 (style: format solution whitespace)
         public LogConsistencyProvider(CustomStorageLogConsistencyOptions options)
         {
             this.options = options;

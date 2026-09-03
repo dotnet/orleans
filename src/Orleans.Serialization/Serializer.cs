@@ -15,7 +15,7 @@ namespace Orleans.Serialization
     /// <summary>
     /// Serializes and deserializes values.
     /// </summary>
-    public sealed class Serializer 
+    public sealed class Serializer
     {
         private readonly SerializerSessionPool _sessionPool;
 
@@ -532,7 +532,7 @@ namespace Orleans.Serialization
         /// <returns>The deserialized value.</returns>
         [return: MaybeNull]
         public T Deserialize<T>(ArraySegment<byte> source, SerializerSession session) => Deserialize<T>(source.AsSpan(), session);
-        
+
         /// <summary>
         /// Deserialize a value of type <typeparamref name="T"/> from <paramref name="source"/>.
         /// </summary>
@@ -1408,7 +1408,7 @@ namespace Orleans.Serialization
     /// <summary>
     /// Provides methods for serializing and deserializing values which have types which are not statically known.
     /// </summary>
-    public sealed class ObjectSerializer 
+    public sealed class ObjectSerializer
     {
         private readonly SerializerSessionPool _sessionPool;
 
@@ -1799,7 +1799,7 @@ namespace Orleans.Serialization
         /// <param name="type">The expected type of the value.</param>
         /// <returns>The deserialized value.</returns>
         public object? Deserialize(ArraySegment<byte> source, SerializerSession session, Type type) => Deserialize(source.AsSpan(), session, type);
-        
+
         /// <summary>
         /// Deserialize a value of type <paramref name="type"/> from <paramref name="source"/>.
         /// </summary>

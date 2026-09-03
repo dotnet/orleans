@@ -1,11 +1,11 @@
-﻿using Orleans.Providers.Streams.Common;
+using Orleans.Providers.Streams.Common;
 
 namespace ServiceBus.Tests.MonitorTests
 {
     public class BlockPoolMonitorForTesting : IBlockPoolMonitor
     {
         public ObjectPoolMonitorCounters CallCounters { get; } = new ObjectPoolMonitorCounters();
- 
+
         public void TrackMemoryAllocated(long allocatedMemoryInByte)
         {
             Interlocked.Increment(ref this.CallCounters.TrackObjectAllocatedByCacheCallCounter);

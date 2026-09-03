@@ -16,7 +16,7 @@ namespace NonSilo.Tests
     public class RuntimeTypeNameFormatterTests
     {
         public interface IMyBaseType<T> { }
-        public interface IMyArrayType<T> : IMyBaseType <T[]> { }
+        public interface IMyArrayType<T> : IMyBaseType<T[]> { }
         private readonly ITestOutputHelper _output;
         private readonly List<Type> _types = new()
             {
@@ -103,7 +103,7 @@ namespace NonSilo.Tests
             Assert.Contains(input, exception.Message);
             Assert.Contains("^", exception.Message); // Position indicator
         }
-        
+
         public class Inner<T>
         {
             public class Middle { }

@@ -144,7 +144,7 @@ namespace Orleans.Tests.SqlUtils
         /// <returns></returns>
         public static Stream GetStream(this DbDataReader reader, int ordinal, IRelationalStorage storage)
         {
-            if(storage.SupportsStreamNatively())
+            if (storage.SupportsStreamNatively())
             {
                 return reader.GetStream(ordinal);
             }

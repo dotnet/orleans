@@ -24,7 +24,7 @@ namespace Orleans.Transactions
         private readonly TransactionalStateConfiguration config;
         private readonly IGrainContext context;
         private readonly ITransactionDataCopier<TState> copier;
-        private readonly Dictionary<Type,object> copiers;
+        private readonly Dictionary<Type, object> copiers;
         private readonly IGrainRuntime grainRuntime;
         private readonly ILogger logger;
         private readonly ActivationLifetime activationLifetime;

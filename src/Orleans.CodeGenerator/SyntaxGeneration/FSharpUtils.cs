@@ -263,7 +263,7 @@ internal static class FSharpUtilities
 
             public INamedTypeSymbol ContainingType => Property.ContainingType;
 
-            public string FieldName => Property.Name + "@"; 
+            public string FieldName => Property.Name + "@";
 
             /// <summary>
             /// Gets the name of the setter field.
@@ -274,7 +274,7 @@ internal static class FSharpUtilities
             /// Gets syntax representing the type of this field.
             /// </summary>
             public TypeSyntax TypeSyntax => Type.TypeKind == TypeKind.Dynamic
-                ? PredefinedType(Token(SyntaxKind.ObjectKeyword)) 
+                ? PredefinedType(Token(SyntaxKind.ObjectKeyword))
                 : GetTypeSyntax(Type);
 
             /// <summary>

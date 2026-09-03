@@ -174,7 +174,7 @@ namespace Orleans.TestingHost
         /// The port allocator.
         /// </summary>
         public ITestClusterPortAllocator PortAllocator { get; }
-        
+
         /// <summary>
         /// Configures the test cluster plus client in-process.
         /// </summary>
@@ -437,12 +437,12 @@ namespace Orleans.TestingHost
                 Primary, additional.Count, Runtime.Utils.EnumerableToString(additional));
 
             if (Primary?.IsActive == true) yield return Primary;
-            
+
 
             if (additional.Count > 0)
-            foreach (var s in additional)
-                if (s?.IsActive == true)
-                    yield return s;
+                foreach (var s in additional)
+                    if (s?.IsActive == true)
+                        yield return s;
         }
 
         /// <summary>
@@ -683,7 +683,7 @@ namespace Orleans.TestingHost
                 if (client is not null)
                 {
                     await client.StopAsync(cancellationToken).ConfigureAwait(false);
-                }                
+                }
             }
             catch (Exception exc)
             {
@@ -903,7 +903,7 @@ namespace Orleans.TestingHost
             if (options.UseTestClusterMembership)
             {
                 var gateways = Silos
-                    .Where(silo => silo.IsActive && silo.GatewayAddress?.Endpoint is { Port: > 0 } )
+                    .Where(silo => silo.IsActive && silo.GatewayAddress?.Endpoint is { Port: > 0 })
                     .Select(silo => new IPEndPoint(silo.GatewayAddress.Endpoint.Address, silo.GatewayAddress.Endpoint.Port))
                     .Distinct()
                     .ToList();

@@ -17,7 +17,7 @@ namespace UnitTests.StorageTests
         File,
         AdoNet
     }
-    
+
     /// <summary>
     /// Tests for local data store operations including read, write, and delete functionality.
     /// </summary>
@@ -53,9 +53,9 @@ namespace UnitTests.StorageTests
             var data = store.ReadRow(keys);
             TimeSpan readTime = sw.Elapsed;
             output.WriteLine("{0} - Read time = {1}", store.GetType().FullName!, readTime);
-            Assert.Equal(state.A,  data["A"]);  // "A"
-            Assert.Equal(state.B,  data["B"]);  // "B"
-            Assert.Equal(state.C,  data["C"]);  // "C"
+            Assert.Equal(state.A, data["A"]);  // "A"
+            Assert.Equal(state.B, data["B"]);  // "B"
+            Assert.Equal(state.C, data["C"]);  // "C"
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
@@ -78,9 +78,9 @@ namespace UnitTests.StorageTests
             var data = store.ReadRow(keys);
             TimeSpan readTime = sw.Elapsed;
             output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName!, writeTime, readTime);
-            Assert.Equal(state.State.A,  data["A"]);  // "A"
-            Assert.Equal(state.State.B,  data["B"]);  // "B"
-            Assert.Equal(state.State.C,  data["C"]);  // "C"
+            Assert.Equal(state.State.A, data["A"]);  // "A"
+            Assert.Equal(state.State.B, data["B"]);  // "B"
+            Assert.Equal(state.State.C, data["C"]);  // "C"
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
@@ -169,7 +169,7 @@ namespace UnitTests.StorageTests
 
             var results = store.ReadMultiRow(keys);
 
-            Assert.Equal(2,  results.Count);  // "Count"
+            Assert.Equal(2, results.Count);  // "Count"
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
@@ -196,9 +196,9 @@ namespace UnitTests.StorageTests
             var data = store.ReadRow(keys);
             TimeSpan readTime = sw.Elapsed;
             output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName!, writeTime, readTime);
-            Assert.Equal(state.A,  data["A"]);  // "A"
-            Assert.Equal(state.B,  data["B"]);  // "B"
-            Assert.Equal(state.C,  data["C"]);  // "C"
+            Assert.Equal(state.A, data["A"]);  // "A"
+            Assert.Equal(state.B, data["B"]);  // "B"
+            Assert.Equal(state.C, data["C"]);  // "C"
         }
 
         // ---------- Utility methods ----------

@@ -49,7 +49,7 @@ namespace ServiceBus.Tests.TestStreamProviders
 
         private class CacheFactoryForTesting : EventHubQueueCacheFactory
         {
-            private readonly ConcurrentBag<QueueCacheForTesting> caches; 
+            private readonly ConcurrentBag<QueueCacheForTesting> caches;
             private readonly string name;
 
             public CacheFactoryForTesting(string name, EventHubStreamCachePressureOptions cacheOptions, StreamCacheEvictionOptions evictionOptions, StreamStatisticOptions statisticOptions,
@@ -136,7 +136,7 @@ namespace ServiceBus.Tests.TestStreamProviders
             IEventHubDataAdapter dataAdapter = services.GetKeyedService<IEventHubDataAdapter>(name)
                 ?? services.GetService<IEventHubDataAdapter>()
                 ?? ActivatorUtilities.CreateInstance<EventHubDataAdapter>(services);
-            var factory = ActivatorUtilities.CreateInstance<EHStreamProviderWithCreatedCacheListAdapterFactory>(services, name, generatorOptions, ehOptions, receiverOptions, 
+            var factory = ActivatorUtilities.CreateInstance<EHStreamProviderWithCreatedCacheListAdapterFactory>(services, name, generatorOptions, ehOptions, receiverOptions,
                 cacheOptions, evictionOptions, statisticOptions, dataAdapter);
             factory.Init();
             return factory;

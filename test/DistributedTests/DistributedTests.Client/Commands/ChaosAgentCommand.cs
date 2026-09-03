@@ -51,7 +51,7 @@ namespace DistributedTests.Client.Commands
             _logger.LogInformation("Waiting {WaitSeconds} seconds before starting...", parameters.Wait);
             await Task.Delay(TimeSpan.FromSeconds(parameters.Wait), cancellationToken);
 
-            for (var i=0; i<parameters.Rounds; i++)
+            for (var i = 0; i < parameters.Rounds; i++)
             {
                 _logger.LogInformation(
                     "Round #{Round}: sending {ServersPerRound} orders [Restart: {Restart}, Graceful: {Graceful}]",

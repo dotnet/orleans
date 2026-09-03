@@ -40,7 +40,7 @@ namespace ServiceBus.Tests
                         .AddMemoryGrainStorage("PubSubStore")
                         .AddEventDataGeneratorStreams(
                             StreamProviderName,
-                            b=>
+                            b =>
                             {
                                 b.Configure<EventDataGeneratorStreamOptions>(ob => ob.Configure(
                                 options =>

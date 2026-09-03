@@ -893,11 +893,11 @@ namespace UnitTests.Grains
                 logger.LogTrace("Test1.Finish");
             }
 
-           CheckRuntimeEnvironment();
-//#if DEBUG
-//            // HACK for testing
-//            Logger.SetTraceLevelOverrides(overridesOff.ToList());
-//#endif
+            CheckRuntimeEnvironment();
+            //#if DEBUG
+            //            // HACK for testing
+            //            Logger.SetTraceLevelOverrides(overridesOff.ToList());
+            //#endif
         }
 
         public async Task Task_Delay(bool doStart)
@@ -1084,7 +1084,7 @@ namespace UnitTests.Grains
                 Field2 = value.Field2,
             };
     }
-    
+
 
     public sealed class RecordTypeWithoutPublicParameterlessConstructorGrain : IGrainBase, IRecordTypeWithoutPublicParameterlessConstructorGrain<RecordTypeWithoutPublicParameterlessConstructor>
     {

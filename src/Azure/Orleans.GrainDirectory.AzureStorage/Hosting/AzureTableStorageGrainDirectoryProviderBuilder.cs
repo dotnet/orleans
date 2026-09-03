@@ -22,7 +22,7 @@ internal sealed class AzureTableStorageGrainDirectoryProviderBuilder : IProvider
                 var tableName = configurationSection["TableName"];
                 if (!string.IsNullOrEmpty(tableName))
                 {
-                    options.TableName = tableName; 
+                    options.TableName = tableName;
                 }
 
                 var serviceKey = configurationSection["ServiceKey"];

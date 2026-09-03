@@ -1,4 +1,4 @@
-﻿namespace TestGrainInterfaces
+namespace TestGrainInterfaces
 {
     /// <summary>
     /// A grain that models a bank account

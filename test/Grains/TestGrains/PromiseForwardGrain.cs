@@ -69,10 +69,10 @@ namespace UnitTests.Grains
         {
             return GetSimpleGrain().GetA();
         }
-        
+
         private ISimpleGrain GetSimpleGrain()
         {
-            if( MySimpleGrain == null )
+            if (MySimpleGrain == null)
                 MySimpleGrain = GrainFactory.GetGrain<ISimpleGrain>((new Random()).Next(), SimpleGrain.SimpleGrainNamePrefix);
 
             return MySimpleGrain;

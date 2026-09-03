@@ -64,7 +64,7 @@ namespace UnitTests.Directory
             grainDirectoryOptions = Options.Create(new GrainDirectoryOptions());
             this.grainLocator = new CachedGrainLocator(
                 services,
-                this.grainDirectoryResolver, 
+                this.grainDirectoryResolver,
                 this.mockMembershipService.Target,
                 CreateDirectoryInstruments(),
                 grainDirectoryOptions);

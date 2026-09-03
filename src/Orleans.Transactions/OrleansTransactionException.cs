@@ -175,12 +175,17 @@ namespace Orleans.Transactions
         [Id(0)]
         public string TransactionId { get; private set; }
 
+<<<<<<< HEAD
         /// <summary>
         /// Initializes a new instance of the <see cref="OrleansTransactionAbortedException"/> class.
         /// </summary>
         /// <param name="transactionId">The identifier of the aborted transaction.</param>
         /// <param name="msg">The message that describes the abort.</param>
         /// <param name="innerException">The exception that caused the transaction to abort.</param>
+||||||| parent of 82a763ec4 (style: format solution whitespace)
+ 
+=======
+>>>>>>> 82a763ec4 (style: format solution whitespace)
         public OrleansTransactionAbortedException(string transactionId, string msg, Exception? innerException) : base(msg, innerException)
         {
             this.TransactionId = transactionId;

@@ -57,7 +57,8 @@ namespace Orleans.Transactions.TestKit
                 try
                 {
                     this.Actual = await this.Grain.Get();
-                } catch(Exception)
+                }
+                catch (Exception)
                 {
                     // allow a single retry
                     await Task.Delay(TimeSpan.FromSeconds(30));
@@ -413,7 +414,7 @@ namespace Orleans.Transactions.TestKit
                 .Select(grainId => new ExpectedGrainActivity(grainId, TestGrain<ITransactionalBitArrayGrain>(transactionTestGrainClassName, grainId)))
                 .ToList();
             //ping all grains to activate them
-            await WakeupGrains(txGrains.Select(g=>g.Grain).ToList()).WaitAsync(cancellationToken);
+            await WakeupGrains(txGrains.Select(g => g.Grain).ToList()).WaitAsync(cancellationToken);
             List<ExpectedGrainActivity>[] transactionGroups = txGrains
                 .Select((txGrain, i) => new { index = i, value = txGrain })
                 .GroupBy(v => v.index / 2)
@@ -611,7 +612,7 @@ namespace Orleans.Transactions.TestKit
 
         private static Task WakeupGrains(List<ITransactionalBitArrayGrain> grains)
         {
-            var tasks =  new List<Task>();
+            var tasks = new List<Task>();
             foreach (var grain in grains)
             {
                 tasks.Add(grain.Ping());

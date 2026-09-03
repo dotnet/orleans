@@ -771,7 +771,7 @@ namespace NonSilo.Tests.Membership
             }
 
             await Until(() => testRig.TestAccessor.ObservedVersion > lastVersion, cancellationToken);
-            
+
             lastVersion = testRig.TestAccessor.ObservedVersion;
 
             table = await this.membershipTable.ReadAll();

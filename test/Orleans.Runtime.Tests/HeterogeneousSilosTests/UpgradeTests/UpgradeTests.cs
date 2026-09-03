@@ -16,7 +16,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
     {
         protected override Type VersionSelectorStrategy => typeof(MinimumVersion);
         protected override Type CompatibilityStrategy => typeof(BackwardCompatible);
-        
+
         [Fact]
         public Task AlwaysCreateActivationWithMinimumVersion()
         {
@@ -121,8 +121,8 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
             }
 
             // 99.95% chance of success
-            Assert.InRange(versionCounter[0]/numberOfGrains, 0.35, 0.65);
-            Assert.InRange(versionCounter[1]/numberOfGrains, 0.35, 0.65);
+            Assert.InRange(versionCounter[0] / numberOfGrains, 0.35, 0.65);
+            Assert.InRange(versionCounter[1] / numberOfGrains, 0.35, 0.65);
         }
     }
 }

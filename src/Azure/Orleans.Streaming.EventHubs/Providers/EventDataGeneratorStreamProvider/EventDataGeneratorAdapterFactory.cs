@@ -209,7 +209,7 @@ namespace Orleans.Streaming.EventHubs.Testing
         /// <returns>The initialized adapter factory.</returns>
         public new static EventDataGeneratorAdapterFactory Create(IServiceProvider services, string name)
         {
-            var generatorOptions= services.GetOptionsByName<EventDataGeneratorStreamOptions>(name);
+            var generatorOptions = services.GetOptionsByName<EventDataGeneratorStreamOptions>(name);
             var ehOptions = services.GetOptionsByName<EventHubOptions>(name);
             var receiverOptions = services.GetOptionsByName<EventHubReceiverOptions>(name);
             var cacheOptions = services.GetOptionsByName<EventHubStreamCachePressureOptions>(name);

@@ -21,7 +21,7 @@ namespace TestExtensions
         }
 
         public IClusterClient Client { get; set; }
-        
+
         internal OutsideRuntimeClient RuntimeClient { get; set; }
 
         public static SerializationTestEnvironment InitializeWithDefaults(Action<IClientBuilder>? configureClientBuilder = null)
@@ -29,7 +29,7 @@ namespace TestExtensions
             var result = new SerializationTestEnvironment(configureClientBuilder);
             return result;
         }
-        
+
         public IGrainFactory GrainFactory => this.RuntimeClient.InternalGrainFactory;
 
         internal IInternalGrainFactory InternalGrainFactory => this.RuntimeClient.InternalGrainFactory;
@@ -38,7 +38,7 @@ namespace TestExtensions
 
         public DeepCopier DeepCopier => this.RuntimeClient.ServiceProvider.GetRequiredService<DeepCopier>();
         public Serializer Serializer => RuntimeClient.ServiceProvider.GetRequiredService<Serializer>();
-        
+
         public void Dispose()
         {
             this.RuntimeClient?.Dispose();

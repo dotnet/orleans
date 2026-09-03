@@ -77,7 +77,7 @@ namespace Orleans.Transactions
         private readonly List<Action<bool>> followUpActions;
         private readonly List<Func<Task<bool>>> storeConditions;
         private int completionInvoked;
-        
+
         // counters for each type of event
         private int total = 0;
         private int prepare = 0;

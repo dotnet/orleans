@@ -372,9 +372,9 @@ public sealed class StreamingDiagnosticObserver : IDisposable
             .ConfigureAwait(false);
     }
 
-     /// <summary>
-     /// Waits for a subscription to be removed on a specific stream.
-     /// </summary>
+    /// <summary>
+    /// Waits for a subscription to be removed on a specific stream.
+    /// </summary>
     public async Task<StreamingEvents.SubscriptionRemoved> WaitForSubscriptionRemovedAsync(StreamId streamId, string? streamProvider, CancellationToken cancellationToken)
     {
         return await _events

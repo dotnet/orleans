@@ -178,7 +178,7 @@ namespace Orleans.Serialization.TypeSystem
             _ = _typeConverter.TryParse(typeNameString, out type);
             var key = new TypeKey(hashCode, typeName.ToArray());
             typeString = key.ToString();
-            return type is not null; 
+            return type is not null;
         }
 
         [DoesNotReturn]

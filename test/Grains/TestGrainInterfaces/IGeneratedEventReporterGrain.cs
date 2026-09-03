@@ -6,7 +6,7 @@ namespace TestGrainInterfaces
     {
         Task ReportResult(Guid streamGuid, string streamProvider, string streamNamespace, int count);
 
-        Task<IDictionary<Guid,int>> GetReport(string streamProvider, string streamNamespace, CancellationToken cancellationToken = default);
+        Task<IDictionary<Guid, int>> GetReport(string streamProvider, string streamNamespace, CancellationToken cancellationToken = default);
 
         Task Reset(CancellationToken cancellationToken = default);
 

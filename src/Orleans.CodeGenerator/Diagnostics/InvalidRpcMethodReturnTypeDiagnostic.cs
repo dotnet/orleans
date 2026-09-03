@@ -7,10 +7,16 @@ namespace Orleans.CodeGenerator.Diagnostics;
 /// </summary>
 public static class InvalidRpcMethodReturnTypeDiagnostic
 {
+<<<<<<< HEAD
     /// <summary>
     /// The diagnostic identifier.
     /// </summary>
+    public const string RuleId = DiagnosticRuleId.InvalidRpcMethodReturnType;
+||||||| parent of 82a763ec4 (style: format solution whitespace)
     public const string RuleId = DiagnosticRuleId.InvalidRpcMethodReturnType; 
+=======
+    public const string RuleId = DiagnosticRuleId.InvalidRpcMethodReturnType;
+>>>>>>> 82a763ec4 (style: format solution whitespace)
     private const string Category = "Usage";
     private static readonly LocalizableString Title = new LocalizableResourceString(nameof(Resources.InvalidRpcMethodReturnTypeTitle), Resources.ResourceManager, typeof(Resources));
     private static readonly LocalizableString MessageFormat = new LocalizableResourceString(nameof(Resources.InvalidRpcMethodReturnTypeMessageFormat), Resources.ResourceManager, typeof(Resources));

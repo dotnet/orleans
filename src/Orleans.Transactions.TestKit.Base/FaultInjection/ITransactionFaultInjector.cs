@@ -1,4 +1,4 @@
-﻿namespace Orleans.Transactions.TestKit
+namespace Orleans.Transactions.TestKit
 {
     /// <summary>
     /// Injects faults before or after transactional state is stored.

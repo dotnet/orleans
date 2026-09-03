@@ -150,7 +150,8 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 this.listenToClusterChangeTask = ListenToClusterChange();
                 return Task.CompletedTask;
-            };
+            }
+            ;
             async Task OnStop(CancellationToken ct)
             {
                 this.shutdownToken.Cancel();
@@ -163,7 +164,8 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     await GrainDirectoryCacheFactory.DisposeGrainDirectoryCacheAsync(this.cache);
                 }
-            };
+            }
+            ;
             lifecycle.Subscribe(nameof(CachedGrainLocator), ServiceLifecycleStage.RuntimeGrainServices, OnStart, OnStop);
         }
 

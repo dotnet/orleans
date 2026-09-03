@@ -54,7 +54,7 @@ namespace Benchmarks.Dashboard
                 History.Add(trace.Time, trace.Silo, trace.Traces);
             }
         }
-        
+
         [Benchmark]
         public ICollection Test_QueryAll_TraceHistory()
         {
@@ -78,7 +78,7 @@ namespace Benchmarks.Dashboard
         {
             return History.GroupByGrainAndSilo().ToList();
         }
-        
+
         [Benchmark]
         public ICollection Test_AggregateByGrainMethod_TraceHistory()
         {

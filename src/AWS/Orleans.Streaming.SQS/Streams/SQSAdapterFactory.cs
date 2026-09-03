@@ -40,12 +40,12 @@ namespace OrleansAWSUtils.Streams
         /// <param name="dataAdapter">The adapter used to convert between Orleans stream batches and SQS messages.</param>
         /// <param name="loggerFactory">The logger factory.</param>
         public SQSAdapterFactory(
-            string name, 
+            string name,
             SqsOptions sqsOptions,
             HashRingStreamQueueMapperOptions queueMapperOptions,
             SimpleQueueCacheOptions cacheOptions,
-            IOptions<ClusterOptions> clusterOptions, 
-            ISQSDataAdapter dataAdapter, 
+            IOptions<ClusterOptions> clusterOptions,
+            ISQSDataAdapter dataAdapter,
             ILoggerFactory loggerFactory)
         {
             ArgumentNullException.ThrowIfNull(sqsOptions);

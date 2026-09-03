@@ -32,10 +32,15 @@ namespace Orleans.Streams
         [Id(2)]
         public List<IBatchContainer> BatchContainers { get; }
 
+<<<<<<< HEAD
         /// <summary>
         /// Initializes a new instance of the <see cref="BatchContainerBatch"/> class.
         /// </summary>
         /// <param name="batchContainers">The batch containers comprising this batch.</param>
+||||||| parent of 82a763ec4 (style: format solution whitespace)
+                
+=======
+>>>>>>> 82a763ec4 (style: format solution whitespace)
         public BatchContainerBatch(List<IBatchContainer> batchContainers)
         {
             if ((batchContainers == null) || !batchContainers.Any())

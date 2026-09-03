@@ -57,15 +57,20 @@ namespace Orleans.Runtime.Membership
         /// </summary>
         private readonly string rootConnectionString;
 
+<<<<<<< HEAD
         /// <summary>
         /// Initializes a new instance of the <see cref="ZooKeeperBasedMembershipTable"/> class.
         /// </summary>
         /// <param name="logger">The logger.</param>
         /// <param name="membershipTableOptions">The ZooKeeper clustering options.</param>
         /// <param name="clusterOptions">The cluster identity options.</param>
+||||||| parent of 82a763ec4 (style: format solution whitespace)
+        
+=======
+>>>>>>> 82a763ec4 (style: format solution whitespace)
         public ZooKeeperBasedMembershipTable(
-            ILogger<ZooKeeperBasedMembershipTable> logger, 
-            IOptions<ZooKeeperClusteringSiloOptions> membershipTableOptions, 
+            ILogger<ZooKeeperBasedMembershipTable> logger,
+            IOptions<ZooKeeperClusteringSiloOptions> membershipTableOptions,
             IOptions<ClusterOptions> clusterOptions)
         {
             this.logger = logger;

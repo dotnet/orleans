@@ -26,7 +26,7 @@ namespace UnitTests.Grains
         public Task LogMessage(string msg)
         {
             logger.LogInformation("{Message}", msg);
-           return Task.CompletedTask;
+            return Task.CompletedTask;
         }
 
         public Task SetAError(int a)

@@ -1,4 +1,4 @@
-﻿using TestGrainInterfaces;
+using TestGrainInterfaces;
 
 namespace TestGrains
 {
@@ -75,7 +75,7 @@ namespace TestGrains
         {
             return Task.FromResult(GetType().Name);
         }
-        
+
         public Task SetA(int a)
         {
             A = a;

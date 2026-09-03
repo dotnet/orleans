@@ -33,7 +33,7 @@ namespace Orleans.Runtime.Membership
         /// <param name="clusterOptions">The cluster identity options.</param>
         public ConsulBasedMembershipTable(
             ILogger<ConsulBasedMembershipTable> logger,
-            IOptions<ConsulClusteringOptions> membershipTableOptions, 
+            IOptions<ConsulClusteringOptions> membershipTableOptions,
             IOptions<ClusterOptions> clusterOptions)
         {
             this.clusterId = clusterOptions.Value.ClusterId;

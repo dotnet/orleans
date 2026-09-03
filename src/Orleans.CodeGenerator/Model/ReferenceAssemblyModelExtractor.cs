@@ -134,7 +134,7 @@ internal static class ReferenceAssemblyModelExtractor
                     {
                         if (iface.GetAttribute(libraryTypes.GenerateMethodSerializersAttribute, inherited: true) is not null)
                         {
-                        interfaceImplementations.Add(new InterfaceImplementationModel(typeRef, SymbolSourceLocationExtractor.GetSourceLocation(symbol)));
+                            interfaceImplementations.Add(new InterfaceImplementationModel(typeRef, SymbolSourceLocationExtractor.GetSourceLocation(symbol)));
                             break;
                         }
                     }

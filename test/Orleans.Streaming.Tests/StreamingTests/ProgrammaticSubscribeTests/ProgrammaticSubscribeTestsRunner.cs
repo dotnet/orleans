@@ -29,7 +29,7 @@ public abstract class ProgrammaticSubscribeTestsRunner
         var subGrain = this.fixture.HostedCluster.GrainFactory!.GetGrain<ISubscribeGrain>(Guid.NewGuid());
         Assert.True(await subGrain.CanGetSubscriptionManager(StreamProviderName));
     }
-    
+
     [Fact]
     public async Task Programmatic_Subscribe_CanUseNullNamespace()
     {
@@ -134,7 +134,7 @@ public abstract class ProgrammaticSubscribeTestsRunner
         Assert.NotNull(subscriptionIds);
         Assert.True(expectedSubscriptionIds.SetEquals(subscriptionIds));
 
-         //remove one subscription
+        //remove one subscription
         await subscriptionManager.RemoveSubscription(streamId, expectedSubscriptions[0].SubscriptionId);
         expectedSubscriptions = expectedSubscriptions.GetRange(1, 1);
         subscriptions = await subscriptionManager.GetSubscriptions(streamId);

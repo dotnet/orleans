@@ -25,7 +25,7 @@ namespace UnitTests
     /// 
     /// Note: These tests modify global timeout settings, so they should run in isolation.
     /// </summary>
-        [TestArea("Runtime")]
+    [TestArea("Runtime")]
     public class TimeoutTests : HostedTestClusterEnsureDefaultStarted, IDisposable
     {
         private readonly ITestOutputHelper output;
@@ -63,7 +63,7 @@ namespace UnitTests
         {
             var cancellationToken = TestContext.Current.CancellationToken;
             bool finished = false;
-            var grainName = typeof (ErrorGrain).FullName;
+            var grainName = typeof(ErrorGrain).FullName;
             IErrorGrain grain = this.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainName);
             var errorGrainType = this.typeResolver.GetGrainInterfaceType(typeof(IErrorGrain));
             // Set a 1-second timeout for this test

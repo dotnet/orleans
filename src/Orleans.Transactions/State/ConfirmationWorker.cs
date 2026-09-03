@@ -144,7 +144,7 @@ namespace Orleans.Transactions.State
             {
                 return false;
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 LogWarnCollectingTransaction(transactionId, ex);
             }

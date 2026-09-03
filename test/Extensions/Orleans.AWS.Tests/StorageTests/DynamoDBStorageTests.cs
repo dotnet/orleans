@@ -34,14 +34,14 @@ namespace AWSUtils.Tests.StorageTests.AWSUtils
         /// Tests creating a new item with conditional check to prevent duplicates.
         /// Verifies that the conditional expression prevents overwriting existing items.
         /// </summary>
-        [Fact,  TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task DynamoDBDataManager_CreateItemAsync()
         {
             var expression = "attribute_not_exists(PartitionKey) AND attribute_not_exists(RowKey)";
             var toPersist = GenerateNewData();
             await manager.PutEntryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, GetValues(toPersist, true), expression);
             var originalEtag = toPersist.ETag;
-            var persisted = await manager.ReadSingleEntryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, GetKeys(toPersist), response => new UnitTestDynamoDBTableData(response) );
+            var persisted = await manager.ReadSingleEntryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, GetKeys(toPersist), response => new UnitTestDynamoDBTableData(response));
             Assert.NotNull(persisted);
             Assert.Equal(toPersist.StringData, persisted.StringData);
             Assert.True(persisted.ETag == 0);
@@ -58,7 +58,7 @@ namespace AWSUtils.Tests.StorageTests.AWSUtils
         /// Tests upserting items (insert or update).
         /// Verifies that items can be created and then updated in subsequent operations.
         /// </summary>
-        [Fact,  TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task DynamoDBDataManager_UpsertItemAsync()
         {
             var expression = "attribute_not_exists(PartitionKey) AND attribute_not_exists(RowKey)";
@@ -66,7 +66,7 @@ namespace AWSUtils.Tests.StorageTests.AWSUtils
             toPersist.StringData = "Create";
             await manager.PutEntryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, GetValues(toPersist, true), expression);
 
-            toPersist.StringData = "Replaced";            
+            toPersist.StringData = "Replaced";
             await manager.UpsertEntryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, GetKeys(toPersist), GetValues(toPersist));
             var persisted = await manager.ReadSingleEntryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, GetKeys(toPersist), response => new UnitTestDynamoDBTableData(response));
             Assert.NotNull(persisted);
@@ -90,7 +90,7 @@ namespace AWSUtils.Tests.StorageTests.AWSUtils
             });
         }
 
-        [Fact,  TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task DynamoDBDataManager_DeleteItemAsync()
         {
             var toPersist = GenerateNewData();
@@ -100,7 +100,7 @@ namespace AWSUtils.Tests.StorageTests.AWSUtils
             Assert.Null(persisted);
         }
 
-        [Fact,  TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task DynamoDBDataManager_ReadSingleTableEntryAsync()
         {
             var toPersist = GenerateNewData();
@@ -113,7 +113,7 @@ namespace AWSUtils.Tests.StorageTests.AWSUtils
             Assert.Null(notFound);
         }
 
-        [Fact,  TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task DynamoDBDataManager_ReadAllTableEntryByPartitionAsync()
         {
             var toPersist = GenerateNewData();
@@ -126,7 +126,7 @@ namespace AWSUtils.Tests.StorageTests.AWSUtils
             Assert.NotNull(found.results);
             Assert.True(found.results.Count == 2);
         }
-        
+
         internal static Dictionary<string, AttributeValue> GetKeys(UnitTestDynamoDBTableData data)
         {
             var keys = new Dictionary<string, AttributeValue>();
@@ -140,11 +140,11 @@ namespace AWSUtils.Tests.StorageTests.AWSUtils
             var values = new Dictionary<string, AttributeValue>();
             if (!string.IsNullOrWhiteSpace(data.StringData))
             {
-                values.Add("StringData", new AttributeValue(data.StringData)); 
+                values.Add("StringData", new AttributeValue(data.StringData));
             }
             if (data.BinaryData != null && data.BinaryData.Length > 0)
             {
-                values.Add("BinaryData", new AttributeValue { B = new MemoryStream(data.BinaryData) }); 
+                values.Add("BinaryData", new AttributeValue { B = new MemoryStream(data.BinaryData) });
             }
 
             if (includeKeys)

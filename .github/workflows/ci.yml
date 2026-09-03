@@ -44,12 +44,8 @@ jobs:
         global-json-file: global.json
     - name: Verify .NET formatter
       run: dotnet format --version
-    - name: Check changed source files
-      shell: pwsh
-      env:
-        BASE_COMMIT: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
-        HEAD_COMMIT: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
-      run: ./.github/scripts/check-whitespace.ps1 -BaseCommit $env:BASE_COMMIT -HeadCommit $env:HEAD_COMMIT
+    - name: Check solution
+      run: dotnet format whitespace Orleans.slnx --verify-no-changes --verbosity normal
   build:
     name: Build
     runs-on: ${{ matrix.os }}

@@ -314,7 +314,7 @@ namespace Orleans.Serialization.Codecs
             return result;
         }
     }
-    
+
     /// <summary>
     /// Serializer for <see cref="Memory{T}"/>.
     /// </summary>
@@ -472,7 +472,7 @@ namespace Orleans.Serialization.Codecs
             return result;
         }
     }
-    
+
     /// <summary>
     /// Serializer for <see cref="ArraySegment{T}"/>.
     /// </summary>

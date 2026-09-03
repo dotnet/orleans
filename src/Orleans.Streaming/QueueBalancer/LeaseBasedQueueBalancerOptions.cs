@@ -31,7 +31,7 @@ namespace Orleans.Configuration
         /// <remarks>
         /// <see cref="DefaultLeaseRenewPeriod"/> set to (<see cref="DefaultLeaseLength"/>/2 - 1) to allow time for at least 2 renew calls before we lose the lease.        
         /// </remarks>
-        public static readonly TimeSpan DefaultLeaseRenewPeriod = TimeSpan.FromSeconds(29); 
+        public static readonly TimeSpan DefaultLeaseRenewPeriod = TimeSpan.FromSeconds(29);
 
         /// <summary>
         /// Gets or sets how often balancer attempts to acquire leases.

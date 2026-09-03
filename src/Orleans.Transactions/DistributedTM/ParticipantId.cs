@@ -159,11 +159,16 @@ namespace Orleans.Transactions
             return participant.SupportsRoles(ParticipantId.Role.PriorityManager);
         }
 
+<<<<<<< HEAD
         /// <summary>
         /// Selects participants which store transactional state.
         /// </summary>
         /// <param name="participants">The participants and their transaction access counts.</param>
         /// <returns>The participants which support the resource role, with their access counts.</returns>
+||||||| parent of 82a763ec4 (style: format solution whitespace)
+        public static IEnumerable<KeyValuePair<ParticipantId,AccessCounter>> SelectResources(this IEnumerable<KeyValuePair<ParticipantId, AccessCounter>> participants)
+=======
+>>>>>>> 82a763ec4 (style: format solution whitespace)
         public static IEnumerable<KeyValuePair<ParticipantId, AccessCounter>> SelectResources(this IEnumerable<KeyValuePair<ParticipantId, AccessCounter>> participants)
         {
             return participants.Where(p => p.Key.IsResource());

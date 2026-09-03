@@ -133,7 +133,7 @@ namespace Orleans.Transactions.AzureStorage
                 {
                     if (properties.TryGetValue(stringDataPropertyName, out var dataProperty))
                     {
-                        if (dataProperty is string { Length: >0 } data)
+                        if (dataProperty is string { Length: > 0 } data)
                         {
                             yield return data;
                         }

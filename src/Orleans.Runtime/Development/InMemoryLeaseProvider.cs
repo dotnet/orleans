@@ -32,7 +32,8 @@ namespace Orleans.Runtime.Development
             try
             {
                 return await this.leaseProvider.Acquire(category, leaseRequests);
-            } catch (Exception ex)
+            }
+            catch (Exception ex)
             {
                 return leaseRequests.Select(request => new AcquireLeaseResult(new AcquiredLease(request.ResourceKey), ResponseCode.TransientFailure, ex)).ToArray();
             }
@@ -89,7 +90,7 @@ namespace Orleans.Runtime.Development
 
         public Task Release(string category, AcquiredLease[] acquiredLeases)
         {
-            foreach(AcquiredLease lease in acquiredLeases)
+            foreach (AcquiredLease lease in acquiredLeases)
             {
                 Release(category, lease);
             }
@@ -112,7 +113,7 @@ namespace Orleans.Runtime.Development
         {
             DateTime now = DateTime.UtcNow;
             Lease lease = this.leases.GetValueOrAddNew(Tuple.Create(category, leaseRequest.ResourceKey));
-            if(lease.ExpiredUtc < now)
+            if (lease.ExpiredUtc < now)
             {
                 lease.ExpiredUtc = now + leaseRequest.Duration;
                 return new AcquireLeaseResult(new AcquiredLease(leaseRequest.ResourceKey, leaseRequest.Duration, lease.Token, now), ResponseCode.OK, null);
@@ -122,7 +123,7 @@ namespace Orleans.Runtime.Development
 
         private void Release(string category, AcquiredLease acquiredLease)
         {
-            Tuple<string,string> leaseKey = Tuple.Create(category, acquiredLease.ResourceKey);
+            Tuple<string, string> leaseKey = Tuple.Create(category, acquiredLease.ResourceKey);
             if (this.leases.TryGetValue(leaseKey, out Lease? lease) && lease.Token == acquiredLease.Token)
             {
                 leases.Remove(leaseKey);

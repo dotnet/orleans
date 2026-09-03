@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using Amazon.DynamoDBv2.Model;
 using Orleans.Runtime;
 using Orleans.Runtime.MembershipService;
@@ -18,7 +18,7 @@ namespace AWSUtils.Tests.MembershipTests
         [Fact]
         public void GetKeysTest()
         {
-            SiloAddress address = SiloAddress.New(new IPEndPoint(IPAddress.Parse("127.0.0.1"), 12345), 67890); 
+            SiloAddress address = SiloAddress.New(new IPEndPoint(IPAddress.Parse("127.0.0.1"), 12345), 67890);
             var instanceRecord = new SiloInstanceRecord
             {
                 DeploymentId = "deploymentID",

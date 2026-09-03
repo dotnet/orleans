@@ -268,7 +268,7 @@ namespace UnitTests.SchedulerTests
 
             var n = 0;
             var finished = new TaskCompletionSource<int>();
-            var numCompleted = new[] {0};
+            var numCompleted = new[] { 0 };
             var gates = new SemaphoreSlim[10];
             for (var i = 0; i < 10; i++)
             {

@@ -1,4 +1,4 @@
-﻿namespace Orleans.EventSourcing.Common
+namespace Orleans.EventSourcing.Common
 {
     /// <summary>
     /// Provides operations for a compact, string-encoded set of replica identifiers used as a write vector.

@@ -173,6 +173,6 @@ namespace Orleans
             Message = "Client shutdown completed."
         )]
         private static partial void LogClientShutdownCompleted(ILogger logger);
-      
+
     }
 }

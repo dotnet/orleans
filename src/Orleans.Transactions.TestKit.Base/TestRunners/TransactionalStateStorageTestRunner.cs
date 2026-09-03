@@ -32,15 +32,37 @@ namespace Orleans.Transactions.TestKit
         /// <summary>
         /// Initializes a new instance of the <see cref="TransactionalStateStorageTestRunner{TState}"/> class.
         /// </summary>
+<<<<<<< HEAD
         /// <param name="stateStorageFactory">The factory which creates a storage instance with empty initial state.</param>
         /// <param name="stateFactory">The factory which creates test state values from integer seeds.</param>
         /// <param name="grainFactory">The grain factory used by the test runner.</param>
         /// <param name="testOutput">The callback used to write test output.</param>
         /// <param name="assertConfig">An optional callback which configures state equivalency comparisons.</param>
+        protected TransactionalStateStorageTestRunner(Func<Task<ITransactionalStateStorage<TState>>> stateStorageFactory, Func<int, TState> stateFactory,
+||||||| parent of 82a763ec4 (style: format solution whitespace)
+        /// <param name="stateStorageFactory">factory to create ITransactionalStateStorage, the test runner are assuming the state 
+        /// in storage is empty when ITransactionalStateStorage was created </param>
+        /// <param name="stateFactory">factory to create TState for test</param>
+        /// <param name="grainFactory">grain Factory needed for test runner</param>
+        /// <param name="testOutput">test output to helpful messages</param>
+        /// <param name="assertConfig">A reference to the AwesomeAssertions.Equivalency.EquivalencyOptions`1
+        ///     configuration object that can be used to influence the way the object graphs
+        ///     are compared</param>
         protected TransactionalStateStorageTestRunner(Func<Task<ITransactionalStateStorage<TState>>> stateStorageFactory, Func<int, TState> stateFactory, 
+=======
+        /// <param name="stateStorageFactory">factory to create ITransactionalStateStorage, the test runner are assuming the state 
+        /// in storage is empty when ITransactionalStateStorage was created </param>
+        /// <param name="stateFactory">factory to create TState for test</param>
+        /// <param name="grainFactory">grain Factory needed for test runner</param>
+        /// <param name="testOutput">test output to helpful messages</param>
+        /// <param name="assertConfig">A reference to the AwesomeAssertions.Equivalency.EquivalencyOptions`1
+        ///     configuration object that can be used to influence the way the object graphs
+        ///     are compared</param>
+        protected TransactionalStateStorageTestRunner(Func<Task<ITransactionalStateStorage<TState>>> stateStorageFactory, Func<int, TState> stateFactory,
+>>>>>>> 82a763ec4 (style: format solution whitespace)
             IGrainFactory grainFactory, Action<string> testOutput,
             Func<EquivalencyOptions<TState>, EquivalencyOptions<TState>>? assertConfig = null)
-            :base(grainFactory, testOutput)
+            : base(grainFactory, testOutput)
         {
             this.stateStorageFactory = stateStorageFactory;
             this.stateFactory = stateFactory;
@@ -66,11 +88,17 @@ namespace Orleans.Transactions.TestKit
         }
 
         private static readonly List<PendingTransactionState<TState>> emptyPendingStates = new List<PendingTransactionState<TState>>();
-  
+
+<<<<<<< HEAD
+
         /// <summary>
         /// Verifies that storing unchanged state creates an ETag and persists metadata without changing state.
         /// </summary>
         /// <returns>A task which represents the storage test.</returns>
+||||||| parent of 82a763ec4 (style: format solution whitespace)
+  
+=======
+>>>>>>> 82a763ec4 (style: format solution whitespace)
         public virtual async Task StoreWithoutChanges()
         {
             var stateStorage = await this.stateStorageFactory();
@@ -142,7 +170,7 @@ namespace Orleans.Transactions.TestKit
 
             // update timestamp in metadata, then write back with correct e-tag
             var now = DateTime.UtcNow;
-            var cr = MakeCommitRecords(2,2);
+            var cr = MakeCommitRecords(2, 2);
             var metadata = new TransactionalStateMetaData() { TimeStamp = now, CommitRecords = cr };
             var etag2 = await stateStorage.Store(null, metadata, emptyPendingStates, null, null);
             etag2.Should().NotBeNullOrEmpty();
@@ -181,7 +209,7 @@ namespace Orleans.Transactions.TestKit
 
         private void AssertTState(TState actual, TState expected)
         {
-            if(assertConfig == null)
+            if (assertConfig == null)
                 actual.Should().BeEquivalentTo(expected);
             else
                 actual.Should().BeEquivalentTo(expected, assertConfig);
@@ -262,7 +290,7 @@ namespace Orleans.Transactions.TestKit
         /// <param name="useTwoSteps">Whether preparing and confirming are performed in separate storage writes.</param>
         /// <returns>A task which represents the storage test.</returns>
         public virtual async Task ConfirmOne(bool useTwoSteps)
-        { 
+        {
             var stateStorage = await this.stateStorageFactory();
             var loadresponse = await stateStorage.Load();
             var etag = loadresponse.ETag;
@@ -306,7 +334,7 @@ namespace Orleans.Transactions.TestKit
             var etag = loadresponse.ETag;
             var metadata = loadresponse.Metadata;
             var initialstate = loadresponse.CommittedState;
-            
+
             var pendingstate = MakePendingState(1, this.stateFactory(123), false);
 
             etag = await stateStorage.Store(etag, metadata, new List<PendingTransactionState<TState>>() { pendingstate }, null, null);
@@ -320,7 +348,7 @@ namespace Orleans.Transactions.TestKit
             loadresponse.Metadata.Should().NotBeNull();
             loadresponse.CommittedSequenceId.Should().Be(0);
             loadresponse.PendingStates.Count.Should().Be(0);
-            AssertTState(loadresponse.CommittedState,initialstate);
+            AssertTState(loadresponse.CommittedState, initialstate);
             loadresponse.Metadata.TimeStamp.Should().Be(default);
             loadresponse.Metadata.CommitRecords.Count.Should().Be(0);
         }
@@ -344,7 +372,7 @@ namespace Orleans.Transactions.TestKit
 
             etag = await stateStorage.Store(etag, metadata, new List<PendingTransactionState<TState>>() { pendingstate1 }, null, null);
             _ = await stateStorage.Store(etag, metadata, new List<PendingTransactionState<TState>>() { pendingstate2 }, null, null);
-      
+
             loadresponse = await stateStorage.Load();
             _ = loadresponse.ETag;
             _ = loadresponse.Metadata;
@@ -357,7 +385,7 @@ namespace Orleans.Transactions.TestKit
             loadresponse.PendingStates[0].TimeStamp.Should().Be(pendingstate2.TimeStamp);
             loadresponse.PendingStates[0].TransactionManager.Should().Be(pendingstate2.TransactionManager);
             loadresponse.PendingStates[0].TransactionId.Should().Be(pendingstate2.TransactionId);
-            AssertTState(loadresponse.PendingStates[0].State,expectedState2);
+            AssertTState(loadresponse.PendingStates[0].State, expectedState2);
         }
 
 
@@ -407,7 +435,7 @@ namespace Orleans.Transactions.TestKit
             loadresponse.Metadata.Should().NotBeNull();
             loadresponse.CommittedSequenceId.Should().Be(1);
             loadresponse.PendingStates.Count.Should().Be(0);
-            AssertTState(loadresponse.CommittedState,expectedState);
+            AssertTState(loadresponse.CommittedState, expectedState);
             loadresponse.Metadata.TimeStamp.Should().Be(default);
             loadresponse.Metadata.CommitRecords.Count.Should().Be(0);
         }
@@ -449,11 +477,11 @@ namespace Orleans.Transactions.TestKit
 
             for (int i = 0; i < count; i++)
             {
-                loadresponse.PendingStates[i].SequenceId.Should().Be(i+1);
+                loadresponse.PendingStates[i].SequenceId.Should().Be(i + 1);
                 loadresponse.PendingStates[i].TimeStamp.Should().Be(pendingstates[i].TimeStamp);
                 loadresponse.PendingStates[i].TransactionManager.Should().Be(pendingstates[i].TransactionManager);
                 loadresponse.PendingStates[i].TransactionId.Should().Be(pendingstates[i].TransactionId);
-                AssertTState(loadresponse.PendingStates[i].State,expectedStates[i]);
+                AssertTState(loadresponse.PendingStates[i].State, expectedStates[i]);
             }
         }
 
@@ -500,7 +528,7 @@ namespace Orleans.Transactions.TestKit
             loadresponse.Metadata.Should().NotBeNull();
             loadresponse.CommittedSequenceId.Should().Be(count);
             loadresponse.PendingStates.Count.Should().Be(0);
-            AssertTState(loadresponse.CommittedState,expectedStates[count - 1]);
+            AssertTState(loadresponse.CommittedState, expectedStates[count - 1]);
             loadresponse.Metadata.TimeStamp.Should().Be(default);
             loadresponse.Metadata.CommitRecords.Count.Should().Be(0);
         }
@@ -541,7 +569,7 @@ namespace Orleans.Transactions.TestKit
             loadresponse.Metadata.Should().NotBeNull();
             loadresponse.CommittedSequenceId.Should().Be(0);
             loadresponse.PendingStates.Count.Should().Be(0);
-            AssertTState(loadresponse.CommittedState,initialstate);
+            AssertTState(loadresponse.CommittedState, initialstate);
             loadresponse.Metadata.TimeStamp.Should().Be(default);
             loadresponse.Metadata.CommitRecords.Count.Should().Be(0);
         }
@@ -616,7 +644,7 @@ namespace Orleans.Transactions.TestKit
             var etag = loadresponse.ETag;
             var metadata = loadresponse.Metadata;
             var initialstate = loadresponse.CommittedState;
-            
+
             var pendingstate1 = MakePendingState(1, this.stateFactory(11), false);
             var pendingstate2 = MakePendingState(2, this.stateFactory(22), false);
             var pendingstate3a = MakePendingState(3, this.stateFactory(333), false);
@@ -631,10 +659,10 @@ namespace Orleans.Transactions.TestKit
             var pendingstate7 = MakePendingState(7, expectedState7, false);
             var expectedState8 = this.stateFactory(88);
             var pendingstate8 = MakePendingState(8, expectedState8, false);
-           
+
 
             // prepare 1,2,3a,4a
-            etag = await stateStorage.Store(etag, metadata, new List<PendingTransactionState<TState>>() { pendingstate1, pendingstate2, pendingstate3a, pendingstate4a}, null, null);
+            etag = await stateStorage.Store(etag, metadata, new List<PendingTransactionState<TState>>() { pendingstate1, pendingstate2, pendingstate3a, pendingstate4a }, null, null);
 
             // replace 3b,4b, prepare 5, 6, 7, 8 confirm 1, 2, 3b, 4b, 5, 6
             _ = await stateStorage.Store(etag, metadata, new List<PendingTransactionState<TState>>() { pendingstate3b, pendingstate4b, pendingstate5, pendingstate6, pendingstate7, pendingstate8 }, 6, null);
@@ -711,6 +739,6 @@ namespace Orleans.Transactions.TestKit
             loadresponse.PendingStates[0].TransactionId.Should().Be(pendingstate4b.TransactionId);
             AssertTState(loadresponse.PendingStates[0].State, expectedState4b);
         }
-        
+
     }
 }

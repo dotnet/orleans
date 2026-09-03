@@ -52,7 +52,7 @@ public class PersistenceGrainTests_AzureTableGrainStorage : Base_PersistenceGrai
         }
     }
 
-    public PersistenceGrainTests_AzureTableGrainStorage(ITestOutputHelper output, Fixture fixture) : 
+    public PersistenceGrainTests_AzureTableGrainStorage(ITestOutputHelper output, Fixture fixture) :
         base(output, fixture)
     {
         fixture.EnsurePreconditionsMet();
@@ -103,7 +103,7 @@ public class PersistenceGrainTests_AzureTableGrainStorage_DeleteStateOnClear : B
         }
     }
 
-    public PersistenceGrainTests_AzureTableGrainStorage_DeleteStateOnClear(ITestOutputHelper output, Fixture fixture) : 
+    public PersistenceGrainTests_AzureTableGrainStorage_DeleteStateOnClear(ITestOutputHelper output, Fixture fixture) :
         base(output, fixture)
     {
         fixture.EnsurePreconditionsMet();

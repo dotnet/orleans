@@ -1,4 +1,4 @@
-﻿
+
 using Orleans.Runtime;
 
 namespace Orleans.Transactions.Abstractions

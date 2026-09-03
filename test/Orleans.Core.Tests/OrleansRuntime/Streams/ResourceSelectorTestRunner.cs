@@ -21,7 +21,7 @@ namespace UnitTests.OrleansRuntime.Streams
             selected = selected.Distinct().ToList();
             selected.Sort();
             Assert.Equal(resources.Count, selected.Count);
-            for (int i=0; i<selected.Count; i++)
+            for (int i = 0; i < selected.Count; i++)
             {
                 Assert.Equal(resources[i], selected[i]);
             }

@@ -7,14 +7,20 @@ namespace Orleans.CodeGenerator.Diagnostics;
 /// </summary>
 public static class InaccessibleSerializableTypeDiagnostic
 {
+<<<<<<< HEAD
     /// <summary>
     /// The diagnostic identifier.
     /// </summary>
-    public const string RuleId = DiagnosticRuleId.InaccessibleSerializableType; 
+    public const string RuleId = DiagnosticRuleId.InaccessibleSerializableType;
 
     /// <summary>
     /// The diagnostic title.
     /// </summary>
+||||||| parent of 82a763ec4 (style: format solution whitespace)
+    public const string RuleId = DiagnosticRuleId.InaccessibleSerializableType; 
+=======
+    public const string RuleId = DiagnosticRuleId.InaccessibleSerializableType;
+>>>>>>> 82a763ec4 (style: format solution whitespace)
     public const string Title = "Serializable type must be accessible from generated code";
 
     /// <summary>

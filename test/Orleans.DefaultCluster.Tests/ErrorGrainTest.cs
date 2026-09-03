@@ -55,7 +55,7 @@ namespace DefaultCluster.Tests
         public async Task ErrorHandlingLocalError()
         {
             LocalErrorGrain localGrain = new LocalErrorGrain();
-            
+
             Task<int> intPromise = localGrain.GetAxBError();
             try
             {
@@ -67,7 +67,7 @@ namespace DefaultCluster.Tests
                 Assert.Equal(exc2.GetBaseException().Message, (new Exception("GetAxBError-Exception")).Message);
             }
 
-            Assert.True(intPromise.Status == TaskStatus.Faulted);                
+            Assert.True(intPromise.Status == TaskStatus.Faulted);
         }
 
         /// <summary>

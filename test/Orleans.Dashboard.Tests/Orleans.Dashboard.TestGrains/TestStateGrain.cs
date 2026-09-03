@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans;
@@ -19,7 +19,7 @@ namespace TestGrains
         private readonly IPersistentState<CounterState> _counter;
 
         public TestStateGrain(
-            [PersistentState("counter")]IPersistentState <CounterState> counter)
+            [PersistentState("counter")] IPersistentState<CounterState> counter)
         {
             _counter = counter;
         }

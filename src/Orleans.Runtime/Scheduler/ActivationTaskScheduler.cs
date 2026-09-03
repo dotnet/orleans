@@ -145,7 +145,7 @@ namespace Orleans.Runtime.Scheduler
 
         [LoggerMessage(
             Level = LogLevel.Trace,
-            Message =  "{TaskScheduler} TryExecuteTaskInline Task Id={TaskId} Status={Status} PreviouslyQueued={PreviouslyQueued} CanExecute={CanExecute} Queued={Queued}"
+            Message = "{TaskScheduler} TryExecuteTaskInline Task Id={TaskId} Status={Status} PreviouslyQueued={PreviouslyQueued} CanExecute={CanExecute} Queued={Queued}"
         )]
         private partial void LogTraceTryExecuteTaskInline(long taskScheduler, int taskId, TaskStatus status, bool previouslyQueued, bool canExecute, int queued);
 

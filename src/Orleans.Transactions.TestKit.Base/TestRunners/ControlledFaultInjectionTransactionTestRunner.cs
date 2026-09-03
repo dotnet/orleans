@@ -28,10 +28,15 @@ namespace Orleans.Transactions.TestKit
          : base(grainFactory, output)
         { }
 
+<<<<<<< HEAD
         /// <summary>
         /// Verifies that a committed value remains readable after the grain is deactivated and reactivated.
         /// </summary>
         /// <returns>A task which represents the test.</returns>
+||||||| parent of 82a763ec4 (style: format solution whitespace)
+        
+=======
+>>>>>>> 82a763ec4 (style: format solution whitespace)
         public virtual async Task SingleGrainReadTransaction()
         {
             const int expected = 5;
@@ -44,11 +49,17 @@ namespace Orleans.Transactions.TestKit
             actual = await grain.Get();
             actual.Should().Be(expected);
         }
-        
+
+<<<<<<< HEAD
+
         /// <summary>
         /// Verifies that a transactional write remains committed after the grain is deactivated and reactivated.
         /// </summary>
         /// <returns>A task which represents the test.</returns>
+||||||| parent of 82a763ec4 (style: format solution whitespace)
+        
+=======
+>>>>>>> 82a763ec4 (style: format solution whitespace)
         public virtual async Task SingleGrainWriteTransaction()
         {
             const int delta = 5;

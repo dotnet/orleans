@@ -16,7 +16,7 @@ namespace UnitTests.Grains
         private readonly IGrainContextAccessor grainContextAccessor;
         private IGrainContext originalGrainContext = null!;
 
-        public DIGrainWithInjectedServices(IInjectedService injectedService, IInjectedScopedService injectedScopedService,  IGrainFactory injectedGrainFactory, IGrainContextAccessor grainContextAccessor)
+        public DIGrainWithInjectedServices(IInjectedService injectedService, IInjectedScopedService injectedScopedService, IGrainFactory injectedGrainFactory, IGrainContextAccessor grainContextAccessor)
         {
             this.injectedService = injectedService;
             this.injectedGrainFactory = injectedGrainFactory;
@@ -151,6 +151,6 @@ namespace UnitTests.Grains
             logger.LogInformation("Disposed instance {Value}", this.instanceValue);
         }
 
-        public string GetInstanceValue() =>  this.instanceValue;
+        public string GetInstanceValue() => this.instanceValue;
     }
 }

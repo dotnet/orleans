@@ -38,10 +38,16 @@ namespace Orleans.Hosting.Developer
             configurator.Configure(configureOptions);
         }
     }
-    
+
+<<<<<<< HEAD
+
     /// <summary>
     /// Configures a named stream provider which generates Event Hubs data for development and testing.
     /// </summary>
+||||||| parent of 82a763ec4 (style: format solution whitespace)
+    
+=======
+>>>>>>> 82a763ec4 (style: format solution whitespace)
     public class EventDataGeneratorStreamConfigurator : SiloRecoverableStreamConfigurator, IEventDataGeneratorStreamConfigurator
     {
         /// <summary>

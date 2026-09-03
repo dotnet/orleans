@@ -130,4 +130,4 @@ public class StructDeserializeBenchmark
 
     [Benchmark(Description = "SpanJson")]
     public int SpanJsonUtf8() => SumResult(SpanJson.JsonSerializer.Generic.Utf8.Deserialize<IntStruct>(SpanJsonInput));
-} 
+}

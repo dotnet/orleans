@@ -49,8 +49,8 @@ namespace UnitTests.StorageTests.AdoNet
         [Fact, TestCategory("Functional")]
         public async Task Streaming_MySql_Test()
         {
-            using(var tokenSource = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken))
-            {             
+            using (var tokenSource = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken))
+            {
                 tokenSource.CancelAfter(StreamCancellationTimeoutLimit);
                 var isMatch = await Task.WhenAll(InsertAndReadStreamsAndCheckMatch(_storage, StreamSizeToBeInsertedInBytes, NumberOfParallelStreams, tokenSource.Token));
                 Assert.True(isMatch.All(i => i), "All inserted streams should be equal to read streams.");

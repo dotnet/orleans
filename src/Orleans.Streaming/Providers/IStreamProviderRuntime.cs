@@ -48,7 +48,7 @@ namespace Orleans.Streams
     /// Identifies the publish/subscribe system types which stream providers can use.
     /// </summary>
     public enum StreamPubSubType
-    {        
+    {
         /// <summary>
         /// Supports explicit subscriptions created at runtime and implicit subscriptions declared on grain types.
         /// </summary>

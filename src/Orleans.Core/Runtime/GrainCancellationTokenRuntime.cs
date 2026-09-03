@@ -56,11 +56,11 @@ namespace Orleans.Runtime
             return tasks is null ? localTask ?? Task.CompletedTask : Task.WhenAll(tasks);
         }
 
-         private async Task CancelTokenWithRetries(
-             Guid id,
-             ConcurrentDictionary<GrainId, GrainReference> grainReferences,
-             GrainId key,
-             ICancellationSourcesExtension tokenExtension)
+        private async Task CancelTokenWithRetries(
+            Guid id,
+            ConcurrentDictionary<GrainId, GrainReference> grainReferences,
+            GrainId key,
+            ICancellationSourcesExtension tokenExtension)
         {
             await AsyncExecutorWithRetries.ExecuteWithRetries(
                 i => tokenExtension.CancelRemoteToken(id, CancellationToken.None),

@@ -137,7 +137,8 @@ namespace Orleans.Serialization.WireProtocol
         /// </summary>
         /// <value>The wire type.</value>
         public WireType WireType
-        { readonly get => Tag.WireType;
+        {
+            readonly get => Tag.WireType;
             set => Tag.WireType = value;
         }
 

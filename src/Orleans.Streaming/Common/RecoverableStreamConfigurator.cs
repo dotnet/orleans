@@ -9,7 +9,7 @@ namespace Orleans.Hosting
     /// <summary>
     /// Silo-specific configuration builder for recoverable streams.
     /// </summary>
-    public interface ISiloRecoverableStreamConfigurator : ISiloPersistentStreamConfigurator {}
+    public interface ISiloRecoverableStreamConfigurator : ISiloPersistentStreamConfigurator { }
 
     /// <summary>
     /// Extension methods for <see cref="ISiloRecoverableStreamConfigurator"/>.

@@ -1,4 +1,4 @@
-﻿namespace Orleans.Transactions.TestKit
+namespace Orleans.Transactions.TestKit
 {
     /// <summary>
     /// Defines transactional integer-state operations whose reads acquire an exclusive lock.

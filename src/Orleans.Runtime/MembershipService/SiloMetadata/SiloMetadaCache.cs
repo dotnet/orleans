@@ -80,7 +80,7 @@ internal partial class SiloMetadataCache(
                         {
                             throw;
                         }
-                        catch(Exception exception)
+                        catch (Exception exception)
                         {
                             _negativeCache.TryAdd(membershipEntry.Key, now + negativeCachePeriod);
                             LogErrorFetchingSiloMetadata(logger, exception, membershipEntry.Key);

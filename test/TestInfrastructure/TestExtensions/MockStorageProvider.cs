@@ -49,7 +49,7 @@ namespace UnitTests.StorageTests
         }
         [Serializable]
         [GenerateSerializer]
-        public class StateForTest 
+        public class StateForTest
         {
             [Id(0)]
             public int InitCount { get; set; }
@@ -147,7 +147,7 @@ namespace UnitTests.StorageTests
                 if (!storedDict.ContainsKey(stateStoreKey))
                 {
                     storedDict[stateStoreKey] = Activator.CreateInstance(stateType);
-                } 
+                }
 
                 var storedState = storedDict[stateStoreKey]!;
                 var field = storedState.GetType().GetProperty(name)!.GetSetMethod(true)!;
@@ -214,7 +214,7 @@ namespace UnitTests.StorageTests
             lock (StateStore)
             {
                 var storedState = this.copier.Copy(grainState.State); // Store current state data
-                var stateStore = new Dictionary<string, object?> {{ stateStoreKey, storedState }};
+                var stateStore = new Dictionary<string, object?> { { stateStoreKey, storedState } };
                 StateStore.WriteRow(MakeGrainStateKeys(grainType, grainId), stateStore, grainState.ETag);
 
                 LastId = GetId(grainId);

@@ -20,7 +20,7 @@ namespace Orleans.Tests.SqlUtils
     /// <summary>
     /// Formats .NET types appropriately for database consumption in non-parameterized queries.
     /// </summary>
-    internal class AdoNetFormatProvider: IFormatProvider
+    internal class AdoNetFormatProvider : IFormatProvider
     {
         private readonly AdoNetFormatter formatter = new AdoNetFormatter();
 
@@ -35,32 +35,32 @@ namespace Orleans.Tests.SqlUtils
         }
 
 
-        private class AdoNetFormatter: ICustomFormatter
+        private class AdoNetFormatter : ICustomFormatter
         {
             public string Format(string? format, object? arg, IFormatProvider? formatProvider)
             {
                 //This null check applies also to Nullable<T> when T does not have value defined.
-                if(arg == null)
+                if (arg == null)
                 {
                     return "NULL";
                 }
 
-                if(arg is string)
+                if (arg is string)
                 {
                     return "N'" + ((string)arg).Replace("'", "''", StringComparison.Ordinal) + "'";
                 }
 
-                if(arg is DateTime)
+                if (arg is DateTime)
                 {
                     return "'" + ((DateTime)arg).ToString("O") + "'";
                 }
 
-                if(arg is DateTimeOffset)
+                if (arg is DateTimeOffset)
                 {
                     return "'" + ((DateTimeOffset)arg).ToString("O") + "'";
                 }
 
-                if(arg is IFormattable)
+                if (arg is IFormattable)
                 {
                     return ((IFormattable)arg).ToString(format, CultureInfo.InvariantCulture);
                 }

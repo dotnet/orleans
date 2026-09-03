@@ -29,8 +29,8 @@ namespace Orleans.Streaming.EventHubs
         /// </summary>
         /// <param name="logger"></param>
         /// <param name="monitor"></param>
-        public AveragingCachePressureMonitor(ILogger logger, ICacheMonitor? monitor=null)
-            :this(EventHubStreamCachePressureOptions.DEFAULT_AVERAGING_CACHE_PRESSURE_MONITORING_THRESHOLD, logger, monitor)
+        public AveragingCachePressureMonitor(ILogger logger, ICacheMonitor? monitor = null)
+            : this(EventHubStreamCachePressureOptions.DEFAULT_AVERAGING_CACHE_PRESSURE_MONITORING_THRESHOLD, logger, monitor)
         { }
 
         /// <summary>
@@ -39,7 +39,7 @@ namespace Orleans.Streaming.EventHubs
         /// <param name="flowControlThreshold"></param>
         /// <param name="logger"></param>
         /// <param name="monitor"></param>
-        public AveragingCachePressureMonitor(double flowControlThreshold, ILogger logger, ICacheMonitor? monitor=null)
+        public AveragingCachePressureMonitor(double flowControlThreshold, ILogger logger, ICacheMonitor? monitor = null)
         {
             this.flowControlThreshold = flowControlThreshold;
             this.logger = logger;

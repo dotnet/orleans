@@ -36,7 +36,7 @@ internal class StateEntity
             this.TransactionId = transactionId.S;
 
         if (fields.TryGetValue(TRANSACTION_TIMESTAMP_PROPERTY_NAME, out var timestamp))
-            this.TransactionTimestamp = DateTime.Parse(timestamp.S, null,DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal);
+            this.TransactionTimestamp = DateTime.Parse(timestamp.S, null, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal);
 
         if (fields.TryGetValue(TRANSACTION_MANAGER_PROPERTY_NAME, out var transactionManager))
             this.TransactionManager = transactionManager.B.ToArray();

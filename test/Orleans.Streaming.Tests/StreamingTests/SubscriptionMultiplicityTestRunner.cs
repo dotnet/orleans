@@ -425,8 +425,8 @@ public class SubscriptionMultiplicityTestRunner
         actualSubscriptions = await consumer.GetAllSubscriptions(streamGuid, streamNamespace, streamProviderName);
 
         // validate
-        Assert.Equal(subscriptionCount-1, actualSubscriptions.Count);
-        Assert.Equal(subscriptionCount-1, expectedSubscriptions.Count);
+        Assert.Equal(subscriptionCount - 1, actualSubscriptions.Count);
+        Assert.Equal(subscriptionCount - 1, expectedSubscriptions.Count);
         foreach (StreamSubscriptionHandle<int> subscription in actualSubscriptions)
         {
             Assert.True(expectedSubscriptions.Contains(subscription), "Subscription Match");

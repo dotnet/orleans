@@ -75,9 +75,10 @@ namespace UnitTests.General
             Message msg = new Message();
             msg.RequestContextData = RequestContextExtensions.Export(this.fixture.DeepCopier);
             if (msg.RequestContextData != null) foreach (var kvp in msg.RequestContextData)
-                {
-                    headers.Add(kvp.Key, kvp.Value);
-                };
+            {
+                headers.Add(kvp.Key, kvp.Value);
+            }
+            ;
             Assert.False(headers.ContainsKey(RequestContext.CALL_CHAIN_REENTRANCY_HEADER), "ActivityId should not be be present " + headers.ToStrings(separator: ","));
             TestCleanup();
 
@@ -85,9 +86,10 @@ namespace UnitTests.General
             msg = new Message();
             msg.RequestContextData = RequestContextExtensions.Export(this.fixture.DeepCopier);
             if (msg.RequestContextData != null) foreach (var kvp in msg.RequestContextData)
-                {
-                    headers.Add(kvp.Key, kvp.Value);
-                };
+            {
+                headers.Add(kvp.Key, kvp.Value);
+            }
+            ;
             Assert.True(headers.ContainsKey(RequestContext.CALL_CHAIN_REENTRANCY_HEADER), "ActivityId #1 should be present " + headers.ToStrings(separator: ","));
             object result = headers[RequestContext.CALL_CHAIN_REENTRANCY_HEADER];
             Assert.NotNull(result);// ActivityId #1 should not be null
@@ -99,9 +101,10 @@ namespace UnitTests.General
             msg = new Message();
             msg.RequestContextData = RequestContextExtensions.Export(this.fixture.DeepCopier);
             if (msg.RequestContextData != null) foreach (var kvp in msg.RequestContextData)
-                {
-                    headers.Add(kvp.Key, kvp.Value);
-                };
+            {
+                headers.Add(kvp.Key, kvp.Value);
+            }
+            ;
             Assert.False(headers.ContainsKey(RequestContext.CALL_CHAIN_REENTRANCY_HEADER), "Null ActivityId should not be present " + headers.ToStrings(separator: ","));
             TestCleanup();
 
@@ -111,7 +114,8 @@ namespace UnitTests.General
             foreach (var kvp in msg.RequestContextData!)
             {
                 headers.Add(kvp.Key, kvp.Value);
-            };
+            }
+            ;
             Assert.True(headers.ContainsKey(RequestContext.CALL_CHAIN_REENTRANCY_HEADER), "ActivityId #2 should be present " + headers.ToStrings(separator: ","));
             result = headers[RequestContext.CALL_CHAIN_REENTRANCY_HEADER];
             Assert.NotNull(result); // ActivityId #2 should not be null
@@ -143,9 +147,10 @@ namespace UnitTests.General
             RequestContextExtensions.Import(msg.RequestContextData);
             actId = RequestContext.Get(RequestContext.CALL_CHAIN_REENTRANCY_HEADER);
             if (msg.RequestContextData != null) foreach (var kvp in msg.RequestContextData)
-                {
-                    headers.Add(kvp.Key, kvp.Value);
-                };
+            {
+                headers.Add(kvp.Key, kvp.Value);
+            }
+            ;
             Assert.NotNull(actId); // "ActivityId #1 should be present " + headers.ToStrings(separator: ",")
             object result = headers[RequestContext.CALL_CHAIN_REENTRANCY_HEADER];
             Assert.NotNull(result);// "ActivityId #1 should not be null"
@@ -169,9 +174,10 @@ namespace UnitTests.General
             RequestContextExtensions.Import(msg.RequestContextData);
             actId = RequestContext.Get(RequestContext.CALL_CHAIN_REENTRANCY_HEADER);
             if (msg.RequestContextData != null) foreach (var kvp in msg.RequestContextData)
-                {
-                    headers.Add(kvp.Key, kvp.Value);
-                };
+            {
+                headers.Add(kvp.Key, kvp.Value);
+            }
+            ;
             Assert.NotNull(actId); // "ActivityId #2 should be present " + headers.ToStrings(separator: ",")
             result = headers[RequestContext.CALL_CHAIN_REENTRANCY_HEADER];
             Assert.NotNull(result); // "ActivityId #2 should not be null"

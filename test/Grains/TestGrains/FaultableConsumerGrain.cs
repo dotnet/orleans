@@ -97,7 +97,7 @@ namespace UnitTests.Grains
             {
                 eventsConsumedCount++;
             }
-            else if(failPeriodTimer.Elapsed >= failPeriod)
+            else if (failPeriodTimer.Elapsed >= failPeriod)
             {
                 failPeriodTimer = null;
                 eventsConsumedCount++;

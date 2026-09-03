@@ -85,7 +85,7 @@ namespace Orleans.Providers.Streams.Common
             IBatchContainer? next;
             while (cache.TryGetNextMessage(this, out next))
             {
-                if(IsInStream(next))
+                if (IsInStream(next))
                     break;
             }
             current = next;

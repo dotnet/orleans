@@ -178,7 +178,7 @@ namespace Tester
         {
             // Arange
             var gateways = await this.HostedCluster.Client!.ServiceProvider.GetRequiredService<IGatewayListProvider>().GetGateways(); // The fixture deploys the client.
-            var gwEndpoint  = gateways.First().ToIPEndPoint()!;
+            var gwEndpoint = gateways.First().ToIPEndPoint()!;
             var exceptions = new List<Exception>();
 
             Task<bool> RetryFunc(Exception exception, CancellationToken cancellationToken)

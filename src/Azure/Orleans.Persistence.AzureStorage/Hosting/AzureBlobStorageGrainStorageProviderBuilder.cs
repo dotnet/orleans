@@ -22,7 +22,7 @@ internal sealed class AzureBlobStorageGrainStorageProviderBuilder : IProviderBui
                 var containerName = configurationSection["ContainerName"];
                 if (!string.IsNullOrEmpty(containerName))
                 {
-                    options.ContainerName = containerName; 
+                    options.ContainerName = containerName;
                 }
 
                 var serviceKey = configurationSection["ServiceKey"];

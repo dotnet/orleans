@@ -276,7 +276,7 @@ internal sealed partial class AsyncEnumerableGrainExtension : IAsyncEnumerableGr
             if (moveNextTask.IsCompletedSuccessfully)
             {
                 var hasValue = moveNextTask.GetAwaiter().GetResult();
-   
+
                 if (hasValue)
                 {
                     return (EnumerationResult.Element, typedEnumerator.Current);
@@ -322,7 +322,7 @@ internal sealed partial class AsyncEnumerableGrainExtension : IAsyncEnumerableGr
         await RemoveEnumeratorAsync(requestId);
         return (status, value);
     }
-    
+
     /// <inheritdoc/>
     public async ValueTask DisposeAsync()
     {

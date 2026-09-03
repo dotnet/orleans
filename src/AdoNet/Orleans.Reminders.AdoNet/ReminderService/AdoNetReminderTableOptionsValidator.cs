@@ -11,10 +11,15 @@ namespace Orleans.Configuration
     {
         private readonly AdoNetReminderTableOptions options;
 
+<<<<<<< HEAD
         /// <summary>
         /// Initializes a new instance of the <see cref="AdoNetReminderTableOptionsValidator"/> class.
         /// </summary>
         /// <param name="options">The reminder table options to validate.</param>
+||||||| parent of 82a763ec4 (style: format solution whitespace)
+        
+=======
+>>>>>>> 82a763ec4 (style: format solution whitespace)
         public AdoNetReminderTableOptionsValidator(IOptions<AdoNetReminderTableOptions> options)
         {
             this.options = options.Value;

@@ -92,8 +92,8 @@ namespace Tester.AzureUtils.Streaming
                 builder.ConfigureClient(clientBuilder =>
                 {
                     clientBuilder
-                        .AddAzureQueueStreams(AzureQueueStreamProviderName, b=>
-                        b.ConfigureAzureQueue(ob=>ob.Configure<IOptions<ClusterOptions>>(
+                        .AddAzureQueueStreams(AzureQueueStreamProviderName, b =>
+                        b.ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>(
                             (options, dep) =>
                             {
                                 options.ConfigureTestDefaults();

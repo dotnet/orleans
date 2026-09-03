@@ -98,7 +98,7 @@ internal partial class FirestoreGrainStorage : IGrainStorage, ILifecycleParticip
             {
                 newETag = await this._dataManager.CreateEntity(entity).ConfigureAwait(false);
             }
-            
+
             grainState.ETag = newETag;
             grainState.RecordExists = true;
         }

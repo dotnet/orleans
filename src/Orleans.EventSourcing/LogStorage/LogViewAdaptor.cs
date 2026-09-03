@@ -279,7 +279,7 @@ namespace Orleans.EventSourcing.LogStorage
             {
                 return string.Format("v{0} ({1} updates by {2}) etag={3}", Version, Updates.Count, Origin, ETag);
             }
-         }
+        }
 
         /// <inheritdoc/>
         protected override INotificationMessage Merge(INotificationMessage earlierMessage, INotificationMessage laterMessage)
@@ -305,7 +305,7 @@ namespace Orleans.EventSourcing.LogStorage
                 return base.Merge(earlierMessage, laterMessage); // keep only the version number
         }
 
-        private readonly SortedList<long, UpdateNotificationMessage> notifications = new SortedList<long,UpdateNotificationMessage>();
+        private readonly SortedList<long, UpdateNotificationMessage> notifications = new SortedList<long, UpdateNotificationMessage>();
 
         /// <inheritdoc/>
         protected override void OnNotificationReceived(INotificationMessage payload)

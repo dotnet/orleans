@@ -31,7 +31,7 @@ namespace Orleans.Storage
             IGrainState<T> grainState,
             CancellationToken cancellationToken)
             => WriteStateAsync(grainStoreKey, grainState);
-        
+
         /// <param name="grainStoreKey">Store key for this grain.</param>
         /// <param name="eTag">The previous etag that was read.</param>
         /// <returns>Completion promise for the update operation for stored grain state for the specified grain.</returns>

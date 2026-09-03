@@ -53,7 +53,7 @@ namespace Orleans.Connections.Security.Tests
             var decoded = TestCertificateHelper.ConvertFromBase64(encoded);
             Assert.Equal(original, decoded);
         }
-        
+
         /// <summary>
         /// Configures TLS for Orleans clients in the test cluster.
         /// Sets up:
@@ -167,7 +167,7 @@ namespace Orleans.Connections.Security.Tests
                 // Create a self-signed certificate with specified OIDs
                 var certificate = TestCertificateHelper.CreateSelfSignedCertificate(
                     CertificateSubjectName, oids);
-                
+
                 // Pass certificate through configuration (simulates real deployment)
                 var encodedCertificate = TestCertificateHelper.ConvertToBase64(certificate);
                 builder.Properties[CertificateConfigKey] = encodedCertificate;

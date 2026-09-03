@@ -1,4 +1,4 @@
-﻿namespace UnitTests.Grains
+namespace UnitTests.Grains
 {
     public class GeneratedStreamTestConstants
     {
