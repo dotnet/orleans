@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Xunit;
 
@@ -82,6 +83,39 @@ public class ActivationDataStructureTests
         Assert.Equal(
             typeof(Dictionary<Message, CoarseStopwatch>),
             schedulerType.GetProperty("Running")?.PropertyType);
+    }
+
+    [Fact]
+    public void SharedInterleavingPredicate_DoesNotUseComponentDictionary()
+    {
+        var shared = (GrainTypeSharedContext)RuntimeHelpers.GetUninitializedObject(typeof(GrainTypeSharedContext));
+        var component = new GrainCanInterleave();
+        var componentsField = Assert.IsAssignableFrom<FieldInfo>(
+            typeof(GrainTypeSharedContext).GetField("_components", InstanceFields));
+
+        shared.SetComponent(component);
+
+        Assert.Same(component, shared.GetComponent<GrainCanInterleave>());
+        Assert.Null(componentsField.GetValue(shared));
+
+        shared.SetComponent<GrainCanInterleave>(null);
+
+        Assert.Null(shared.GetComponent<GrainCanInterleave>());
+        Assert.Null(componentsField.GetValue(shared));
+    }
+
+    [Fact]
+    public void LifecycleStartAndStopFailures_HaveDistinctLogMessages()
+    {
+        var start = Assert.IsAssignableFrom<LoggerMessageAttribute>(
+            ActivationType.GetMethod("LogErrorStartingLifecycle", DeclaredMethods)?
+                .GetCustomAttribute<LoggerMessageAttribute>());
+        var stop = Assert.IsAssignableFrom<LoggerMessageAttribute>(
+            ActivationType.GetMethod("LogErrorStoppingLifecycle", DeclaredMethods)?
+                .GetCustomAttribute<LoggerMessageAttribute>());
+
+        Assert.Equal("Error starting lifecycle for activation '{Activation}'", start.Message);
+        Assert.Equal("Error stopping lifecycle for activation '{Activation}'", stop.Message);
     }
 
     [Theory]
