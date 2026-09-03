@@ -33,6 +33,7 @@ Use streams when events should fan out to independently managed consumers, when 
 
 1. Follow the [streaming quickstart](streams-quick-start.md) with the in-memory provider.
 1. Learn stream [identity, production, consumption, and subscription APIs](streams-programming-apis.md).
+1. Choose how new persistent-stream subscriptions [begin with live or locally cached messages](subscription-start-positions.md).
 1. Choose a [provider](stream-providers.md) for the required durability and replay behavior.
 1. Plan for [delivery, ordering, replay, and recovery](delivery-semantics.md).
 1. Configure [PubSub storage](pubsub-storage.md) and [operations](streaming-operations.md) for production.
