@@ -563,6 +563,51 @@ public sealed class ClusterLocatorTests
         Assert.Contains("foreign-service", exception.Message, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("configured-service")]
+    [InlineData(ClusterOptions.DefaultServiceId)]
+    public void ClusterReferenceResolver_DisabledMetacluster_RecognizesVirtualReferenceAsLocal(string serviceId)
+    {
+        var fixture = CreatePhase4ResolverFixture(
+            serviceId: "configured-service",
+            localClusterId: "local",
+            enabled: false);
+        var reference = VirtualReference(serviceId, "local");
+
+        var result = fixture.ReferenceResolver.TryResolveLocal(reference, out var cluster);
+
+        Assert.True(result);
+        Assert.Equal(new ClusterIdentity("configured-service", "local"), cluster);
+    }
+
+    [Fact]
+    public void ClusterReferenceResolver_ClusterBoundFastPath_ValidatesLocalIdentity()
+    {
+        var fixture = CreatePhase4ResolverFixture();
+        var local = UniversalReference.CreateCluster(
+            GrainId.Create(LocalGrainType, "local"),
+            default,
+            "service",
+            "local");
+        var remote = UniversalReference.CreateCluster(
+            GrainId.Create(LocalGrainType, "remote"),
+            default,
+            "service",
+            "west");
+        var foreignService = UniversalReference.CreateCluster(
+            GrainId.Create(LocalGrainType, "foreign"),
+            default,
+            "foreign-service",
+            "local");
+
+        Assert.True(fixture.ReferenceResolver.TryResolveLocal(local, out var cluster));
+        Assert.Equal(new ClusterIdentity("service", "local"), cluster);
+        Assert.False(fixture.ReferenceResolver.TryResolveLocal(remote, out _));
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => fixture.ReferenceResolver.TryResolveLocal(foreignService, out _));
+        Assert.Contains("does not match the local service", exception.Message, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task ClusterReferenceResolver_ZeroCacheDuration_DoesNotReuseResolution()
     {
@@ -1047,13 +1092,15 @@ public sealed class ClusterLocatorTests
                 topology ?? Phase4Topology(serviceId, 1, (localClusterId, MetaclusterClusterState.Active), ("west", MetaclusterClusterState.Active)));
         var clock = new Microsoft.Extensions.Time.Testing.FakeTimeProvider(
             new DateTimeOffset(2040, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var clusterOptions = Options.Create(new ClusterOptions { ServiceId = serviceId, ClusterId = localClusterId });
+        var metaclusterOptions = Options.Create(new MetaclusterOptions
+        {
+            Enabled = enabled,
+            ClusterLocationCacheDuration = cacheDuration ?? TimeSpan.FromMinutes(5)
+        });
         var resolver = new ClusterReferenceResolver(
-            Options.Create(new ClusterOptions { ServiceId = serviceId, ClusterId = localClusterId }),
-            Options.Create(new MetaclusterOptions
-            {
-                Enabled = enabled,
-                ClusterLocationCacheDuration = cacheDuration ?? TimeSpan.FromMinutes(5)
-            }),
+            clusterOptions,
+            metaclusterOptions,
             locatorResolver,
             grainPropertiesResolver,
             effectiveTopologyProvider,
