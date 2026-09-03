@@ -218,7 +218,7 @@ internal sealed partial class DisseminationProtocol
             return;
         }
 
-        var roundLifetime = GetAntiEntropyRoundLifetime(requestDigests);
+        var roundLifetime = GetAntiEntropyRoundLifetime(requests.Values);
         using var lifetimeCancellation = new CancellationTokenSource(roundLifetime, _timeProvider);
         using var exchangeCancellation = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken,
@@ -315,15 +315,18 @@ internal sealed partial class DisseminationProtocol
     }
 
     private TimeSpan GetAntiEntropyRoundLifetime(
-        Dictionary<DisseminationNamespace, List<DigestEntry>> requestDigests)
+        IEnumerable<DisseminationAntiEntropyRequest> requests)
     {
         var result = MaxAntiEntropyRoundLifetime;
-        foreach (var namespaceName in requestDigests.Keys)
+        foreach (var request in requests)
         {
-            if (_namespaces.TryGetValue(namespaceName, out var disseminationNamespace)
-                && disseminationNamespace.Options.StaleItemTtl < result)
+            foreach (var namespaceName in request.SupportedNamespaces)
             {
-                result = disseminationNamespace.Options.StaleItemTtl;
+                if (_namespaces.TryGetValue(namespaceName, out var disseminationNamespace)
+                    && disseminationNamespace.Options.StaleItemTtl < result)
+                {
+                    result = disseminationNamespace.Options.StaleItemTtl;
+                }
             }
         }
 

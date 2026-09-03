@@ -1787,6 +1787,44 @@ public class DisseminationProtocolTests
     }
 
     [Fact]
+    public async Task AntiEntropyCapabilityOnlyRoundUsesNamespaceStaleItemTtl()
+    {
+        var local = CreateSilo(11115);
+        var peer = CreateSilo(11116);
+        var transport = new FakeTransport(local, peer);
+        var timeProvider = new FakeTimeProvider();
+        var ns = new FakeNamespace(local);
+        ns.Options.StaleItemTtl = TimeSpan.FromSeconds(1);
+        var exchangeStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var cancellationObserved = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        transport.ExchangeAntiEntropyHandler = async (target, request, cancellationToken) =>
+        {
+            Assert.Empty(request.Digests);
+            Assert.Equal([ns.Name], request.SupportedNamespaces);
+            exchangeStarted.TrySetResult();
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            }
+            finally
+            {
+                cancellationObserved.TrySetResult();
+            }
+
+            return new DisseminationAntiEntropyResponse { Sender = target };
+        };
+        var protocol = CreateProtocol(transport, ns, timeProvider: timeProvider);
+
+        var round = protocol.RunAntiEntropyRound(TestContext.Current.CancellationToken);
+        await exchangeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        timeProvider.Advance(ns.Options.StaleItemTtl);
+
+        await cancellationObserved.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        await round.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
     public async Task DuplicateBroadcastDoesNotPostponeAntiEntropyProbe()
     {
         var local = CreateSilo(11111);
@@ -6315,6 +6353,33 @@ public class DisseminationProtocolTests
 
         AssertDirectRecipients(harness, harness.ActiveOne, harness.ActiveTwo);
         Assert.Single(harness.Dissemination.PublishCalls);
+        Assert.Empty(harness.Dissemination.QueryCalls);
+    }
+
+    [Fact]
+    public async Task DeploymentLoadPublisherCallerCancellationStopsDisseminationWithoutFallback()
+    {
+        var harness = CreateDeploymentLoadPublisherHarness();
+        using var cancellation = new CancellationTokenSource();
+        CancellationToken observedToken = default;
+        harness.Dissemination.PublishHandler = async (_, _, _, cancellationToken) =>
+        {
+            observedToken = cancellationToken;
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            return true;
+        };
+
+        var publish = harness.Publisher.PublishStatistics(cancellation.Token);
+        await harness.Dissemination.PublishStarted.Task.WaitAsync(
+            TimeSpan.FromSeconds(5),
+            TestContext.Current.CancellationToken);
+
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            async () => await publish.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+        Assert.True(observedToken.IsCancellationRequested);
+        AssertDirectRecipients(harness);
         Assert.Empty(harness.Dissemination.QueryCalls);
     }
 

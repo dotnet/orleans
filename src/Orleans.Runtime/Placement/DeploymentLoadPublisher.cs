@@ -127,7 +127,7 @@ namespace Orleans.Runtime
                 // Inform other cluster members about our refreshed statistics.
                 var members = _siloStatusOracle.GetApproximateSiloStatuses(true).Keys.ToArray();
                 IReadOnlyCollection<SiloAddress> directRecipients = members;
-                if (await TryPublishStatisticsViaDissemination(myStats))
+                if (await TryPublishStatisticsViaDissemination(myStats, cancellationToken))
                 {
                     try
                     {
@@ -148,7 +148,7 @@ namespace Orleans.Runtime
                 await PublishStatisticsDirectly(myStats, directRecipients, cancellationToken);
                 DeploymentLoadPublisherEvents.EmitClusterRefreshed(_siloDetails.SiloAddress, _periodicStats);
             }
-            catch (OperationCanceledException exception) when (exception.CancellationToken == cancellationToken)
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 throw;
             }
@@ -210,10 +210,15 @@ namespace Orleans.Runtime
             }
         }
 
-        internal async Task<bool> TryPublishStatisticsViaDissemination(SiloRuntimeStatistics myStats)
+        internal async Task<bool> TryPublishStatisticsViaDissemination(
+            SiloRuntimeStatistics myStats,
+            CancellationToken cancellationToken = default)
         {
             var timeProvider = _serviceProvider.GetService<TimeProvider>() ?? TimeProvider.System;
-            using var cancellation = new CancellationTokenSource(_statisticsRefreshTime, timeProvider);
+            using var timeoutCancellation = new CancellationTokenSource(_statisticsRefreshTime, timeProvider);
+            using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken,
+                timeoutCancellation.Token);
             try
             {
                 var dissemination = _serviceProvider.GetService<IDisseminationService>();
@@ -231,10 +236,17 @@ namespace Orleans.Runtime
                     .AsTask()
                     .WaitAsync(cancellation.Token);
             }
-            catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+            catch (OperationCanceledException) when (
+                timeoutCancellation.IsCancellationRequested
+                && !cancellationToken.IsCancellationRequested)
             {
                 LogDebugRuntimeStatisticsDisseminationTimedOut(_logger, _statisticsRefreshTime);
                 return false;
+            }
+            catch (OperationCanceledException)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                throw;
             }
             catch (Exception exception)
             {
