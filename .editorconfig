@@ -672,13 +672,13 @@ dotnet_diagnostic.CA1848.severity = warning
 dotnet_diagnostic.CA1849.severity = warning
 dotnet_diagnostic.CA1873.severity = warning
 dotnet_diagnostic.CA2000.severity = warning
+
+[src/Orleans.Runtime/**.cs]
 dotnet_diagnostic.CA2002.severity = warning
 
-[src/Orleans.Runtime/Catalog/GrainLifecycle.cs]
-dotnet_diagnostic.CA2002.severity = warning
-
-[src/Orleans.Runtime/GrainDirectory/GrainDirectoryHandoffManager.cs]
-dotnet_diagnostic.CA2002.severity = warning
+# ActivationData's shared monitor migration is tracked by #10068.
+[src/Orleans.Runtime/Catalog/ActivationData.cs]
+dotnet_diagnostic.CA2002.severity = suggestion
 
 [src/Orleans.Serialization.SystemTextJson/**.cs]
 dotnet_diagnostic.CA2000.severity = warning
