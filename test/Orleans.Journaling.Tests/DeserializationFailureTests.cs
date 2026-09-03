@@ -214,7 +214,7 @@ public class DeserializationFailureTests : IClassFixture<DeserializationFailureT
             timeout: TimeSpan.FromMilliseconds(300));
 
         var activationBefore = await survivorGrain.GetActivationId();
-        await survivorGrain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
+        await survivorGrain.Cast<IGrainManagementExtension>().DeactivateOnIdle(TestContext.Current.CancellationToken);
 
         // Wait for grain to be reactivated with new activation id
         await TestHelpers.WaitUntilAsync(
@@ -470,7 +470,7 @@ public class TypeMismatchHandlerGrain : DurableGrain, ITypeMismatchHandlerGrain
                 _grain._typeMismatchDetected = true;
             }
 
-            await _grain.WriteStateAsync();
+            await _grain.WriteStateAsync(cancellationToken);
         }
     }
 }
@@ -521,7 +521,7 @@ public class ContextMismatchHandlerGrain : DurableGrain, IContextMismatchHandler
                 _grain._contextMismatchDetected = true;
             }
 
-            await _grain.WriteStateAsync();
+            await _grain.WriteStateAsync(cancellationToken);
         }
     }
 }
@@ -578,7 +578,7 @@ public class UnavailableTypeHandlerGrain : DurableGrain, IUnavailableTypeHandler
                 _grain._failedDeserializationCount++;
             }
 
-            await _grain.WriteStateAsync();
+            await _grain.WriteStateAsync(cancellationToken);
         }
     }
 }
@@ -632,7 +632,7 @@ public class FallbackHandlerGrain : DurableGrain, IFallbackHandlerGrain
                 _grain._rawBytesReceived = rawBytes.Length > 0;
             }
 
-            await _grain.WriteStateAsync();
+            await _grain.WriteStateAsync(cancellationToken);
         }
     }
 }
@@ -685,7 +685,7 @@ public class MixedMessageHandlerGrain : DurableGrain, IMixedMessageHandlerGrain
                 _grain._invalidMessageCount++;
             }
 
-            await _grain.WriteStateAsync();
+            await _grain.WriteStateAsync(cancellationToken);
         }
     }
 }
@@ -732,7 +732,7 @@ public class SurvivorGrain : DurableGrain, ISurvivorGrain
             if (context.Envelope.Data.TryGetBody<SimpleMessage>(out var message) && message is not null)
             {
                 _grain._lastReceivedValue.Value = message.Value;
-                await _grain.WriteStateAsync();
+                await _grain.WriteStateAsync(cancellationToken);
             }
             // Silently ignore messages that can't be deserialized
         }

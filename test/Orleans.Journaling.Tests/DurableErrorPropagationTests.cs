@@ -299,7 +299,7 @@ public class ErrorRequesterGrain : DurableGrain, IErrorRequesterGrain
         {
             _grain._receivedError = message;
             _grain._receivedCorrelationKey = context.Envelope.CorrelationKey;
-            await _grain.WriteStateAsync();
+            await _grain.WriteStateAsync(cancellationToken);
         }
     }
 }
@@ -367,7 +367,7 @@ public class ErrorProcessorGrain : DurableGrain, IErrorProcessorGrain
             if (!context.Envelope.Data.TryGetBody<ErrorTestRequest>(out var request) || request is null)
             {
                 context.SendError(StandardErrorCodes.DeserializationFailed, "Failed to deserialize request", isRetriable: false);
-                await _grain.WriteStateAsync();
+                await _grain.WriteStateAsync(cancellationToken);
                 return;
             }
 
@@ -428,7 +428,7 @@ public class ErrorProcessorGrain : DurableGrain, IErrorProcessorGrain
                     break;
             }
 
-            await _grain.WriteStateAsync();
+            await _grain.WriteStateAsync(cancellationToken);
         }
     }
 }

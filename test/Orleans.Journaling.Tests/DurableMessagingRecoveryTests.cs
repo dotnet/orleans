@@ -57,7 +57,7 @@ public class DurableMessagingRecoveryTests : IClassFixture<DurableMessagingRecov
 
         // Deactivate the receiver
         var activationIdBefore = await receiverGrain.GetActivationId();
-        await receiverGrain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
+        await receiverGrain.Cast<IGrainManagementExtension>().DeactivateOnIdle(TestContext.Current.CancellationToken);
 
         // Wait for grain to be reactivated with new activation id
         await TestHelpers.WaitUntilAsync(
@@ -145,7 +145,7 @@ public class DurableMessagingRecoveryTests : IClassFixture<DurableMessagingRecov
 
         // Deactivate the grain
         var activationIdBefore = await receiverGrain.GetActivationId();
-        await receiverGrain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
+        await receiverGrain.Cast<IGrainManagementExtension>().DeactivateOnIdle(TestContext.Current.CancellationToken);
 
         // Wait for grain to be reactivated
         await TestHelpers.WaitUntilAsync(
@@ -318,7 +318,7 @@ public class RecoveryTestGrain : DurableGrain, IRecoveryTestGrain
         public async ValueTask HandleAsync(TestMessage message, IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             // Just process the message - persist state to remove from inbox
-            await _grain.WriteStateAsync();
+            await _grain.WriteStateAsync(cancellationToken);
         }
     }
 }

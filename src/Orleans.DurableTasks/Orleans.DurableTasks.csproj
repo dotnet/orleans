@@ -2,6 +2,7 @@
 
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.DurableTasks</PackageId>
+    <RootNamespace>Orleans</RootNamespace>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>

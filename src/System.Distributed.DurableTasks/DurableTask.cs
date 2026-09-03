@@ -339,12 +339,12 @@ public struct ConfiguredDurableTask(DurableTask task)
 {
     private ConfiguredDurableTaskCore<DurableTask> _core = new(task);
 
-    public DurableTaskAwaiter GetAwaiter() => new(_core.RunAsync(CancellationToken.None));
+    public readonly DurableTaskAwaiter GetAwaiter() => new(_core.RunAsync(CancellationToken.None));
 
     internal readonly DurableTask Task => _core.Task;
     internal readonly TaskId TaskId => _core.TaskId;
 
-    internal ConfiguredDurableTask WithId(string taskId)
+    internal readonly ConfiguredDurableTask WithId(string taskId)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(taskId);
         _core.TrySetTaskId(taskId);
@@ -352,13 +352,13 @@ public struct ConfiguredDurableTask(DurableTask task)
     }
 
     // Schedules a durable task without waiting for the task to complete
-    public Task<ScheduledTask> ScheduleAsync(CancellationToken cancellationToken = default) => _core.ScheduleAsync(cancellationToken);
+    public readonly Task<ScheduledTask> ScheduleAsync(CancellationToken cancellationToken = default) => _core.ScheduleAsync(cancellationToken);
 
     // Cancels a durable task without waiting for the task to complete
-    public Task<bool> CancelAsync(CancellationToken cancellationToken) => _core.CancelAsync(cancellationToken);
+    public readonly Task<bool> CancelAsync(CancellationToken cancellationToken) => _core.CancelAsync(cancellationToken);
 
     // Polls a task, returning the status of the task.
-    public Task<DurableTaskStatus> PollAsync(PollingOptions pollingOptions, CancellationToken cancellationToken) => _core.PollAsync(pollingOptions, cancellationToken);
+    public readonly Task<DurableTaskStatus> PollAsync(PollingOptions pollingOptions, CancellationToken cancellationToken) => _core.PollAsync(pollingOptions, cancellationToken);
 
     internal static InvalidOperationException GetNonSchedulableTaskException() => new("The provided task does not support scheduling. This may be because it is a local method or another non-serializable task type.");
 }
@@ -370,9 +370,9 @@ public struct ConfiguredDurableTask<TResult>(DurableTask<TResult> task)
     internal readonly DurableTask<TResult> Task => _core.Task;
     internal readonly TaskId TaskId => _core.TaskId;
 
-    public DurableTaskAwaiter<TResult> GetAwaiter() => new(_core.RunAsync(CancellationToken.None));
+    public readonly DurableTaskAwaiter<TResult> GetAwaiter() => new(_core.RunAsync(CancellationToken.None));
 
-    public ConfiguredDurableTask<TResult> WithId(string taskId)
+    public readonly ConfiguredDurableTask<TResult> WithId(string taskId)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(taskId);
         _core.TrySetTaskId(taskId);
@@ -380,7 +380,7 @@ public struct ConfiguredDurableTask<TResult>(DurableTask<TResult> task)
     }
 
     // Schedules a durable task without waiting for the task to complete
-    public async Task<ScheduledTask<TResult>> ScheduleAsync(CancellationToken cancellationToken = default)
+    public readonly async Task<ScheduledTask<TResult>> ScheduleAsync(CancellationToken cancellationToken = default)
     {
         // Ensure the task id is set.
         _core.TrySetTaskId(null);
@@ -409,10 +409,10 @@ public struct ConfiguredDurableTask<TResult>(DurableTask<TResult> task)
     }
 
     // Cancels a durable task without waiting for the task to complete
-    public Task<bool> CancelAsync(CancellationToken cancellationToken) => _core.CancelAsync(cancellationToken);
+    public readonly Task<bool> CancelAsync(CancellationToken cancellationToken) => _core.CancelAsync(cancellationToken);
 
     // Polls a task, returning the status of the task.
-    public Task<DurableTaskStatus> PollAsync(PollingOptions pollingOptions, CancellationToken cancellationToken) => _core.PollAsync(pollingOptions, cancellationToken);
+    public readonly Task<DurableTaskStatus> PollAsync(PollingOptions pollingOptions, CancellationToken cancellationToken) => _core.PollAsync(pollingOptions, cancellationToken);
 }
 
 /// <summary>

@@ -427,7 +427,7 @@ internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<Hierarchica
         Span<char> buffer = array ?? stackalloc char[256];
 
         // Write the value into the buffer.
-        var didFormat = TryFormat(buffer, out var len, ReadOnlySpan<char>.Empty, null);
+        var didFormat = TryFormat(buffer, out var len, [], null);
         buffer = buffer[..len];
         Debug.Assert(didFormat);
 
@@ -500,8 +500,8 @@ internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<Hierarchica
 
     public ref struct SegmentEnumerator(HierarchicalKey id)
     {
-        private StructureEnumerator _enumerator = new StructureEnumerator(id);
-        private ReadOnlySpan<char> _buffer = ReadOnlySpan<char>.Empty;
+        private StructureEnumerator _enumerator = new(id);
+        private ReadOnlySpan<char> _buffer = [];
 
         public ReadOnlySpan<char> Current { get; private set; }
 

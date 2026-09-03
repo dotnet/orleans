@@ -277,7 +277,7 @@ public class MultiHandlerGrain(IDurableInbox inbox) : DurableGrain, IMultiHandle
         protected override async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             _grain._handler1Count++;
-            await _grain.WriteStateAsync();
+            await _grain.WriteStateAsync(cancellationToken);
         }
     }
 
@@ -293,7 +293,7 @@ public class MultiHandlerGrain(IDurableInbox inbox) : DurableGrain, IMultiHandle
         protected override async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             _grain._handler2Count++;
-            await _grain.WriteStateAsync();
+            await _grain.WriteStateAsync(cancellationToken);
         }
     }
 
@@ -309,7 +309,7 @@ public class MultiHandlerGrain(IDurableInbox inbox) : DurableGrain, IMultiHandle
         protected override async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             _grain._handler3Count++;
-            await _grain.WriteStateAsync();
+            await _grain.WriteStateAsync(cancellationToken);
         }
     }
 }
@@ -352,7 +352,7 @@ public class SpecificBeforePrefixGrain(IDurableInbox inbox) : DurableGrain, ISpe
         protected override async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             _grain._specificCount++;
-            await _grain.WriteStateAsync();
+            await _grain.WriteStateAsync(cancellationToken);
         }
     }
 
@@ -368,7 +368,7 @@ public class SpecificBeforePrefixGrain(IDurableInbox inbox) : DurableGrain, ISpe
         protected override async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             _grain._prefixCount++;
-            await _grain.WriteStateAsync();
+            await _grain.WriteStateAsync(cancellationToken);
         }
     }
 }
@@ -409,7 +409,7 @@ public class OrderedHandlerGrainA(IDurableInbox inbox) : DurableGrain, IOrderedH
         protected override async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             _grain._handlerACount++;
-            await _grain.WriteStateAsync();
+            await _grain.WriteStateAsync(cancellationToken);
         }
     }
 
@@ -425,7 +425,7 @@ public class OrderedHandlerGrainA(IDurableInbox inbox) : DurableGrain, IOrderedH
         protected override async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             _grain._handlerBCount++;
-            await _grain.WriteStateAsync();
+            await _grain.WriteStateAsync(cancellationToken);
         }
     }
 }
@@ -466,7 +466,7 @@ public class OrderedHandlerGrainB(IDurableInbox inbox) : DurableGrain, IOrderedH
         protected override async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             _grain._handlerACount++;
-            await _grain.WriteStateAsync();
+            await _grain.WriteStateAsync(cancellationToken);
         }
     }
 
@@ -482,7 +482,7 @@ public class OrderedHandlerGrainB(IDurableInbox inbox) : DurableGrain, IOrderedH
         protected override async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             _grain._handlerBCount++;
-            await _grain.WriteStateAsync();
+            await _grain.WriteStateAsync(cancellationToken);
         }
     }
 }

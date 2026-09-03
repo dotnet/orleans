@@ -507,7 +507,7 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
     {
         try
         {
-            await _asyncLock.WaitAsync();
+            await _asyncLock.WaitAsync(cancellationToken);
             await _storage.ReadAsync(cancellationToken);
             if (PruneInternal(DateTime.UtcNow, cleanupAge))
             {
