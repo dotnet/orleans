@@ -728,7 +728,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
             transition.Range,
             operationName,
             heldDuration,
-            canceled || !canComplete);
+            canceled);
     }
 
     private async Task<bool> TransferSnapshotAsync(
