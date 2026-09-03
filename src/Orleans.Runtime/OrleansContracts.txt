@@ -25,7 +25,7 @@ interface [GrainInterfaceType("Orleans.Runtime.Development.IDevelopmentLeaseProv
 
 class [GrainType("graincallcancellationmanager")] Orleans.Runtime.GrainCallCancellationManager
 
-class Orleans.Runtime.InterClusterRelayGrain
+class [GrainType("interclusterrelay")] Orleans.Runtime.InterClusterRelayGrain
 
 class [GrainType("clientdirectory")] Orleans.Runtime.GrainDirectory.ClientDirectory
 
