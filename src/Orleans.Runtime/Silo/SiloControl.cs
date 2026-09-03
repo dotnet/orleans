@@ -444,7 +444,7 @@ namespace Orleans.Runtime
         )]
         private partial void LogErrorProviderNotFound(string providerTypeFullName, string providerName);
 
-        public Task DropDisconnectedClients(bool excludeRecent)
+        public Task DropDisconnectedClients(bool excludeRecent, CancellationToken cancellationToken)
         {
             var gateway = this.services.GetRequiredService<MessageCenter>().Gateway;
             if (gateway is null)
@@ -457,7 +457,7 @@ namespace Orleans.Runtime
             return Task.CompletedTask;
         }
 
-        public Task CompleteGatewayRequest(GrainId clientId, GrainId sourceId, CorrelationId correlationId)
+        public Task CompleteGatewayRequest(GrainId clientId, GrainId sourceId, CorrelationId correlationId, CancellationToken cancellationToken)
         {
             this.services.GetRequiredService<MessageCenter>().Gateway?.CompleteTrackedClientRequest(clientId, sourceId, correlationId);
             return Task.CompletedTask;

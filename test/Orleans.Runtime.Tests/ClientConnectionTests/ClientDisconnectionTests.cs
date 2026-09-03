@@ -95,7 +95,7 @@ public class ClientDisconnectionTests(ClientDisconnectionTests.Fixture fixture) 
             TimeSpan.FromSeconds(10));
 
         await _cluster.RemoveClientAsync("OwnerClientB");
-        await clientA.GetGrain<IManagementGrain>(0).DropDisconnectedClients(excludeRecent: false);
+        await clientA.GetGrain<IManagementGrain>(0).DropDisconnectedClients(excludeRecent: false, cancellationToken);
         Assert.All(gateways, gateway => Assert.Equal(0, gateway.GetOutstandingRequestCount(clientBId)));
     }
 
@@ -135,7 +135,7 @@ public class ClientDisconnectionTests(ClientDisconnectionTests.Fixture fixture) 
 
         // Use IManagementGrain to force all Gateways to drop defunct clients.
         var managementGrain = clientA.GetGrain<IManagementGrain>(0);
-        await managementGrain.DropDisconnectedClients(excludeRecent: false);
+        await managementGrain.DropDisconnectedClients(excludeRecent: false, cancellationToken);
 
         // The call should promptly fail with a ClientNotAvailableException.
         await Assert.ThrowsAsync<ClientNotAvailableException>(() => responseTask);
@@ -153,6 +153,7 @@ public class ClientDisconnectionTests(ClientDisconnectionTests.Fixture fixture) 
     [InlineData(false)]
     public async Task ClientReceivesRejectionForResponseWhenTargetClientDisconnected(bool hostedClient)
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var clientA = hostedClient ? _cluster.Silos[0].ServiceProvider.GetRequiredService<IClusterClient>() : await _cluster.GetClientAsync("ClientA");
         var clientB = await _cluster.GetClientAsync("ClientB");
 
@@ -183,7 +184,7 @@ public class ClientDisconnectionTests(ClientDisconnectionTests.Fixture fixture) 
 
         // Purge disconnected clients (rejecting pending response)
         var managementGrain = clientA.GetGrain<IManagementGrain>(0);
-        await managementGrain.DropDisconnectedClients(excludeRecent: false);
+        await managementGrain.DropDisconnectedClients(excludeRecent: false, cancellationToken);
     }
 
     [Fact]
@@ -207,6 +208,7 @@ public class ClientDisconnectionTests(ClientDisconnectionTests.Fixture fixture) 
     [InlineData(false)]
     public async Task MessageToDisconnectingClientIsRejected(bool hostedClient)
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var clientA = hostedClient ? _cluster.Silos[0].ServiceProvider.GetRequiredService<IClusterClient>() : await _cluster.GetClientAsync("ClientA");
         var clientB = await _cluster.GetClientAsync("ClientB");
 
@@ -225,7 +227,7 @@ public class ClientDisconnectionTests(ClientDisconnectionTests.Fixture fixture) 
 
         // Purge disconnected clients (rejecting pending response)
         var managementGrain = clientA.GetGrain<IManagementGrain>(0);
-        await managementGrain.DropDisconnectedClients(excludeRecent: false);
+        await managementGrain.DropDisconnectedClients(excludeRecent: false, cancellationToken);
 
         // The call should be rejected
         await Assert.ThrowsAsync<ClientNotAvailableException>(async () => await responseTask);

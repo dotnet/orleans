@@ -27,7 +27,6 @@ using Orleans.Hosting;
 using Orleans.Runtime.TestHooks;
 using Orleans.Configuration.Internal;
 using Orleans.TestingHost.Logging;
-using System.Diagnostics.CodeAnalysis;
 
 namespace Orleans.TestingHost;
 
@@ -478,25 +477,6 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         {
             WriteLog("WaitForClusterManifestToStabilize reached the fallback wait of {0}", stabilizationTime);
         }
-    }
-
-    /// <summary>
-    /// Attempts to find a grain context by searching all silos.
-    /// </summary>
-    public bool TryGetGrainContext(GrainId grainId, [NotNullWhen(true)] out IGrainContext? grainContext)
-    {
-        foreach (var silo in Silos)
-        {
-            var activationDirectory = silo.SiloHost.Services.GetRequiredService<ActivationDirectory>();
-            grainContext = activationDirectory.FindTarget(grainId);
-            if (grainContext is not null)
-            {
-                return true;
-            }
-        }
-
-        grainContext = null;
-        return false;
     }
 
     /// <summary>

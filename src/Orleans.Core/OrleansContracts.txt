@@ -60,6 +60,7 @@ interface [GrainInterfaceType("Orleans.Runtime.IGrainCallCancellationExtension")
   FA239824: CancelRequestAsync(Orleans.Runtime.GrainId, Orleans.Runtime.CorrelationId, System.Threading.CancellationToken) -> ValueTask
 
 interface [GrainInterfaceType("Orleans.Runtime.IManagementGrain")] Orleans.Runtime.IManagementGrain [Version(0)]
+  DropDisconnectedClients: DropDisconnectedClients(bool) -> Task
   101564A8: DropDisconnectedClients(bool, System.Threading.CancellationToken) -> Task
   ForceActivationCollectionOnSilos: ForceActivationCollection(Orleans.Runtime.SiloAddress[], System.TimeSpan) -> Task
   329F9A1B: ForceActivationCollection(Orleans.Runtime.SiloAddress[], System.TimeSpan, System.Threading.CancellationToken) -> Task
