@@ -7,8 +7,16 @@ using Orleans.Connections.Security;
 
 namespace Orleans
 {
+    /// <summary>
+    /// Provides extension methods for adding TLS middleware to Orleans connections.
+    /// </summary>
     public static class TlsConnectionBuilderExtensions
     {
+        /// <summary>
+        /// Adds TLS server authentication and encryption to the connection pipeline.
+        /// </summary>
+        /// <param name="builder">The connection pipeline builder.</param>
+        /// <param name="options">The TLS configuration.</param>
         public static void UseServerTls(
             this IConnectionBuilder builder,
             TlsOptions options)
@@ -22,6 +30,11 @@ namespace Orleans
             builder.UseMiddleware(new TlsServerConnectionMiddleware(options, loggerFactory));
         }
 
+        /// <summary>
+        /// Adds TLS client authentication and encryption to the connection pipeline.
+        /// </summary>
+        /// <param name="builder">The connection pipeline builder.</param>
+        /// <param name="options">The TLS configuration.</param>
         public static void UseClientTls(
             this IConnectionBuilder builder,
             TlsOptions options)

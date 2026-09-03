@@ -106,16 +106,40 @@ public static class ReminderEvents
     /// </summary>
     public enum LocalReminderStopReason
     {
+        /// <summary>
+        /// The stop reason is unknown.
+        /// </summary>
         Unknown = 0,
+
+        /// <summary>
+        /// The reminder was unregistered.
+        /// </summary>
         Unregistered = 1,
+
         /// <summary>
         /// Unused. Retained for compatibility.
         /// </summary>
         [Obsolete("Unused, will be removed in a future version.")]
         Replaced = 2,
+
+        /// <summary>
+        /// The reminder moved outside the silo's responsibility range.
+        /// </summary>
         RemovedFromRange = 3,
+
+        /// <summary>
+        /// The reminder was removed from the reminder table.
+        /// </summary>
         RemovedFromTable = 4,
+
+        /// <summary>
+        /// The reminder service stopped.
+        /// </summary>
         ServiceStopped = 5,
+
+        /// <summary>
+        /// The reminder is outside the service's current loading window.
+        /// </summary>
         OutsideLoadingWindow = 6,
     }
 

@@ -4,6 +4,9 @@ using System.Security.Cryptography.X509Certificates;
 
 namespace Orleans.Connections.Security
 {
+    /// <summary>
+    /// Provides methods for loading TLS certificates from an operating system certificate store.
+    /// </summary>
     public static class CertificateLoader
     {
         // See http://oid-info.com/get/1.3.6.1.5.5.7.3.1
@@ -14,6 +17,22 @@ namespace Orleans.Connections.Security
         // Indicates that a certificate can be used as a TLS client certificate
         private const string ClientAuthenticationOid = "1.3.6.1.5.5.7.3.2";
 
+        /// <summary>
+        /// Loads the newest matching certificate which has an accessible private key and is valid for the requested TLS role.
+        /// </summary>
+        /// <param name="subject">The subject name to search for.</param>
+        /// <param name="storeName">The name of the certificate store.</param>
+        /// <param name="storeLocation">The location of the certificate store.</param>
+        /// <param name="allowInvalid">
+        /// <see langword="true"/> to include certificates which do not pass certificate-chain validation;
+        /// otherwise, <see langword="false"/>.
+        /// </param>
+        /// <param name="server">
+        /// <see langword="true"/> to select a certificate valid for server authentication;
+        /// <see langword="false"/> to select one valid for client authentication.
+        /// </param>
+        /// <returns>The selected certificate.</returns>
+        /// <exception cref="InvalidOperationException">No suitable certificate was found.</exception>
         public static X509Certificate2 LoadFromStoreCert(string subject, string storeName, StoreLocation storeLocation, bool allowInvalid, bool server)
         {
             using (var store = new X509Store(storeName, storeLocation))

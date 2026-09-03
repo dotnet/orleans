@@ -7,6 +7,13 @@ using Microsoft.AspNetCore.Connections;
 
 namespace Orleans.Connections.Security
 {
+    /// <summary>
+    /// Validates a remote certificate presented during TLS authentication.
+    /// </summary>
+    /// <param name="certificate">The remote certificate.</param>
+    /// <param name="chain">The certificate chain built during validation, if available.</param>
+    /// <param name="policyErrors">The policy errors produced by the platform certificate validator.</param>
+    /// <returns><see langword="true"/> to accept the certificate; otherwise, <see langword="false"/>.</returns>
     public delegate bool RemoteCertificateValidator(X509Certificate2 certificate, X509Chain? chain, SslPolicyErrors policyErrors);
 
     /// <summary>
