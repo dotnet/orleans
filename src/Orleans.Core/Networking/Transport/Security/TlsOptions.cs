@@ -49,12 +49,13 @@ public class TlsOptions
     /// <summary>
     /// <para>
     /// A callback that will be invoked to dynamically select a local client certificate. This is higher priority than LocalCertificate.
+    /// Returning <see langword="null"/> omits the client certificate for the connection.
     /// </para>
     /// <para>
     /// If the certificate has an Extended Key Usage extension, the usages must include Client Authentication (OID 1.3.6.1.5.5.7.3.2).
     /// </para>
     /// </summary>
-    public Func<object, string, X509CertificateCollection, X509Certificate?, string[], X509Certificate2>? LocalClientCertificateSelector { get; set; }
+    public Func<object, string, X509CertificateCollection, X509Certificate?, string[], X509Certificate2?>? LocalClientCertificateSelector { get; set; }
 
     /// <summary>
     /// Specifies the remote endpoint certificate requirements for a TLS connection. Defaults to <see cref="RemoteCertificateMode.RequireCertificate"/>.

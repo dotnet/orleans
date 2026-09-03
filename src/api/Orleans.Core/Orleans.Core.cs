@@ -828,7 +828,7 @@ namespace Orleans.Connections.Transport.Security
 
         public System.Security.Cryptography.X509Certificates.X509Certificate2? LocalCertificate { get { throw null; } set { } }
 
-        public System.Func<object, string, System.Security.Cryptography.X509Certificates.X509CertificateCollection, System.Security.Cryptography.X509Certificates.X509Certificate?, string[], System.Security.Cryptography.X509Certificates.X509Certificate2>? LocalClientCertificateSelector { get { throw null; } set { } }
+        public System.Func<object, string, System.Security.Cryptography.X509Certificates.X509CertificateCollection, System.Security.Cryptography.X509Certificates.X509Certificate?, string[], System.Security.Cryptography.X509Certificates.X509Certificate2?>? LocalClientCertificateSelector { get { throw null; } set { } }
 
         public System.Func<MessageTransport, string?, System.Security.Cryptography.X509Certificates.X509Certificate2?>? LocalServerCertificateSelector { get { throw null; } set { } }
 
