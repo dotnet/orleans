@@ -2,10 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
-using System.Runtime.CompilerServices;
 using Amazon.DynamoDBv2.Model;
-
-[assembly: InternalsVisibleTo("Orleans.Transactions.DynamoDB.Tests")]
 
 namespace Orleans.Transactions.DynamoDB.TransactionalState;
 

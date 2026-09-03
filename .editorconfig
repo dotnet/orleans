@@ -698,3 +698,7 @@ dotnet_diagnostic.CA2002.severity = suggestion
 # DynamoDB persistence and transactional state use stable wire representations.
 [src/AWS/{Orleans.Persistence.DynamoDB,Orleans.Transactions.DynamoDB}/**.cs]
 dotnet_diagnostic.CA1305.severity = warning
+
+# Shared linked sources are separately owned and remain advisory for this rollout.
+[src/AWS/Shared/{AWSUtils.cs,Storage/DynamoDBStorage.cs}]
+dotnet_diagnostic.CA1305.severity = suggestion
