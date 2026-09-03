@@ -53,6 +53,20 @@ public class InterfaceToImplementationMappingCacheTests
         Assert.Contains("is not an interface", exception.Message);
     }
 
+    [Fact]
+    public void TypeArrayComparer_UnequalOrOneSidedNullArrays_AreNotEqual()
+    {
+        var comparerType = typeof(InterfaceToImplementationMappingCache.Entry).GetNestedType("TypeArrayComparer", BindingFlags.NonPublic)!;
+        var comparer = (IEqualityComparer<Type[]>)comparerType
+            .GetField("Instance", BindingFlags.Static | BindingFlags.NonPublic)!
+            .GetValue(null)!;
+
+        Assert.False(comparer.Equals([typeof(int)], [typeof(int), typeof(string)]));
+        Assert.False(comparer.Equals(null, []));
+        Assert.False(comparer.Equals([], null));
+        Assert.True(comparer.Equals(null, null));
+    }
+
     private static void AssertMapping(
         Dictionary<MethodInfo, InterfaceToImplementationMappingCache.Entry> mapping,
         MethodInfo interfaceMethod)

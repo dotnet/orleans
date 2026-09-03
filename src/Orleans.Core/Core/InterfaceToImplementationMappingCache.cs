@@ -58,7 +58,8 @@ namespace Orleans
             {
                 internal static readonly TypeArrayComparer Instance = new();
 
-                public bool Equals(Type[]? x, Type[]? y) => ReferenceEquals(x, y) || x is null && y is null || x!.Length != y!.Length || x.AsSpan().SequenceEqual(y.AsSpan());
+                public bool Equals(Type[]? x, Type[]? y) =>
+                    ReferenceEquals(x, y) || x is not null && y is not null && x.AsSpan().SequenceEqual(y);
 
                 public int GetHashCode([DisallowNull] Type[] obj)
                 {
