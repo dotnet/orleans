@@ -76,6 +76,30 @@ public sealed class ClusterServiceTopologyTests
         Assert.Equal(2, collision.RangeOwners.Count);
     }
 
+    [Fact]
+    public void MemberRanges_AreStableUnderConcurrentReads()
+    {
+        var members = CreateMembers(4);
+        var topology = new ClusterServiceTopology(
+            CreateSnapshot(members, [0, 1, 2, 3]),
+            CreateConfiguration(partitionsPerSilo: 4),
+            GetBoundaries);
+        var expected = members.Select(topology.GetMemberRanges).ToArray();
+        var failures = 0;
+
+        Parallel.For(0, 10_000, index =>
+        {
+            var memberIndex = index % members.Length;
+            if (topology.GetMemberRanges(members[memberIndex]) != expected[memberIndex])
+            {
+                Interlocked.Increment(ref failures);
+            }
+        });
+
+        Assert.Equal(0, failures);
+        Assert.All(expected, static ranges => Assert.False(ranges.IsDefault));
+    }
+
     private static void VerifyTopologyProjection(int[] values)
     {
         var memberCount = 1 + (int)((uint)values[0] % 6);
