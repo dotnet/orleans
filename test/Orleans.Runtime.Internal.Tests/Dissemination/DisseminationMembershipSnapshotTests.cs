@@ -366,16 +366,16 @@ public class DisseminationMembershipSnapshotTests
         SiloAddress silo,
         SiloStatus status,
         int startSeconds) => new()
-    {
-        SiloAddress = silo,
-        Status = status,
-        ProxyPort = silo.Endpoint.Port,
-        HostName = "localhost",
-        SiloName = silo.ToParsableString(),
-        RoleName = "test",
-        StartTime = DateTime.UnixEpoch.AddSeconds(startSeconds),
-        IAmAliveTime = DateTime.UnixEpoch.AddSeconds(startSeconds),
-    };
+        {
+            SiloAddress = silo,
+            Status = status,
+            ProxyPort = silo.Endpoint.Port,
+            HostName = "localhost",
+            SiloName = silo.ToParsableString(),
+            RoleName = "test",
+            StartTime = DateTime.UnixEpoch.AddSeconds(startSeconds),
+            IAmAliveTime = DateTime.UnixEpoch.AddSeconds(startSeconds),
+        };
 
     private static MembershipTableSnapshot CreateSourceSnapshot(
         long version,

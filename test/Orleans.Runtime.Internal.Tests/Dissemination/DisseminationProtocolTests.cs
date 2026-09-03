@@ -3736,16 +3736,16 @@ public class DisseminationProtocolTests
         SiloStatus status,
         DateTime startTime,
         DateTime? iAmAliveTime = null) => new()
-    {
-        SiloAddress = silo,
-        Status = status,
-        ProxyPort = silo.Endpoint.Port,
-        HostName = "localhost",
-        SiloName = silo.ToParsableString(),
-        RoleName = "test",
-        StartTime = startTime,
-        IAmAliveTime = iAmAliveTime ?? startTime,
-    };
+        {
+            SiloAddress = silo,
+            Status = status,
+            ProxyPort = silo.Endpoint.Port,
+            HostName = "localhost",
+            SiloName = silo.ToParsableString(),
+            RoleName = "test",
+            StartTime = startTime,
+            IAmAliveTime = iAmAliveTime ?? startTime,
+        };
 
     private static IReadOnlyList<SiloAddress> GetOriginatorTreeTargets(
         SiloAddress root,
@@ -5929,13 +5929,13 @@ public class DisseminationProtocolTests
         SiloAddress sender,
         ScopedNamespace disseminationNamespace,
         params DisseminationBroadcastValue[] values) => new()
-    {
-        Sender = sender,
-        Values = new()
         {
-            [disseminationNamespace.Name] = [.. values],
-        },
-    };
+            Sender = sender,
+            Values = new()
+            {
+                [disseminationNamespace.Name] = [.. values],
+            },
+        };
 
     private static SiloAddress[] GetBroadcastPeersForNamespace(
         FakeTransport transport,
