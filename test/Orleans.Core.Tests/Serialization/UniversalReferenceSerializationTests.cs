@@ -310,7 +310,21 @@ public sealed class UniversalReferenceSerializationTests(TestEnvironmentFixture 
 
         Assert.Null(result);
         Assert.NotNull(exception);
-        Assert.True(exception is System.Text.Json.JsonException or ArgumentException, exception?.ToString());
+        Assert.IsType<System.Text.Json.JsonException>(exception);
+    }
+
+    [Theory]
+    [InlineData("""[{"grainId":"test.grain/1","interfaceType":"test.interface","serviceId":" ","binding":0}]""")]
+    [InlineData("""[{"grainId":"test.grain/1","interfaceType":"test.interface","serviceId":"service","binding":255}]""")]
+    [InlineData("""[{"grainId":"/","interfaceType":"test.interface","serviceId":"service","binding":0}]""")]
+    [InlineData("""[{"grainId":"test.grain/1","interfaceType":"test.interface","serviceId":"service","binding":1}]""")]
+    public void SystemTextJsonReader_InvalidUniversalReferenceThrowsJsonException(string json)
+    {
+        var exception = Assert.Throws<System.Text.Json.JsonException>(
+            () => SystemTextJson.Deserialize<IAddressable>(json, SystemTextJsonOptions));
+
+        Assert.Equal("Could not deserialize an invalid universal reference.", exception.Message);
+        Assert.IsAssignableFrom<ArgumentException>(exception.InnerException);
     }
 
     [Fact]
