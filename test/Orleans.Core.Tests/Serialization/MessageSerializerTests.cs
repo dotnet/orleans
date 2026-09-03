@@ -45,7 +45,7 @@ namespace UnitTests.Serialization
         [TestProvider("None")]
         [Theory, TestCategory("Functional")]
         [InlineData(1_000, 1_000, 1_500, 500)]
-        [InlineData(-1_500, 1_000, 1_500, -500)]
+        [InlineData(1_000, 1_000, 2_500, -500)]
         public void MessageTest_TtlUpdatedOnAccess(long timeToLive, long creationTimestamp, long accessTimestamp, long expected)
         {
             var message = this.messageFactory.CreateMessage(null, InvokeMethodOptions.None);
@@ -57,9 +57,21 @@ namespace UnitTests.Serialization
 
         [TestSuite("Functional")]
         [TestProvider("None")]
+        [Fact, TestCategory("Functional")]
+        public void MessageTest_NegativeTtlPreservesStoppedStopwatchValue()
+        {
+            var message = this.messageFactory.CreateMessage(null, InvokeMethodOptions.None);
+
+            message.SetTimeToLiveMilliseconds(-1_500, timestamp: 1_000);
+
+            Assert.Equal(-500, message.GetTimeToLiveMilliseconds(timestamp: 1_500));
+        }
+
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
         [InlineData(1_000, 1_000, 1_500, 500)]
-        [InlineData(-1_500, 1_000, 1_500, -500)]
+        [InlineData(1_000, 1_000, 2_500, -500)]
         public void MessageTest_TtlUpdatedOnSerialization(long timeToLive, long creationTimestamp, long serializationTimestamp, long expected)
         {
             var message = this.messageFactory.CreateMessage(null, InvokeMethodOptions.None);
