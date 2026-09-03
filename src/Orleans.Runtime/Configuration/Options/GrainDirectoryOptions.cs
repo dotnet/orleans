@@ -2,6 +2,9 @@ using Orleans.Runtime.GrainDirectory;
 
 namespace Orleans.Configuration;
 
+/// <summary>
+/// Options for configuring grain directory caching and partitioning.
+/// </summary>
 public class GrainDirectoryOptions
 {
     /// <summary>

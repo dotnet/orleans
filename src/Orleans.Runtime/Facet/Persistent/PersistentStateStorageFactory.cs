@@ -31,6 +31,12 @@ namespace Orleans.Runtime
             return new PersistentState<TState>(fullStateName, context, storageProvider);
         }
 
+        /// <summary>
+        /// Gets the storage record name for a persistent state instance.
+        /// </summary>
+        /// <param name="context">The grain context.</param>
+        /// <param name="cfg">The persistent state configuration.</param>
+        /// <returns>The storage record name.</returns>
         protected virtual string GetFullStateName(IGrainContext context, IPersistentStateConfiguration cfg)
         {
             return cfg.StateName;
