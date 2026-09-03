@@ -376,26 +376,36 @@ namespace Orleans.Serialization
 
             var serviceId = serviceIdToken.ToObject<string>()!;
             var binding = (UniversalReferenceBinding)bindingToken.ToObject<byte>();
-            var reference = binding switch
+            if (binding is not (UniversalReferenceBinding.Virtual or UniversalReferenceBinding.Cluster))
             {
-                UniversalReferenceBinding.Virtual => UniversalReference.CreateVirtual(grainId, interfaceType, serviceId),
-                UniversalReferenceBinding.Cluster => UniversalReference.CreateCluster(
+                throw new JsonSerializationException($"Unknown universal reference binding '{binding}'.");
+            }
+
+            var clusterId = jo["ClusterId"]?.ToObject<string>();
+            try
+            {
+                var reference = new UniversalReference(
                     grainId,
                     interfaceType,
                     serviceId,
-                    GetRequiredClusterId(jo)),
-                _ => throw new JsonSerializationException($"Unknown universal reference binding '{binding}'.")
-            };
-            return this.referenceActivator.CreateReference(reference);
-        }
-
-        private static string GetRequiredClusterId(JObject value)
-        {
-            var clusterId = value["ClusterId"]?.ToObject<string>();
-            return string.IsNullOrWhiteSpace(clusterId)
-                ? throw new JsonSerializationException(
-                    "A cluster-bound universal reference must specify a non-empty ClusterId.")
-                : clusterId;
+                    binding,
+                    clusterId);
+                return this.referenceActivator.CreateReference(reference);
+            }
+            catch (ArgumentException exception) when (
+                binding == UniversalReferenceBinding.Cluster
+                && string.IsNullOrWhiteSpace(clusterId))
+            {
+                throw new JsonSerializationException(
+                    "A cluster-bound universal reference must specify a non-empty ClusterId.",
+                    exception);
+            }
+            catch (ArgumentException exception)
+            {
+                throw new JsonSerializationException(
+                    "Could not deserialize an invalid universal reference.",
+                    exception);
+            }
         }
     }
 }
