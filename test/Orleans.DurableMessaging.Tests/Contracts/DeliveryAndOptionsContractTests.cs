@@ -29,6 +29,17 @@ public sealed class DeliveryAndOptionsContractTests
         Assert.False((bool)isExpired.Invoke(
             null,
             [DateTimeOffset.MaxValue, timestamp, TimeSpan.MaxValue])!);
+        var fullDateTimeRange = TimeSpan.FromTicks(
+            DateTimeOffset.MaxValue.UtcTicks - DateTimeOffset.MinValue.UtcTicks);
+        Assert.True((bool)isExpired.Invoke(
+            null,
+            [DateTimeOffset.MaxValue, DateTimeOffset.MinValue, fullDateTimeRange])!);
+        Assert.False((bool)isExpired.Invoke(
+            null,
+            [DateTimeOffset.MaxValue, DateTimeOffset.MinValue, TimeSpan.MaxValue])!);
+        Assert.False((bool)isExpired.Invoke(
+            null,
+            [DateTimeOffset.MinValue, DateTimeOffset.MaxValue, TimeSpan.FromTicks(1)])!);
         Assert.Equal(
             DateTimeOffset.MaxValue,
             (DateTimeOffset)addClamped.Invoke(null, [timestamp, TimeSpan.MaxValue])!);
