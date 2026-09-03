@@ -464,7 +464,7 @@ public sealed class EnumerationAbortedException : Exception
     /// Initializes a new instance of the <see cref="EnumerationAbortedException"/> class.
     /// </summary>
     [Obsolete]
-    protected EnumerationAbortedException(SerializationInfo info, StreamingContext context) : base(info, context)
+    private EnumerationAbortedException(SerializationInfo info, StreamingContext context) : base(info, context)
     {
     }
 }
