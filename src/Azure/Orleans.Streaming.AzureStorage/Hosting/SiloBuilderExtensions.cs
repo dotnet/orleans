@@ -8,6 +8,9 @@ using Orleans.LeaseProviders;
 
 namespace Orleans.Hosting
 {
+    /// <summary>
+    /// Extension methods for configuring Azure Queue streaming and Azure Blob lease providers on an <see cref="ISiloBuilder"/>.
+    /// </summary>
     public static class SiloBuilderExtensions
     {
         /// <summary>

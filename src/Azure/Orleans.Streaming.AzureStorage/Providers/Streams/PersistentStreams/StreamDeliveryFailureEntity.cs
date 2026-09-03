@@ -11,9 +11,24 @@ namespace Orleans.Providers.Streams.PersistentStreams
     /// </summary>
     public class StreamDeliveryFailureEntity : ITableEntity
     {
+        /// <summary>
+        /// Gets or sets the table partition key identifying the stream provider and deployment.
+        /// </summary>
         public string PartitionKey { get; set; } = null!;
+
+        /// <summary>
+        /// Gets or sets the table row key identifying and ordering the delivery failure.
+        /// </summary>
         public string RowKey { get; set; } = null!;
+
+        /// <summary>
+        /// Gets or sets the timestamp maintained by the Azure Table service.
+        /// </summary>
         public DateTimeOffset? Timestamp { get; set; }
+
+        /// <summary>
+        /// Gets or sets the entity tag used for optimistic concurrency.
+        /// </summary>
         public ETag ETag { get; set; }
 
         /// <summary>

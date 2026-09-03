@@ -11,20 +11,41 @@ using Orleans.Streaming.AzureStorage.Providers.Streams.AzureQueue.Json;
 
 namespace Orleans.Hosting
 {
+    /// <summary>
+    /// Configures an Azure Queue stream provider.
+    /// </summary>
     public interface IAzureQueueStreamConfigurator : INamedServiceConfigurator { }
 
+    /// <summary>
+    /// Extension methods for configuring Azure Queue stream providers.
+    /// </summary>
     public static class AzureQueueStreamConfiguratorExtensions
     {
+        /// <summary>
+        /// Configures the Azure Queue storage options for the stream provider.
+        /// </summary>
+        /// <param name="configurator">The stream provider configurator.</param>
+        /// <param name="configureOptions">The delegate used to configure the Azure Queue options.</param>
         public static void ConfigureAzureQueue(this IAzureQueueStreamConfigurator configurator, Action<OptionsBuilder<AzureQueueOptions>> configureOptions)
         {
             configurator.Configure(configureOptions);
         }
 
+        /// <summary>
+        /// Configures the adapter used to convert between stream batches and Azure Queue messages.
+        /// </summary>
+        /// <param name="configurator">The stream provider configurator.</param>
+        /// <param name="factory">The factory which creates the adapter for the named stream provider.</param>
         public static void ConfigureQueueDataAdapter(this IAzureQueueStreamConfigurator configurator, Func<IServiceProvider, string, IQueueDataAdapter<string, IBatchContainer>> factory)
         {
             configurator.ConfigureComponent(factory);
         }
 
+        /// <summary>
+        /// Configures the adapter used to convert between stream batches and Azure Queue messages.
+        /// </summary>
+        /// <typeparam name="TQueueDataAdapter">The data adapter type.</typeparam>
+        /// <param name="configurator">The stream provider configurator.</param>
         public static void ConfigureQueueDataAdapter<TQueueDataAdapter>(this IAzureQueueStreamConfigurator configurator)
             where TQueueDataAdapter : IQueueDataAdapter<string, IBatchContainer>
         {
@@ -32,18 +53,37 @@ namespace Orleans.Hosting
         }
     }
 
+    /// <summary>
+    /// Configures an Azure Queue stream provider on a silo.
+    /// </summary>
     public interface ISiloAzureQueueStreamConfigurator : IAzureQueueStreamConfigurator, ISiloPersistentStreamConfigurator { }
 
+    /// <summary>
+    /// Extension methods for configuring Azure Queue stream providers on a silo.
+    /// </summary>
     public static class SiloAzureQueueStreamConfiguratorExtensions
     {
+        /// <summary>
+        /// Configures the maximum number of stream batches held in the receiver cache.
+        /// </summary>
+        /// <param name="configurator">The silo stream provider configurator.</param>
+        /// <param name="cacheSize">The maximum number of batches held in the cache.</param>
         public static void ConfigureCacheSize(this ISiloAzureQueueStreamConfigurator configurator, int cacheSize = SimpleQueueCacheOptions.DEFAULT_CACHE_SIZE)
         {
             configurator.Configure<SimpleQueueCacheOptions>(ob => ob.Configure(options => options.CacheSize = cacheSize));
         }
     }
 
+    /// <summary>
+    /// Configures an Azure Queue stream provider on a silo.
+    /// </summary>
     public class SiloAzureQueueStreamConfigurator : SiloPersistentStreamConfigurator, ISiloAzureQueueStreamConfigurator
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="SiloAzureQueueStreamConfigurator"/> class.
+        /// </summary>
+        /// <param name="name">The stream provider name.</param>
+        /// <param name="configureServicesDelegate">The delegate used to configure silo services.</param>
         public SiloAzureQueueStreamConfigurator(string name, Action<Action<IServiceCollection>> configureServicesDelegate)
             : base(name, configureServicesDelegate, AzureQueueAdapterFactory.Create)
         {
@@ -64,10 +104,21 @@ namespace Orleans.Hosting
         }
     }
 
+    /// <summary>
+    /// Configures an Azure Queue stream provider on a cluster client.
+    /// </summary>
     public interface IClusterClientAzureQueueStreamConfigurator : IAzureQueueStreamConfigurator, IClusterClientPersistentStreamConfigurator { }
 
+    /// <summary>
+    /// Configures an Azure Queue stream provider on a cluster client.
+    /// </summary>
     public class ClusterClientAzureQueueStreamConfigurator : ClusterClientPersistentStreamConfigurator, IClusterClientAzureQueueStreamConfigurator
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ClusterClientAzureQueueStreamConfigurator"/> class.
+        /// </summary>
+        /// <param name="name">The stream provider name.</param>
+        /// <param name="builder">The client builder.</param>
         public ClusterClientAzureQueueStreamConfigurator(string name, IClientBuilder builder)
             : base(name, builder, AzureQueueAdapterFactory.Create)
         {

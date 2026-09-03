@@ -5,6 +5,9 @@ using Orleans.Configuration;
 
 namespace Orleans.Hosting
 {
+    /// <summary>
+    /// Extension methods for configuring Azure Queue stream providers on an <see cref="IClientBuilder"/>.
+    /// </summary>
     public static class ClientBuilderExtensions
     {
         /// <summary>
