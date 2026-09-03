@@ -1,5 +1,7 @@
 using System.Reflection;
+using Orleans;
 using Orleans.CodeGeneration;
+using Orleans.Runtime;
 using Xunit;
 
 namespace UnitTests;
@@ -86,5 +88,7 @@ public class InterfaceToImplementationMappingCacheTests
         Task IDerivedInterface.DerivedMethod() => Task.CompletedTask;
     }
 
-    private sealed class UnrelatedImplementation;
+    private sealed class UnrelatedImplementation
+    {
+    }
 }

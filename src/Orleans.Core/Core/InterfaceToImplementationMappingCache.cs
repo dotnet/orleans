@@ -80,12 +80,13 @@ namespace Orleans
         private readonly ConcurrentDictionary<(Type ImplementationType, Type InterfaceType), Dictionary<MethodInfo, Entry>> mappings = new();
 
         /// <summary>
-        /// Returns a mapping from method id to method info for the provided implementation and interface types.
+        /// Returns a mapping from each interface method to its interface and implementation method metadata
+        /// for the provided implementation and interface types.
         /// </summary>
         /// <param name="implementationType">The implementation type.</param>
         /// <param name="interfaceType">The interface type.</param>
         /// <returns>
-        /// A mapping from method id to method info.
+        /// A mapping from interface methods to interface and implementation method metadata.
         /// </returns>
         public Dictionary<MethodInfo, Entry> GetOrCreate(Type implementationType, Type interfaceType)
         {
