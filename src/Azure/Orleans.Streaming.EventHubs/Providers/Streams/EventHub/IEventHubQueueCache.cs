@@ -29,6 +29,28 @@ namespace Orleans.Streaming.EventHubs
         object GetCursor(StreamId streamId, StreamSequenceToken? sequenceToken);
 
         /// <summary>
+        /// Gets a cursor into the cache at the specified subscription start position.
+        /// </summary>
+        /// <param name="streamId">The stream identifier.</param>
+        /// <param name="startPosition">The initial subscription position.</param>
+        /// <returns>The cache cursor.</returns>
+        object GetCursorAtPosition(StreamId streamId, StreamSubscriptionStartPosition startPosition)
+        {
+            if (startPosition == StreamSubscriptionStartPosition.Latest)
+            {
+                return GetCursor(streamId, null);
+            }
+
+            if (startPosition != StreamSubscriptionStartPosition.EarliestAvailable)
+            {
+                throw new ArgumentOutOfRangeException(nameof(startPosition), startPosition, "The subscription start position is not defined.");
+            }
+
+            throw new NotSupportedException(
+                $"{GetType().FullName} does not support {StreamSubscriptionStartPosition.EarliestAvailable} cursor positioning.");
+        }
+
+        /// <summary>
         /// Refreshes an inactive cursor at the provided sequence token.
         /// </summary>
         /// <param name="cursor">The cursor to refresh.</param>

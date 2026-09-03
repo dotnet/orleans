@@ -12,6 +12,40 @@ namespace Orleans.Streams
         private static readonly Func<Task> DefaultOnCompleted = () => Task.CompletedTask;
 
         /// <summary>
+        /// Subscribe a consumer to this observable using the specified initial position.
+        /// </summary>
+        /// <typeparam name="T">The type of object produced by the observable.</typeparam>
+        /// <param name="obs">The observable.</param>
+        /// <param name="observer">The asynchronous observer to subscribe.</param>
+        /// <param name="startPosition">The initial subscription position.</param>
+        /// <param name="filterData">Data object that will be passed to the filter.</param>
+        /// <returns>A promise for a <see cref="StreamSubscriptionHandle{T}"/> that represents the subscription.</returns>
+        /// <remarks>
+        /// <see cref="StreamSubscriptionStartPosition.EarliestAvailable"/> begins at the earliest message for the
+        /// target stream currently retained in the local queue cache.
+        /// </remarks>
+        public static Task<StreamSubscriptionHandle<T>> SubscribeAsync<T>(
+            this IAsyncObservable<T> obs,
+            IAsyncObserver<T> observer,
+            StreamSubscriptionStartPosition startPosition,
+            string? filterData = null)
+        {
+            startPosition.Validate();
+            if (obs is StreamImpl<T> stream)
+            {
+                return stream.SubscribeAsync(observer, startPosition, filterData);
+            }
+
+            if (startPosition == StreamSubscriptionStartPosition.Latest)
+            {
+                return obs.SubscribeAsync(observer, null, filterData);
+            }
+
+            throw new NotSupportedException(
+                $"{obs.GetType().FullName} does not support {StreamSubscriptionStartPosition.EarliestAvailable} subscriptions.");
+        }
+
+        /// <summary>
         /// Subscribe a consumer to this observable using delegates.
         /// This method is a helper for the IAsyncObservable.SubscribeAsync allowing the subscribing class to inline the 
         /// handler methods instead of requiring an instance of IAsyncObserver.

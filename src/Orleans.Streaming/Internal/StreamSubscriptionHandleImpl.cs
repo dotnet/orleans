@@ -54,12 +54,12 @@ namespace Orleans.Streams
 
         [JsonConstructor]
         public StreamSubscriptionHandleImpl(GuidId subscriptionId, StreamImpl<T> streamImpl, string? filterData)
-            : this(subscriptionId, null, null, streamImpl, null, filterData)
+            : this(subscriptionId, null, null, streamImpl, null, startPosition: null, filterData)
         {
         }
 
         public StreamSubscriptionHandleImpl(GuidId subscriptionId, StreamImpl<T> streamImpl)
-            : this(subscriptionId, null, null, streamImpl, null, null)
+            : this(subscriptionId, null, null, streamImpl, null, startPosition: null, filterData: null)
         {
         }
 
@@ -69,6 +69,7 @@ namespace Orleans.Streams
             IAsyncBatchObserver<T>? batchObserver,
             StreamImpl<T> streamImpl,
             StreamSequenceToken? token,
+            StreamSubscriptionStartPosition? startPosition,
             string? filterData,
             bool disableHandshake = false,
             SharedHandshakeState? handshakeState = null,
@@ -84,9 +85,14 @@ namespace Orleans.Streams
             this.siloAddress = siloAddress;
             this.clusterId = clusterId;
             this.isRewindable = streamImpl.IsRewindable && !disableHandshake;
-            if (IsRewindable)
+            startPosition?.Validate();
+            if (token is not null && IsRewindable)
             {
                 expectedToken ??= StreamHandshakeToken.CreateStartToken(token);
+            }
+            else if (startPosition is { } position)
+            {
+                expectedToken ??= StreamHandshakeToken.CreateStartPositionToken(position);
             }
         }
 
@@ -198,6 +204,10 @@ namespace Orleans.Streams
             {
                 this.expectedToken = StreamHandshakeToken.CreateDeliveyToken(batch.SequenceToken);
             }
+            else if (this.expectedToken is StartPositionToken)
+            {
+                this.expectedToken = null;
+            }
 
             return null;
         }
@@ -213,7 +223,8 @@ namespace Orleans.Streams
                 if (IsRewindable)
                 {
                     if (this.expectedToken is DeliveryToken deliveryToken
-                        && deliveryToken.Token.Equals(currentToken))
+                        && deliveryToken.Token is { } deliveredToken
+                        && deliveredToken.Equals(currentToken))
                         return this.expectedToken;
                 }
             }
@@ -255,6 +266,10 @@ namespace Orleans.Streams
             if (IsRewindable)
             {
                 this.expectedToken = StreamHandshakeToken.CreateDeliveyToken(currentToken);
+            }
+            else if (this.expectedToken is StartPositionToken)
+            {
+                this.expectedToken = null;
             }
             return null;
         }

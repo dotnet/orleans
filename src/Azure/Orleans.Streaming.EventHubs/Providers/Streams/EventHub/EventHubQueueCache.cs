@@ -137,6 +137,11 @@ namespace Orleans.Streaming.EventHubs
             return cache.GetCursor(streamId, sequenceToken);
         }
 
+        object IEventHubQueueCache.GetCursorAtPosition(StreamId streamId, StreamSubscriptionStartPosition startPosition)
+        {
+            return cache.GetCursorAtPosition(streamId, startPosition);
+        }
+
         /// <inheritdoc />
         public void Refresh(object cursor, StreamSequenceToken? sequenceToken)
         {

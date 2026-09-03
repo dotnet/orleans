@@ -336,6 +336,7 @@ public class StreamConsumerLifecycleTests
                 observer: observer,
                 batchObserver: null,
                 token: token,
+                startPosition: null,
                 filterData: filterData);
 
         public StreamSubscriptionHandleImpl<int> Register(
@@ -349,6 +350,7 @@ public class StreamConsumerLifecycleTests
                 observer: null,
                 batchObserver: observer,
                 token: token,
+                startPosition: null,
                 filterData: filterData);
 
         public void AssertNoStreamProviderAcquisitions()

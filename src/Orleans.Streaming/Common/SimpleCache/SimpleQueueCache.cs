@@ -149,6 +149,41 @@ namespace Orleans.Providers.Streams.Common
             return cursor;
         }
 
+        IQueueCacheCursor IQueueCache.GetCacheCursorAtPosition(StreamId streamId, StreamSubscriptionStartPosition startPosition)
+        {
+            if (startPosition == StreamSubscriptionStartPosition.Latest)
+            {
+                var latestCursor = GetCacheCursor(streamId, null);
+                latestCursor.MoveNext();
+                return latestCursor;
+            }
+
+            if (startPosition != StreamSubscriptionStartPosition.EarliestAvailable)
+            {
+                throw new ArgumentOutOfRangeException(nameof(startPosition), startPosition, "The subscription start position is not defined.");
+            }
+
+            var cursor = new SimpleQueueCacheCursor(this, streamId, logger);
+            InitializeCursorAtEarliestAvailable(cursor);
+            return cursor;
+        }
+
+        private void InitializeCursorAtEarliestAvailable(SimpleQueueCacheCursor cursor)
+        {
+            for (var node = cachedMessages.Last; node is not null; node = node.Previous)
+            {
+                if (cursor.IsInStream(node.Value.Batch))
+                {
+                    cursor.WaitingForEarliestAvailable = false;
+                    SetCursor(cursor, node);
+                    return;
+                }
+            }
+
+            UnsetCursor(cursor, null);
+            cursor.WaitingForEarliestAvailable = true;
+        }
+
         internal void InitializeCursor(SimpleQueueCacheCursor cursor, StreamSequenceToken? sequenceToken)
         {
             LogDebugInitializeCursor(cursor, sequenceToken);
@@ -206,6 +241,12 @@ namespace Orleans.Providers.Streams.Common
             // set if unset
             if (!cursor.IsSet)
             {
+                if (cursor.WaitingForEarliestAvailable)
+                {
+                    InitializeCursorAtEarliestAvailable(cursor);
+                    return;
+                }
+
                 InitializeCursor(cursor, cursor.SequenceToken ?? sequenceToken);
             }
         }

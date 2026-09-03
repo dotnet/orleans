@@ -148,11 +148,14 @@ namespace Orleans.Configuration
         public static readonly int DEFAULT_BATCH_CONTAINER_BATCH_SIZE;
         public static readonly System.TimeSpan DEFAULT_GET_QUEUE_MESSAGES_TIMER_PERIOD;
         public static readonly System.TimeSpan DEFAULT_INIT_QUEUE_TIMEOUT;
+        public static readonly Streams.StreamSubscriptionStartPosition DEFAULT_INITIAL_SUBSCRIPTION_START_POSITION;
         public static readonly System.TimeSpan DEFAULT_MAX_EVENT_DELIVERY_TIME;
         public static readonly System.TimeSpan DEFAULT_STREAM_INACTIVITY_PERIOD;
         public int BatchContainerBatchSize { get { throw null; } set { } }
 
         public System.TimeSpan GetQueueMsgsTimerPeriod { get { throw null; } set { } }
+
+        public Streams.StreamSubscriptionStartPosition InitialSubscriptionStartPosition { get { throw null; } set { } }
 
         public System.TimeSpan InitQueueTimeout { get { throw null; } set { } }
 
@@ -454,6 +457,8 @@ namespace Orleans.Providers
         public Orleans.Streams.StreamSequenceToken GetSequenceToken(ref Streams.Common.CachedMessage cachedMessage) { throw null; }
 
         public bool IsUnderPressure() { throw null; }
+
+        Orleans.Streams.IQueueCacheCursor Orleans.Streams.IQueueCache.GetCacheCursorAtPosition(Runtime.StreamId streamId, Orleans.Streams.StreamSubscriptionStartPosition startPosition) { throw null; }
 
         public bool TryPurgeFromCache(out System.Collections.Generic.IList<Orleans.Streams.IBatchContainer> purgedItems) { throw null; }
     }
@@ -823,6 +828,8 @@ namespace Orleans.Providers.Streams.Common
 
         public object GetCursor(Runtime.StreamId streamId, Orleans.Streams.StreamSequenceToken? sequenceToken) { throw null; }
 
+        public object GetCursorAtPosition(Runtime.StreamId streamId, Orleans.Streams.StreamSubscriptionStartPosition startPosition) { throw null; }
+
         public void Refresh(object cursorObj, Orleans.Streams.StreamSequenceToken? sequenceToken) { }
 
         public void RemoveOldestMessage() { }
@@ -886,6 +893,8 @@ namespace Orleans.Providers.Streams.Common
         public int GetMaxAddCount() { throw null; }
 
         public virtual bool IsUnderPressure() { throw null; }
+
+        Orleans.Streams.IQueueCacheCursor Orleans.Streams.IQueueCache.GetCacheCursorAtPosition(Runtime.StreamId streamId, Orleans.Streams.StreamSubscriptionStartPosition startPosition) { throw null; }
 
         public virtual bool TryPurgeFromCache(out System.Collections.Generic.IList<Orleans.Streams.IBatchContainer> purgedItems) { throw null; }
     }
@@ -1009,6 +1018,8 @@ namespace Orleans.Providers.Streams.Generator
         public Orleans.Streams.StreamSequenceToken GetSequenceToken(ref Common.CachedMessage cachedMessage) { throw null; }
 
         public bool IsUnderPressure() { throw null; }
+
+        Orleans.Streams.IQueueCacheCursor Orleans.Streams.IQueueCache.GetCacheCursorAtPosition(Runtime.StreamId streamId, Orleans.Streams.StreamSubscriptionStartPosition startPosition) { throw null; }
 
         public bool TryPurgeFromCache(out System.Collections.Generic.IList<Orleans.Streams.IBatchContainer> purgedItems) { throw null; }
     }
@@ -1350,6 +1361,8 @@ namespace Orleans.Streams
 
     public static partial class AsyncBatchObservableExtensions
     {
+        public static System.Threading.Tasks.Task<StreamSubscriptionHandle<T>> SubscribeAsync<T>(this IAsyncBatchObservable<T> obs, IAsyncBatchObserver<T> observer, StreamSubscriptionStartPosition startPosition) { throw null; }
+
         public static System.Threading.Tasks.Task<StreamSubscriptionHandle<T>> SubscribeAsync<T>(this IAsyncBatchObservable<T> obs, System.Func<System.Collections.Generic.IList<SequentialItem<T>>, System.Threading.Tasks.Task> onNextAsync, System.Func<System.Exception, System.Threading.Tasks.Task> onErrorAsync, System.Func<System.Threading.Tasks.Task> onCompletedAsync) { throw null; }
 
         public static System.Threading.Tasks.Task<StreamSubscriptionHandle<T>> SubscribeAsync<T>(this IAsyncBatchObservable<T> obs, System.Func<System.Collections.Generic.IList<SequentialItem<T>>, System.Threading.Tasks.Task> onNextAsync, System.Func<System.Exception, System.Threading.Tasks.Task> onErrorAsync) { throw null; }
@@ -1361,6 +1374,8 @@ namespace Orleans.Streams
 
     public static partial class AsyncObservableExtensions
     {
+        public static System.Threading.Tasks.Task<StreamSubscriptionHandle<T>> SubscribeAsync<T>(this IAsyncObservable<T> obs, IAsyncObserver<T> observer, StreamSubscriptionStartPosition startPosition, string? filterData = null) { throw null; }
+
         public static System.Threading.Tasks.Task<StreamSubscriptionHandle<T>> SubscribeAsync<T>(this IAsyncObservable<T> obs, System.Func<T, StreamSequenceToken?, System.Threading.Tasks.Task> onNextAsync, StreamSequenceToken token) { throw null; }
 
         public static System.Threading.Tasks.Task<StreamSubscriptionHandle<T>> SubscribeAsync<T>(this IAsyncObservable<T> obs, System.Func<T, StreamSequenceToken?, System.Threading.Tasks.Task> onNextAsync, System.Func<System.Exception, System.Threading.Tasks.Task> onErrorAsync, StreamSequenceToken token) { throw null; }
@@ -1645,6 +1660,7 @@ namespace Orleans.Streams
     {
         void AddToCache(System.Collections.Generic.IList<IBatchContainer> messages);
         IQueueCacheCursor GetCacheCursor(Runtime.StreamId streamId, StreamSequenceToken? token);
+        IQueueCacheCursor GetCacheCursorAtPosition(Runtime.StreamId streamId, StreamSubscriptionStartPosition startPosition);
         bool IsUnderPressure();
         bool TryPurgeFromCache(out System.Collections.Generic.IList<IBatchContainer> purgedItems);
         void UpdateDeliveryProgress(StreamSequenceToken? earliestSubscriptionToken, System.DateTime utcNow);
@@ -2164,6 +2180,12 @@ namespace Orleans.Streams
         public abstract System.Threading.Tasks.Task<StreamSubscriptionHandle<T>> ResumeAsync(IAsyncBatchObserver<T> observer, StreamSequenceToken? token = null);
         public abstract System.Threading.Tasks.Task<StreamSubscriptionHandle<T>> ResumeAsync(IAsyncObserver<T> observer, StreamSequenceToken? token = null);
         public abstract System.Threading.Tasks.Task UnsubscribeAsync();
+    }
+
+    public enum StreamSubscriptionStartPosition
+    {
+        Latest = 0,
+        EarliestAvailable = 1
     }
 }
 

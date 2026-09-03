@@ -110,6 +110,12 @@ namespace Orleans.Providers
                 cursor = cache.GetCursor(streamId, token);
             }
 
+            public Cursor(PooledQueueCache cache, object cursor)
+            {
+                this.cache = cache;
+                this.cursor = cursor;
+            }
+
             public void Dispose()
             {
             }
@@ -134,6 +140,7 @@ namespace Orleans.Providers
 
             public void Refresh(StreamSequenceToken token)
             {
+                cache.Refresh(cursor, token);
             }
 
             public void RecordDeliveryFailure()
@@ -171,6 +178,11 @@ namespace Orleans.Providers
         public IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken? token)
         {
             return new Cursor(cache, streamId, token);
+        }
+
+        IQueueCacheCursor IQueueCache.GetCacheCursorAtPosition(StreamId streamId, StreamSubscriptionStartPosition startPosition)
+        {
+            return new Cursor(cache, cache.GetCursorAtPosition(streamId, startPosition));
         }
 
         /// <inheritdoc/>
