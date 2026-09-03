@@ -4,9 +4,17 @@ using System.Threading.Tasks;
 
 namespace Orleans.Streaming.EventHubs.Testing
 {
+    /// <summary>
+    /// Creates checkpointers which keep no persistent checkpoint state.
+    /// </summary>
     public class NoOpCheckpointerFactory : IStreamQueueCheckpointerFactory
     {
+        /// <summary>
+        /// Gets the shared factory instance.
+        /// </summary>
         public static NoOpCheckpointerFactory Instance = new NoOpCheckpointerFactory();
+
+        /// <inheritdoc />
         public Task<IStreamQueueCheckpointer<string>> Create(string partition)
         {
             return Task.FromResult<IStreamQueueCheckpointer<string>>(NoOpCheckpointer.Instance);
@@ -19,13 +27,20 @@ namespace Orleans.Streaming.EventHubs.Testing
     /// </summary>
     public class NoOpCheckpointer : IStreamQueueCheckpointer<string>
     {
+        /// <summary>
+        /// Gets the shared checkpointer instance.
+        /// </summary>
         public static NoOpCheckpointer Instance = new NoOpCheckpointer();
 
+        /// <inheritdoc />
         public bool CheckpointExists => true;
+
+        /// <inheritdoc />
         public Task<string> Load()
         {
             return Task.FromResult(EventHubConstants.StartOfStream);
         }
+        /// <inheritdoc />
         public void Update(string offset, DateTime utcNow)
         {
         }

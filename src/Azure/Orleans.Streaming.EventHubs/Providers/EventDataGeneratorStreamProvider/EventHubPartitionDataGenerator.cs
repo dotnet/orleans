@@ -28,6 +28,13 @@ namespace Orleans.Streaming.EventHubs.Testing
         private readonly DeepCopier deepCopier;
         private readonly Serializer serializer;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="SimpleStreamEventDataGenerator"/> class.
+        /// </summary>
+        /// <param name="streamId">The stream to generate events for.</param>
+        /// <param name="logger">The logger.</param>
+        /// <param name="deepCopier">The request context copier.</param>
+        /// <param name="serializer">The serializer used to encode generated events.</param>
         public SimpleStreamEventDataGenerator(StreamId streamId, ILogger<SimpleStreamEventDataGenerator> logger, DeepCopier deepCopier, Serializer serializer)
         {
             this.StreamId = streamId;
@@ -82,6 +89,11 @@ namespace Orleans.Streaming.EventHubs.Testing
             return [sequenceNumber];
         }
 
+        /// <summary>
+        /// Creates a factory for stream-specific event data generators.
+        /// </summary>
+        /// <param name="services">The service provider used to activate generators.</param>
+        /// <returns>A factory which creates an event data generator for a stream.</returns>
         public static Func<StreamId, IStreamDataGenerator<EventData>> CreateFactory(IServiceProvider services)
         {
             return (streamId) => ActivatorUtilities.CreateInstance<SimpleStreamEventDataGenerator>(services, streamId);

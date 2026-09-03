@@ -10,9 +10,10 @@ namespace Orleans.Streaming.EventHubs.StatisticMonitors
     public class DefaultEventHubBlockPoolMonitor : DefaultBlockPoolMonitor
     {
         /// <summary>
-        /// Constructor
+        /// Initializes a new instance of the <see cref="DefaultEventHubBlockPoolMonitor"/> class.
         /// </summary>
-        /// <param name="dimensions"></param>
+        /// <param name="dimensions">The Event Hub block pool metric dimensions.</param>
+        /// <param name="instruments">The Orleans runtime instruments.</param>
         public DefaultEventHubBlockPoolMonitor(EventHubBlockPoolMonitorDimensions dimensions, OrleansInstruments instruments)
             : base(new KeyValuePair<string, object>[] { new("Path", dimensions.EventHubPath), new("ObjectPoolId", dimensions.BlockPoolId) }, instruments)
         {

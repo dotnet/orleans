@@ -10,6 +10,9 @@ using Orleans.Configuration.Overrides;
 
 namespace Orleans.Streaming.EventHubs
 {
+    /// <summary>
+    /// Creates Event Hub partition checkpointers backed by Azure Table Storage.
+    /// </summary>
     public class EventHubCheckpointerFactory : IStreamQueueCheckpointerFactory
     {
         private readonly ILoggerFactory loggerFactory;
@@ -17,6 +20,13 @@ namespace Orleans.Streaming.EventHubs
         private readonly AzureTableStreamCheckpointerOptions options;
         private readonly ClusterOptions clusterOptions;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="EventHubCheckpointerFactory"/> class.
+        /// </summary>
+        /// <param name="providerName">The stream provider name.</param>
+        /// <param name="options">The Azure Table Storage checkpointer options.</param>
+        /// <param name="clusterOptions">The cluster options.</param>
+        /// <param name="loggerFactory">The logger factory.</param>
         public EventHubCheckpointerFactory(string providerName, AzureTableStreamCheckpointerOptions options, IOptions<ClusterOptions> clusterOptions, ILoggerFactory loggerFactory)
         {
             this.options = options;
@@ -25,11 +35,18 @@ namespace Orleans.Streaming.EventHubs
             this.providerName = providerName;
         }
 
+        /// <inheritdoc />
         public Task<IStreamQueueCheckpointer<string>> Create(string partition)
         {
             return EventHubCheckpointer.Create(options, providerName, partition, this.clusterOptions.ServiceId.ToString(), loggerFactory);
         }
 
+        /// <summary>
+        /// Creates an Event Hub partition checkpointer factory.
+        /// </summary>
+        /// <param name="services">The service provider.</param>
+        /// <param name="providerName">The stream provider name.</param>
+        /// <returns>The checkpointer factory.</returns>
         public static IStreamQueueCheckpointerFactory CreateFactory(IServiceProvider services, string providerName)
         {
             var options = services.GetOptionsByName<AzureTableStreamCheckpointerOptions>(providerName);
@@ -45,20 +62,18 @@ namespace Orleans.Streaming.EventHubs
     {
         private readonly IStreamQueueCheckpointer<string> _inner;
 
-        /// <summary>
-        /// Indicates if a checkpoint exists
-        /// </summary>
+        /// <inheritdoc />
         public bool CheckpointExists => _inner.CheckpointExists;
 
         /// <summary>
-        /// Factory function that creates and initializes the checkpointer
+        /// Creates and initializes an Event Hub partition checkpointer.
         /// </summary>
-        /// <param name="options"></param>
-        /// <param name="streamProviderName"></param>
-        /// <param name="partition"></param>
-        /// <param name="serviceId"></param>
-        /// <param name="loggerFactory"></param>
-        /// <returns></returns>
+        /// <param name="options">The Azure Table Storage checkpointer options.</param>
+        /// <param name="streamProviderName">The stream provider name.</param>
+        /// <param name="partition">The Event Hub partition identifier.</param>
+        /// <param name="serviceId">The Orleans service identifier.</param>
+        /// <param name="loggerFactory">The logger factory.</param>
+        /// <returns>A task which resolves to the initialized checkpointer.</returns>
         public static async Task<IStreamQueueCheckpointer<string>> Create(AzureTableStreamCheckpointerOptions options, string streamProviderName, string partition, string serviceId, ILoggerFactory loggerFactory)
         {
             var inner = await AzureTableStreamQueueCheckpointer.Create(
@@ -78,9 +93,9 @@ namespace Orleans.Streaming.EventHubs
         }
 
         /// <summary>
-        /// Loads a checkpoint
+        /// Loads the checkpoint.
         /// </summary>
-        /// <returns></returns>
+        /// <returns>A task which resolves to the checkpoint offset.</returns>
         [Obsolete("Use the overload which accepts a CancellationToken.")]
         public Task<string> Load() => Load(CancellationToken.None);
 
@@ -99,8 +114,8 @@ namespace Orleans.Streaming.EventHubs
         /// Updates the checkpoint.  This is a best effort.  It does not always update the checkpoint.
         /// The latest offset is always tracked in memory so that <see cref="FlushAsync(CancellationToken)"/> can persist it on shutdown.
         /// </summary>
-        /// <param name="offset"></param>
-        /// <param name="utcNow"></param>
+        /// <param name="offset">The checkpoint offset.</param>
+        /// <param name="utcNow">The current UTC time.</param>
         [Obsolete("Use the overload which accepts a CancellationToken.")]
         public void Update(string offset, DateTime utcNow)
             => Update(offset, utcNow, CancellationToken.None);
@@ -119,6 +134,7 @@ namespace Orleans.Streaming.EventHubs
         /// Awaits any in-progress save, then persists the latest offset if it has advanced beyond the last saved value.
         /// </summary>
         /// <param name="cancellationToken">The cancellation token.</param>
+        /// <returns>A task which represents the flush operation.</returns>
         public Task FlushAsync(CancellationToken cancellationToken) => _inner.FlushAsync(cancellationToken);
     }
 }

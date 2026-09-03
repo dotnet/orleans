@@ -28,6 +28,9 @@ namespace Orleans.Streaming.EventHubs
         /// </summary>
         public EventHubOptions Hub { get; set; } = null!;
 
+        /// <summary>
+        /// Gets or sets the options which control receiving events from the partition.
+        /// </summary>
         public EventHubReceiverOptions ReceiverOptions { get; set; } = null!;
 
         /// <summary>

@@ -104,6 +104,19 @@ namespace Orleans.Streaming.EventHubs
         internal ConcurrentDictionary<QueueId, EventHubAdapterReceiver> EventHubReceivers => receivers;
         internal HashRingBasedPartitionedStreamQueueMapper EventHubQueueMapper => streamQueueMapper;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="EventHubAdapterFactory"/> class.
+        /// </summary>
+        /// <param name="name">The stream provider name.</param>
+        /// <param name="ehOptions">The Event Hub connection options.</param>
+        /// <param name="receiverOptions">The Event Hub receiver options.</param>
+        /// <param name="cacheOptions">The Event Hub cache pressure options.</param>
+        /// <param name="cacheEvictionOptions">The stream cache eviction options.</param>
+        /// <param name="statisticOptions">The stream statistics options.</param>
+        /// <param name="dataAdapter">The adapter used to convert between Event Hubs data and Orleans stream data.</param>
+        /// <param name="serviceProvider">The service provider.</param>
+        /// <param name="loggerFactory">The logger factory.</param>
+        /// <param name="environmentStatisticsProvider">The environment statistics provider.</param>
         public EventHubAdapterFactory(
             string name,
             EventHubOptions ehOptions,
@@ -129,6 +142,9 @@ namespace Orleans.Streaming.EventHubs
             this.orleansInstruments = serviceProvider.GetRequiredService<OrleansInstruments>();
         }
 
+        /// <summary>
+        /// Initializes the adapter factory and its Event Hub client, cache, queue mapping, and monitoring components.
+        /// </summary>
         public virtual void Init()
         {
             this.receivers = new ConcurrentDictionary<QueueId, EventHubAdapterReceiver>();
@@ -166,9 +182,9 @@ namespace Orleans.Streaming.EventHubs
             this.checkpointerFactory = this.serviceProvider.GetRequiredKeyedService<IStreamQueueCheckpointerFactory>(this.Name);
         }
         /// <summary>
-        /// Create queue adapter.
+        /// Creates the queue adapter and initializes its partition mapping.
         /// </summary>
-        /// <returns></returns>
+        /// <returns>The queue adapter.</returns>
         public async Task<IQueueAdapter> CreateAdapter()
         {
             if (this.streamQueueMapper == null)
@@ -180,18 +196,18 @@ namespace Orleans.Streaming.EventHubs
         }
 
         /// <summary>
-        /// Create queue message cache adapter
+        /// Gets the queue cache factory implemented by this instance.
         /// </summary>
-        /// <returns></returns>
+        /// <returns>The queue cache factory.</returns>
         public IQueueAdapterCache GetQueueAdapterCache()
         {
             return this;
         }
 
         /// <summary>
-        /// Create queue mapper
+        /// Gets the mapper between Orleans stream queues and Event Hub partitions.
         /// </summary>
-        /// <returns></returns>
+        /// <returns>The stream queue mapper.</returns>
         public IStreamQueueMapper GetStreamQueueMapper()
         {
             //TODO: CreateAdapter must be called first.  Figure out how to safely enforce this
@@ -199,10 +215,10 @@ namespace Orleans.Streaming.EventHubs
         }
 
         /// <summary>
-        /// Acquire delivery failure handler for a queue
+        /// Gets the delivery failure handler for a queue.
         /// </summary>
-        /// <param name="queueId"></param>
-        /// <returns></returns>
+        /// <param name="queueId">The queue identifier.</param>
+        /// <returns>A task which resolves to the delivery failure handler.</returns>
         public Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId)
         {
             return this.StreamFailureHandlerFactory(this.streamQueueMapper.QueueToPartition(queueId));
@@ -211,12 +227,12 @@ namespace Orleans.Streaming.EventHubs
         /// <summary>
         /// Writes a set of events to the queue as a single batch associated with the provided streamId.
         /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <param name="streamId"></param>
-        /// <param name="events"></param>
-        /// <param name="token"></param>
-        /// <param name="requestContext"></param>
-        /// <returns></returns>
+        /// <typeparam name="T">The event type.</typeparam>
+        /// <param name="streamId">The destination stream.</param>
+        /// <param name="events">The events to enqueue.</param>
+        /// <param name="token">The stream sequence token, which must be <see langword="null"/> for Event Hubs streams.</param>
+        /// <param name="requestContext">The request context to propagate with the events.</param>
+        /// <returns>A task which represents the enqueue operation.</returns>
         public virtual Task QueueMessageBatchAsync<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken? token,
             Dictionary<string, object>? requestContext)
         {
@@ -226,19 +242,20 @@ namespace Orleans.Streaming.EventHubs
         }
 
         /// <summary>
-        /// Creates a queue receiver for the specified queueId
+        /// Creates a queue receiver for the specified queue.
         /// </summary>
-        /// <param name="queueId"></param>
-        /// <returns></returns>
+        /// <param name="queueId">The queue identifier.</param>
+        /// <returns>The queue receiver.</returns>
         public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
         {
             return GetOrCreateReceiver(queueId);
         }
 
         /// <summary>
-        /// Create a cache for a given queue id
+        /// Creates a cache for the specified queue.
         /// </summary>
-        /// <param name="queueId"></param>
+        /// <param name="queueId">The queue identifier.</param>
+        /// <returns>The queue cache.</returns>
         public IQueueCache CreateQueueCache(QueueId queueId)
         {
             return GetOrCreateReceiver(queueId);
@@ -249,6 +266,9 @@ namespace Orleans.Streaming.EventHubs
             return this.receivers.GetOrAdd(queueId, (q, instance) => instance.MakeReceiver(q), this);
         }
 
+        /// <summary>
+        /// Initializes the Event Hub producer client.
+        /// </summary>
         protected virtual void InitEventHubClient()
         {
             var connectionOptions = ehOptions.ConnectionOptions;
@@ -261,7 +281,8 @@ namespace Orleans.Streaming.EventHubs
         /// User can override this function to return their own implementation of IEventHubQueueCacheFactory,
         /// and other customization of IEventHubQueueCacheFactory if they may.
         /// </summary>
-        /// <returns></returns>
+        /// <param name="eventHubCacheOptions">The cache pressure options.</param>
+        /// <returns>The Event Hub queue cache factory.</returns>
         protected virtual IEventHubQueueCacheFactory CreateCacheFactory(EventHubStreamCachePressureOptions eventHubCacheOptions)
         {
            var eventHubPath = this.ehOptions.EventHubName;
@@ -297,14 +318,20 @@ namespace Orleans.Streaming.EventHubs
         }
 
         /// <summary>
-        /// Get partition Ids from eventhub
+        /// Gets the partition identifiers from Event Hubs.
         /// </summary>
-        /// <returns></returns>
+        /// <returns>A task which resolves to the partition identifiers.</returns>
         protected virtual async Task<string[]> GetPartitionIdsAsync()
         {
             return await client.GetPartitionIdsAsync();
         }
 
+        /// <summary>
+        /// Creates and initializes an Event Hubs adapter factory.
+        /// </summary>
+        /// <param name="services">The service provider.</param>
+        /// <param name="name">The stream provider name.</param>
+        /// <returns>The initialized adapter factory.</returns>
         public static EventHubAdapterFactory Create(IServiceProvider services, string name)
         {
             var ehOptions = services.GetOptionsByName<EventHubOptions>(name);

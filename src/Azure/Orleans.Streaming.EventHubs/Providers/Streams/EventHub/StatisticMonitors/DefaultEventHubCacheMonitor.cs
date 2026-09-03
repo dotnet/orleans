@@ -10,9 +10,10 @@ namespace Orleans.Streaming.EventHubs.StatisticMonitors
     public class DefaultEventHubCacheMonitor : DefaultCacheMonitor
     {
         /// <summary>
-        /// Constructor
+        /// Initializes a new instance of the <see cref="DefaultEventHubCacheMonitor"/> class.
         /// </summary>
-        /// <param name="dimensions"></param>
+        /// <param name="dimensions">The Event Hub cache metric dimensions.</param>
+        /// <param name="instruments">The Orleans runtime instruments.</param>
         public DefaultEventHubCacheMonitor(EventHubCacheMonitorDimensions dimensions, OrleansInstruments instruments)
             : base(new KeyValuePair<string, object>[] { new("Path", dimensions.EventHubPath), new("Partition", dimensions.EventHubPartition) }, instruments)
         {
