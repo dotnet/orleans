@@ -1,5 +1,7 @@
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Runtime.ClusterServices;
+using Orleans.Serialization;
 using TestExtensions;
 using Xunit;
 
@@ -66,5 +68,34 @@ public sealed class ClusterServiceOperationResultTests
         Assert.Equal(TimeSpan.Zero, zeroDelay.RetryAfter);
         Assert.Equal(ClusterServiceRetryReason.PartitionNotReady, zeroDelay.RetryReason);
         Assert.True(zeroDelay.CanRetryWithoutDeduplication);
+    }
+
+    [Fact]
+    public void GeneratedSerializer_RoundTripsOperationResult()
+    {
+        using var serviceProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = serviceProvider.GetRequiredService<Serializer>();
+        var expectedResults = new[]
+        {
+            ClusterServiceOperationResult<int>.Executed(42, View),
+            ClusterServiceOperationResult<int>.Rejected(
+                View,
+                ClusterServiceRetryReason.SafetyDelay,
+                TimeSpan.FromMilliseconds(250)),
+            ClusterServiceOperationResult<int>.Unknown(View),
+        };
+
+        foreach (var expected in expectedResults)
+        {
+            var actual = serializer.Deserialize<ClusterServiceOperationResult<int>>(
+                serializer.SerializeToArray(expected));
+
+            Assert.Equal(expected.Value, actual.Value);
+            Assert.Equal(expected.ViewId, actual.ViewId);
+            Assert.Equal(expected.Disposition, actual.Disposition);
+            Assert.Equal(expected.RetryReason, actual.RetryReason);
+            Assert.Equal(expected.RetryAfter, actual.RetryAfter);
+            Assert.Equal(expected.CanRetryWithoutDeduplication, actual.CanRetryWithoutDeduplication);
+        }
     }
 }
