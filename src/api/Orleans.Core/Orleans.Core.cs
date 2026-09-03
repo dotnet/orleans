@@ -1713,9 +1713,6 @@ namespace Orleans.Runtime.Messaging
     {
         public InvalidMessageFrameException() { }
 
-        [System.Obsolete]
-        protected InvalidMessageFrameException(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) { }
-
         public InvalidMessageFrameException(string message, System.Exception innerException) { }
 
         public InvalidMessageFrameException(string message) { }
