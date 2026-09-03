@@ -1,6 +1,7 @@
 using Amazon.DynamoDBv2.Model;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Net;
 using System.Text;
 
@@ -58,22 +59,22 @@ namespace Orleans.Runtime.MembershipService
                 Address = address.S;
 
             if (fields.TryGetValue(PORT_PROPERTY_NAME, out var sPort) &&
-                int.TryParse(sPort.N, out var port))
+                int.TryParse(sPort.N, NumberStyles.Integer, CultureInfo.InvariantCulture, out var port))
                 Port = port;
 
             if (fields.TryGetValue(GENERATION_PROPERTY_NAME, out var sGeneration) &&
-                int.TryParse(sGeneration.N, out var generation))
+                int.TryParse(sGeneration.N, NumberStyles.Integer, CultureInfo.InvariantCulture, out var generation))
                 Generation = generation;
 
             if (fields.TryGetValue(HOSTNAME_PROPERTY_NAME, out var hostName))
                 HostName = hostName.S;
 
             if (fields.TryGetValue(STATUS_PROPERTY_NAME, out var sStatus) &&
-                int.TryParse(sStatus.N, out var status))
+                int.TryParse(sStatus.N, NumberStyles.Integer, CultureInfo.InvariantCulture, out var status))
                 Status = status;
 
             if (fields.TryGetValue(PROXY_PORT_PROPERTY_NAME, out var sProxyPort) &&
-                int.TryParse(sProxyPort.N, out var proxyPort))
+                int.TryParse(sProxyPort.N, NumberStyles.Integer, CultureInfo.InvariantCulture, out var proxyPort))
                 ProxyPort = proxyPort;
 
             if (fields.TryGetValue(SILO_NAME_PROPERTY_NAME, out var siloName))
@@ -92,11 +93,11 @@ namespace Orleans.Runtime.MembershipService
                 IAmAliveTime = aliveTime.S;
 
             if (fields.TryGetValue(ETAG_PROPERTY_NAME, out var sETag) &&
-                int.TryParse(sETag.N, out var etag))
+                int.TryParse(sETag.N, NumberStyles.Integer, CultureInfo.InvariantCulture, out var etag))
                 ETag = etag;
 
             if (fields.TryGetValue(MEMBERSHIP_VERSION_PROPERTY_NAME, out var value) &&
-                int.TryParse(value.N, out var version))
+                int.TryParse(value.N, NumberStyles.Integer, CultureInfo.InvariantCulture, out var version))
                 MembershipVersion = version;
         }
 
@@ -104,15 +105,15 @@ namespace Orleans.Runtime.MembershipService
         {
             try
             {
-                int idx1 = rowKey.IndexOf(Seperator);
+                int idx1 = rowKey.IndexOf(Seperator, StringComparison.Ordinal);
                 int idx2 = rowKey.LastIndexOf(Seperator);
                 ReadOnlySpan<char> rowKeySpan = rowKey.AsSpan();
                 ReadOnlySpan<char> addressStr = rowKeySpan[..idx1];
                 ReadOnlySpan<char> portStr = rowKeySpan.Slice(idx1 + 1, idx2 - idx1 - 1);
                 ReadOnlySpan<char> genStr = rowKeySpan[(idx2 + 1)..];
                 IPAddress address = IPAddress.Parse(addressStr);
-                int port = int.Parse(portStr);
-                int generation = int.Parse(genStr);
+                int port = int.Parse(portStr, NumberStyles.Integer, CultureInfo.InvariantCulture);
+                int generation = int.Parse(genStr, NumberStyles.Integer, CultureInfo.InvariantCulture);
                 return SiloAddress.New(address, port, generation);
             }
             catch (Exception exc)
@@ -146,7 +147,7 @@ namespace Orleans.Runtime.MembershipService
 
         public static string ConstructSiloIdentity(SiloAddress silo)
         {
-            return string.Format("{0}-{1}-{2}", silo.Endpoint.Address, silo.Endpoint.Port, silo.Generation);
+            return string.Format(CultureInfo.InvariantCulture, "{0}-{1}-{2}", silo.Endpoint.Address, silo.Endpoint.Port, silo.Generation);
         }
 
         public Dictionary<string, AttributeValue> GetKeys()
@@ -170,14 +171,14 @@ namespace Orleans.Runtime.MembershipService
             if (!string.IsNullOrWhiteSpace(Address))
                 fields.Add(ADDRESS_PROPERTY_NAME, new AttributeValue(Address));
 
-            fields.Add(PORT_PROPERTY_NAME, new AttributeValue { N = Port.ToString() });
-            fields.Add(GENERATION_PROPERTY_NAME, new AttributeValue { N = Generation.ToString() });
+            fields.Add(PORT_PROPERTY_NAME, new AttributeValue { N = Port.ToString(CultureInfo.InvariantCulture) });
+            fields.Add(GENERATION_PROPERTY_NAME, new AttributeValue { N = Generation.ToString(CultureInfo.InvariantCulture) });
 
             if (!string.IsNullOrWhiteSpace(HostName))
                 fields.Add(HOSTNAME_PROPERTY_NAME, new AttributeValue(HostName));
 
-            fields.Add(STATUS_PROPERTY_NAME, new AttributeValue { N = Status.ToString() });
-            fields.Add(PROXY_PORT_PROPERTY_NAME, new AttributeValue { N = ProxyPort.ToString() });
+            fields.Add(STATUS_PROPERTY_NAME, new AttributeValue { N = Status.ToString(CultureInfo.InvariantCulture) });
+            fields.Add(PROXY_PORT_PROPERTY_NAME, new AttributeValue { N = ProxyPort.ToString(CultureInfo.InvariantCulture) });
 
             if (!string.IsNullOrWhiteSpace(SiloName))
                 fields.Add(SILO_NAME_PROPERTY_NAME, new AttributeValue(SiloName));
@@ -194,9 +195,9 @@ namespace Orleans.Runtime.MembershipService
             if (!string.IsNullOrWhiteSpace(IAmAliveTime))
                 fields.Add(I_AM_ALIVE_TIME_PROPERTY_NAME, new AttributeValue(IAmAliveTime));
 
-            fields.Add(MEMBERSHIP_VERSION_PROPERTY_NAME, new AttributeValue { N = MembershipVersion.ToString() });
+            fields.Add(MEMBERSHIP_VERSION_PROPERTY_NAME, new AttributeValue { N = MembershipVersion.ToString(CultureInfo.InvariantCulture) });
 
-            fields.Add(ETAG_PROPERTY_NAME, new AttributeValue { N = ETag.ToString() });
+            fields.Add(ETAG_PROPERTY_NAME, new AttributeValue { N = ETag.ToString(CultureInfo.InvariantCulture) });
             return fields;
         }
     }

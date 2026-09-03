@@ -8,6 +8,7 @@ using Orleans.Runtime;
 using Orleans.Runtime.MembershipService;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Net;
 using System.Threading.Tasks;
 
@@ -17,7 +18,7 @@ namespace Orleans.Clustering.DynamoDB
     {
         private DynamoDBStorage storage = null!;
         private readonly string clusterId;
-        private readonly string INSTANCE_STATUS_ACTIVE = ((int)SiloStatus.Active).ToString();
+        private readonly string INSTANCE_STATUS_ACTIVE = ((int)SiloStatus.Active).ToString(CultureInfo.InvariantCulture);
         private readonly ILogger logger;
         private readonly DynamoDBGatewayOptions options;
 
@@ -80,8 +81,8 @@ namespace Orleans.Clustering.DynamoDB
                 {
                     return SiloAddress.New(
                             IPAddress.Parse(gateway[SiloInstanceRecord.ADDRESS_PROPERTY_NAME].S),
-                            int.Parse(gateway[SiloInstanceRecord.PROXY_PORT_PROPERTY_NAME].N),
-                            int.Parse(gateway[SiloInstanceRecord.GENERATION_PROPERTY_NAME].N)).ToGatewayUri();
+                                int.Parse(gateway[SiloInstanceRecord.PROXY_PORT_PROPERTY_NAME].N, NumberStyles.Integer, CultureInfo.InvariantCulture),
+                                int.Parse(gateway[SiloInstanceRecord.GENERATION_PROPERTY_NAME].N, NumberStyles.Integer, CultureInfo.InvariantCulture)).ToGatewayUri();
                 });
 
             return records;

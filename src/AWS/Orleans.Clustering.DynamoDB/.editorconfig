@@ -1,0 +1,3 @@
+[*.cs]
+dotnet_diagnostic.CA1305.severity = warning
+dotnet_diagnostic.CA1307.severity = warning
