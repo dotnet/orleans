@@ -37,9 +37,9 @@ public class InProcessTestClusterBuilderTimeProviderTests
     [Fact, TestCategory("BVT")]
     public async Task ConfigureHost_CanControlReminderDueTimeUsingFakeTimeProvider()
     {
-        using var observer = ReminderDiagnosticObserver.Create();
         var fakeTimeProvider = new FakeTimeProvider(DateTimeOffset.Parse("2026-04-21T12:00:00+00:00"));
         var builder = CreateBuilder(fakeTimeProvider);
+        using var observer = ReminderDiagnosticObserver.Create(builder);
 
         await using var cluster = builder.Build();
         await cluster.DeployAsync(TestContext.Current.CancellationToken);
@@ -63,9 +63,9 @@ public class InProcessTestClusterBuilderTimeProviderTests
     [Fact, TestCategory("BVT")]
     public async Task ConfigureHost_CanAdvanceFakeTimeToTriggerSubsequentReminderTicks()
     {
-        using var observer = ReminderDiagnosticObserver.Create();
         var fakeTimeProvider = new FakeTimeProvider(DateTimeOffset.Parse("2026-04-21T12:00:00+00:00"));
         var builder = CreateBuilder(fakeTimeProvider);
+        using var observer = ReminderDiagnosticObserver.Create(builder);
 
         await using var cluster = builder.Build();
         await cluster.DeployAsync(TestContext.Current.CancellationToken);

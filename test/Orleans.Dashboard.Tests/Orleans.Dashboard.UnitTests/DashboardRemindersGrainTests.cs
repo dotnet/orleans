@@ -57,7 +57,7 @@ public sealed class DashboardRemindersGrainTests
                 }));
         var grain = new DashboardRemindersGrain(serviceProvider);
 
-        var response = (await grain.GetReminders(1, 50)).Value;
+        var response = (await grain.GetReminders(1, 50, TestContext.Current.CancellationToken)).Value;
 
         Assert.Equal(1, response.Count);
         var classic = Assert.Single(response.Reminders);
@@ -89,7 +89,7 @@ public sealed class DashboardRemindersGrainTests
                 }));
         var grain = new DashboardRemindersGrain(serviceProvider);
 
-        var response = (await grain.GetAdvancedReminders(1, 50)).Value;
+        var response = (await grain.GetAdvancedReminders(1, 50, TestContext.Current.CancellationToken)).Value;
 
         Assert.Equal(1, response.Count);
         var advanced = Assert.Single(response.Reminders);
@@ -120,7 +120,7 @@ public sealed class DashboardRemindersGrainTests
                 }));
         var grain = new DashboardRemindersGrain(serviceProvider);
 
-        var response = (await grain.GetAdvancedReminders(1, 50)).Value;
+        var response = (await grain.GetAdvancedReminders(1, 50, TestContext.Current.CancellationToken)).Value;
 
         Assert.Equal(1, response.Count);
         var utc = Assert.Single(response.Reminders);
@@ -158,7 +158,7 @@ public sealed class DashboardRemindersGrainTests
                 }));
         var grain = new DashboardRemindersGrain(serviceProvider);
 
-        var response = (await grain.GetAdvancedReminders(2, 1)).Value;
+        var response = (await grain.GetAdvancedReminders(2, 1, TestContext.Current.CancellationToken)).Value;
 
         Assert.Equal(2, response.Count);
         var reminder = Assert.Single(response.Reminders);
@@ -192,7 +192,7 @@ public sealed class DashboardRemindersGrainTests
             new AdvancedReminderTableStub(reminders));
         var grain = new DashboardRemindersGrain(serviceProvider);
 
-        var response = (await grain.GetAdvancedReminders(1, reminders.Length)).Value;
+        var response = (await grain.GetAdvancedReminders(1, reminders.Length, TestContext.Current.CancellationToken)).Value;
 
         Assert.Equal(
             reminders.Select(static reminder => reminder.ReminderName),
@@ -207,8 +207,8 @@ public sealed class DashboardRemindersGrainTests
         var management = new PagedAdvancedReminderManagementGrain();
         var grain = new DashboardRemindersGrain(serviceProvider, management);
 
-        var first = (await grain.GetAdvancedReminders(1, 1)).Value;
-        var second = (await grain.GetAdvancedReminders(2, 1)).Value;
+        var first = (await grain.GetAdvancedReminders(1, 1, TestContext.Current.CancellationToken)).Value;
+        var second = (await grain.GetAdvancedReminders(2, 1, TestContext.Current.CancellationToken)).Value;
 
         Assert.Equal("advanced-reminder-1", Assert.Single(first.Reminders).Name);
         Assert.Equal("advanced-reminder-2", Assert.Single(second.Reminders).Name);
@@ -228,7 +228,7 @@ public sealed class DashboardRemindersGrainTests
         var management = new PagedAdvancedReminderManagementGrain();
         var grain = new DashboardRemindersGrain(serviceProvider, management);
 
-        var response = (await grain.GetAdvancedReminders(int.MaxValue, 1)).Value;
+        var response = (await grain.GetAdvancedReminders(int.MaxValue, 1, TestContext.Current.CancellationToken)).Value;
 
         Assert.Empty(response.Reminders);
         Assert.Null(response.Count);
@@ -247,11 +247,11 @@ public sealed class DashboardRemindersGrainTests
 
         for (var pageSize = 1; pageSize <= 65; pageSize++)
         {
-            await grain.GetAdvancedReminders(1, pageSize);
+            await grain.GetAdvancedReminders(1, pageSize, TestContext.Current.CancellationToken);
         }
 
         var callsBeforeEvictedPage = management.ListCallCount;
-        var response = (await grain.GetAdvancedReminders(2, 1)).Value;
+        var response = (await grain.GetAdvancedReminders(2, 1, TestContext.Current.CancellationToken)).Value;
 
         Assert.Equal("advanced-reminder-2", Assert.Single(response.Reminders).Name);
         Assert.Equal(callsBeforeEvictedPage + 2, management.ListCallCount);
@@ -264,7 +264,7 @@ public sealed class DashboardRemindersGrainTests
         var serviceProvider = new ReminderServiceProvider(classicReminderTable, new AdvancedReminderTableStub());
         var grain = new DashboardRemindersGrain(serviceProvider);
 
-        await grain.GetReminders(1, 50);
+        await grain.GetReminders(1, 50, TestContext.Current.CancellationToken);
 
         Assert.Equal(1, classicReminderTable.RangeReadCount);
         Assert.Equal(0u, classicReminderTable.BeginHash);
