@@ -412,15 +412,23 @@ namespace Orleans.Runtime.Messaging
                         // Send all pending messages.
                         while (_pendingToSend.TryDequeue(out var message))
                         {
-                            if (TrySend(connection, message))
+                            message.Acquire();
+                            try
                             {
-                                LogTraceSentQueuedMessage(_gateway.logger, message, Id);
+                                if (TrySend(connection, message))
+                                {
+                                    LogTraceSentQueuedMessage(_gateway.logger, message, Id);
+                                }
+                                else
+                                {
+                                    // Re-enqueue the message. It's ok that it is at the end of the queue: message ordering is not guaranteed.
+                                    _pendingToSend.Enqueue(message);
+                                    return;
+                                }
                             }
-                            else
+                            finally
                             {
-                                // Re-enqueue the message. It's ok that it is at the end of the queue: message ordering is not guaranteed.
-                                _pendingToSend.Enqueue(message);
-                                return;
+                                message.Release();
                             }
                         }
                     }
