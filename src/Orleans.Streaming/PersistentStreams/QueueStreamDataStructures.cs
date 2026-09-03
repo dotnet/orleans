@@ -36,6 +36,7 @@ namespace Orleans.Streams
         public StreamSequenceToken? PendingStartToken;
         [NonSerialized]
         public bool StartPositionIsProviderDefault;
+        [NonSerialized]
         public StreamSequenceToken? CursorStartToken;
 
         /// <summary>

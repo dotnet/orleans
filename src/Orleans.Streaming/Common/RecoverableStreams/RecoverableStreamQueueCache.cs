@@ -207,6 +207,12 @@ namespace Orleans.Providers.Streams.Common
             => new Cursor(_cache, streamId, token);
 
         /// <inheritdoc />
+        public IQueueCacheCursor GetCacheCursorAtPosition(
+            StreamId streamId,
+            StreamSubscriptionStartPosition startPosition)
+            => new Cursor(_cache, streamId, startPosition);
+
+        /// <inheritdoc />
         public bool IsUnderPressure() => GetMaxAddCount() <= 0;
 
         /// <inheritdoc />
@@ -270,6 +276,15 @@ namespace Orleans.Providers.Streams.Common
             {
                 _cache = cache;
                 _cursor = cache.GetCursor(streamId, token);
+            }
+
+            public Cursor(
+                PooledQueueCache cache,
+                StreamId streamId,
+                StreamSubscriptionStartPosition startPosition)
+            {
+                _cache = cache;
+                _cursor = cache.GetCursorAtPosition(streamId, startPosition);
             }
 
             public void Dispose()

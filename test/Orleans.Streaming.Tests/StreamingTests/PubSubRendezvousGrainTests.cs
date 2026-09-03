@@ -110,7 +110,7 @@ namespace UnitTests.StreamingTests
             var streamId = new QualifiedStreamId("ProviderName", StreamId.Create("StreamNamespace", Guid.NewGuid()));
             var subscriptionId = GuidId.GetGuidId(Guid.NewGuid());
             var pubSubGrain = this.fixture.GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamId.ToString());
-            using var observer = StreamingDiagnosticObserver.Create();
+            using var observer = StreamingDiagnosticObserver.Create(fixture.HostedCluster);
 
             await pubSubGrain.RegisterConsumer(subscriptionId, streamId, default, null!);
             await pubSubGrain.UnregisterConsumer(subscriptionId, streamId);

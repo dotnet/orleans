@@ -335,17 +335,14 @@ namespace Orleans.Providers.Streams.Common
 
         private void SetCursorAtEarliestAvailable(Cursor cursor)
         {
-            for (var node = messageBlocks.Last; node is not null; node = node.Previous)
+            if (messageBlocks.Last is { } oldestBlock)
             {
-                if (node.Value.TryFindFirstMessage(cursor.StreamId, cacheDataAdapter, out var index))
-                {
-                    cursor.State = CursorStates.EarliestAvailableSet;
-                    cursor.CurrentBlock = node;
-                    cursor.Index = index;
-                    cursor.SequenceToken = node.Value.GetSequenceToken(index, cacheDataAdapter);
-                    cursor.BlockGeneration = node.Value.Generation;
-                    return;
-                }
+                cursor.State = CursorStates.EarliestAvailableSet;
+                cursor.CurrentBlock = oldestBlock;
+                cursor.Index = oldestBlock.Value.OldestMessageIndex;
+                cursor.SequenceToken = oldestBlock.Value.GetOldestSequenceToken(cacheDataAdapter);
+                cursor.BlockGeneration = oldestBlock.Value.Generation;
+                return;
             }
 
             SetWaitingAtCurrentEnd(cursor);
@@ -369,7 +366,7 @@ namespace Orleans.Providers.Streams.Common
             cursor.Index = index + 1;
         }
 
-        private bool TrySetCursorAtFirstMatchingMessageAfterAnchor(Cursor cursor)
+        private bool TrySetCursorAfterAnchor(Cursor cursor)
         {
             LinkedListNode<CachedMessageBlock>? node;
             int startIndex;
@@ -389,13 +386,12 @@ namespace Orleans.Providers.Streams.Common
             while (node is not null)
             {
                 if (!node.Value.IsEmpty
-                    && startIndex < node.Value.WriteIndex
-                    && node.Value.TryFindNextMessage(startIndex, cursor.StreamId, cacheDataAdapter, out var index))
+                    && startIndex < node.Value.WriteIndex)
                 {
                     cursor.State = CursorStates.EarliestAvailableSet;
                     cursor.CurrentBlock = node;
-                    cursor.Index = index;
-                    cursor.SequenceToken = node.Value.GetSequenceToken(index, cacheDataAdapter);
+                    cursor.Index = startIndex;
+                    cursor.SequenceToken = node.Value.GetSequenceToken(startIndex, cacheDataAdapter);
                     cursor.BlockGeneration = node.Value.Generation;
                     return true;
                 }
@@ -449,7 +445,7 @@ namespace Orleans.Providers.Streams.Common
             }
 
             if (cursor.State == CursorStates.EarliestAvailableWaiting
-                && !TrySetCursorAtFirstMatchingMessageAfterAnchor(cursor))
+                && !TrySetCursorAfterAnchor(cursor))
             {
                 return false;
             }
