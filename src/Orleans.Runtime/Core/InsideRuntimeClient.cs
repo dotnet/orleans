@@ -150,6 +150,12 @@ namespace Orleans.Runtime
         {
             var cancellationToken = request.GetCancellationToken();
             cancellationToken.ThrowIfCancellationRequested();
+            if (_clusterReferenceResolver.TryResolveLocal(target.UniversalReference, out var localCluster))
+            {
+                SendRequest(target, request, context, options, cancellationToken, localCluster);
+                return;
+            }
+
             var resolutionCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             resolutionCts.CancelAfter(request.GetDefaultResponseTimeout() ?? this.messagingOptions.ResponseTimeout);
             ValueTask<ClusterIdentity> resolveTask;

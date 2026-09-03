@@ -50,19 +50,9 @@ public sealed class ClusterReferenceResolver
         IReadOnlyDictionary<string, object>? requestContext = null,
         CancellationToken cancellationToken = default)
     {
-        reference.Validate();
-        if (!_metaclusterOptions.Enabled
-            && reference.Binding == UniversalReferenceBinding.Virtual
-            && string.Equals(reference.ServiceId, ClusterOptions.DefaultServiceId, StringComparison.Ordinal))
+        if (TryResolveLocal(reference, out var localCluster))
         {
-            return new ValueTask<ClusterIdentity>(
-                new ClusterIdentity(_clusterOptions.ServiceId, _clusterOptions.ClusterId));
-        }
-
-        if (!string.Equals(reference.ServiceId, _clusterOptions.ServiceId, StringComparison.Ordinal))
-        {
-            throw new InvalidOperationException(
-                $"Reference service '{reference.ServiceId}' does not match the local service '{_clusterOptions.ServiceId}'.");
+            return new ValueTask<ClusterIdentity>(localCluster);
         }
 
         if (reference.Binding == UniversalReferenceBinding.Cluster)
@@ -97,6 +87,37 @@ public sealed class ClusterReferenceResolver
 
         var cacheable = requestContext is null && locator is not IClusterOwnershipValidator;
         return ResolveAndCache(reference, locator, context, cacheable, cancellationToken);
+    }
+
+    internal bool TryResolveLocal(UniversalReference reference, out ClusterIdentity cluster)
+    {
+        reference.Validate();
+        var isLegacyVirtualReference = !_metaclusterOptions.Enabled
+            && reference.Binding == UniversalReferenceBinding.Virtual
+            && string.Equals(reference.ServiceId, ClusterOptions.DefaultServiceId, StringComparison.Ordinal);
+        if (!isLegacyVirtualReference
+            && !string.Equals(reference.ServiceId, _clusterOptions.ServiceId, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"Reference service '{reference.ServiceId}' does not match the local service '{_clusterOptions.ServiceId}'.");
+        }
+
+        if (reference.Binding == UniversalReferenceBinding.Cluster)
+        {
+            if (!string.Equals(reference.ClusterId, _clusterOptions.ClusterId, StringComparison.Ordinal))
+            {
+                cluster = default;
+                return false;
+            }
+        }
+        else if (_metaclusterOptions.Enabled)
+        {
+            cluster = default;
+            return false;
+        }
+
+        cluster = new ClusterIdentity(_clusterOptions.ServiceId, _clusterOptions.ClusterId);
+        return true;
     }
 
     /// <summary>
