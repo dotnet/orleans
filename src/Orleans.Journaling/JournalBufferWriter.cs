@@ -231,6 +231,22 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
         }
     }
 
+    internal void AppendCommitted(ReadOnlySequence<byte> value)
+    {
+        lock (_lock)
+        {
+            ThrowIfDisposed();
+            ThrowIfEntryActive();
+            var length = checked((int)value.Length);
+            foreach (var segment in value)
+            {
+                _buffer.Write(segment.Span);
+            }
+
+            _committedLength = checked(_committedLength + length);
+        }
+    }
+
     internal JournalEntryScope BeginEntry(JournalStreamId streamId)
     {
         lock (_lock)

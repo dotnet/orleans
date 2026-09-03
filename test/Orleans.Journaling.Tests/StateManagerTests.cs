@@ -732,6 +732,7 @@ public class StateManagerTests : JournalingTestBase
         var exception = await Assert.ThrowsAsync<IOException>(
             () => sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask());
         Assert.Same(expected, exception);
+        Assert.True(JournalStorageFailure.IsMarked(exception));
 
         await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask()
             .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
@@ -745,6 +746,89 @@ public class StateManagerTests : JournalingTestBase
 
         Assert.Equal(1, recoveredDictionary["first"]);
         Assert.Equal(2, recoveredDictionary["second"]);
+    }
+
+    [Fact]
+    public async Task StateManager_ReconcilePendingChanges_PreservesCommandsAddedDuringFailedAppend()
+    {
+        var storage = new CapturingStorage
+        {
+            BlockNextAppend = true,
+            NextAppendException = new IOException("Expected uncertain storage write failure."),
+            ThrowNextAppendExceptionAfterBlock = true,
+        };
+        var sut = CreateTestSystem(storage: storage);
+        var dictionary = new DurableDictionary<string, int>("dict", sut.Manager, CreateDictionaryCodec<string, int>());
+        var value = new DurableValue<int>("value", sut.Manager, CreateValueCodec<int>());
+
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+        dictionary.Add("attempted", 1);
+        var recovery = Assert.IsAssignableFrom<IJournaledStateWriteRecovery>(sut.Manager);
+        var failedWrite = recovery.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
+        await storage.AppendEntered.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        dictionary.Add("suffix", 2);
+        value.Value = 42;
+        storage.ReleaseAppend.SetResult();
+        await Assert.ThrowsAsync<IOException>(() => failedWrite);
+
+        Assert.False(await recovery.ReconcilePendingChangesAsync(
+            static () => false,
+            TestContext.Current.CancellationToken));
+
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
+
+        var recovered = CreateTestSystem(storage: storage);
+        var recoveredDictionary = new DurableDictionary<string, int>("dict", recovered.Manager, CreateDictionaryCodec<string, int>());
+        var recoveredValue = new DurableValue<int>("value", recovered.Manager, CreateValueCodec<int>());
+        await recovered.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, recoveredDictionary["attempted"]);
+        Assert.Equal(2, recoveredDictionary["suffix"]);
+        Assert.Equal(42, recoveredValue.Value);
+    }
+
+    [Fact]
+    public async Task StateManager_ReconcilePendingChanges_PreservesCommandsAddedDuringFailedSnapshot()
+    {
+        var storage = new CapturingStorage
+        {
+            IsCompactionRequested = true,
+            BlockNextReplace = true,
+            NextReplaceException = new IOException("Expected uncertain snapshot failure."),
+            ThrowNextReplaceExceptionAfterBlock = true,
+        };
+        var sut = CreateTestSystem(storage: storage);
+        var dictionary = new DurableDictionary<string, int>("dict", sut.Manager, CreateDictionaryCodec<string, int>());
+        var value = new DurableValue<int>("value", sut.Manager, CreateValueCodec<int>());
+
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+        dictionary.Add("attempted", 1);
+        value.Value = 10;
+        var recovery = Assert.IsAssignableFrom<IJournaledStateWriteRecovery>(sut.Manager);
+        var failedWrite = recovery.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
+        await storage.ReplaceEntered.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        dictionary.Add("suffix", 2);
+        value.Value = 42;
+        storage.ReleaseReplace.SetResult();
+        await Assert.ThrowsAsync<IOException>(() => failedWrite);
+
+        Assert.False(await recovery.ReconcilePendingChangesAsync(
+            static () => false,
+            TestContext.Current.CancellationToken));
+
+        storage.IsCompactionRequested = false;
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
+
+        var recovered = CreateTestSystem(storage: storage);
+        var recoveredDictionary = new DurableDictionary<string, int>("dict", recovered.Manager, CreateDictionaryCodec<string, int>());
+        var recoveredValue = new DurableValue<int>("value", recovered.Manager, CreateValueCodec<int>());
+        await recovered.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, recoveredDictionary["attempted"]);
+        Assert.Equal(2, recoveredDictionary["suffix"]);
+        Assert.Equal(42, recoveredValue.Value);
     }
 
     [Fact]
@@ -2681,6 +2765,8 @@ public class StateManagerTests : JournalingTestBase
 
         public bool BlockNextAppend { get; set; }
 
+        public bool ThrowNextAppendExceptionAfterBlock { get; set; }
+
         public TaskCompletionSource AppendEntered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public TaskCompletionSource ReleaseAppend { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -2690,6 +2776,8 @@ public class StateManagerTests : JournalingTestBase
         public bool DeleteEnteredWhileAppendInProgress { get; private set; }
 
         public bool BlockNextReplace { get; set; }
+
+        public bool ThrowNextReplaceExceptionAfterBlock { get; set; }
 
         public TaskCompletionSource ReplaceEntered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -2832,7 +2920,7 @@ public class StateManagerTests : JournalingTestBase
                 }
             }
 
-            if (exceptionToThrow is not null)
+            if (exceptionToThrow is not null && !ThrowNextReplaceExceptionAfterBlock)
             {
                 ExceptionDispatchInfo.Throw(exceptionToThrow);
             }
@@ -2842,6 +2930,12 @@ public class StateManagerTests : JournalingTestBase
             {
                 BlockNextReplace = false;
                 await ReleaseReplace.Task.WaitAsync(cancellationToken);
+            }
+
+            if (exceptionToThrow is not null)
+            {
+                ThrowNextReplaceExceptionAfterBlock = false;
+                ExceptionDispatchInfo.Throw(exceptionToThrow);
             }
 
             if (DelayReplace)
@@ -2880,7 +2974,7 @@ public class StateManagerTests : JournalingTestBase
                     }
                 }
 
-                if (exceptionToThrow is not null)
+                if (exceptionToThrow is not null && !ThrowNextAppendExceptionAfterBlock)
                 {
                     ExceptionDispatchInfo.Throw(exceptionToThrow);
                 }
@@ -2890,6 +2984,12 @@ public class StateManagerTests : JournalingTestBase
                 {
                     BlockNextAppend = false;
                     await ReleaseAppend.Task.WaitAsync(cancellationToken);
+                }
+
+                if (exceptionToThrow is not null)
+                {
+                    ThrowNextAppendExceptionAfterBlock = false;
+                    ExceptionDispatchInfo.Throw(exceptionToThrow);
                 }
 
                 var bytes = value.ToArray();

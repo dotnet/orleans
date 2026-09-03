@@ -216,7 +216,7 @@ internal sealed class LogViewAdaptor<TLogView, TLogEntry> : PrimaryBasedLogViewA
         _stagedUpdateCount = 0;
 
         Services.Log(LogLevel.Debug, "write ({0} updates) success v{1}", writtenCount, _eventLog.Count);
-        UpdateConfirmedViewFromJournal();
+        UpdateConfirmedViewFromJournal(toVersion: checked(_confirmedVersion + writtenCount));
         LastPrimaryIssue.Resolve(Host, Services);
 
         ExitOperation("WriteAsync");
@@ -239,12 +239,15 @@ internal sealed class LogViewAdaptor<TLogView, TLogEntry> : PrimaryBasedLogViewA
         {
             try
             {
-                await _stateManager.WriteStateAsync(cancellationToken);
+                await ((IJournaledStateWriteRecovery)_stateManager).WriteStateAsync(cancellationToken);
                 LastPrimaryIssue.Resolve(Host, Services);
                 return true;
             }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            catch (OperationCanceledException exception) when (cancellationToken.IsCancellationRequested)
             {
+                LastPrimaryIssue.Record(new UpdateJournaledStateFailed { Exception = exception }, Host, Services);
+                _terminalFailure = exception;
+                _grain.DeactivateOnIdle();
                 throw;
             }
             catch (Exception exception)
@@ -267,9 +270,30 @@ internal sealed class LogViewAdaptor<TLogView, TLogEntry> : PrimaryBasedLogViewA
                     cancellationToken.ThrowIfCancellationRequested();
                 }
 
+                if (IsRetryableStorageFailure(exception))
+                {
+                    var isWriteCommitted = await ReconcileAfterStorageFailureAsync(writeBit, cancellationToken);
+                    if (isWriteCommitted)
+                    {
+                        Services.Log(LogLevel.Debug, "last {0} was actually a success v{1}", operation, _eventLog.Count);
+                        LastPrimaryIssue.Resolve(Host, Services);
+                        return true;
+                    }
+
+                    return false;
+                }
+
+                if (JournalStorageFailure.IsMarked(exception))
+                {
+                    _terminalFailure = exception;
+                    _grain.DeactivateOnIdle();
+                    throw;
+                }
+
                 if (!IsRecoverySignal(exception))
                 {
-                    return false;
+                    await TerminallyFailAfterStagingErrorAsync(exception);
+                    throw;
                 }
 
                 await RecoverAfterWriteFailureAsync();
@@ -298,6 +322,41 @@ internal sealed class LogViewAdaptor<TLogView, TLogEntry> : PrimaryBasedLogViewA
         }
 
         return false;
+    }
+
+    private static bool IsRetryableStorageFailure(Exception exception) =>
+        JournalStorageFailure.IsMarked(exception)
+        && exception is not InvalidOperationException
+        && exception is not ArgumentException
+        && exception is not NotSupportedException;
+
+    private async Task<bool> ReconcileAfterStorageFailureAsync(bool writeBit, CancellationToken cancellationToken)
+    {
+        var recovery = (IJournaledStateWriteRecovery)_stateManager;
+        while (true)
+        {
+            try
+            {
+                return await recovery.ReconcilePendingChangesAsync(
+                    () => writeBit == GetWriteVectorBit(),
+                    CancellationToken.None);
+            }
+            catch (Exception exception)
+            {
+                LastPrimaryIssue.Record(new ReadFromJournaledStateFailed { Exception = exception }, Host, Services);
+            }
+
+            Services.Log(LogLevel.Debug, "read failed {0}", LastPrimaryIssue);
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                _terminalFailure = new OperationCanceledException(cancellationToken);
+                _grain.DeactivateOnIdle();
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+
+            await LastPrimaryIssue.DelayBeforeRetry();
+        }
     }
 
     private async Task RecoverAfterWriteFailureAsync()
@@ -342,14 +401,15 @@ internal sealed class LogViewAdaptor<TLogView, TLogEntry> : PrimaryBasedLogViewA
         }
     }
 
-    private void UpdateConfirmedViewFromJournal(bool rebuild = false)
+    private void UpdateConfirmedViewFromJournal(bool rebuild = false, int? toVersion = null)
     {
         if (rebuild || _eventLog.Count < _confirmedVersion)
         {
             InitializeConfirmedView(InitialState);
         }
 
-        for (var index = _confirmedVersion; index < _eventLog.Count; index++)
+        var confirmedVersion = toVersion ?? _eventLog.Count;
+        for (var index = _confirmedVersion; index < confirmedVersion; index++)
         {
             try
             {
@@ -361,7 +421,7 @@ internal sealed class LogViewAdaptor<TLogView, TLogEntry> : PrimaryBasedLogViewA
             }
         }
 
-        _confirmedVersion = _eventLog.Count;
+        _confirmedVersion = confirmedVersion;
     }
 
     private bool FlipWriteVectorBit()

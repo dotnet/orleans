@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Benchmarks" />
+    <InternalsVisibleTo Include="Orleans.EventSourcing" />
     <InternalsVisibleTo Include="Orleans.Journaling.Tests" />
     <InternalsVisibleTo Include="Orleans.Journaling.Json.Tests" />
   </ItemGroup>
