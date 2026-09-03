@@ -672,17 +672,45 @@ namespace Orleans.Runtime.Messaging
 
             private void RejectClaimedRequest(Message request, SiloAddress deadSilo)
             {
+                lock (_requestLock)
+                {
+                    if (_pendingRequests.Contains(request.Id))
+                    {
+                        return;
+                    }
+                }
+
                 _gateway._messagingInstruments.OnRejectedMessage(request);
                 var rejection = _gateway.CreateDeadSiloRejection(request, deadSilo);
                 SendSyntheticResponse(rejection);
-                GatewayEvents.EmitDeadSiloRequestRejected(_gateway.siloAddress, Id.GrainId, rejection);
+                try
+                {
+                    GatewayEvents.EmitDeadSiloRequestRejected(_gateway.siloAddress, Id.GrainId, rejection);
+                }
+                catch (Exception exception)
+                {
+                    LogWarningGatewayDiagnosticObserverException(
+                        _gateway.logger,
+                        nameof(GatewayEvents.DeadSiloRequestRejected),
+                        exception);
+                }
             }
 
             private void EmitRequestTrackingStopped(bool requestTrackingStopped)
             {
                 if (requestTrackingStopped)
                 {
-                    GatewayEvents.EmitRequestTrackingStopped(_gateway.siloAddress, Id.GrainId);
+                    try
+                    {
+                        GatewayEvents.EmitRequestTrackingStopped(_gateway.siloAddress, Id.GrainId);
+                    }
+                    catch (Exception exception)
+                    {
+                        LogWarningGatewayDiagnosticObserverException(
+                            _gateway.logger,
+                            nameof(GatewayEvents.RequestTrackingStopped),
+                            exception);
+                    }
                 }
             }
 
@@ -855,5 +883,14 @@ namespace Orleans.Runtime.Messaging
             Message = "Exception in message loop for client {ClientId}"
         )]
         private static partial void LogWarningGatewayClientMessageLoopException(ILogger logger, Exception exception, ClientGrainId clientId);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Gateway diagnostic event {EventName} observer threw an exception."
+        )]
+        private static partial void LogWarningGatewayDiagnosticObserverException(
+            ILogger logger,
+            string eventName,
+            Exception exception);
     }
 }

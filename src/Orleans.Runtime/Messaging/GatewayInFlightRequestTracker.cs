@@ -82,6 +82,8 @@ namespace Orleans.Runtime.Messaging
             return false;
         }
 
+        internal bool Contains(CorrelationId requestId) => _requests?.ContainsKey(requestId) is true;
+
         internal List<Message>? RemoveForSilo(SiloAddress silo)
         {
             if (_requests is not { Count: > 0 } requests)
