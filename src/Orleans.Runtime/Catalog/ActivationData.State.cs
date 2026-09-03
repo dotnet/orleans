@@ -28,6 +28,8 @@ internal sealed partial class ActivationData
         private readonly List<(Message Message, CoarseStopwatch QueuedTime)> _waiting;
         private readonly Dictionary<Message, CoarseStopwatch> _running;
         private Message? _blockingRequest;
+        private int _runningNonAlwaysInterleaveCount;
+        private int _runningNonAlwaysInterleaveWritableCount;
         private CoarseStopwatch _busyDuration;
 
         public RequestScheduler()
@@ -64,18 +66,37 @@ internal sealed partial class ActivationData
         {
             var stopwatch = CoarseStopwatch.StartNew();
             _running.Add(message, stopwatch);
-            if (_blockingRequest is not null || message.IsAlwaysInterleave)
+            if (message.IsAlwaysInterleave)
             {
                 return;
             }
 
-            _blockingRequest = message;
-            _busyDuration = stopwatch;
+            ++_runningNonAlwaysInterleaveCount;
+            if (!message.IsReadOnly)
+            {
+                ++_runningNonAlwaysInterleaveWritableCount;
+            }
+
+            if (_blockingRequest is null)
+            {
+                _blockingRequest = message;
+                _busyDuration = stopwatch;
+            }
         }
 
         public void Complete(Message message)
         {
-            _running.Remove(message);
+            if (_running.Remove(message) && !message.IsAlwaysInterleave)
+            {
+                --_runningNonAlwaysInterleaveCount;
+                if (!message.IsReadOnly)
+                {
+                    --_runningNonAlwaysInterleaveWritableCount;
+                }
+
+                Debug.Assert(_runningNonAlwaysInterleaveCount >= 0);
+                Debug.Assert(_runningNonAlwaysInterleaveWritableCount >= 0);
+            }
 
             if (_blockingRequest is null || message.Equals(_blockingRequest))
             {
@@ -91,20 +112,41 @@ internal sealed partial class ActivationData
             object? grainInstance)
         {
             if (!IsRunning || incoming.IsAlwaysInterleave
-                || _blockingRequest is null
-                || (_blockingRequest.IsReadOnly && incoming.IsReadOnly)
+                || _runningNonAlwaysInterleaveCount == 0
+                || (incoming.IsReadOnly && _runningNonAlwaysInterleaveWritableCount == 0)
                 || isReentrantSection)
             {
                 return true;
             }
 
-            if (canInterleave is not null)
+            bool? incomingMayInterleave = null;
+            foreach (var (runningMessage, stopwatch) in _running)
             {
-                return canInterleave.MayInterleave(grainInstance, incoming)
-                    || canInterleave.MayInterleave(grainInstance, _blockingRequest);
+                if (runningMessage.IsAlwaysInterleave || (runningMessage.IsReadOnly && incoming.IsReadOnly))
+                {
+                    continue;
+                }
+
+                if (canInterleave is not null)
+                {
+                    incomingMayInterleave ??= canInterleave.MayInterleave(grainInstance, incoming);
+                    if (incomingMayInterleave.Value)
+                    {
+                        return true;
+                    }
+
+                    if (canInterleave.MayInterleave(grainInstance, runningMessage))
+                    {
+                        continue;
+                    }
+                }
+
+                _blockingRequest = runningMessage;
+                _busyDuration = stopwatch;
+                return false;
             }
 
-            return false;
+            return true;
         }
 
         public List<Message> DrainWaiting()
