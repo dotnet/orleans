@@ -365,7 +365,7 @@ internal sealed partial class ActivationData
     {
         public readonly MigrationContext MigrationContext = new(sessionPool);
         public readonly Dictionary<string, object>? RequestContext = requestContext;
-        
+
         /// <summary>
         /// The activity context from the grain call that initiated the migration.
         /// This is used to parent the dehydrate span to the migration request trace.
