@@ -699,26 +699,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         Exception? failure)
     {
         _directoryInstruments.RangeLockHeldDuration.Record((long)heldDuration.TotalMilliseconds);
-        var canceled = ShutdownToken.IsCancellationRequested;
-        var canComplete = transition.Direction switch
-        {
-            PartitionTransitionDirection.Inbound => transition.Stage == PartitionTransitionStage.Fenced,
-            PartitionTransitionDirection.Outbound => transition.Stage is PartitionTransitionStage.Drained or PartitionTransitionStage.StateRetained,
-            _ => false
-        };
-        if (canceled)
-        {
-            transition.Abort(ShutdownToken);
-        }
-        else if (failure is not null || !canComplete)
-        {
-            transition.Fail(failure ?? new InvalidOperationException(
-                $"Range transition '{operationName}' did not reach a safe terminal stage."));
-        }
-        else
-        {
-            transition.Complete();
-        }
+        var unsuccessful = FinishRangeTransition(transition, ShutdownToken, operationName, failure);
 
         GrainDirectoryEvents.EmitRangeOperationCompleted(
             _id,
@@ -727,7 +708,46 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
             transition.Range,
             operationName,
             heldDuration,
-            canceled || failure is not null || !canComplete);
+            unsuccessful);
+    }
+
+    internal static bool FinishRangeTransition(
+        PartitionTransition transition,
+        CancellationToken shutdownToken,
+        string operationName,
+        Exception? failure)
+    {
+        if (failure is not null)
+        {
+            transition.Fail(failure);
+            return true;
+        }
+
+        var canceled = shutdownToken.IsCancellationRequested;
+        var canComplete = transition.Direction switch
+        {
+            PartitionTransitionDirection.Inbound => transition.Stage == PartitionTransitionStage.Fenced,
+            PartitionTransitionDirection.Outbound => transition.Stage is PartitionTransitionStage.Drained or PartitionTransitionStage.StateRetained,
+            _ => false
+        };
+        if (canceled || !canComplete)
+        {
+            if (canceled)
+            {
+                transition.Abort(shutdownToken);
+            }
+            else
+            {
+                transition.Fail(new InvalidOperationException(
+                    $"Range transition '{operationName}' did not reach a safe terminal stage."));
+            }
+        }
+        else
+        {
+            transition.Complete();
+        }
+
+        return canceled || !canComplete;
     }
 
     private async Task<bool> TransferSnapshotAsync(
