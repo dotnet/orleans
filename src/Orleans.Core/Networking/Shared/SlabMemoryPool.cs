@@ -104,6 +104,10 @@ namespace Orleans.Networking.Shared
         /// Internal method called when a block is requested and the pool is empty. It allocates one additional slab, creates all of the
         /// block tracking objects, and adds them all to the pool.
         /// </summary>
+        [System.Diagnostics.CodeAnalysis.SuppressMessage(
+            "Reliability",
+            "CA2000:Dispose objects before losing scope",
+            Justification = "The pool owns the slab and blocks after adding them to its collections and disposes the slabs with the pool.")]
         private MemoryPoolBlock AllocateSlab()
         {
             var slab = MemoryPoolSlab.Create(_slabLength);
@@ -165,6 +169,10 @@ namespace Orleans.Networking.Shared
         }
 
         // This method can ONLY be called from the finalizer of MemoryPoolBlock
+        [System.Diagnostics.CodeAnalysis.SuppressMessage(
+            "Reliability",
+            "CA2000:Dispose objects before losing scope",
+            Justification = "Return transfers ownership of the replacement block back to the pool.")]
         internal void RefreshBlock(MemoryPoolSlab slab, int offset, int length)
         {
             lock (_disposeSync)

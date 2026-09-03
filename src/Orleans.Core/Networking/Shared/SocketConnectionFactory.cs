@@ -30,45 +30,53 @@ namespace Orleans.Networking.Shared
 
         public async ValueTask<ConnectionContext> ConnectAsync(EndPoint endpoint, CancellationToken cancellationToken)
         {
-            var socket = new Socket(endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp)
+            Socket? socket = new Socket(endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp)
             {
                 LingerState = new LingerOption(true, 0),
                 NoDelay = _options.NoDelay,
             };
 
-            if (_options.KeepAlive)
+            try
             {
-                socket.EnableKeepAlive(
-                    timeSeconds: _options.KeepAliveTimeSeconds,
-                    intervalSeconds: _options.KeepAliveIntervalSeconds,
-                    retryCount: _options.KeepAliveRetryCount);
-            }
-
-            socket.EnableFastPath();
-            using var completion = new SingleUseSocketAsyncEventArgs
-            {
-                RemoteEndPoint = endpoint
-            };
-
-            if (socket.ConnectAsync(completion))
-            {
-                using (cancellationToken.Register(s => Socket.CancelConnectAsync((SingleUseSocketAsyncEventArgs)s!), completion))
+                if (_options.KeepAlive)
                 {
-                    await completion.Task;
+                    socket.EnableKeepAlive(
+                        timeSeconds: _options.KeepAliveTimeSeconds,
+                        intervalSeconds: _options.KeepAliveIntervalSeconds,
+                        retryCount: _options.KeepAliveRetryCount);
                 }
-            }
 
-            if (completion.SocketError != SocketError.Success)
+                socket.EnableFastPath();
+                using var completion = new SingleUseSocketAsyncEventArgs
+                {
+                    RemoteEndPoint = endpoint
+                };
+
+                if (socket.ConnectAsync(completion))
+                {
+                    using (cancellationToken.Register(s => Socket.CancelConnectAsync((SingleUseSocketAsyncEventArgs)s!), completion))
+                    {
+                        await completion.Task;
+                    }
+                }
+
+                if (completion.SocketError != SocketError.Success)
+                {
+                    if (completion.SocketError == SocketError.OperationAborted)
+                        cancellationToken.ThrowIfCancellationRequested();
+                    throw new SocketConnectionException($"Unable to connect to {endpoint}. Error: {completion.SocketError}");
+                }
+
+                var scheduler = this.schedulers.GetScheduler();
+                var connection = new SocketConnection(socket, this.memoryPool, scheduler, this.trace);
+                connection.Start();
+                socket = null;
+                return connection;
+            }
+            finally
             {
-                if (completion.SocketError == SocketError.OperationAborted)
-                    cancellationToken.ThrowIfCancellationRequested();
-                throw new SocketConnectionException($"Unable to connect to {endpoint}. Error: {completion.SocketError}");
+                socket?.Dispose();
             }
-
-            var scheduler = this.schedulers.GetScheduler();
-            var connection = new SocketConnection(socket, this.memoryPool, scheduler, this.trace);
-            connection.Start();
-            return connection;
         }
 
         private sealed class SingleUseSocketAsyncEventArgs : SocketAsyncEventArgs
