@@ -10,6 +10,9 @@ namespace Orleans.Providers.Streams.Common
     /// </summary>
     public class DefaultBlockPoolMonitor : IBlockPoolMonitor
     {
+        /// <summary>
+        /// The dimensions attached to metrics reported by this monitor.
+        /// </summary>
         protected KeyValuePair<string, object>[] _dimensions;
         private readonly ObservableCounter<long> _totalMemoryCounter;
         private readonly ObservableCounter<long> _availableMemoryCounter;
@@ -22,11 +25,21 @@ namespace Orleans.Providers.Streams.Common
         private long _releasedMemory;
         private long _allocatedMemory;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="DefaultBlockPoolMonitor"/> class.
+        /// </summary>
+        /// <param name="dimensions">The block pool metric dimensions.</param>
+        /// <param name="instruments">The Orleans runtime instruments.</param>
         public DefaultBlockPoolMonitor(BlockPoolMonitorDimensions dimensions, OrleansInstruments instruments)
             : this(new KeyValuePair<string, object>[] { new("BlockPoolId", dimensions.BlockPoolId) }, instruments.Meter)
         {
         }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="DefaultBlockPoolMonitor"/> class.
+        /// </summary>
+        /// <param name="dimensions">The dimensions attached to metrics reported by this monitor.</param>
+        /// <param name="instruments">The Orleans runtime instruments.</param>
         protected DefaultBlockPoolMonitor(KeyValuePair<string, object>[] dimensions, OrleansInstruments instruments)
             : this(dimensions, instruments.Meter)
         {

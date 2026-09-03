@@ -19,10 +19,12 @@ namespace Orleans.Streaming.JsonConverters
         private readonly Type _eventSequenceTokenTypeV2 = typeof(EventSequenceTokenV2);
         private readonly Type _streamSequenceTokenType = typeof(StreamSequenceToken);
 
+        /// <inheritdoc />
         public override bool CanConvert(Type typeToConvert) => typeToConvert == _streamSequenceTokenType
                                                                || typeToConvert == _eventSequenceTokenType
                                                                || typeToConvert == _eventSequenceTokenTypeV2;
 
+        /// <inheritdoc />
         public override StreamSequenceToken? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             if (reader.TokenType != JsonTokenType.StartArray
@@ -81,6 +83,7 @@ namespace Orleans.Streaming.JsonConverters
                 : new EventSequenceTokenV2(sequenceNumber, eventIndex);
         }
 
+        /// <inheritdoc />
         public override void Write(Utf8JsonWriter writer, StreamSequenceToken value, JsonSerializerOptions options)
         {
             var runtimeType = value.GetType();

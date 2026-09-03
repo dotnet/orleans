@@ -34,11 +34,21 @@ namespace Orleans.Providers.Streams.Common
         private ValueStopwatch _oldestMessageDequeueAgo;
         private ValueStopwatch _oldestToNewestAge;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="DefaultCacheMonitor"/> class.
+        /// </summary>
+        /// <param name="dimensions">The cache metric dimensions.</param>
+        /// <param name="instruments">The Orleans runtime instruments.</param>
         public DefaultCacheMonitor(CacheMonitorDimensions dimensions, OrleansInstruments instruments)
             : this(new KeyValuePair<string, object>[] { new("QueueId", dimensions.QueueId) }, instruments.Meter)
         {
         }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="DefaultCacheMonitor"/> class.
+        /// </summary>
+        /// <param name="dimensions">The dimensions attached to metrics reported by this monitor.</param>
+        /// <param name="instruments">The Orleans runtime instruments.</param>
         protected DefaultCacheMonitor(KeyValuePair<string, object>[] dimensions, OrleansInstruments instruments)
             : this(dimensions, instruments.Meter)
         {

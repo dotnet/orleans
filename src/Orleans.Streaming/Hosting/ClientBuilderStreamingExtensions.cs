@@ -4,6 +4,9 @@ using Orleans.Streams;
 
 namespace Orleans.Hosting
 {
+    /// <summary>
+    /// Extension methods for configuring streaming on an Orleans client.
+    /// </summary>
     public static class ClientBuilderStreamingExtensions
     {
         /// <summary>

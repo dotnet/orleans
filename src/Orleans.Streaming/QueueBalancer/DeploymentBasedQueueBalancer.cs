@@ -29,7 +29,15 @@ namespace Orleans.Streams
         private List<QueueId> allQueues = null!; // Initialized in Initialize.
         private string _name;
         private bool isStarting;
-        
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="DeploymentBasedQueueBalancer"/> class.
+        /// </summary>
+        /// <param name="siloStatusOracle">The silo status oracle.</param>
+        /// <param name="deploymentConfig">The deployment configuration.</param>
+        /// <param name="options">The queue balancer options.</param>
+        /// <param name="services">The service provider.</param>
+        /// <param name="logger">The logger.</param>
         public DeploymentBasedQueueBalancer(
             ISiloStatusOracle siloStatusOracle,
             IDeploymentConfiguration deploymentConfig,
@@ -54,6 +62,13 @@ namespace Orleans.Streams
                 select new KeyValuePair<SiloAddress, bool>(s, false));
         }
 
+        /// <summary>
+        /// Creates a deployment-based queue balancer.
+        /// </summary>
+        /// <param name="services">The service provider.</param>
+        /// <param name="name">The stream provider name.</param>
+        /// <param name="deploymentConfiguration">The deployment configuration.</param>
+        /// <returns>The queue balancer.</returns>
         public static IStreamQueueBalancer Create(IServiceProvider services, string name, IDeploymentConfiguration deploymentConfiguration)
         {
             var options = services.GetRequiredService<IOptionsMonitor<DeploymentBasedQueueBalancerOptions>>().Get(name);
@@ -62,6 +77,7 @@ namespace Orleans.Streams
             return balancer;
         }
 
+        /// <inheritdoc />
         public override Task Initialize(IStreamQueueMapper queueMapper)
         {
             if (queueMapper == null)
@@ -72,7 +88,7 @@ namespace Orleans.Streams
             NotifyAfterStart().Ignore();
             return base.Initialize(queueMapper);
         }
-        
+
         private async Task NotifyAfterStart()
         {
             await Task.Delay(this.options.SiloMaturityPeriod, _timeProvider);
@@ -89,6 +105,7 @@ namespace Orleans.Streams
             return updatedSilo;
         }
 
+        /// <inheritdoc />
         public override IEnumerable<QueueId> GetMyQueues()
         {
             BestFitBalancer<string, QueueId> balancer = GetBalancer();
@@ -159,6 +176,7 @@ namespace Orleans.Streams
             return queuesOfImmatureSilos;
         }
 
+        /// <inheritdoc />
         protected override void OnClusterMembershipChange(HashSet<SiloAddress> activeSilos)
         {
             SignalClusterChange(activeSilos).Ignore();

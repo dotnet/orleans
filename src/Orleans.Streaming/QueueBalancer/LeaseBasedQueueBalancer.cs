@@ -25,6 +25,7 @@ namespace Orleans.Streams;
 /// <param name="leaseProvider">The lease provider.</param>
 /// <param name="services">The services.</param>
 /// <param name="loggerFactory">The logger factory.</param>
+/// <param name="timeProvider">The time provider used to schedule lease maintenance and acquisition.</param>
 public partial class LeaseBasedQueueBalancer(
     string name,
     LeaseBasedQueueBalancerOptions options,

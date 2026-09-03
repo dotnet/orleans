@@ -41,6 +41,9 @@ namespace Orleans.Configuration
         /// </summary>
         public RunState StartupState { get; set; } = DEFAULT_STARTUP_STATE;
 
+        /// <summary>
+        /// The default stream runtime startup state.
+        /// </summary>
         public const RunState DEFAULT_STARTUP_STATE = RunState.AgentsStarted;
 
         /// <summary>
@@ -48,6 +51,10 @@ namespace Orleans.Configuration
         /// </summary>
         /// <value>The initialization stage.</value>
         public int InitStage { get; set; } = DEFAULT_INIT_STAGE;
+
+        /// <summary>
+        /// The default lifecycle stage at which the stream runtime is initialized.
+        /// </summary>
         public const int DEFAULT_INIT_STAGE = ServiceLifecycleStage.ApplicationServices;
 
         /// <summary>
@@ -55,6 +62,10 @@ namespace Orleans.Configuration
         /// </summary>
         /// <value>The startup stage.</value>
         public int StartStage { get; set; } = DEFAULT_START_STAGE;
+
+        /// <summary>
+        /// The default lifecycle stage at which the stream runtime is started.
+        /// </summary>
         public const int DEFAULT_START_STAGE = ServiceLifecycleStage.Active;
     }
 
@@ -68,6 +79,10 @@ namespace Orleans.Configuration
         /// </summary>
         /// <value>The type of the pub sub.</value>
         public StreamPubSubType PubSubType { get; set; } = DEFAULT_STREAM_PUBSUB_TYPE;
+
+        /// <summary>
+        /// The default stream pub/sub implementation.
+        /// </summary>
         public const StreamPubSubType DEFAULT_STREAM_PUBSUB_TYPE = StreamPubSubType.ExplicitGrainBasedAndImplicit;
     }
 
