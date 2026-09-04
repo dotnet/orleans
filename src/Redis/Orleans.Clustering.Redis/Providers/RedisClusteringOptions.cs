@@ -43,7 +43,7 @@ namespace Orleans.Clustering.Redis
         /// The default multiplexer creation delegate.
         /// </summary>
         /// <param name="options">The Redis clustering options.</param>
-        /// <returns>A task containing the created multiplexer and an indication that the provider owns it.</returns>
+        /// <returns>A task containing the created multiplexer and a value indicating whether it is shared.</returns>
         /// <exception cref="ArgumentNullException"><paramref name="options"/> is <see langword="null"/>.</exception>
         public static async Task<(IConnectionMultiplexer Multiplexer, bool IsShared)> DefaultCreateMultiplexer(RedisClusteringOptions options)
         {

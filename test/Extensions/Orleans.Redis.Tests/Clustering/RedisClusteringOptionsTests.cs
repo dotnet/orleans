@@ -1,5 +1,6 @@
 using Orleans.Clustering.Redis;
 using Orleans.Configuration;
+using StackExchange.Redis;
 using TestExtensions;
 using Xunit;
 
@@ -39,6 +40,6 @@ public sealed class RedisClusteringOptionsTests
 
         var result = RedisClusteringOptions.DefaultCreateRedisKey(clusterOptions);
 
-        Assert.Equal("service/members/cluster", result);
+        Assert.Equal((RedisKey)"service/members/cluster", result);
     }
 }
