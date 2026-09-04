@@ -44,12 +44,29 @@ public class ActivationDataMigrationTests(ActivationDataMigrationTests.Fixture f
     }
 
     [Fact]
+    public async Task TryDeactivateForCollection_AtomicallyStartsDeactivation()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var activation = await GetActivation(cancellationToken);
+        var reason = new DeactivationReason(DeactivationReasonCode.ActivationIdle, "test");
+
+        var result = ((ICollectibleGrainContext)activation).TryDeactivateForCollection(
+            reason,
+            DateTime.UtcNow,
+            TimeSpan.Zero,
+            respectKeepAlive: true,
+            cancellationToken);
+
+        Assert.Equal(ActivationCollectionAction.StartedDeactivation, result.Action);
+        Assert.Equal(ActivationState.Deactivating, activation.State);
+        await activation.Deactivated.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+    }
+
+    [Fact]
     public async Task TryStartMigration_DoesNotAcquireActivationInstanceMonitor()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var activation = await GetActivation(cancellationToken);
-        Assert.NotSame(activation, activation.SynchronizationLock);
-        Assert.Same(activation.SynchronizationLock, activation.SynchronizationLock);
 
         var lockAcquired = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         using var releaseLock = new ManualResetEventSlim();

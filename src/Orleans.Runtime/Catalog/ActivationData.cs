@@ -23,8 +23,7 @@ namespace Orleans.Runtime;
 
 /// <summary>
 /// Maintains additional per-activation state that is required for Orleans internal operations.
-/// The activation synchronization lock protects concurrent access to mutable activation state.
-/// Consider: compartmentalize by usage, e.g., using separate interfaces for data for catalog, etc.
+/// Concurrent mutation of activation state is synchronized internally.
 /// </summary>
 [DebuggerDisplay("GrainId = {GrainId}, State = {State}, Waiting = {WaitingCount}, Executing = {IsCurrentlyExecuting}")]
 internal sealed partial class ActivationData :
@@ -147,12 +146,6 @@ internal sealed partial class ActivationData :
     public GrainReference GrainReference => _selfReference ??= _shared.GrainReferenceActivator.CreateReference(GrainId, default);
     public ActivationState State { get; private set; } = ActivationState.Creating;
     public PlacementStrategy PlacementStrategy => _shared.PlacementStrategy;
-    public DateTime CollectionTicket { get; set; }
-
-    /// <summary>
-    /// Gets the monitor which protects mutable state for this activation.
-    /// </summary>
-    internal object SynchronizationLock => _lock;
 
     public IServiceProvider ActivationServices => _serviceScope.ServiceProvider;
     public ActivationId ActivationId => Address.ActivationId;
@@ -167,15 +160,9 @@ internal sealed partial class ActivationData :
 
     internal GrainTypeSharedContext Shared => _shared;
 
-    /// <summary>
-    /// Gets the monitor which protects collection state for the provided context.
-    /// </summary>
-    internal static object GetSynchronizationLock(ICollectibleGrainContext context)
-        => context is ActivationData activation ? activation._lock : context;
-
     public GrainId GrainId => Address.GrainId;
     public bool IsExemptFromCollection => _shared.CollectionAgeLimit == Timeout.InfiniteTimeSpan;
-    public DateTime KeepAliveUntil { get; set; } = DateTime.MinValue;
+    private DateTime KeepAliveUntil { get; set; } = DateTime.MinValue;
     public bool IsValid => State is ActivationState.Valid;
 
     // Currently, the only supported multi-activation grain is one using the StatelessWorkerPlacement strategy.
@@ -217,6 +204,21 @@ internal sealed partial class ActivationData :
         {
             var waitingCount = _waitingRequests.Count;
             return (waitingCount, waitingCount == 0 && _runningRequests.Count == 0);
+        }
+    }
+
+    internal ValueTask WaitForActivationReadyAsync(CancellationToken cancellationToken)
+    {
+        lock (_lock)
+        {
+            if (State is ActivationState.Valid or ActivationState.Invalid)
+            {
+                return ValueTask.CompletedTask;
+            }
+
+            _extras ??= new();
+            var completion = _extras.ActivationReady ??= new(TaskCreationOptions.RunContinuationsAsynchronously);
+            return new ValueTask(completion.Task.WaitAsync(cancellationToken));
         }
     }
 
@@ -443,9 +445,20 @@ internal sealed partial class ActivationData :
         }
     }
 
-    public void SetState(ActivationState state)
+    private void SetState(ActivationState state)
     {
+        Debug.Assert(Monitor.IsEntered(_lock));
         State = state;
+        if (state is ActivationState.Valid or ActivationState.Invalid)
+        {
+            var activationReady = _extras?.ActivationReady;
+            if (_extras is not null)
+            {
+                _extras.ActivationReady = null;
+            }
+
+            activationReady?.TrySetResult();
+        }
     }
 
     /// <summary>
@@ -525,30 +538,72 @@ internal sealed partial class ActivationData :
 
     public void DelayDeactivation(TimeSpan timespan)
     {
-        if (timespan == TimeSpan.MaxValue || timespan == Timeout.InfiniteTimeSpan)
+        var rescheduleCollection = false;
+        lock (_lock)
         {
-            // Adding these values to the current time would overflow, so use DateTime.MaxValue directly.
-            KeepAliveUntil = DateTime.MaxValue;
-        }
-        else if (timespan <= TimeSpan.Zero)
-        {
-            // Cancel the previous DelayDeactivation and revert to normal collection behavior.
-            // If there was an active keep-alive, reschedule collection so the grain can be collected
-            // after CollectionAgeLimit rather than waiting for the previously scheduled far-future time.
-            var hadActiveKeepAlive = KeepAliveUntil > GrainRuntime.TimeProvider.GetUtcNow().UtcDateTime;
-            ResetKeepAliveRequest();
-            if (hadActiveKeepAlive)
+            if (timespan == TimeSpan.MaxValue || timespan == Timeout.InfiniteTimeSpan)
             {
-                _shared.InternalRuntime.ActivationCollector.TryRescheduleCollection(this);
+                // Adding these values to the current time would overflow, so use DateTime.MaxValue directly.
+                KeepAliveUntil = DateTime.MaxValue;
+            }
+            else if (timespan <= TimeSpan.Zero)
+            {
+                // Cancel the previous DelayDeactivation and revert to normal collection behavior.
+                // If there was an active keep-alive, reschedule collection so the grain can be collected
+                // after CollectionAgeLimit rather than waiting for the previously scheduled far-future time.
+                rescheduleCollection = KeepAliveUntil > GrainRuntime.TimeProvider.GetUtcNow().UtcDateTime;
+                KeepAliveUntil = DateTime.MinValue;
+            }
+            else
+            {
+                KeepAliveUntil = GrainRuntime.TimeProvider.GetUtcNow().UtcDateTime + timespan;
             }
         }
-        else
+
+        if (rescheduleCollection)
         {
-            KeepAliveUntil = GrainRuntime.TimeProvider.GetUtcNow().UtcDateTime + timespan;
+            _shared.InternalRuntime.ActivationCollector.TryRescheduleCollection(this);
         }
     }
 
-    public void ResetKeepAliveRequest() => KeepAliveUntil = DateTime.MinValue;
+    public void ResetKeepAliveRequest()
+    {
+        lock (_lock)
+        {
+            KeepAliveUntil = DateTime.MinValue;
+        }
+    }
+
+    ActivationCollectionResult ICollectibleGrainContext.TryDeactivateForCollection(
+        DeactivationReason reason,
+        DateTime now,
+        TimeSpan ageLimit,
+        bool respectKeepAlive,
+        CancellationToken cancellationToken)
+    {
+        lock (_lock)
+        {
+            if (State is not ActivationState.Valid)
+            {
+                return ActivationCollectionResult.Remove;
+            }
+
+            if (respectKeepAlive && KeepAliveUntil > now)
+            {
+                var keepAliveDuration = KeepAliveUntil - now;
+                return ActivationCollectionResult.Reschedule(
+                    TimeSpan.FromTicks(Math.Max(keepAliveDuration.Ticks, CollectionAgeLimit.Ticks)));
+            }
+
+            if (_waitingRequests.Count > 0 || _runningRequests.Count > 0 || _idleDuration.Elapsed < ageLimit)
+            {
+                return ActivationCollectionResult.Reschedule(CollectionAgeLimit);
+            }
+
+            Deactivate(reason, cancellationToken);
+            return ActivationCollectionResult.StartedDeactivation;
+        }
+    }
 
     private void ScheduleOperation(object operation)
     {
@@ -2400,6 +2455,8 @@ internal sealed partial class ActivationData :
         /// A <see cref="TaskCompletionSource{TResult}"/> which completes when a grain has deactivated.
         /// </summary>
         public TaskCompletionSource<bool>? DeactivationTask { get => GetDeactivationInfoOrDefault()?.DeactivationTask; set => EnsureDeactivationInfo().DeactivationTask = value; }
+
+        public TaskCompletionSource? ActivationReady { get => GetValueOrDefault<TaskCompletionSource>(nameof(ActivationReady)); set => SetOrRemoveValue(nameof(ActivationReady), value); }
 
         public DateTime? DeactivationStartTime { get => GetDeactivationInfoOrDefault()?.DeactivationStartTime; set => EnsureDeactivationInfo().DeactivationStartTime = value; }
 

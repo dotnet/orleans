@@ -72,7 +72,7 @@ namespace UnitTests.Runtime
         [Fact, TestCategory("Activation")]
         public void TryRescheduleCollection_DoesNotThrow_WhenCollectionTicketIsMaxValue()
         {
-            // Simulate an activation whose collection ticket sits in the DateTime.MaxValue bucket.
+            // Simulate an activation whose collector-owned registration sits in the DateTime.MaxValue bucket.
             // That state arises when ScanStale reschedules an activation with
             // KeepAliveUntil = DateTime.MaxValue (from DelayDeactivation(Timeout.InfiniteTimeSpan))
             // and MakeTicketFromDateTime clamps the overflowed timestamp to DateTime.MaxValue
@@ -83,13 +83,12 @@ namespace UnitTests.Runtime
             // activation out of the MaxValue bucket without throwing.
             var activation = Substitute.For<ICollectibleGrainContext, IActivationWorkingSetMember>();
             activation.CollectionAgeLimit.Returns(TimeSpan.FromMinutes(5));
-            activation.IsValid.Returns(true);
             activation.IsExemptFromCollection.Returns(false);
 
             var now = timeProvider.GetUtcNow().UtcDateTime;
             var farFuture = DateTime.MaxValue - now;
             collector.ScheduleCollection(activation, farFuture, now);
-            Assert.Equal(DateTime.MaxValue, activation.CollectionTicket);
+            Assert.Equal(DateTime.MaxValue, collector.GetCollectionTicketForTesting(activation));
 
             var rescheduled = false;
             var exception = Record.Exception(() =>
@@ -99,24 +98,85 @@ namespace UnitTests.Runtime
 
             Assert.Null(exception);
             Assert.True(rescheduled);
-            Assert.NotEqual(default, activation.CollectionTicket);
-            Assert.NotEqual(DateTime.MaxValue, activation.CollectionTicket);
+            Assert.NotEqual(default, collector.GetCollectionTicketForTesting(activation));
+            Assert.NotEqual(DateTime.MaxValue, collector.GetCollectionTicketForTesting(activation));
         }
 
         [Fact, TestCategory("Activation")]
-        public void ScheduleCollection_UsesContextMonitor_ForNonActivationData()
+        public void ScheduleCollection_DoesNotAcquireContextMonitor()
         {
             var activation = Substitute.For<ICollectibleGrainContext>();
             activation.IsExemptFromCollection.Returns(_ =>
             {
-                Assert.True(Monitor.IsEntered(activation));
+                Assert.False(Monitor.IsEntered(activation));
                 return false;
             });
 
             var now = timeProvider.GetUtcNow().UtcDateTime;
             collector.ScheduleCollection(activation, TimeSpan.FromMinutes(1), now);
 
-            Assert.NotEqual(default, activation.CollectionTicket);
+            Assert.NotEqual(default, collector.GetCollectionTicketForTesting(activation));
+        }
+
+        [Fact, TestCategory("Activation")]
+        public async Task CollectStaleActivations_DelegatesAtomicTransitionToContext()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var ageLimit = TimeSpan.FromMinutes(1);
+            var activation = Substitute.For<ICollectibleGrainContext>();
+            activation.CollectionAgeLimit.Returns(ageLimit);
+            activation.IsExemptFromCollection.Returns(false);
+            activation.TryDeactivateForCollection(
+                    Arg.Any<DeactivationReason>(),
+                    Arg.Any<DateTime>(),
+                    Arg.Any<TimeSpan>(),
+                    Arg.Any<bool>(),
+                    Arg.Any<CancellationToken>())
+                .Returns(ActivationCollectionResult.StartedDeactivation);
+            activation.Deactivated.Returns(Task.CompletedTask);
+
+            var scheduledAt = timeProvider.GetUtcNow().UtcDateTime;
+            collector.ScheduleCollection(activation, ageLimit, scheduledAt);
+            timeProvider.Advance(ageLimit);
+
+            await collector.CollectStaleActivations(cancellationToken);
+
+            activation.Received(1).TryDeactivateForCollection(
+                Arg.Is<DeactivationReason>(reason => reason.ReasonCode == DeactivationReasonCode.ActivationIdle),
+                timeProvider.GetUtcNow().UtcDateTime,
+                ageLimit,
+                true,
+                cancellationToken);
+            Assert.Equal(default, collector.GetCollectionTicketForTesting(activation));
+        }
+
+        [Fact, TestCategory("Activation")]
+        public async Task CollectStaleActivations_CancellationInvalidatesClaim()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var ageLimit = TimeSpan.FromMinutes(1);
+            var activation = Substitute.For<ICollectibleGrainContext>();
+            activation.CollectionAgeLimit.Returns(ageLimit);
+            activation.IsExemptFromCollection.Returns(false);
+            activation.TryDeactivateForCollection(
+                    Arg.Any<DeactivationReason>(),
+                    Arg.Any<DateTime>(),
+                    Arg.Any<TimeSpan>(),
+                    Arg.Any<bool>(),
+                    Arg.Any<CancellationToken>())
+                .Returns(_ =>
+                {
+                    Assert.True(collector.TryCancelCollection(activation));
+                    return ActivationCollectionResult.Reschedule(ageLimit);
+                });
+
+            var scheduledAt = timeProvider.GetUtcNow().UtcDateTime;
+            collector.ScheduleCollection(activation, ageLimit, scheduledAt);
+            timeProvider.Advance(ageLimit);
+
+            await collector.CollectStaleActivations(cancellationToken);
+
+            Assert.Equal(default, collector.GetCollectionTicketForTesting(activation));
         }
 
         [Theory, TestCategory("MemoryBasedDeactivations")]
@@ -384,15 +444,49 @@ namespace UnitTests.Runtime
             workingSet.OnActivated(invalidActivation);
             workingSet.OnActivated(inactiveActivation2);
 
-            ((ICollectibleGrainContext)activeActivation).IsInactive.Returns(false);
-            ((ICollectibleGrainContext)invalidActivation).IsValid.Returns(false);
+            ((ICollectibleGrainContext)activeActivation)
+                .TryDeactivateForCollection(
+                    Arg.Any<DeactivationReason>(),
+                    Arg.Any<DateTime>(),
+                    Arg.Any<TimeSpan>(),
+                    Arg.Any<bool>(),
+                    Arg.Any<CancellationToken>())
+                .Returns(ActivationCollectionResult.Reschedule(TimeSpan.FromMinutes(1)));
+            ((ICollectibleGrainContext)invalidActivation)
+                .TryDeactivateForCollection(
+                    Arg.Any<DeactivationReason>(),
+                    Arg.Any<DateTime>(),
+                    Arg.Any<TimeSpan>(),
+                    Arg.Any<bool>(),
+                    Arg.Any<CancellationToken>())
+                .Returns(ActivationCollectionResult.Remove);
 
             await collector.DeactivateInDueTimeOrder(4, CancellationToken.None);
 
-            ((ICollectibleGrainContext)inactiveActivation1).Received(1).Deactivate(Arg.Any<DeactivationReason>(), Arg.Any<CancellationToken>());
-            ((ICollectibleGrainContext)inactiveActivation2).Received(1).Deactivate(Arg.Any<DeactivationReason>(), Arg.Any<CancellationToken>());
-            ((ICollectibleGrainContext)activeActivation).DidNotReceive().Deactivate(Arg.Any<DeactivationReason>(), Arg.Any<CancellationToken>());
-            ((ICollectibleGrainContext)invalidActivation).DidNotReceive().Deactivate(Arg.Any<DeactivationReason>(), Arg.Any<CancellationToken>());
+            ((ICollectibleGrainContext)inactiveActivation1).Received(1).TryDeactivateForCollection(
+                Arg.Any<DeactivationReason>(),
+                Arg.Any<DateTime>(),
+                TimeSpan.Zero,
+                false,
+                Arg.Any<CancellationToken>());
+            ((ICollectibleGrainContext)inactiveActivation2).Received(1).TryDeactivateForCollection(
+                Arg.Any<DeactivationReason>(),
+                Arg.Any<DateTime>(),
+                TimeSpan.Zero,
+                false,
+                Arg.Any<CancellationToken>());
+            ((ICollectibleGrainContext)activeActivation).Received(1).TryDeactivateForCollection(
+                Arg.Any<DeactivationReason>(),
+                Arg.Any<DateTime>(),
+                TimeSpan.Zero,
+                false,
+                Arg.Any<CancellationToken>());
+            ((ICollectibleGrainContext)invalidActivation).Received(1).TryDeactivateForCollection(
+                Arg.Any<DeactivationReason>(),
+                Arg.Any<DateTime>(),
+                TimeSpan.Zero,
+                false,
+                Arg.Any<CancellationToken>());
             Assert.Equal(2, collector._activationCount);
         }
 
@@ -412,9 +506,14 @@ namespace UnitTests.Runtime
         {
             var activation = Substitute.For<ICollectibleGrainContext, IActivationWorkingSetMember>();
             activation.CollectionAgeLimit.Returns(collectionAgeLimit);
-            activation.IsValid.Returns(true);
             activation.IsExemptFromCollection.Returns(false);
-            activation.IsInactive.Returns(true);
+            activation.TryDeactivateForCollection(
+                    Arg.Any<DeactivationReason>(),
+                    Arg.Any<DateTime>(),
+                    Arg.Any<TimeSpan>(),
+                    Arg.Any<bool>(),
+                    Arg.Any<CancellationToken>())
+                .Returns(ActivationCollectionResult.StartedDeactivation);
             activation.Deactivated.Returns(Task.CompletedTask).AndDoes(_ => { Interlocked.Decrement(ref collector._activationCount); });
 
             return (IActivationWorkingSetMember)activation;
