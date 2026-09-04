@@ -672,6 +672,10 @@ try {
             'macOS coverage must specify files for static instrumentation.'
         Assert-Matches `
             $dotnetTestAction `
+            '-IncludeFiles "\$\{\{ github\.workspace \}\}/test/\*\*/bin/Debug/\$\{\{ inputs\.framework \}\}/Orleans\.\*\.dll"' `
+            'macOS static instrumentation must target only Orleans assemblies.'
+        Assert-Matches `
+            $dotnetTestAction `
             'coverage\.static\.config\.xml' `
             'macOS coverage must use static-only instrumentation settings.'
         Assert-Matches `

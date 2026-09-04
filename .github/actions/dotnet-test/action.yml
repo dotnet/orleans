@@ -94,7 +94,7 @@ runs:
         '1'
         '--no-build'
       )
-      ./.github/scripts/invoke-coverage.ps1 -Settings ./.github/coverage.static.config.xml -Output "TestResults/${{ inputs.coverage-id }}.cobertura.xml" -RetryLogFile "logs/${{ inputs.coverage-id }}.retry.log" -IncludeFiles "${{ github.workspace }}/test/**/bin/Debug/${{ inputs.framework }}/*.dll" -Command $command
+      ./.github/scripts/invoke-coverage.ps1 -Settings ./.github/coverage.static.config.xml -Output "TestResults/${{ inputs.coverage-id }}.cobertura.xml" -RetryLogFile "logs/${{ inputs.coverage-id }}.retry.log" -IncludeFiles "${{ github.workspace }}/test/**/bin/Debug/${{ inputs.framework }}/Orleans.*.dll" -Command $command
   - name: Validate coverage report
     if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch))
     shell: pwsh
