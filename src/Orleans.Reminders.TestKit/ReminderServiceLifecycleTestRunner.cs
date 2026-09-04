@@ -900,12 +900,9 @@ public abstract class ReminderServiceLifecycleTestRunner
     }
 
     private static DateTime NormalizeStartAt(DateTime value)
-    {
-        var utc = value.Kind == DateTimeKind.Utc ? value : DateTime.SpecifyKind(value, DateTimeKind.Utc);
-        return new DateTime(
-            utc.Ticks - (utc.Ticks % TimeSpan.TicksPerSecond),
+        => new(
+            ReminderTableEntrySnapshot.NormalizeStartAtTicks(value, supportsSubSecondPrecision: false),
             DateTimeKind.Utc);
-    }
 
     private void AssertCounts(
         string guarantee,
