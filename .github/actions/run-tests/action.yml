@@ -5,6 +5,10 @@ inputs:
   artifact-name:
     description: Test output artifact name.
     required: true
+  build-external-assets:
+    description: Build external assets required by the selected tests.
+    required: false
+    default: 'false'
   filter-query:
     description: Optional Microsoft Testing Platform query filter.
     required: false
@@ -39,6 +43,8 @@ runs:
       framework: ${{ inputs.framework }}
       result-id: ${{ inputs.retry == 'true' && format('{0}-attempt1', inputs.artifact-name) || inputs.artifact-name }}
       static-instrumentation: ${{ inputs.static-instrumentation }}
+    env:
+      BuildExternalAssets: ${{ inputs.build-external-assets }}
   - name: Retry tests
     if: inputs.retry == 'true' && steps.test.outcome == 'failure'
     uses: ./.github/actions/dotnet-test
@@ -48,6 +54,8 @@ runs:
       framework: ${{ inputs.framework }}
       result-id: ${{ format('{0}-attempt2', inputs.artifact-name) }}
       static-instrumentation: ${{ inputs.static-instrumentation }}
+    env:
+      BuildExternalAssets: ${{ inputs.build-external-assets }}
   - name: Archive test results
     if: always()
     uses: ./.github/actions/archive-test-results
