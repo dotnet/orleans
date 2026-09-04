@@ -6,8 +6,6 @@ param(
     [Parameter(Mandatory)]
     [string] $Output,
 
-    [string] $IncludeFiles,
-
     [string] $RetryLogFile,
 
     [string] $CoverageCommand = 'dotnet-coverage',
@@ -56,10 +54,6 @@ function Invoke-Collector {
     $arguments.Add('--output-format')
     $arguments.Add('cobertura')
     $arguments.Add('--nologo')
-
-    if (-not [string]::IsNullOrWhiteSpace($IncludeFiles)) {
-        $arguments.Add("--include-files=$IncludeFiles")
-    }
 
     if ($EnableVerboseLog -and -not [string]::IsNullOrWhiteSpace($RetryLogFile)) {
         $logDirectory = Split-Path -Parent $RetryLogFile

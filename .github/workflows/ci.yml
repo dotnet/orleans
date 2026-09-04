@@ -785,7 +785,6 @@ jobs:
         artifact-name: test_output_${{ github.job }}_${{ matrix.os }}_${{ matrix.framework }}
         filter-query: /[(Provider=None)&(Area=CodeGen)&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))]
         framework: ${{ matrix.framework }}
-        static-instrumentation: 'true'
   test-google:
     name: Google Cloud providers tests
     runs-on: ubuntu-latest
