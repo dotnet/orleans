@@ -148,7 +148,12 @@ internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, IP
 
     private void WriteState(JournalStreamWriter writer)
     {
-        var version = _version + 1;
+        var version = _pendingWrite switch
+        {
+            PendingWriteKind.Set => _pendingVersion + 1,
+            PendingWriteKind.Clear => 1UL,
+            _ => _version + 1,
+        };
         _codec.WriteSet(_value!, version, writer);
         _pendingWrite = PendingWriteKind.Set;
         _pendingVersion = version;
