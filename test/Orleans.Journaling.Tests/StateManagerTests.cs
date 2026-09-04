@@ -823,6 +823,21 @@ public class StateManagerTests : JournalingTestBase
     }
 
     [Fact]
+    public async Task StateManager_ReconcilePendingChanges_ThrowsWhenNoWriteIsAwaitingReconciliation()
+    {
+        var sut = CreateTestSystem();
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+        var recovery = Assert.IsAssignableFrom<IJournaledStateWriteRecovery>(sut.Manager);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => recovery.ReconcilePendingChangesAsync(
+                static () => false,
+                TestContext.Current.CancellationToken).AsTask());
+
+        Assert.Equal("No uncertain journal storage write is awaiting reconciliation.", exception.Message);
+    }
+
+    [Fact]
     public async Task StateManager_ReconcilePendingChanges_PreservesCommandsAddedDuringFailedSnapshot()
     {
         var storage = new CapturingStorage
