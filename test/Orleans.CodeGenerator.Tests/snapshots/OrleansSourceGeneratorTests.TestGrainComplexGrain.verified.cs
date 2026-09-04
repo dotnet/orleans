@@ -117,16 +117,16 @@ namespace OrleansCodeGen.TestProject
     internal sealed class Proxy_IComplexGrain : global::Orleans.Runtime.GrainReference, global::TestProject.IComplexGrain
     {
         private readonly OrleansCodeGen.TestProject.Copier_ComplexData _copier_ComplexData_765A40ED2309AF35;
-        private readonly global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IComplexGrain_GrainReference_67FE5808> _activator_67FE5808;
+        private readonly global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IComplexGrain_GrainReference_67FE5808> _activator_67FE5808_F4F7CFE7;
         public Proxy_IComplexGrain(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.IdSpan arg1) : base(arg0, arg1)
         {
             _copier_ComplexData_765A40ED2309AF35 = OrleansGeneratedCodeHelper.GetService<OrleansCodeGen.TestProject.Copier_ComplexData>(this, CodecProvider);
-            _activator_67FE5808 = CodecProvider.GetActivator<OrleansCodeGen.TestProject.Invokable_IComplexGrain_GrainReference_67FE5808>();
+            _activator_67FE5808_F4F7CFE7 = CodecProvider.GetActivator<OrleansCodeGen.TestProject.Invokable_IComplexGrain_GrainReference_67FE5808>();
         }
 
         global::System.Threading.Tasks.Task<global::TestProject.ComplexData> global::TestProject.IComplexGrain.ProcessData(int arg0, string arg1, global::TestProject.ComplexData arg2, global::System.Threading.CancellationToken arg3)
         {
-            var request = _activator_67FE5808.Create();
+            var request = _activator_67FE5808_F4F7CFE7.Create();
             request.arg0 = arg0;
             request.arg1 = arg1;
             using var copyContext = base.CopyContextPool.GetContext();

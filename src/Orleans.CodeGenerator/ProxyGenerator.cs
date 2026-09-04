@@ -636,7 +636,7 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
     private sealed class ActivatorDescription(ProxyMethodDescription method)
     {
         public ProxyMethodDescription Method { get; } = method;
-        public string FieldName { get; } = $"_activator_{method.GeneratedMethodId}";
+        public string FieldName { get; } = $"_activator_{method.GeneratedMethodId}_{GeneratedSourceOutput.CreateStableHash(method.GeneratedInvokable.TypeSyntax.ToString())}";
     }
 
     private static ParameterSyntax GetParameterSyntax(int index, IParameterSymbol parameter, Dictionary<ITypeParameterSymbol, string>? typeParameterSubstitutions)
