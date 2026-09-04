@@ -258,7 +258,7 @@ public class DurableTaskMessageHandlerTests
         var acknowledgement = Assert.Single(handlerTransport.CancellationAcknowledgements);
         Assert.Equal((grainId, sender, taskId), (acknowledgement.Sender, acknowledgement.Target, acknowledgement.TaskId));
         Assert.Equal(DurableTaskStatus.Canceled, acknowledgement.Response.Status);
-        Assert.Equal(1, handlerTransport.CommitAsyncCallCount);
+        Assert.Equal(0, handlerTransport.CommitAsyncCallCount);
     }
 
     [Fact]
