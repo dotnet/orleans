@@ -562,7 +562,7 @@ namespace UnitTests.StreamingTests
                 => DeliveryProgressTokens.Add(earliestSubscriptionToken);
         }
 
-        private sealed class RecordingQueueCache : IQueueCache
+        private sealed class RecordingQueueCache : IQueueCache, IQueueCacheRetainedReplay
         {
             private TaskCompletionSource<bool> deliveryProgressUpdated = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -572,6 +572,7 @@ namespace UnitTests.StreamingTests
             public Task DeliveryProgressUpdated => deliveryProgressUpdated.Task;
             public Func<StreamId, StreamSequenceToken?, IQueueCacheCursor>? CursorFactory { get; set; }
             public int GetCacheCursorCallCount { get; private set; }
+            public bool SupportsRetainedReplay { get; set; }
 
             public int GetMaxAddCount() => 1000;
 
@@ -797,7 +798,7 @@ namespace UnitTests.StreamingTests
             }
         }
 
-        private sealed class ScriptedQueueCache(int maxCacheSize = 1000) : IQueueCache
+        private sealed class ScriptedQueueCache(int maxCacheSize = 1000) : IQueueCache, IQueueCacheRetainedReplay
         {
             private readonly List<IBatchContainer> messages = new();
             private TaskCompletionSource<bool> deliveryProgressUpdated = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -806,6 +807,7 @@ namespace UnitTests.StreamingTests
             public int DeliveryProgressCallCount { get; private set; }
             public List<StreamSequenceToken?> DeliveryProgressTokens { get; } = new();
             public Task DeliveryProgressUpdated => deliveryProgressUpdated.Task;
+            public bool SupportsRetainedReplay { get; set; }
 
             public int GetMaxAddCount()
                 => Math.Max(0, maxCacheSize - messages.Count(message =>
@@ -5181,7 +5183,7 @@ namespace UnitTests.StreamingTests
             var queueId = QueueId.GetQueueId("queue", 0u, 0u);
             var streamId = StreamId.Create("namespace", Guid.NewGuid());
             var qualifiedStreamId = new QualifiedStreamId("provider", streamId);
-            var queueCache = new ScriptedQueueCache();
+            var queueCache = new ScriptedQueueCache { SupportsRetainedReplay = true };
             queueCache.AddToCache(
             [
                 new TestBatchContainer(streamId, new EventSequenceTokenV2(10)),
@@ -5230,7 +5232,7 @@ namespace UnitTests.StreamingTests
         {
             var queueId = QueueId.GetQueueId("queue", 0u, 0u);
             var streamId = new QualifiedStreamId("provider", StreamId.Create("namespace", Guid.NewGuid()));
-            var queueCache = new RecordingQueueCache();
+            var queueCache = new RecordingQueueCache { SupportsRetainedReplay = true };
             var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
             queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
             var pubSub = Substitute.For<IStreamPubSub>();
@@ -5265,6 +5267,50 @@ namespace UnitTests.StreamingTests
             Assert.True(consumerData.IsReplayUnavailable);
             Assert.IsType<DataNotAvailableException>(Assert.Single(consumer.Errors));
             Assert.Equal(2, queueCache.GetCacheCursorCallCount);
+            await testAccessor.Shutdown();
+        }
+
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public async Task Handshake_LegacyRewindableCacheUsesTriggeringLiveBatch()
+        {
+            var queueId = QueueId.GetQueueId("queue", 0u, 0u);
+            var streamId = StreamId.Create("namespace", Guid.NewGuid());
+            var qualifiedStreamId = new QualifiedStreamId("provider", streamId);
+            var triggeringToken = new EventSequenceTokenV2(12);
+            var queueCache = new ScriptedQueueCache();
+            queueCache.AddToCache([new TestBatchContainer(streamId, triggeringToken)]);
+            var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
+            queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
+            var pubSub = Substitute.For<IStreamPubSub>();
+            pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
+                .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
+            var agent = CreateAgent(
+                pubSub,
+                queueId,
+                receiver: null,
+                queueAdapterCache,
+                isRewindable: true);
+            var testAccessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
+            await InitializeAgent(agent);
+            await testAccessor.RegisterStream(qualifiedStreamId, triggeringToken, DateTime.UtcNow);
+            var streamData = (await testAccessor.GetPubSubCache()).Single().Value;
+            var consumer = new StartingConsumer(
+                StreamHandshakeToken.CreateDeliveyToken(new EventSequenceTokenV2(2)));
+            var consumerData = streamData.AddConsumer(
+                GuidId.GetGuidId(Guid.NewGuid()),
+                qualifiedStreamId,
+                consumer,
+                filterData: null,
+                now: DateTime.UtcNow);
+
+            Assert.True(await testAccessor.DoHandshakeWithConsumer(consumerData, triggeringToken));
+            consumerData.IsRegistered = true;
+            await testAccessor.RunConsumerCursor(consumerData);
+
+            Assert.Equal([12L], consumer.DeliveredTokens.Select(static token => token.SequenceNumber));
             await testAccessor.Shutdown();
         }
 
@@ -5537,7 +5583,7 @@ namespace UnitTests.StreamingTests
             var queueId = QueueId.GetQueueId("queue", 0u, 0u);
             var streamId = StreamId.Create("namespace", Guid.NewGuid());
             var qualifiedStreamId = new QualifiedStreamId("provider", streamId);
-            var queueCache = new RecordingQueueCache();
+            var queueCache = new RecordingQueueCache { SupportsRetainedReplay = true };
             var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
             queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
             var pubSub = Substitute.For<IStreamPubSub>();
@@ -5587,7 +5633,7 @@ namespace UnitTests.StreamingTests
             var queueId = QueueId.GetQueueId("queue", 0u, 0u);
             var streamId = StreamId.Create("namespace", Guid.NewGuid());
             var qualifiedStreamId = new QualifiedStreamId("provider", streamId);
-            var queueCache = new RecordingQueueCache();
+            var queueCache = new RecordingQueueCache { SupportsRetainedReplay = true };
             var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
             queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
             var pubSub = Substitute.For<IStreamPubSub>();
@@ -5632,7 +5678,7 @@ namespace UnitTests.StreamingTests
             var queueId = QueueId.GetQueueId("queue", 0u, 0u);
             var streamId = StreamId.Create("namespace", Guid.NewGuid());
             var qualifiedStreamId = new QualifiedStreamId("provider", streamId);
-            var queueCache = new RecordingQueueCache();
+            var queueCache = new RecordingQueueCache { SupportsRetainedReplay = true };
             var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
             queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
             var pubSub = Substitute.For<IStreamPubSub>();
@@ -5677,7 +5723,7 @@ namespace UnitTests.StreamingTests
             var queueId = QueueId.GetQueueId("queue", 0u, 0u);
             var streamId = StreamId.Create("namespace", Guid.NewGuid());
             var qualifiedStreamId = new QualifiedStreamId("provider", streamId);
-            var queueCache = new RecordingQueueCache();
+            var queueCache = new RecordingQueueCache { SupportsRetainedReplay = true };
             var retryCursor = new AwaitableReplayCursor(
                 new TestBatchContainer(streamId, new EventSequenceTokenV2(2)));
             retryCursor.Release();
@@ -5733,7 +5779,7 @@ namespace UnitTests.StreamingTests
             var queueId = QueueId.GetQueueId("queue", 0u, 0u);
             var streamId = StreamId.Create("namespace", Guid.NewGuid());
             var qualifiedStreamId = new QualifiedStreamId("provider", streamId);
-            var queueCache = new RecordingQueueCache();
+            var queueCache = new RecordingQueueCache { SupportsRetainedReplay = true };
             var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
             queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
             var pubSub = Substitute.For<IStreamPubSub>();
@@ -5786,7 +5832,7 @@ namespace UnitTests.StreamingTests
             var options = new StreamPullingAgentOptions();
             var queueId = QueueId.GetQueueId("queue", 0u, 0u);
             var streamId = new QualifiedStreamId("provider", StreamId.Create("namespace", Guid.NewGuid()));
-            var queueCache = new RecordingQueueCache();
+            var queueCache = new RecordingQueueCache { SupportsRetainedReplay = true };
             var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
             queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
             var pubSub = Substitute.For<IStreamPubSub>();
