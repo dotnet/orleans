@@ -139,6 +139,39 @@ public class StreamingJsonConverterTests
     }
 
     [Fact]
+    public void PartitionedStreamSequenceToken_JsonRoundTripThroughV2BaseType()
+    {
+        var options = new JsonSerializerOptions();
+        options.Converters.Add(new EventSequenceTokenJsonConverter());
+        EventSequenceTokenV2 original = new PartitionedStreamSequenceToken(
+            "provider",
+            "partition",
+            "42",
+            sequenceNumber: 42,
+            eventIndex: 3);
+
+        var json = JsonSerializer.Serialize(original, options);
+        var restored = Assert.IsType<PartitionedStreamSequenceToken>(
+            JsonSerializer.Deserialize<EventSequenceTokenV2>(json, options));
+
+        Assert.Equal(original, restored);
+        Assert.Equal("provider", restored.ProviderIdentity);
+        Assert.Equal("partition", restored.PartitionIdentity);
+    }
+
+    [Fact]
+    public void PartitionedStreamSequenceToken_ReadAsV1Token_ThrowsJsonException()
+    {
+        var exception = Assert.Throws<JsonException>(
+            () => DeserializeToken("[3,\"provider\",\"partition\",\"42\",42,3]", typeof(EventSequenceToken)));
+
+        Assert.Contains(
+            $"Cannot deserialize {nameof(PartitionedStreamSequenceToken)} as {typeof(EventSequenceToken)}.",
+            exception.Message,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void PartitionedStreamSequenceToken_SerializerIdsFollowBaseTokenIds()
     {
         Assert.Equal(2u, GetId(nameof(PartitionedStreamSequenceToken.ProviderIdentity)));

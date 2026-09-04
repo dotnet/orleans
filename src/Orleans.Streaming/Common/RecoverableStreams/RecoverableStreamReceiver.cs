@@ -13,7 +13,7 @@ namespace Orleans.Providers.Streams.Common
     /// Coordinates a recoverable stream partition pipeline comprising a partition source, pooled cache, and durable checkpoint.
     /// </summary>
     /// <typeparam name="TQueueMessage">The source record type.</typeparam>
-    public sealed class RecoverableStreamReceiver<TQueueMessage> : IQueueAdapterReceiver, IQueueCache
+    public sealed class RecoverableStreamReceiver<TQueueMessage> : IQueueAdapterReceiver, IQueueCache, IQueueCacheRetainedReplay
     {
         private readonly IRecoverableStreamSource<TQueueMessage> _source;
         private readonly IRecoverableStreamDataAdapter<TQueueMessage> _dataAdapter;
@@ -28,6 +28,9 @@ namespace Orleans.Providers.Streams.Common
         private CancellationToken _initializeTaskOwnerToken;
         private int _running;
         private int _shutdown;
+
+        /// <inheritdoc />
+        public bool SupportsRetainedReplay => _replayManager is not null;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="RecoverableStreamReceiver{TQueueMessage}"/> class.

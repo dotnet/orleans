@@ -48,6 +48,8 @@ namespace Orleans.Streams
         private Task? receiverInitTask;
         private Task _activePumpTask = Task.CompletedTask;
         private bool IsShutdown => timer is null;
+        private bool SupportsRetainedReplay
+            => queueCache is IQueueCacheRetainedReplay { SupportsRetainedReplay: true };
         private string StatisticUniquePostfix => $"{streamProviderName}.{QueueId}";
 
         internal interface ITestAccessor
@@ -443,7 +445,7 @@ namespace Orleans.Streams
                     {
                         var isDeliveryToken = requestedHandshakeToken is DeliveryToken;
                         cursorStartToken = isDeliveryToken
-                            ? queueAdapter.IsRewindable
+                            ? SupportsRetainedReplay
                                 ? requestedToken
                                 : cacheToken ?? consumerData.PendingStartToken ?? requestedToken
                             : requestedToken;
@@ -489,7 +491,7 @@ namespace Orleans.Streams
                             consumerData.IsReplayUnavailable = false;
                             cursorRepositioned = true;
                         }
-                        catch (QueueCacheMissException) when (cacheToken is not null && !queueAdapter.IsRewindable)
+                        catch (QueueCacheMissException) when (cacheToken is not null && !SupportsRetainedReplay)
                         {
                             // A cold stream's triggering batch is the receiver's first available
                             // message, so resume there if the consumer's prior token was evicted.
@@ -570,7 +572,7 @@ namespace Orleans.Streams
                     consumerData.IsReplayUnavailable = false;
                     cursorRepositioned = true;
                 }
-                catch (Exception) when (!queueAdapter.IsRewindable || cursorStartToken is null)
+                catch (Exception) when (!SupportsRetainedReplay || cursorStartToken is null)
                 {
                     consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, null); // just in case last GetCacheCursor failed.
                     cursorStartToken = null;
@@ -647,7 +649,7 @@ namespace Orleans.Streams
                 {
                     return GetCursorAfterProcessedToken(consumerData, lastProcessedToken);
                 }
-                catch (QueueCacheMissException) when (!queueAdapter.IsRewindable)
+                catch (QueueCacheMissException) when (!SupportsRetainedReplay)
                 {
                     return queueCache!.GetCacheCursor(consumerData.StreamId, null);
                 }
@@ -671,7 +673,7 @@ namespace Orleans.Streams
 
                     return GetCacheCursor(consumerData.StreamId, handshakeSequenceToken);
                 }
-                catch (QueueCacheMissException) when (!queueAdapter.IsRewindable)
+                catch (QueueCacheMissException) when (!SupportsRetainedReplay)
                 {
                     return queueCache!.GetCacheCursor(consumerData.StreamId, null);
                 }
@@ -690,7 +692,7 @@ namespace Orleans.Streams
             {
                 cursor = GetCacheCursor(consumerData.StreamId, restartToken);
             }
-            catch (QueueCacheMissException) when (!queueAdapter.IsRewindable)
+            catch (QueueCacheMissException) when (!SupportsRetainedReplay)
             {
                 try
                 {
@@ -1092,7 +1094,7 @@ namespace Orleans.Streams
             {
                 return queueCache!.GetCacheCursor(streamId, token);
             }
-            catch (ArgumentException exception) when (queueAdapter.IsRewindable && token is not null)
+            catch (ArgumentException exception) when (SupportsRetainedReplay && token is not null)
             {
                 throw new DataNotAvailableException(
                     $"The requested token '{token}' is not valid for stream '{streamId}' in provider '{streamProviderName}'.",
@@ -1474,7 +1476,7 @@ namespace Orleans.Streams
                                                 pendingBatch = AdvanceCursorPastToken(newCursor, sequenceToken);
                                             }
                                         }
-                                        catch (QueueCacheMissException) when (!queueAdapter.IsRewindable)
+                                        catch (QueueCacheMissException) when (!SupportsRetainedReplay)
                                         {
                                             // The current batch is the receiver's first available message.
                                             // Keep it pending when the prior activation's token was evicted.
@@ -1512,7 +1514,7 @@ namespace Orleans.Streams
                                             pendingBatch = AdvanceCursorPastToken(newCursor, sequenceToken);
                                         }
                                     }
-                                    catch (QueueCacheMissException) when (!queueAdapter.IsRewindable)
+                                    catch (QueueCacheMissException) when (!SupportsRetainedReplay)
                                     {
                                         // The current batch is the receiver's first available message.
                                         // Keep it pending when the consumer resumes from an evicted token.

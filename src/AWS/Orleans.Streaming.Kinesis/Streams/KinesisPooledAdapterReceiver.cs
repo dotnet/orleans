@@ -11,7 +11,7 @@ using Orleans.Streams;
 
 namespace Orleans.Streaming.Kinesis;
 
-internal sealed class KinesisPooledAdapterReceiver : IQueueAdapterReceiver, IQueueCache
+internal sealed class KinesisPooledAdapterReceiver : IQueueAdapterReceiver, IQueueCache, IQueueCacheRetainedReplay
 {
     private const int BufferSize = 1024 * 1024;
     private static readonly TimeSpan ReplayMetadataRetention = TimeSpan.FromDays(3650);
@@ -33,6 +33,8 @@ internal sealed class KinesisPooledAdapterReceiver : IQueueAdapterReceiver, IQue
     private int _shutdown;
 
     internal CancellationToken LifecycleCancellationToken => _lifecycleCancellation.Token;
+
+    public bool SupportsRetainedReplay => true;
 
     public KinesisPooledAdapterReceiver(
         IAmazonKinesis client,
