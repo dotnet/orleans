@@ -2146,6 +2146,84 @@ public class MessageTransportLifecycleTests
     }
 
     [Fact]
+    public async Task SocketMessageTransport_LinuxIoUringWriteFailure_InterruptsPendingRead()
+    {
+        if (!IsIoUringTestEnabled())
+        {
+            return;
+        }
+
+        using var listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        listener.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+        listener.Listen(1);
+
+        using var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        await client.ConnectAsync(listener.LocalEndPoint!, TestContext.Current.CancellationToken);
+        using var server = await listener.AcceptAsync(TestContext.Current.CancellationToken);
+        await using var transport = new SocketMessageTransport(client, NullLogger.Instance, useLinuxIoUring: true);
+        typeof(SocketMessageTransport)
+            .GetField("_largeSocketSender", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(transport, new FailingSocketSender());
+        transport.Start();
+        var closed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var registration = transport.Closed.Register(static state => ((TaskCompletionSource)state!).TrySetResult(), closed);
+
+        using var readRequest = new FixedLengthReadRequest(1);
+        Assert.True(transport.EnqueueRead(readRequest));
+        Assert.True(SpinWait.SpinUntil(() => transport.IsSocketReceivePending, TimeSpan.FromSeconds(10)));
+
+        using var writeRequest = new BufferedWriteRequest(new byte[64 * 1024], useMultipleBuffers: true);
+        Assert.True(transport.EnqueueWrite(writeRequest));
+
+        await Assert.ThrowsAsync<IOException>(() => writeRequest.Completion);
+        await closed.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task TcpMessageTransportListener_ConstructionFailure_DisposesAcceptedSocket()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        const string ListenerName = "test";
+        var tcpOptions = Substitute.For<IOptionsMonitor<TcpMessageTransportOptions>>();
+        tcpOptions.Get(ListenerName).Returns(new TcpMessageTransportOptions
+        {
+            FastPath = false,
+            UseLinuxIoUring = true
+        });
+        var listenerOptions = Substitute.For<IOptionsMonitor<TcpMessageTransportListenerOptions>>();
+        listenerOptions.Get(ListenerName).Returns(new TcpMessageTransportListenerOptions
+        {
+            Endpoint = new IPEndPoint(IPAddress.Loopback, 0)
+        });
+        await using var listener = new TcpMessageTransportListener(
+            ListenerName,
+            tcpOptions,
+            listenerOptions,
+            NullLoggerFactory.Instance);
+        await listener.BindAsync(TestContext.Current.CancellationToken);
+        var listenSocket = (Socket)typeof(TcpMessageTransportListener)
+            .GetField("_listenSocket", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(listener)!;
+        var acceptTask = listener.AcceptAsync(TestContext.Current.CancellationToken).AsTask();
+        using var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+
+        await client.ConnectAsync(listenSocket.LocalEndPoint!, TestContext.Current.CancellationToken);
+        await Assert.ThrowsAsync<PlatformNotSupportedException>(() => acceptTask);
+
+        var exception = await Assert.ThrowsAsync<SocketException>(
+            () => client.ReceiveAsync(
+                new byte[1],
+                TestContext.Current.CancellationToken).AsTask().WaitAsync(
+                    TimeSpan.FromSeconds(10),
+                    TestContext.Current.CancellationToken));
+        Assert.Equal(SocketError.ConnectionReset, exception.SocketErrorCode);
+    }
+
+    [Fact]
     public async Task TlsConnector_ConstructionFailure_DisposesInnerTransport()
     {
         var inner = new TrackingTransport();
@@ -2580,6 +2658,23 @@ public class MessageTransportLifecycleTests
     {
         public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default) =>
             ValueTask.FromException(new IOException("Write failed"));
+    }
+
+    private sealed class FailingSocketSender : ISocketSender
+    {
+        private readonly IOException _error = new("Write failed");
+
+        public int BytesTransferred => 0;
+        public SocketError SocketError => SocketError.SocketError;
+        public Exception Error => _error;
+        public bool HasError => true;
+        public ValueTask SendAsync(Socket socket, List<ArraySegment<byte>> buffers, bool buffersArePinned, bool useZeroCopy)
+            => ValueTask.FromException(_error);
+        public ValueTask SendAsync(Socket socket, ReadOnlyMemory<byte> memory, bool bufferIsPinned, bool useZeroCopy)
+            => ValueTask.FromException(_error);
+        public void Dispose()
+        {
+        }
     }
 
     private sealed class TrackingTransport : MessageTransport

@@ -121,15 +121,23 @@ internal sealed class TcpMessageTransportListener : MessageTransportListener
             try
             {
                 var acceptSocket = await _listenSocket!.AcceptAsync(ct.Token).ConfigureAwait(false);
-                OnAcceptSocket(acceptSocket);
+                try
+                {
+                    OnAcceptSocket(acceptSocket);
 
-                var transport = new SocketMessageTransport(
-                    acceptSocket,
-                    Logger,
-                    _tcpOptions.Get(ListenerName).UseLinuxIoUring);
-                transport.Start();
+                    var transport = new SocketMessageTransport(
+                        acceptSocket,
+                        Logger,
+                        _tcpOptions.Get(ListenerName).UseLinuxIoUring);
+                    transport.Start();
 
-                return transport;
+                    return transport;
+                }
+                catch
+                {
+                    acceptSocket.Dispose();
+                    throw;
+                }
             }
             catch (OperationCanceledException)
             {
