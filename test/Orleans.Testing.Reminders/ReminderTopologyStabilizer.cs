@@ -80,9 +80,10 @@ public static class ReminderTopologyStabilizer
         try
         {
             var ready = requiredReadySilos
-                .Select(silo => observer.WaitForReminderServiceStartedAsync(
-                    cancellationToken,
-                    silo.SiloAddress))
+                .Select(silo => WaitForReminderServiceStartedAsync(
+                    silo,
+                    observer,
+                    cancellationToken))
                 .ToArray();
             await Task.WhenAll(ready);
 
@@ -111,9 +112,10 @@ public static class ReminderTopologyStabilizer
 
                 phase = "selected active reminder service readiness";
                 var activeServicesReady = expectedActiveSilos
-                    .Select(silo => observer.WaitForReminderServiceStartedAsync(
-                        cancellationToken,
-                        silo.SiloAddress))
+                    .Select(silo => WaitForReminderServiceStartedAsync(
+                        silo,
+                        observer,
+                        cancellationToken))
                     .ToArray();
                 await Task.WhenAll(activeServicesReady);
 
@@ -183,6 +185,20 @@ public static class ReminderTopologyStabilizer
                 exception,
                 cancellationToken);
         }
+    }
+
+    private static async Task WaitForReminderServiceStartedAsync(
+        InProcessSiloHandle silo,
+        ReminderDiagnosticObserver observer,
+        CancellationToken cancellationToken)
+    {
+        var service = silo.ServiceProvider.GetRequiredService<LocalReminderService>();
+        if (service.TestOnlyIsStarted)
+        {
+            return;
+        }
+
+        await observer.WaitForReminderServiceStartedAsync(cancellationToken, silo.SiloAddress);
     }
 
     private static string DescribeFailure(

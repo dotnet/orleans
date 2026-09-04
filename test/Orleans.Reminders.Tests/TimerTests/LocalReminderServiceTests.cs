@@ -688,6 +688,30 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
         }
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
+    public async Task ReconciledTopologyBarrier_ObservesStartedServiceWithLateObserver()
+    {
+        var silo = Assert.Single(fixture.HostedCluster.Silos);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cancellation.CancelAfter(TestConstants.InitTimeout);
+        await ReminderTopologyStabilizer.WaitForStartupTopologyAsync(
+            fixture.HostedCluster,
+            fixture.DiagnosticObserver,
+            [silo],
+            cancellation.Token);
+
+        using var lateObserver = ReminderDiagnosticObserver.Create(fixture.HostedCluster);
+        using var barrierCancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        barrierCancellation.CancelAfter(TimeSpan.FromSeconds(1));
+        await ReminderTopologyStabilizer.WaitForReconciledTopologyAsync(
+            fixture.HostedCluster,
+            lateObserver,
+            [silo],
+            barrierCancellation.Token);
+    }
+
     public sealed class Fixture : BaseInProcessTestClusterFixture
     {
         public ReminderLifecycleHarness ReminderHarness { get; } = new();

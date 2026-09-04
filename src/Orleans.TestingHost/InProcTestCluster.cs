@@ -433,8 +433,8 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         var clusterMembershipOptions = Client!.ServiceProvider
             .GetRequiredService<IOptions<ClusterMembershipOptions>>().Value;
         var timeout = GetLivenessStabilizationTime(clusterMembershipOptions, didKill);
-        // Cluster manifest fetches retry every five seconds. Preserve one full retry interval beyond the
-        // default liveness boundary so the retry can publish and the hook can perform its final snapshot check.
+        // Use two configured liveness intervals for manifests. Under the default gossip configuration, this
+        // covers the five-second manifest fetch retry plus one scheduling interval for the final snapshot check.
         var manifestTimeout = TestingUtils.Multiply(timeout, 2);
         var activeSilos = GetActiveSilos().ToArray();
         var expectedSilos = string.Join(", ", activeSilos.Select(static silo => silo.SiloAddress));
