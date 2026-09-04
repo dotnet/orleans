@@ -13,10 +13,7 @@ namespace Orleans.Runtime
 
         internal static string GetVersion(Assembly assembly)
         {
-            if (assembly is null)
-            {
-                throw new ArgumentNullException(nameof(assembly));
-            }
+            ArgumentNullException.ThrowIfNull(assembly);
 
             var apiVersion = assembly.GetName().Version!.ToString();
             var productVersion = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
