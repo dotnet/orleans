@@ -67,6 +67,16 @@ public sealed class ReminderThrottleInstruments
             new KeyValuePair<string, object?>(ReminderActivityAttributes.ThrottleOutcome, FormatOutcome(outcome)));
     }
 
+    internal void RecordAcquireDuration(IReminderDeliveryThrottle throttle, ReminderDeliveryLease lease)
+    {
+        if (ReferenceEquals(throttle, NoOpReminderDeliveryThrottle.Instance))
+        {
+            return;
+        }
+
+        RecordAcquireDuration(lease.TierName, lease.Outcome, lease.WaitedFor);
+    }
+
     /// <summary>Increments the active lease count for an admitted lease.</summary>
     public void OnLeaseAcquired(string? tier)
     {
