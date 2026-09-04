@@ -71,6 +71,11 @@ namespace OrleansAWSUtils.Streams
                     {
                         await pendingTask.WaitAsync(timeoutCancellation.Token);
                     }
+                    catch (OperationCanceledException exception) when (timeoutCancellation.IsCancellationRequested)
+                    {
+                        pendingTask.Ignore();
+                        LogWarningPendingOperationException(logger, exception, Id);
+                    }
                     catch (Exception exception)
                     {
                         LogWarningPendingOperationException(logger, exception, Id);
