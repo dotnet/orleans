@@ -50,11 +50,11 @@ namespace UnitTests.TimerTests
         public class Fixture : BaseInProcessTestClusterFixture
         {
             private ReminderTestClock? _reminderClock;
-            private IReadOnlyList<SiloAddress>? _stableReminderServices;
+            private IReadOnlyList<SiloAddress>? _startedReminderServices;
             internal ReminderTestClock ReminderClock => _reminderClock ?? throw new InvalidOperationException($"{nameof(ReminderTestClock)} has not been configured.");
             internal ReminderTableReadController ReadController { get; } = new();
-            internal IReadOnlyList<SiloAddress> StableReminderServices => _stableReminderServices
-                ?? throw new InvalidOperationException("Reminder services have not reached stable topology.");
+            internal IReadOnlyList<SiloAddress> StartedReminderServices => _startedReminderServices
+                ?? throw new InvalidOperationException("Reminder services have not reached startup topology.");
 
             protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
             {
@@ -88,12 +88,12 @@ namespace UnitTests.TimerTests
                 topologyCancellation.CancelAfter(TestConstants.InitTimeout);
                 try
                 {
-                    var stableSilos = await ReminderTopologyStabilizer.WaitForStableTopologyAsync(
+                    var startedSilos = await ReminderTopologyStabilizer.WaitForStartupTopologyAsync(
                         HostedCluster,
                         ReminderClock.DiagnosticObserver,
                         HostedCluster.Silos,
                         topologyCancellation.Token);
-                    _stableReminderServices = stableSilos.Select(static silo => silo.SiloAddress).ToArray();
+                    _startedReminderServices = startedSilos.Select(static silo => silo.SiloAddress).ToArray();
                 }
                 catch (OperationCanceledException exception) when (
                     topologyCancellation.IsCancellationRequested
@@ -136,11 +136,11 @@ namespace UnitTests.TimerTests
         // Basic tests
 
         [Fact]
-        public async Task Fixture_WaitsForStableReminderTopologyBeforeGrainCalls()
+        public async Task Fixture_WaitsForReminderStartupTopologyBeforeGrainCalls()
         {
             Assert.All(
                 HostedCluster.Silos,
-                silo => Assert.Contains(silo.SiloAddress, _fixture.StableReminderServices));
+                silo => Assert.Contains(silo.SiloAddress, _fixture.StartedReminderServices));
 
             using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
             cancellation.CancelAfter(TestConstants.InitTimeout);
