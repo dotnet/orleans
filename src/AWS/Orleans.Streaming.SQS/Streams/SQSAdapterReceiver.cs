@@ -58,18 +58,20 @@ namespace OrleansAWSUtils.Streams
 
         public async Task Shutdown(TimeSpan timeout)
         {
+            using var timeoutCancellation = new CancellationTokenSource(timeout);
+
             try
             {
                 // await the last storage operation, so after we shutdown and stop this receiver we don't get async operation completions from pending storage operations.
                 if (outstandingTask != null)
-                    await outstandingTask;
+                    await outstandingTask.WaitAsync(timeoutCancellation.Token);
 
                 if (queue is not null && pending.Count > 0)
                 {
                     try
                     {
                         outstandingTask = queue.ReleaseMessages(pending.Select(static item => item.Message));
-                        await outstandingTask.WaitAsync(timeout);
+                        await outstandingTask.WaitAsync(timeoutCancellation.Token);
                     }
                     catch (Exception exc)
                     {
