@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -17,6 +16,7 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
     private readonly Dictionary<string, JobBucket> _jobsIdToBucket = new();
     private readonly Dictionary<DateTimeOffset, JobBucket> _buckets = new();
     private TaskCompletionSource _queueChanged = CreateQueueChangedSource();
+    private int _jobCount;
     private bool _isComplete;
 #if NET9_0_OR_GREATER
     private readonly Lock _syncLock = new();
@@ -32,7 +32,7 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
     /// <summary>
     /// Gets the total number of jobs currently in the queue.
     /// </summary>
-    public int Count => _jobsIdToBucket.Count;
+    public int Count => Volatile.Read(ref _jobCount);
 
     /// <summary>
     /// Adds a durable job to the queue with the specified dequeue count.
@@ -55,8 +55,19 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
                 throw new InvalidOperationException("Cannot enqueue job to a completed queue.");
 
             var bucket = GetJobBucket(job.DueTime);
+            var isReplacement = _jobsIdToBucket.TryGetValue(job.Id, out var existingBucket);
+            if (existingBucket is not null && !ReferenceEquals(existingBucket, bucket))
+            {
+                existingBucket.RemoveJob(job.Id);
+            }
+
             bucket.AddJob(job, dequeueCount);
             _jobsIdToBucket[job.Id] = bucket;
+            if (!isReplacement)
+            {
+                Volatile.Write(ref _jobCount, _jobCount + 1);
+            }
+
             SignalQueueChanged();
         }
     }
@@ -92,6 +103,7 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
                 // Try to remove from bucket (may already be dequeued)
                 bucket.RemoveJob(jobId);
                 _jobsIdToBucket.Remove(jobId);
+                Volatile.Write(ref _jobCount, _jobCount - 1);
                 // Note: The bucket remains in the priority queue until processed
                 SignalQueueChanged();
                 return true;
@@ -207,6 +219,7 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
             _queue.Clear();
             _jobsIdToBucket.Clear();
             _buckets.Clear();
+            Volatile.Write(ref _jobCount, 0);
             _isComplete = false;
             SignalQueueChanged();
         }
@@ -225,6 +238,7 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
         while (true)
         {
             List<(DurableJob Job, int DequeueCount)>? jobsToYield = null;
+            JobBucket? bucketBeingProcessed = null;
             Task? queueChanged = null;
             TimeSpan? delay = null;
 
@@ -252,6 +266,7 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
                         // GetJobBucket would find the bucket still in _buckets and add to it,
                         // but the bucket is no longer in _queue, so the new job would be stranded.
                         var bucketToProcess = _queue.Dequeue();
+                        bucketBeingProcessed = bucketToProcess;
                         _buckets.Remove(bucketToProcess.DueTime);
 
                         // Snapshot the jobs under the lock so concurrent Cancel/Retry mutations
@@ -279,7 +294,10 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
                     bool shouldYield;
                     lock (_syncLock)
                     {
-                        shouldYield = _jobsIdToBucket.ContainsKey(job.Id);
+                        shouldYield = bucketBeingProcessed is not null
+                            && _jobsIdToBucket.TryGetValue(job.Id, out var currentBucket)
+                            && ReferenceEquals(currentBucket, bucketBeingProcessed)
+                            && bucketBeingProcessed.ContainsJob(job);
                         // Keep job in _jobsIdToBucket for explicit removal via CancelJob/RetryJobLater
                     }
 
@@ -377,4 +395,7 @@ internal sealed class JobBucket
     {
         return _jobs.TryGetValue(jobId, out job);
     }
+
+    public bool ContainsJob(DurableJob job)
+        => _jobs.TryGetValue(job.Id, out var current) && ReferenceEquals(current.Job, job);
 }
