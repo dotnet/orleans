@@ -31,7 +31,7 @@ public sealed class ClientConnectionAuthenticationTests
         TestCluster? cluster = null;
         try
         {
-            var certificate = TestCertificateHelper.CreateSelfSignedCertificate(
+            using var certificate = TestCertificateHelper.CreateSelfSignedCertificate(
                 TargetHost,
                 [TestCertificateHelper.ClientAuthenticationOid, TestCertificateHelper.ServerAuthenticationOid]);
             var builder = new TestClusterBuilder()
