@@ -36,11 +36,21 @@ namespace Orleans.Streaming.Kinesis
         internal KinesisSequenceToken Token { get; } = null!;
 
         private KinesisBatchContainer(Record record, Serializer<KinesisBatchContainer.Body> serializer, long sequenceId)
+            : this(record, serializer, streamName: null, shardId: null, sequenceId)
+        {
+        }
+
+        private KinesisBatchContainer(
+            Record record,
+            Serializer<KinesisBatchContainer.Body> serializer,
+            string? streamName,
+            string? shardId,
+            long sequenceId)
         {
             this.Serializer = serializer;
             this._rawRecord = record.Data.ToArray();
 
-            Token = new KinesisSequenceToken(record.SequenceNumber, sequenceId, 0);
+            Token = new KinesisSequenceToken(streamName, shardId, record.SequenceNumber, sequenceId, 0);
         }
 
         private KinesisBatchContainer(
@@ -140,6 +150,14 @@ namespace Orleans.Streaming.Kinesis
         {
             return new KinesisBatchContainer(record, serializer, sequenceId);
         }
+
+        internal static KinesisBatchContainer FromKinesisRecord(
+            Serializer<KinesisBatchContainer.Body> serializer,
+            Record record,
+            string streamName,
+            string shardId,
+            long sequenceId)
+            => new(record, serializer, streamName, shardId, sequenceId);
 
         internal static KinesisBatchContainer FromCachedRecord(
             Serializer<KinesisBatchContainer.Body> serializer,

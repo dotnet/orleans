@@ -839,6 +839,13 @@ public sealed class KinesisRuntimeTests
 
         Assert.Equal([0L, 1L], firstBatch.Select(container => container.Token.SequenceNumber));
         Assert.Equal([2L], secondBatch.Select(container => container.Token.SequenceNumber));
+        Assert.All(
+            firstBatch.Concat(secondBatch),
+            container =>
+            {
+                Assert.Equal("stream", container.Token.StreamName);
+                Assert.Equal("shard-1", container.Token.ShardId);
+            });
     }
 
     [Fact]
