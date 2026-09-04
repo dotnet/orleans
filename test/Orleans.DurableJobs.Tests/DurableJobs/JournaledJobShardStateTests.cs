@@ -270,12 +270,12 @@ public class JournaledJobShardStateTests
         string name,
         DateTimeOffset dueTime,
         DurableJobPriority priority = DurableJobPriority.Normal) => new()
-    {
-        Id = id,
-        Name = name,
-        DueTime = dueTime,
-        TargetGrainId = GrainId.Create("type", id),
-        ShardId = shardId.Value,
-        Priority = priority
-    };
+        {
+            Id = id,
+            Name = name,
+            DueTime = dueTime,
+            TargetGrainId = GrainId.Create("type", id),
+            ShardId = shardId.Value,
+            Priority = priority
+        };
 }

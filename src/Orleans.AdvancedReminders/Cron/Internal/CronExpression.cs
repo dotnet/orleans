@@ -34,7 +34,7 @@ namespace Orleans.AdvancedReminders.Cron.Internal;
 /// <summary>
 /// Provides a parser and scheduler for cron expressions.
 /// </summary>
-internal sealed class CronExpression: IEquatable<CronExpression>
+internal sealed class CronExpression : IEquatable<CronExpression>
 {
     private const long NotFound = -1;
 
@@ -82,15 +82,15 @@ internal sealed class CronExpression: IEquatable<CronExpression>
 
     private static readonly TimeZoneInfo UtcTimeZone = TimeZoneInfo.Utc;
 
-    private readonly ulong  _second;     // 60 bits -> from 0 bit to 59 bit
-    private readonly ulong  _minute;     // 60 bits -> from 0 bit to 59 bit
-    private readonly uint   _hour;       // 24 bits -> from 0 bit to 23 bit
-    private readonly uint   _dayOfMonth; // 31 bits -> from 1 bit to 31 bit
+    private readonly ulong _second;     // 60 bits -> from 0 bit to 59 bit
+    private readonly ulong _minute;     // 60 bits -> from 0 bit to 59 bit
+    private readonly uint _hour;       // 24 bits -> from 0 bit to 23 bit
+    private readonly uint _dayOfMonth; // 31 bits -> from 1 bit to 31 bit
     private readonly ushort _month;      // 12 bits -> from 1 bit to 12 bit
-    private readonly byte  _dayOfWeek;  // 8 bits  -> from 0 bit to 7 bit
+    private readonly byte _dayOfWeek;  // 8 bits  -> from 0 bit to 7 bit
 
-    private readonly byte  _nthDayOfWeek;
-    private readonly byte  _lastMonthOffset;
+    private readonly byte _nthDayOfWeek;
+    private readonly byte _lastMonthOffset;
 
     private readonly CronExpressionFlag _flags;
 
@@ -478,7 +478,7 @@ internal sealed class CronExpression: IEquatable<CronExpression>
         if (!GetBit(_dayOfMonth, day) && !Move(_dayOfMonth, ref day)) goto RetryMonth;
         if (!GetBit(_month, month)) goto RetryMonth;
 
-        Retry:
+Retry:
 
         if (day > GetLastDayOfMonth(year, month)) goto RetryMonth;
 
@@ -495,11 +495,11 @@ internal sealed class CronExpression: IEquatable<CronExpression>
             if (minute > startMinute) goto RolloverMinute;
             goto ReturnResult;
 
-            RolloverDay: hour = GetFirstSet(_hour);
-            RolloverHour: minute = GetFirstSet(_minute);
-            RolloverMinute: second = GetFirstSet(_second);
+RolloverDay: hour = GetFirstSet(_hour);
+RolloverHour: minute = GetFirstSet(_minute);
+RolloverMinute: second = GetFirstSet(_second);
 
-            ReturnResult:
+ReturnResult:
 
             var found = CalendarHelper.DateTimeToTicks(year, month, day, hour, minute, second);
             if (found >= ticks) return found;
@@ -508,7 +508,7 @@ internal sealed class CronExpression: IEquatable<CronExpression>
         day = lastCheckedDay;
         if (Move(_dayOfMonth, ref day)) goto Retry;
 
-        RetryMonth:
+RetryMonth:
 
         if (!Move(_month, ref month))
         {

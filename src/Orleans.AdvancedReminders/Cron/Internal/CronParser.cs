@@ -52,9 +52,9 @@ internal static class CronParser
                 return cronExpression;
             }
 
-            ulong  second = default;
-            byte  nthDayOfWeek = default;
-            byte  lastMonthOffset = default;
+            ulong second = default;
+            byte nthDayOfWeek = default;
+            byte lastMonthOffset = default;
 
             CronExpressionFlag flags = default;
 

@@ -156,10 +156,10 @@ internal sealed class JournaledJobShardState : IJournaledState, IDurableValueCom
     internal DurableJobShardSnapshot CaptureSnapshot()
     {
         var jobs = _jobQueue.GetSnapshot(static (job, dequeueCount) => new DurableJobShardSnapshotEntry
-            {
-                Job = job,
-                DequeueCount = dequeueCount
-            });
+        {
+            Job = job,
+            DequeueCount = dequeueCount
+        });
 
         return new() { Jobs = jobs };
     }
