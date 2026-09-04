@@ -33,6 +33,7 @@ internal sealed partial class DynamoDBReminderTable
     private static readonly TimeSpan MigrationLeaseDuration = TimeSpan.FromMinutes(2);
     private static readonly TimeSpan CompatibilityMarkerLifetime = TimeSpan.FromMinutes(2);
     private static readonly TimeSpan CompatibilityHeartbeatPeriod = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan MigrationConflictBackoff = TimeSpan.FromMilliseconds(100);
 
     private void ValidateOptions()
     {
@@ -253,6 +254,7 @@ internal sealed partial class DynamoDBReminderTable
 
             if (conflict)
             {
+                await Task.Delay(MigrationConflictBackoff, timeProvider, cancellationToken);
                 continue;
             }
 

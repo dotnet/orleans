@@ -706,6 +706,11 @@ namespace Orleans.Runtime.ReminderService
                 var stronglyConfirmedRows = new Dictionary<ReminderIdentity, ReminderEntry?>();
                 foreach (var batch in remindersNotInTable.BatchIEnumerable(MissingReminderPointReadConcurrency))
                 {
+                    if (cachedSequence < localTableSequence || rangeSerialNumberCopy < RangeSerialNumber)
+                    {
+                        return;
+                    }
+
                     var reads = batch.Select(async key =>
                         (Key: key, Entry: await reminderTable.ReadRow(key.GrainId, key.ReminderName)));
                     foreach (var result in await Task.WhenAll(reads))
