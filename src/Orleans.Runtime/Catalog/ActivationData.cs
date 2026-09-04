@@ -664,7 +664,22 @@ internal sealed partial class ActivationData :
 
                 if (state is ActivationState.Creating or ActivationState.Activating or ActivationState.Valid)
                 {
-                    GetComponent<IActivationDeactivationParticipant>()?.OnDeactivationRequested();
+                    if (GetComponent<IActivationDeactivationParticipant>() is { } participant)
+                    {
+                        try
+                        {
+                            participant.OnDeactivationRequested();
+                        }
+                        catch (Exception exception)
+                        {
+                            LogErrorInGrainMethod(
+                                _shared.Logger,
+                                exception,
+                                nameof(IActivationDeactivationParticipant.OnDeactivationRequested),
+                                this);
+                        }
+                    }
+
                     GrainLifecycleEvents.EmitDeactivating(this, DeactivationReason);
 
                     CancelPendingOperations();
