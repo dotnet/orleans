@@ -1186,19 +1186,18 @@ exit 0
             $archiveTestResultsAction `
             '(?s)path:\s*\|.*?TestResults/\$\{\{ inputs\.name \}\}\.cobertura\.xml.*?TestResults/\$\{\{ inputs\.name \}\}\.coverage\.json' `
             'Each test job must publish its exact coverage report.'
-        Assert-Equal 4 ([regex]::Matches($archiveTestResultsAction, 'uses: actions/upload-artifact@')).Count 'Artifact upload attempt count differs.'
-        Assert-Equal 2 ([regex]::Matches($archiveTestResultsAction, 'run: Start-Sleep -Seconds 30')).Count 'Artifact upload retry delay count differs.'
-        Assert-Equal 2 ([regex]::Matches($archiveTestResultsAction, 'overwrite: true')).Count 'Artifact upload retries must replace partial artifacts.'
-        Assert-Equal 2 ([regex]::Matches($archiveTestResultsAction, 'if-no-files-found: error')).Count 'Both coverage upload attempts must require the report.'
-        Assert-Equal 3 ([regex]::Matches($archiveTestResultsAction, 'continue-on-error: true')).Count 'Only the final coverage upload attempt may gate the job.'
+        Assert-Equal 2 ([regex]::Matches($archiveTestResultsAction, 'uses: actions/upload-artifact@')).Count 'Each artifact must have one immutable upload attempt.'
+        Assert-Equal 0 ([regex]::Matches($archiveTestResultsAction, 'overwrite: true')).Count 'Artifact uploads must not replace an ambiguous partial upload.'
+        Assert-Equal 1 ([regex]::Matches($archiveTestResultsAction, 'if-no-files-found: error')).Count 'Coverage upload must require the report.'
+        Assert-Equal 1 ([regex]::Matches($archiveTestResultsAction, 'continue-on-error: true')).Count 'Only diagnostic upload may remain advisory.'
         Assert-Matches `
             $archiveTestResultsAction `
-            "(?ms)^  - id: archive-test-results\r?\n    uses: actions/upload-artifact@.*?\r?\n    continue-on-error: true\r?\n.*?^  - name: Retry test result upload\r?\n    if: steps\.archive-test-results\.outcome == 'failure'\r?\n    continue-on-error: true\r?\n    uses: actions/upload-artifact@.*?\r?\n    with:\r?\n(?:(?!^  - ).)*?      overwrite: true\r?$" `
-            'Test result upload attempts must remain non-gating and retry with overwrite.'
+            "(?ms)^  - id: archive-test-results\r?\n    uses: actions/upload-artifact@.*?\r?\n    continue-on-error: true\r?\n.*?^  - name: Report test result upload failure\r?\n    if: steps\.archive-test-results\.outcome == 'failure'\r?\n    shell: pwsh\r?\n    run: Write-Output '::warning title=Test result artifact upload failed::" `
+            'Test result upload failures must remain advisory and explicit.'
         Assert-Matches `
             $archiveTestResultsAction `
-            "(?ms)^  - name: Archive coverage\r?\n    id: archive-coverage\r?\n    if: .*?github\.event_name == 'pull_request'.*?github\.event_name == 'push'.*?\r?\n    continue-on-error: true\r?\n    uses: actions/upload-artifact@.*?\r?\n.*?^  - name: Retry coverage upload\r?\n    if: .*?steps\.archive-coverage\.outcome == 'failure'\r?\n    uses: actions/upload-artifact@.*?\r?\n    with:\r?\n(?:(?!^  - ).)*?      overwrite: true\r?$" `
-            'Coverage upload must retry with overwrite and keep the final attempt gating.'
+            "(?ms)^  - name: Archive coverage\r?\n    if: .*?github\.event_name == 'pull_request'.*?github\.event_name == 'push'.*?\r?\n    uses: actions/upload-artifact@.*?\r?\n    with:\r?\n(?:(?!^  - ).)*?      if-no-files-found: error\r?$" `
+            'Coverage upload must remain directly gating.'
     }
 
     Invoke-Test 'collects coverage from every test job' {
