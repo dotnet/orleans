@@ -82,6 +82,25 @@ namespace UnitTests
             Assert.Equal(stateFromGrain.Counter, counter);
         }
 
+        [Theory]
+        [InlineData(null, "TestGrains.TestStateGrain", "id")]
+        [InlineData("", "TestGrains.TestStateGrain", "id")]
+        [InlineData("123", null, "grainType")]
+        [InlineData("123", "", "grainType")]
+        [InlineData("123", "TestGrains.UnknownGrain", "Unknown grain type")]
+        public async Task GetGrainState_InvalidRequest_ReturnsErrorPayload(string? id, string? grainType, string expectedError)
+        {
+            var dashboardGrain = _cluster.GrainFactory!.GetGrain<IDashboardGrain>(1); // This fixture deploys the client.
+
+            var immutableState = await dashboardGrain.GetGrainState(
+                id,
+                grainType,
+                TestContext.Current.CancellationToken);
+
+            var state = JObject.Parse(immutableState.Value);
+            Assert.Contains(expectedError, (string)state["error"]!, StringComparison.Ordinal);
+        }
+
 
         public class TestSiloConfigurations : ISiloConfigurator
         {
