@@ -22,8 +22,10 @@ internal sealed class MessageHandlerShared(
     private readonly ConcurrentQueue<MessageReadRequest> _receivePool = new();
     private readonly ConcurrentQueue<MessageWriteRequest> _sendPool = new();
     private readonly object _poolLock = new();
+    private bool _disposing;
     private volatile bool _disposed;
     private int _activeSerializers;
+    private int _activeSendWorkItems;
 
     public MessagingTrace MessagingTrace { get; } = messagingTrace;
     public ConnectionTrace ConnectionTrace { get; } = connectionTrace;
@@ -61,7 +63,7 @@ internal sealed class MessageHandlerShared(
         lock (_poolLock)
         {
             _activeSerializers--;
-            if (_disposed)
+            if (_disposing)
             {
                 serializer.Dispose();
             }
@@ -70,16 +72,37 @@ internal sealed class MessageHandlerShared(
                 _serializerPool.Enqueue(serializer);
             }
 
-            if (_activeSerializers == 0)
+            SignalIfQuiescent();
+        }
+    }
+
+    internal bool TryAcquireSendWork()
+    {
+        lock (_poolLock)
+        {
+            if (_disposing)
             {
-                Monitor.PulseAll(_poolLock);
+                return false;
             }
+
+            _activeSendWorkItems++;
+            return true;
+        }
+    }
+
+    internal void ReleaseSendWork()
+    {
+        lock (_poolLock)
+        {
+            _activeSendWorkItems--;
+            SignalIfQuiescent();
         }
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal MessageReadRequest GetReceiveMessageHandler()
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
         if (_receivePool.TryDequeue(out var result))
         {
             return result;
@@ -93,7 +116,7 @@ internal sealed class MessageHandlerShared(
     {
         lock (_poolLock)
         {
-            if (!_disposed)
+            if (!_disposing)
             {
                 _receivePool.Enqueue(handler);
             }
@@ -103,6 +126,7 @@ internal sealed class MessageHandlerShared(
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal MessageWriteRequest GetSendMessageHandler()
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
         if (_sendPool.TryDequeue(out var result))
         {
             return result;
@@ -124,7 +148,7 @@ internal sealed class MessageHandlerShared(
     {
         lock (_poolLock)
         {
-            if (_disposed)
+            if (_disposing)
             {
                 handler.Dispose();
             }
@@ -144,7 +168,17 @@ internal sealed class MessageHandlerShared(
                 return;
             }
 
-            _disposed = true;
+            if (_disposing)
+            {
+                while (!_disposed)
+                {
+                    Monitor.Wait(_poolLock);
+                }
+
+                return;
+            }
+
+            _disposing = true;
             while (_serializerPool.TryDequeue(out var serializer))
             {
                 serializer.Dispose();
@@ -156,10 +190,21 @@ internal sealed class MessageHandlerShared(
             }
 
             _receivePool.Clear();
-            while (_activeSerializers > 0)
+            while (_activeSerializers > 0 || _activeSendWorkItems > 0)
             {
                 Monitor.Wait(_poolLock);
             }
+
+            _disposed = true;
+            Monitor.PulseAll(_poolLock);
+        }
+    }
+
+    private void SignalIfQuiescent()
+    {
+        if (_activeSerializers == 0 && _activeSendWorkItems == 0)
+        {
+            Monitor.PulseAll(_poolLock);
         }
     }
 }

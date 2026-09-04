@@ -3,7 +3,6 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Connections;
-using Orleans.Placement.Repartitioning;
 
 namespace Orleans.Runtime.Messaging;
 
@@ -14,7 +13,7 @@ internal sealed class ConnectionCommon(
     ConnectionTrace networkingTrace,
     MessagingInstruments messagingInstruments,
     NetworkingInstruments networkingInstruments,
-    IMessageStatisticsSink messageStatisticsSink)
+    Orleans.Placement.Repartitioning.IMessageStatisticsSink messageStatisticsSink)
 {
     private readonly object _lock = new();
     private MessageHandlerShared? _messageHandlerShared;
