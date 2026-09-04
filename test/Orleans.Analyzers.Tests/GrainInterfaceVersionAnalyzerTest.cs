@@ -25,6 +25,12 @@ namespace Analyzers.Tests;
 [TestCategory("BVT"), TestCategory("Analyzer")]
 public class GrainInterfaceVersionAnalyzerTest
 {
+    private enum ContractsTargetsContract
+    {
+        PackageBuildRoundTrip,
+        RepositoryDotNetFormat,
+    }
+
     private const string OrleansContractsFileName = "OrleansContracts.txt";
     private const string RegenerateCodeActionTitle = "Regenerate OrleansContracts.txt";
     private const string RegenerateCodeActionEquivalenceKey = "RegenerateOrleansContractsFileAsync";
@@ -2783,11 +2789,11 @@ interface Outer.IInnerGrain [Version(1)]
     public Task DotNetFormat_CreatesMissingContractsFileUsingRepositoryBuildTargets()
         => VerifyDotNetFormatCreatesMissingContractsFileAsync(
             configuredContractsPath: null,
-            useRepositoryBuildTargets: true);
+            targetsContract: ContractsTargetsContract.RepositoryDotNetFormat);
 
     private static async Task VerifyDotNetFormatCreatesMissingContractsFileAsync(
         string? configuredContractsPath,
-        bool useRepositoryBuildTargets = false)
+        ContractsTargetsContract targetsContract = ContractsTargetsContract.PackageBuildRoundTrip)
     {
         var repositoryRoot = GetRepositoryRoot();
         var tempDirectory = Path.Combine(
@@ -2810,7 +2816,7 @@ interface Outer.IInnerGrain [Version(1)]
                 "Orleans.Analyzers",
                 "build",
                 "Microsoft.Orleans.Analyzers.props");
-            var targetsPath = useRepositoryBuildTargets
+            var targetsPath = targetsContract == ContractsTargetsContract.RepositoryDotNetFormat
                 ? Path.Combine(repositoryRoot, "src", "Directory.Build.targets")
                 : Path.Combine(
                     repositoryRoot,
@@ -2836,6 +2842,19 @@ interface Outer.IInnerGrain [Version(1)]
                     <Reference Include="Orleans.Core.Abstractions" HintPath="{EscapeXml(abstractionsPath)}" />
                 {analyzerItem}  </ItemGroup>
                   <Import Project="{EscapeXml(targetsPath)}" />
+                  <Target Name="VerifyOrleansContractsTargetState">
+                    <ItemGroup>
+                      <_OrleansContractsFile Include="@(AdditionalFiles->WithMetadataValue('OrleansContractsFile', 'true'))" />
+                    </ItemGroup>
+                    <Error Condition="'$(ExpectedOrleansContractsFileExists)' != 'true' and '$(ExpectedOrleansContractsFileExists)' != 'false'"
+                           Text="ExpectedOrleansContractsFileExists must be true or false." />
+                    <Error Condition="'$(ExpectedOrleansContractsFileExists)' == 'false' and '@(_OrleansContractsFile)' != ''"
+                           Text="The missing contracts file was included in the regular build." />
+                    <Error Condition="'$(ExpectedOrleansContractsFileExists)' == 'true' and '@(_OrleansContractsFile)' != '$(OrleansContractsPath)'"
+                           Text="The repository targets did not include the configured contracts file." />
+                    <Error Condition="'$(ExpectedOrleansContractsFileExists)' == 'true' and '@(_OrleansContractsFile->Metadata('OrleansContractsFileExists'))' != 'true'"
+                           Text="The repository targets did not mark the configured contracts file as existing." />
+                  </Target>
                 </Project>
                 """,
                 TestContext.Current.CancellationToken);
@@ -2856,14 +2875,24 @@ interface Outer.IInnerGrain [Version(1)]
             Assert.True(restore.ExitCode == 0, restore.Output);
             Assert.False(File.Exists(contractsPath));
 
-            var missingManifestBuild = await RunDotNetAsync(
-                repositoryRoot,
-                "build",
-                projectPath,
-                "--no-restore",
-                "--nologo");
-            Assert.True(missingManifestBuild.ExitCode == 0, missingManifestBuild.Output);
-            Assert.False(File.Exists(contractsPath));
+            if (targetsContract == ContractsTargetsContract.PackageBuildRoundTrip)
+            {
+                var missingManifestBuild = await RunDotNetAsync(
+                    repositoryRoot,
+                    "build",
+                    projectPath,
+                    "--no-restore",
+                    "--nologo");
+                Assert.True(missingManifestBuild.ExitCode == 0, missingManifestBuild.Output);
+                Assert.False(File.Exists(contractsPath));
+            }
+            else
+            {
+                await VerifyRepositoryContractsTargetStateAsync(
+                    repositoryRoot,
+                    projectPath,
+                    contractsFileExists: false);
+            }
 
             var format = await RunDotNetAsync(
                 repositoryRoot,
@@ -2892,13 +2921,23 @@ interface Outer.IInnerGrain [Version(1)]
                 "interface [GrainInterfaceType(\"IMyGrain\")] IMyGrain [Version(0)]",
                 content);
 
-            var build = await RunDotNetAsync(
-                repositoryRoot,
-                "build",
-                projectPath,
-                "--no-restore",
-                "--nologo");
-            Assert.True(build.ExitCode == 0, build.Output);
+            if (targetsContract == ContractsTargetsContract.PackageBuildRoundTrip)
+            {
+                var build = await RunDotNetAsync(
+                    repositoryRoot,
+                    "build",
+                    projectPath,
+                    "--no-restore",
+                    "--nologo");
+                Assert.True(build.ExitCode == 0, build.Output);
+            }
+            else
+            {
+                await VerifyRepositoryContractsTargetStateAsync(
+                    repositoryRoot,
+                    projectPath,
+                    contractsFileExists: true);
+            }
         }
         finally
         {
@@ -2906,6 +2945,21 @@ interface Outer.IInnerGrain [Version(1)]
                 tempDirectory,
                 TestContext.Current.CancellationToken);
         }
+    }
+
+    private static async Task VerifyRepositoryContractsTargetStateAsync(
+        string repositoryRoot,
+        string projectPath,
+        bool contractsFileExists)
+    {
+        var result = await RunDotNetAsync(
+            repositoryRoot,
+            "msbuild",
+            projectPath,
+            "-nologo",
+            "-target:VerifyOrleansContractsTargetState",
+            $"-property:ExpectedOrleansContractsFileExists={contractsFileExists.ToString().ToLowerInvariant()}");
+        Assert.True(result.ExitCode == 0, result.Output);
     }
 
     private static async Task DeleteDirectoryWithRetriesAsync(
@@ -2950,25 +3004,49 @@ interface Outer.IInnerGrain [Version(1)]
         Assert.NotNull(process);
         var standardOutput = process!.StandardOutput.ReadToEndAsync();
         var standardError = process.StandardError.ReadToEndAsync();
+        var completion = Task.WhenAll(
+            process.WaitForExitAsync(CancellationToken.None),
+            standardOutput,
+            standardError);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(
             TestContext.Current.CancellationToken);
         timeout.CancelAfter(TimeSpan.FromMinutes(2));
         try
         {
-            await process.WaitForExitAsync(timeout.Token);
+            await completion.WaitAsync(timeout.Token);
         }
-        catch (OperationCanceledException) when (!TestContext.Current.CancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException)
         {
-            process.Kill(entireProcessTree: true);
+            if (!process.HasExited)
+            {
+                try
+                {
+                    process.Kill(entireProcessTree: true);
+                }
+                catch (InvalidOperationException) when (process.HasExited)
+                {
+                }
+            }
+
+            await completion;
+            if (TestContext.Current.CancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+
             throw new TimeoutException(
-                $"dotnet {string.Join(' ', arguments)} exceeded the two-minute test timeout.");
+                $"dotnet {string.Join(' ', arguments)} exceeded the two-minute test timeout."
+                + Environment.NewLine
+                + await ReadOutputAsync());
         }
 
-        var output = string.Concat(
-            await standardOutput,
-            Environment.NewLine,
-            await standardError);
-        return (process.ExitCode, output);
+        return (process.ExitCode, await ReadOutputAsync());
+
+        async Task<string> ReadOutputAsync()
+            => string.Concat(
+                await standardOutput,
+                Environment.NewLine,
+                await standardError);
     }
 
     private static string EscapeXml(string value)
