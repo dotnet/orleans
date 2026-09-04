@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using Aspire.Hosting;
@@ -816,252 +816,252 @@ public sealed class KinesisAspireIntegrationTests
         switch (scenario)
         {
             case "MissingStreamIdentity":
-            {
-                var config = BuildConfig(new Dictionary<string, string?>
                 {
-                    [$"Orleans:Streaming:{provider}:ProviderType"] = "Kinesis",
-                    [$"Orleans:Streaming:{provider}:Region"] = "us-west-2",
-                }, providerName: provider);
-                using var host = BuildSiloHost(config);
-                var exception = Assert.Throws<OrleansConfigurationException>(() => Resolve(host, provider));
-                Assert.Contains(provider, exception.Message);
-                Assert.Contains("requires StreamName", exception.Message);
-                Assert.Contains("StreamArn", exception.Message);
-                break;
-            }
-            case "MalformedStreamArn":
-            {
-                const string invalidArn = "arn:aws:sqs:us-west-2:123456789012:queue/not-kinesis";
-                var config = BuildConfig(new Dictionary<string, string?>
-                {
-                    [$"Orleans:Streaming:{provider}:ProviderType"] = "Kinesis",
-                    [$"Orleans:Streaming:{provider}:StreamArn"] = invalidArn,
-                }, providerName: provider);
-                using var host = BuildSiloHost(config);
-                var exception = Assert.Throws<OrleansConfigurationException>(() => Resolve(host, provider));
-                Assert.Contains(provider, exception.Message);
-                Assert.Contains(invalidArn, exception.Message);
-                Assert.Contains("StreamArn", exception.Message);
-                break;
-            }
-            case "UnresolvedConnectionOrTableReference":
-            {
-                const string unresolved = "missing-connection-or-table";
-                var connectionConfig = BuildConfig(new Dictionary<string, string?>
-                {
-                    [$"Orleans:Streaming:{provider}:ProviderType"] = "Kinesis",
-                    [$"Orleans:Streaming:{provider}:StreamName"] = "orleans-orders",
-                    [$"Orleans:Streaming:{provider}:ConnectionName"] = unresolved,
-                }, providerName: provider);
-                using (var host = BuildSiloHost(connectionConfig))
-                {
+                    var config = BuildConfig(new Dictionary<string, string?>
+                    {
+                        [$"Orleans:Streaming:{provider}:ProviderType"] = "Kinesis",
+                        [$"Orleans:Streaming:{provider}:Region"] = "us-west-2",
+                    }, providerName: provider);
+                    using var host = BuildSiloHost(config);
                     var exception = Assert.Throws<OrleansConfigurationException>(() => Resolve(host, provider));
                     Assert.Contains(provider, exception.Message);
-                    Assert.Contains(unresolved, exception.Message);
-                    Assert.Contains("connection string", exception.Message, StringComparison.OrdinalIgnoreCase);
+                    Assert.Contains("requires StreamName", exception.Message);
+                    Assert.Contains("StreamArn", exception.Message);
+                    break;
                 }
-
-                var tableConfig = BuildConfig(new Dictionary<string, string?>
+            case "MalformedStreamArn":
                 {
-                    [$"Orleans:Streaming:{provider}:ProviderType"] = "Kinesis",
-                    [$"Orleans:Streaming:{provider}:StreamName"] = "orleans-orders",
-                    [$"Orleans:Streaming:{provider}:Region"] = "us-west-2",
-                    [$"Orleans:Streaming:{provider}:Checkpoint:Type"] = "DynamoDB",
-                    [$"Orleans:Streaming:{provider}:Checkpoint:ServiceKey"] = unresolved,
-                }, providerName: provider);
-                using var tableHost = BuildSiloHost(tableConfig);
-                var tableException = Assert.Throws<OrleansConfigurationException>(() =>
-                    tableHost.Services
-                        .GetRequiredService<IOptionsMonitor<DynamoDBStreamQueueCheckpointerOptions>>()
-                        .Get(provider));
-                Assert.Equal(
-                    $"Kinesis stream provider '{provider}' references DynamoDB checkpoint resource '{unresolved}', " +
-                    "but its AWS Aspire TableName output is missing.",
-                    tableException.Message);
-                break;
-            }
+                    const string invalidArn = "arn:aws:sqs:us-west-2:123456789012:queue/not-kinesis";
+                    var config = BuildConfig(new Dictionary<string, string?>
+                    {
+                        [$"Orleans:Streaming:{provider}:ProviderType"] = "Kinesis",
+                        [$"Orleans:Streaming:{provider}:StreamArn"] = invalidArn,
+                    }, providerName: provider);
+                    using var host = BuildSiloHost(config);
+                    var exception = Assert.Throws<OrleansConfigurationException>(() => Resolve(host, provider));
+                    Assert.Contains(provider, exception.Message);
+                    Assert.Contains(invalidArn, exception.Message);
+                    Assert.Contains("StreamArn", exception.Message);
+                    break;
+                }
+            case "UnresolvedConnectionOrTableReference":
+                {
+                    const string unresolved = "missing-connection-or-table";
+                    var connectionConfig = BuildConfig(new Dictionary<string, string?>
+                    {
+                        [$"Orleans:Streaming:{provider}:ProviderType"] = "Kinesis",
+                        [$"Orleans:Streaming:{provider}:StreamName"] = "orleans-orders",
+                        [$"Orleans:Streaming:{provider}:ConnectionName"] = unresolved,
+                    }, providerName: provider);
+                    using (var host = BuildSiloHost(connectionConfig))
+                    {
+                        var exception = Assert.Throws<OrleansConfigurationException>(() => Resolve(host, provider));
+                        Assert.Contains(provider, exception.Message);
+                        Assert.Contains(unresolved, exception.Message);
+                        Assert.Contains("connection string", exception.Message, StringComparison.OrdinalIgnoreCase);
+                    }
+
+                    var tableConfig = BuildConfig(new Dictionary<string, string?>
+                    {
+                        [$"Orleans:Streaming:{provider}:ProviderType"] = "Kinesis",
+                        [$"Orleans:Streaming:{provider}:StreamName"] = "orleans-orders",
+                        [$"Orleans:Streaming:{provider}:Region"] = "us-west-2",
+                        [$"Orleans:Streaming:{provider}:Checkpoint:Type"] = "DynamoDB",
+                        [$"Orleans:Streaming:{provider}:Checkpoint:ServiceKey"] = unresolved,
+                    }, providerName: provider);
+                    using var tableHost = BuildSiloHost(tableConfig);
+                    var tableException = Assert.Throws<OrleansConfigurationException>(() =>
+                        tableHost.Services
+                            .GetRequiredService<IOptionsMonitor<DynamoDBStreamQueueCheckpointerOptions>>()
+                            .Get(provider));
+                    Assert.Equal(
+                        $"Kinesis stream provider '{provider}' references DynamoDB checkpoint resource '{unresolved}', " +
+                        "but its AWS Aspire TableName output is missing.",
+                        tableException.Message);
+                    break;
+                }
             case "UnsupportedCheckpointType":
-            {
-                const string unsupported = "Redis";
-                var config = BuildConfig(new Dictionary<string, string?>
                 {
-                    [$"Orleans:Streaming:{provider}:ProviderType"] = "Kinesis",
-                    [$"Orleans:Streaming:{provider}:StreamName"] = "orleans-orders",
-                    [$"Orleans:Streaming:{provider}:Region"] = "us-west-2",
-                    [$"Orleans:Streaming:{provider}:Checkpoint:Type"] = unsupported,
-                }, providerName: provider);
-                var exception = Assert.Throws<OrleansConfigurationException>(() => BuildSiloHost(config));
-                Assert.Contains(provider, exception.Message);
-                Assert.Contains(unsupported, exception.Message);
-                Assert.Contains("DynamoDB", exception.Message);
-                break;
-            }
+                    const string unsupported = "Redis";
+                    var config = BuildConfig(new Dictionary<string, string?>
+                    {
+                        [$"Orleans:Streaming:{provider}:ProviderType"] = "Kinesis",
+                        [$"Orleans:Streaming:{provider}:StreamName"] = "orleans-orders",
+                        [$"Orleans:Streaming:{provider}:Region"] = "us-west-2",
+                        [$"Orleans:Streaming:{provider}:Checkpoint:Type"] = unsupported,
+                    }, providerName: provider);
+                    var exception = Assert.Throws<OrleansConfigurationException>(() => BuildSiloHost(config));
+                    Assert.Contains(provider, exception.Message);
+                    Assert.Contains(unsupported, exception.Message);
+                    Assert.Contains("DynamoDB", exception.Message);
+                    break;
+                }
             case "InvalidCreateIfNotExists":
-            {
-                const string invalidBoolean = "definitely-not-a-bool";
-                var config = BuildConfig(new Dictionary<string, string?>
                 {
-                    [$"Orleans:Streaming:{provider}:ProviderType"] = "Kinesis",
-                    [$"Orleans:Streaming:{provider}:StreamName"] = "orleans-orders",
-                    [$"Orleans:Streaming:{provider}:Region"] = "us-west-2",
-                    [$"Orleans:Streaming:{provider}:Checkpoint:Type"] = "DynamoDB",
-                    [$"Orleans:Streaming:{provider}:Checkpoint:TableName"] = "orleans-orders-checkpoints",
-                    [$"Orleans:Streaming:{provider}:Checkpoint:CreateIfNotExists"] = invalidBoolean,
-                }, providerName: provider);
-                using var host = BuildSiloHost(config);
-                var exception = Assert.Throws<OrleansConfigurationException>(() =>
-                    host.Services
-                        .GetRequiredService<IOptionsMonitor<DynamoDBStreamQueueCheckpointerOptions>>()
-                        .Get(provider));
-                Assert.Contains(nameof(DynamoDBStreamQueueCheckpointerOptions.CreateIfNotExists), exception.Message);
-                Assert.Contains(invalidBoolean, exception.Message);
-                Assert.Contains(provider, exception.Message);
-                break;
-            }
+                    const string invalidBoolean = "definitely-not-a-bool";
+                    var config = BuildConfig(new Dictionary<string, string?>
+                    {
+                        [$"Orleans:Streaming:{provider}:ProviderType"] = "Kinesis",
+                        [$"Orleans:Streaming:{provider}:StreamName"] = "orleans-orders",
+                        [$"Orleans:Streaming:{provider}:Region"] = "us-west-2",
+                        [$"Orleans:Streaming:{provider}:Checkpoint:Type"] = "DynamoDB",
+                        [$"Orleans:Streaming:{provider}:Checkpoint:TableName"] = "orleans-orders-checkpoints",
+                        [$"Orleans:Streaming:{provider}:Checkpoint:CreateIfNotExists"] = invalidBoolean,
+                    }, providerName: provider);
+                    using var host = BuildSiloHost(config);
+                    var exception = Assert.Throws<OrleansConfigurationException>(() =>
+                        host.Services
+                            .GetRequiredService<IOptionsMonitor<DynamoDBStreamQueueCheckpointerOptions>>()
+                            .Get(provider));
+                    Assert.Contains(nameof(DynamoDBStreamQueueCheckpointerOptions.CreateIfNotExists), exception.Message);
+                    Assert.Contains(invalidBoolean, exception.Message);
+                    Assert.Contains(provider, exception.Message);
+                    break;
+                }
             case "ConflictingDirectAndReferenceInputs":
-            {
-                var directConfig = BuildConfig(new Dictionary<string, string?>
                 {
-                    [$"Orleans:Streaming:{provider}:ProviderType"] = "Kinesis",
-                    [$"Orleans:Streaming:{provider}:ServiceKey"] = "service-stream",
-                    [$"Orleans:Streaming:{provider}:ResourceConfigSection"] = "AWS:Resources:section-stream",
-                    [$"Orleans:Streaming:{provider}:StreamArn"] =
-                        "arn:aws:kinesis:us-east-1:123456789012:stream/direct-arn-stream",
-                    [$"Orleans:Streaming:{provider}:StreamName"] = "explicit-stream",
-                    [$"Orleans:Streaming:{provider}:Region"] = "eu-central-1",
-                    [$"Orleans:Streaming:{provider}:ConnectionString"] =
-                        "http://direct:4566;direct-access;direct-secret;ap-south-1",
-                    [$"Orleans:Streaming:{provider}:ConnectionName"] = "ignored-connection",
-                    ["AWS:Resources:service-stream:StreamArn"] =
-                        "arn:aws:kinesis:us-west-1:123456789012:stream/service-stream",
-                    ["AWS:Resources:section-stream:StreamArn"] =
-                        "arn:aws:kinesis:us-west-2:123456789012:stream/section-stream",
-                    ["ConnectionStrings:ignored-connection"] =
-                        "http://ignored:4566;ignored-access;ignored-secret;ca-central-1",
-                }, providerName: provider);
-                using (var host = BuildSiloHost(directConfig))
-                {
-                    var options = Resolve(host, provider);
-                    Assert.Equal("explicit-stream", options.StreamName);
-                    Assert.Equal("eu-central-1", options.Region);
-                    Assert.Equal("http://direct:4566", options.Service);
-                    Assert.Equal("direct-access", options.AccessKey);
-                    Assert.Equal("direct-secret", options.SecretKey);
-                }
+                    var directConfig = BuildConfig(new Dictionary<string, string?>
+                    {
+                        [$"Orleans:Streaming:{provider}:ProviderType"] = "Kinesis",
+                        [$"Orleans:Streaming:{provider}:ServiceKey"] = "service-stream",
+                        [$"Orleans:Streaming:{provider}:ResourceConfigSection"] = "AWS:Resources:section-stream",
+                        [$"Orleans:Streaming:{provider}:StreamArn"] =
+                            "arn:aws:kinesis:us-east-1:123456789012:stream/direct-arn-stream",
+                        [$"Orleans:Streaming:{provider}:StreamName"] = "explicit-stream",
+                        [$"Orleans:Streaming:{provider}:Region"] = "eu-central-1",
+                        [$"Orleans:Streaming:{provider}:ConnectionString"] =
+                            "http://direct:4566;direct-access;direct-secret;ap-south-1",
+                        [$"Orleans:Streaming:{provider}:ConnectionName"] = "ignored-connection",
+                        ["AWS:Resources:service-stream:StreamArn"] =
+                            "arn:aws:kinesis:us-west-1:123456789012:stream/service-stream",
+                        ["AWS:Resources:section-stream:StreamArn"] =
+                            "arn:aws:kinesis:us-west-2:123456789012:stream/section-stream",
+                        ["ConnectionStrings:ignored-connection"] =
+                            "http://ignored:4566;ignored-access;ignored-secret;ca-central-1",
+                    }, providerName: provider);
+                    using (var host = BuildSiloHost(directConfig))
+                    {
+                        var options = Resolve(host, provider);
+                        Assert.Equal("explicit-stream", options.StreamName);
+                        Assert.Equal("eu-central-1", options.Region);
+                        Assert.Equal("http://direct:4566", options.Service);
+                        Assert.Equal("direct-access", options.AccessKey);
+                        Assert.Equal("direct-secret", options.SecretKey);
+                    }
 
-                var sectionConfig = BuildConfig(new Dictionary<string, string?>
-                {
-                    [$"Orleans:Streaming:{provider}:ProviderType"] = "Kinesis",
-                    [$"Orleans:Streaming:{provider}:ServiceKey"] = "service-stream",
-                    [$"Orleans:Streaming:{provider}:ResourceConfigSection"] = "AWS:Resources:section-stream",
-                    ["AWS:Resources:service-stream:StreamArn"] =
-                        "arn:aws:kinesis:us-west-1:123456789012:stream/service-stream",
-                    ["AWS:Resources:section-stream:StreamArn"] =
-                        "arn:aws:kinesis:us-west-2:123456789012:stream/section-stream",
-                }, providerName: provider);
-                using (var host = BuildSiloHost(sectionConfig))
-                {
-                    var options = Resolve(host, provider);
-                    Assert.Equal("section-stream", options.StreamName);
-                    Assert.Equal("us-west-2", options.Region);
-                }
+                    var sectionConfig = BuildConfig(new Dictionary<string, string?>
+                    {
+                        [$"Orleans:Streaming:{provider}:ProviderType"] = "Kinesis",
+                        [$"Orleans:Streaming:{provider}:ServiceKey"] = "service-stream",
+                        [$"Orleans:Streaming:{provider}:ResourceConfigSection"] = "AWS:Resources:section-stream",
+                        ["AWS:Resources:service-stream:StreamArn"] =
+                            "arn:aws:kinesis:us-west-1:123456789012:stream/service-stream",
+                        ["AWS:Resources:section-stream:StreamArn"] =
+                            "arn:aws:kinesis:us-west-2:123456789012:stream/section-stream",
+                    }, providerName: provider);
+                    using (var host = BuildSiloHost(sectionConfig))
+                    {
+                        var options = Resolve(host, provider);
+                        Assert.Equal("section-stream", options.StreamName);
+                        Assert.Equal("us-west-2", options.Region);
+                    }
 
-                AssertRegionFallback(provider, "AWS:Region", "eu-west-1");
-                AssertRegionFallback(provider, "AWS_REGION", "ap-northeast-1");
-                AssertRegionFallback(provider, "AWS_DEFAULT_REGION", "sa-east-1");
+                    AssertRegionFallback(provider, "AWS:Region", "eu-west-1");
+                    AssertRegionFallback(provider, "AWS_REGION", "ap-northeast-1");
+                    AssertRegionFallback(provider, "AWS_DEFAULT_REGION", "sa-east-1");
 
-                var endpointConfig = BuildConfig(new Dictionary<string, string?>
-                {
-                    [$"Orleans:Streaming:{provider}:ProviderType"] = "Kinesis",
-                    [$"Orleans:Streaming:{provider}:StreamName"] = "orleans-orders",
-                    [$"Orleans:Streaming:{provider}:Checkpoint:Type"] = "DynamoDB",
-                    [$"Orleans:Streaming:{provider}:Checkpoint:TableName"] = "checkpoints",
-                    ["AWS_ENDPOINT_URL_KINESIS"] = "http://kinesis-endpoint:4566",
-                    ["AWS_ENDPOINT_URL_DYNAMODB"] = "http://dynamodb-endpoint:4566",
-                    ["AWS:Region"] = "us-west-2",
-                }, providerName: provider);
-                using (var host = BuildSiloHost(endpointConfig))
-                {
-                    Assert.Equal("http://kinesis-endpoint:4566", Resolve(host, provider).Service);
-                    var checkpoint = host.Services
-                        .GetRequiredService<IOptionsMonitor<DynamoDBStreamQueueCheckpointerOptions>>()
-                        .Get(provider);
-                    Assert.Equal("http://dynamodb-endpoint:4566", checkpoint.Service);
-                }
+                    var endpointConfig = BuildConfig(new Dictionary<string, string?>
+                    {
+                        [$"Orleans:Streaming:{provider}:ProviderType"] = "Kinesis",
+                        [$"Orleans:Streaming:{provider}:StreamName"] = "orleans-orders",
+                        [$"Orleans:Streaming:{provider}:Checkpoint:Type"] = "DynamoDB",
+                        [$"Orleans:Streaming:{provider}:Checkpoint:TableName"] = "checkpoints",
+                        ["AWS_ENDPOINT_URL_KINESIS"] = "http://kinesis-endpoint:4566",
+                        ["AWS_ENDPOINT_URL_DYNAMODB"] = "http://dynamodb-endpoint:4566",
+                        ["AWS:Region"] = "us-west-2",
+                    }, providerName: provider);
+                    using (var host = BuildSiloHost(endpointConfig))
+                    {
+                        Assert.Equal("http://kinesis-endpoint:4566", Resolve(host, provider).Service);
+                        var checkpoint = host.Services
+                            .GetRequiredService<IOptionsMonitor<DynamoDBStreamQueueCheckpointerOptions>>()
+                            .Get(provider);
+                        Assert.Equal("http://dynamodb-endpoint:4566", checkpoint.Service);
+                    }
 
-                var directArnConflictConfig = BuildConfig(new Dictionary<string, string?>
-                {
-                    [$"Orleans:Streaming:{provider}:ProviderType"] = "Kinesis",
-                    [$"Orleans:Streaming:{provider}:ServiceKey"] = "referenced-stream",
-                    [$"Orleans:Streaming:{provider}:StreamArn"] =
-                        "arn:aws:kinesis:eu-north-1:123456789012:stream/direct-stream",
-                    ["AWS:Resources:referenced-stream:StreamArn"] =
-                        "arn:aws:kinesis:us-west-1:123456789012:stream/referenced-stream",
-                }, providerName: provider);
-                using (var host = BuildSiloHost(directArnConflictConfig))
-                {
-                    var options = Resolve(host, provider);
-                    Assert.Equal("direct-stream", options.StreamName);
-                    Assert.Equal("eu-north-1", options.Region);
-                }
+                    var directArnConflictConfig = BuildConfig(new Dictionary<string, string?>
+                    {
+                        [$"Orleans:Streaming:{provider}:ProviderType"] = "Kinesis",
+                        [$"Orleans:Streaming:{provider}:ServiceKey"] = "referenced-stream",
+                        [$"Orleans:Streaming:{provider}:StreamArn"] =
+                            "arn:aws:kinesis:eu-north-1:123456789012:stream/direct-stream",
+                        ["AWS:Resources:referenced-stream:StreamArn"] =
+                            "arn:aws:kinesis:us-west-1:123456789012:stream/referenced-stream",
+                    }, providerName: provider);
+                    using (var host = BuildSiloHost(directArnConflictConfig))
+                    {
+                        var options = Resolve(host, provider);
+                        Assert.Equal("direct-stream", options.StreamName);
+                        Assert.Equal("eu-north-1", options.Region);
+                    }
 
-                var simultaneousRegionConfig = BuildConfig(new Dictionary<string, string?>
-                {
-                    [$"Orleans:Streaming:{provider}:ProviderType"] = "Kinesis",
-                    [$"Orleans:Streaming:{provider}:StreamName"] = "region-precedence-stream",
-                    [$"Orleans:Streaming:{provider}:Checkpoint:Type"] = "DynamoDB",
-                    [$"Orleans:Streaming:{provider}:Checkpoint:TableName"] = "region-precedence-checkpoints",
-                    ["AWS:Region"] = "eu-west-1",
-                    ["AWS_REGION"] = "ap-northeast-1",
-                    ["AWS_DEFAULT_REGION"] = "sa-east-1",
-                }, providerName: provider);
-                using (var host = BuildSiloHost(simultaneousRegionConfig))
-                {
-                    var options = Resolve(host, provider);
-                    var checkpoint = host.Services
-                        .GetRequiredService<IOptionsMonitor<DynamoDBStreamQueueCheckpointerOptions>>()
-                        .Get(provider);
-                    Assert.Equal("region-precedence-stream", options.StreamName);
-                    Assert.Equal("eu-west-1", options.Region);
-                    Assert.Equal("region-precedence-checkpoints", checkpoint.TableName);
-                    Assert.Equal("eu-west-1", checkpoint.Service);
-                }
+                    var simultaneousRegionConfig = BuildConfig(new Dictionary<string, string?>
+                    {
+                        [$"Orleans:Streaming:{provider}:ProviderType"] = "Kinesis",
+                        [$"Orleans:Streaming:{provider}:StreamName"] = "region-precedence-stream",
+                        [$"Orleans:Streaming:{provider}:Checkpoint:Type"] = "DynamoDB",
+                        [$"Orleans:Streaming:{provider}:Checkpoint:TableName"] = "region-precedence-checkpoints",
+                        ["AWS:Region"] = "eu-west-1",
+                        ["AWS_REGION"] = "ap-northeast-1",
+                        ["AWS_DEFAULT_REGION"] = "sa-east-1",
+                    }, providerName: provider);
+                    using (var host = BuildSiloHost(simultaneousRegionConfig))
+                    {
+                        var options = Resolve(host, provider);
+                        var checkpoint = host.Services
+                            .GetRequiredService<IOptionsMonitor<DynamoDBStreamQueueCheckpointerOptions>>()
+                            .Get(provider);
+                        Assert.Equal("region-precedence-stream", options.StreamName);
+                        Assert.Equal("eu-west-1", options.Region);
+                        Assert.Equal("region-precedence-checkpoints", checkpoint.TableName);
+                        Assert.Equal("eu-west-1", checkpoint.Service);
+                    }
 
-                string[] malformedArns =
-                [
-                    "arn:aws:sqs:us-west-2:123456789012:stream/wrong-service",
+                    string[] malformedArns =
+                    [
+                        "arn:aws:sqs:us-west-2:123456789012:stream/wrong-service",
                     "arn:aws:kinesis::123456789012:stream/missing-region",
                     "arn:aws:kinesis:us-west-2:123456789012:streams/wrong-prefix",
                     "arn:aws:kinesis:us-west-2:123456789012:stream/",
                     "arn:aws:kinesis:us-west-2:123456789012:stream",
                 ];
-                foreach (var malformedArn in malformedArns)
-                {
-                    var malformedConfig = BuildConfig(new Dictionary<string, string?>
+                    foreach (var malformedArn in malformedArns)
                     {
-                        [$"Orleans:Streaming:{provider}:ProviderType"] = "Kinesis",
-                        [$"Orleans:Streaming:{provider}:StreamArn"] = malformedArn,
-                    }, providerName: provider);
-                    using var malformedHost = BuildSiloHost(malformedConfig);
-                    var malformedException = Assert.Throws<OrleansConfigurationException>(
-                        () => Resolve(malformedHost, provider));
+                        var malformedConfig = BuildConfig(new Dictionary<string, string?>
+                        {
+                            [$"Orleans:Streaming:{provider}:ProviderType"] = "Kinesis",
+                            [$"Orleans:Streaming:{provider}:StreamArn"] = malformedArn,
+                        }, providerName: provider);
+                        using var malformedHost = BuildSiloHost(malformedConfig);
+                        var malformedException = Assert.Throws<OrleansConfigurationException>(
+                            () => Resolve(malformedHost, provider));
+                        Assert.Equal(
+                            $"Kinesis stream provider '{provider}' has invalid StreamArn '{malformedArn}'.",
+                            malformedException.Message);
+                    }
+
+                    var duplicateKeyException = Assert.Throws<InvalidOperationException>(() =>
+                        KinesisAspireTestApp.NormalizeConfiguration(new Dictionary<string, string?>
+                        {
+                            ["AWS__Region"] = "us-west-2",
+                            ["AWS:Region"] = "eu-west-1",
+                        }));
                     Assert.Equal(
-                        $"Kinesis stream provider '{provider}' has invalid StreamArn '{malformedArn}'.",
-                        malformedException.Message);
+                        "Environment keys normalize to duplicate configuration key 'AWS:Region'.",
+                        duplicateKeyException.Message);
+
+                    break;
                 }
-
-                var duplicateKeyException = Assert.Throws<InvalidOperationException>(() =>
-                    KinesisAspireTestApp.NormalizeConfiguration(new Dictionary<string, string?>
-                    {
-                        ["AWS__Region"] = "us-west-2",
-                        ["AWS:Region"] = "eu-west-1",
-                    }));
-                Assert.Equal(
-                    "Environment keys normalize to duplicate configuration key 'AWS:Region'.",
-                    duplicateKeyException.Message);
-
-                break;
-            }
             default:
                 throw new ArgumentOutOfRangeException(nameof(scenario), scenario, "Unknown scenario.");
         }
