@@ -56,7 +56,29 @@
     <Exec
       Command="npm ci --prefer-offline --no-audit $(NpmFetchRetryArgs)"
       WorkingDirectory="$(NpmAppRootDirectory)"
-      ConsoleToMsBuild="true" />
+      ConsoleToMsBuild="true"
+      IgnoreExitCode="true">
+      <Output TaskParameter="ExitCode" PropertyName="NpmInstallExitCode" />
+    </Exec>
+
+    <Message
+      Condition="'$(NpmInstallExitCode)' == '152' and $([MSBuild]::IsOSPlatform('Linux'))"
+      Importance="High"
+      Text="npm ci exit code 152 maps to SIGXCPU (signal 24) on Linux." />
+
+    <Exec
+      Condition="'$(NpmInstallExitCode)' != '0' and $([MSBuild]::IsOSPlatform('Linux'))"
+      Command="echo 'Linux resource snapshot after npm ci failure:'; uname -a; echo 'Process limits:'; cat /proc/self/limits; echo 'CPU cgroup quota and usage:'; if test -r /sys/fs/cgroup/cpu.max; then cat /sys/fs/cgroup/cpu.max; fi; if test -r /sys/fs/cgroup/cpu.stat; then cat /sys/fs/cgroup/cpu.stat; fi; echo 'Memory cgroup limit, usage, peak, and events:'; if test -r /sys/fs/cgroup/memory.max; then cat /sys/fs/cgroup/memory.max; fi; if test -r /sys/fs/cgroup/memory.current; then cat /sys/fs/cgroup/memory.current; fi; if test -r /sys/fs/cgroup/memory.peak; then cat /sys/fs/cgroup/memory.peak; fi; if test -r /sys/fs/cgroup/memory.events; then cat /sys/fs/cgroup/memory.events; fi; echo 'System memory:'; free -h; echo 'Workspace disk:'; df -h .; echo 'Largest processes by resident memory:'; ps -eo pid,ppid,stat,etimes,pcpu,pmem,rss,vsz,comm --sort=-rss | head -n 20"
+      WorkingDirectory="$(NpmAppRootDirectory)"
+      ConsoleToMsBuild="true"
+      StandardOutputImportance="High"
+      StandardErrorImportance="High"
+      IgnoreExitCode="true" />
+
+    <Error
+      Condition="'$(NpmInstallExitCode)' != '0'"
+      Code="MSB3073"
+      Text="The command &quot;npm ci --prefer-offline --no-audit $(NpmFetchRetryArgs)&quot; exited with code $(NpmInstallExitCode)." />
 
     <!-- Build the frontend -->
     <Exec
