@@ -1,9 +1,12 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Orleans.DurableTasks;
 
 /// <summary>Provides the host entry points for running and canceling durable definitions.</summary>
 public static class DurableTaskRuntimeHelper
 {
     /// <summary>Runs <paramref name="task"/> in <paramref name="context"/> and converts terminal exceptions to responses.</summary>
+    [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Durable task failures are represented as terminal responses.")]
     public static async ValueTask<DurableTaskResponse> RunAsync(DurableTask task, DurableExecutionContext context)
     {
         ArgumentNullException.ThrowIfNull(task);

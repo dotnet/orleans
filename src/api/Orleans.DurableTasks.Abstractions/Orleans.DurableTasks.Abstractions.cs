@@ -10,9 +10,9 @@ namespace Orleans.DurableTasks
 {
     public sealed partial class CanceledDurableTaskResponse : DurableTaskResponse
     {
-        public CanceledDurableTaskResponse(OperationCanceledException exception) { }
+        public CanceledDurableTaskResponse(System.OperationCanceledException exception) { }
 
-        public override OperationCanceledException Exception { get { throw null; } }
+        public override System.OperationCanceledException Exception { get { throw null; } }
 
         public static CanceledDurableTaskResponse Instance { get { throw null; } }
 
@@ -25,26 +25,26 @@ namespace Orleans.DurableTasks
 
     public partial struct ConfiguredDurableTask
     {
-        public Threading.Tasks.ValueTask CancelAsync(Threading.CancellationToken cancellationToken = default) { throw null; }
+        public System.Threading.Tasks.ValueTask CancelAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
         public DurableTaskAwaiter GetAwaiter() { throw null; }
 
-        public Threading.Tasks.Task<DurableTaskStatus> PollAsync(PollingOptions options = default, Threading.CancellationToken cancellationToken = default) { throw null; }
+        public System.Threading.Tasks.Task<DurableTaskStatus> PollAsync(PollingOptions options = default, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
-        public Threading.Tasks.Task<ScheduledTask> ScheduleAsync(Threading.CancellationToken cancellationToken = default) { throw null; }
+        public System.Threading.Tasks.Task<ScheduledTask> ScheduleAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
         public ConfiguredDurableTask WithId(string segment) { throw null; }
     }
 
     public partial struct ConfiguredDurableTask<TResult>
     {
-        public Threading.Tasks.ValueTask CancelAsync(Threading.CancellationToken cancellationToken = default) { throw null; }
+        public System.Threading.Tasks.ValueTask CancelAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
         public DurableTaskAwaiter<TResult> GetAwaiter() { throw null; }
 
-        public Threading.Tasks.Task<DurableTaskStatus> PollAsync(PollingOptions options = default, Threading.CancellationToken cancellationToken = default) { throw null; }
+        public System.Threading.Tasks.Task<DurableTaskStatus> PollAsync(PollingOptions options = default, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
-        public Threading.Tasks.Task<ScheduledTask<TResult>> ScheduleAsync(Threading.CancellationToken cancellationToken = default) { throw null; }
+        public System.Threading.Tasks.Task<ScheduledTask<TResult>> ScheduleAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
         public ConfiguredDurableTask<TResult> WithId(string segment) { throw null; }
     }
@@ -54,7 +54,7 @@ namespace Orleans.DurableTasks
         private readonly ScheduledTask<TResult> _task_P;
         private readonly object _dummy;
         private readonly int _dummyPrimitive;
-        public ConfiguredScheduledTaskAwaitable(ScheduledTask<TResult> task, Threading.CancellationToken cancellationToken) { }
+        public ConfiguredScheduledTaskAwaitable(ScheduledTask<TResult> task, System.Threading.CancellationToken cancellationToken) { }
 
         public readonly ScheduledTaskAwaiter<TResult> GetAwaiter() { throw null; }
     }
@@ -63,7 +63,7 @@ namespace Orleans.DurableTasks
     {
         protected DurableExecutionContext(TaskId taskId) { }
 
-        public Threading.CancellationToken CancellationToken { get { throw null; } }
+        public System.Threading.CancellationToken CancellationToken { get { throw null; } }
 
         public static DurableExecutionContext? Current { get { throw null; } }
 
@@ -71,71 +71,71 @@ namespace Orleans.DurableTasks
 
         public TaskId TaskId { get { throw null; } }
 
-        public abstract DateTimeOffset UtcNow { get; }
+        public abstract System.DateTimeOffset UtcNow { get; }
 
         protected internal virtual TaskId CreateChildTaskId(string? name) { throw null; }
 
         protected internal abstract IScheduledTaskHandle GetChildTaskHandle(TaskId taskId);
-        public Threading.Tasks.ValueTask<IAsyncDisposable> RegisterCancellationCallbackAsync(Func<Threading.CancellationToken, Threading.Tasks.ValueTask> callback, Threading.CancellationToken cancellationToken = default) { throw null; }
+        public System.Threading.Tasks.ValueTask<System.IAsyncDisposable> RegisterCancellationCallbackAsync(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask> callback, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
-        protected internal abstract Threading.Tasks.ValueTask<IScheduledTaskHandle> ScheduleChildTaskAsync(TaskId taskId, DurableTask taskDefinition, Threading.CancellationToken cancellationToken);
-        protected internal abstract Threading.Tasks.ValueTask<DurableTaskResponse> ScheduleDelayAsync(TaskId taskId, DateTimeOffset dueTime, Threading.CancellationToken cancellationToken);
-        protected internal abstract Threading.Tasks.ValueTask<TaskId> SelectCompletionAsync(TaskId decisionId, Collections.Generic.IReadOnlyList<TaskId> candidates, Threading.CancellationToken cancellationToken);
+        protected internal abstract System.Threading.Tasks.ValueTask<IScheduledTaskHandle> ScheduleChildTaskAsync(TaskId taskId, DurableTask taskDefinition, System.Threading.CancellationToken cancellationToken);
+        protected internal abstract System.Threading.Tasks.ValueTask<DurableTaskResponse> ScheduleDelayAsync(TaskId taskId, System.DateTimeOffset dueTime, System.Threading.CancellationToken cancellationToken);
+        protected internal abstract System.Threading.Tasks.ValueTask<TaskId> SelectCompletionAsync(TaskId decisionId, System.Collections.Generic.IReadOnlyList<TaskId> candidates, System.Threading.CancellationToken cancellationToken);
     }
 
-    [Runtime.CompilerServices.AsyncMethodBuilder(typeof(DurableTaskMethodBuilder))]
+    [System.Runtime.CompilerServices.AsyncMethodBuilder(typeof(DurableTaskMethodBuilder))]
     public abstract partial class DurableTask
     {
-        public static DurableTask Delay(TimeSpan duration) { throw null; }
+        public static DurableTask Delay(System.TimeSpan duration) { throw null; }
 
         public static DurableTask<TResult> FromResult<TResult>(TResult value) { throw null; }
 
-        public static DurableTask Run(Action<Threading.CancellationToken> action) { throw null; }
+        public static DurableTask Run(System.Action<System.Threading.CancellationToken> action) { throw null; }
 
-        public static DurableTask Run(Func<Threading.CancellationToken, Threading.Tasks.Task> function) { throw null; }
+        public static DurableTask Run(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task> function) { throw null; }
 
-        public static DurableTask Run<TState>(Action<TState, Threading.CancellationToken> action, TState state) { throw null; }
+        public static DurableTask Run<TState>(System.Action<TState, System.Threading.CancellationToken> action, TState state) { throw null; }
 
-        public static DurableTask Run<TState>(Func<TState, Threading.CancellationToken, Threading.Tasks.Task> function, TState state) { throw null; }
+        public static DurableTask Run<TState>(System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task> function, TState state) { throw null; }
 
-        public static DurableTask<TResult> Run<TResult>(Func<Threading.CancellationToken, TResult> function) { throw null; }
+        public static DurableTask<TResult> Run<TResult>(System.Func<System.Threading.CancellationToken, TResult> function) { throw null; }
 
-        public static DurableTask<TResult> Run<TResult>(Func<Threading.CancellationToken, Threading.Tasks.Task<TResult>> function) { throw null; }
+        public static DurableTask<TResult> Run<TResult>(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<TResult>> function) { throw null; }
 
-        public static DurableTask<TResult> Run<TState, TResult>(Func<TState, Threading.CancellationToken, TResult> function, TState state) { throw null; }
+        public static DurableTask<TResult> Run<TState, TResult>(System.Func<TState, System.Threading.CancellationToken, TResult> function, TState state) { throw null; }
 
-        public static DurableTask<TResult> Run<TState, TResult>(Func<TState, Threading.CancellationToken, Threading.Tasks.Task<TResult>> function, TState state) { throw null; }
+        public static DurableTask<TResult> Run<TState, TResult>(System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task<TResult>> function, TState state) { throw null; }
 
-        protected internal abstract Threading.Tasks.ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context);
-        public static DurableTask<Collections.Generic.IReadOnlyList<TaskId>> WhenAll(Collections.Generic.IReadOnlyList<DurableTask> tasks) { throw null; }
+        protected internal abstract System.Threading.Tasks.ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context);
+        public static DurableTask<System.Collections.Generic.IReadOnlyList<TaskId>> WhenAll(System.Collections.Generic.IReadOnlyList<DurableTask> tasks) { throw null; }
 
-        public static DurableTask<Collections.Generic.IReadOnlyList<TaskId>> WhenAll<TResult>(Collections.Generic.IReadOnlyList<DurableTask<TResult>> tasks) { throw null; }
+        public static DurableTask<System.Collections.Generic.IReadOnlyList<TaskId>> WhenAll<TResult>(System.Collections.Generic.IReadOnlyList<DurableTask<TResult>> tasks) { throw null; }
 
-        public static DurableTask<TaskId> WhenAny(Collections.Generic.IReadOnlyList<DurableTask> tasks) { throw null; }
+        public static DurableTask<TaskId> WhenAny(System.Collections.Generic.IReadOnlyList<DurableTask> tasks) { throw null; }
 
-        public static DurableTask<TaskId> WhenAny<TResult>(Collections.Generic.IReadOnlyList<DurableTask<TResult>> tasks) { throw null; }
+        public static DurableTask<TaskId> WhenAny<TResult>(System.Collections.Generic.IReadOnlyList<DurableTask<TResult>> tasks) { throw null; }
     }
 
-    public readonly partial struct DurableTaskAwaiter : Runtime.CompilerServices.ICriticalNotifyCompletion, Runtime.CompilerServices.INotifyCompletion
+    public readonly partial struct DurableTaskAwaiter : System.Runtime.CompilerServices.ICriticalNotifyCompletion, System.Runtime.CompilerServices.INotifyCompletion
     {
         public bool IsCompleted { get { throw null; } }
 
         public readonly void GetResult() { }
 
-        public readonly void OnCompleted(Action continuation) { }
+        public readonly void OnCompleted(System.Action continuation) { }
 
-        public readonly void UnsafeOnCompleted(Action continuation) { }
+        public readonly void UnsafeOnCompleted(System.Action continuation) { }
     }
 
-    public readonly partial struct DurableTaskAwaiter<TResult> : Runtime.CompilerServices.ICriticalNotifyCompletion, Runtime.CompilerServices.INotifyCompletion
+    public readonly partial struct DurableTaskAwaiter<TResult> : System.Runtime.CompilerServices.ICriticalNotifyCompletion, System.Runtime.CompilerServices.INotifyCompletion
     {
         public bool IsCompleted { get { throw null; } }
 
         public readonly TResult GetResult() { throw null; }
 
-        public readonly void OnCompleted(Action continuation) { }
+        public readonly void OnCompleted(System.Action continuation) { }
 
-        public readonly void UnsafeOnCompleted(Action continuation) { }
+        public readonly void UnsafeOnCompleted(System.Action continuation) { }
     }
 
     public static partial class DurableTaskExtensions
@@ -144,9 +144,9 @@ namespace Orleans.DurableTasks
 
         public static DurableTaskAwaiter<TResult> GetAwaiter<TResult>(this DurableTask<TResult> task) { throw null; }
 
-        public static Threading.Tasks.Task<ScheduledTask> ScheduleAsync(this DurableTask task, string rootId, Threading.CancellationToken cancellationToken = default) { throw null; }
+        public static System.Threading.Tasks.Task<ScheduledTask> ScheduleAsync(this DurableTask task, string rootId, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
-        public static Threading.Tasks.Task<ScheduledTask<TResult>> ScheduleAsync<TResult>(this DurableTask<TResult> task, string rootId, Threading.CancellationToken cancellationToken = default) { throw null; }
+        public static System.Threading.Tasks.Task<ScheduledTask<TResult>> ScheduleAsync<TResult>(this DurableTask<TResult> task, string rootId, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
         public static ConfiguredDurableTask WithId(this DurableTask task, string segment) { throw null; }
 
@@ -160,21 +160,21 @@ namespace Orleans.DurableTasks
         public DurableTask Task { get { throw null; } }
 
         public readonly void AwaitOnCompleted<TAwaiter, TStateMachine>(ref TAwaiter awaiter, ref TStateMachine stateMachine)
-            where TAwaiter : Runtime.CompilerServices.INotifyCompletion where TStateMachine : Runtime.CompilerServices.IAsyncStateMachine { }
+            where TAwaiter : System.Runtime.CompilerServices.INotifyCompletion where TStateMachine : System.Runtime.CompilerServices.IAsyncStateMachine { }
 
         public readonly void AwaitUnsafeOnCompleted<TAwaiter, TStateMachine>(ref TAwaiter awaiter, ref TStateMachine stateMachine)
-            where TAwaiter : Runtime.CompilerServices.ICriticalNotifyCompletion where TStateMachine : Runtime.CompilerServices.IAsyncStateMachine { }
+            where TAwaiter : System.Runtime.CompilerServices.ICriticalNotifyCompletion where TStateMachine : System.Runtime.CompilerServices.IAsyncStateMachine { }
 
         public static DurableTaskMethodBuilder Create() { throw null; }
 
-        public readonly void SetException(Exception exception) { }
+        public readonly void SetException(System.Exception exception) { }
 
         public readonly void SetResult() { }
 
-        public readonly void SetStateMachine(Runtime.CompilerServices.IAsyncStateMachine stateMachine) { }
+        public readonly void SetStateMachine(System.Runtime.CompilerServices.IAsyncStateMachine stateMachine) { }
 
         public void Start<TStateMachine>(ref TStateMachine stateMachine)
-            where TStateMachine : Runtime.CompilerServices.IAsyncStateMachine { }
+            where TStateMachine : System.Runtime.CompilerServices.IAsyncStateMachine { }
     }
 
     public partial struct DurableTaskMethodBuilder<TResult>
@@ -184,21 +184,21 @@ namespace Orleans.DurableTasks
         public DurableTask<TResult> Task { get { throw null; } }
 
         public readonly void AwaitOnCompleted<TAwaiter, TStateMachine>(ref TAwaiter awaiter, ref TStateMachine stateMachine)
-            where TAwaiter : Runtime.CompilerServices.INotifyCompletion where TStateMachine : Runtime.CompilerServices.IAsyncStateMachine { }
+            where TAwaiter : System.Runtime.CompilerServices.INotifyCompletion where TStateMachine : System.Runtime.CompilerServices.IAsyncStateMachine { }
 
         public readonly void AwaitUnsafeOnCompleted<TAwaiter, TStateMachine>(ref TAwaiter awaiter, ref TStateMachine stateMachine)
-            where TAwaiter : Runtime.CompilerServices.ICriticalNotifyCompletion where TStateMachine : Runtime.CompilerServices.IAsyncStateMachine { }
+            where TAwaiter : System.Runtime.CompilerServices.ICriticalNotifyCompletion where TStateMachine : System.Runtime.CompilerServices.IAsyncStateMachine { }
 
         public static DurableTaskMethodBuilder<TResult> Create() { throw null; }
 
-        public readonly void SetException(Exception exception) { }
+        public readonly void SetException(System.Exception exception) { }
 
         public readonly void SetResult(TResult result) { }
 
-        public readonly void SetStateMachine(Runtime.CompilerServices.IAsyncStateMachine stateMachine) { }
+        public readonly void SetStateMachine(System.Runtime.CompilerServices.IAsyncStateMachine stateMachine) { }
 
         public void Start<TStateMachine>(ref TStateMachine stateMachine)
-            where TStateMachine : Runtime.CompilerServices.IAsyncStateMachine { }
+            where TStateMachine : System.Runtime.CompilerServices.IAsyncStateMachine { }
     }
 
     public abstract partial class DurableTaskResponse
@@ -209,7 +209,7 @@ namespace Orleans.DurableTasks
 
         public static DurableTaskResponse Completed { get { throw null; } }
 
-        public abstract Exception? Exception { get; }
+        public abstract System.Exception? Exception { get; }
 
         public bool IsCompleted { get { throw null; } }
 
@@ -218,20 +218,20 @@ namespace Orleans.DurableTasks
         public abstract DurableTaskResponseKind ResponseKind { get; }
         public abstract object? Result { get; }
 
-        public virtual Type? ResultType { get { throw null; } }
+        public virtual System.Type? ResultType { get { throw null; } }
 
         public DurableTaskStatus Status { get { throw null; } }
 
         public static DurableTaskResponse Subscribed { get { throw null; } }
 
-        public static DurableTaskResponse FromCanceled(OperationCanceledException exception) { throw null; }
+        public static DurableTaskResponse FromCanceled(System.OperationCanceledException exception) { throw null; }
 
-        public static DurableTaskResponse FromException(Exception exception) { throw null; }
+        public static DurableTaskResponse FromException(System.Exception exception) { throw null; }
 
         public static DurableTaskResponse<TResult> FromResult<TResult>(TResult value) { throw null; }
 
         public abstract T GetResult<T>();
-        protected static InvalidOperationException Incomplete() { throw null; }
+        protected static System.InvalidOperationException Incomplete() { throw null; }
     }
 
     public enum DurableTaskResponseKind
@@ -248,13 +248,13 @@ namespace Orleans.DurableTasks
     {
         public DurableTaskResponse(TResult result) { }
 
-        public override Exception? Exception { get { throw null; } }
+        public override System.Exception? Exception { get { throw null; } }
 
         public override DurableTaskResponseKind ResponseKind { get { throw null; } }
 
         public override object? Result { get { throw null; } }
 
-        public override Type ResultType { get { throw null; } }
+        public override System.Type ResultType { get { throw null; } }
 
         public TResult TypedResult { get { throw null; } }
 
@@ -263,9 +263,9 @@ namespace Orleans.DurableTasks
 
     public static partial class DurableTaskRuntimeHelper
     {
-        public static Threading.Tasks.Task RequestCancellationAsync(DurableExecutionContext context, Threading.CancellationToken cancellationToken = default) { throw null; }
+        public static System.Threading.Tasks.Task RequestCancellationAsync(DurableExecutionContext context, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
-        public static Threading.Tasks.ValueTask<DurableTaskResponse> RunAsync(DurableTask task, DurableExecutionContext context) { throw null; }
+        public static System.Threading.Tasks.ValueTask<DurableTaskResponse> RunAsync(DurableTask task, DurableExecutionContext context) { throw null; }
     }
 
     public enum DurableTaskStatus
@@ -277,16 +277,16 @@ namespace Orleans.DurableTasks
         Failed = 4
     }
 
-    [Runtime.CompilerServices.AsyncMethodBuilder(typeof(DurableTaskMethodBuilder<>))]
+    [System.Runtime.CompilerServices.AsyncMethodBuilder(typeof(DurableTaskMethodBuilder<>))]
     public abstract partial class DurableTask<TResult> : DurableTask
     {
     }
 
     public sealed partial class ExceptionDurableTaskResponse : DurableTaskResponse
     {
-        public ExceptionDurableTaskResponse(Exception exception) { }
+        public ExceptionDurableTaskResponse(System.Exception exception) { }
 
-        public override Exception Exception { get { throw null; } }
+        public override System.Exception Exception { get { throw null; } }
 
         public override DurableTaskResponseKind ResponseKind { get { throw null; } }
 
@@ -298,23 +298,23 @@ namespace Orleans.DurableTasks
     public partial interface ISchedulableTask
     {
         IScheduledTaskHandle GetHandle(TaskId taskId);
-        Threading.Tasks.ValueTask<DurableTaskResponse> ScheduleAsync(TaskId taskId, Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.ValueTask<DurableTaskResponse> ScheduleAsync(TaskId taskId, System.Threading.CancellationToken cancellationToken);
     }
 
     public partial interface IScheduledTaskHandle
     {
         TaskId TaskId { get; }
 
-        Threading.Tasks.ValueTask CancelAsync(Threading.CancellationToken cancellationToken);
-        Threading.Tasks.ValueTask<DurableTaskResponse> PollAsync(PollingOptions options, Threading.CancellationToken cancellationToken);
-        Threading.Tasks.ValueTask<DurableTaskResponse> WaitAsync(Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.ValueTask CancelAsync(System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.ValueTask<DurableTaskResponse> PollAsync(PollingOptions options, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.ValueTask<DurableTaskResponse> WaitAsync(System.Threading.CancellationToken cancellationToken);
     }
 
     public sealed partial class PendingDurableTaskResponse : DurableTaskResponse
     {
         internal PendingDurableTaskResponse() { }
 
-        public override Exception? Exception { get { throw null; } }
+        public override System.Exception? Exception { get { throw null; } }
 
         public static PendingDurableTaskResponse Instance { get { throw null; } }
 
@@ -325,12 +325,22 @@ namespace Orleans.DurableTasks
         public override T GetResult<T>() { throw null; }
     }
 
-    public readonly partial struct PollingOptions
+    public readonly partial struct PollingOptions : System.IEquatable<PollingOptions>
     {
         private readonly int _dummyPrimitive;
-        public static TimeSpan DefaultPollTimeout { get { throw null; } }
+        public static System.TimeSpan DefaultPollTimeout { get { throw null; } }
 
-        public TimeSpan PollTimeout { get { throw null; } init { } }
+        public System.TimeSpan PollTimeout { get { throw null; } init { } }
+
+        public readonly bool Equals(PollingOptions other) { throw null; }
+
+        public override readonly bool Equals(object? obj) { throw null; }
+
+        public override readonly int GetHashCode() { throw null; }
+
+        public static bool operator ==(PollingOptions left, PollingOptions right) { throw null; }
+
+        public static bool operator !=(PollingOptions left, PollingOptions right) { throw null; }
     }
 
     public abstract partial class ScheduledTask
@@ -339,50 +349,50 @@ namespace Orleans.DurableTasks
 
         public abstract TaskId Id { get; }
 
-        public abstract Threading.Tasks.ValueTask CancelAsync(Threading.CancellationToken cancellationToken = default);
+        public abstract System.Threading.Tasks.ValueTask CancelAsync(System.Threading.CancellationToken cancellationToken = default);
         public ScheduledTaskAwaiter GetAwaiter() { throw null; }
 
-        public Threading.Tasks.Task<DurableTaskResponse> GetResponseAsync(PollingOptions options, Threading.CancellationToken cancellationToken = default) { throw null; }
+        public System.Threading.Tasks.Task<DurableTaskResponse> GetResponseAsync(PollingOptions options, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
-        public Threading.Tasks.Task<DurableTaskResponse> GetResponseAsync(Threading.CancellationToken cancellationToken = default) { throw null; }
+        public System.Threading.Tasks.Task<DurableTaskResponse> GetResponseAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
-        public Threading.Tasks.Task<DurableTaskStatus> GetStatusAsync(PollingOptions options = default, Threading.CancellationToken cancellationToken = default) { throw null; }
+        public System.Threading.Tasks.Task<DurableTaskStatus> GetStatusAsync(PollingOptions options = default, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
-        public Threading.Tasks.Task<bool> IsCompletedAsync(PollingOptions options = default, Threading.CancellationToken cancellationToken = default) { throw null; }
+        public System.Threading.Tasks.Task<bool> IsCompletedAsync(PollingOptions options = default, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
-        protected abstract Threading.Tasks.ValueTask<DurableTaskResponse> PollAsyncCore(PollingOptions options, Threading.CancellationToken cancellationToken);
-        public Threading.Tasks.ValueTask WaitAsync(Threading.CancellationToken cancellationToken = default) { throw null; }
+        protected abstract System.Threading.Tasks.ValueTask<DurableTaskResponse> PollAsyncCore(PollingOptions options, System.Threading.CancellationToken cancellationToken);
+        public System.Threading.Tasks.ValueTask WaitAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
-        protected internal abstract Threading.Tasks.ValueTask<DurableTaskResponse> WaitAsyncCore(Threading.CancellationToken cancellationToken);
-        public static Threading.Tasks.Task WhenAll(Collections.Generic.IReadOnlyList<ScheduledTask> tasks, Threading.CancellationToken cancellationToken = default) { throw null; }
+        protected internal abstract System.Threading.Tasks.ValueTask<DurableTaskResponse> WaitAsyncCore(System.Threading.CancellationToken cancellationToken);
+        public static System.Threading.Tasks.Task WhenAll(System.Collections.Generic.IReadOnlyList<ScheduledTask> tasks, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
-        public static Threading.Tasks.Task WhenAll<TResult>(Collections.Generic.IReadOnlyList<ScheduledTask<TResult>> tasks, Threading.CancellationToken cancellationToken = default) { throw null; }
+        public static System.Threading.Tasks.Task WhenAll<TResult>(System.Collections.Generic.IReadOnlyList<ScheduledTask<TResult>> tasks, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
-        public static Threading.Tasks.Task<ScheduledTask> WhenAny(Collections.Generic.IReadOnlyList<ScheduledTask> tasks, Threading.CancellationToken cancellationToken = default) { throw null; }
+        public static System.Threading.Tasks.Task<ScheduledTask> WhenAny(System.Collections.Generic.IReadOnlyList<ScheduledTask> tasks, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
-        public static Threading.Tasks.Task<ScheduledTask<TResult>> WhenAny<TResult>(Collections.Generic.IReadOnlyList<ScheduledTask<TResult>> tasks, Threading.CancellationToken cancellationToken = default) { throw null; }
+        public static System.Threading.Tasks.Task<ScheduledTask<TResult>> WhenAny<TResult>(System.Collections.Generic.IReadOnlyList<ScheduledTask<TResult>> tasks, System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }
 
-    public readonly partial struct ScheduledTaskAwaiter : Runtime.CompilerServices.ICriticalNotifyCompletion, Runtime.CompilerServices.INotifyCompletion
+    public readonly partial struct ScheduledTaskAwaiter : System.Runtime.CompilerServices.ICriticalNotifyCompletion, System.Runtime.CompilerServices.INotifyCompletion
     {
         public bool IsCompleted { get { throw null; } }
 
         public readonly void GetResult() { }
 
-        public readonly void OnCompleted(Action continuation) { }
+        public readonly void OnCompleted(System.Action continuation) { }
 
-        public readonly void UnsafeOnCompleted(Action continuation) { }
+        public readonly void UnsafeOnCompleted(System.Action continuation) { }
     }
 
-    public readonly partial struct ScheduledTaskAwaiter<TResult> : Runtime.CompilerServices.ICriticalNotifyCompletion, Runtime.CompilerServices.INotifyCompletion
+    public readonly partial struct ScheduledTaskAwaiter<TResult> : System.Runtime.CompilerServices.ICriticalNotifyCompletion, System.Runtime.CompilerServices.INotifyCompletion
     {
         public bool IsCompleted { get { throw null; } }
 
         public readonly TResult GetResult() { throw null; }
 
-        public readonly void OnCompleted(Action continuation) { }
+        public readonly void OnCompleted(System.Action continuation) { }
 
-        public readonly void UnsafeOnCompleted(Action continuation) { }
+        public readonly void UnsafeOnCompleted(System.Action continuation) { }
     }
 
     public abstract partial class ScheduledTask<TResult> : ScheduledTask
@@ -391,14 +401,14 @@ namespace Orleans.DurableTasks
 
         public new ScheduledTaskAwaiter<TResult> GetAwaiter() { throw null; }
 
-        public new ConfiguredScheduledTaskAwaitable<TResult> WaitAsync(Threading.CancellationToken cancellationToken = default) { throw null; }
+        public new ConfiguredScheduledTaskAwaitable<TResult> WaitAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }
 
     public sealed partial class SubscribedDurableTaskResponse : DurableTaskResponse
     {
         internal SubscribedDurableTaskResponse() { }
 
-        public override Exception? Exception { get { throw null; } }
+        public override System.Exception? Exception { get { throw null; } }
 
         public static SubscribedDurableTaskResponse Instance { get { throw null; } }
 
@@ -413,7 +423,7 @@ namespace Orleans.DurableTasks
     {
         internal SuccessDurableTaskResponse() { }
 
-        public override Exception? Exception { get { throw null; } }
+        public override System.Exception? Exception { get { throw null; } }
 
         public static SuccessDurableTaskResponse Instance { get { throw null; } }
 
@@ -424,7 +434,7 @@ namespace Orleans.DurableTasks
         public override T GetResult<T>() { throw null; }
     }
 
-    public readonly partial struct TaskId : IEquatable<TaskId>, IParsable<TaskId>, ISpanParsable<TaskId>, ISpanFormattable, IFormattable
+    public readonly partial struct TaskId : System.IEquatable<TaskId>, System.IParsable<TaskId>, System.ISpanParsable<TaskId>, System.ISpanFormattable, System.IFormattable
     {
         private readonly object _dummy;
         private readonly int _dummyPrimitive;
@@ -460,26 +470,26 @@ namespace Orleans.DurableTasks
 
         public readonly TaskId Parent() { throw null; }
 
-        static TaskId ISpanParsable<TaskId>.Parse(ReadOnlySpan<char> s, IFormatProvider? provider) { throw null; }
+        static TaskId System.ISpanParsable<TaskId>.Parse(System.ReadOnlySpan<char> s, System.IFormatProvider? provider) { throw null; }
 
-        public static TaskId Parse(ReadOnlySpan<char> s) { throw null; }
+        public static TaskId Parse(System.ReadOnlySpan<char> s) { throw null; }
 
-        static TaskId IParsable<TaskId>.Parse(string s, IFormatProvider? provider) { throw null; }
+        static TaskId System.IParsable<TaskId>.Parse(string s, System.IFormatProvider? provider) { throw null; }
 
         public static TaskId Parse(string s) { throw null; }
 
         public override readonly string ToString() { throw null; }
 
-        public readonly string ToString(string? format, IFormatProvider? formatProvider) { throw null; }
+        public readonly string ToString(string? format, System.IFormatProvider? formatProvider) { throw null; }
 
-        public readonly bool TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider) { throw null; }
+        public readonly bool TryFormat(System.Span<char> destination, out int charsWritten, System.ReadOnlySpan<char> format, System.IFormatProvider? provider) { throw null; }
 
-        public static bool TryParse(ReadOnlySpan<char> s, out TaskId result) { throw null; }
+        public static bool TryParse(System.ReadOnlySpan<char> s, out TaskId result) { throw null; }
 
-        static bool ISpanParsable<TaskId>.TryParse(ReadOnlySpan<char> s, IFormatProvider? provider, out TaskId result) { throw null; }
+        static bool System.ISpanParsable<TaskId>.TryParse(System.ReadOnlySpan<char> s, System.IFormatProvider? provider, out TaskId result) { throw null; }
 
         public static bool TryParse(string? s, out TaskId result) { throw null; }
 
-        static bool IParsable<TaskId>.TryParse(string? s, IFormatProvider? provider, out TaskId result) { throw null; }
+        static bool System.IParsable<TaskId>.TryParse(string? s, System.IFormatProvider? provider, out TaskId result) { throw null; }
     }
 }

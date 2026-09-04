@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 
 namespace Orleans.DurableTasks;
@@ -219,6 +220,7 @@ internal sealed class DelayDurableTask(TimeSpan duration) : DurableTask
 
 internal abstract class DelegateDurableTaskBase : DurableTask
 {
+    [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Durable task failures are represented as terminal responses.")]
     protected async ValueTask<DurableTaskResponse> InvokeAsync(
         DurableExecutionContext context,
         Func<CancellationToken, ValueTask<DurableTaskResponse>> callback)
@@ -248,6 +250,7 @@ internal sealed class DelegateDurableTask(Action<CancellationToken> action) : De
 
 internal sealed class DelegateDurableTask<TResult>(Func<CancellationToken, TResult> function) : DurableTask<TResult>
 {
+    [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Durable task failures are represented as terminal responses.")]
     protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)
     {
         using var scope = DurableExecutionContext.Enter(context);
@@ -275,6 +278,7 @@ internal sealed class AsyncDelegateDurableTask(Func<CancellationToken, Task> fun
 
 internal class AsyncDelegateDurableTask<TResult>(Func<CancellationToken, Task<TResult>> function) : DurableTask<TResult>
 {
+    [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Durable task failures are represented as terminal responses.")]
     protected internal override async ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)
     {
         using var scope = DurableExecutionContext.Enter(context);
@@ -400,6 +404,7 @@ internal struct ConfiguredDurableTaskCore<TTask> where TTask : DurableTask
 }
 
 /// <summary>Configures and schedules a durable task.</summary>
+[SuppressMessage("Performance", "CA1815:Override equals and operator equals on value types", Justification = "This mutable fluent configuration value has no equality contract.")]
 public struct ConfiguredDurableTask
 {
     private ConfiguredDurableTaskCore<DurableTask> _core;
@@ -448,6 +453,7 @@ public struct ConfiguredDurableTask
 }
 
 /// <summary>Configures and schedules a durable task with a result.</summary>
+[SuppressMessage("Performance", "CA1815:Override equals and operator equals on value types", Justification = "This mutable fluent configuration value has no equality contract.")]
 public struct ConfiguredDurableTask<TResult>
 {
     private ConfiguredDurableTaskCore<DurableTask<TResult>> _core;
