@@ -15,11 +15,12 @@ messages whose state effects and outgoing messages must survive activation loss.
 
 Each <xref:Orleans.DurableMessaging.DurableEnvelope> identifies its sender, target,
 route, message ID, optional <xref:Orleans.DurableMessaging.HierarchicalKey> correlation, optional
-`ReplyTo` grain ID, and an opaque serialized body. A receiver evaluates registered
-handlers in registration order. Handlers can select envelopes by exact route, route
-prefix, correlation hierarchy, or arbitrary metadata, and typed handlers deserialize
-the body only when selected. The receiving grain verifies that the envelope target
-matches its own identity before deduplication or persistence.
+`ReplyTo` grain ID, and an opaque serialized body. Exact route registrations take
+precedence. When no exact route is registered, a receiver evaluates generic handlers in
+registration order. Handlers can select envelopes by route prefix, correlation hierarchy,
+or arbitrary metadata, and typed handlers deserialize the body only when selected. The
+receiving grain verifies that the envelope target matches its own identity before
+deduplication or persistence.
 
 The preview correlation key type now belongs to this package as
 <xref:Orleans.DurableMessaging.HierarchicalKey>. Draft consumers of

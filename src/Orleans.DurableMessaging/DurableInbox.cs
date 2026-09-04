@@ -79,7 +79,7 @@ internal sealed class DurableInbox : IDurableInbox
 
     /// <summary>
     /// Registers a handler that will be evaluated using its CanHandle method.
-    /// Handlers are evaluated in registration order (first-match-wins).
+    /// When no exact route is registered, handlers are evaluated in registration order (first-match-wins).
     /// </summary>
     /// <param name="handler">The handler implementation.</param>
     public void RegisterHandler(IInboxHandler handler)
@@ -91,8 +91,9 @@ internal sealed class DurableInbox : IDurableInbox
     }
 
     /// <summary>
-    /// Tries to find a handler for the given context by calling CanHandle on registered handlers.
-    /// Returns the first handler that returns true from CanHandle.
+    /// Tries to find a handler for the given context.
+    /// Exact route registrations take precedence; otherwise, returns the first generic handler
+    /// that returns true from CanHandle.
     /// </summary>
     /// <param name="context">The inbox handler context containing envelope metadata.</param>
     /// <param name="handler">The handler if found; otherwise, null.</param>
@@ -100,6 +101,11 @@ internal sealed class DurableInbox : IDurableInbox
     internal bool TryFindHandler(IInboxHandlerContext context, [MaybeNullWhen(false)] out IInboxHandler handler)
     {
         ArgumentNullException.ThrowIfNull(context);
+
+        if (_exactRouteHandlers.TryGetValue(context.Envelope.RouteKey, out handler))
+        {
+            return true;
+        }
 
         foreach (var candidate in _handlers)
         {
@@ -129,8 +135,6 @@ internal sealed class DurableInbox : IDurableInbox
         {
             throw new InvalidOperationException($"A handler is already registered for exact route '{routeKey}'.");
         }
-
-        _handlers.Add(wrappedHandler);
 
     }
 
