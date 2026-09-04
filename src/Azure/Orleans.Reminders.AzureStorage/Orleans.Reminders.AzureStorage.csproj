@@ -18,6 +18,7 @@
     <Compile Include="..\Shared\Utilities\ErrorCode.cs" Link="Utilities\ErrorCode.cs" />
     <Compile Include="..\Shared\Storage\AzureStorageOperationOptions.cs" Link="Storage\AzureStorageOperationOptions.cs" />
     <Compile Include="..\Shared\Storage\AzureStoragePolicyOptions.cs" Link="Storage\AzureStoragePolicyOptions.cs" />
+    <GlobalAnalyzerConfigFiles Include="$(MSBuildThisFileDirectory)Orleans.Reminders.AzureStorage.globalconfig" />
   </ItemGroup>
 
   <ItemGroup>

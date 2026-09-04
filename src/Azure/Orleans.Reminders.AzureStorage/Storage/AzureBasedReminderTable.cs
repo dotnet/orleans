@@ -30,6 +30,9 @@ namespace Orleans.Runtime.ReminderService
         /// <param name="loggerFactory">The logger factory.</param>
         /// <param name="clusterOptions">The cluster identity options used to scope reminder entries.</param>
         /// <param name="storageOptions">The Azure Table Storage reminder options.</param>
+        /// <exception cref="ArgumentNullException">
+        /// <paramref name="clusterOptions"/> or <paramref name="storageOptions"/> is <see langword="null"/>.
+        /// </exception>
         public AzureBasedReminderTable(
             ILoggerFactory loggerFactory,
             IOptions<ClusterOptions> clusterOptions,
@@ -37,6 +40,8 @@ namespace Orleans.Runtime.ReminderService
         {
             this.logger = loggerFactory.CreateLogger<AzureBasedReminderTable>();
             this.loggerFactory = loggerFactory;
+            ArgumentNullException.ThrowIfNull(clusterOptions);
+            ArgumentNullException.ThrowIfNull(storageOptions);
             this.clusterOptions = clusterOptions.Value;
             this.storageOptions = storageOptions.Value;
             this.remTableManager = new RemindersTableManager(
@@ -284,8 +289,11 @@ namespace Orleans.Runtime.ReminderService
         /// </summary>
         /// <param name="entry">The reminder entry to store.</param>
         /// <returns>The new entity tag when the write succeeds; otherwise, <see langword="null"/>.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="entry"/> is <see langword="null"/>.</exception>
         public async Task<string?> UpsertRow(ReminderEntry entry)
         {
+            ArgumentNullException.ThrowIfNull(entry);
+
             try
             {
                 await Volatile.Read(ref _initializationTask).Task;
