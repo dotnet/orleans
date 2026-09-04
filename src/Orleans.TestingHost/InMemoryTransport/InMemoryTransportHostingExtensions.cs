@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Connections.Transport;
 using Orleans.Hosting;
+using Orleans.Runtime.Messaging;
 
 namespace Orleans.TestingHost.InMemoryTransport;
 
@@ -24,11 +25,11 @@ internal static class InMemoryTransportHostingExtensions
         siloBuilder.Services.RemoveAll<MessageTransportListener>();
         siloBuilder.Services.AddSingleton<MessageTransportConnector>(sp => new InMemoryTransportConnector(hub, sp.GetRequiredService<ILoggerFactory>()));
         siloBuilder.Services.AddSingleton<MessageTransportListener>(sp => new InMemoryTransportListener(
-            "gateway",
+            GatewayConnectionListener.DefaultListenerName,
             sp.GetRequiredService<IOptions<EndpointOptions>>().Value.GetListeningProxyEndpoint()?.ToString(),
             hub));
         siloBuilder.Services.AddSingleton<MessageTransportListener>(sp => new InMemoryTransportListener(
-            "silo",
+            SiloConnectionListener.DefaultListenerName,
             sp.GetRequiredService<IOptions<EndpointOptions>>().Value.GetListeningSiloEndpoint()!.ToString(),
             hub));
         return siloBuilder;
