@@ -456,7 +456,7 @@ namespace Orleans.GrainReferences
                     return _createFromUniversalReference(_shared, reference);
                 }
 
-                if (reference.Equals(_shared.CreateReference(reference.GrainId)))
+                if (reference.Equals(_shared.CreateUniversalReference(reference.GrainId)))
                 {
                     return _createFromKey(_shared, reference.GrainId.Key);
                 }

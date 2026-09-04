@@ -2507,7 +2507,7 @@ namespace Orleans.Runtime
 
         public System.IServiceProvider ServiceProvider { get { throw null; } }
 
-        public UniversalReference CreateReference(GrainId grainId) { throw null; }
+        public UniversalReference CreateUniversalReference(GrainId grainId) { throw null; }
     }
 
     public readonly partial struct GrainTimerCreationOptions

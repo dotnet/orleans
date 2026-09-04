@@ -91,7 +91,7 @@ public sealed class FederationCoverageGapTests(TestEnvironmentFixture environmen
             template.CopyContextPool,
             template.ServiceProvider);
 
-        var reference = shared.CreateReference(GrainId);
+        var reference = shared.CreateUniversalReference(GrainId);
 
         Assert.Equal(GrainId, reference.GrainId);
         Assert.Equal(template.InterfaceType, reference.InterfaceType);
@@ -105,7 +105,7 @@ public sealed class FederationCoverageGapTests(TestEnvironmentFixture environmen
     {
         var shared = CreateShared((UniversalReferenceBinding)byte.MaxValue);
 
-        var exception = Assert.Throws<InvalidOperationException>(() => shared.CreateReference(GrainId));
+        var exception = Assert.Throws<InvalidOperationException>(() => shared.CreateUniversalReference(GrainId));
 
         Assert.Equal("Unsupported universal reference binding '255'.", exception.Message);
     }
@@ -138,7 +138,7 @@ public sealed class FederationCoverageGapTests(TestEnvironmentFixture environmen
     public void GrainReference_ValueSemantics_ForwardToUniversalIdentityAndFormatting()
     {
         var shared = CreateShared(UniversalReferenceBinding.Cluster);
-        var identity = shared.CreateReference(GrainId);
+        var identity = shared.CreateUniversalReference(GrainId);
         var reference = GrainReference.FromUniversalReference(shared, identity);
         Span<char> buffer = stackalloc char[256];
         Span<char> shortBuffer = stackalloc char[4];
@@ -400,7 +400,7 @@ public sealed class FederationCoverageGapTests(TestEnvironmentFixture environmen
     public void GrainReferenceActivator_LegacyKeyConstructorAcceptsEquivalentLocalIdentity()
     {
         var shared = CreateShared(UniversalReferenceBinding.Virtual);
-        var expected = shared.CreateReference(GrainId);
+        var expected = shared.CreateUniversalReference(GrainId);
         var activator = CreateLegacyKeyActivator(shared);
 
         var result = activator.CreateReference(expected);
@@ -429,7 +429,7 @@ public sealed class FederationCoverageGapTests(TestEnvironmentFixture environmen
 
         Assert.Contains("does not support cluster-bound references", exception.Message, StringComparison.Ordinal);
         Assert.Equal(UniversalReferenceBinding.Cluster, remote.Binding);
-        Assert.NotEqual(shared.CreateReference(GrainId), remote);
+        Assert.NotEqual(shared.CreateUniversalReference(GrainId), remote);
     }
 
     private static Orleans.GrainReferences.IGrainReferenceActivator CreateLegacyKeyActivator(GrainReferenceShared shared)

@@ -139,7 +139,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Creates a universal reference for the provided grain identity.
         /// </summary>
-        public UniversalReference CreateReference(GrainId grainId) => DefaultBinding switch
+        public UniversalReference CreateUniversalReference(GrainId grainId) => DefaultBinding switch
         {
             UniversalReferenceBinding.Virtual => UniversalReference.CreateVirtual(grainId, InterfaceType, ServiceId),
             UniversalReferenceBinding.Cluster => UniversalReference.CreateCluster(grainId, InterfaceType, ServiceId, ClusterId),
@@ -354,7 +354,7 @@ namespace Orleans.Runtime
         /// The key portion of the grain id.
         /// </param>
         protected GrainReference(GrainReferenceShared shared, IdSpan key)
-            : this(shared, shared.CreateReference(GrainId.Create(shared.GrainType, key)))
+            : this(shared, shared.CreateUniversalReference(GrainId.Create(shared.GrainType, key)))
         {
         }
 
