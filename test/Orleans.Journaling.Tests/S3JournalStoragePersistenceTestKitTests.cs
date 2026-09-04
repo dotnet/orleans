@@ -313,7 +313,7 @@ internal sealed class JournalGrainStorageAdapter(Func<JournalId, IJournalStorage
     {
         var journalId = CreateJournalId(grainType, grainId);
         var gate = _locks.GetOrAdd(journalId, static _ => new SemaphoreSlim(1, 1));
-        await gate.WaitAsync();
+        await gate.WaitAsync(TestContext.Current.CancellationToken);
         try
         {
             var current = await ReadAsync<T>(createStorage(journalId));
@@ -341,7 +341,7 @@ internal sealed class JournalGrainStorageAdapter(Func<JournalId, IJournalStorage
     {
         var journalId = CreateJournalId(grainType, grainId);
         var gate = _locks.GetOrAdd(journalId, static _ => new SemaphoreSlim(1, 1));
-        await gate.WaitAsync();
+        await gate.WaitAsync(TestContext.Current.CancellationToken);
         try
         {
             var storage = createStorage(journalId);
@@ -377,7 +377,7 @@ internal sealed class JournalGrainStorageAdapter(Func<JournalId, IJournalStorage
     {
         var journalId = CreateJournalId(grainType, grainId);
         var gate = _locks.GetOrAdd(journalId, static _ => new SemaphoreSlim(1, 1));
-        await gate.WaitAsync();
+        await gate.WaitAsync(TestContext.Current.CancellationToken);
         try
         {
             var storage = createStorage(journalId);
