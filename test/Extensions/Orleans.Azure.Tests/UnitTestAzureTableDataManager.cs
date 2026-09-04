@@ -59,8 +59,18 @@ namespace Tester.AzureUtils
                   NullLoggerFactory.Instance.CreateLogger<UnitTestAzureTableDataManager>())
         {
             using var cancellationSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cancellationSource.CancelAfter(StoragePolicyOptions.CreationTimeout);
-            InitTableAsync(cancellationSource.Token).GetAwaiter().GetResult();
+            var creationTimeout = StoragePolicyOptions.CreationTimeout;
+            cancellationSource.CancelAfter(creationTimeout);
+            try
+            {
+                InitTableAsync(cancellationSource.Token).GetAwaiter().GetResult();
+            }
+            catch (OperationCanceledException exception) when (
+                cancellationSource.IsCancellationRequested
+                && !cancellationToken.IsCancellationRequested)
+            {
+                throw new TimeoutException($"Azure Table initialization timed out after {creationTimeout}.", exception);
+            }
         }
     }
 }
