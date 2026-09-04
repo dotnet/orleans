@@ -38,7 +38,12 @@ public class DisseminationProtocolTests
 
         Assert.NotNull(method);
         Assert.False(method.IsDefined(typeof(Orleans.Concurrency.OneWayAttribute), inherit: false));
+        Assert.Equal("017AA907", method.GetCustomAttribute<Orleans.AliasAttribute>()?.Alias);
         Assert.Equal(typeof(Task<DisseminationBroadcastResponse>), method.ReturnType);
+
+        method = typeof(IDisseminationSystemTarget).GetMethod(nameof(IDisseminationSystemTarget.ExchangeAntiEntropy));
+        Assert.NotNull(method);
+        Assert.Equal("EF58CB3D", method.GetCustomAttribute<Orleans.AliasAttribute>()?.Alias);
     }
 
     [Fact]

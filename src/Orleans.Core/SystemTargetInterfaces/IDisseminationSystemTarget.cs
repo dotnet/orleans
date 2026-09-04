@@ -3,8 +3,10 @@ namespace Orleans.Runtime;
 internal interface IDisseminationSystemTarget : ISystemTarget
 {
     // The response carries receiver versions, which are the evidence used to sequence later repairs.
+    [Alias("017AA907")]
     Task<DisseminationBroadcastResponse> PushBroadcast(DisseminationBroadcastBatch batch, CancellationToken cancellationToken);
 
+    [Alias("EF58CB3D")]
     Task<DisseminationAntiEntropyResponse> ExchangeAntiEntropy(DisseminationAntiEntropyRequest request, CancellationToken cancellationToken);
 }
 
