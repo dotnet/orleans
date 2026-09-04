@@ -134,17 +134,17 @@ internal sealed class TcpMessageTransportListener : MessageTransportListener
                 try
                 {
                     OnAcceptSocket(acceptSocket);
+
+                    return await SocketMessageTransport.CreateAndStartAsync(
+                        acceptSocket,
+                        Logger,
+                        _tcpOptions.Get(ListenerName).UseLinuxIoUring).ConfigureAwait(false);
                 }
                 catch
                 {
                     acceptSocket.Dispose();
                     throw;
                 }
-
-                return await SocketMessageTransport.CreateAndStartAsync(
-                    acceptSocket,
-                    Logger,
-                    _tcpOptions.Get(ListenerName).UseLinuxIoUring).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {

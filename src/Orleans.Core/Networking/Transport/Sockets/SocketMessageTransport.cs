@@ -1508,7 +1508,7 @@ RefreshRequestQueue:
         finally
         {
             _shutdownReason ??= error;
-            Shutdown();
+            ShutdownSocket();
             await _connectionClosingCts.CancelAsync().ConfigureAwait(false);
             _readSignal.Signal();
 
