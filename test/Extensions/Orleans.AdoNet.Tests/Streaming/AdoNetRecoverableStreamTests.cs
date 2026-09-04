@@ -2,11 +2,13 @@ using System.Data;
 using System.Reflection;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging.Abstractions;
+using NSubstitute;
 using Orleans.Configuration;
 using Orleans.Providers.Streams.Common;
 using Orleans.Streaming.AdoNet;
 using Orleans.Streaming.AdoNet.Storage;
 using Orleans.Streams;
+using Tester.AdoNet.Fakes;
 
 namespace Tester.AdoNet.Streaming;
 
@@ -16,6 +18,63 @@ namespace Tester.AdoNet.Streaming;
 [TestArea("Streaming")]
 public class AdoNetRecoverableStreamTests
 {
+    [Fact]
+    public async Task ConcurrentCreateAdapterCallsConstructOnce()
+    {
+        const int callerCount = 8;
+        var lifetime = new FakeHostApplicationLifetime();
+        var adapter = Substitute.For<IQueueAdapter>();
+        var factory = new BlockingAdoNetQueueAdapterFactory(
+            CreateQueries(new CapturingRelationalStorage()),
+            adapter,
+            lifetime);
+        var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var invoked = new CountdownEvent(callerCount);
+        var tasks = Enumerable.Range(0, callerCount).Select(async _ =>
+        {
+            await start.Task;
+            var operation = factory.CreateAdapter();
+            invoked.Signal();
+            return await operation;
+        }).ToArray();
+
+        start.SetResult();
+        await Task.Run(
+            () => invoked.Wait(TestContext.Current.CancellationToken),
+            TestContext.Current.CancellationToken);
+
+        var adapterConstructionCount = factory.AdapterConstructionCount;
+        factory.CompleteAdapterConstruction();
+
+        var adapters = await Task.WhenAll(tasks);
+        Assert.Equal(1, adapterConstructionCount);
+        Assert.Equal(1, factory.AdapterConstructionCount);
+        Assert.All(adapters, result => Assert.Same(adapter, result));
+    }
+
+    [Fact]
+    public async Task TimedOutCreateAdapterDoesNotEnterCriticalSection()
+    {
+        var lifetime = new FakeHostApplicationLifetime();
+        var adapter = Substitute.For<IQueueAdapter>();
+        var factory = new BlockingAdoNetQueueAdapterFactory(
+            CreateQueries(new CapturingRelationalStorage()),
+            adapter,
+            lifetime,
+            TimeSpan.FromMilliseconds(50));
+
+        var first = factory.CreateAdapter();
+        await factory.AdapterConstructionStarted.Task;
+
+        await Assert.ThrowsAsync<TimeoutException>(() => factory.CreateAdapter());
+        Assert.Equal(1, factory.AdapterConstructionCount);
+
+        factory.CompleteAdapterConstruction();
+        Assert.Same(adapter, await first);
+        Assert.Same(adapter, await factory.CreateAdapter());
+        Assert.Equal(1, factory.AdapterConstructionCount);
+    }
+
     [Fact]
     public void ResolveCheckpointUpdate_ReturnsAuthoritativeStateForExpectedVersionConflict()
     {
@@ -342,6 +401,45 @@ public class AdoNetRecoverableStreamTests
 
     private static IDataRecord Record(params (string Name, object? Value)[] values)
         => new DictionaryDataRecord(values.ToDictionary(value => value.Name, value => value.Value));
+
+    private sealed class BlockingAdoNetQueueAdapterFactory(
+        RelationalOrleansQueries queries,
+        IQueueAdapter adapter,
+        FakeHostApplicationLifetime lifetime,
+        TimeSpan? initializationTimeout = null)
+        : AdoNetQueueAdapterFactory(
+            "provider",
+            new AdoNetStreamOptions { InitializationTimeout = initializationTimeout ?? TimeSpan.FromSeconds(5) },
+            new ClusterOptions(),
+            new SimpleQueueCacheOptions(),
+            new HashRingStreamQueueMapperOptions(),
+            NullLoggerFactory.Instance,
+            lifetime,
+            Substitute.For<IServiceProvider>())
+    {
+        private readonly TaskCompletionSource _adapterConstruction =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _adapterConstructionStarted =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int _adapterConstructionCount;
+
+        public int AdapterConstructionCount => Volatile.Read(ref _adapterConstructionCount);
+
+        public TaskCompletionSource AdapterConstructionStarted => _adapterConstructionStarted;
+
+        public void CompleteAdapterConstruction() => _adapterConstruction.SetResult();
+
+        internal override ValueTask<RelationalOrleansQueries> GetQueriesAsync() => new(queries);
+
+        internal override async ValueTask<IQueueAdapter> CreateAdapterCore(RelationalOrleansQueries value)
+        {
+            Assert.Same(queries, value);
+            Interlocked.Increment(ref _adapterConstructionCount);
+            _adapterConstructionStarted.TrySetResult();
+            await _adapterConstruction.Task;
+            return adapter;
+        }
+    }
 
     private sealed class BlockingRelationalStorage : IRelationalStorage
     {
