@@ -563,6 +563,16 @@ public sealed class LocalThrottleRateTests
     [TestSuite("BVT")]
     [TestProvider("None")]
     [Fact]
+    public void WaitMode_FractionalRateDelayNeverRoundsToZero()
+    {
+        Assert.Equal(
+            TimeSpan.FromTicks(1),
+            LocalRateReminderAdmissionGate.GetPositiveDelay(0.00000001));
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
     public async Task WaitUpTo_DoesNotAdmitRateTokenGeneratedAtDeadline()
     {
         var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
