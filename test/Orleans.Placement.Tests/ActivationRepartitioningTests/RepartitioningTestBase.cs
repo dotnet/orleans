@@ -12,6 +12,7 @@ public abstract class RepartitioningTestBase<TFixture> : IAsyncLifetime where TF
     private readonly TFixture _fixture;
 
     internal IInternalGrainFactory GrainFactory => _fixture.HostedCluster.InternalGrainFactory!;
+    private protected TestCluster HostedCluster => _fixture.HostedCluster;
     internal IActivationRepartitionerSystemTarget Silo1Repartitioner { get; }
     internal IActivationRepartitionerSystemTarget Silo2Repartitioner { get; }
     protected SiloAddress Silo1 { get; }
