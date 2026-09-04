@@ -14,6 +14,7 @@ namespace Orleans.Streaming.Kinesis;
 internal sealed class KinesisPooledAdapterReceiver : IQueueAdapterReceiver, IQueueCache
 {
     private const int BufferSize = 1024 * 1024;
+    private static readonly TimeSpan ReplayMetadataRetention = TimeSpan.FromDays(3650);
     private readonly IStreamQueueCheckpointerFactory _checkpointerFactory;
     private readonly string _partition;
     private readonly KinesisRecoverableStreamSource _source;
@@ -89,8 +90,8 @@ internal sealed class KinesisPooledAdapterReceiver : IQueueAdapterReceiver, IQue
             topologyMonitor,
             readThrottle);
         _dataAdapter = new(streamName, partition, serializer);
-        _cache = CreateCache(cacheOptions.CacheSize);
-        _replayCacheFactory = () => CreateCache(_replayOptions.CacheSize);
+        _cache = CreateCache(cacheOptions.CacheSize, trackPurgedMetadata: false);
+        _replayCacheFactory = () => CreateCache(_replayOptions.CacheSize, trackPurgedMetadata: true);
         _replaySourceFactory = new KinesisReplaySourceFactory(
             clientFactory,
             streamName,
@@ -98,7 +99,9 @@ internal sealed class KinesisPooledAdapterReceiver : IQueueAdapterReceiver, IQue
             topologyMonitor,
             readThrottle);
 
-        RecoverableStreamQueueCache<KinesisCacheRecord> CreateCache(int cacheSize)
+        RecoverableStreamQueueCache<KinesisCacheRecord> CreateCache(
+            int cacheSize,
+            bool trackPurgedMetadata)
         {
             var evictionStrategy = new ChronologicalEvictionStrategy(
                 logger,
@@ -111,6 +114,7 @@ internal sealed class KinesisPooledAdapterReceiver : IQueueAdapterReceiver, IQue
                 _dataAdapter,
                 evictionStrategy,
                 logger,
+                metadataMinTimeInCache: trackPurgedMetadata ? ReplayMetadataRetention : null,
                 maxCacheSize: cacheSize);
         }
     }

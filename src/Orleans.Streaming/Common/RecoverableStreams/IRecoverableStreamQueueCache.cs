@@ -37,5 +37,29 @@ namespace Orleans.Providers.Streams.Common
             offset = null;
             return false;
         }
+
+        /// <summary>
+        /// Reclaims replay records before or through a partition position.
+        /// </summary>
+        /// <param name="token">The replay reclamation boundary.</param>
+        /// <param name="inclusive">Whether the boundary record is reclaimable.</param>
+        /// <param name="utcNow">The current UTC time.</param>
+        void UpdateReplayProgress(
+            StreamSequenceToken token,
+            bool inclusive,
+            DateTime utcNow)
+            => UpdateDeliveryProgress(inclusive ? token : null, utcNow);
+
+        /// <summary>
+        /// Registers a stream whose cursor needs purge metadata while replay is active.
+        /// </summary>
+        /// <param name="streamId">The stream identifier.</param>
+        void RegisterReplayStream(StreamId streamId) { }
+
+        /// <summary>
+        /// Unregisters a stream when its last replay cursor leaves the cache.
+        /// </summary>
+        /// <param name="streamId">The stream identifier.</param>
+        void UnregisterReplayStream(StreamId streamId) { }
     }
 }

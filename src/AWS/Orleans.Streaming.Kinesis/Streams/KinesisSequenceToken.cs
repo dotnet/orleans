@@ -3,17 +3,13 @@ using Orleans.Providers.Streams.Common;
 using Orleans.Streams;
 using System;
 using System.Globalization;
-using System.Numerics;
 
 namespace Orleans.Streaming.Kinesis
 {
     [Serializable]
     [GenerateSerializer]
-    internal sealed class KinesisSequenceToken : PartitionedStreamSequenceToken
+    internal sealed class KinesisSequenceToken : EventSequenceTokenV2, IPartitionedStreamSequenceToken
     {
-        [NonSerialized]
-        private BigInteger? _numericShardSequence;
-
         /// <summary>
         /// Initializes a new instance of the <see cref="KinesisSequenceToken" /> class.
         /// </summary>
@@ -41,7 +37,7 @@ namespace Orleans.Streaming.Kinesis
             string shardSequence,
             long sequenceNumber,
             int eventIndex)
-            : base(streamName, shardId, shardSequence, sequenceNumber, eventIndex)
+            : base(sequenceNumber, eventIndex)
         {
             StreamName = streamName;
             ShardId = shardId;
@@ -79,17 +75,23 @@ namespace Orleans.Streaming.Kinesis
         [JsonProperty]
         public string? StreamName { get; }
 
+        string? IPartitionedStreamSequenceToken.ProviderIdentity => StreamName;
+
+        string? IPartitionedStreamSequenceToken.PartitionIdentity => ShardId;
+
+        string IPartitionedStreamSequenceToken.Position => ShardSequence;
+
         /// <inheritdoc />
         public override bool Equals(object? obj) => obj is StreamSequenceToken token && Equals(token);
 
         /// <inheritdoc />
         public override bool Equals(StreamSequenceToken? other)
         {
-            return other is KinesisSequenceToken token
-                && string.Equals(StreamName, token.StreamName, StringComparison.Ordinal)
-                && string.Equals(ShardId, token.ShardId, StringComparison.Ordinal)
-                && NumericShardSequence.Equals(token.NumericShardSequence)
-                && EventIndex == token.EventIndex;
+            return other is IPartitionedStreamSequenceToken token
+                && string.Equals(StreamName, token.ProviderIdentity, StringComparison.Ordinal)
+                && string.Equals(ShardId, token.PartitionIdentity, StringComparison.Ordinal)
+                && CompareShardSequences(ShardSequence, token.Position) == 0
+                && EventIndex == ((StreamSequenceToken)token).EventIndex;
         }
 
         /// <inheritdoc />
@@ -100,23 +102,28 @@ namespace Orleans.Streaming.Kinesis
                 return 1;
             }
 
-            if (other is not KinesisSequenceToken token)
+            if (other is not IPartitionedStreamSequenceToken token)
             {
                 throw new ArgumentOutOfRangeException(nameof(other));
             }
 
-            if (!string.Equals(StreamName, token.StreamName, StringComparison.Ordinal)
-                || !string.Equals(ShardId, token.ShardId, StringComparison.Ordinal))
+            if (!string.Equals(StreamName, token.ProviderIdentity, StringComparison.Ordinal)
+                || !string.Equals(ShardId, token.PartitionIdentity, StringComparison.Ordinal))
             {
                 throw new ArgumentOutOfRangeException(nameof(other));
             }
 
-            var difference = CompareShardSequences(ShardSequence, token.ShardSequence);
-            return difference != 0 ? difference : EventIndex.CompareTo(token.EventIndex);
+            var difference = CompareShardSequences(ShardSequence, token.Position);
+            return difference != 0 ? difference : EventIndex.CompareTo(((StreamSequenceToken)token).EventIndex);
         }
 
         /// <inheritdoc />
-        public override int GetHashCode() => HashCode.Combine(StreamName, ShardId, NumericShardSequence, EventIndex);
+        public override int GetHashCode()
+            => HashCode.Combine(
+                StreamName,
+                ShardId,
+                GetPositionHashCode(ShardSequence),
+                EventIndex);
 
         /// <summary>Returns a string that represents the current object.</summary>
         /// <returns>A string that represents the current object.</returns>
@@ -125,12 +132,6 @@ namespace Orleans.Streaming.Kinesis
         {
             return string.Format(CultureInfo.InvariantCulture, "KinesisSequenceToken(StreamName: {0}, ShardId: {1}, ShardSequence: {2}, SequenceNumber: {3}, EventIndex: {4})", StreamName, ShardId, ShardSequence, SequenceNumber, EventIndex);
         }
-
-        private BigInteger NumericShardSequence
-            => _numericShardSequence ??= BigInteger.Parse(
-                ShardSequence,
-                NumberStyles.None,
-                CultureInfo.InvariantCulture);
 
         internal static int CompareShardSequences(string left, string right)
         {
@@ -150,6 +151,17 @@ namespace Orleans.Streaming.Kinesis
             return lengthComparison != 0
                 ? lengthComparison
                 : left.AsSpan(leftStart).SequenceCompareTo(right.AsSpan(rightStart));
+        }
+
+        private static int GetPositionHashCode(string position)
+        {
+            var start = 0;
+            while (start < position.Length && position[start] == '0')
+            {
+                start++;
+            }
+
+            return string.GetHashCode(position.AsSpan(start), StringComparison.Ordinal);
         }
     }
 }

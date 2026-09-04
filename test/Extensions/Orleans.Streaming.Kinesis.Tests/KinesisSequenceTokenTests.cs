@@ -233,5 +233,8 @@ public sealed class KinesisSequenceTokenTests
         Assert.Equal("shard-1", restored.PartitionIdentity);
         Assert.Equal(HugeShardSequence, restored.Position);
         Assert.Equal(2, restored.EventIndex);
+        Assert.True(original.Equals(restored));
+        Assert.True(restored.Equals(original));
+        Assert.Equal(original.GetHashCode(), restored.GetHashCode());
     }
 }

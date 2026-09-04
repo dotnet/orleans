@@ -106,7 +106,18 @@ public sealed class RecoverableStreamReceiverTests
             new TestQueueMessage(streamId, 2, "target-2"),
         };
         var replayFactory = new TestReplaySourceFactory(history);
-        var receiver = CreateReplayReceiver([], replayFactory, new TestCheckpointer(string.Empty));
+        var receiver = CreateReplayReceiver(
+            [],
+            replayFactory,
+            new TestCheckpointer(string.Empty),
+            new RecoverableStreamReplayOptions
+            {
+                MaxConcurrentReaders = 1,
+                MaxPendingReaders = 0,
+                CacheSize = 4,
+                ReadBatchSize = 2,
+                TemporaryTailRetryDelay = TimeSpan.Zero,
+            });
         await receiver.Initialize(TimeSpan.FromSeconds(5));
 
         using var cursor = receiver.GetCacheCursor(streamId, new EventSequenceTokenV2(1));
@@ -181,6 +192,219 @@ public sealed class RecoverableStreamReceiverTests
         Assert.Equal([1, 2, 3, 4, 5], firstDelivered);
         Assert.Equal([2, 3, 4, 5], secondDelivered);
         Assert.Equal(1, replayFactory.CreateCount);
+        await receiver.Shutdown(TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public async Task Replay_FutureOverlappingCursorWaitsWithoutBlockingFragmentReclamation()
+    {
+        var streamId = StreamId.Create("namespace", Guid.NewGuid());
+        var history = Enumerable.Range(1, 8)
+            .Select(sequence => new TestQueueMessage(streamId, sequence, $"target-{sequence}"))
+            .ToArray();
+        var replayFactory = new TestReplaySourceFactory(history);
+        var receiver = CreateReplayReceiver(
+            history[7..],
+            replayFactory,
+            new TestCheckpointer(string.Empty),
+            new RecoverableStreamReplayOptions
+            {
+                MaxConcurrentReaders = 1,
+                MaxPendingReaders = 2,
+                CacheSize = 3,
+                ReadBatchSize = 2,
+                TemporaryTailRetryDelay = TimeSpan.Zero,
+            });
+        await receiver.Initialize(TimeSpan.FromSeconds(5));
+        _ = await receiver.GetQueueMessagesAsync(10, CancellationToken.None);
+
+        using var first = receiver.GetCacheCursor(streamId, new EventSequenceTokenV2(1));
+        using var future = receiver.GetCacheCursor(streamId, new EventSequenceTokenV2(6));
+        var firstDelivered = await ReadAll(first);
+        var futureDelivered = await ReadAll(future);
+
+        Assert.Equal(Enumerable.Range(1, 8).Select(static value => (long)value), firstDelivered);
+        Assert.Equal([6, 7, 8], futureDelivered);
+        Assert.Equal(1, replayFactory.CreateCount);
+        await receiver.Shutdown(TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public async Task Replay_PendingReadyCursorBypassesFutureHeadWithoutOpeningAnotherReader()
+    {
+        var streamId = StreamId.Create("namespace", Guid.NewGuid());
+        var history = Enumerable.Range(1, 8)
+            .Select(sequence => new TestQueueMessage(streamId, sequence, $"target-{sequence}"))
+            .ToArray();
+        var replayFactory = new TestReplaySourceFactory(history);
+        var receiver = CreateReplayReceiver(
+            history[7..],
+            replayFactory,
+            new TestCheckpointer(string.Empty),
+            new RecoverableStreamReplayOptions
+            {
+                MaxConcurrentReaders = 1,
+                MaxPendingReaders = 3,
+                CacheSize = 4,
+                ReadBatchSize = 2,
+                TemporaryTailRetryDelay = TimeSpan.Zero,
+            });
+        await receiver.Initialize(TimeSpan.FromSeconds(5));
+        _ = await receiver.GetQueueMessagesAsync(10, CancellationToken.None);
+        using var first = Assert.IsAssignableFrom<IAsyncQueueCacheCursor>(
+            receiver.GetCacheCursor(streamId, new EventSequenceTokenV2(1)));
+        using var futureHead = receiver.GetCacheCursor(streamId, new EventSequenceTokenV2(7));
+        using var readyLater = Assert.IsAssignableFrom<IAsyncQueueCacheCursor>(
+            receiver.GetCacheCursor(streamId, new EventSequenceTokenV2(2)));
+
+        Assert.Equal(
+            QueueCacheCursorMoveNextResult.ItemAvailable,
+            await first.MoveNextAsync(CancellationToken.None));
+        var readyMove = readyLater.MoveNextAsync(CancellationToken.None).AsTask();
+
+        Assert.True(readyMove.IsCompleted);
+        Assert.Equal(QueueCacheCursorMoveNextResult.ItemAvailable, await readyMove);
+        Assert.Equal(2, readyLater.GetCurrent(out _)!.SequenceToken.SequenceNumber);
+        Assert.Equal(1, replayFactory.CreateCount);
+        await receiver.Shutdown(TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public async Task Replay_LateCursorBeforeReclaimedBoundaryStartsIndependentReader()
+    {
+        var streamId = StreamId.Create("namespace", Guid.NewGuid());
+        var history = Enumerable.Range(1, 5)
+            .Select(sequence => new TestQueueMessage(streamId, sequence, $"target-{sequence}"))
+            .ToArray();
+        var replayFactory = new TestReplaySourceFactory(history);
+        var receiver = CreateReplayReceiver(
+            history[4..],
+            replayFactory,
+            new TestCheckpointer(string.Empty));
+        await receiver.Initialize(TimeSpan.FromSeconds(5));
+        _ = await receiver.GetQueueMessagesAsync(10, CancellationToken.None);
+        using var first = Assert.IsAssignableFrom<IAsyncQueueCacheCursor>(
+            receiver.GetCacheCursor(streamId, new EventSequenceTokenV2(1)));
+        for (var sequence = 1; sequence <= 3; sequence++)
+        {
+            Assert.Equal(
+                QueueCacheCursorMoveNextResult.ItemAvailable,
+                await first.MoveNextAsync(CancellationToken.None));
+            Assert.Equal(sequence, first.GetCurrent(out _)!.SequenceToken.SequenceNumber);
+            ((IQueueCacheCursorProgress)first).RecordDeliverySuccess();
+        }
+
+        using var late = receiver.GetCacheCursor(streamId, new EventSequenceTokenV2(2));
+        var delivered = await ReadAll(late);
+
+        Assert.Equal([2, 3, 4, 5], delivered);
+        Assert.Equal(2, replayFactory.CreateCount);
+        await receiver.Shutdown(TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public void ReplayCache_TracksPurgeMetadataOnlyForRegisteredStreams()
+    {
+        var target = StreamId.Create("namespace", Guid.NewGuid());
+        var adapter = new TestDataAdapter();
+        var cache = new RecoverableStreamQueueCache<TestQueueMessage>(
+            100,
+            new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(4 * 1024)),
+            adapter,
+            new NoOpEvictionStrategy(),
+            NullLogger.Instance,
+            metadataMinTimeInCache: TimeSpan.FromDays(3650),
+            maxCacheSize: 100);
+        cache.RegisterReplayStream(target);
+        var messages = Enumerable.Range(1, 50)
+            .Select(sequence => new TestQueueMessage(
+                sequence == 25
+                    ? target
+                    : StreamId.Create("namespace", Guid.NewGuid()),
+                sequence,
+                $"payload-{sequence}"))
+            .ToArray();
+        _ = cache.Add(messages, DateTime.UtcNow);
+
+        cache.UpdateReplayProgress(
+            new EventSequenceTokenV2(50),
+            inclusive: true,
+            utcNow: DateTime.UtcNow);
+
+        Assert.Equal(1, cache.PurgedMetadataCount);
+        cache.Dispose();
+    }
+
+    [Fact]
+    public async Task Replay_LiveArrivalAfterObservedTailHandsOffWithoutGap()
+    {
+        var streamId = StreamId.Create("namespace", Guid.NewGuid());
+        var history = new[]
+        {
+            new TestQueueMessage(streamId, 1, "target-1"),
+            new TestQueueMessage(streamId, 2, "target-2"),
+        };
+        var replayFactory = new TestReplaySourceFactory(history);
+        var receiver = CreateReplayReceiver(
+            [new TestQueueMessage(streamId, 3, "target-3")],
+            replayFactory,
+            new TestCheckpointer(string.Empty));
+        await receiver.Initialize(TimeSpan.FromSeconds(5));
+        using var cursor = Assert.IsAssignableFrom<IAsyncQueueCacheCursor>(
+            receiver.GetCacheCursor(streamId, new EventSequenceTokenV2(1)));
+
+        Assert.Equal(
+            QueueCacheCursorMoveNextResult.ItemAvailable,
+            await cursor.MoveNextAsync(CancellationToken.None));
+        Assert.Equal(1, cursor.GetCurrent(out _)!.SequenceToken.SequenceNumber);
+        ((IQueueCacheCursorProgress)cursor).RecordDeliverySuccess();
+        _ = await receiver.GetQueueMessagesAsync(10, CancellationToken.None);
+        var delivered = await ReadAll(cursor);
+
+        Assert.Equal([2, 3], delivered);
+        await receiver.Shutdown(TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public async Task Replay_FailedFragmentIsNotReusedByRecoveryCursor()
+    {
+        var streamId = StreamId.Create("namespace", Guid.NewGuid());
+        var history = new[]
+        {
+            new TestQueueMessage(streamId, 1, "target-1"),
+            new TestQueueMessage(streamId, 2, "target-2"),
+        };
+        var replayFactory = new TestReplaySourceFactory(history)
+        {
+            FirstReadException = new TransientStreamReplayException(
+                "temporary provider failure",
+                new TimeoutException()),
+        };
+        var receiver = CreateReplayReceiver(
+            [],
+            replayFactory,
+            new TestCheckpointer(string.Empty),
+            new RecoverableStreamReplayOptions
+            {
+                MaxConcurrentReaders = 1,
+                MaxPendingReaders = 0,
+                CacheSize = 4,
+                ReadBatchSize = 2,
+                TemporaryTailRetryDelay = TimeSpan.Zero,
+            });
+        await receiver.Initialize(TimeSpan.FromSeconds(5));
+        using (var failed = Assert.IsAssignableFrom<IAsyncQueueCacheCursor>(
+            receiver.GetCacheCursor(streamId, new EventSequenceTokenV2(1))))
+        {
+            await Assert.ThrowsAsync<TransientStreamReplayException>(
+                async () => await failed.MoveNextAsync(CancellationToken.None));
+        }
+
+        using var recovered = receiver.GetCacheCursor(streamId, new EventSequenceTokenV2(1));
+        var delivered = await ReadAll(recovered);
+
+        Assert.Equal([1, 2], delivered);
+        Assert.Equal(2, replayFactory.CreateCount);
         await receiver.Shutdown(TimeSpan.FromSeconds(5));
     }
 
@@ -317,6 +541,7 @@ public sealed class RecoverableStreamReceiverTests
                 adapter,
                 new NoOpEvictionStrategy(),
                 NullLogger.Instance,
+                metadataMinTimeInCache: TimeSpan.FromDays(3650),
                 maxCacheSize: replayOptions.CacheSize);
 
         return new(
@@ -1449,6 +1674,7 @@ public sealed class RecoverableStreamReceiverTests
         public int CreateCount { get; private set; }
         public bool BlockReads { get; init; }
         public Exception? DisposeException { get; init; }
+        public Exception? FirstReadException { get; init; }
         public TaskCompletionSource ReadStarted { get; } =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
         public List<TestReplaySource> Sources { get; } = [];
@@ -1470,7 +1696,8 @@ public sealed class RecoverableStreamReceiverTests
                 messages.Where(message => message.SequenceNumber >= token.SequenceNumber).ToArray(),
                 BlockReads,
                 ReadStarted,
-                DisposeException);
+                DisposeException,
+                CreateCount == 1 ? FirstReadException : null);
             Sources.Add(source);
             return ValueTask.FromResult<IRecoverableStreamReplaySource<TestQueueMessage>>(source);
         }
@@ -1480,10 +1707,12 @@ public sealed class RecoverableStreamReceiverTests
         IReadOnlyList<TestQueueMessage> messages,
         bool blockReads,
         TaskCompletionSource readStarted,
-        Exception? disposeException)
+        Exception? disposeException,
+        Exception? readException)
         : IRecoverableStreamReplaySource<TestQueueMessage>
     {
         private int _index;
+        private Exception? _readException = readException;
 
         public bool IsDisposed { get; private set; }
 
@@ -1493,6 +1722,12 @@ public sealed class RecoverableStreamReceiverTests
         {
             cancellationToken.ThrowIfCancellationRequested();
             readStarted.TrySetResult();
+            if (_readException is { } exception)
+            {
+                _readException = null;
+                throw exception;
+            }
+
             if (blockReads)
             {
                 await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);

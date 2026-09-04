@@ -37,6 +37,10 @@ namespace Orleans.Providers.Streams.Common
 
         private readonly Dictionary<StreamId, (DateTime TimeStamp, StreamSequenceToken Token)> lastPurgedToken = new Dictionary<StreamId, (DateTime TimeStamp, StreamSequenceToken Token)>();
 
+        internal Func<StreamId, bool>? ShouldTrackPurgedMetadata { get; set; }
+
+        internal int PurgedMetadataCount => lastPurgedToken.Count;
+
         /// <summary>
         /// Gets the cached message most recently added.
         /// </summary>
@@ -221,11 +225,19 @@ namespace Orleans.Providers.Streams.Common
 
             var now = DateTime.UtcNow;
             var streamId = messageToRemove.StreamId;
+            if (ShouldTrackPurgedMetadata is { } shouldTrack && !shouldTrack(streamId))
+            {
+                return;
+            }
+
             var token = this.cacheDataAdapter.GetSequenceToken(ref messageToRemove);
             this.lastPurgedToken[streamId] = (now, token);
 
             this.periodicMetadaPurging.TryAction(now);
         }
+
+        internal void RemovePurgedMetadata(StreamId streamId)
+            => lastPurgedToken.Remove(streamId);
 
         private void SetCursor(Cursor cursor, StreamSequenceToken? sequenceToken)
         {

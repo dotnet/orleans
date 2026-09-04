@@ -771,6 +771,15 @@ namespace Orleans.Providers.Streams.Common
         void Free(T resource);
     }
 
+    public partial interface IPartitionedStreamSequenceToken
+    {
+        string? PartitionIdentity { get; }
+
+        string Position { get; }
+
+        string? ProviderIdentity { get; }
+    }
+
     public partial interface IPurgeObservable
     {
         bool IsEmpty { get; }
@@ -804,8 +813,11 @@ namespace Orleans.Providers.Streams.Common
     public partial interface IRecoverableStreamQueueCache<TQueueMessage> : Orleans.Streams.IQueueCache, Orleans.Streams.IQueueFlowController, System.IDisposable
     {
         System.Collections.Generic.IReadOnlyList<Orleans.Streams.StreamPosition> Add(System.Collections.Generic.IReadOnlyList<TQueueMessage> messages, System.DateTime dequeueTimeUtc);
+        void RegisterReplayStream(Runtime.StreamId streamId);
         bool TryGetNewestPosition(out Orleans.Streams.StreamSequenceToken? token, out string? offset);
         bool TryGetOldestPosition(out Orleans.Streams.StreamSequenceToken? token, out string? offset);
+        void UnregisterReplayStream(Runtime.StreamId streamId);
+        void UpdateReplayProgress(Orleans.Streams.StreamSequenceToken token, bool inclusive, System.DateTime utcNow);
     }
 
     public partial interface IRecoverableStreamReplaySourceFactory<TQueueMessage>
@@ -852,7 +864,7 @@ namespace Orleans.Providers.Streams.Common
     }
 
     [GenerateSerializer]
-    public partial class PartitionedStreamSequenceToken : EventSequenceTokenV2
+    public partial class PartitionedStreamSequenceToken : EventSequenceTokenV2, IPartitionedStreamSequenceToken
     {
         public PartitionedStreamSequenceToken() { }
 
@@ -992,13 +1004,19 @@ namespace Orleans.Providers.Streams.Common
 
         public bool IsUnderPressure() { throw null; }
 
+        public void RegisterReplayStream(Runtime.StreamId streamId) { }
+
         public bool TryGetNewestPosition(out Orleans.Streams.StreamSequenceToken? token, out string? offset) { throw null; }
 
         public bool TryGetOldestPosition(out Orleans.Streams.StreamSequenceToken? token, out string? offset) { throw null; }
 
         public bool TryPurgeFromCache(out System.Collections.Generic.IList<Orleans.Streams.IBatchContainer> purgedItems) { throw null; }
 
+        public void UnregisterReplayStream(Runtime.StreamId streamId) { }
+
         public void UpdateDeliveryProgress(Orleans.Streams.StreamSequenceToken? earliestSubscriptionToken, System.DateTime utcNow) { }
+
+        public void UpdateReplayProgress(Orleans.Streams.StreamSequenceToken token, bool inclusive, System.DateTime utcNow) { }
     }
 
     public sealed partial class RecoverableStreamReceiver<TQueueMessage> : Orleans.Streams.IQueueAdapterReceiver, Orleans.Streams.IQueueCache, Orleans.Streams.IQueueFlowController
@@ -1894,6 +1912,14 @@ namespace Orleans.Streams
         bool MoveNext();
         void RecordDeliveryFailure();
         void Refresh(StreamSequenceToken token);
+    }
+
+    public partial interface IQueueCacheCursorProgress
+    {
+        StreamSequenceToken? SafeSequenceToken { get; }
+
+        void RecordDeliverySuccess();
+        void SetDeliveredThrough(StreamSequenceToken token);
     }
 
     public partial interface IQueueDataAdapter<TQueueMessage>
