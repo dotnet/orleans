@@ -21,7 +21,11 @@ namespace Orleans.Runtime
     /// </summary>
     internal partial class ActivationCollector : IActivationWorkingSetObserver, ILifecycleParticipant<ISiloLifecycle>, IDisposable
     {
+#if NET10_0_OR_GREATER
+        private readonly Lock _scheduleLock = new();
+#else
         private readonly object _scheduleLock = new();
+#endif
         private readonly TimeSpan shortestAgeLimit;
         private readonly ConcurrentDictionary<DateTime, Bucket> buckets = new();
         private readonly ConcurrentDictionary<ICollectibleGrainContext, CollectionRegistration> _registrations = new(ReferenceEqualsComparer.Default);
@@ -729,7 +733,11 @@ namespace Orleans.Runtime
 
         private sealed class CollectionRegistration(ICollectibleGrainContext context)
         {
+#if NET10_0_OR_GREATER
+            private readonly Lock _lock = new();
+#else
             private readonly object _lock = new();
+#endif
             private Bucket? _bucket;
             private long _generation;
             private CollectionRegistrationState _state;

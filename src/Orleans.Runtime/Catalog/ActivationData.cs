@@ -39,7 +39,11 @@ internal sealed partial class ActivationData :
     IDisposable
 {
     private const string GrainAddressMigrationContextKey = "sys.addr";
+#if NET10_0_OR_GREATER
+    private readonly Lock _lock = new();
+#else
     private readonly object _lock = new();
+#endif
     private readonly GrainTypeSharedContext _shared;
     private readonly IServiceScope _serviceScope;
     private readonly WorkItemGroup _workItemGroup;
@@ -2521,7 +2525,11 @@ internal sealed partial class ActivationData :
     private abstract class Command(CancellationTokenSource cts) : IDisposable
     {
         private bool _disposed;
+#if NET10_0_OR_GREATER
+        private readonly Lock _lock = new();
+#else
         private readonly object _lock = new();
+#endif
         private readonly CancellationTokenSource _cts = cts;
         public CancellationToken CancellationToken => _cts.Token;
 
