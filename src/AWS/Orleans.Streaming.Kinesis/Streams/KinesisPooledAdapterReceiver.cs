@@ -19,6 +19,9 @@ internal sealed class KinesisPooledAdapterReceiver : IQueueAdapterReceiver, IQue
     private readonly KinesisRecoverableStreamSource _source;
     private readonly KinesisRecoverableStreamDataAdapter _dataAdapter;
     private readonly RecoverableStreamQueueCache<KinesisCacheRecord> _cache;
+    private readonly KinesisReplaySourceFactory _replaySourceFactory;
+    private readonly Func<IRecoverableStreamQueueCache<KinesisCacheRecord>> _replayCacheFactory;
+    private readonly RecoverableStreamReplayOptions _replayOptions;
     private readonly Action<KinesisPooledAdapterReceiver>? _onShutdown;
     private readonly object _lifecycleLock = new();
     private readonly CancellationTokenSource _lifecycleCancellation = new();
@@ -41,32 +44,75 @@ internal sealed class KinesisPooledAdapterReceiver : IQueueAdapterReceiver, IQue
         KinesisShardTopologyMonitor topologyMonitor,
         TimeSpan getRecordsInterval,
         TimeProvider timeProvider,
+        RecoverableStreamReplayOptions? replayOptions = null,
+        Action<KinesisPooledAdapterReceiver>? onShutdown = null)
+        : this(
+            () => client,
+            streamName,
+            partition,
+            checkpointerFactory,
+            cacheOptions,
+            serializer,
+            loggerFactory,
+            topologyMonitor,
+            getRecordsInterval,
+            timeProvider,
+            replayOptions,
+            onShutdown)
+    {
+    }
+
+    public KinesisPooledAdapterReceiver(
+        Func<IAmazonKinesis> clientFactory,
+        string streamName,
+        string partition,
+        IStreamQueueCheckpointerFactory checkpointerFactory,
+        SimpleQueueCacheOptions cacheOptions,
+        Serializer<KinesisBatchContainer.Body> serializer,
+        ILoggerFactory loggerFactory,
+        KinesisShardTopologyMonitor topologyMonitor,
+        TimeSpan getRecordsInterval,
+        TimeProvider timeProvider,
+        RecoverableStreamReplayOptions? replayOptions = null,
         Action<KinesisPooledAdapterReceiver>? onShutdown = null)
     {
         _checkpointerFactory = checkpointerFactory;
         _partition = partition;
         _onShutdown = onShutdown;
+        _replayOptions = replayOptions ?? new RecoverableStreamReplayOptions();
         var logger = loggerFactory.CreateLogger<KinesisPooledAdapterReceiver>();
+        var readThrottle = new KinesisShardReadThrottle(getRecordsInterval, timeProvider);
         _source = new(
-            client,
+            clientFactory(),
             streamName,
             partition,
             topologyMonitor,
-            getRecordsInterval,
-            timeProvider);
-        _dataAdapter = new(serializer);
-        var evictionStrategy = new ChronologicalEvictionStrategy(
-            logger,
-            new TimePurgePredicate(TimeSpan.MaxValue, TimeSpan.MaxValue),
-            cacheMonitor: null,
-            monitorWriteInterval: null);
-        _cache = new(
-            Math.Min(1000, cacheOptions.CacheSize),
-            new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(BufferSize)),
-            _dataAdapter,
-            evictionStrategy,
-            logger,
-            maxCacheSize: cacheOptions.CacheSize);
+            readThrottle);
+        _dataAdapter = new(streamName, partition, serializer);
+        _cache = CreateCache(cacheOptions.CacheSize);
+        _replayCacheFactory = () => CreateCache(_replayOptions.CacheSize);
+        _replaySourceFactory = new KinesisReplaySourceFactory(
+            clientFactory,
+            streamName,
+            partition,
+            topologyMonitor,
+            readThrottle);
+
+        RecoverableStreamQueueCache<KinesisCacheRecord> CreateCache(int cacheSize)
+        {
+            var evictionStrategy = new ChronologicalEvictionStrategy(
+                logger,
+                new TimePurgePredicate(TimeSpan.MaxValue, TimeSpan.MaxValue),
+                cacheMonitor: null,
+                monitorWriteInterval: null);
+            return new(
+                Math.Min(1000, cacheSize),
+                new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(BufferSize)),
+                _dataAdapter,
+                evictionStrategy,
+                logger,
+                maxCacheSize: cacheSize);
+        }
     }
 
     public async Task Initialize(TimeSpan timeout)
@@ -178,24 +224,24 @@ internal sealed class KinesisPooledAdapterReceiver : IQueueAdapterReceiver, IQue
         }
     }
 
-    public int GetMaxAddCount() => _cache.GetMaxAddCount();
+    public int GetMaxAddCount() => _inner?.GetMaxAddCount() ?? _cache.GetMaxAddCount();
 
     public void AddToCache(IList<IBatchContainer> messages)
     {
     }
 
     public bool TryPurgeFromCache([MaybeNullWhen(false)] out IList<IBatchContainer> purgedItems)
-        => _cache.TryPurgeFromCache(out purgedItems);
+        => _inner?.TryPurgeFromCache(out purgedItems) ?? _cache.TryPurgeFromCache(out purgedItems);
 
     public IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken? token)
-        => _cache.GetCacheCursor(streamId, token);
+        => _inner?.GetCacheCursor(streamId, token) ?? _cache.GetCacheCursor(streamId, token);
 
     public IQueueCacheCursor GetCacheCursorAtPosition(
         StreamId streamId,
         StreamSubscriptionStartPosition startPosition)
         => _cache.GetCacheCursorAtPosition(streamId, startPosition);
 
-    public bool IsUnderPressure() => _cache.IsUnderPressure();
+    public bool IsUnderPressure() => _inner?.IsUnderPressure() ?? _cache.IsUnderPressure();
 
     public void UpdateDeliveryProgress(StreamSequenceToken? earliestSubscriptionToken, DateTime utcNow)
         => _inner?.UpdateDeliveryProgress(earliestSubscriptionToken, utcNow);
@@ -259,7 +305,10 @@ internal sealed class KinesisPooledAdapterReceiver : IQueueAdapterReceiver, IQue
                 _dataAdapter,
                 _cache,
                 checkpointer,
-                startFromNow: false);
+                startFromNow: false,
+                _replaySourceFactory,
+                _replayCacheFactory,
+                _replayOptions);
         }
 
         await _inner.Initialize(lifecycleToken);

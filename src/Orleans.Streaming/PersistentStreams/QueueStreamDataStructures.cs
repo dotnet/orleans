@@ -56,6 +56,9 @@ namespace Orleans.Streams
         [NonSerialized]
         public StreamSequenceToken? LastSafePartitionToken;
 
+        [NonSerialized]
+        public bool IsReplayUnavailable;
+
         public StreamConsumerData(GuidId subscriptionId, QualifiedStreamId streamId, IStreamConsumerExtension streamConsumer, string? filterData)
         {
             SubscriptionId = subscriptionId;

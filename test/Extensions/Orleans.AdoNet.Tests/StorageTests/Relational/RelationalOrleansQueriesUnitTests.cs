@@ -53,6 +53,10 @@ public sealed class RelationalOrleansQueriesUnitTests
         "AdvanceStreamCheckpointKey",
         "GetStreamPartitionBoundsKey",
         "CleanupStreamMessagesKey",
+        "AcquireStreamReplayLeaseKey",
+        "ReadStreamReplayMessagesKey",
+        "UpdateStreamReplayLeaseKey",
+        "ReleaseStreamReplayLeaseKey",
     ];
 
     private static readonly string[] DirectoryQueryKeys =
@@ -1000,7 +1004,7 @@ public sealed class RelationalOrleansQueriesUnitTests
         storage.ExpectRead(
             GetQueriesSql,
             CreateQueryTable(keys
-                .Select(key => (key, key == "StreamSchemaVersionKey" ? "2" : Sql(key)))
+                .Select(key => (key, key == "StreamSchemaVersionKey" ? "3" : Sql(key)))
                 .ToArray()));
 
     private static DataTable CreateQueryTable(params (string Key, string Query)[] queries) =>

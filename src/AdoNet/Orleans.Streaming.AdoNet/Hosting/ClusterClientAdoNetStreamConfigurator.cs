@@ -20,6 +20,7 @@ public class ClusterClientAdoNetStreamConfigurator : ClusterClientPersistentStre
         clientBuilder.ConfigureServices(services => services
             .ConfigureNamedOptionForLogging<AdoNetStreamOptions>(name)
             .ConfigureNamedOptionForLogging<SimpleQueueCacheOptions>(name)
+            .ConfigureNamedOptionForLogging<RecoverableStreamReplayOptions>(name)
             .ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name)
             .AddTransient<IConfigurationValidator>(sp => new AdoNetStreamOptionsValidator(sp.GetOptionsByName<AdoNetStreamOptions>(name), name)));
 
@@ -51,6 +52,18 @@ public class ClusterClientAdoNetStreamConfigurator : ClusterClientPersistentStre
     {
         this.Configure<SimpleQueueCacheOptions>(ob => ob.Configure(options => options.CacheSize = cacheSize));
 
+        return this;
+    }
+
+    /// <summary>
+    /// Configures retained-history readers and replay buffering for this provider.
+    /// </summary>
+    /// <param name="configureOptions">The replay configuration delegate.</param>
+    /// <returns>This configurator.</returns>
+    public ClusterClientAdoNetStreamConfigurator ConfigureReplay(Action<OptionsBuilder<RecoverableStreamReplayOptions>> configureOptions)
+    {
+        ArgumentNullException.ThrowIfNull(configureOptions);
+        this.Configure(configureOptions);
         return this;
     }
 

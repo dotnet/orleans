@@ -1,7 +1,7 @@
 ---
 title: Stream with Amazon Kinesis
 description: Configure Amazon Kinesis Data Streams for Orleans, including durable DynamoDB checkpoints.
-ms.date: 08/07/2026
+ms.date: 09/03/2026
 ms.topic: how-to
 ---
 
@@ -49,6 +49,16 @@ If no checkpointer is selected, the provider uses Orleans grain-backed checkpoin
 :::code language="csharp" source="../snippets/compiled/Streaming/KinesisSnippets.cs" id="configure_grain_checkpoints":::
 
 Both implementations preserve monotonic Kinesis sequence numbers and can replay a small number of already delivered records after an unclean shutdown. Consumers must tolerate duplicate delivery.
+
+## Replay retained shard history
+
+An explicit subscription can start or resume from a Kinesis sequence token while Kinesis retains the corresponding shard record. A start token includes its record; an acknowledged delivery token resumes after its record. The receiver opens an independent `AT_SEQUENCE_NUMBER` iterator, replays the shard in partition order, and renews an expired iterator from the last accepted historical position.
+
+The receiver pins the oldest live-cache handoff position while replay is active. Historical records before that boundary are delivered first, then the subscription attaches to the live cursor before the historical reader is released. This transition preserves a contiguous partition scan. Delivery remains at least once across failures.
+
+Configure retained-history capacity with <xref:Orleans.Hosting.SiloKinesisStreamConfigurator.ConfigureReplay*>. <xref:Orleans.Configuration.RecoverableStreamReplayOptions.MaxConcurrentReaders> bounds active shard iterators, <xref:Orleans.Configuration.RecoverableStreamReplayOptions.MaxPendingReaders> bounds queued admissions, and <xref:Orleans.Configuration.RecoverableStreamReplayOptions.CacheSize> bounds each replay fragment. Live and historical readers share the per-shard <xref:Orleans.Streaming.Kinesis.KinesisStreamOptions.GetRecordsInterval> gate so aggregate reads remain within Kinesis limits.
+
+Kinesis tokens carry shard identity and arbitrary-precision shard sequence values. A token from another shard, an invalid sequence, or a position removed by Kinesis retention fails with <xref:Orleans.Streams.DataNotAvailableException>. Throughput throttling and iterator expiry retain their retry behavior.
 
 ## Operations and permissions
 

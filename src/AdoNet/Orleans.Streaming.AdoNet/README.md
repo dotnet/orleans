@@ -57,8 +57,14 @@ The provider stores each queue as an immutable, ordered stream partition. Its st
 - `RetentionPeriod`: retain checkpointed records for at least this period (one day by default). Fractional seconds round upward.
 - `MaximumRetentionPeriod`: optionally delete older records even when they are not checkpointed. This is a hard capacity ceiling and can create a diagnosed retention gap. Fractional seconds round upward.
 - `CleanupInterval` and `CleanupBatchSize`: bound cleanup frequency and work. Fractional cleanup intervals round upward.
+- `ReplayLeaseDuration`: protect a historical reader's retained range in the database across silos.
+- `ReplayLeaseRenewalInterval`: renew active replay protection before its TTL expires.
 
-The partitioned stream provider resumes strictly after the durable, ownership-fenced queue checkpoint and can redeliver records after a crash without skipping uncheckpointed data. The checkpoint advances through the earliest contiguous position which is safe for every subscription, including unrelated partition records which quiet-stream cursors have scanned. Subscription starts attach to the live partition position. Partition state retains the next message identifier, so recovery detects a hard-retention gap even when the purge leaves no records.
+The partitioned stream provider resumes strictly after the durable, ownership-fenced queue checkpoint and can redeliver records after a crash without skipping uncheckpointed data. The checkpoint advances through the earliest contiguous position which is safe for every live subscription, including unrelated partition records which quiet-stream cursors have scanned.
+
+Explicit subscriptions can start or resume from retained ADO.NET tokens after their records leave the live cache. Admission locks the partition, validates the retained lower bound, and creates a provider-visible replay lease in one database transaction. Cleanup respects the minimum active replay watermark across silos. Consumer-safe partition progress alone advances that watermark. A receiver shutdown leaves the lease active until TTL expiry so a new queue owner can reconstruct the reader with continuous cleanup protection.
+
+The receiver delivers historical records in partition order, pins the live-cache boundary, and attaches the subscription to live delivery before releasing replay state. Start tokens are inclusive and acknowledged delivery tokens resume after their record. Delivery remains at least once. `MaximumRetentionPeriod` remains a hard capacity ceiling and terminates an affected replay with a diagnosed `DataNotAvailableException`.
 
 Partition acquisition is cancellation-aware. A receiver whose acquisition command is still completing retains its queue reservation, so a late database result settles before a replacement receiver acquires a newer ownership epoch.
 
@@ -66,9 +72,9 @@ Message creation and checkpoint-eligibility timestamps are sampled after the par
 
 ## Alpha schema upgrade
 
-The current streaming scripts use schema version 2 and are intentionally incompatible with the former queue, visibility-timeout, confirmation, and dead-letter schema. The provider fails during initialization when it detects old or mixed streaming query keys.
+The current streaming scripts use schema version 3 and include fenced replay leases. The provider fails during initialization when it detects old or mixed streaming query keys.
 
-There is no in-place migration for this alpha package. Stop producers and consumers, drop `OrleansStreamMessage`, `OrleansStreamDeadLetter`, `OrleansStreamControl`, `OrleansStreamMessageSequence`, the old streaming routines, and their `OrleansQuery` rows. Drop `OrleansStreamPartition` too after a partial version 2 installation. Then apply the current SQL Server, PostgreSQL, or MySQL streaming script. Existing alpha rows are not read or silently converted, so export payloads first if they must be retained.
+Alpha schema upgrades replace the streaming schema as one unit. Stop producers and consumers, drop `OrleansStreamMessage`, `OrleansStreamReplayLease`, `OrleansStreamPartition`, former dead-letter/control/sequence objects, the streaming routines, and their `OrleansQuery` rows. Then apply the current SQL Server, PostgreSQL, or MySQL streaming script. Export required payloads before replacing the tables.
 
 ## Example - Using ADO.NET Streams in a Grain
 ```csharp

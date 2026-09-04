@@ -114,6 +114,29 @@ public class StreamingJsonConverterTests
         Assert.Equal("Could not deserialize StreamSequenceToken.", exception.Message);
     }
 
+    [Fact]
+    public void PartitionedStreamSequenceToken_JsonRoundTripPreservesIdentityAndPosition()
+    {
+        var options = new JsonSerializerOptions();
+        options.Converters.Add(new EventSequenceTokenJsonConverter());
+        StreamSequenceToken original = new PartitionedStreamSequenceToken(
+            "provider",
+            "partition",
+            "170141183460469231731687303715884105727",
+            sequenceNumber: 42,
+            eventIndex: 3);
+
+        var json = JsonSerializer.Serialize(original, options);
+        var restored = Assert.IsType<PartitionedStreamSequenceToken>(
+            JsonSerializer.Deserialize<StreamSequenceToken>(json, options));
+
+        Assert.Equal("provider", restored.ProviderIdentity);
+        Assert.Equal("partition", restored.PartitionIdentity);
+        Assert.Equal("170141183460469231731687303715884105727", restored.Position);
+        Assert.Equal(42, restored.SequenceNumber);
+        Assert.Equal(3, restored.EventIndex);
+    }
+
     private static StreamSequenceToken DeserializeToken(string json, Type requestedType)
     {
         var options = new JsonSerializerOptions();

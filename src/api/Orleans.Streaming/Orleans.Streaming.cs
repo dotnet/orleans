@@ -96,6 +96,19 @@ namespace Orleans.Configuration
         public int MaxAddCount { get { throw null; } set { } }
     }
 
+    public partial class RecoverableStreamReplayOptions
+    {
+        public int CacheSize { get { throw null; } set { } }
+
+        public int MaxConcurrentReaders { get { throw null; } set { } }
+
+        public int MaxPendingReaders { get { throw null; } set { } }
+
+        public int ReadBatchSize { get { throw null; } set { } }
+        public System.TimeSpan TemporaryTailRetryDelay { get { throw null; } set { } }
+        public System.TimeSpan TemporaryTailRetryDelay { get { throw null; } set { } }
+    }
+
     public partial class SimpleQueueCacheOptions
     {
         public const int DEFAULT_CACHE_SIZE = 4096;
@@ -329,6 +342,8 @@ namespace Orleans.Hosting
     {
         public static void ConfigureCacheEviction(this ISiloRecoverableStreamConfigurator configurator, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.StreamCacheEvictionOptions>> configureOptions) { }
 
+        public static void ConfigureReplay(this ISiloRecoverableStreamConfigurator configurator, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.RecoverableStreamReplayOptions>> configureOptions) { }
+
         public static void ConfigureStatistics(this ISiloRecoverableStreamConfigurator configurator, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.StreamStatisticOptions>> configureOptions) { }
     }
 
@@ -470,7 +485,6 @@ namespace Orleans.Providers
 
         public Orleans.Streams.IBatchContainer GetBatchContainer(ref Streams.Common.CachedMessage cachedMessage) { throw null; }
 
-        [System.Obsolete("Use IQueueCache.TryGetCacheCursor instead.")]
         public Orleans.Streams.IQueueCacheCursor GetCacheCursor(Runtime.StreamId streamId, Orleans.Streams.StreamSequenceToken? token) { throw null; }
 
         public int GetMaxAddCount() { throw null; }
@@ -479,9 +493,7 @@ namespace Orleans.Providers
 
         public bool IsUnderPressure() { throw null; }
 
-        Orleans.Streams.QueueCacheCursorResult<Orleans.Streams.IQueueCacheCursor> Orleans.Streams.IQueueCache.TryGetCacheCursor(Runtime.StreamId streamId, Orleans.Streams.StreamSequenceToken? token) { throw null; }
-
-        Orleans.Streams.QueueCacheCursorResult<Orleans.Streams.IQueueCacheCursor> Orleans.Streams.IQueueCache.TryGetCacheCursorAtPosition(Runtime.StreamId streamId, Orleans.Streams.StreamSubscriptionStartPosition startPosition) { throw null; }
+        Orleans.Streams.IQueueCacheCursor Orleans.Streams.IQueueCache.GetCacheCursorAtPosition(Runtime.StreamId streamId, Orleans.Streams.StreamSubscriptionStartPosition startPosition) { throw null; }
 
         public bool TryPurgeFromCache(out System.Collections.Generic.IList<Orleans.Streams.IBatchContainer> purgedItems) { throw null; }
     }
@@ -511,7 +523,7 @@ namespace Orleans.Providers.Streams.Common
         public string BlockPoolId { get { throw null; } set { } }
     }
 
-    public partial struct CachedMessage : System.IEquatable<CachedMessage>
+    public partial struct CachedMessage
     {
         public System.DateTime DequeueTimeUtc;
         public System.DateTime EnqueueTimeUtc;
@@ -519,15 +531,6 @@ namespace Orleans.Providers.Streams.Common
         public System.ArraySegment<byte> Segment;
         public long SequenceNumber;
         public Runtime.StreamId StreamId;
-        public readonly bool Equals(CachedMessage other) { throw null; }
-
-        public override readonly bool Equals(object? obj) { throw null; }
-
-        public override readonly int GetHashCode() { throw null; }
-
-        public static bool operator ==(CachedMessage left, CachedMessage right) { throw null; }
-
-        public static bool operator !=(CachedMessage left, CachedMessage right) { throw null; }
     }
 
     public partial class CachedMessageBlock : PooledResource<CachedMessageBlock>
@@ -807,6 +810,7 @@ namespace Orleans.Providers.Streams.Common
     {
         CachedMessage FromQueueMessage(Orleans.Streams.StreamPosition streamPosition, TQueueMessage queueMessage, System.DateTime dequeueTimeUtc, System.Func<int, System.ArraySegment<byte>> getSegment);
         string GetOffset(ref CachedMessage cachedMessage);
+        Orleans.Streams.StreamSequenceToken GetRecordToken(Orleans.Streams.StreamSequenceToken token);
         Orleans.Streams.StreamPosition GetStreamPosition(TQueueMessage queueMessage);
         bool TryGetOffset(Orleans.Streams.StreamSequenceToken token, out string offset);
     }
@@ -815,6 +819,21 @@ namespace Orleans.Providers.Streams.Common
     {
         System.Collections.Generic.IReadOnlyList<Orleans.Streams.StreamPosition> Add(System.Collections.Generic.IReadOnlyList<TQueueMessage> messages, System.DateTime dequeueTimeUtc);
         bool TryGetNewestPosition(out Orleans.Streams.StreamSequenceToken? token, out string? offset);
+        bool TryGetOldestPosition(out Orleans.Streams.StreamSequenceToken? token, out string? offset);
+    }
+
+    public partial interface IRecoverableStreamReplaySourceFactory<TQueueMessage>
+    {
+        System.Threading.Tasks.ValueTask<IRecoverableStreamReplaySource<TQueueMessage>> Create(Runtime.StreamId streamId, Orleans.Streams.StreamSequenceToken token, System.Threading.CancellationToken cancellationToken);
+    }
+
+    public partial interface IRecoverableStreamReplaySource<TQueueMessage> : System.IAsyncDisposable
+    {
+        void MessagesAdded(System.Collections.Generic.IReadOnlyList<TQueueMessage> messages);
+        void MessagesAddFailed(System.Collections.Generic.IReadOnlyList<TQueueMessage> messages);
+        System.Threading.Tasks.ValueTask<RecoverableStreamReplayReadResult<TQueueMessage>> Read(int maxCount, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.ValueTask ShutdownAsync(System.Threading.CancellationToken cancellationToken);
+        void UpdateProgress(Orleans.Streams.StreamSequenceToken token);
     }
 
     public partial interface IRecoverableStreamSource<TQueueMessage>
@@ -844,6 +863,33 @@ namespace Orleans.Providers.Streams.Common
         public virtual T Allocate() { throw null; }
 
         public virtual void Free(T resource) { }
+    }
+
+    [GenerateSerializer]
+    public partial class PartitionedStreamSequenceToken : EventSequenceTokenV2
+    {
+        public PartitionedStreamSequenceToken() { }
+
+        public PartitionedStreamSequenceToken(string? providerIdentity, string? partitionIdentity, string position, long sequenceNumber, int eventIndex = 0) { }
+
+        [Id(1)]
+        public string? PartitionIdentity { get { throw null; } }
+
+        [Id(2)]
+        public string Position { get { throw null; } }
+
+        [Id(0)]
+        public string? ProviderIdentity { get { throw null; } }
+
+        public override int CompareTo(Orleans.Streams.StreamSequenceToken? other) { throw null; }
+
+        public override bool Equals(Orleans.Streams.StreamSequenceToken? other) { throw null; }
+
+        public override bool Equals(object? obj) { throw null; }
+
+        public override int GetHashCode() { throw null; }
+
+        public override string ToString() { throw null; }
     }
 
     public partial class PersistentStreamProvider : Orleans.Streams.IStreamProvider, IControllable, Orleans.Streams.Core.IStreamSubscriptionManagerRetriever, ILifecycleParticipant<ILifecycleObservable>
@@ -895,21 +941,15 @@ namespace Orleans.Providers.Streams.Common
 
         public void Add(System.Collections.Generic.List<CachedMessage> messages, System.DateTime dequeueTime) { }
 
-        [System.Obsolete("Use TryGetCursor instead.")]
         public object GetCursor(Runtime.StreamId streamId, Orleans.Streams.StreamSequenceToken? sequenceToken) { throw null; }
+
+        public object GetCursorAtPosition(Runtime.StreamId streamId, Orleans.Streams.StreamSubscriptionStartPosition startPosition) { throw null; }
 
         public void Refresh(object cursorObj, Orleans.Streams.StreamSequenceToken? sequenceToken) { }
 
         public void RemoveOldestMessage() { }
 
-        public Orleans.Streams.QueueCacheCursorResult<object> TryGetCursor(Runtime.StreamId streamId, Orleans.Streams.StreamSequenceToken? sequenceToken) { throw null; }
-
-        public Orleans.Streams.QueueCacheCursorResult<object> TryGetCursorAtPosition(Runtime.StreamId streamId, Orleans.Streams.StreamSubscriptionStartPosition startPosition) { throw null; }
-
-        [System.Obsolete("Use TryGetNextMessageWithResult instead.")]
         public bool TryGetNextMessage(object cursorObj, out Orleans.Streams.IBatchContainer? message) { throw null; }
-
-        public Orleans.Streams.QueueCacheCursorMoveResult TryGetNextMessageWithResult(object cursorObj, out Orleans.Streams.IBatchContainer? message) { throw null; }
     }
 
     public abstract partial class PooledResource<T> : System.IDisposable where T : PooledResource<T>, System.IDisposable
@@ -966,6 +1006,8 @@ namespace Orleans.Providers.Streams.Common
 
         public bool TryGetNewestPosition(out Orleans.Streams.StreamSequenceToken? token, out string? offset) { throw null; }
 
+        public bool TryGetOldestPosition(out Orleans.Streams.StreamSequenceToken? token, out string? offset) { throw null; }
+
         public bool TryPurgeFromCache(out System.Collections.Generic.IList<Orleans.Streams.IBatchContainer> purgedItems) { throw null; }
 
         public void UpdateDeliveryProgress(Orleans.Streams.StreamSequenceToken? earliestSubscriptionToken, System.DateTime utcNow) { }
@@ -973,7 +1015,11 @@ namespace Orleans.Providers.Streams.Common
 
     public sealed partial class RecoverableStreamReceiver<TQueueMessage> : Orleans.Streams.IQueueAdapterReceiver, Orleans.Streams.IQueueCache, Orleans.Streams.IQueueFlowController
     {
+        public RecoverableStreamReceiver(IRecoverableStreamSource<TQueueMessage> source, IRecoverableStreamDataAdapter<TQueueMessage> dataAdapter, IRecoverableStreamQueueCache<TQueueMessage> cache, Orleans.Streams.IStreamQueueCheckpointer<string> checkpointer, bool startFromNow, IRecoverableStreamReplaySourceFactory<TQueueMessage>? replaySourceFactory, System.Func<IRecoverableStreamQueueCache<TQueueMessage>>? replayCacheFactory, Configuration.RecoverableStreamReplayOptions? replayOptions) { }
+
         public RecoverableStreamReceiver(IRecoverableStreamSource<TQueueMessage> source, IRecoverableStreamDataAdapter<TQueueMessage> dataAdapter, IRecoverableStreamQueueCache<TQueueMessage> cache, Orleans.Streams.IStreamQueueCheckpointer<string> checkpointer, bool startFromNow) { }
+
+        public RecoverableStreamReceiver(IRecoverableStreamSource<TQueueMessage> source, IRecoverableStreamDataAdapter<TQueueMessage> dataAdapter, RecoverableStreamQueueCache<TQueueMessage> cache, Orleans.Streams.IStreamQueueCheckpointer<string> checkpointer, bool startFromNow, IRecoverableStreamReplaySourceFactory<TQueueMessage>? replaySourceFactory, System.Func<IRecoverableStreamQueueCache<TQueueMessage>>? replayCacheFactory, Configuration.RecoverableStreamReplayOptions? replayOptions) { }
 
         public RecoverableStreamReceiver(IRecoverableStreamSource<TQueueMessage> source, IRecoverableStreamDataAdapter<TQueueMessage> dataAdapter, RecoverableStreamQueueCache<TQueueMessage> cache, Orleans.Streams.IStreamQueueCheckpointer<string> checkpointer, bool startFromNow) { }
 
@@ -1007,6 +1053,18 @@ namespace Orleans.Providers.Streams.Common
         public bool TryPurgeFromCache(out System.Collections.Generic.IList<Orleans.Streams.IBatchContainer> purgedItems) { throw null; }
 
         public void UpdateDeliveryProgress(Orleans.Streams.StreamSequenceToken? earliestSubscriptionToken, System.DateTime utcNow) { }
+    }
+
+    public readonly partial struct RecoverableStreamReplayReadResult<TQueueMessage>
+    {
+        private readonly System.Collections.Generic.IReadOnlyList<TQueueMessage> _Messages_k__BackingField;
+        private readonly object _dummy;
+        private readonly int _dummyPrimitive;
+        public RecoverableStreamReplayReadResult(System.Collections.Generic.IReadOnlyList<TQueueMessage> messages, bool isAtTail) { }
+
+        public bool IsAtTail { get { throw null; } }
+
+        public System.Collections.Generic.IReadOnlyList<TQueueMessage> Messages { get { throw null; } }
     }
 
     public readonly partial struct RecoverableStreamStartPosition
@@ -1051,16 +1109,13 @@ namespace Orleans.Providers.Streams.Common
 
         public virtual void AddToCache(System.Collections.Generic.IList<Orleans.Streams.IBatchContainer> msgs) { }
 
-        [System.Obsolete("Use IQueueCache.TryGetCacheCursor instead.")]
         public virtual Orleans.Streams.IQueueCacheCursor GetCacheCursor(Runtime.StreamId streamId, Orleans.Streams.StreamSequenceToken? token) { throw null; }
 
         public int GetMaxAddCount() { throw null; }
 
         public virtual bool IsUnderPressure() { throw null; }
 
-        Orleans.Streams.QueueCacheCursorResult<Orleans.Streams.IQueueCacheCursor> Orleans.Streams.IQueueCache.TryGetCacheCursor(Runtime.StreamId streamId, Orleans.Streams.StreamSequenceToken? token) { throw null; }
-
-        Orleans.Streams.QueueCacheCursorResult<Orleans.Streams.IQueueCacheCursor> Orleans.Streams.IQueueCache.TryGetCacheCursorAtPosition(Runtime.StreamId streamId, Orleans.Streams.StreamSubscriptionStartPosition startPosition) { throw null; }
+        Orleans.Streams.IQueueCacheCursor Orleans.Streams.IQueueCache.GetCacheCursorAtPosition(Runtime.StreamId streamId, Orleans.Streams.StreamSubscriptionStartPosition startPosition) { throw null; }
 
         public virtual bool TryPurgeFromCache(out System.Collections.Generic.IList<Orleans.Streams.IBatchContainer> purgedItems) { throw null; }
     }
@@ -1075,10 +1130,7 @@ namespace Orleans.Providers.Streams.Common
 
         public virtual Orleans.Streams.IBatchContainer? GetCurrent(out System.Exception? exception) { throw null; }
 
-        [System.Obsolete("Use MoveNextWithResult instead.")]
         public virtual bool MoveNext() { throw null; }
-
-        public virtual Orleans.Streams.QueueCacheCursorMoveResult MoveNextWithResult() { throw null; }
 
         public void RecordDeliveryFailure() { }
 
@@ -1180,7 +1232,6 @@ namespace Orleans.Providers.Streams.Generator
 
         public Orleans.Streams.IBatchContainer GetBatchContainer(ref Common.CachedMessage cachedMessage) { throw null; }
 
-        [System.Obsolete("Use IQueueCache.TryGetCacheCursor instead.")]
         public Orleans.Streams.IQueueCacheCursor GetCacheCursor(Runtime.StreamId streamId, Orleans.Streams.StreamSequenceToken? token) { throw null; }
 
         public int GetMaxAddCount() { throw null; }
@@ -1189,9 +1240,7 @@ namespace Orleans.Providers.Streams.Generator
 
         public bool IsUnderPressure() { throw null; }
 
-        Orleans.Streams.QueueCacheCursorResult<Orleans.Streams.IQueueCacheCursor> Orleans.Streams.IQueueCache.TryGetCacheCursor(Runtime.StreamId streamId, Orleans.Streams.StreamSequenceToken? token) { throw null; }
-
-        Orleans.Streams.QueueCacheCursorResult<Orleans.Streams.IQueueCacheCursor> Orleans.Streams.IQueueCache.TryGetCacheCursorAtPosition(Runtime.StreamId streamId, Orleans.Streams.StreamSubscriptionStartPosition startPosition) { throw null; }
+        Orleans.Streams.IQueueCacheCursor Orleans.Streams.IQueueCache.GetCacheCursorAtPosition(Runtime.StreamId streamId, Orleans.Streams.StreamSubscriptionStartPosition startPosition) { throw null; }
 
         public bool TryPurgeFromCache(out System.Collections.Generic.IList<Orleans.Streams.IBatchContainer> purgedItems) { throw null; }
     }
@@ -1364,7 +1413,6 @@ namespace Orleans.Streaming.Diagnostics
             public readonly Runtime.StreamId StreamId;
             public readonly System.Guid SubscriptionId;
             public ItemDelivered(string streamProvider, Runtime.StreamId streamId, System.Guid subscriptionId, Runtime.SiloAddress? siloAddress, Streams.StreamSequenceToken? sequenceToken) : base(default!, default) { }
-
             public ItemDelivered(string streamProvider, Runtime.StreamId streamId, System.Guid subscriptionId, Runtime.SiloAddress? siloAddress, string clusterId, Streams.StreamSequenceToken? sequenceToken) : base(default!, default) { }
         }
 
@@ -1750,6 +1798,11 @@ namespace Orleans.Streams
         System.Threading.Tasks.Task OnNextAsync(T item, StreamSequenceToken? token = null);
     }
 
+    public partial interface IAsyncQueueCacheCursor : IQueueCacheCursor, System.IDisposable
+    {
+        System.Threading.Tasks.ValueTask<QueueCacheCursorMoveNextResult> MoveNextAsync(System.Threading.CancellationToken cancellationToken);
+    }
+
     public partial interface IAsyncStream
     {
         bool IsRewindable { get; }
@@ -1838,11 +1891,9 @@ namespace Orleans.Streams
     public partial interface IQueueCache : IQueueFlowController
     {
         void AddToCache(System.Collections.Generic.IList<IBatchContainer> messages);
-        [System.Obsolete("Use TryGetCacheCursor instead.")]
         IQueueCacheCursor GetCacheCursor(Runtime.StreamId streamId, StreamSequenceToken? token);
+        IQueueCacheCursor GetCacheCursorAtPosition(Runtime.StreamId streamId, StreamSubscriptionStartPosition startPosition);
         bool IsUnderPressure();
-        QueueCacheCursorResult<IQueueCacheCursor> TryGetCacheCursor(Runtime.StreamId streamId, StreamSequenceToken? token);
-        QueueCacheCursorResult<IQueueCacheCursor> TryGetCacheCursorAtPosition(Runtime.StreamId streamId, StreamSubscriptionStartPosition startPosition);
         bool TryPurgeFromCache(out System.Collections.Generic.IList<IBatchContainer> purgedItems);
         void UpdateDeliveryProgress(StreamSequenceToken? earliestSubscriptionToken, System.DateTime utcNow);
     }
@@ -1850,9 +1901,7 @@ namespace Orleans.Streams
     public partial interface IQueueCacheCursor : System.IDisposable
     {
         IBatchContainer? GetCurrent(out System.Exception? exception);
-        [System.Obsolete("Use MoveNextWithResult instead.")]
         bool MoveNext();
-        QueueCacheCursorMoveResult MoveNextWithResult();
         void RecordDeliveryFailure();
         void Refresh(StreamSequenceToken token);
     }
@@ -2139,72 +2188,11 @@ namespace Orleans.Streams
         public bool UnSubscribeFromQueueDistributionChangeEvents(IStreamQueueBalanceListener observer) { throw null; }
     }
 
-    public readonly partial struct QueueCacheCursorMoveResult : System.IEquatable<QueueCacheCursorMoveResult>
+    public enum QueueCacheCursorMoveNextResult
     {
-        private readonly int _dummyPrimitive;
-        public QueueCacheMissInfo? CacheMiss { get { throw null; } }
-
-        public QueueCacheCursorMoveResultKind Kind { get { throw null; } }
-
-        public static QueueCacheCursorMoveResult NoData { get { throw null; } }
-
-        public static QueueCacheCursorMoveResult Success { get { throw null; } }
-
-        public readonly bool Equals(QueueCacheCursorMoveResult other) { throw null; }
-
-        public override readonly bool Equals(object? obj) { throw null; }
-
-        public static QueueCacheCursorMoveResult FromCacheMiss(QueueCacheMissInfo cacheMiss) { throw null; }
-
-        public override readonly int GetHashCode() { throw null; }
-
-        public static bool operator ==(QueueCacheCursorMoveResult left, QueueCacheCursorMoveResult right) { throw null; }
-
-        public static bool operator !=(QueueCacheCursorMoveResult left, QueueCacheCursorMoveResult right) { throw null; }
-    }
-
-    public enum QueueCacheCursorMoveResultKind
-    {
-        Invalid = 0,
-        Success = 1,
-        NoData = 2,
-        CacheMiss = 3
-    }
-
-    public enum QueueCacheCursorResultKind
-    {
-        Invalid = 0,
-        Success = 1,
-        CacheMiss = 2,
-        NotSupported = 3
-    }
-
-    public readonly partial struct QueueCacheCursorResult<TCursor> : System.IEquatable<QueueCacheCursorResult<TCursor>> where TCursor : class
-    {
-        private readonly TCursor? _cursor;
-        private readonly object _dummy;
-        private readonly int _dummyPrimitive;
-        public QueueCacheMissInfo? CacheMiss { get { throw null; } }
-
-        public TCursor? Cursor { get { throw null; } }
-
-        public QueueCacheCursorResultKind Kind { get { throw null; } }
-
-        public static QueueCacheCursorResult<TCursor> NotSupported { get { throw null; } }
-
-        public readonly bool Equals(QueueCacheCursorResult<TCursor> other) { throw null; }
-
-        public override readonly bool Equals(object? obj) { throw null; }
-
-        public static QueueCacheCursorResult<TCursor> FromCacheMiss(QueueCacheMissInfo cacheMiss) { throw null; }
-
-        public static QueueCacheCursorResult<TCursor> FromCursor(TCursor cursor) { throw null; }
-
-        public override readonly int GetHashCode() { throw null; }
-
-        public static bool operator ==(QueueCacheCursorResult<TCursor> left, QueueCacheCursorResult<TCursor> right) { throw null; }
-
-        public static bool operator !=(QueueCacheCursorResult<TCursor> left, QueueCacheCursorResult<TCursor> right) { throw null; }
+        ItemAvailable = 0,
+        TemporaryTail = 1,
+        Completed = 2
     }
 
     [GenerateSerializer]
@@ -2231,39 +2219,6 @@ namespace Orleans.Streams
 
         [System.Obsolete]
         public override void GetObjectData(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) { }
-    }
-
-    public readonly partial struct QueueCacheMissInfo : System.IEquatable<QueueCacheMissInfo>
-    {
-        private readonly object _dummy;
-        private readonly int _dummyPrimitive;
-        public QueueCacheMissInfo(StreamSequenceToken requested, StreamSequenceToken low, StreamSequenceToken high) { }
-
-        public QueueCacheMissInfo(string? requested, string? low, string? high) { }
-
-        public string? High { get { throw null; } }
-
-        public StreamSequenceToken? HighToken { get { throw null; } }
-
-        public string? Low { get { throw null; } }
-
-        public StreamSequenceToken? LowToken { get { throw null; } }
-
-        public string? Requested { get { throw null; } }
-
-        public StreamSequenceToken? RequestedToken { get { throw null; } }
-
-        public readonly bool Equals(QueueCacheMissInfo other) { throw null; }
-
-        public override readonly bool Equals(object? obj) { throw null; }
-
-        public override readonly int GetHashCode() { throw null; }
-
-        public static bool operator ==(QueueCacheMissInfo left, QueueCacheMissInfo right) { throw null; }
-
-        public static bool operator !=(QueueCacheMissInfo left, QueueCacheMissInfo right) { throw null; }
-
-        public readonly QueueCacheMissException ToException() { throw null; }
     }
 
     [Immutable]
@@ -2537,6 +2492,16 @@ namespace Orleans.Streams
     {
         Latest = 0,
         EarliestAvailable = 1
+    }
+
+    [GenerateSerializer]
+    public sealed partial class TransientStreamReplayException : Runtime.OrleansException
+    {
+        public TransientStreamReplayException() { }
+
+        public TransientStreamReplayException(string message, System.Exception innerException) { }
+        public TransientStreamReplayException(string message) { }
+        public TransientStreamReplayException(string message) { }
     }
 }
 
@@ -3025,6 +2990,24 @@ namespace OrleansCodeGen.Orleans.Providers.Streams.Common
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_PartitionedStreamSequenceToken : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Providers.Streams.Common.PartitionedStreamSequenceToken>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IBaseCodec<global::Orleans.Providers.Streams.Common.PartitionedStreamSequenceToken>, global::Orleans.Serialization.Serializers.IBaseCodec
+    {
+        public Codec_PartitionedStreamSequenceToken(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Providers.Streams.Common.PartitionedStreamSequenceToken instance) { }
+
+        public global::Orleans.Providers.Streams.Common.PartitionedStreamSequenceToken ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::Orleans.Providers.Streams.Common.PartitionedStreamSequenceToken instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Providers.Streams.Common.PartitionedStreamSequenceToken value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_EventSequenceToken : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Providers.Streams.Common.EventSequenceToken>, global::Orleans.Serialization.Cloning.IDeepCopier, global::Orleans.Serialization.Cloning.IBaseCopier<global::Orleans.Providers.Streams.Common.EventSequenceToken>, global::Orleans.Serialization.Cloning.IBaseCopier
     {
         public Copier_EventSequenceToken(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -3044,6 +3027,18 @@ namespace OrleansCodeGen.Orleans.Providers.Streams.Common
         public void DeepCopy(global::Orleans.Providers.Streams.Common.EventSequenceTokenV2 input, global::Orleans.Providers.Streams.Common.EventSequenceTokenV2 output, global::Orleans.Serialization.Cloning.CopyContext context) { }
 
         public global::Orleans.Providers.Streams.Common.EventSequenceTokenV2 DeepCopy(global::Orleans.Providers.Streams.Common.EventSequenceTokenV2 original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_PartitionedStreamSequenceToken : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Providers.Streams.Common.PartitionedStreamSequenceToken>, global::Orleans.Serialization.Cloning.IDeepCopier, global::Orleans.Serialization.Cloning.IBaseCopier<global::Orleans.Providers.Streams.Common.PartitionedStreamSequenceToken>, global::Orleans.Serialization.Cloning.IBaseCopier
+    {
+        public Copier_PartitionedStreamSequenceToken(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public void DeepCopy(global::Orleans.Providers.Streams.Common.PartitionedStreamSequenceToken input, global::Orleans.Providers.Streams.Common.PartitionedStreamSequenceToken output, global::Orleans.Serialization.Cloning.CopyContext context) { }
+
+        public global::Orleans.Providers.Streams.Common.PartitionedStreamSequenceToken DeepCopy(global::Orleans.Providers.Streams.Common.PartitionedStreamSequenceToken original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 }
 
@@ -3406,6 +3401,24 @@ namespace OrleansCodeGen.Orleans.Streams
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_TransientStreamReplayException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Streams.TransientStreamReplayException>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public Codec_TransientStreamReplayException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Streams.TransientStreamReplayException instance) { }
+
+        public global::Orleans.Streams.TransientStreamReplayException ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::Orleans.Streams.TransientStreamReplayException instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Streams.TransientStreamReplayException value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_BatchContainerBatch : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Streams.BatchContainerBatch>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
         public Copier_BatchContainerBatch(global::Orleans.Serialization.Activators.IActivator<global::Orleans.Streams.BatchContainerBatch> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -3529,6 +3542,14 @@ namespace OrleansCodeGen.Orleans.Streams
         public global::Orleans.Streams.StreamSubscriptionHandle<T> DeepCopy(global::Orleans.Streams.StreamSubscriptionHandle<T> original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
 
         public void DeepCopy(global::Orleans.Streams.StreamSubscriptionHandle<T> input, global::Orleans.Streams.StreamSubscriptionHandle<T> output, global::Orleans.Serialization.Cloning.CopyContext context) { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_TransientStreamReplayException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Streams.TransientStreamReplayException, global::Orleans.Runtime.OrleansException>
+    {
+        public Copier_TransientStreamReplayException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
     }
 
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]

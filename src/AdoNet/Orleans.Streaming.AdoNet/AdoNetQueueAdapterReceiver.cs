@@ -22,15 +22,19 @@ internal sealed class AdoNetQueueAdapterReceiver : IQueueAdapterReceiver, IQueue
         SimpleQueueCacheOptions cacheOptions,
         RelationalOrleansQueries queries,
         Serializer<AdoNetBatchContainer> serializer,
-        ILogger<AdoNetQueueAdapterReceiver> logger)
+        ILogger<AdoNetQueueAdapterReceiver> logger,
+        RecoverableStreamReplayOptions replayOptions,
+        TimeProvider? timeProvider = null)
     {
+        timeProvider ??= TimeProvider.System;
         _source = new AdoNetRecoverableStream(
             clusterOptions.ServiceId,
             providerId,
             queueId,
             streamOptions,
             queries,
-            logger);
+            logger,
+            timeProvider);
         var checkpointer = new StreamQueueCheckpointer(
             _source,
             new StreamQueueCheckpointerOptions
@@ -38,26 +42,44 @@ internal sealed class AdoNetQueueAdapterReceiver : IQueueAdapterReceiver, IQueue
                 CheckpointComparer = StreamCheckpointComparers.Numeric,
                 PersistInterval = streamOptions.CheckpointPersistInterval,
             });
-        var dataAdapter = new AdoNetRecoverableStreamDataAdapter(serializer);
+        var dataAdapter = new AdoNetRecoverableStreamDataAdapter(
+            clusterOptions.ServiceId,
+            providerId,
+            queueId,
+            serializer);
         var bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(BufferSize));
-        var evictionStrategy = new ChronologicalEvictionStrategy(
-            logger,
-            new TimePurgePredicate(TimeSpan.MaxValue, TimeSpan.MaxValue),
-            cacheMonitor: null,
-            monitorWriteInterval: null);
-        var cache = new RecoverableStreamQueueCache<AdoNetStreamMessage>(
-            Math.Min(streamOptions.MaxMessagesPerRead, cacheOptions.CacheSize),
-            bufferPool,
-            dataAdapter,
-            evictionStrategy,
-            logger,
-            maxCacheSize: cacheOptions.CacheSize);
+        var cache = CreateCache(cacheOptions.CacheSize, bufferPool);
+        IRecoverableStreamQueueCache<AdoNetStreamMessage> CreateReplayCache()
+            => CreateCache(
+                replayOptions.CacheSize,
+                new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(BufferSize)));
         _inner = new RecoverableStreamReceiver<AdoNetStreamMessage>(
             _source,
             dataAdapter,
             cache,
             checkpointer,
-            streamOptions.StartFromNow);
+            streamOptions.StartFromNow,
+            _source,
+            CreateReplayCache,
+            replayOptions);
+
+        RecoverableStreamQueueCache<AdoNetStreamMessage> CreateCache(
+            int cacheSize,
+            IObjectPool<FixedSizeBuffer> pool)
+        {
+            var evictionStrategy = new ChronologicalEvictionStrategy(
+                logger,
+                new TimePurgePredicate(TimeSpan.MaxValue, TimeSpan.MaxValue),
+                cacheMonitor: null,
+                monitorWriteInterval: null);
+            return new(
+                Math.Min(streamOptions.MaxMessagesPerRead, cacheSize),
+                pool,
+                dataAdapter,
+                evictionStrategy,
+                logger,
+                maxCacheSize: cacheSize);
+        }
     }
 
     public Task Initialize(TimeSpan timeout) => _inner.Initialize(timeout);

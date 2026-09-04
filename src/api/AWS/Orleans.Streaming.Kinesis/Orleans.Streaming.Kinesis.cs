@@ -55,6 +55,8 @@ namespace Orleans.Hosting
         public ClusterClientKinesisStreamConfigurator ConfigureKinesis(System.Action<Microsoft.Extensions.Options.OptionsBuilder<Streaming.Kinesis.KinesisStreamOptions>> configureOptions) { throw null; }
 
         public ClusterClientKinesisStreamConfigurator ConfigureKinesis(System.Action<Streaming.Kinesis.KinesisStreamOptions> configureOptions) { throw null; }
+
+        public ClusterClientKinesisStreamConfigurator ConfigureReplay(System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.RecoverableStreamReplayOptions>> configureOptions) { throw null; }
     }
 
     public static partial class SiloBuilderExtensions
@@ -74,6 +76,8 @@ namespace Orleans.Hosting
         public SiloKinesisStreamConfigurator ConfigureKinesis(System.Action<Microsoft.Extensions.Options.OptionsBuilder<Streaming.Kinesis.KinesisStreamOptions>> configureOptions) { throw null; }
 
         public SiloKinesisStreamConfigurator ConfigureKinesis(System.Action<Streaming.Kinesis.KinesisStreamOptions> configureOptions) { throw null; }
+
+        public SiloKinesisStreamConfigurator ConfigureReplay(System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.RecoverableStreamReplayOptions>> configureOptions) { throw null; }
 
         public SiloKinesisStreamConfigurator UseDynamoDBCheckpointer(System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.DynamoDBStreamQueueCheckpointerOptions>>? configureOptions = null) { throw null; }
 
