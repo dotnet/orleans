@@ -1,15 +1,17 @@
 name: Setup code coverage
-description: Install the cross-platform dependencies and tool used to collect CI coverage.
+description: Verify the cross-platform prerequisites and install the tool used to collect CI coverage.
 
 runs:
   using: composite
   steps:
-  - name: Install Linux coverage dependencies
+  - name: Verify Linux coverage dependencies
     if: runner.os == 'Linux'
     shell: bash
     run: |
-      sudo apt-get update
-      sudo apt-get install --yes libxml2
+      if ! dpkg-query --show --showformat='${Status}' libxml2 2>/dev/null | grep --quiet 'ok installed'; then
+        echo "::error::The GitHub-hosted Linux runner must provide libxml2 for dotnet-coverage."
+        exit 1
+      fi
   - name: Install dotnet-coverage
     shell: pwsh
     run: ./.github/scripts/setup-coverage.ps1
