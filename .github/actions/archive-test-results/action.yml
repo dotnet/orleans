@@ -21,24 +21,10 @@ runs:
         !TestResults/*.cobertura.xml
         !TestResults/*.coverage.json
         **/logs/*
-  - name: Wait before retrying test result upload
+  - name: Report test result upload failure
     if: steps.archive-test-results.outcome == 'failure'
     shell: pwsh
-    run: Start-Sleep -Seconds 30
-  - name: Retry test result upload
-    if: steps.archive-test-results.outcome == 'failure'
-    continue-on-error: true
-    uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-    with:
-      name: ${{ inputs.name }}
-      if-no-files-found: warn
-      retention-days: 1
-      overwrite: true
-      path: |
-        **/TestResults/*
-        !TestResults/*.cobertura.xml
-        !TestResults/*.coverage.json
-        **/logs/*
+    run: Write-Output '::warning title=Test result artifact upload failed::Test result diagnostics are unavailable. See the preceding upload error.'
   - name: Write coverage metadata
     if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch))
     shell: pwsh
@@ -53,29 +39,12 @@ runs:
          ConvertTo-Json |
          Set-Content -LiteralPath 'TestResults/${{ inputs.name }}.coverage.json' -Encoding utf8NoBOM
   - name: Archive coverage
-    id: archive-coverage
     if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch))
-    continue-on-error: true
     uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
     with:
       name: coverage_${{ inputs.name }}
       if-no-files-found: error
       retention-days: ${{ github.event_name == 'push' && 7 || 1 }}
-      path: |
-        TestResults/${{ inputs.name }}.cobertura.xml
-        TestResults/${{ inputs.name }}.coverage.json
-  - name: Wait before retrying coverage upload
-    if: (github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch))) && steps.archive-coverage.outcome == 'failure'
-    shell: pwsh
-    run: Start-Sleep -Seconds 30
-  - name: Retry coverage upload
-    if: (github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch))) && steps.archive-coverage.outcome == 'failure'
-    uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-    with:
-      name: coverage_${{ inputs.name }}
-      if-no-files-found: error
-      retention-days: ${{ github.event_name == 'push' && 7 || 1 }}
-      overwrite: true
       path: |
         TestResults/${{ inputs.name }}.cobertura.xml
         TestResults/${{ inputs.name }}.coverage.json
