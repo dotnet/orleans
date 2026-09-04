@@ -57,21 +57,21 @@ namespace Orleans.Streaming.Kinesis
         /// <summary>
         /// Offset of the message within an Kinesis shard.
         /// </summary>
-        [Id(0)]
+        [Id(2)]
         [JsonProperty]
         public string ShardSequence { get; } = null!;
 
         /// <summary>
         /// Gets the Kinesis shard which produced this position.
         /// </summary>
-        [Id(1)]
+        [Id(3)]
         [JsonProperty]
         public string? ShardId { get; }
 
         /// <summary>
         /// Gets the Kinesis stream which contains this position.
         /// </summary>
-        [Id(2)]
+        [Id(4)]
         [JsonProperty]
         public string? StreamName { get; }
 

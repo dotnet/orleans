@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
@@ -236,5 +237,19 @@ public sealed class KinesisSequenceTokenTests
         Assert.True(original.Equals(restored));
         Assert.True(restored.Equals(original));
         Assert.Equal(original.GetHashCode(), restored.GetHashCode());
+    }
+
+    [Fact]
+    public void SerializerIdsFollowBaseTokenIds()
+    {
+        Assert.Equal(2u, GetId(nameof(KinesisSequenceToken.ShardSequence)));
+        Assert.Equal(3u, GetId(nameof(KinesisSequenceToken.ShardId)));
+        Assert.Equal(4u, GetId(nameof(KinesisSequenceToken.StreamName)));
+
+        static uint GetId(string propertyName)
+            => typeof(KinesisSequenceToken)
+                .GetProperty(propertyName)!
+                .GetCustomAttribute<Orleans.IdAttribute>()!
+                .Id;
     }
 }

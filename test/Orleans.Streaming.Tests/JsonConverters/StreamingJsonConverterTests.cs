@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
@@ -135,6 +136,20 @@ public class StreamingJsonConverterTests
         Assert.Equal("170141183460469231731687303715884105727", restored.Position);
         Assert.Equal(42, restored.SequenceNumber);
         Assert.Equal(3, restored.EventIndex);
+    }
+
+    [Fact]
+    public void PartitionedStreamSequenceToken_SerializerIdsFollowBaseTokenIds()
+    {
+        Assert.Equal(2u, GetId(nameof(PartitionedStreamSequenceToken.ProviderIdentity)));
+        Assert.Equal(3u, GetId(nameof(PartitionedStreamSequenceToken.PartitionIdentity)));
+        Assert.Equal(4u, GetId(nameof(PartitionedStreamSequenceToken.Position)));
+
+        static uint GetId(string propertyName)
+            => typeof(PartitionedStreamSequenceToken)
+                .GetProperty(propertyName)!
+                .GetCustomAttribute<Orleans.IdAttribute>()!
+                .Id;
     }
 
     private static StreamSequenceToken DeserializeToken(string json, Type requestedType)
