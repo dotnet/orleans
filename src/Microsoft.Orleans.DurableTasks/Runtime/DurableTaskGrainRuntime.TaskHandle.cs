@@ -1,9 +1,9 @@
 using System;
+using System.Threading;
+using System.Threading.Tasks;
 using Orleans.DurableTasks;
 using Orleans.DurableTasks.Protocol;
 using Orleans.Runtime;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Orleans.DurableTasks.Runtime;
 

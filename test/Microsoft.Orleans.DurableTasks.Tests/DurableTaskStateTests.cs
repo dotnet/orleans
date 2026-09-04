@@ -1,11 +1,11 @@
 #nullable enable
 using System;
-using Orleans.DurableTasks;
-using Orleans.DurableTasks.Protocol;
-using Orleans.DurableTasks.Runtime;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
+using Orleans.DurableTasks;
+using Orleans.DurableTasks.Protocol;
+using Orleans.DurableTasks.Runtime;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Xunit;
