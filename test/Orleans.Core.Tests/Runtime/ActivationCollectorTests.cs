@@ -119,6 +119,51 @@ namespace UnitTests.Runtime
         }
 
         [Fact, TestCategory("Activation")]
+        public async Task TryRescheduleCollection_DoesNotSerializeIndependentContexts()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var ageLimit = TimeSpan.FromMinutes(5);
+            var first = Substitute.For<ICollectibleGrainContext>();
+            var second = Substitute.For<ICollectibleGrainContext>();
+            first.IsExemptFromCollection.Returns(false);
+            second.IsExemptFromCollection.Returns(false);
+            second.CollectionAgeLimit.Returns(ageLimit);
+
+            var now = timeProvider.GetUtcNow().UtcDateTime;
+            collector.ScheduleCollection(first, ageLimit, now);
+            collector.ScheduleCollection(second, ageLimit, now);
+
+            var metadataRequested = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var releaseMetadata = new ManualResetEventSlim();
+            first.CollectionAgeLimit.Returns(_ =>
+            {
+                metadataRequested.TrySetResult();
+                if (!releaseMetadata.Wait(TimeSpan.FromSeconds(10), cancellationToken))
+                {
+                    throw new TimeoutException("Timed out waiting to release collection metadata access.");
+                }
+
+                return ageLimit;
+            });
+
+            var firstReschedule = Task.Run(() => collector.TryRescheduleCollection(first), cancellationToken);
+            await metadataRequested.Task.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+            try
+            {
+                Assert.True(
+                    await Task.Run(
+                        () => collector.TryRescheduleCollection(second),
+                        cancellationToken).WaitAsync(TimeSpan.FromSeconds(10), cancellationToken));
+            }
+            finally
+            {
+                releaseMetadata.Set();
+            }
+
+            Assert.True(await firstReschedule.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken));
+        }
+
+        [Fact, TestCategory("Activation")]
         public async Task CollectStaleActivations_DelegatesAtomicTransitionToContext()
         {
             var cancellationToken = TestContext.Current.CancellationToken;

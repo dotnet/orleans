@@ -21,19 +21,15 @@ namespace Orleans.Runtime
     /// </summary>
     internal partial class ActivationCollector : IActivationWorkingSetObserver, ILifecycleParticipant<ISiloLifecycle>, IDisposable
     {
-#if NET10_0_OR_GREATER
-        private readonly Lock _scheduleLock = new();
-#else
-        private readonly object _scheduleLock = new();
-#endif
         private readonly TimeSpan shortestAgeLimit;
         private readonly ConcurrentDictionary<DateTime, Bucket> buckets = new();
         private readonly ConcurrentDictionary<ICollectibleGrainContext, CollectionRegistration> _registrations = new(ReferenceEqualsComparer.Default);
         private readonly CancellationTokenSource _shutdownCts = new();
         private readonly TimeProvider _timeProvider;
-        private DateTime nextTicket;
+        private long _nextTicketTicks;
         private static readonly List<ICollectibleGrainContext> nothing = [];
         private static readonly IReadOnlyList<CollectionClaim> NoClaims = Array.Empty<CollectionClaim>();
+        private static readonly IEnumerable<CollectionRegistration> NoRegistrations = Array.Empty<CollectionRegistration>();
         private readonly ILogger logger;
         private int collectionNumber;
 
@@ -69,7 +65,7 @@ namespace Orleans.Runtime
             _catalogInstruments = catalogInstruments;
 
             shortestAgeLimit = new(_grainCollectionOptions.ClassSpecificCollectionAge.Values.Aggregate(_grainCollectionOptions.CollectionAge.Ticks, (a, v) => Math.Min(a, v.Ticks)));
-            nextTicket = MakeTicketFromDateTime(timeProvider.GetUtcNow().UtcDateTime);
+            _nextTicketTicks = MakeTicketFromDateTime(timeProvider.GetUtcNow().UtcDateTime).Ticks;
             this.logger = logger;
             _collectionTimer = new PeriodicTimer(_grainCollectionOptions.CollectionQuantum);
 
@@ -94,7 +90,7 @@ namespace Orleans.Runtime
                 var timeSinceLastUsed = shortestAgeLimit - timeTillCollection;
                 if (timeSinceLastUsed <= recencyPeriod)
                 {
-                    sum += bucket.Value.Items.Count;
+                    sum += bucket.Value.Count;
                 }
             }
 
@@ -129,13 +125,9 @@ namespace Orleans.Runtime
             }
 
             var registration = _registrations.GetOrAdd(item, static item => new(item));
-            lock (_scheduleLock)
+            if (!TryScheduleCollection(registration, timeout, now, throwIfExpired: true))
             {
-                var ticket = MakeTicketFromTimeSpan(timeout, now);
-                if (!registration.TrySchedule(GetOrCreateBucket(ticket), ticket))
-                {
-                    throw new InvalidOperationException("Call CancelCollection before calling ScheduleCollection.");
-                }
+                throw new InvalidOperationException("Call CancelCollection before calling ScheduleCollection.");
             }
         }
 
@@ -161,55 +153,74 @@ namespace Orleans.Runtime
         {
             if (item.IsExemptFromCollection) return false;
             var registration = _registrations.GetOrAdd(item, static item => new(item));
-
-            lock (_scheduleLock)
-            {
-                return TryRescheduleCollection(registration, item.CollectionAgeLimit);
-            }
+            return TryRescheduleCollection(registration, item.CollectionAgeLimit);
         }
 
         private bool TryRescheduleCollection(CollectionRegistration registration, TimeSpan timeout)
         {
-            if (registration.TryGetScheduledTicket(out var oldTicket))
+            while (registration.TryGetScheduledTicket(out var oldTicket))
             {
                 ThrowIfTicketIsInvalid(oldTicket);
                 if (!IsExpired(oldTicket))
                 {
-                    var rescheduledTicket = MakeTicketFromTimeSpan(timeout, _timeProvider.GetUtcNow().UtcDateTime);
+                    if (!TryMakeTicketFromTimeSpan(timeout, _timeProvider.GetUtcNow().UtcDateTime, out var rescheduledTicket))
+                    {
+                        break;
+                    }
+
                     if (rescheduledTicket.Equals(oldTicket)) return true;
 
-                    return registration.TryReschedule(GetOrCreateBucket(rescheduledTicket), rescheduledTicket);
+                    var bucket = GetOrCreateBucket(rescheduledTicket);
+                    if (registration.TryReschedule(bucket, rescheduledTicket))
+                    {
+                        if (!IsExpired(rescheduledTicket))
+                        {
+                            return true;
+                        }
+
+                        registration.TryCancel();
+                        bucket.CloseForCleanup();
+                        break;
+                    }
+
+                    continue;
                 }
+
+                break;
             }
 
             registration.TryCancel();
-            var newTicket = MakeTicketFromTimeSpan(timeout, _timeProvider.GetUtcNow().UtcDateTime);
-            return registration.TrySchedule(GetOrCreateBucket(newTicket), newTicket);
+            return TryScheduleCollection(registration, timeout, _timeProvider.GetUtcNow().UtcDateTime, throwIfExpired: false);
         }
 
         private bool DequeueQuantum([NotNullWhen(true)] out IReadOnlyList<CollectionClaim>? items, DateTime now)
         {
-            Bucket? bucket;
-            lock (_scheduleLock)
+            long ticketTicks;
+            while (true)
             {
-                if (nextTicket > now)
+                ticketTicks = Volatile.Read(ref _nextTicketTicks);
+                if (ticketTicks > now.Ticks)
                 {
                     items = null;
                     return false;
                 }
 
-                var key = nextTicket;
-                nextTicket += _grainCollectionOptions.CollectionQuantum;
-                buckets.TryRemove(key, out bucket);
+                var nextTicketTicks = checked(ticketTicks + _grainCollectionOptions.CollectionQuantum.Ticks);
+                if (Interlocked.CompareExchange(ref _nextTicketTicks, nextTicketTicks, ticketTicks) == ticketTicks)
+                {
+                    break;
+                }
             }
 
+            var key = new DateTime(ticketTicks, DateTimeKind.Utc);
+            buckets.TryRemove(key, out var bucket);
             if (bucket is null)
             {
                 items = NoClaims;
                 return true;
             }
 
-            items = bucket.ClaimAll();
+            items = bucket.CloseAndClaimAll();
             return true;
         }
 
@@ -218,8 +229,8 @@ namespace Orleans.Runtime
         {
             var now = _timeProvider.GetUtcNow().UtcDateTime;
             var all = buckets.ToList();
-            var bucketsText = Utils.EnumerableToString(all.OrderBy(bucket => bucket.Key), bucket => $"{Utils.TimeSpanToString(bucket.Key - now)}->{bucket.Value.Items.Count} items");
-            return $"<#Activations={all.Sum(b => b.Value.Items.Count)}, #Buckets={all.Count}, buckets={bucketsText}>";
+            var bucketsText = Utils.EnumerableToString(all.OrderBy(bucket => bucket.Key), bucket => $"{Utils.TimeSpanToString(bucket.Key - now)}->{bucket.Value.Count} items");
+            return $"<#Activations={all.Sum(b => b.Value.Count)}, #Buckets={all.Count}, buckets={bucketsText}>";
         }
 
         private List<ICollectibleGrainContext> ScanStale(DeactivationReason reason, CancellationToken cancellationToken)
@@ -267,7 +278,7 @@ namespace Orleans.Runtime
             foreach (var kv in buckets)
             {
                 var bucket = kv.Value;
-                foreach (var registration in bucket.Items.Keys)
+                foreach (var registration in bucket.Registrations)
                 {
                     if (!registration.IsScheduledIn(bucket))
                     {
@@ -299,10 +310,35 @@ namespace Orleans.Runtime
 
         private void RescheduleClaim(CollectionClaim claim, TimeSpan timeout, DateTime now)
         {
-            lock (_scheduleLock)
+            while (claim.Registration.IsClaimed(claim.Generation))
             {
-                var ticket = MakeTicketFromTimeSpan(timeout, now);
-                claim.Registration.TryRescheduleClaim(claim.Generation, GetOrCreateBucket(ticket), ticket);
+                if (!TryMakeTicketFromTimeSpan(timeout, now, out var ticket))
+                {
+                    claim.Registration.TryCompleteClaim(claim.Generation);
+                    TryScheduleCollection(claim.Registration, timeout, _timeProvider.GetUtcNow().UtcDateTime, throwIfExpired: false);
+                    return;
+                }
+
+                var bucket = GetOrCreateBucket(ticket);
+                if (claim.Registration.TryRescheduleClaim(claim.Generation, bucket, ticket))
+                {
+                    if (IsExpired(ticket))
+                    {
+                        claim.Registration.TryCancel();
+                        bucket.CloseForCleanup();
+                        TryScheduleCollection(claim.Registration, timeout, _timeProvider.GetUtcNow().UtcDateTime, throwIfExpired: false);
+                    }
+
+                    return;
+                }
+
+                if (IsExpired(ticket))
+                {
+                    bucket.CloseForCleanup();
+                    claim.Registration.TryCompleteClaim(claim.Generation);
+                    TryScheduleCollection(claim.Registration, timeout, _timeProvider.GetUtcNow().UtcDateTime, throwIfExpired: false);
+                    return;
+                }
             }
         }
 
@@ -365,7 +401,7 @@ namespace Orleans.Runtime
             Array.Sort(bucketSnapshot, static (left, right) => left.Key.CompareTo(right.Key));
             foreach (var bucket in bucketSnapshot)
             {
-                foreach (var registration in bucket.Value.Items.Keys)
+                foreach (var registration in bucket.Value.Registrations)
                 {
                     if (candidates.Count >= count)
                     {
@@ -442,10 +478,22 @@ namespace Orleans.Runtime
 
         private bool IsExpired(DateTime ticket)
         {
-            return ticket < nextTicket;
+            return ticket.Ticks < Volatile.Read(ref _nextTicketTicks);
         }
 
         public DateTime MakeTicketFromDateTime(DateTime timestamp)
+        {
+            var ticket = CalculateTicket(timestamp);
+            var nextTicketTicks = Volatile.Read(ref _nextTicketTicks);
+            if (ticket.Ticks < nextTicketTicks)
+            {
+                throw new ArgumentException(string.Format("The earliest collection that can be scheduled from now is for {0}", new DateTime(nextTicketTicks - _grainCollectionOptions.CollectionQuantum.Ticks + 1, DateTimeKind.Utc)));
+            }
+
+            return ticket;
+        }
+
+        private DateTime CalculateTicket(DateTime timestamp)
         {
             // Round the timestamp to the next _grainCollectionOptions.CollectionQuantum. e.g. if the _grainCollectionOptions.CollectionQuantum is 1 minute and the timestamp is 3:45:22, then the ticket will be 3:46.
             // Note that TimeStamp.Ticks and DateTime.Ticks both return a long.
@@ -455,26 +503,65 @@ namespace Orleans.Runtime
                 return DateTime.MaxValue;
             }
 
-            var ticket = new DateTime(ticketTicks, DateTimeKind.Utc);
-            if (ticket < nextTicket)
-            {
-                throw new ArgumentException(string.Format("The earliest collection that can be scheduled from now is for {0}", new DateTime(nextTicket.Ticks - _grainCollectionOptions.CollectionQuantum.Ticks + 1, DateTimeKind.Utc)));
-            }
-
-            return ticket;
+            return new DateTime(ticketTicks, DateTimeKind.Utc);
         }
 
-        private DateTime MakeTicketFromTimeSpan(TimeSpan timeout, DateTime now)
+        private bool TryMakeTicketFromTimeSpan(TimeSpan timeout, DateTime now, out DateTime ticket)
         {
             if (timeout < _grainCollectionOptions.CollectionQuantum)
             {
                 throw new ArgumentException(string.Format("timeout must be at least {0}, but it is {1}", _grainCollectionOptions.CollectionQuantum, timeout), nameof(timeout));
             }
 
-            return MakeTicketFromDateTime(now + timeout);
+            ticket = CalculateTicket(now + timeout);
+            return !IsExpired(ticket);
         }
 
-        private Bucket GetOrCreateBucket(DateTime ticket) => buckets.GetOrAdd(ticket, static _ => new());
+        private Bucket GetOrCreateBucket(DateTime ticket)
+            => buckets.GetOrAdd(ticket, static (ticket, owner) => new(owner, ticket), this);
+
+        private void RemoveClosedBucket(DateTime ticket, Bucket bucket)
+            => ((ICollection<KeyValuePair<DateTime, Bucket>>)buckets).Remove(new(ticket, bucket));
+
+        private bool TryScheduleCollection(CollectionRegistration registration, TimeSpan timeout, DateTime now, bool throwIfExpired)
+        {
+            while (!registration.IsScheduled)
+            {
+                if (!TryMakeTicketFromTimeSpan(timeout, now, out var ticket))
+                {
+                    if (throwIfExpired)
+                    {
+                        MakeTicketFromDateTime(now + timeout);
+                    }
+
+                    now = GetInternalScheduleBaseline();
+                    continue;
+                }
+
+                var bucket = GetOrCreateBucket(ticket);
+                if (registration.TrySchedule(bucket, ticket))
+                {
+                    if (!IsExpired(ticket))
+                    {
+                        return true;
+                    }
+
+                    registration.TryCancel();
+                    bucket.CloseForCleanup();
+                }
+
+                now = GetInternalScheduleBaseline();
+            }
+
+            return false;
+        }
+
+        private DateTime GetInternalScheduleBaseline()
+        {
+            var now = _timeProvider.GetUtcNow().UtcDateTime;
+            var nextTicketTicks = Volatile.Read(ref _nextTicketTicks);
+            return now.Ticks >= nextTicketTicks ? now : new DateTime(nextTicketTicks, DateTimeKind.Utc);
+        }
 
         internal DateTime GetCollectionTicketForTesting(ICollectibleGrainContext item)
             => _registrations.TryGetValue(item, out var registration) ? registration.Ticket : default;
@@ -487,18 +574,9 @@ namespace Orleans.Runtime
             }
 
             var registration = _registrations.GetOrAdd(item, static item => new(item));
-            if (registration.IsTracked)
+            if (!registration.IsScheduled)
             {
-                return;
-            }
-
-            lock (_scheduleLock)
-            {
-                if (!registration.IsTracked)
-                {
-                    var ticket = MakeTicketFromTimeSpan(item.CollectionAgeLimit, _timeProvider.GetUtcNow().UtcDateTime);
-                    registration.TrySchedule(GetOrCreateBucket(ticket), ticket);
-                }
+                TryScheduleCollection(registration, item.CollectionAgeLimit, _timeProvider.GetUtcNow().UtcDateTime, throwIfExpired: false);
             }
         }
 
@@ -745,13 +823,13 @@ namespace Orleans.Runtime
 
             public ICollectibleGrainContext Context { get; } = context;
 
-            public bool IsTracked
+            public bool IsScheduled
             {
                 get
                 {
                     lock (_lock)
                     {
-                        return _state is not CollectionRegistrationState.None;
+                        return _state is CollectionRegistrationState.Scheduled;
                     }
                 }
             }
@@ -771,14 +849,14 @@ namespace Orleans.Runtime
             {
                 lock (_lock)
                 {
-                    if (_state is not CollectionRegistrationState.None)
+                    if (_state is CollectionRegistrationState.Scheduled)
                     {
                         return false;
                     }
 
-                    if (!bucket.Items.TryAdd(this, 0))
+                    if (!bucket.TryAdd(this))
                     {
-                        throw new InvalidOperationException("Collection registration is already associated with this bucket.");
+                        return false;
                     }
 
                     _bucket = bucket;
@@ -819,12 +897,12 @@ namespace Orleans.Runtime
                         return true;
                     }
 
-                    _bucket!.Items.TryRemove(this, out _);
-                    if (!bucket.Items.TryAdd(this, 0))
+                    if (!bucket.TryAdd(this))
                     {
-                        throw new InvalidOperationException("Collection registration is already associated with the destination bucket.");
+                        return false;
                     }
 
+                    _bucket!.TryRemove(this);
                     _bucket = bucket;
                     _ticket = ticket;
                     _generation++;
@@ -841,7 +919,7 @@ namespace Orleans.Runtime
                         return false;
                     }
 
-                    _bucket?.Items.TryRemove(this, out _);
+                    _bucket?.TryRemove(this);
                     _bucket = null;
                     _ticket = default;
                     _state = CollectionRegistrationState.None;
@@ -855,6 +933,14 @@ namespace Orleans.Runtime
                 lock (_lock)
                 {
                     return _state is CollectionRegistrationState.Scheduled && ReferenceEquals(_bucket, bucket);
+                }
+            }
+
+            public bool IsClaimed(long generation)
+            {
+                lock (_lock)
+                {
+                    return _state is CollectionRegistrationState.Claimed && _generation == generation;
                 }
             }
 
@@ -901,9 +987,9 @@ namespace Orleans.Runtime
                         return false;
                     }
 
-                    if (!bucket.Items.TryAdd(this, 0))
+                    if (!bucket.TryAdd(this))
                     {
-                        throw new InvalidOperationException("Collection registration is already associated with the destination bucket.");
+                        return false;
                     }
 
                     _bucket = bucket;
@@ -915,14 +1001,78 @@ namespace Orleans.Runtime
             }
         }
 
-        private sealed class Bucket
+        private sealed class Bucket(ActivationCollector owner, DateTime ticket)
         {
-            public ConcurrentDictionary<CollectionRegistration, byte> Items { get; } = new(ReferenceEqualsComparer.Default);
+            private readonly ActivationCollector _owner = owner;
+            private readonly DateTime _ticket = ticket;
+            private ConcurrentDictionary<CollectionRegistration, byte>? _items;
+            private int _activeAdders;
+            private int _closed;
 
-            public IReadOnlyList<CollectionClaim> ClaimAll()
+            public int Count => Volatile.Read(ref _items)?.Count ?? 0;
+
+            public IEnumerable<CollectionRegistration> Registrations
+                => Volatile.Read(ref _items)?.Keys ?? NoRegistrations;
+
+            public bool TryAdd(CollectionRegistration registration)
             {
+                Interlocked.Increment(ref _activeAdders);
+                try
+                {
+                    if (Volatile.Read(ref _closed) != 0)
+                    {
+                        return false;
+                    }
+
+                    var items = LazyInitializer.EnsureInitialized(
+                        ref _items,
+                        static () => new ConcurrentDictionary<CollectionRegistration, byte>(ReferenceEqualsComparer.Default));
+                    if (!items.TryAdd(registration, 0))
+                    {
+                        return false;
+                    }
+
+                    if (Volatile.Read(ref _closed) == 0)
+                    {
+                        return true;
+                    }
+
+                    items.TryRemove(registration, out _);
+                    return false;
+                }
+                finally
+                {
+                    if (Interlocked.Decrement(ref _activeAdders) == 0)
+                    {
+                        RemoveIfClosedAndEmpty();
+                    }
+                }
+            }
+
+            public void TryRemove(CollectionRegistration registration)
+            {
+                Volatile.Read(ref _items)?.TryRemove(registration, out _);
+                RemoveIfClosedAndEmpty();
+            }
+
+            public void CloseForCleanup()
+            {
+                Interlocked.Exchange(ref _closed, 1);
+                RemoveIfClosedAndEmpty();
+            }
+
+            public IReadOnlyList<CollectionClaim> CloseAndClaimAll()
+            {
+                Interlocked.Exchange(ref _closed, 1);
+                WaitForAdders();
+                var items = Volatile.Read(ref _items);
+                if (items is null)
+                {
+                    return NoClaims;
+                }
+
                 List<CollectionClaim>? result = null;
-                foreach (var registration in Items.Keys)
+                foreach (var registration in items.Keys)
                 {
                     if (registration.TryClaim(this, out var claim))
                     {
@@ -931,7 +1081,27 @@ namespace Orleans.Runtime
                     }
                 }
 
+                items.Clear();
                 return result ?? NoClaims;
+            }
+
+            private void RemoveIfClosedAndEmpty()
+            {
+                if (Volatile.Read(ref _closed) != 0
+                    && Volatile.Read(ref _activeAdders) == 0
+                    && Volatile.Read(ref _items) is not { IsEmpty: false })
+                {
+                    _owner.RemoveClosedBucket(_ticket, this);
+                }
+            }
+
+            private void WaitForAdders()
+            {
+                var spinner = new SpinWait();
+                while (Volatile.Read(ref _activeAdders) != 0)
+                {
+                    spinner.SpinOnce();
+                }
             }
         }
 
