@@ -23,7 +23,11 @@ internal sealed class CosmosRemindersProviderBuilder : IProviderBuilder<ISiloBui
                 if (!string.IsNullOrEmpty(serviceKey))
                 {
                     options.ConfigureCosmosClient(
-                        provider => new ValueTask<CosmosClient>(provider.GetRequiredKeyedService<CosmosClient>(serviceKey)));
+                        provider => new ValueTask<CosmosClient>(
+                            provider.GetKeyedService<CosmosClient>(serviceKey)
+                            ?? throw new OrleansConfigurationException(
+                                $"Cosmos reminder provider configuration '{configurationSection.Path}' requires the keyed CosmosClient '{serviceKey}'. " +
+                                "Register the keyed client or configure ConnectionName or ConnectionString.")));
                     return;
                 }
 
