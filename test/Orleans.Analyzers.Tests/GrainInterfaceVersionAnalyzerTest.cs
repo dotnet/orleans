@@ -2922,12 +2922,7 @@ interface Outer.IInnerGrain [Version(1)]
                 Directory.Delete(path, recursive: true);
                 return;
             }
-            catch (IOException) when (attempt < maxAttempts)
-            {
-                await Task.Delay(retryDelay, cancellationToken)
-                    .ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
-            }
-            catch (UnauthorizedAccessException) when (attempt < maxAttempts)
+            catch (Exception exception) when (attempt < maxAttempts && (exception is IOException or UnauthorizedAccessException))
             {
                 await Task.Delay(retryDelay, cancellationToken)
                     .ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
