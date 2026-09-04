@@ -6,6 +6,7 @@ namespace Orleans.Journaling;
 
 internal sealed class S3JournalStorageInstruments(OrleansInstruments instruments)
 {
+    private static readonly Lazy<S3JournalStorageInstruments> DirectConstruction = new(CreateDirectConstruction);
     private const string MillisecondsUnit = "ms";
     private const string BytesUnit = "bytes";
     private const string OperationTagName = "operation";
@@ -21,7 +22,9 @@ internal sealed class S3JournalStorageInstruments(OrleansInstruments instruments
     internal const string OperationRead = "read";
     internal const string OperationReplace = "replace";
 
-    internal static S3JournalStorageInstruments CreateForDirectConstruction()
+    internal static S3JournalStorageInstruments CreateForDirectConstruction() => DirectConstruction.Value;
+
+    private static S3JournalStorageInstruments CreateDirectConstruction()
     {
         var services = new ServiceCollection();
         services.AddMetrics();

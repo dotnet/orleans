@@ -10,6 +10,15 @@ namespace Orleans.Journaling.Tests;
 public sealed class S3JournalStorageInstrumentsTests
 {
     [Fact]
+    public void CreateForDirectConstruction_ReturnsCachedInstance()
+    {
+        var first = S3JournalStorageInstruments.CreateForDirectConstruction();
+        var second = S3JournalStorageInstruments.CreateForDirectConstruction();
+
+        Assert.Same(first, second);
+    }
+
+    [Fact]
     public void OnOperationCompleted_RecordsNamesTypesUnitsValuesAndOutcomeTags()
     {
         var services = new ServiceCollection();
