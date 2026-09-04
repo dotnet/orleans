@@ -42,7 +42,10 @@ namespace TestExtensions
         public static Uri DataBlobUri => new(defaultConfiguration[nameof(DataBlobUri)]!);
         public static Uri DataQueueUri => new(defaultConfiguration[nameof(DataQueueUri)]!);
         public static string? DataConnectionString => defaultConfiguration[nameof(DataConnectionString)];
-        public static string AzureStorageConnectionString => UseAzurite ? AzuriteContainerManager.ConnectionString : DataConnectionString!;
+        public static string AzureStorageConnectionString => GetAzureStorageConnectionString(
+            UseAadAuthentication,
+            DataConnectionString,
+            static () => AzuriteContainerManager.ConnectionString);
         public static string? EventHubConnectionString => defaultConfiguration[nameof(EventHubConnectionString)];
         public static string? EventHubFullyQualifiedNamespace => defaultConfiguration[nameof(EventHubFullyQualifiedNamespace)];
         public static string? ZooKeeperConnectionString => defaultConfiguration[nameof(ZooKeeperConnectionString)];
@@ -78,6 +81,22 @@ namespace TestExtensions
             value = defaultConfiguration.GetValue(key, default(string));
 
             return value != null;
+        }
+
+        internal static string GetAzureStorageConnectionString(
+            bool useAadAuthentication,
+            string? dataConnectionString,
+            Func<string> azuriteConnectionStringFactory)
+        {
+            if (useAadAuthentication)
+            {
+                throw new InvalidOperationException(
+                    "AzureStorageConnectionString is unavailable when AAD authentication is enabled. Configure clients with the Azure Storage service endpoints and TokenCredential.");
+            }
+
+            return string.IsNullOrWhiteSpace(dataConnectionString)
+                ? azuriteConnectionStringFactory()
+                : dataConnectionString;
         }
 
         private static IConfiguration BuildDefaultConfiguration()
