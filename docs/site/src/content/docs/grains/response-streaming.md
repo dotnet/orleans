@@ -41,7 +41,7 @@ Batching doesn't cause Orleans to read an unbounded number of elements ahead. Th
 
 ## Cancel response streaming
 
-Pass the caller's token to the grain method and through `WithCancellation` so cancellation reaches both the grain call and the async enumerator. Orleans links distinct tokens so cancellation of either stops the enumeration. Call `WithBatchSize` before `WithCancellation`:
+Pass the caller's token to the grain method either as a method parameter or through `WithCancellation` (or both), so cancellation stops the async enumerator. Orleans links distinct tokens so cancellation of either stops the enumeration. Call `WithBatchSize` before `WithCancellation`:
 
 :::code language="csharp" source="snippets/async-enumerable-results/StreamingConsumer.cs" id="cancel_stream":::
 
