@@ -410,7 +410,7 @@ namespace Orleans.Serialization.Configuration
                 var result = new Dictionary<TKey, TValue>(current, current.Comparer);
                 foreach (var pair in additions)
                 {
-                    result[pair.Key] = pair.Value;
+                    result.TryAdd(pair.Key, pair.Value);
                 }
 
                 return result;

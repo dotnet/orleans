@@ -125,6 +125,44 @@ public class HotReloadRefreshTests : IDisposable
         Assert.Equal(previousCount, previousAllowedTypes.Count);
     }
 
+    [Fact]
+    public void RefreshPreservesExistingWellKnownMappings()
+    {
+        const uint id = uint.MaxValue;
+        const string alias = "hot_reload_existing_alias";
+        var options = _services.GetRequiredService<IOptions<TypeManifestOptions>>().Value;
+        options.WellKnownTypeIds[id] = typeof(string);
+        options.WellKnownTypeAliases[alias] = typeof(string);
+
+        _refresher.Refresh(
+        [
+            new ConfigureOptions<TypeManifestOptions>(scratch =>
+            {
+                scratch.WellKnownTypeIds.Add(id, typeof(int));
+                scratch.WellKnownTypeAliases.Add(alias, typeof(int));
+            }),
+        ]);
+
+        Assert.Equal(typeof(string), options.WellKnownTypeIds[id]);
+        Assert.Equal(typeof(string), options.WellKnownTypeAliases[alias]);
+    }
+
+    [Fact]
+    public void RefreshUpdatesCompoundAliases()
+    {
+        const string alias = "(\"hot_reload_compound_alias\",\"v1\")";
+        var typeConverter = _services.GetRequiredService<TypeConverter>();
+        Assert.Throws<TypeLoadException>(() => typeConverter.Parse(alias));
+
+        _refresher.Refresh(
+        [
+            new ConfigureOptions<TypeManifestOptions>(scratch =>
+                scratch.CompoundTypeAliases.Add("hot_reload_compound_alias").Add("v1", typeof(string))),
+        ]);
+
+        Assert.Equal(typeof(string), typeConverter.Parse(alias));
+    }
+
     private void Refresh() => _refresher.Refresh(new HashSet<System.Reflection.Assembly> { typeof(HotReloadRefreshTests).Assembly });
 
     private static void RemoveScenarioTypes(TypeManifestOptions options)
