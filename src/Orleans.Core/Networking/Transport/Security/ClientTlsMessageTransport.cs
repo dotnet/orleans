@@ -79,7 +79,7 @@ internal sealed class ClientTlsMessageTransport : TlsMessageTransport
             case RemoteCertificateMode.NoCertificate:
                 return null;
             case RemoteCertificateMode.AllowCertificate:
-                // If certificate exists but can not be used for client authentication.
+                // Use the certificate only when it is valid for client authentication.
                 if (certificate != null && CertificateLoader.IsCertificateAllowedForClientAuth(certificate))
                 {
                     return certificate;
