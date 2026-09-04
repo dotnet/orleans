@@ -1192,7 +1192,8 @@ exit 0
         Assert-Equal 1 ([regex]::Matches($archiveTestResultsAction, 'if-no-files-found: error')).Count 'Coverage upload must require the report.'
         Assert-Equal 1 ([regex]::Matches($archiveTestResultsAction, 'continue-on-error: true')).Count 'Only diagnostic upload may remain advisory.'
         Assert-Equal 1 ([regex]::Matches($archiveTestResultsAction, 'retention-days: \$\{\{ inputs\.retention-days \}\}')).Count 'Diagnostic upload must use the requested retention period.'
-        Assert-Equal 1 ([regex]::Matches($runTestsAction, 'retention-days: \$\{\{ steps\.test\.outcome == ''failure'' && 14 \|\| 1 \}\}')).Count 'Failed test diagnostics must remain available for 14 days.'
+        Assert-Equal 1 ([regex]::Matches($runTestsAction, '(?m)^    id: retry$')).Count 'The retry outcome must be available to diagnostic retention policy.'
+        Assert-Equal 1 ([regex]::Matches($runTestsAction, 'retention-days: \$\{\{ steps\.test\.outcome == ''failure'' && steps\.retry\.outcome != ''success'' && 14 \|\| 1 \}\}')).Count 'Only unrecovered test failures may retain diagnostics for 14 days.'
         Assert-Matches `
             $archiveTestResultsAction `
             "(?ms)^  - id: archive-test-results\r?\n    uses: actions/upload-artifact@.*?\r?\n    continue-on-error: true\r?\n.*?^  - name: Report test result upload failure\r?\n    if: steps\.archive-test-results\.outcome == 'failure'\r?\n    shell: pwsh\r?\n    run: Write-Output '::warning title=Test result artifact upload failed::" `
