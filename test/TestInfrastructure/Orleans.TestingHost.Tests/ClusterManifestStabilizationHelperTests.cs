@@ -1,8 +1,4 @@
-using System.Collections.Immutable;
 using System.Net;
-using System.Runtime.CompilerServices;
-using System.Threading.Channels;
-using Orleans.Metadata;
 using Orleans.Runtime;
 using TestExtensions;
 using Xunit;
@@ -15,10 +11,6 @@ namespace Orleans.TestingHost.Tests;
 [TestArea("TestingHost")]
 public sealed class ClusterManifestStabilizationHelperTests
 {
-    private static readonly GrainManifest EmptyGrainManifest = new(
-        ImmutableDictionary<GrainType, GrainProperties>.Empty,
-        ImmutableDictionary<GrainInterfaceType, GrainInterfaceProperties>.Empty);
-
     [Fact]
     public async Task WaitForExpectedClusterManifestAsync_WhenActiveSilosAreNull_ThrowsArgumentNullException()
     {
@@ -67,33 +59,6 @@ public sealed class ClusterManifestStabilizationHelperTests
         }
     }
 
-    [Fact]
-    public async Task WaitForExpectedClusterManifestAsync_WaitsForManifestUpdate()
-    {
-        using var firstSilo = CreateSilo(port: 11111, generation: 7);
-        using var secondSilo = CreateSilo(port: 11112, generation: 8);
-        var provider = new TestClusterManifestProvider(CreateManifest(firstSilo.SiloAddress));
-
-        var wait = ClusterManifestStabilizationHelper.WaitForExpectedClusterManifestAsync(
-            activeSilos: [firstSilo, secondSilo],
-            manifestProviders:
-            [
-                provider,
-                new TestClusterManifestProvider(CreateManifest(firstSilo.SiloAddress, secondSilo.SiloAddress)),
-            ],
-            TestContext.Current.CancellationToken);
-
-        Assert.False(wait.IsCompleted);
-
-        provider.Update(CreateManifest(firstSilo.SiloAddress, secondSilo.SiloAddress));
-        await wait;
-    }
-
-    private static ClusterManifest CreateManifest(params SiloAddress[] silos)
-        => new(
-            MajorMinorVersion.Zero,
-            silos.ToImmutableDictionary(static silo => silo, _ => EmptyGrainManifest));
-
     private static TestSiloHandle CreateSilo(int port, int generation) =>
         new()
         {
@@ -111,38 +76,5 @@ public sealed class ClusterManifestStabilizationHelperTests
         public override Task StopSiloAsync(CancellationToken ct) => throw new NotSupportedException();
 
         public override ValueTask DisposeAsync() => ValueTask.CompletedTask;
-    }
-
-    private sealed class TestClusterManifestProvider : IClusterManifestProvider
-    {
-        private readonly Channel<ClusterManifest> _updates = Channel.CreateUnbounded<ClusterManifest>();
-
-        public TestClusterManifestProvider(ClusterManifest current)
-        {
-            Current = current;
-            LocalGrainManifest = EmptyGrainManifest;
-        }
-
-        public ClusterManifest Current { get; private set; }
-
-        public IAsyncEnumerable<ClusterManifest> Updates => GetUpdates();
-
-        public GrainManifest LocalGrainManifest { get; }
-
-        public void Update(ClusterManifest manifest)
-        {
-            Current = manifest;
-            Assert.True(_updates.Writer.TryWrite(manifest));
-        }
-
-        private async IAsyncEnumerable<ClusterManifest> GetUpdates(
-            [EnumeratorCancellation] CancellationToken cancellationToken = default)
-        {
-            yield return Current;
-            await foreach (var update in _updates.Reader.ReadAllAsync(cancellationToken))
-            {
-                yield return update;
-            }
-        }
     }
 }

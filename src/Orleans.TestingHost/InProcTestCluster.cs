@@ -433,6 +433,9 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         var clusterMembershipOptions = Client!.ServiceProvider
             .GetRequiredService<IOptions<ClusterMembershipOptions>>().Value;
         var timeout = GetLivenessStabilizationTime(clusterMembershipOptions, didKill);
+        // Cluster manifest fetches retry every five seconds. Preserve one full retry interval beyond the
+        // default liveness boundary so the retry can publish and the hook can perform its final snapshot check.
+        var manifestTimeout = TestingUtils.Multiply(timeout, 2);
         var activeSilos = GetActiveSilos().ToArray();
         var expectedSilos = string.Join(", ", activeSilos.Select(static silo => silo.SiloAddress));
         var testHooks = activeSilos
@@ -462,22 +465,16 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
                 $"Membership, gateway, and grain-directory views did not converge within {timeout}. Expected active silos: {expectedSilos}.");
         }
 
-        try
-        {
-            await ClusterManifestStabilizationHelper.WaitForExpectedClusterManifestAsync(
-                activeSilos,
-                manifestProviders,
-                cancellationToken);
-        }
-        catch (OperationCanceledException exception) when (cancellationToken.IsCancellationRequested)
+        var manifestConverged = await ClusterManifestStabilizationHelper
+            .WaitForExpectedClusterManifestAsync(activeSilos, testHooks, manifestTimeout)
+            .WaitAsync(cancellationToken);
+        if (!manifestConverged)
         {
             var observedManifests = activeSilos.Select((silo, index) =>
                 $"{silo.SiloAddress}=[{string.Join(", ", manifestProviders[index].Current.Silos.Keys.Order())}]");
-            throw new OperationCanceledException(
-                $"Cluster manifests did not converge before cancellation. Expected active silos: {expectedSilos}. "
-                + $"Observed manifests: {string.Join("; ", observedManifests)}.",
-                exception,
-                cancellationToken);
+            throw new TimeoutException(
+                $"Cluster manifests did not converge within {manifestTimeout}. Expected active silos: {expectedSilos}. "
+                + $"Observed manifests: {string.Join("; ", observedManifests)}.");
         }
     }
 
