@@ -29,7 +29,7 @@ public static class StringEncodedWriteVector
     {
         ArgumentNullException.ThrowIfNull(writeVector);
         ArgumentException.ThrowIfNullOrEmpty(Replica);
-        return Decode(writeVector, out _).Contains(Replica, StringComparer.Ordinal);
+        return Decode(writeVector, out _).Contains(Replica);
     }
 
     /// <summary>

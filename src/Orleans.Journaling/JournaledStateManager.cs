@@ -1130,6 +1130,11 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                 throw new InvalidOperationException("A journal recovery operation is already pending.");
             }
 
+            if (_uncertainWrite is null)
+            {
+                throw new InvalidOperationException("No uncertain journal storage write is awaiting reconciliation.");
+            }
+
             workItem = new(isWriteCommitted)
             {
                 EnqueuedTimestamp = _shared.TimeProvider.GetTimestamp(),
