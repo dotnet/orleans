@@ -451,7 +451,11 @@ internal sealed partial class ActivationData :
 
     private void SetState(ActivationState state)
     {
+#if NET10_0_OR_GREATER
+        Debug.Assert(_lock.IsHeldByCurrentThread);
+#else
         Debug.Assert(Monitor.IsEntered(_lock));
+#endif
         State = state;
         if (state is ActivationState.Valid or ActivationState.Invalid)
         {
