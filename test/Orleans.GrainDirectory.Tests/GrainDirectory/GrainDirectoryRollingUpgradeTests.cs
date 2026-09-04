@@ -1110,7 +1110,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                 AssertNoTrafficFailures(traffic, restartPhase, verificationPhase);
                 AssertTransientTrafficFailuresWithinLimit(traffic, SiloCount, restartPhase);
                 AssertTransientTrafficFailuresWithinLimit(traffic, 0, verificationPhase);
-                AssertNoImpactfulErrors(logs);
+                AssertNoImpactfulErrors(logs, retiredAddresses);
                 WriteInPlacePhaseReport(
                     verificationPhase,
                     cluster,
@@ -1189,7 +1189,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
             Assert.True(traffic.MaximumObservedSiloCount <= SiloCount);
             AssertNoTrafficFailures(traffic);
             AssertTransientTrafficFailuresWithinLimit(traffic, 0, phase.Current);
-            AssertNoImpactfulErrors(logs);
+            AssertNoImpactfulErrors(logs, retiredAddresses);
             WriteInPlacePhaseReport(
                 phase.Current,
                 cluster,
@@ -1561,11 +1561,11 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         }
     }
 
-    private void AssertNoImpactfulErrors(PhaseAwareLogCapture logs)
+    private void AssertNoImpactfulErrors(PhaseAwareLogCapture logs, HashSet<SiloAddress> retiredAddresses)
     {
         var errors = logs.ToArray()
             .Where(static entry => entry.Level >= LogLevel.Error)
-            .Where(static entry => !IsExpectedIntentionalRestartLog(entry))
+            .Where(entry => !IsExpectedIntentionalRestartLog(entry, retiredAddresses))
             .ToArray();
         foreach (var error in errors.Take(20))
         {
@@ -1690,11 +1690,25 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
 
     private sealed record SplitPartitionTransfer(InProcessSiloHandle Source, GrainAddress Address);
 
-    private static bool IsExpectedIntentionalRestartLog(PhaseAwareLogEntry entry)
+    private static bool IsExpectedIntentionalRestartLog(
+        PhaseAwareLogEntry entry,
+        HashSet<SiloAddress> retiredAddresses)
     {
         if (!entry.Phase.StartsWith("restart-", StringComparison.Ordinal))
         {
             return false;
+        }
+
+        if (string.Equals(entry.Category, typeof(ClientDirectory).FullName, StringComparison.Ordinal)
+            && string.Equals(
+                entry.EventId.Name,
+                "LogErrorPublishingClientRoutingTableToSilo",
+                StringComparison.Ordinal)
+            && string.Equals(entry.ExceptionType, typeof(SiloUnavailableException).FullName, StringComparison.Ordinal)
+            && entry.ClientDirectoryTargetSilo is { } targetSilo
+            && retiredAddresses.Contains(targetSilo))
+        {
+            return true;
         }
 
         if (string.Equals(entry.Category, "Orleans.Runtime.GrainDirectory.ClientDirectory", StringComparison.Ordinal)
@@ -2254,7 +2268,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
             {
                 if (IsEnabled(logLevel))
                 {
-                    var (handoffSilo, handoffCount) = GetHandoffIdentity(state);
+                    var (handoffSilo, handoffCount, clientDirectoryTargetSilo) = GetLogProperties(state);
                     capture.Add(
                         siloName,
                         category,
@@ -2263,11 +2277,13 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                         formatter(state, exception),
                         exception,
                         handoffSilo,
-                        handoffCount);
+                        handoffCount,
+                        clientDirectoryTargetSilo);
                 }
             }
 
-            private static (string? Silo, int? Count) GetHandoffIdentity<TState>(TState state)
+            private static (string? HandoffSilo, int? HandoffCount, SiloAddress? ClientDirectoryTargetSilo)
+                GetLogProperties<TState>(TState state)
             {
                 if (state is not IEnumerable<KeyValuePair<string, object?>> properties)
                 {
@@ -2276,6 +2292,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
 
                 string? silo = null;
                 int? count = null;
+                SiloAddress? clientDirectoryTargetSilo = null;
                 foreach (var property in properties)
                 {
                     if (property.Key is "Silo" or "AddedSilo")
@@ -2286,9 +2303,13 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                     {
                         count = value;
                     }
+                    else if (property.Key == "SiloAddress" && property.Value is SiloAddress targetSilo)
+                    {
+                        clientDirectoryTargetSilo = targetSilo;
+                    }
                 }
 
-                return (silo, count);
+                return (silo, count, clientDirectoryTargetSilo);
             }
         }
     }
@@ -2306,7 +2327,8 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
             string message,
             Exception? exception,
             string? handoffSilo,
-            int? handoffCount)
+            int? handoffCount,
+            SiloAddress? clientDirectoryTargetSilo)
         {
             var baseException = exception?.GetBaseException();
             _entries.Enqueue(
@@ -2321,7 +2343,8 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                     baseException?.GetType().FullName,
                     baseException?.Message,
                     handoffSilo,
-                    handoffCount));
+                    handoffCount,
+                    clientDirectoryTargetSilo));
             Interlocked.Exchange(ref _entryAdded, CreateEntryAddedSignal()).TrySetResult(true);
         }
 
@@ -2370,7 +2393,8 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         string? ExceptionType,
         string? ExceptionMessage,
         string? HandoffSilo,
-        int? HandoffCount)
+        int? HandoffCount,
+        SiloAddress? ClientDirectoryTargetSilo)
     {
         public override string ToString() =>
             $"{Timestamp:O} phase='{Phase}' silo='{SiloName}' [{Level}] [{Category}] ({EventId.Id}:{EventId.Name}) "
