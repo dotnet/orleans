@@ -60,6 +60,13 @@ namespace OrleansAWSUtils.Streams
         public async Task Shutdown(TimeSpan timeout)
         {
             using var timeoutCancellation = new CancellationTokenSource(timeout);
+            SQSStorage? queueRef;
+
+            lock (pendingLock)
+            {
+                queueRef = queue;
+                queue = null;
+            }
 
             try
             {
@@ -82,7 +89,6 @@ namespace OrleansAWSUtils.Streams
                     }
                 }
 
-                var queueRef = queue;
                 SQSMessage[] pendingMessages;
                 lock (pendingLock)
                 {
@@ -109,8 +115,6 @@ namespace OrleansAWSUtils.Streams
             }
             finally
             {
-                // remember that we shut down so we never try to read from the queue again.
-                queue = null;
                 lock (pendingLock)
                 {
                     pending.Clear();
@@ -130,8 +134,8 @@ namespace OrleansAWSUtils.Streams
 
                 var task = queueRef.GetMessages(count);
                 outstandingTask = task;
-                IEnumerable<SQSMessage> messages = await task;
-                if (!messages.Any())
+                var messages = (await task).ToArray();
+                if (messages.Length == 0)
                     return Array.Empty<IBatchContainer>();
 
                 var messageBatch = new List<IBatchContainer>();
@@ -146,6 +150,11 @@ namespace OrleansAWSUtils.Streams
 
                 lock (pendingLock)
                 {
+                    if (!ReferenceEquals(queue, queueRef))
+                    {
+                        pendingDeliveries.Clear();
+                    }
+
                     foreach (var delivery in pendingDeliveries)
                     {
                         if (!string.IsNullOrEmpty(delivery.Message.MessageId))
@@ -155,6 +164,20 @@ namespace OrleansAWSUtils.Streams
                     }
 
                     pending.AddRange(pendingDeliveries);
+                }
+
+                if (pendingDeliveries.Count == 0)
+                {
+                    try
+                    {
+                        await queueRef.ReleaseMessages(messages);
+                    }
+                    catch (Exception exception)
+                    {
+                        LogWarningReleaseMessageException(logger, exception, Id, messages.Length);
+                    }
+
+                    return Array.Empty<IBatchContainer>();
                 }
 
                 return messageBatch;
