@@ -71,8 +71,9 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// <summary>
         /// Connects to, or creates and initializes a new Azure table if it does not already exist.
         /// </summary>
+        /// <param name="cancellationToken">The token used to cancel table creation.</param>
         /// <returns>Completion promise for this operation.</returns>
-        public async Task InitTableAsync()
+        public async Task InitTableAsync(CancellationToken cancellationToken = default)
         {
             const string operation = "InitTable";
             var startTime = DateTime.UtcNow;
@@ -81,7 +82,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             {
                 TableServiceClient tableCreationClient = await GetCloudTableCreationClientAsync();
                 var table = tableCreationClient.GetTableClient(TableName);
-                var response = await table.CreateIfNotExistsAsync();
+                var response = await table.CreateIfNotExistsAsync(cancellationToken);
                 var alreadyExisted = response.GetRawResponse().Status == (int)HttpStatusCode.Conflict;
 
                 LogInfoTableCreation(Logger, alreadyExisted ? "Attached to" : "Created", TableName);
