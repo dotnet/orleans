@@ -8,7 +8,7 @@
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
     <!-- Set during project evaluation because the validation-only reference below participates in restore. -->
-    <EnablePackageValidation Condition="'$(EnablePackageValidation)' == ''">true</EnablePackageValidation>
+    <EnablePackageValidation Condition="'$(EnablePackageValidation)' == '' and '$(IsPackable)' == 'true'">true</EnablePackageValidation>
   </PropertyGroup>
 
   <ItemGroup>
