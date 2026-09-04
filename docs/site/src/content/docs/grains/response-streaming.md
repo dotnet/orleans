@@ -1,7 +1,7 @@
 ---
 title: Response streaming with IAsyncEnumerable
 description: Stream a grain call's response incrementally using IAsyncEnumerable<T>.
-ms.date: 08/08/2026
+ms.date: 09/04/2026
 ms.topic: concept-article
 ---
 
@@ -41,7 +41,7 @@ Batching doesn't cause Orleans to read an unbounded number of elements ahead. Th
 
 ## Cancel response streaming
 
-Supply a token as a grain method argument, through `WithCancellation`, or both. Orleans links distinct tokens so cancellation of either stops the enumeration. Call `WithBatchSize` first when using both extensions:
+Pass the caller's token to the grain method either as a method parameter or through `WithCancellation` (or both), so cancellation stops the async enumerator. Orleans links distinct tokens so cancellation of either stops the enumeration. Call `WithBatchSize` before `WithCancellation`:
 
 :::code language="csharp" source="snippets/async-enumerable-results/StreamingConsumer.cs" id="cancel_stream":::
 
