@@ -90,7 +90,7 @@ namespace Orleans.Serialization.Serializers
 
                 _initialized = true;
 
-#if NET
+#if NET6_0_OR_GREATER
                 if (System.Reflection.Metadata.MetadataUpdater.IsSupported)
                 {
                     // Construct the hot reload refresher (if registered) so it subscribes before the first update.
