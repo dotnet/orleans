@@ -221,7 +221,7 @@ namespace Orleans.TestingHost
         /// <param name="grainId">The ID of the grain to find.</param>
         /// <param name="grainContext">When this method returns, contains the grain context if found; otherwise, <see langword="null"/>.</param>
         /// <returns><see langword="true"/> if the grain was found in one of the silos; otherwise, <see langword="false"/>.</returns>
-        #nullable enable
+#nullable enable
         public bool TryGetGrainContext(GrainId grainId, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out IGrainContext? grainContext)
         {
             foreach (var silo in Silos)
@@ -1052,7 +1052,7 @@ namespace Orleans.TestingHost
                         case ConnectionTransportType.InMemory:
                             {
                                 siloBuilder.UseInMemoryTransport(_transportHub);
-                               break;
+                                break;
                             }
                         case ConnectionTransportType.UnixSocket:
                             {

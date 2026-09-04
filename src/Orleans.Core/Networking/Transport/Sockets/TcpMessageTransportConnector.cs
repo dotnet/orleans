@@ -55,6 +55,11 @@ internal sealed class TcpMessageTransportConnector : MessageTransportConnector
             NoDelay = options.NoDelay
         };
 
+        if (ip.AddressFamily == AddressFamily.InterNetworkV6)
+        {
+            socket.DualMode = options.DualMode;
+        }
+
         if (options.FastPath)
         {
             socket.EnableFastPath(noDelay: options.NoDelay);

@@ -432,6 +432,47 @@ public class MessageTransportLifecycleTests
         listener.Stop();
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task TcpMessageTransportConnector_AppliesDualModeToIpv6Socket(bool dualMode)
+    {
+        if (!Socket.OSSupportsIPv6)
+        {
+            throw Xunit.Sdk.SkipException.ForSkip("IPv6 is not supported.");
+        }
+
+        var options = Substitute.For<IOptionsMonitor<TcpMessageTransportOptions>>();
+        options.CurrentValue.Returns(new TcpMessageTransportOptions
+        {
+            DualMode = dualMode,
+            FastPath = false
+        });
+        var connector = new TcpMessageTransportConnector(options, NullLoggerFactory.Instance);
+        var listener = new TcpListener(IPAddress.IPv6Loopback, 0);
+        listener.Server.DualMode = false;
+        listener.Start();
+        try
+        {
+            var connectTask = connector.CreateAsync(
+                listener.LocalEndpoint,
+                TestContext.Current.CancellationToken).AsTask();
+            using var acceptedSocket = await listener.AcceptSocketAsync(TestContext.Current.CancellationToken);
+            await using var transport = await connectTask;
+            var socket = (Socket)typeof(SocketMessageTransport)
+                .GetField("_socket", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .GetValue(transport)!;
+
+            Assert.Equal(dualMode, socket.DualMode);
+
+            await transport.CloseAsync(null, TestContext.Current.CancellationToken);
+        }
+        finally
+        {
+            listener.Stop();
+        }
+    }
+
     [Fact]
     public async Task StreamMessageTransport_WriteFailure_WakesIdleReadLoop()
     {
