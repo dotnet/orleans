@@ -18,14 +18,14 @@ public static class GrainFactoryResolutionExtensions
     /// <param name="grainClassNamePrefix">An optional grain implementation class name prefix.</param>
     /// <param name="cancellationToken">A token which cancels the wait.</param>
     /// <returns>The resolved grain type.</returns>
-    public static async ValueTask<GrainType> WaitForGrainTypeAsync<TGrainInterface>(
+    public static ValueTask<GrainType> WaitForGrainTypeAsync<TGrainInterface>(
         this IGrainFactory grainFactory,
         string? grainClassNamePrefix = null,
         CancellationToken cancellationToken = default)
         where TGrainInterface : IGrain
     {
         ArgumentNullException.ThrowIfNull(grainFactory);
-        return await GetAvailability(grainFactory)
+        return GetAvailability(grainFactory)
             .WaitForGrainTypeAsync(typeof(TGrainInterface), grainClassNamePrefix, cancellationToken);
     }
 
