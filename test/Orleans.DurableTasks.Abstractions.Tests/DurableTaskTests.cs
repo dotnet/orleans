@@ -1998,6 +1998,22 @@ public class DurableTaskTests
         Assert.Equal("value", exception.ParamName);
     }
 
+    [Fact]
+    public void PollingOptionsEqualityUsesEffectiveTimeout()
+    {
+        var @default = default(PollingOptions);
+        var explicitDefault = new PollingOptions { PollTimeout = PollingOptions.DefaultPollTimeout };
+        var zero = new PollingOptions { PollTimeout = TimeSpan.Zero };
+
+        Assert.Equal(@default, explicitDefault);
+        Assert.True(@default == explicitDefault);
+        Assert.False(@default != explicitDefault);
+        Assert.Equal(@default.GetHashCode(), explicitDefault.GetHashCode());
+        Assert.NotEqual(@default, zero);
+        Assert.True(@default != zero);
+        Assert.False(@default == zero);
+    }
+
     private static InvalidOperationException CreateResponseFailure()
     {
         try

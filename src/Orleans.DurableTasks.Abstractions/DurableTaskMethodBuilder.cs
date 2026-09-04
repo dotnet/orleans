@@ -1,9 +1,11 @@
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 
 namespace Orleans.DurableTasks;
 
 /// <summary>Builds compiler-lowered asynchronous methods which return <see cref="DurableTask"/>.</summary>
+[SuppressMessage("Performance", "CA1815:Override equals and operator equals on value types", Justification = "Compiler method builders are mutable protocol values without an equality contract.")]
 public struct DurableTaskMethodBuilder
 {
     private VoidDurableTaskMethodInvocation? _invocation;
@@ -58,6 +60,7 @@ public struct DurableTaskMethodBuilder
 }
 
 /// <summary>Builds compiler-lowered asynchronous methods which return <see cref="DurableTask{TResult}"/>.</summary>
+[SuppressMessage("Performance", "CA1815:Override equals and operator equals on value types", Justification = "Compiler method builders are mutable protocol values without an equality contract.")]
 public struct DurableTaskMethodBuilder<TResult>
 {
     private DurableTaskMethodInvocation<TResult>? _invocation;
