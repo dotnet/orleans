@@ -114,6 +114,26 @@ public sealed class KinesisRuntimeTests
     }
 
     [Fact]
+    public void ReceiverAndCacheCreationRequireAdapterInitialization()
+    {
+        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        using var factory = new KinesisAdapterFactory(
+            "Kinesis",
+            new KinesisStreamOptions(),
+            new SimpleQueueCacheOptions(),
+            services.GetRequiredService<Serializer<KinesisBatchContainer.Body>>(),
+            Substitute.For<IStreamQueueCheckpointerFactory>(),
+            NullLoggerFactory.Instance);
+        var queueId = QueueId.GetQueueId("queue", 0, 0);
+
+        var receiverException = Assert.Throws<InvalidOperationException>(() => factory.CreateReceiver(queueId));
+        var cacheException = Assert.Throws<InvalidOperationException>(() => factory.CreateQueueCache(queueId));
+
+        Assert.Contains(nameof(KinesisAdapterFactory.CreateAdapter), receiverException.Message, StringComparison.Ordinal);
+        Assert.Equal(receiverException.Message, cacheException.Message);
+    }
+
+    [Fact]
     public async Task ConcurrentCreateAdapterCallsInitializeOnce()
     {
         const int callerCount = 8;
