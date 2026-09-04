@@ -8,6 +8,9 @@ namespace Orleans.Configuration;
 /// </summary>
 public class AdoNetStreamOptionsValidator(AdoNetStreamOptions options, string name) : IConfigurationValidator
 {
+    private static readonly TimeSpan MaximumReplayLeaseRenewalInterval =
+        TimeSpan.FromMilliseconds(uint.MaxValue - 1d);
+
     /// <inheritdoc />
     public void ValidateConfiguration()
     {
@@ -53,9 +56,10 @@ public class AdoNetStreamOptionsValidator(AdoNetStreamOptions options, string na
         }
 
         if (options.ReplayLeaseRenewalInterval <= TimeSpan.Zero
+            || options.ReplayLeaseRenewalInterval > MaximumReplayLeaseRenewalInterval
             || options.ReplayLeaseRenewalInterval >= options.ReplayLeaseDuration)
         {
-            throw new OrleansConfigurationException($"Invalid {nameof(AdoNetStreamOptions)} values for ADO.NET Streaming Provider '{name}': {nameof(options.ReplayLeaseRenewalInterval)} must be greater than zero and less than {nameof(options.ReplayLeaseDuration)}.");
+            throw new OrleansConfigurationException($"Invalid {nameof(AdoNetStreamOptions)} values for ADO.NET Streaming Provider '{name}': {nameof(options.ReplayLeaseRenewalInterval)} must be greater than zero, no greater than {MaximumReplayLeaseRenewalInterval}, and less than {nameof(options.ReplayLeaseDuration)}.");
         }
 
         if (options.CleanupBatchSize <= 0)

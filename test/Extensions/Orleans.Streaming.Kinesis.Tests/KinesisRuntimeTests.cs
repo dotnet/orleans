@@ -712,6 +712,43 @@ public sealed class KinesisRuntimeTests
     }
 
     [Fact]
+    public async Task ReplayReader_TransportFailureIsRestartable()
+    {
+        var client = Substitute.For<IAmazonKinesis>();
+        client.GetShardIteratorAsync(
+                Arg.Any<GetShardIteratorRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new GetShardIteratorResponse { ShardIterator = "iterator" });
+        client.GetRecordsAsync(
+                Arg.Any<GetRecordsRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns<Task<GetRecordsResponse>>(
+                _ => throw new HttpRequestException("connection reset"));
+        var timeProvider = new FakeTimeProvider();
+        var factory = new KinesisReplaySourceFactory(
+            () => client,
+            "stream",
+            "shard-1",
+            new KinesisShardTopologyMonitor(
+                client,
+                "stream",
+                ["shard-1"],
+                TimeSpan.FromMinutes(1),
+                timeProvider,
+                NullLogger<KinesisShardTopologyMonitor>.Instance),
+            new KinesisShardReadThrottle(TimeSpan.Zero, timeProvider));
+        await using var source = await factory.Create(
+            StreamId.Create("namespace", Guid.NewGuid()),
+            new KinesisSequenceToken("stream", "shard-1", "1", 0, 0),
+            TestContext.Current.CancellationToken);
+
+        var exception = await Assert.ThrowsAsync<TransientStreamReplayException>(
+            async () => await source.Read(10, TestContext.Current.CancellationToken));
+
+        Assert.IsType<HttpRequestException>(exception.InnerException);
+    }
+
+    [Fact]
     public async Task ReplayReader_NormalizesIdentitylessLegacyToken()
     {
         var client = Substitute.For<IAmazonKinesis>();

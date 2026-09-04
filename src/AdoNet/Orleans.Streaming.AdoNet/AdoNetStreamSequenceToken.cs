@@ -4,7 +4,7 @@ namespace Orleans.Streaming.AdoNet;
 
 [Serializable]
 [GenerateSerializer]
-internal sealed class AdoNetStreamSequenceToken : PartitionedStreamSequenceToken
+internal sealed class AdoNetStreamSequenceToken : EventSequenceTokenV2, IPartitionedStreamSequenceToken
 {
     public AdoNetStreamSequenceToken(
         string serviceId,
@@ -12,12 +12,7 @@ internal sealed class AdoNetStreamSequenceToken : PartitionedStreamSequenceToken
         string queueId,
         long sequenceNumber,
         int eventIndex = 0)
-        : base(
-            GetProviderIdentity(serviceId, providerId),
-            queueId,
-            sequenceNumber.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            sequenceNumber,
-            eventIndex)
+        : base(sequenceNumber, eventIndex)
     {
         ServiceId = serviceId;
         ProviderId = providerId;
@@ -37,13 +32,25 @@ internal sealed class AdoNetStreamSequenceToken : PartitionedStreamSequenceToken
     [Id(2)]
     public string QueueId { get; } = null!;
 
+    string? IPartitionedStreamSequenceToken.ProviderIdentity
+        => GetProviderIdentity(ServiceId, ProviderId);
+
+    string? IPartitionedStreamSequenceToken.PartitionIdentity => QueueId;
+
+    string IPartitionedStreamSequenceToken.Position
+        => SequenceNumber.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
     public override bool Equals(StreamSequenceToken? other)
-        => other is AdoNetStreamSequenceToken token
-            && string.Equals(ServiceId, token.ServiceId, StringComparison.Ordinal)
-            && string.Equals(ProviderId, token.ProviderId, StringComparison.Ordinal)
-            && string.Equals(QueueId, token.QueueId, StringComparison.Ordinal)
-            && SequenceNumber == token.SequenceNumber
-            && EventIndex == token.EventIndex;
+        => other is IPartitionedStreamSequenceToken token
+            && string.Equals(
+                GetProviderIdentity(ServiceId, ProviderId),
+                token.ProviderIdentity,
+                StringComparison.Ordinal)
+            && string.Equals(QueueId, token.PartitionIdentity, StringComparison.Ordinal)
+            && ComparePositions(
+                SequenceNumber.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                token.Position) == 0
+            && EventIndex == ((StreamSequenceToken)token).EventIndex;
 
     public override bool Equals(object? obj)
         => obj is StreamSequenceToken token && Equals(token);
@@ -55,21 +62,61 @@ internal sealed class AdoNetStreamSequenceToken : PartitionedStreamSequenceToken
             return 1;
         }
 
-        if (other is not AdoNetStreamSequenceToken token
-            || !string.Equals(ServiceId, token.ServiceId, StringComparison.Ordinal)
-            || !string.Equals(ProviderId, token.ProviderId, StringComparison.Ordinal)
-            || !string.Equals(QueueId, token.QueueId, StringComparison.Ordinal))
+        if (other is not IPartitionedStreamSequenceToken token
+            || !string.Equals(
+                GetProviderIdentity(ServiceId, ProviderId),
+                token.ProviderIdentity,
+                StringComparison.Ordinal)
+            || !string.Equals(QueueId, token.PartitionIdentity, StringComparison.Ordinal))
         {
             throw new ArgumentOutOfRangeException(nameof(other));
         }
 
-        var difference = SequenceNumber.CompareTo(token.SequenceNumber);
-        return difference != 0 ? difference : EventIndex.CompareTo(token.EventIndex);
+        var difference = ComparePositions(
+            SequenceNumber.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            token.Position);
+        return difference != 0 ? difference : EventIndex.CompareTo(((StreamSequenceToken)token).EventIndex);
     }
 
     public override int GetHashCode()
-        => HashCode.Combine(ServiceId, ProviderId, QueueId, SequenceNumber, EventIndex);
+        => HashCode.Combine(
+            GetProviderIdentity(ServiceId, ProviderId),
+            QueueId,
+            GetPositionHashCode(
+                SequenceNumber.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+            EventIndex);
 
     internal static string GetProviderIdentity(string serviceId, string providerId)
         => $"{serviceId.Length}:{serviceId}{providerId}";
+
+    private static int ComparePositions(string left, string right)
+    {
+        var leftStart = 0;
+        while (leftStart < left.Length && left[leftStart] == '0')
+        {
+            leftStart++;
+        }
+
+        var rightStart = 0;
+        while (rightStart < right.Length && right[rightStart] == '0')
+        {
+            rightStart++;
+        }
+
+        var lengthComparison = (left.Length - leftStart).CompareTo(right.Length - rightStart);
+        return lengthComparison != 0
+            ? lengthComparison
+            : left.AsSpan(leftStart).SequenceCompareTo(right.AsSpan(rightStart));
+    }
+
+    private static int GetPositionHashCode(string position)
+    {
+        var start = 0;
+        while (start < position.Length && position[start] == '0')
+        {
+            start++;
+        }
+
+        return string.GetHashCode(position.AsSpan(start), StringComparison.Ordinal);
+    }
 }

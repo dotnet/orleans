@@ -1,6 +1,9 @@
+using System.Text.Json;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streaming.AdoNet;
+using Orleans.Streaming.JsonConverters;
+using Orleans.Streams;
 using TestExtensions;
 
 namespace Tester.AdoNet.Streaming;
@@ -71,6 +74,28 @@ public class AdoNetBatchContainerTests(TestEnvironmentFixture fixture)
         Assert.Equal("MyServiceId", restoredToken.ServiceId);
         Assert.Equal("MyProviderId", restoredToken.ProviderId);
         Assert.Equal("MyQueueId", restoredToken.QueueId);
+    }
+
+    [Fact]
+    public void AdoNetToken_SystemTextJsonRoundTripPreservesComparablePosition()
+    {
+        var options = new JsonSerializerOptions();
+        options.Converters.Add(new EventSequenceTokenJsonConverter());
+        StreamSequenceToken original = new AdoNetStreamSequenceToken(
+            "service",
+            "provider",
+            "queue",
+            42,
+            3);
+
+        var restored = Assert.IsType<PartitionedStreamSequenceToken>(
+            System.Text.Json.JsonSerializer.Deserialize<StreamSequenceToken>(
+                System.Text.Json.JsonSerializer.Serialize(original, options),
+                options));
+
+        Assert.True(original.Equals(restored));
+        Assert.True(restored.Equals(original));
+        Assert.Equal(original.GetHashCode(), restored.GetHashCode());
     }
 
     [Fact]

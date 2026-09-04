@@ -347,6 +347,19 @@ public sealed class AdoNetOptionsValidatorTests
     }
 
     [Fact]
+    public void Streaming_RejectsReplayRenewalBeyondTaskDelayMaximum()
+    {
+        var options = ValidStreamOptions();
+        options.ReplayLeaseDuration = TimeSpan.FromDays(60);
+        options.ReplayLeaseRenewalInterval = TimeSpan.FromDays(50);
+
+        AssertStreamingValidation(
+            false,
+            options,
+            nameof(AdoNetStreamOptions.ReplayLeaseRenewalInterval));
+    }
+
+    [Fact]
     public void Streaming_RejectsRetentionWhoseCeilingExceedsSqlIntegerRange()
     {
         var options = ValidStreamOptions();
