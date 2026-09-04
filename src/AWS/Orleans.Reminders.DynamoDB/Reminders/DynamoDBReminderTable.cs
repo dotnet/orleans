@@ -121,7 +121,7 @@ namespace Orleans.Reminders.DynamoDB
                     }
                     catch
                     {
-                        await StopAsync();
+                        await StopAsync(cancellationToken);
                         throw;
                     }
                 }
@@ -178,7 +178,7 @@ namespace Orleans.Reminders.DynamoDB
             }
             catch
             {
-                await StopAsync();
+                await StopAsync(cancellationToken);
                 throw;
             }
         }
