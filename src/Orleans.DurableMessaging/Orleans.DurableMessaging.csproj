@@ -10,6 +10,8 @@
     <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
     <VersionSuffix Condition="$(VersionSuffix) != ''">$(VersionSuffix).alpha.1</VersionSuffix>
     <VersionSuffix Condition="$(VersionSuffix) == ''">alpha.1</VersionSuffix>
+    <!-- Enable package validation after the first Microsoft.Orleans.DurableMessaging release establishes a baseline. -->
+    <EnablePackageValidation>false</EnablePackageValidation>
   </PropertyGroup>
 
   <ItemGroup>
