@@ -38,9 +38,12 @@ public sealed class ReferencedAssemblyProviderTests
     [Fact]
     public void GetRelevantAssembliesIncludesGeneratedEntryAssemblyMetadata()
     {
+        var entryAssembly = Assembly.GetEntryAssembly();
         var result = ReferencedAssemblyProvider.GetRelevantAssemblies().ToHashSet();
 
-        Assert.Contains(typeof(ReferencedAssemblyProviderTests).Assembly, result);
+        Assert.NotNull(entryAssembly);
+        Assert.Same(typeof(ReferencedAssemblyProviderTests).Assembly, entryAssembly);
+        Assert.Contains(entryAssembly, result);
     }
 
     [Fact]
