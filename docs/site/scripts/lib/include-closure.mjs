@@ -29,6 +29,7 @@ export async function collectIncludeTargets(markdownFiles, options = {}) {
   const allowedRoot = options.allowedRoot ? await realpath(path.resolve(options.allowedRoot)) : undefined;
   const onIssue = options.onIssue;
   const onTarget = options.onTarget;
+  const readSource = options.readSource ?? ((filePath) => readFile(filePath, 'utf8'));
   const splitFrontmatter = options.splitFrontmatter ?? splitFrontmatterWithoutYaml;
   const targets = new Set();
   const visitedContexts = new Set();
@@ -58,7 +59,7 @@ export async function collectIncludeTargets(markdownFiles, options = {}) {
     }
     visitedContexts.add(context);
 
-    const source = await readFile(logicalPath, 'utf8');
+    const source = await readSource(logicalPath);
     const { body, bodyStartLine } = splitFrontmatter(source);
     const lines = body.replaceAll('\r\n', '\n').split('\n');
     const protectedLineRanges = body.includes('[!INCLUDE')
