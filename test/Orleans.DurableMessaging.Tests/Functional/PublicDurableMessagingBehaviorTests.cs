@@ -1045,6 +1045,7 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
             static snapshot => snapshot.FirstExactRouteHandlerCalls == 1);
         Assert.Equal(1, state.FirstExactRouteHandlerCalls);
         Assert.Equal(0, state.ReplacementExactRouteHandlerCalls);
+        Assert.Equal(0, state.GenericExactRouteHandlerCalls);
     }
 
     [Theory]
