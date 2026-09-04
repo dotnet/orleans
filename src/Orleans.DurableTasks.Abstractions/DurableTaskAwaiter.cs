@@ -1,8 +1,10 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 
 namespace Orleans.DurableTasks;
 
 /// <summary>Provides an awaiter for a durable task without a result.</summary>
+[SuppressMessage("Performance", "CA1815:Override equals and operator equals on value types", Justification = "Awaiters are compiler protocol values whose identity and equality are not part of their contract.")]
 public readonly struct DurableTaskAwaiter : ICriticalNotifyCompletion
 {
     private readonly TaskAwaiter<DurableTaskResponse> _awaiter;
@@ -23,6 +25,7 @@ public readonly struct DurableTaskAwaiter : ICriticalNotifyCompletion
 }
 
 /// <summary>Provides an awaiter for a durable task with a result.</summary>
+[SuppressMessage("Performance", "CA1815:Override equals and operator equals on value types", Justification = "Awaiters are compiler protocol values whose identity and equality are not part of their contract.")]
 public readonly struct DurableTaskAwaiter<TResult> : ICriticalNotifyCompletion
 {
     private readonly TaskAwaiter<DurableTaskResponse> _awaiter;

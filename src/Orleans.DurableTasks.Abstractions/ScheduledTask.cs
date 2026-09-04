@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 
 namespace Orleans.DurableTasks;
@@ -126,6 +127,7 @@ public abstract class ScheduledTask
         }
     }
 
+    [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "The original wait-construction failure takes precedence over best-effort cleanup failures.")]
     private static async Task CancelAndDrainWaitsPreservingFailureAsync(
         CancellationTokenSource waitCancellation,
         IReadOnlyList<Task<DurableTaskResponse>> waits)
@@ -140,6 +142,8 @@ public abstract class ScheduledTask
         }
     }
 
+    [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Canceling losing wait observations is best-effort cleanup.")]
+    [SuppressMessage("Performance", "CA1849:Call async methods when in an async method", Justification = "CancellationTokenSource.Cancel is used to synchronously notify every losing wait before they are drained.")]
     private static async Task CancelAndDrainWaitsAsync(
         CancellationTokenSource waitCancellation,
         IReadOnlyList<Task<DurableTaskResponse>> waits,
@@ -157,6 +161,7 @@ public abstract class ScheduledTask
         await DrainLosingWaitsAsync(waits, winnerIndex).ConfigureAwait(false);
     }
 
+    [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Losing observation failures do not determine the WhenAny result.")]
     private static async Task DrainLosingWaitsAsync(
         IReadOnlyList<Task<DurableTaskResponse>> waits,
         int winnerIndex)
@@ -241,12 +246,14 @@ internal sealed class CompletedScheduledTask<TResult>(TaskId id, DurableTaskResp
 }
 
 /// <summary>Provides an awaiter for a scheduled durable task without a result.</summary>
+[SuppressMessage("Performance", "CA1815:Override equals and operator equals on value types", Justification = "Awaiters are compiler protocol values whose equality is not part of their contract.")]
 public readonly struct ScheduledTaskAwaiter : ICriticalNotifyCompletion
 {
-    private readonly TaskAwaiter _awaiter;
+    private readonly ValueTaskAwaiter _awaiter;
 
+    [SuppressMessage("Reliability", "CA2012:Use ValueTasks correctly", Justification = "The compiler consumes this awaiter once, and the stored awaiter preserves allocation-free IValueTaskSource implementations.")]
     internal ScheduledTaskAwaiter(ScheduledTask task, CancellationToken cancellationToken)
-        => _awaiter = task.WaitAsync(cancellationToken).AsTask().GetAwaiter();
+        => _awaiter = task.WaitAsync(cancellationToken).GetAwaiter();
 
     /// <inheritdoc />
     public bool IsCompleted => _awaiter.IsCompleted;
@@ -262,12 +269,14 @@ public readonly struct ScheduledTaskAwaiter : ICriticalNotifyCompletion
 }
 
 /// <summary>Provides an awaiter for a scheduled durable task with a result.</summary>
+[SuppressMessage("Performance", "CA1815:Override equals and operator equals on value types", Justification = "Awaiters are compiler protocol values whose equality is not part of their contract.")]
 public readonly struct ScheduledTaskAwaiter<TResult> : ICriticalNotifyCompletion
 {
-    private readonly TaskAwaiter<DurableTaskResponse> _awaiter;
+    private readonly ValueTaskAwaiter<DurableTaskResponse> _awaiter;
 
+    [SuppressMessage("Reliability", "CA2012:Use ValueTasks correctly", Justification = "The compiler consumes this awaiter once, and the stored awaiter preserves allocation-free IValueTaskSource implementations.")]
     internal ScheduledTaskAwaiter(ScheduledTask<TResult> task, CancellationToken cancellationToken)
-        => _awaiter = task.WaitAsyncCore(cancellationToken).AsTask().GetAwaiter();
+        => _awaiter = task.WaitAsyncCore(cancellationToken).GetAwaiter();
 
     /// <inheritdoc />
     public bool IsCompleted => _awaiter.IsCompleted;
@@ -283,6 +292,7 @@ public readonly struct ScheduledTaskAwaiter<TResult> : ICriticalNotifyCompletion
 }
 
 /// <summary>Provides an awaitable scheduled durable task with a wait-cancellation token.</summary>
+[SuppressMessage("Performance", "CA1815:Override equals and operator equals on value types", Justification = "Configured awaitables are compiler protocol values whose equality is not part of their contract.")]
 public readonly struct ConfiguredScheduledTaskAwaitable<TResult>(
     ScheduledTask<TResult> task,
     CancellationToken cancellationToken)
