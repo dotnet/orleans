@@ -28,7 +28,7 @@ public sealed class OverloadBackoffTests
             .Build();
         await using var throttle = new TestThrottle(config, overloadDetector: detector);
 
-        var lease = await throttle.AcquireAsync(TestContext.Default(), CancellationToken.None);
+        var lease = await throttle.AcquireAsync(ReminderDeliveryTestContext.Default(), CancellationToken.None);
 
         Assert.Equal(ReminderAdmissionOutcome.Skipped, lease.Outcome);
         Assert.Equal(ReminderSkipReason.SiloOverloaded, lease.SkipReason);
@@ -46,7 +46,7 @@ public sealed class OverloadBackoffTests
             .Build();
         await using var throttle = new TestThrottle(config, overloadDetector: detector);
 
-        var lease = await throttle.AcquireAsync(TestContext.Default(), CancellationToken.None);
+        var lease = await throttle.AcquireAsync(ReminderDeliveryTestContext.Default(), CancellationToken.None);
 
         Assert.Equal(ReminderAdmissionOutcome.Admitted, lease.Outcome);
         lease.Dispose();
@@ -65,14 +65,14 @@ public sealed class OverloadBackoffTests
             .Build();
         await using var throttle = new TestThrottle(config, clock, overloadDetector: detector);
 
-        var acquireTask = throttle.AcquireAsync(TestContext.Default(), CancellationToken.None).AsTask();
+        var acquireTask = throttle.AcquireAsync(ReminderDeliveryTestContext.Default(), CancellationToken.None).AsTask();
         clock.Advance(TimeSpan.FromMilliseconds(200));
         Assert.False(acquireTask.IsCompleted);
 
         detector.IsOverloaded = false;
         clock.Advance(TimeSpan.FromMilliseconds(200));
 
-        var lease = await acquireTask.WaitAsync(TimeSpan.FromSeconds(5));
+        var lease = await acquireTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         Assert.Equal(ReminderAdmissionOutcome.Admitted, lease.Outcome);
         lease.Dispose();
     }
@@ -90,15 +90,15 @@ public sealed class OverloadBackoffTests
             .Build();
         await using var throttle = new TestThrottle(config, clock, overloadDetector: detector);
 
-        var acquireTask = throttle.AcquireAsync(TestContext.Default(), CancellationToken.None).AsTask();
+        var acquireTask = throttle.AcquireAsync(ReminderDeliveryTestContext.Default(), CancellationToken.None).AsTask();
 
         for (var i = 0; i < 10 && !acquireTask.IsCompleted; i++)
         {
             clock.Advance(TimeSpan.FromMilliseconds(100));
-            await Task.Delay(10);
+            await Task.Delay(10, TestContext.Current.CancellationToken);
         }
 
-        var lease = await acquireTask.WaitAsync(TimeSpan.FromSeconds(5));
+        var lease = await acquireTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         Assert.Equal(ReminderAdmissionOutcome.Skipped, lease.Outcome);
         Assert.Equal(ReminderSkipReason.SiloOverloaded, lease.SkipReason);
         Assert.Equal(10, throttle.AvailableConcurrencyPermits);
@@ -118,9 +118,9 @@ public sealed class OverloadBackoffTests
             .Build();
         await using var throttle = new TestThrottle(config, clock, overloadDetector: detector);
 
-        var acquireTask = throttle.AcquireAsync(TestContext.Default(), CancellationToken.None).AsTask();
+        var acquireTask = throttle.AcquireAsync(ReminderDeliveryTestContext.Default(), CancellationToken.None).AsTask();
         clock.Advance(TimeSpan.FromMilliseconds(500));
-        var lease = await acquireTask.WaitAsync(TimeSpan.FromSeconds(5));
+        var lease = await acquireTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         Assert.Equal(ReminderAdmissionOutcome.Skipped, lease.Outcome);
         Assert.Equal(ReminderSkipReason.SiloOverloaded, lease.SkipReason);
@@ -161,7 +161,7 @@ public sealed class OverloadBackoffTests
             .Build();
         await using var throttle = new TestThrottle(config, overloadDetector: detector);
 
-        var lease = await throttle.AcquireAsync(TestContext.Default(), CancellationToken.None);
+        var lease = await throttle.AcquireAsync(ReminderDeliveryTestContext.Default(), CancellationToken.None);
         Assert.Equal(ReminderAdmissionOutcome.Admitted, lease.Outcome);
     }
 
@@ -182,11 +182,11 @@ public sealed class OverloadBackoffTests
             .Build();
         await using var throttle = new TestThrottle(config, clock, overloadDetector: detector);
 
-        var first = await throttle.AcquireAsync(TestContext.Default(), CancellationToken.None);
+        var first = await throttle.AcquireAsync(ReminderDeliveryTestContext.Default(), CancellationToken.None);
         Assert.Equal(ReminderAdmissionOutcome.Admitted, first.Outcome);
 
         detector.IsOverloaded = true;
-        var secondTask = throttle.AcquireAsync(TestContext.Default(), CancellationToken.None).AsTask();
+        var secondTask = throttle.AcquireAsync(ReminderDeliveryTestContext.Default(), CancellationToken.None).AsTask();
 
         clock.Advance(TimeSpan.FromMilliseconds(500));
         Assert.False(secondTask.IsCompleted);
@@ -196,7 +196,7 @@ public sealed class OverloadBackoffTests
         Assert.False(secondTask.IsCompleted);
 
         clock.Advance(TimeSpan.FromMilliseconds(250));
-        var second = await secondTask.WaitAsync(TimeSpan.FromSeconds(5));
+        var second = await secondTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         Assert.Equal(ReminderAdmissionOutcome.Skipped, second.Outcome);
         Assert.Equal(ReminderSkipReason.AcquireTimeout, second.SkipReason);
@@ -225,9 +225,9 @@ public sealed class SlowStartTests
 
         Assert.Equal(2, throttle.SlowStartCurrentCapacity);
 
-        var l1 = await throttle.AcquireAsync(TestContext.Default(), CancellationToken.None);
-        var l2 = await throttle.AcquireAsync(TestContext.Default(), CancellationToken.None);
-        var l3 = await throttle.AcquireAsync(TestContext.Default(), CancellationToken.None);
+        var l1 = await throttle.AcquireAsync(ReminderDeliveryTestContext.Default(), CancellationToken.None);
+        var l2 = await throttle.AcquireAsync(ReminderDeliveryTestContext.Default(), CancellationToken.None);
+        var l3 = await throttle.AcquireAsync(ReminderDeliveryTestContext.Default(), CancellationToken.None);
 
         Assert.Equal(ReminderAdmissionOutcome.Admitted, l1.Outcome);
         Assert.Equal(ReminderAdmissionOutcome.Admitted, l2.Outcome);
@@ -266,7 +266,7 @@ public sealed class SlowStartTests
 
         // Should remain at 16, no further growth.
         clock.Advance(TimeSpan.FromSeconds(5));
-        await Task.Delay(50);
+        await Task.Delay(50, TestContext.Current.CancellationToken);
         Assert.Equal(16, throttle.SlowStartCurrentCapacity);
     }
 
@@ -286,8 +286,8 @@ public sealed class SlowStartTests
         Assert.Equal(1, throttle.SlowStartCurrentCapacity);
 
         throttle.Start();
-        var first = await throttle.AcquireAsync(TestContext.Default(), CancellationToken.None);
-        var second = await throttle.AcquireAsync(TestContext.Default(), CancellationToken.None);
+        var first = await throttle.AcquireAsync(ReminderDeliveryTestContext.Default(), CancellationToken.None);
+        var second = await throttle.AcquireAsync(ReminderDeliveryTestContext.Default(), CancellationToken.None);
         Assert.Equal(ReminderAdmissionOutcome.Admitted, first.Outcome);
         Assert.Equal(ReminderAdmissionOutcome.Skipped, second.Outcome);
         Assert.Equal(ReminderSkipReason.SlowStartLimited, second.SkipReason);
@@ -313,7 +313,7 @@ public sealed class SlowStartTests
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(2);
         while (throttle.SlowStartCurrentCapacity != 2 && DateTime.UtcNow < deadline)
         {
-            await Task.Delay(10);
+            await Task.Delay(10, TestContext.Current.CancellationToken);
         }
 
         Assert.Equal(2, throttle.SlowStartCurrentCapacity);
@@ -362,16 +362,16 @@ public sealed class SlowStartTests
         clock.Advance(TimeSpan.FromSeconds(1));
         await WaitForCapacityAsync(throttle, expected: 2);
 
-        var first = await throttle.AcquireAsync(TestContext.Default(), CancellationToken.None);
-        var second = await throttle.AcquireAsync(TestContext.Default(), CancellationToken.None);
-        var thirdTask = throttle.AcquireAsync(TestContext.Default(), CancellationToken.None).AsTask();
+        var first = await throttle.AcquireAsync(ReminderDeliveryTestContext.Default(), CancellationToken.None);
+        var second = await throttle.AcquireAsync(ReminderDeliveryTestContext.Default(), CancellationToken.None);
+        var thirdTask = throttle.AcquireAsync(ReminderDeliveryTestContext.Default(), CancellationToken.None).AsTask();
 
         Assert.Equal(ReminderAdmissionOutcome.Admitted, first.Outcome);
         Assert.Equal(ReminderAdmissionOutcome.Admitted, second.Outcome);
         Assert.False(thirdTask.IsCompleted);
 
         first.Dispose();
-        var third = await thirdTask.WaitAsync(TimeSpan.FromSeconds(5));
+        var third = await thirdTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         Assert.Equal(ReminderAdmissionOutcome.Admitted, third.Outcome);
 
         second.Dispose();
@@ -391,16 +391,16 @@ public sealed class SlowStartTests
         await using var throttle = new TestThrottle(config, clock);
 
         // Consume the only initial permit; do NOT dispose so the slow-start semaphore stays exhausted.
-        var l1 = await throttle.AcquireAsync(TestContext.Default(), CancellationToken.None);
+        var l1 = await throttle.AcquireAsync(ReminderDeliveryTestContext.Default(), CancellationToken.None);
         Assert.Equal(ReminderAdmissionOutcome.Admitted, l1.Outcome);
 
-        var nextTask = throttle.AcquireAsync(TestContext.Default(), CancellationToken.None).AsTask();
+        var nextTask = throttle.AcquireAsync(ReminderDeliveryTestContext.Default(), CancellationToken.None).AsTask();
         Assert.False(nextTask.IsCompleted);
 
         // Advance to trigger the first doubling (1 -> 2). The waiter should now get a permit.
         clock.Advance(TimeSpan.FromSeconds(1));
 
-        var lease = await nextTask.WaitAsync(TimeSpan.FromSeconds(5));
+        var lease = await nextTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         Assert.Equal(ReminderAdmissionOutcome.Admitted, lease.Outcome);
 
         l1.Dispose();
@@ -422,11 +422,11 @@ public sealed class SlowStartTests
             .Build();
         await using var throttle = new TestThrottle(config, clock);
 
-        var l1 = await throttle.AcquireAsync(TestContext.Default(), CancellationToken.None);
+        var l1 = await throttle.AcquireAsync(ReminderDeliveryTestContext.Default(), CancellationToken.None);
 
-        var nextTask = throttle.AcquireAsync(TestContext.Default(), CancellationToken.None).AsTask();
+        var nextTask = throttle.AcquireAsync(ReminderDeliveryTestContext.Default(), CancellationToken.None).AsTask();
         clock.Advance(TimeSpan.FromMilliseconds(600));
-        var lease = await nextTask.WaitAsync(TimeSpan.FromSeconds(5));
+        var lease = await nextTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         Assert.Equal(ReminderAdmissionOutcome.Skipped, lease.Outcome);
         Assert.Equal(ReminderSkipReason.SlowStartLimited, lease.SkipReason);
@@ -495,7 +495,7 @@ public sealed class SlowStartTests
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(2);
         while (throttle.SlowStartCurrentCapacity != expected && DateTime.UtcNow < deadline)
         {
-            await Task.Delay(10);
+            await Task.Delay(10, TestContext.Current.CancellationToken);
         }
 
         Assert.Equal(expected, throttle.SlowStartCurrentCapacity);

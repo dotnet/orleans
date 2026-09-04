@@ -84,9 +84,11 @@ is restored if cancellation, a reminder schedule update, a later rejection, or
 the deadline prevents admission from committing. Rate tokens are consumed only
 when the runtime returns an admitted lease.
 
-Use `Wait` when delayed execution is acceptable but dropping a tick isn't. Use
-`WaitUpTo` or `SkipImmediately` when exceeding downstream capacity is worse than
-missing an occurrence.
+Use `Wait` when throttle admission should wait instead of rejecting the current
+occurrence. Reminder scheduling still advances to the current cadence after a
+delayed callback, so elapsed cadences aren't replayed. Use `WaitUpTo` or
+`SkipImmediately` when exceeding downstream capacity is worse than omitting the
+current occurrence.
 
 ## Understand delivery semantics
 

@@ -434,7 +434,7 @@ internal sealed class SlowStartReminderAdmissionGate : IReminderAdmissionGate
         }
 
         var semaphore = Volatile.Read(ref _semaphore);
-        if (semaphore.Wait(0))
+        if (semaphore.Wait(0, CancellationToken.None))
         {
             return GateAcquireResult.Reserved(CreateSemaphoreReservation(semaphore));
         }
@@ -556,7 +556,7 @@ internal sealed class LocalConcurrencyReminderAdmissionGate : IReminderAdmission
     public async ValueTask<GateAcquireResult> AcquireAsync(ReminderDeliveryContext context, ReminderAcquireBudget budget, CancellationToken cancellationToken)
     {
         _ = context;
-        if (_semaphore.Wait(0))
+        if (_semaphore.Wait(0, CancellationToken.None))
         {
             return GateAcquireResult.Reserved(CreateSemaphoreReservation(_semaphore));
         }
