@@ -58,6 +58,29 @@
       WorkingDirectory="$(NpmAppRootDirectory)"
       ConsoleToMsBuild="true" />
 
+    <!-- Verify Rolldown's optional native binding before building. A single clean-install
+         retry recovers transient npm optional-dependency omissions. -->
+    <Exec
+      Command="node --input-type=module --eval &quot;import 'rolldown'&quot;"
+      WorkingDirectory="$(NpmAppRootDirectory)"
+      ConsoleToMsBuild="true"
+      IgnoreExitCode="true"
+      StandardOutputImportance="Low"
+      StandardErrorImportance="Low">
+      <Output TaskParameter="ExitCode" PropertyName="RolldownLoadExitCode" />
+    </Exec>
+
+    <Message
+      Condition="'$(RolldownLoadExitCode)' != '0'"
+      Importance="High"
+      Text="Retrying dependency installation once to restore Rolldown's native binding." />
+
+    <Exec
+      Condition="'$(RolldownLoadExitCode)' != '0'"
+      Command="npm ci --prefer-offline --no-audit $(NpmFetchRetryArgs)"
+      WorkingDirectory="$(NpmAppRootDirectory)"
+      ConsoleToMsBuild="true" />
+
     <!-- Build the frontend -->
     <Exec
       Command="npm run build"
