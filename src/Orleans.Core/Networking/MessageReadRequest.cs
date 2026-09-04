@@ -87,6 +87,10 @@ internal sealed partial class MessageReadRequest(MessageHandlerShared shared) : 
     bool IFramedReadRequest.OnRead(ArcBufferReader bufferReader, out int framedLength)
         => OnRead(bufferReader, out framedLength);
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Reliability",
+        "CA2000:Dispose objects before losing scope",
+        Justification = "The serializer is borrowed from and returned to MessageHandlerShared.")]
     private bool OnRead(ArcBufferReader bufferReader, out int framedLength)
     {
         if (bufferReader.Length < Message.LENGTH_HEADER_SIZE)
