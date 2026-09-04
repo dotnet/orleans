@@ -54,7 +54,7 @@ public sealed class ReminderTestKitClusterIntegrationTests
 
         try
         {
-            await DeployAndWaitForStableReminderTopologyAsync(cluster, observer, cancellationToken);
+            await DeployAndWaitForStartupReminderTopologyAsync(cluster, observer, cancellationToken);
             var grain = cluster.Client.GetGrain<IReminderTestKitGrain>(Guid.NewGuid());
             var grainId = grain.GetGrainId();
             var period = TimeSpan.FromMinutes(5);
@@ -100,7 +100,7 @@ public sealed class ReminderTestKitClusterIntegrationTests
 
         try
         {
-            await DeployAndWaitForStableReminderTopologyAsync(cluster, observer, cancellationToken);
+            await DeployAndWaitForStartupReminderTopologyAsync(cluster, observer, cancellationToken);
             var grain = cluster.Client.GetGrain<IReminderTestKitGrain>(Guid.NewGuid());
 
             await grain.RegisterReminderAsync("updated-reminder", TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(5)).WaitAsync(cancellationToken);
@@ -133,7 +133,7 @@ public sealed class ReminderTestKitClusterIntegrationTests
 
         try
         {
-            await DeployAndWaitForStableReminderTopologyAsync(cluster, observer, cancellationToken);
+            await DeployAndWaitForStartupReminderTopologyAsync(cluster, observer, cancellationToken);
             var grain = cluster.Client.GetGrain<IReminderTestKitGrain>(Guid.NewGuid());
 
             oracle.SetAvailable(false);
@@ -178,7 +178,7 @@ public sealed class ReminderTestKitClusterIntegrationTests
 
         try
         {
-            await DeployAndWaitForStableReminderTopologyAsync(cluster, observer, testCancellationToken);
+            await DeployAndWaitForStartupReminderTopologyAsync(cluster, observer, testCancellationToken);
             var grain = cluster.Client.GetGrain<IReminderTestKitGrain>(Guid.NewGuid());
             var grainId = grain.GetGrainId();
             using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(testCancellationToken);
@@ -222,7 +222,7 @@ public sealed class ReminderTestKitClusterIntegrationTests
 
         try
         {
-            await DeployAndWaitForStableReminderTopologyAsync(cluster, observer, testCancellationToken);
+            await DeployAndWaitForStartupReminderTopologyAsync(cluster, observer, testCancellationToken);
             var grain = cluster.Client.GetGrain<IReminderTestKitGrain>(Guid.NewGuid());
             var grainId = grain.GetGrainId();
             var timerLimit = TimeSpan.FromMilliseconds(0xfffffffe) + TimeSpan.FromMilliseconds(1);
@@ -273,7 +273,7 @@ public sealed class ReminderTestKitClusterIntegrationTests
 
         try
         {
-            await DeployAndWaitForStableReminderTopologyAsync(cluster, observer, testCancellationToken);
+            await DeployAndWaitForStartupReminderTopologyAsync(cluster, observer, testCancellationToken);
             var grain = cluster.Client.GetGrain<IReminderTestKitGrain>(Guid.NewGuid());
             var grainId = grain.GetGrainId();
             var dueTime = loadingWindow + TimeSpan.FromMinutes(1);
@@ -327,7 +327,7 @@ public sealed class ReminderTestKitClusterIntegrationTests
 
         try
         {
-            await DeployAndWaitForStableReminderTopologyAsync(cluster, observer, testCancellationToken);
+            await DeployAndWaitForStartupReminderTopologyAsync(cluster, observer, testCancellationToken);
             var grain = cluster.Client.GetGrain<IReminderTestKitGrain>(Guid.NewGuid());
             var grainId = grain.GetGrainId();
             using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(testCancellationToken);
@@ -369,7 +369,7 @@ public sealed class ReminderTestKitClusterIntegrationTests
     public async Task ReminderTestKit_TwoSilosMaintainOneOwnerAndOneDelivery()
     {
         var testCancellationToken = TestContext.Current.CancellationToken;
-        var builder = new InProcessTestClusterBuilder(2);
+        var builder = new InProcessTestClusterBuilder(1);
         builder.ConfigureSilo((_, siloBuilder) =>
             siloBuilder.Configure<ConsistentRingOptions>(options => options.UseVirtualBucketsConsistentRing = false));
         var oracle = builder.UseIdealizedReminderTable();
@@ -382,7 +382,7 @@ public sealed class ReminderTestKitClusterIntegrationTests
 
         try
         {
-            await DeployAndWaitForStableReminderTopologyAsync(cluster, observer, testCancellationToken);
+            await DeployAndWaitForStableTwoSiloReminderTopologyAsync(cluster, observer, testCancellationToken);
             var grain = cluster.Client.GetGrain<IReminderTestKitGrain>(Guid.NewGuid());
             var grainId = grain.GetGrainId();
             var dueTime = TimeSpan.FromMinutes(10);
@@ -478,7 +478,7 @@ public sealed class ReminderTestKitClusterIntegrationTests
         }
     }
 
-    private static async Task DeployAndWaitForStableReminderTopologyAsync(
+    private static async Task DeployAndWaitForStartupReminderTopologyAsync(
         InProcessTestCluster cluster,
         ReminderDiagnosticObserver observer,
         CancellationToken cancellationToken)
@@ -488,10 +488,38 @@ public sealed class ReminderTestKitClusterIntegrationTests
         topologyCancellation.CancelAfter(TimeSpan.FromSeconds(30));
         try
         {
-            await ReminderTopologyStabilizer.WaitForStableTopologyAsync(
+            await ReminderTopologyStabilizer.WaitForStartupTopologyAsync(
                 cluster,
                 observer,
                 cluster.Silos,
+                topologyCancellation.Token);
+        }
+        catch (OperationCanceledException exception) when (
+            topologyCancellation.IsCancellationRequested
+            && !cancellationToken.IsCancellationRequested)
+        {
+            throw new TimeoutException(exception.Message, exception);
+        }
+    }
+
+    private static async Task DeployAndWaitForStableTwoSiloReminderTopologyAsync(
+        InProcessTestCluster cluster,
+        ReminderDiagnosticObserver observer,
+        CancellationToken cancellationToken)
+    {
+        await cluster.DeployAsync(cancellationToken);
+        var initialSilo = Assert.Single(cluster.Silos);
+        await observer.WaitForReminderServiceStartedAsync(cancellationToken, initialSilo.SiloAddress);
+
+        var joinedSilo = Assert.Single(await cluster.StartSilosAsync(1, cancellationToken));
+        using var topologyCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        topologyCancellation.CancelAfter(TimeSpan.FromSeconds(30));
+        try
+        {
+            await ReminderTopologyStabilizer.WaitForStableTopologyAsync(
+                cluster,
+                observer,
+                [initialSilo, joinedSilo],
                 topologyCancellation.Token);
         }
         catch (OperationCanceledException exception) when (
