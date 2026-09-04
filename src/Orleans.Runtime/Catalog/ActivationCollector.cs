@@ -170,10 +170,10 @@ namespace Orleans.Runtime
                 ThrowIfTicketIsInvalid(oldTicket);
                 if (!IsExpired(oldTicket))
                 {
-                    var newTicket = MakeTicketFromTimeSpan(timeout, _timeProvider.GetUtcNow().UtcDateTime);
-                    if (newTicket.Equals(oldTicket)) return true;
+                    var rescheduledTicket = MakeTicketFromTimeSpan(timeout, _timeProvider.GetUtcNow().UtcDateTime);
+                    if (rescheduledTicket.Equals(oldTicket)) return true;
 
-                    return registration.TryReschedule(GetOrCreateBucket(newTicket), newTicket);
+                    return registration.TryReschedule(GetOrCreateBucket(rescheduledTicket), rescheduledTicket);
                 }
             }
 
