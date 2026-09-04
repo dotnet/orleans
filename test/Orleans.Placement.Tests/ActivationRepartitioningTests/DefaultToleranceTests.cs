@@ -314,11 +314,31 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Repa
         var pullingAgentSilo = observedOwner == 1 ? Silo1 : Silo2;
         var receiverSilo = pullingAgentSilo == Silo1 ? Silo2 : Silo1;
         var receiverRepartitioner = receiverSilo == Silo1 ? Silo1Repartitioner : Silo2Repartitioner;
-        var pullingAgentRepartitioner = pullingAgentSilo == Silo1 ? Silo1Repartitioner : Silo2Repartitioner;
 
         var sp1 = GrainFactory.GetGrain<ISP>("s1");
         var sp2 = GrainFactory.GetGrain<ISP>("s2");
         var sp3 = GrainFactory.GetGrain<ISP>("s3");
+        using var streamingObserver = StreamingDiagnosticObserver.Create(HostedCluster);
+        using var deliveryCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deliveryCancellation.CancelAfter(TimeSpan.FromSeconds(30));
+        var deliveryTasks = new[]
+        {
+            streamingObserver.WaitForItemDeliveryCountAsync(
+                StreamId.Create(Fixture.StreamNamespaceName, "s1"),
+                3,
+                Fixture.StreamProviderName,
+                deliveryCancellation.Token),
+            streamingObserver.WaitForItemDeliveryCountAsync(
+                StreamId.Create(Fixture.StreamNamespaceName, "s2"),
+                3,
+                Fixture.StreamProviderName,
+                deliveryCancellation.Token),
+            streamingObserver.WaitForItemDeliveryCountAsync(
+                StreamId.Create(Fixture.StreamNamespaceName, "s3"),
+                3,
+                Fixture.StreamProviderName,
+                deliveryCancellation.Token),
+        };
 
         RequestContext.Set(IPlacementDirector.PlacementHintKey, receiverSilo);
         await sp1.FirstPing();
@@ -336,30 +356,11 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Repa
             i++;
         }
 
+        await Task.WhenAll(deliveryTasks);
+
         var sr1 = GrainFactory.GetGrain<ISR>("s1");
         var sr2 = GrainFactory.GetGrain<ISR>("s2");
         var sr3 = GrainFactory.GetGrain<ISR>("s3");
-
-        var sr1_GotHit = false;
-        var sr2_GotHit = false;
-        var sr3_GotHit = false;
-
-        stopwatch.Restart();
-        while (stopwatch.Elapsed < allowedDuration && (!sr1_GotHit || !sr2_GotHit || !sr3_GotHit))
-        {
-            sr1_GotHit = await sr1.GotStreamHit();
-            sr2_GotHit = await sr2.GotStreamHit();
-            sr3_GotHit = await sr3.GotStreamHit();
-
-            if (!sr1_GotHit || !sr2_GotHit || !sr3_GotHit)
-            {
-                await Task.Delay(10, cancellationToken);
-            }
-        }
-
-        Assert.True(
-            sr1_GotHit && sr2_GotHit && sr3_GotHit,
-            $"Expected all stream receivers to observe a message within {allowedDuration}. SR1: {sr1_GotHit}; SR2: {sr2_GotHit}; SR3: {sr3_GotHit}.");
 
         var sr1_host = await sr1.GetAddress();
         var sr2_host = await sr2.GetAddress();
@@ -429,7 +430,6 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Repa
     public interface ISR : IGrainWithStringKey
     {
         Task Ping();
-        Task<bool> GotStreamHit();
         Task<SiloAddress> GetAddress();
     }
 
@@ -600,22 +600,15 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Repa
     [ImplicitStreamSubscription(Fixture.StreamNamespaceName)]
     public class SR : GrainBase, ISR
     {
-        private bool _streamHit = false;
-
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
             var sp = this.GetStreamProvider(Fixture.StreamProviderName)
                 .GetStream<int>(StreamId.Create(Fixture.StreamNamespaceName, this.GetPrimaryKeyString()));
 
-            await sp.SubscribeAsync((_, _) =>
-             {
-                 _streamHit = true;
-                 return Task.CompletedTask;
-             });
+            await sp.SubscribeAsync(static (_, _) => Task.CompletedTask);
         }
 
         public Task Ping() => Task.CompletedTask;
-        public Task<bool> GotStreamHit() => Task.FromResult(_streamHit);
     }
 
     public class Fixture : BaseTestClusterFixture
