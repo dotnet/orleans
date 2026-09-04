@@ -59,6 +59,10 @@ internal partial class EventHubAdapterReceiver : IQueueAdapterReceiver, IQueueCa
     private IStreamQueueCheckpointer<string>? checkpointer;
     private AggregatedQueueFlowController flowController = new(MaxMessagesPerRead);
     private bool receiverUsesCheckpoint;
+    private IEventHubQueueCache? recoveryCache;
+    private Dictionary<Cursor, RecoveredCursorProgress>? recoveredCursorProgress;
+    private readonly HashSet<Cursor> cursors = new(ReferenceEqualityComparer.Instance);
+    private HashSet<Cursor>? recoveryPendingCursors;
 
     // Receiver life cycle
     private int receiverState = ReceiverShutdown;
@@ -161,6 +165,10 @@ internal partial class EventHubAdapterReceiver : IQueueAdapterReceiver, IQueueCa
                 this.checkpointer = checkpointer;
                 this.cache = cache;
                 this.flowController = flowController;
+                if (this.recoveredCursorProgress is not null)
+                {
+                    this.recoveryCache = cache;
+                }
             }
 
             this.receiverUsesCheckpoint = receiverUsesCheckpoint;
@@ -277,7 +285,30 @@ internal partial class EventHubAdapterReceiver : IQueueAdapterReceiver, IQueueCa
 
     private async Task ResetReceiver(CancellationToken cancellationToken)
     {
-        await this.checkpointer!.Reset(cancellationToken);
+        IStreamQueueCheckpointer<string> checkpointer;
+        lock (this.cacheLock)
+        {
+            checkpointer = this.checkpointer!;
+            this.recoveryCache = null;
+            this.recoveredCursorProgress = new Dictionary<Cursor, RecoveredCursorProgress>(ReferenceEqualityComparer.Instance);
+            this.recoveryPendingCursors = new HashSet<Cursor>(this.cursors, ReferenceEqualityComparer.Instance);
+        }
+
+        try
+        {
+            await checkpointer.Reset(cancellationToken);
+        }
+        catch
+        {
+            lock (this.cacheLock)
+            {
+                this.recoveryCache = null;
+                this.recoveredCursorProgress = null;
+                this.recoveryPendingCursors = null;
+            }
+
+            throw;
+        }
 
         this.receiverUsesCheckpoint = false;
         var receiver = Interlocked.Exchange(ref this.receiver, null);
@@ -377,7 +408,66 @@ internal partial class EventHubAdapterReceiver : IQueueAdapterReceiver, IQueueCa
         if (earliestSubscriptionToken is IEventHubPartitionLocation location
             && long.TryParse(location.EventHubOffset, NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
         {
-            this.checkpointer?.Update(location.EventHubOffset, utcNow, CancellationToken.None);
+            IStreamQueueCheckpointer<string>? checkpointer;
+            lock (this.cacheLock)
+            {
+                if (this.recoveredCursorProgress is { } recoveredProgress)
+                {
+                    if (this.recoveryPendingCursors is { Count: > 0 }
+                        || !recoveredProgress.Values.Any(
+                            progress => ReferenceEquals(progress.DeliveredToken, earliestSubscriptionToken)
+                                || ReferenceEquals(progress.ResumeToken, earliestSubscriptionToken)))
+                    {
+                        return;
+                    }
+
+                    this.recoveryCache = null;
+                    this.recoveredCursorProgress = null;
+                    this.recoveryPendingCursors = null;
+                }
+
+                checkpointer = this.checkpointer;
+            }
+
+            checkpointer?.Update(location.EventHubOffset, utcNow, CancellationToken.None);
+        }
+    }
+
+    private void RecordRecoveredDeliveryToken(
+        Cursor cursor,
+        IEventHubQueueCache? cursorCache,
+        StreamSequenceToken deliveredToken,
+        StreamSequenceToken? resumeToken)
+    {
+        if (this.recoveredCursorProgress is not { } cursorProgress
+            || !ReferenceEquals(cursorCache, this.recoveryCache))
+        {
+            return;
+        }
+
+        cursorProgress.TryGetValue(cursor, out var previousProgress);
+        cursorProgress[cursor] = new(
+            deliveredToken,
+            previousProgress.ResumeToken ?? resumeToken);
+        this.recoveryPendingCursors?.Remove(cursor);
+    }
+
+    private void ClearRecoveredDeliveryToken(Cursor cursor)
+    {
+        this.recoveredCursorProgress?.Remove(cursor);
+    }
+
+    private readonly record struct RecoveredCursorProgress(
+        StreamSequenceToken DeliveredToken,
+        StreamSequenceToken? ResumeToken);
+
+    private void UnregisterCursor(Cursor cursor)
+    {
+        lock (this.cacheLock)
+        {
+            this.ClearRecoveredDeliveryToken(cursor);
+            this.recoveryPendingCursors?.Remove(cursor);
+            this.cursors.Remove(cursor);
         }
     }
 
@@ -525,6 +615,7 @@ internal partial class EventHubAdapterReceiver : IQueueAdapterReceiver, IQueueCa
         private IEventHubQueueCache? cache;
         private object? cursor;
         private IBatchContainer? current;
+        private StreamSequenceToken? recoveryResumeToken;
 
         public Cursor(EventHubAdapterReceiver owner, StreamId streamId, StreamSequenceToken? token)
         {
@@ -534,6 +625,12 @@ internal partial class EventHubAdapterReceiver : IQueueAdapterReceiver, IQueueCa
             {
                 this.cache = owner.cache;
                 this.cursor = this.cache?.GetCursor(streamId, token);
+                if (ReferenceEquals(this.cache, owner.recoveryCache))
+                {
+                    this.recoveryResumeToken = token;
+                }
+
+                owner.cursors.Add(this);
             }
         }
 
@@ -548,11 +645,13 @@ internal partial class EventHubAdapterReceiver : IQueueAdapterReceiver, IQueueCa
             {
                 this.cache = owner.cache;
                 this.cursor = this.cache?.GetCursorAtPosition(streamId, startPosition);
+                owner.cursors.Add(this);
             }
         }
 
         public void Dispose()
         {
+            this.owner.UnregisterCursor(this);
         }
 
         public IBatchContainer? GetCurrent(out Exception? exception)
@@ -570,12 +669,30 @@ internal partial class EventHubAdapterReceiver : IQueueAdapterReceiver, IQueueCa
                     return false;
                 }
 
-                if (!this.cache.TryGetNextMessage(this.cursor, out var next))
+                IBatchContainer? next;
+                try
                 {
-                    return false;
+                    if (!this.cache.TryGetNextMessage(this.cursor, out next))
+                    {
+                        return false;
+                    }
+                }
+                catch
+                {
+                    this.owner.UnregisterCursor(this);
+                    this.cache = null;
+                    this.cursor = null;
+                    this.current = null;
+                    throw;
                 }
 
                 this.current = next;
+                this.owner.RecordRecoveredDeliveryToken(
+                    this,
+                    this.cache,
+                    next.SequenceToken,
+                    this.recoveryResumeToken);
+                this.recoveryResumeToken = null;
                 return true;
             }
         }
@@ -587,17 +704,21 @@ internal partial class EventHubAdapterReceiver : IQueueAdapterReceiver, IQueueCa
                 var cache = this.owner.cache;
                 if (cache is null)
                 {
+                    this.owner.ClearRecoveredDeliveryToken(this);
                     this.cache = null;
                     this.cursor = null;
                     this.current = null;
+                    this.recoveryResumeToken = null;
                     return;
                 }
 
                 if (!ReferenceEquals(this.cache, cache))
                 {
+                    this.owner.ClearRecoveredDeliveryToken(this);
                     this.cache = cache;
                     this.cursor = cache.GetCursor(this.streamId, token);
                     this.current = null;
+                    this.recoveryResumeToken = null;
                     return;
                 }
 
