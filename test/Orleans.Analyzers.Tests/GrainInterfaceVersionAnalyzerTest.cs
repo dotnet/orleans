@@ -2902,11 +2902,15 @@ interface Outer.IInnerGrain [Version(1)]
         }
         finally
         {
-            await DeleteDirectoryWithRetriesAsync(tempDirectory);
+            await DeleteDirectoryWithRetriesAsync(
+                tempDirectory,
+                TestContext.Current.CancellationToken);
         }
     }
 
-    private static async Task DeleteDirectoryWithRetriesAsync(string path)
+    private static async Task DeleteDirectoryWithRetriesAsync(
+        string path,
+        CancellationToken cancellationToken)
     {
         const int maxAttempts = 10;
         var retryDelay = TimeSpan.FromMilliseconds(100);
@@ -2920,11 +2924,11 @@ interface Outer.IInnerGrain [Version(1)]
             }
             catch (IOException) when (attempt < maxAttempts)
             {
-                await Task.Delay(retryDelay, TestContext.Current.CancellationToken);
+                await Task.Delay(retryDelay, cancellationToken);
             }
             catch (UnauthorizedAccessException) when (attempt < maxAttempts)
             {
-                await Task.Delay(retryDelay, TestContext.Current.CancellationToken);
+                await Task.Delay(retryDelay, cancellationToken);
             }
         }
     }
