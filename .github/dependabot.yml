@@ -8,10 +8,6 @@ registries:
     type: "python-index"
     url: "https://packagefeedproxy.microsoft.io/pypi/simple/"
     replaces-base: true
-  cfs-npm:
-    type: "npm-registry"
-    url: "https://packagefeedproxy.microsoft.io/npm/"
-    replaces-base: true
 updates:
   - package-ecosystem: "dotnet-sdk"
     directory: "/"
