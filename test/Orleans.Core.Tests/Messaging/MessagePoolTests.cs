@@ -1,7 +1,6 @@
 using System.Collections.Concurrent;
 using System.Net;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.CodeGeneration;
 using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
 using TestExtensions;
@@ -81,7 +80,7 @@ public class MessagePoolTests
     [Fact, TestCategory("BVT"), TestCategory("Messaging")]
     public void MessageFactory_CreateMessage_ReturnsPooledMessage()
     {
-        var message = _messageFactory.CreateMessage(null, InvokeMethodOptions.None);
+        var message = _messageFactory.CreateMessage(null, Orleans.CodeGeneration.InvokeMethodOptions.None);
 
         Assert.Equal(Message.Directions.Request, message.Direction);
 
