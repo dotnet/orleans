@@ -310,6 +310,8 @@ jobs:
   test-sqlite:
     name: SQLite provider tests
     runs-on: ubuntu-latest
+    env:
+      BuildExternalAssets: "false"
     strategy:
       fail-fast: false
       matrix:
