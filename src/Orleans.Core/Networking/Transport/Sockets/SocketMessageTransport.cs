@@ -840,7 +840,8 @@ internal sealed partial class SocketMessageTransport : MessageTransportBase
 
             isGracefulTermination = true;
 exit:
-            /* no op */;
+/* no op */
+            ;
         }
         catch (Exception exception)
         {
@@ -957,7 +958,8 @@ exit:
 
             isGracefulTermination = true;
 exit:
-            /* no op */;
+/* no op */
+            ;
         }
         catch (Exception exception)
         {

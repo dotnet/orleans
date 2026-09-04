@@ -1103,7 +1103,7 @@ public class MessageTransportLifecycleTests
                                 throw new TimeoutException("Timed out waiting to complete the backlogged read.");
                             }
                         }
-                        : null);
+                : null);
                 frames[i] = CreateFrame(payload);
                 Assert.True(transport.EnqueueRead(requests[i]));
             }
