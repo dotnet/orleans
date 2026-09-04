@@ -15,6 +15,10 @@ namespace Orleans.TestingHost.Tests;
 [TestArea("TestingHost")]
 public sealed class ClusterManifestStabilizationHelperTests
 {
+    private static readonly GrainManifest EmptyGrainManifest = new(
+        ImmutableDictionary<GrainType, GrainProperties>.Empty,
+        ImmutableDictionary<GrainInterfaceType, GrainInterfaceProperties>.Empty);
+
     [Fact]
     public async Task WaitForExpectedClusterManifestAsync_WhenActiveSilosAreNull_ThrowsArgumentNullException()
     {
@@ -86,14 +90,9 @@ public sealed class ClusterManifestStabilizationHelperTests
     }
 
     private static ClusterManifest CreateManifest(params SiloAddress[] silos)
-    {
-        var grainManifest = new GrainManifest(
-            ImmutableDictionary<GrainType, GrainProperties>.Empty,
-            ImmutableDictionary<GrainInterfaceType, GrainInterfaceProperties>.Empty);
-        return new ClusterManifest(
+        => new(
             MajorMinorVersion.Zero,
-            silos.ToImmutableDictionary(static silo => silo, _ => grainManifest));
-    }
+            silos.ToImmutableDictionary(static silo => silo, _ => EmptyGrainManifest));
 
     private static TestSiloHandle CreateSilo(int port, int generation) =>
         new()
@@ -121,7 +120,7 @@ public sealed class ClusterManifestStabilizationHelperTests
         public TestClusterManifestProvider(ClusterManifest current)
         {
             Current = current;
-            LocalGrainManifest = current.AllGrainManifests.Single();
+            LocalGrainManifest = EmptyGrainManifest;
         }
 
         public ClusterManifest Current { get; private set; }

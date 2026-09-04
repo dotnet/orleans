@@ -23,6 +23,23 @@ public static class ReminderTopologyStabilizer
             observer,
             readySilos,
             useInitialLoadForSingleSilo: false,
+            requestRefresh: true,
+            cancellationToken);
+
+    /// <summary>
+    /// Waits for stable membership visibility and completion of the reconciliation triggered by that topology.
+    /// </summary>
+    public static async Task<IReadOnlyList<InProcessSiloHandle>> WaitForReconciledTopologyAsync(
+        InProcessTestCluster cluster,
+        ReminderDiagnosticObserver observer,
+        IEnumerable<InProcessSiloHandle> readySilos,
+        CancellationToken cancellationToken)
+        => await WaitForStableTopologyAsync(
+            cluster,
+            observer,
+            readySilos,
+            useInitialLoadForSingleSilo: false,
+            requestRefresh: false,
             cancellationToken);
 
     /// <summary>
@@ -39,6 +56,7 @@ public static class ReminderTopologyStabilizer
             observer,
             readySilos,
             useInitialLoadForSingleSilo: true,
+            requestRefresh: true,
             cancellationToken);
 
     private static async Task<IReadOnlyList<InProcessSiloHandle>> WaitForStableTopologyAsync(
@@ -46,6 +64,7 @@ public static class ReminderTopologyStabilizer
         ReminderDiagnosticObserver observer,
         IEnumerable<InProcessSiloHandle> readySilos,
         bool useInitialLoadForSingleSilo,
+        bool requestRefresh,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(cluster);
@@ -113,11 +132,17 @@ public static class ReminderTopologyStabilizer
                     && requiredReadySilos.Length == 1
                     && expectedActiveSilos.Length == 1
                     && requiredReadySilos[0].SiloAddress.Equals(expectedActiveSilos[0].SiloAddress);
-                if (!initialLoadIsRefreshBoundary)
+                if (!initialLoadIsRefreshBoundary && requestRefresh)
                 {
                     phase = "stable topology refresh start";
                     var refreshesStarted = reminderServices.Select(service => service.TestOnlyStartRefresh()).ToArray();
                     await Task.WhenAll(refreshesStarted).WaitAsync(cancellationToken);
+                }
+                else if (!initialLoadIsRefreshBoundary)
+                {
+                    phase = "reminder scheduler topology boundary";
+                    var schedulerTurns = reminderServices.Select(service => service.TestOnlyWaitForSchedulerTurn()).ToArray();
+                    await Task.WhenAll(schedulerTurns).WaitAsync(cancellationToken);
                 }
 
                 phase = "latest reminder reconciliation";

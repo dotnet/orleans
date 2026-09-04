@@ -647,6 +647,47 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
         }
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
+    public async Task ReconciledTopologyBarrier_WaitsForQueuedRangeChange()
+    {
+        var silo = Assert.Single(fixture.HostedCluster.Silos);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cancellation.CancelAfter(TestConstants.InitTimeout);
+        await ReminderTopologyStabilizer.WaitForStartupTopologyAsync(
+            fixture.HostedCluster,
+            fixture.DiagnosticObserver,
+            [silo],
+            cancellation.Token);
+
+        var reminderTable = silo.ServiceProvider.GetRequiredService<NullReturningReminderTable>();
+        var reminderService = silo.ServiceProvider.GetRequiredService<LocalReminderService>();
+        var oldRange = RangeFactory.CreateRange(0, uint.MaxValue / 2);
+        var newRange = RangeFactory.CreateRange(0, uint.MaxValue / 4);
+        var readGate = reminderTable.BlockNextRangeRead(cancellation.Token);
+
+        try
+        {
+            var rangeChange = reminderService.TestOnlyChangeRange(oldRange, newRange, increased: false);
+            var barrier = ReminderTopologyStabilizer.WaitForReconciledTopologyAsync(
+                fixture.HostedCluster,
+                fixture.DiagnosticObserver,
+                [silo],
+                cancellation.Token);
+
+            await readGate.WaitUntilBlockedAsync(cancellation.Token);
+            Assert.False(barrier.IsCompleted);
+
+            readGate.Release();
+            await Task.WhenAll(rangeChange, barrier).WaitAsync(cancellation.Token);
+        }
+        finally
+        {
+            readGate.Release();
+        }
+    }
+
     public sealed class Fixture : BaseInProcessTestClusterFixture
     {
         public ReminderLifecycleHarness ReminderHarness { get; } = new();

@@ -75,7 +75,7 @@ public sealed class ReminderLifecycleHarness : IDisposable
         try
         {
             await topologyConverged.WaitAsync(phaseCancellation.Token);
-            await ReminderTopologyStabilizer.WaitForStableTopologyAsync(
+            await ReminderTopologyStabilizer.WaitForReconciledTopologyAsync(
                 GetCluster(),
                 _diagnostics,
                 addedSiloArray,
