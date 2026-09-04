@@ -2046,7 +2046,7 @@ public class DisseminationProtocolTests
         };
         listener.SetMeasurementEventCallback<long>((instrument, measurement, tags, state) =>
         {
-            if (tags.Any(static tag => tag.Key == "reason" && Equals(tag.Value, "timeout")))
+            if (tags.ToArray().Any(static tag => tag.Key == "reason" && object.Equals(tag.Value, "timeout")))
             {
                 timeoutMetric.TrySetResult(measurement);
             }
@@ -5670,18 +5670,15 @@ public class DisseminationProtocolTests
             reason: "disabled");
 
         Assert.Equal(expectedInstruments.Order(), observations.Keys.Order());
-        AssertMetric(DisseminationInstruments.BroadcastSendFailuresName, "reason", "timeout");
-        AssertMetric(DisseminationInstruments.BroadcastScheduledName, "reason", "retry");
-        AssertMetric(DisseminationInstruments.AntiEntropyFailuresName, "reason", "error");
-        AssertMetric(DisseminationInstruments.PumpFailuresName, "status", "permanent");
+        AssertMetric(DisseminationInstruments.BroadcastSendFailuresName, ("reason", "timeout"));
+        AssertMetric(DisseminationInstruments.BroadcastScheduledName, ("reason", "retry"));
+        AssertMetric(DisseminationInstruments.AntiEntropyFailuresName, ("reason", "error"));
+        AssertMetric(DisseminationInstruments.PumpFailuresName, ("status", "permanent"));
         AssertMetric(
             DisseminationInstruments.PublicationsName,
             ("namespace", new DisseminationNamespace("test")),
             ("result", "rejected"),
             ("reason", "disabled"));
-
-        void AssertMetric(string name, string tagName, string tagValue) =>
-            AssertMetric(name, (tagName, (object)tagValue));
 
         void AssertMetric(string name, params (string Name, object Value)[] expectedTags)
         {
