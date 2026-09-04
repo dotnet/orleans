@@ -23,13 +23,13 @@ internal sealed class AdoNetStreamSequenceToken : EventSequenceTokenV2, IPartiti
     {
     }
 
-    [Id(0)]
+    [Id(2)]
     public string ServiceId { get; } = null!;
 
-    [Id(1)]
+    [Id(3)]
     public string ProviderId { get; } = null!;
 
-    [Id(2)]
+    [Id(4)]
     public string QueueId { get; } = null!;
 
     string? IPartitionedStreamSequenceToken.ProviderIdentity
