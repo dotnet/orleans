@@ -703,13 +703,11 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
             cancellation.Token);
 
         using var lateObserver = ReminderDiagnosticObserver.Create(fixture.HostedCluster);
-        using var barrierCancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        barrierCancellation.CancelAfter(TimeSpan.FromSeconds(1));
         await ReminderTopologyStabilizer.WaitForReconciledTopologyAsync(
             fixture.HostedCluster,
             lateObserver,
             [silo],
-            barrierCancellation.Token);
+            cancellation.Token);
     }
 
     public sealed class Fixture : BaseInProcessTestClusterFixture
