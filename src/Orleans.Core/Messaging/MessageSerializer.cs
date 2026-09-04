@@ -224,16 +224,30 @@ namespace Orleans.Runtime.Messaging
                         ThrowCannotForwardUndecodedBody(undecodedBody);
                     }
 
-                    innerWriter = Writer.Create(new MessageBufferWriter(bufferWriter), _serializationSession);
-                    innerWriter.Write(undecodedBody.Body);
-                    innerWriter.Commit();
+                    var bodyWriter = Writer.Create(new MessageBufferWriter(bufferWriter), _serializationSession);
+                    try
+                    {
+                        bodyWriter.Write(undecodedBody.Body);
+                        bodyWriter.Commit();
+                    }
+                    finally
+                    {
+                        bodyWriter.Dispose();
+                    }
                 }
                 else if (bodyCodec is not null)
                 {
-                    innerWriter = Writer.Create(new MessageBufferWriter(bufferWriter), _serializationSession);
-                    if (rawCodec != null) rawCodec.WriteRaw(ref innerWriter, message.BodyObject!);
-                    else bodyCodec.WriteField(ref innerWriter, 0, null, message.BodyObject);
-                    innerWriter.Commit();
+                    var bodyWriter = Writer.Create(new MessageBufferWriter(bufferWriter), _serializationSession);
+                    try
+                    {
+                        if (rawCodec != null) rawCodec.WriteRaw(ref bodyWriter, message.BodyObject!);
+                        else bodyCodec.WriteField(ref bodyWriter, 0, null, message.BodyObject);
+                        bodyWriter.Commit();
+                    }
+                    finally
+                    {
+                        bodyWriter.Dispose();
+                    }
                 }
 
                 var bodyLength = bufferWriter.CommittedBytes - headerLength;
