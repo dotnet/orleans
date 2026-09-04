@@ -76,7 +76,7 @@ Choose the limiter behavior by passing one of these block modes when you configu
 
 | Block mode | Behavior when no permit is available | Trade-off |
 |---|---|---|
-| `ThrottleBlockMode.Wait` | Wait for a permit. The shortest configured `WaitUpTo` on any composed gate bounds the complete acquire; without one, waiting is indefinite. | When all gates use `Wait`, no ticks are dropped, but tardiness is unbounded. The grain may see a tick arrive much later than scheduled. |
+| `ThrottleBlockMode.Wait` | Wait for a permit. The shortest configured `WaitUpTo` on any composed gate bounds the complete acquire; without one, waiting is indefinite. | The throttle doesn't reject the current occurrence, but reminder scheduling advances to the current cadence after a delayed callback instead of replaying elapsed cadences. |
 | `ThrottleBlockMode.WaitUpTo(timeout)` | Wait up to `timeout`, then skip the tick if no permit became available. | Bounded tardiness and skip rate. The skip reason identifies the gate: `AcquireTimeout`, `SiloOverloaded`, or `SlowStartLimited`. |
 | `ThrottleBlockMode.SkipImmediately` | Skip the tick if no permit is available right now. | Maximum downstream protection; minimum delivery guarantee. Best when "missing a tick" is materially better than "exceeding the limit". |
 
@@ -99,7 +99,7 @@ The block mode is **required** at configuration time — it is not defaulted —
 
 | Block mode | Behavior while the silo is overloaded |
 |---|---|
-| `ThrottleBlockMode.Wait` | Poll the overload signal (default every 1 s) until it clears. Unbounded delay; never drops a tick. |
+| `ThrottleBlockMode.Wait` | Poll the overload signal (default every 1 s) until it clears. The throttle doesn't reject the current occurrence; elapsed cadences aren't replayed. |
 | `ThrottleBlockMode.WaitUpTo(timeout)` | Wait up to `timeout`, then skip the tick with `ReminderSkipReason.SiloOverloaded`. Bounded delay; some ticks may drop. |
 | `ThrottleBlockMode.SkipImmediately` | Skip the tick immediately if the silo is overloaded. Most protective; most ticks dropped during overload. |
 
@@ -127,7 +127,7 @@ The block mode is **required** at configuration time so that the behavior during
 
 | Block mode | Behavior while the ramping capacity is exhausted |
 |---|---|
-| `ThrottleBlockMode.Wait` | Wait for the ramp-up to release more capacity. No ticks dropped during warm-up. |
+| `ThrottleBlockMode.Wait` | Wait for the ramp-up to release more capacity. The throttle doesn't reject the current occurrence; elapsed cadences aren't replayed. |
 | `ThrottleBlockMode.WaitUpTo(timeout)` | Wait up to `timeout`, then skip with `ReminderSkipReason.SlowStartLimited`. |
 | `ThrottleBlockMode.SkipImmediately` | Skip the tick immediately if no current capacity is available. Most protective; most ticks dropped during warm-up. |
 

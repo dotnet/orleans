@@ -133,7 +133,7 @@ public sealed class AdmissionTransactionTests
         using var transaction = new ReminderAdmissionTransaction(cancellation.Token);
         var budget = new ReminderAcquireBudget(clock, timeout: null);
 
-        var result = await gate.AcquireAsync(TestContext.Default(), budget, cancellation.Token);
+        var result = await gate.AcquireAsync(ReminderDeliveryTestContext.Default(), budget, cancellation.Token);
         Assert.True(result.AdmittedLease);
         Assert.True(transaction.TryAdd(result.Reservation));
         Assert.Equal(0, gate.AvailableTokens);
@@ -161,8 +161,8 @@ public sealed class AdmissionTransactionTests
         using var transaction = new ReminderAdmissionTransaction(CancellationToken.None);
         var budget = new ReminderAcquireBudget(clock, timeout: null);
 
-        var concurrency = await concurrencyGate.AcquireAsync(TestContext.Default(), budget, CancellationToken.None);
-        var rate = await rateGate.AcquireAsync(TestContext.Default(), budget, CancellationToken.None);
+        var concurrency = await concurrencyGate.AcquireAsync(ReminderDeliveryTestContext.Default(), budget, CancellationToken.None);
+        var rate = await rateGate.AcquireAsync(ReminderDeliveryTestContext.Default(), budget, CancellationToken.None);
         Assert.True(transaction.TryAdd(concurrency.Reservation));
         Assert.True(transaction.TryAdd(rate.Reservation));
         Assert.Equal(0, concurrencyGate.AvailablePermits);
@@ -189,10 +189,10 @@ public sealed class AdmissionTransactionTests
         using var transaction = new ReminderAdmissionTransaction(CancellationToken.None);
         var budget = new ReminderAcquireBudget(clock, TimeSpan.FromMilliseconds(500));
 
-        var concurrency = await concurrencyGate.AcquireAsync(TestContext.Default(), budget, CancellationToken.None);
+        var concurrency = await concurrencyGate.AcquireAsync(ReminderDeliveryTestContext.Default(), budget, CancellationToken.None);
         Assert.True(transaction.TryAdd(concurrency.Reservation));
         clock.Advance(TimeSpan.FromMilliseconds(500));
-        var rate = await rateGate.AcquireAsync(TestContext.Default(), budget, CancellationToken.None);
+        var rate = await rateGate.AcquireAsync(ReminderDeliveryTestContext.Default(), budget, CancellationToken.None);
         Assert.True(transaction.TryAdd(rate.Reservation));
 
         Assert.Equal(
@@ -215,12 +215,12 @@ public sealed class AdmissionTransactionTests
         var budget = new ReminderAcquireBudget(clock, timeout: null);
 
         using var transactionA = new ReminderAdmissionTransaction(CancellationToken.None);
-        var reservationA = await gate.AcquireAsync(TestContext.Default(), budget, CancellationToken.None);
+        var reservationA = await gate.AcquireAsync(ReminderDeliveryTestContext.Default(), budget, CancellationToken.None);
         Assert.True(transactionA.TryAdd(reservationA.Reservation));
 
         clock.Advance(TimeSpan.FromMilliseconds(500));
         using var transactionB = new ReminderAdmissionTransaction(CancellationToken.None);
-        var reservationB = await gate.AcquireAsync(TestContext.Default(), budget, CancellationToken.None);
+        var reservationB = await gate.AcquireAsync(ReminderDeliveryTestContext.Default(), budget, CancellationToken.None);
         Assert.True(transactionB.TryAdd(reservationB.Reservation));
         Assert.Equal(
             ReminderAdmissionCommitOutcome.Committed,
@@ -229,14 +229,14 @@ public sealed class AdmissionTransactionTests
         transactionA.Rollback();
 
         using var transactionC = new ReminderAdmissionTransaction(CancellationToken.None);
-        var reservationC = await gate.AcquireAsync(TestContext.Default(), budget, CancellationToken.None);
+        var reservationC = await gate.AcquireAsync(ReminderDeliveryTestContext.Default(), budget, CancellationToken.None);
         Assert.True(transactionC.TryAdd(reservationC.Reservation));
         Assert.Equal(
             ReminderAdmissionCommitOutcome.Committed,
             transactionC.TryCommit(budget, CancellationToken.None, out _));
 
         clock.Advance(TimeSpan.FromMilliseconds(500));
-        var next = await gate.AcquireAsync(TestContext.Default(), budget, CancellationToken.None);
+        var next = await gate.AcquireAsync(ReminderDeliveryTestContext.Default(), budget, CancellationToken.None);
         Assert.False(next.AdmittedLease);
         Assert.Equal(ReminderSkipReason.LocalLimiterFull, next.SkipReason);
     }
@@ -333,7 +333,7 @@ public sealed class NoOpThrottleTests
     public async Task AcquireAsync_AlwaysReturnsSharedAdmittedLease()
     {
         var throttle = NoOpReminderDeliveryThrottle.Instance;
-        var ctx = TestContext.Default();
+        var ctx = ReminderDeliveryTestContext.Default();
 
         var l1 = await throttle.AcquireAsync(ctx, CancellationToken.None);
         var l2 = await throttle.AcquireAsync(ctx, CancellationToken.None);
@@ -352,7 +352,7 @@ public sealed class NoOpThrottleTests
     [Fact]
     public async Task Dispose_OnNoOpLease_IsIdempotentNoOp()
     {
-        var lease = await NoOpReminderDeliveryThrottle.Instance.AcquireAsync(TestContext.Default(), CancellationToken.None);
+        var lease = await NoOpReminderDeliveryThrottle.Instance.AcquireAsync(ReminderDeliveryTestContext.Default(), CancellationToken.None);
         lease.Dispose();
         lease.Dispose();
         // No exception, no state change to verify other than not throwing.
@@ -371,15 +371,15 @@ public sealed class LocalThrottleConcurrencyTests
             .Build();
         await using var throttle = new TestThrottle(config);
 
-        var l1 = await throttle.AcquireAsync(TestContext.Default(), CancellationToken.None);
-        var l2 = await throttle.AcquireAsync(TestContext.Default(), CancellationToken.None);
+        var l1 = await throttle.AcquireAsync(ReminderDeliveryTestContext.Default(), CancellationToken.None);
+        var l2 = await throttle.AcquireAsync(ReminderDeliveryTestContext.Default(), CancellationToken.None);
         Assert.Equal(0, throttle.AvailableConcurrencyPermits);
 
-        var l3Task = throttle.AcquireAsync(TestContext.Default(), CancellationToken.None);
+        var l3Task = throttle.AcquireAsync(ReminderDeliveryTestContext.Default(), CancellationToken.None);
         Assert.False(l3Task.IsCompleted);
 
         l1.Dispose();
-        var l3 = await l3Task.AsTask().WaitAsync(TimeSpan.FromSeconds(2));
+        var l3 = await l3Task.AsTask().WaitAsync(TimeSpan.FromSeconds(2), Xunit.TestContext.Current.CancellationToken);
         Assert.Equal(ReminderAdmissionOutcome.Admitted, l3.Outcome);
 
         l2.Dispose();
@@ -397,8 +397,8 @@ public sealed class LocalThrottleConcurrencyTests
             .Build();
         await using var throttle = new TestThrottle(config);
 
-        var l1 = await throttle.AcquireAsync(TestContext.Default(), CancellationToken.None);
-        var l2 = await throttle.AcquireAsync(TestContext.Default(), CancellationToken.None);
+        var l1 = await throttle.AcquireAsync(ReminderDeliveryTestContext.Default(), CancellationToken.None);
+        var l2 = await throttle.AcquireAsync(ReminderDeliveryTestContext.Default(), CancellationToken.None);
 
         Assert.Equal(ReminderAdmissionOutcome.Admitted, l1.Outcome);
         Assert.Equal(ReminderAdmissionOutcome.Skipped, l2.Outcome);
@@ -420,9 +420,9 @@ public sealed class LocalThrottleConcurrencyTests
             .Build();
         await using var throttle = new TestThrottle(config);
 
-        var l1 = await throttle.AcquireAsync(TestContext.Default(), CancellationToken.None);
+        var l1 = await throttle.AcquireAsync(ReminderDeliveryTestContext.Default(), CancellationToken.None);
         using var cts = new CancellationTokenSource();
-        var l2Task = throttle.AcquireAsync(TestContext.Default(), cts.Token).AsTask();
+        var l2Task = throttle.AcquireAsync(ReminderDeliveryTestContext.Default(), cts.Token).AsTask();
         cts.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => l2Task);
 
@@ -439,7 +439,7 @@ public sealed class LocalThrottleConcurrencyTests
         var config = new ReminderThrottleConfigBuilder().MaxConcurrent(1, ThrottleBlockMode.Wait).Build();
         await using var throttle = new TestThrottle(config);
 
-        var lease = await throttle.AcquireAsync(TestContext.Default(), CancellationToken.None);
+        var lease = await throttle.AcquireAsync(ReminderDeliveryTestContext.Default(), CancellationToken.None);
         Assert.Equal(0, throttle.AvailableConcurrencyPermits);
         // Simulate a delivery failure: dispose still returns the permit exactly once.
         lease.Dispose();
@@ -466,13 +466,13 @@ public sealed class LocalThrottleConcurrencyTests
         await using var throttle = new TestThrottle(config, clock);
 
         // First acquire takes both the rate token and one concurrency permit.
-        var l1 = await throttle.AcquireAsync(TestContext.Default(), CancellationToken.None);
+        var l1 = await throttle.AcquireAsync(ReminderDeliveryTestContext.Default(), CancellationToken.None);
         Assert.Equal(ReminderAdmissionOutcome.Admitted, l1.Outcome);
         Assert.Equal(1, throttle.AvailableConcurrencyPermits);
 
         // Second acquire reserves a concurrency permit but blocks on the empty rate bucket.
         using var cts = new CancellationTokenSource();
-        var l2Task = throttle.AcquireAsync(TestContext.Default(), cts.Token).AsTask();
+        var l2Task = throttle.AcquireAsync(ReminderDeliveryTestContext.Default(), cts.Token).AsTask();
 
         // Yield until the throttle has reserved the second concurrency permit and is waiting on
         // the bucket refill. The acquire completes the semaphore wait synchronously and then awaits
@@ -480,7 +480,7 @@ public sealed class LocalThrottleConcurrencyTests
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(2);
         while (throttle.AvailableConcurrencyPermits == 1 && DateTime.UtcNow < deadline)
         {
-            await Task.Delay(10);
+            await Task.Delay(10, Xunit.TestContext.Current.CancellationToken);
         }
         Assert.Equal(0, throttle.AvailableConcurrencyPermits);
         Assert.False(l2Task.IsCompleted);
@@ -513,7 +513,7 @@ public sealed class LocalThrottleRateTests
         var admitted = 0;
         for (var i = 0; i < 10; i++)
         {
-            var l = await throttle.AcquireAsync(TestContext.Default(), CancellationToken.None);
+            var l = await throttle.AcquireAsync(ReminderDeliveryTestContext.Default(), CancellationToken.None);
             if (l.Outcome == ReminderAdmissionOutcome.Admitted)
             {
                 admitted++;
@@ -524,13 +524,13 @@ public sealed class LocalThrottleRateTests
         Assert.Equal(10, admitted);
 
         // 11th immediately is skipped (no tokens left).
-        var next = await throttle.AcquireAsync(TestContext.Default(), CancellationToken.None);
+        var next = await throttle.AcquireAsync(ReminderDeliveryTestContext.Default(), CancellationToken.None);
         Assert.Equal(ReminderAdmissionOutcome.Skipped, next.Outcome);
         Assert.Equal(ReminderSkipReason.LocalLimiterFull, next.SkipReason);
 
         // Advance one second: bucket refills to capacity.
         clock.Advance(TimeSpan.FromSeconds(1));
-        var refilled = await throttle.AcquireAsync(TestContext.Default(), CancellationToken.None);
+        var refilled = await throttle.AcquireAsync(ReminderDeliveryTestContext.Default(), CancellationToken.None);
         Assert.Equal(ReminderAdmissionOutcome.Admitted, refilled.Outcome);
         refilled.Dispose();
     }
@@ -546,16 +546,16 @@ public sealed class LocalThrottleRateTests
             .Build();
         await using var throttle = new TestThrottle(config, clock);
 
-        var first = await throttle.AcquireAsync(TestContext.Default(), CancellationToken.None);
+        var first = await throttle.AcquireAsync(ReminderDeliveryTestContext.Default(), CancellationToken.None);
         Assert.Equal(ReminderAdmissionOutcome.Admitted, first.Outcome);
         first.Dispose();
 
         // Next acquire must wait ~0.5s.
-        var nextTask = throttle.AcquireAsync(TestContext.Default(), CancellationToken.None).AsTask();
+        var nextTask = throttle.AcquireAsync(ReminderDeliveryTestContext.Default(), CancellationToken.None).AsTask();
         Assert.False(nextTask.IsCompleted);
 
         clock.Advance(TimeSpan.FromMilliseconds(500));
-        var next = await nextTask.WaitAsync(TimeSpan.FromSeconds(2));
+        var next = await nextTask.WaitAsync(TimeSpan.FromSeconds(2), Xunit.TestContext.Current.CancellationToken);
         Assert.Equal(ReminderAdmissionOutcome.Admitted, next.Outcome);
         next.Dispose();
     }
@@ -571,11 +571,11 @@ public sealed class LocalThrottleRateTests
             .Build();
         await using var throttle = new TestThrottle(config, clock);
 
-        var first = await throttle.AcquireAsync(TestContext.Default(), CancellationToken.None);
-        var secondTask = throttle.AcquireAsync(TestContext.Default(), CancellationToken.None).AsTask();
+        var first = await throttle.AcquireAsync(ReminderDeliveryTestContext.Default(), CancellationToken.None);
+        var secondTask = throttle.AcquireAsync(ReminderDeliveryTestContext.Default(), CancellationToken.None).AsTask();
 
         clock.Advance(TimeSpan.FromMilliseconds(500));
-        var second = await secondTask.WaitAsync(TimeSpan.FromSeconds(5));
+        var second = await secondTask.WaitAsync(TimeSpan.FromSeconds(5), Xunit.TestContext.Current.CancellationToken);
 
         Assert.Equal(ReminderAdmissionOutcome.Skipped, second.Outcome);
         Assert.Equal(ReminderSkipReason.AcquireTimeout, second.SkipReason);
@@ -594,15 +594,15 @@ public sealed class LocalThrottleRateTests
             .Build();
         await using var throttle = new TestThrottle(config, clock);
 
-        var first = await throttle.AcquireAsync(TestContext.Default(), CancellationToken.None);
+        var first = await throttle.AcquireAsync(ReminderDeliveryTestContext.Default(), CancellationToken.None);
         Assert.Equal(ReminderAdmissionOutcome.Admitted, first.Outcome);
 
-        var secondTask = throttle.AcquireAsync(TestContext.Default(), CancellationToken.None).AsTask();
+        var secondTask = throttle.AcquireAsync(ReminderDeliveryTestContext.Default(), CancellationToken.None).AsTask();
         Assert.False(secondTask.IsCompleted);
 
         first.Dispose();
 
-        var second = await secondTask.WaitAsync(TimeSpan.FromSeconds(2));
+        var second = await secondTask.WaitAsync(TimeSpan.FromSeconds(2), Xunit.TestContext.Current.CancellationToken);
         Assert.Equal(ReminderAdmissionOutcome.Skipped, second.Outcome);
         Assert.Equal(ReminderSkipReason.LocalLimiterFull, second.SkipReason);
     }
@@ -625,11 +625,11 @@ public sealed class LocalThrottleRateTests
         await using var throttle = new TestThrottle(config, clock);
 
         // First acquire consumes both the rate token and the only concurrency permit.
-        var l1 = await throttle.AcquireAsync(TestContext.Default(), CancellationToken.None);
+        var l1 = await throttle.AcquireAsync(ReminderDeliveryTestContext.Default(), CancellationToken.None);
         Assert.Equal(ReminderAdmissionOutcome.Admitted, l1.Outcome);
 
         // Second acquire blocks on the semaphore. Advance 500ms (within budget) and then release.
-        var l2Task = throttle.AcquireAsync(TestContext.Default(), CancellationToken.None).AsTask();
+        var l2Task = throttle.AcquireAsync(ReminderDeliveryTestContext.Default(), CancellationToken.None).AsTask();
         clock.Advance(TimeSpan.FromMilliseconds(500));
         Assert.False(l2Task.IsCompleted);
 
@@ -638,7 +638,7 @@ public sealed class LocalThrottleRateTests
         // must short-circuit to a skip rather than burning a fresh 800ms budget.
         l1.Dispose();
 
-        var l2 = await l2Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var l2 = await l2Task.WaitAsync(TimeSpan.FromSeconds(5), Xunit.TestContext.Current.CancellationToken);
         Assert.Equal(ReminderAdmissionOutcome.Skipped, l2.Outcome);
         Assert.Equal(ReminderSkipReason.AcquireTimeout, l2.SkipReason);
         Assert.True(l2.WaitedFor <= TimeSpan.FromMilliseconds(800) + TimeSpan.FromMilliseconds(100),
@@ -663,7 +663,7 @@ public sealed class LocalThrottleRateTests
         cts.Cancel();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => throttle.AcquireAsync(TestContext.Default(), cts.Token).AsTask());
+            () => throttle.AcquireAsync(ReminderDeliveryTestContext.Default(), cts.Token).AsTask());
 
         Assert.Equal(1, throttle.AvailableConcurrencyPermits);
     }
@@ -710,7 +710,7 @@ internal sealed class TestThrottle : IAsyncDisposable
     }
 }
 
-internal static class TestContext
+internal static class ReminderDeliveryTestContext
 {
     public static ReminderDeliveryContext Default()
     {
