@@ -63,6 +63,19 @@ namespace OrleansAWSUtils.Streams
                 // await the last storage operation, so after we shutdown and stop this receiver we don't get async operation completions from pending storage operations.
                 if (outstandingTask != null)
                     await outstandingTask;
+
+                if (queue is not null && pending.Count > 0)
+                {
+                    try
+                    {
+                        outstandingTask = queue.ReleaseMessages(pending.Select(static item => item.Message));
+                        await outstandingTask.WaitAsync(timeout);
+                    }
+                    catch (Exception exc)
+                    {
+                        LogWarningReleaseMessageException(logger, exc, Id, pending.Count);
+                    }
+                }
             }
             finally
             {
@@ -153,6 +166,12 @@ namespace OrleansAWSUtils.Streams
             Message = "Exception upon DeleteMessage on queue {Id}. Ignoring."
         )]
         private static partial void LogWarningDeleteMessageException(ILogger logger, Exception exception, QueueId id);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Failed to release {MessageCount} pending messages while shutting down receiver for queue {Id}."
+        )]
+        private static partial void LogWarningReleaseMessageException(ILogger logger, Exception exception, QueueId id, int messageCount);
 
         private sealed record PendingDelivery(IBatchContainer Batch, SQSMessage Message);
     }
