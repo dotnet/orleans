@@ -63,19 +63,19 @@ public class PartitionedStreamSequenceToken : EventSequenceTokenV2, IPartitioned
     /// <summary>
     /// Gets the provider identity.
     /// </summary>
-    [Id(0)]
+    [Id(2)]
     public string? ProviderIdentity { get; } = null!;
 
     /// <summary>
     /// Gets the partition identity.
     /// </summary>
-    [Id(1)]
+    [Id(3)]
     public string? PartitionIdentity { get; } = null!;
 
     /// <summary>
     /// Gets the provider position.
     /// </summary>
-    [Id(2)]
+    [Id(4)]
     public string Position { get; } = null!;
 
     /// <inheritdoc />

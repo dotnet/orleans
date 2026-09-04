@@ -1079,9 +1079,9 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
             acks.Add(await AppendAsync(serviceId, providerId, queueId));
         }
 
-        // No checkpoint is ever established, so these messages are ahead of the (null) checkpoint;
-        // only the hard retention ceiling can force their removal, and that removal must be
-        // reported distinctly from a normal, checkpoint-driven cleanup.
+        // Partition acquisition establishes checkpoint zero immediately before the earliest record.
+        // The messages remain ahead of that checkpoint, so only the hard retention ceiling can
+        // remove them and that removal is reported distinctly from normal checkpoint cleanup.
         await AgePartitionMessagesAsync(serviceId, providerId, queueId);
         var state = await _queries.AcquireStreamPartitionAsync(
             serviceId,
@@ -1102,7 +1102,7 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
         Assert.Equal(3, result.HardDeletedCount);
         Assert.Equal(acks[0].MessageId, result.HardDeletedFromMessageId);
         Assert.Equal(acks[^1].MessageId, result.HardDeletedThroughMessageId);
-        Assert.Null(result.Checkpoint);
+        Assert.Equal(0, result.Checkpoint);
     }
 
     [Fact]
