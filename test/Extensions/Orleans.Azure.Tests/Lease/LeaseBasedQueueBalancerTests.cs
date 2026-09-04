@@ -64,11 +64,13 @@ namespace Tester.AzureUtils.Lease
         public async Task LeaseBalancedQueueBalancer_SupportAutoScaleScenario()
         {
             var mgmtGrain = this.GrainFactory.GetGrain<IManagementGrain>(0);
+            using var queueChanges = new StreamProviderQueueChangeSignal(StreamProviderName);
             //6 queue and 4 silo, then each agent manager should own queues/agents in range of [1, 2]
             await WaitUntilAgentManagersOwnCorrectAmountOfAgents(
                 1,
                 2,
                 mgmtGrain,
+                queueChanges,
                 TestContext.Current.CancellationToken);
             //stop one silo, 6 queues, 3 silo, then each agent manager should own 2 queues 
             await this.HostedCluster.StopSiloAsync(
@@ -78,6 +80,7 @@ namespace Tester.AzureUtils.Lease
                 2,
                 2,
                 mgmtGrain,
+                queueChanges,
                 TestContext.Current.CancellationToken);
             //stop another silo, 6 queues, 2 silo, then each agent manager should own 3 queues
             await this.HostedCluster.StopSiloAsync(
@@ -87,6 +90,7 @@ namespace Tester.AzureUtils.Lease
                 3,
                 3,
                 mgmtGrain,
+                queueChanges,
                 TestContext.Current.CancellationToken);
             //start one silo, 6 queues, 3 silo, then each agent manager should own 2 queues
             this.HostedCluster.StartAdditionalSilo(true);
@@ -94,6 +98,7 @@ namespace Tester.AzureUtils.Lease
                 2,
                 2,
                 mgmtGrain,
+                queueChanges,
                 TestContext.Current.CancellationToken);
         }
 
@@ -101,29 +106,33 @@ namespace Tester.AzureUtils.Lease
         public async Task LeaseBalancedQueueBalancer_SupportUnexpectedNodeFailureScenerio()
         {
             var mgmtGrain = this.GrainFactory.GetGrain<IManagementGrain>(0);
+            using var queueChanges = new StreamProviderQueueChangeSignal(StreamProviderName);
             //6 queue and 4 silo, then each agent manager should own queues/agents in range of [1, 2]
             await WaitUntilAgentManagersOwnCorrectAmountOfAgents(
                 1,
                 2,
                 mgmtGrain,
+                queueChanges,
                 TestContext.Current.CancellationToken);
             //stop one silo, 6 queues, 3 silo, then each agent manager should own 2 queues 
-            await this.HostedCluster.KillSiloAsync(
+            await KillSiloAndWaitForFailureDetection(
                 this.HostedCluster.SecondarySilos[0],
                 TestContext.Current.CancellationToken);
             await WaitUntilAgentManagersOwnCorrectAmountOfAgents(
                 2,
                 2,
                 mgmtGrain,
+                queueChanges,
                 TestContext.Current.CancellationToken);
             //stop another silo, 6 queues, 2 silo, then each agent manager should own 3 queues
-            await this.HostedCluster.KillSiloAsync(
+            await KillSiloAndWaitForFailureDetection(
                 this.HostedCluster.SecondarySilos[0],
                 TestContext.Current.CancellationToken);
             await WaitUntilAgentManagersOwnCorrectAmountOfAgents(
                 3,
                 3,
                 mgmtGrain,
+                queueChanges,
                 TestContext.Current.CancellationToken);
             //start one silo, 6 queues, 3 silo, then each agent manager should own 2 queues
             this.HostedCluster.StartAdditionalSilo(true);
@@ -131,18 +140,25 @@ namespace Tester.AzureUtils.Lease
                 2,
                 2,
                 mgmtGrain,
+                queueChanges,
                 TestContext.Current.CancellationToken);
+        }
+
+        private async Task KillSiloAndWaitForFailureDetection(SiloHandle silo, CancellationToken cancellationToken)
+        {
+            await this.HostedCluster.KillSiloAsync(silo, cancellationToken);
+            await this.HostedCluster.WaitForLivenessToStabilizeAsync(didKill: true).WaitAsync(cancellationToken);
         }
 
         private static async Task WaitUntilAgentManagersOwnCorrectAmountOfAgents(
             int expectedAgentCountMin,
             int expectedAgentCountMax,
             IManagementGrain mgmtGrain,
+            StreamProviderQueueChangeSignal queueChanges,
             CancellationToken cancellationToken)
         {
             int[]? lastObservedCounts = null;
             Exception? lastException = null;
-            using var queueChanges = new StreamProviderQueueChangeSignal(StreamProviderName);
             var stopwatch = Stopwatch.StartNew();
 
             while (stopwatch.Elapsed < TimeOut)
