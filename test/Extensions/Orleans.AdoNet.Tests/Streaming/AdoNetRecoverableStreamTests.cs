@@ -310,6 +310,7 @@ public class AdoNetRecoverableStreamTests
             CreateQueries(storage),
             NullLogger.Instance);
 
+        _ = await source.Load(TestContext.Current.CancellationToken);
         var first = await Assert.ThrowsAsync<DataNotAvailableException>(
             () => source.Read(10, TestContext.Current.CancellationToken));
         var readsAfterFailure = storage.ReadCallCount;
@@ -360,6 +361,7 @@ public class AdoNetRecoverableStreamTests
             new AdoNetStreamOptions { MaxMessagesPerRead = 10 },
             CreateQueries(storage),
             NullLogger.Instance);
+        _ = await source.Load(TestContext.Current.CancellationToken);
         var messages = await source.Read(10, TestContext.Current.CancellationToken);
 
         source.MessagesAddFailed(messages);
@@ -640,8 +642,8 @@ public class AdoNetRecoverableStreamTests
         var exception = await Assert.ThrowsAsync<DataNotAvailableException>(
             () => source.Read(10, TestContext.Current.CancellationToken));
 
-        Assert.Contains("materialized through 0", exception.Message, StringComparison.Ordinal);
-        Assert.Contains("through 2", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("lost unread retained records after message 0", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("through message 2", exception.Message, StringComparison.Ordinal);
     }
 
     [Theory]
