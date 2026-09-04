@@ -48,6 +48,7 @@ public class ActivationDataMigrationTests(ActivationDataMigrationTests.Fixture f
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var activation = await GetActivation(cancellationToken);
+        var deactivated = activation.Deactivated;
         var reason = new DeactivationReason(DeactivationReasonCode.ActivationIdle, "test");
 
         var result = ((ICollectibleGrainContext)activation).TryDeactivateForCollection(
@@ -58,8 +59,8 @@ public class ActivationDataMigrationTests(ActivationDataMigrationTests.Fixture f
             cancellationToken);
 
         Assert.Equal(ActivationCollectionAction.StartedDeactivation, result.Action);
-        Assert.Equal(ActivationState.Deactivating, activation.State);
-        await activation.Deactivated.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+        await deactivated.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+        Assert.Equal(ActivationState.Invalid, activation.State);
     }
 
     [Fact]
