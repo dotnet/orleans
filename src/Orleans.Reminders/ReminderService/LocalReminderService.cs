@@ -396,6 +396,11 @@ namespace Orleans.Runtime.ReminderService
 
         internal Task TestOnlyRefresh() => QueueRefresh().Unwrap();
 
+        internal bool TestOnlyIsStarted => Status == GrainServiceStatus.Started;
+
+        internal Task TestOnlyWaitForSchedulerTurn()
+            => this.QueueAction(static _ => { }, state: 0);
+
         private Task<Task> QueueRefresh()
         {
             var refreshStarted = new TaskCompletionSource<Task>(TaskCreationOptions.RunContinuationsAsynchronously);
