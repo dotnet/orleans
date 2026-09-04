@@ -1,4 +1,4 @@
-﻿namespace System.Distributed.DurableTasks;
+namespace System.Distributed.DurableTasks;
 
 public abstract partial class DurableExecutionContext(TaskId id)
 {

@@ -1,4 +1,4 @@
-﻿using System.Distributed.DurableTasks;
+using System.Distributed.DurableTasks;
 using System.Globalization;
 using System.Runtime.InteropServices;
 namespace PaymentWorkflowApp.Runtime;

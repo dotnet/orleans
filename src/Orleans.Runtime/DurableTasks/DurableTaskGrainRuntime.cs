@@ -778,7 +778,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         // Otherwise, the task must be a local method invocation, so create an execution context for it and execute it.
         _storage.SetTaskKind(taskId, state, DurableTaskKind.Local);
         var executionContext = CreateExecutionContext(taskId);
-        handle =  new TaskHandle(taskId, this) { IsRunning = true };
+        handle = new TaskHandle(taskId, this) { IsRunning = true };
         _taskHandles[taskId] = handle;
         var invocationTask = Invoke(static task => task, durableTask, executionContext);
         TrackInvocation(taskId, invocationTask);

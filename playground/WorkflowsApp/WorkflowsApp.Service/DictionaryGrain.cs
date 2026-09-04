@@ -1,4 +1,4 @@
-﻿using Orleans.Journaling;
+using Orleans.Journaling;
 
 namespace WorkflowsApp.Service;
 

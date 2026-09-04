@@ -1,4 +1,4 @@
-﻿namespace Orleans.DurableTasks;
+namespace Orleans.DurableTasks;
 
 /*
 public abstract partial class DurableTask

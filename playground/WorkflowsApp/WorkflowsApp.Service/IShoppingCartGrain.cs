@@ -1,4 +1,4 @@
-﻿namespace WorkflowsApp.Service;
+namespace WorkflowsApp.Service;
 
 public interface IShoppingCartGrain : IGrainWithStringKey
 {
