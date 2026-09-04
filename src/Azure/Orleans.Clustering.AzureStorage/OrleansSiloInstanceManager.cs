@@ -136,11 +136,11 @@ namespace Orleans.AzureUtils
         {
             int proxyPort = 0;
             if (!string.IsNullOrEmpty(gateway.ProxyPort))
-                int.TryParse(gateway.ProxyPort, out proxyPort);
+                int.TryParse(gateway.ProxyPort, NumberStyles.Integer, CultureInfo.InvariantCulture, out proxyPort);
 
             int gen = 0;
             if (!string.IsNullOrEmpty(gateway.Generation))
-                int.TryParse(gateway.Generation, out gen);
+                int.TryParse(gateway.Generation, NumberStyles.Integer, CultureInfo.InvariantCulture, out gen);
 
             SiloAddress address = SiloAddress.New(IPAddress.Parse(gateway.Address!), proxyPort, gen);
             return address.ToGatewayUri();
@@ -174,7 +174,7 @@ namespace Orleans.AzureUtils
             SiloInstanceTableEntry[] entries = queryResults.Select(entry => entry.Item1).ToArray();
 
             var sb = new StringBuilder();
-            sb.Append(string.Format("Deployment {0}. Silos: ", DeploymentId));
+            sb.Append(string.Format(CultureInfo.CurrentCulture, "Deployment {0}. Silos: ", DeploymentId));
 
             // Loop through the results, displaying information about the entity
             Array.Sort(entries,
@@ -188,8 +188,15 @@ namespace Orleans.AzureUtils
                 });
             foreach (SiloInstanceTableEntry entry in entries)
             {
-                sb.AppendLine(string.Format("[IP {0}:{1}:{2}, {3}, Instance={4}, Status={5}]", entry.Address, entry.Port, entry.Generation,
-                    entry.HostName, entry.SiloName, entry.Status));
+                sb.AppendLine(string.Format(
+                    CultureInfo.CurrentCulture,
+                    "[IP {0}:{1}:{2}, {3}, Instance={4}, Status={5}]",
+                    entry.Address,
+                    entry.Port,
+                    entry.Generation,
+                    entry.HostName,
+                    entry.SiloName,
+                    entry.Status));
             }
             return sb.ToString();
         }
@@ -251,7 +258,11 @@ namespace Orleans.AzureUtils
             var filter = TableClient.CreateQueryFilter($"(PartitionKey eq {DeploymentId}) and ((RowKey eq {rowKey}) or (RowKey eq {SiloInstanceTableEntry.TABLE_VERSION_ROW}))");
             var queryResults = await storage.ReadTableEntriesAndEtagsAsync(filter);
             if (queryResults.Count < 1 || queryResults.Count > 2)
-                throw new KeyNotFoundException(string.Format("Could not find table version row or found too many entries. Was looking for key {0}, found = {1}", siloAddress, Utils.EnumerableToString(queryResults)));
+                throw new KeyNotFoundException(string.Format(
+                    CultureInfo.CurrentCulture,
+                    "Could not find table version row or found too many entries. Was looking for key {0}, found = {1}",
+                    siloAddress,
+                    Utils.EnumerableToString(queryResults)));
 
             var numTableVersionRows = 0;
             foreach (var entry in queryResults)
@@ -263,10 +274,17 @@ namespace Orleans.AzureUtils
             }
 
             if (numTableVersionRows < 1)
-                throw new KeyNotFoundException(string.Format("Did not read table version row. Read = {0}", Utils.EnumerableToString(queryResults)));
+                throw new KeyNotFoundException(string.Format(
+                    CultureInfo.CurrentCulture,
+                    "Did not read table version row. Read = {0}",
+                    Utils.EnumerableToString(queryResults)));
 
             if (numTableVersionRows > 1)
-                throw new KeyNotFoundException(string.Format("Read {0} table version rows, while was expecting only 1. Read = {1}", numTableVersionRows, Utils.EnumerableToString(queryResults)));
+                throw new KeyNotFoundException(string.Format(
+                    CultureInfo.CurrentCulture,
+                    "Read {0} table version rows, while was expecting only 1. Read = {1}",
+                    numTableVersionRows,
+                    Utils.EnumerableToString(queryResults)));
 
             return queryResults;
         }
@@ -366,7 +384,10 @@ namespace Orleans.AzureUtils
         private static string? ValidateAllSiloEntries(List<(SiloInstanceTableEntry Entity, string ETag)> queryResults)
         {
             if (queryResults.Count < 1)
-                throw new KeyNotFoundException(string.Format("Could not find enough rows in the FindAllSiloEntries call. Found = {0}", Utils.EnumerableToString(queryResults)));
+                throw new KeyNotFoundException(string.Format(
+                    CultureInfo.CurrentCulture,
+                    "Could not find enough rows in the FindAllSiloEntries call. Found = {0}",
+                    Utils.EnumerableToString(queryResults)));
 
             var numTableVersionRows = 0;
             string? tableVersion = null;
@@ -380,9 +401,16 @@ namespace Orleans.AzureUtils
             }
 
             if (numTableVersionRows < 1)
-                throw new KeyNotFoundException(string.Format("Did not find table version row. Read = {0}", Utils.EnumerableToString(queryResults)));
+                throw new KeyNotFoundException(string.Format(
+                    CultureInfo.CurrentCulture,
+                    "Did not find table version row. Read = {0}",
+                    Utils.EnumerableToString(queryResults)));
             if (numTableVersionRows > 1)
-                throw new KeyNotFoundException(string.Format("Read {0} table version rows, while was expecting only 1. Read = {1}", numTableVersionRows, Utils.EnumerableToString(queryResults)));
+                throw new KeyNotFoundException(string.Format(
+                    CultureInfo.CurrentCulture,
+                    "Read {0} table version rows, while was expecting only 1. Read = {1}",
+                    numTableVersionRows,
+                    Utils.EnumerableToString(queryResults)));
 
             return tableVersion;
         }

@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Globalization;
 using System.Net;
 using System.Text;
 using Azure;
@@ -48,7 +49,12 @@ namespace Orleans.AzureUtils
 
         public static string ConstructRowKey(SiloAddress silo)
         {
-            return string.Format("{0}-{1}-{2}", silo.Endpoint.Address, silo.Endpoint.Port, silo.Generation);
+            return string.Format(
+                CultureInfo.InvariantCulture,
+                "{0}-{1}-{2}",
+                silo.Endpoint.Address,
+                silo.Endpoint.Port,
+                silo.Generation);
         }
         internal static SiloAddress UnpackRowKey(string rowKey)
         {
@@ -56,27 +62,37 @@ namespace Orleans.AzureUtils
             try
             {
 #if DEBUG
-                debugInfo = string.Format("UnpackRowKey: RowKey={0}", rowKey);
+                debugInfo = string.Format(CultureInfo.CurrentCulture, "UnpackRowKey: RowKey={0}", rowKey);
                 Trace.TraceInformation(debugInfo);
 #endif
-                int idx1 = rowKey.IndexOf(Seperator);
+                int idx1 = rowKey.IndexOf(Seperator, StringComparison.Ordinal);
                 int idx2 = rowKey.LastIndexOf(Seperator);
 #if DEBUG
-                debugInfo = string.Format("UnpackRowKey: RowKey={0} Idx1={1} Idx2={2}", rowKey, idx1, idx2);
+                debugInfo = string.Format(
+                    CultureInfo.CurrentCulture,
+                    "UnpackRowKey: RowKey={0} Idx1={1} Idx2={2}",
+                    rowKey,
+                    idx1,
+                    idx2);
 #endif
                 ReadOnlySpan<char> rowKeySpan = rowKey.AsSpan();
                 ReadOnlySpan<char> addressStr = rowKeySpan[..idx1];
                 ReadOnlySpan<char> portStr = rowKeySpan.Slice(idx1 + 1, idx2 - idx1 - 1);
                 ReadOnlySpan<char> genStr = rowKeySpan[(idx2 + 1)..];
 #if DEBUG
-                debugInfo = string.Format("UnpackRowKey: RowKey={0} -> Address={1} Port={2} Generation={3}",
-                    rowKey, addressStr.ToString(), portStr.ToString(), genStr.ToString());
+                debugInfo = string.Format(
+                    CultureInfo.CurrentCulture,
+                    "UnpackRowKey: RowKey={0} -> Address={1} Port={2} Generation={3}",
+                    rowKey,
+                    addressStr.ToString(),
+                    portStr.ToString(),
+                    genStr.ToString());
 
                 Trace.TraceInformation(debugInfo);
 #endif
                 IPAddress address = IPAddress.Parse(addressStr);
-                int port = int.Parse(portStr);
-                int generation = int.Parse(genStr);
+                int port = int.Parse(portStr, NumberStyles.Integer, CultureInfo.InvariantCulture);
+                int generation = int.Parse(genStr, NumberStyles.Integer, CultureInfo.InvariantCulture);
                 return SiloAddress.New(address, port, generation);
             }
             catch (Exception exc)
