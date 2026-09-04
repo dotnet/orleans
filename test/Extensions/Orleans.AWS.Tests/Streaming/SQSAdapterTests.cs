@@ -122,7 +122,7 @@ namespace AWSUtils.Tests.Streaming
             await replacement.Shutdown(TimeSpan.FromSeconds(10), cancellationToken);
         }
 
-        private static async Task<IBatchContainer> WaitForMessage(
+        private async Task<IBatchContainer> WaitForMessage(
             IQueueAdapterReceiver receiver,
             string phase,
             CancellationToken cancellationToken)
@@ -137,7 +137,7 @@ namespace AWSUtils.Tests.Streaming
                     return Assert.Single(messages);
                 }
 
-                await Task.Delay(TimeSpan.FromMilliseconds(100), cancellationToken);
+                await Task.Delay(QueuePollRate, cancellationToken);
             }
 
             throw new TimeoutException($"Timed out after {timeout} waiting for one SQS message during {phase}; observed 0.");
