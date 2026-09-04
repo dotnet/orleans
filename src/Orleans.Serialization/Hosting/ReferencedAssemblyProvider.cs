@@ -70,8 +70,6 @@ namespace Orleans.Serialization.Internal
                 return;
             }
 
-            AddAssembly(parts, assembly);
-
             // Add all referenced application parts.
             foreach (var referencedAsm in GetApplicationPartAssemblies(assembly))
             {
