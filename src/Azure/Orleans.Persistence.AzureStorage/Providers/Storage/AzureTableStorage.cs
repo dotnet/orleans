@@ -377,9 +377,9 @@ namespace Orleans.Storage
                 tableManager = new AzureTableDataManager<TableEntity>(options, logger);
             }
 
-            public Task InitTableAsync()
+            public Task InitTableAsync(CancellationToken cancellationToken)
             {
-                return tableManager.InitTableAsync();
+                return tableManager.InitTableAsync(cancellationToken);
             }
 
             public async Task<TableEntity?> Read(string partitionKey, string rowKey)
@@ -496,7 +496,7 @@ namespace Orleans.Storage
             {
                 LogDebugStorageInitializing(name, this.options.TableName);
                 this.tableDataManager = new GrainStateTableDataManager(this.options, this.logger);
-                await this.tableDataManager.InitTableAsync();
+                await this.tableDataManager.InitTableAsync(ct);
                 stopWatch.Stop();
                 LogInfoInitializingProvider(this.name, this.GetType().Name, this.options.InitStage, stopWatch.ElapsedMilliseconds);
             }

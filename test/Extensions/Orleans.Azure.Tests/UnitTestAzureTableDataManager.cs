@@ -58,10 +58,19 @@ namespace Tester.AzureUtils
             : base(new AzureStorageOperationOptions { TableName = INSTANCE_TABLE_NAME }.ConfigureTestDefaults(),
                   NullLoggerFactory.Instance.CreateLogger<UnitTestAzureTableDataManager>())
         {
-            InitTableAsync()
-                .WaitAsync(new AzureStoragePolicyOptions().CreationTimeout, cancellationToken)
-                .GetAwaiter()
-                .GetResult();
+            using var cancellationSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            var creationTimeout = StoragePolicyOptions.CreationTimeout;
+            cancellationSource.CancelAfter(creationTimeout);
+            try
+            {
+                InitTableAsync(cancellationSource.Token).GetAwaiter().GetResult();
+            }
+            catch (OperationCanceledException exception) when (
+                cancellationSource.IsCancellationRequested
+                && !cancellationToken.IsCancellationRequested)
+            {
+                throw new TimeoutException($"Azure Table initialization timed out after {creationTimeout}.", exception);
+            }
         }
     }
 }

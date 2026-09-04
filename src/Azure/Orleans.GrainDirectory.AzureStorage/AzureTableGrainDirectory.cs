@@ -228,7 +228,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// <remarks>This method is invoked by the silo lifecycle and can also be used by tests.</remarks>
         public async Task InitializeIfNeeded(CancellationToken ct = default)
         {
-            await this.tableDataManager.InitTableAsync();
+            await this.tableDataManager.InitTableAsync(ct);
         }
 
         /// <summary>

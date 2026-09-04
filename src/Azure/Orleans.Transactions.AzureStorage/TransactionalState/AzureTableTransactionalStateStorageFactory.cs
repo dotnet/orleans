@@ -73,18 +73,18 @@ namespace Orleans.Transactions.AzureStorage
             return AzureTableUtils.SanitizeTableProperty(key);
         }
 
-        private async Task CreateTable()
+        private async Task CreateTable(CancellationToken cancellationToken)
         {
             var tableManager = new AzureTableDataManager<TableEntity>(
                 this.options,
                 this.loggerFactory.CreateLogger<AzureTableDataManager<TableEntity>>());
-            await tableManager.InitTableAsync();
+            await tableManager.InitTableAsync(cancellationToken);
             this.table = tableManager.Table;
         }
 
         private Task Init(CancellationToken cancellationToken)
         {
-            return CreateTable();
+            return CreateTable(cancellationToken);
         }
     }
 }

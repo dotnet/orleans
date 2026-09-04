@@ -10,6 +10,7 @@
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <DevelopmentDependency>true</DevelopmentDependency>
     <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
+    <NeutralLanguage>en-US</NeutralLanguage>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
     <!-- The contracts package includes its analyzer and code fix together; the code fix requires Roslyn Workspaces. -->
     <NoWarn>$(NoWarn);RS1038</NoWarn>

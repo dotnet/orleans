@@ -71,7 +71,7 @@ namespace Orleans.Runtime.ReminderService
                 {
                     try
                     {
-                        await remTableManager.InitTableAsync();
+                        await remTableManager.InitTableAsync(cancellationToken);
                         initialization.TrySetResult();
                         return;
                     }
