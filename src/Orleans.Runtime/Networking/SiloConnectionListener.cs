@@ -63,7 +63,7 @@ namespace Orleans.Runtime.Messaging
 
             // Start accepting connections immediately.
             Start();
-        }, CancellationToken.None);
+        }, ct);
 
         Task ILifecycleObserver.OnStop(CancellationToken ct) => Task.Run(() => StopAsync(ct), CancellationToken.None);
     }

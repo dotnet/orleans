@@ -25,6 +25,8 @@ using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Session;
 using Xunit;
+using SslApplicationProtocol = System.Net.Security.SslApplicationProtocol;
+using SslClientAuthenticationOptions = System.Net.Security.SslClientAuthenticationOptions;
 
 namespace Orleans.Core.Tests.Networking;
 
@@ -599,6 +601,33 @@ public class MessageTransportLifecycleTests
                 TestContext.Current.CancellationToken).AsTask());
 
         Assert.True(inner.Disposed);
+    }
+
+    [Fact]
+    public async Task TlsConnector_ClientAuthenticationCallbackSeesDefaultApplicationProtocolAndCanSetTargetHost()
+    {
+        var inner = new TrackingTransport();
+        var callbackOptions = new TaskCompletionSource<TlsClientAuthenticationOptions>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var options = Substitute.For<IOptionsMonitor<TlsOptions>>();
+        options.CurrentValue.Returns(new TlsOptions
+        {
+            ClientCertificateMode = RemoteCertificateMode.NoCertificate,
+            OnAuthenticateAsClient = (_, sslOptions) =>
+            {
+                sslOptions.TargetHost = "localhost";
+                callbackOptions.TrySetResult(sslOptions);
+            }
+        });
+        await using var connector = new TlsMessageTransportConnector(new TestConnector(inner), options, NullLoggerFactory.Instance);
+        await using var transport = await connector.CreateAsync(
+            new IPEndPoint(IPAddress.Loopback, 1),
+            TestContext.Current.CancellationToken);
+
+        var configuredOptions = await callbackOptions.Task.WaitAsync(TestContext.Current.CancellationToken);
+        var sslOptions = Assert.IsType<SslClientAuthenticationOptions>(configuredOptions.SslClientAuthenticationOptions);
+
+        Assert.Equal("localhost", sslOptions.TargetHost);
+        Assert.Equal([new SslApplicationProtocol("orleans")], sslOptions.ApplicationProtocols);
     }
 
     [Fact]
