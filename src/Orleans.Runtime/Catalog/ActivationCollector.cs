@@ -29,6 +29,7 @@ namespace Orleans.Runtime
         private readonly TimeProvider _timeProvider;
         private DateTime nextTicket;
         private static readonly List<ICollectibleGrainContext> nothing = [];
+        private static readonly IReadOnlyList<CollectionClaim> NoClaims = Array.Empty<CollectionClaim>();
         private readonly ILogger logger;
         private int collectionNumber;
 
@@ -182,7 +183,7 @@ namespace Orleans.Runtime
             return registration.TrySchedule(GetOrCreateBucket(newTicket), newTicket);
         }
 
-        private bool DequeueQuantum([NotNullWhen(true)] out List<CollectionClaim>? items, DateTime now)
+        private bool DequeueQuantum([NotNullWhen(true)] out IReadOnlyList<CollectionClaim>? items, DateTime now)
         {
             Bucket? bucket;
             lock (_scheduleLock)
@@ -200,7 +201,7 @@ namespace Orleans.Runtime
 
             if (bucket is null)
             {
-                items = [];
+                items = NoClaims;
                 return true;
             }
 
@@ -910,7 +911,7 @@ namespace Orleans.Runtime
         {
             public ConcurrentDictionary<CollectionRegistration, byte> Items { get; } = new(ReferenceEqualsComparer.Default);
 
-            public List<CollectionClaim> ClaimAll()
+            public IReadOnlyList<CollectionClaim> ClaimAll()
             {
                 List<CollectionClaim>? result = null;
                 foreach (var registration in Items.Keys)
@@ -922,7 +923,7 @@ namespace Orleans.Runtime
                     }
                 }
 
-                return result ?? [];
+                return result ?? NoClaims;
             }
         }
 
