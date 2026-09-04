@@ -290,7 +290,14 @@ namespace Orleans.Runtime
                     request,
                     options,
                     timeoutCts.Token);
-                context?.Complete(response);
+                if (context is not null)
+                {
+                    context.Complete(response);
+                }
+                else
+                {
+                    response.Dispose();
+                }
             }
             catch (Exception exception)
             {

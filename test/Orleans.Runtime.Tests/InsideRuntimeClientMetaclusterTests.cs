@@ -173,6 +173,23 @@ public sealed class InsideRuntimeClientMetaclusterTests(InsideRuntimeClientMetac
     }
 
     [Fact]
+    public async Task MetaclusterSend_OneWayRemoteWithoutCompletion_DisposesTransportResponse()
+    {
+        fixture.Reset();
+        var response = new TrackingResponse();
+        fixture.Transport.Handler = _ => new ValueTask<Response>(response);
+
+        fixture.Runtime.SendRequest(
+            fixture.CreateTarget(InsideRuntimeClientMetaclusterFixture.RemoteCluster),
+            fixture.CreateRequest(TestContext.Current.CancellationToken),
+            context: null,
+            InvokeMethodOptions.OneWay);
+
+        await response.Disposed.Task.WaitAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(1, response.DisposeCount);
+    }
+
+    [Fact]
     public async Task MetaclusterSend_ExportsRequestContext()
     {
         fixture.Reset();
@@ -715,6 +732,28 @@ public sealed class RecordingCompletion : IResponseCompletionSource
         Response = value;
         Interlocked.Increment(ref _completionCount);
         Completed.TrySetResult();
+    }
+}
+
+public sealed class TrackingResponse : Response
+{
+    private int _disposeCount;
+
+    public TaskCompletionSource Disposed { get; } =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    public int DisposeCount => Volatile.Read(ref _disposeCount);
+
+    public override object? Result { get; set; }
+
+    public override Exception? Exception { get; set; }
+
+    public override T GetResult<T>() => (T)Result!;
+
+    public override void Dispose()
+    {
+        Interlocked.Increment(ref _disposeCount);
+        Disposed.TrySetResult();
     }
 }
 
