@@ -851,6 +851,41 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
         }
 
         [Fact]
+        public async Task UpdateMetadataAsync_WhenSetContainsNullKey_ThrowsArgumentNullException()
+        {
+            var client = Substitute.For<IAmazonS3>();
+            var set = Substitute.For<IReadOnlyDictionary<string, string>>();
+            var entries = new[] { new KeyValuePair<string, string>(null!, "value") };
+            set.GetEnumerator().Returns(_ => entries.AsEnumerable().GetEnumerator());
+            var storage = CreateStorage(client, new S3JournalStorageOptions { BucketName = BucketName });
+
+            var exception = await Assert.ThrowsAsync<ArgumentNullException>(
+                () => storage.UpdateMetadataAsync(set: set, cancellationToken: TestContext.Current.CancellationToken).AsTask());
+
+            Assert.Equal("set", exception.ParamName);
+            await client.DidNotReceiveWithAnyArgs().GetObjectMetadataAsync(
+                default!,
+                TestContext.Current.CancellationToken);
+        }
+
+        [Fact]
+        public async Task UpdateMetadataAsync_WhenRemoveContainsNullName_ThrowsArgumentNullException()
+        {
+            var client = Substitute.For<IAmazonS3>();
+            var storage = CreateStorage(client, new S3JournalStorageOptions { BucketName = BucketName });
+
+            var exception = await Assert.ThrowsAsync<ArgumentNullException>(
+                () => storage.UpdateMetadataAsync(
+                    remove: [null!],
+                    cancellationToken: TestContext.Current.CancellationToken).AsTask());
+
+            Assert.Equal("remove", exception.ParamName);
+            await client.DidNotReceiveWithAnyArgs().GetObjectMetadataAsync(
+                default!,
+                TestContext.Current.CancellationToken);
+        }
+
+        [Fact]
         public async Task UpdateMetadataAsync_NoOpRecoversS3ExpressPartCount()
         {
             var client = Substitute.For<IAmazonS3>();

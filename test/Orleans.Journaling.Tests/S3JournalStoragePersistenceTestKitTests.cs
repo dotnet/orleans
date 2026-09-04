@@ -45,7 +45,7 @@ public sealed class S3JournalStoragePersistenceTestKitTests
 
     [Fact]
     public override Task PersistenceStorage_WriteReadWriteReadStatesInParallel() =>
-        RunPersistenceStorage_WriteReadWriteReadStatesInParallel("S3Journal", 10);
+        RunPersistenceStorage_WriteReadWriteReadStatesInParallel("S3Journal", 10, TestContext.Current.CancellationToken);
 
     [Fact]
     public override Task PersistenceStorage_ReadNonExistentState() =>
@@ -122,7 +122,7 @@ public sealed class S3JournalStoragePersistenceTestKitTests
                 MaxDepth = 3,
                 MaxSequenceLength = 3,
             });
-        return runner.RunGeneratedConformanceTests();
+        return runner.RunGeneratedConformanceTests(TestContext.Current.CancellationToken);
     }
 
     [Fact]

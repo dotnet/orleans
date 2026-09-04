@@ -1310,16 +1310,17 @@ internal sealed partial class S3JournalStorage : IJournalStorage
         return result;
     }
 
-    private static Dictionary<string, string> CopyAndValidateCallerMetadata(IReadOnlyDictionary<string, string>? metadata)
+    private static Dictionary<string, string> CopyAndValidateCallerMetadata(IReadOnlyDictionary<string, string>? set)
     {
         var result = new Dictionary<string, string>(StringComparer.Ordinal);
-        if (metadata is null)
+        if (set is null)
         {
             return result;
         }
 
-        foreach (var (rawKey, value) in metadata)
+        foreach (var (rawKey, value) in set)
         {
+            ArgumentNullException.ThrowIfNull(rawKey, nameof(set));
             var key = NormalizeMetadataKey(rawKey);
             ValidateCallerMetadataProperty(key, value);
             result.Add(key, value);
@@ -1360,6 +1361,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
         var result = new HashSet<string>(StringComparer.Ordinal);
         foreach (var rawPropertyName in remove)
         {
+            ArgumentNullException.ThrowIfNull(rawPropertyName, nameof(remove));
             var propertyName = NormalizeMetadataKey(rawPropertyName);
             ValidateCallerMetadataPropertyName(propertyName);
             if (set.ContainsKey(propertyName))
