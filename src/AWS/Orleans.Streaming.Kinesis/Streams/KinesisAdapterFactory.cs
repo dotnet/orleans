@@ -32,6 +32,7 @@ namespace Orleans.Streaming.Kinesis
         private readonly Func<string[], HashRingBasedPartitionedStreamQueueMapper> _queueMapperFactory;
         private readonly IAmazonKinesis _client;
         private readonly TimeProvider _timeProvider;
+        private readonly SemaphoreSlim _initializationSemaphore = new(1);
 
         private HashRingBasedPartitionedStreamQueueMapper _streamQueueMapper = null!;
         private KinesisShardTopologyMonitor _topologyMonitor = null!;
@@ -91,21 +92,39 @@ namespace Orleans.Streaming.Kinesis
 
         public async Task<IQueueAdapter> CreateAdapter(CancellationToken cancellationToken)
         {
-            if (_streamQueueMapper is null)
+            if (Volatile.Read(ref _streamQueueMapper) is not null)
             {
-                var kinesisStreams = await GetPartitionIdsAsync(cancellationToken);
-                _streamQueueMapper = _queueMapperFactory(kinesisStreams);
-                _topologyMonitor = new(
+                return this;
+            }
+
+            await _initializationSemaphore.WaitAsync(cancellationToken);
+            try
+            {
+                if (_streamQueueMapper is not null)
+                {
+                    return this;
+                }
+
+                var partitions = await GetPartitionIdsAsync(cancellationToken);
+                var queueMapper = _queueMapperFactory(partitions);
+                var topologyMonitor = new KinesisShardTopologyMonitor(
                     _client,
                     _options.StreamName,
-                    kinesisStreams,
+                    partitions,
                     _options.TopologyCheckInterval,
                     _timeProvider,
                     _loggerFactory.CreateLogger<KinesisShardTopologyMonitor>());
-                _receivers = new QueueAdapterReceiverRegistry<KinesisPooledAdapterReceiver>(MakeReceiver);
-            }
+                var receivers = new QueueAdapterReceiverRegistry<KinesisPooledAdapterReceiver>(MakeReceiver);
 
-            return this;
+                _topologyMonitor = topologyMonitor;
+                _receivers = receivers;
+                Volatile.Write(ref _streamQueueMapper, queueMapper);
+                return this;
+            }
+            finally
+            {
+                _initializationSemaphore.Release();
+            }
         }
 
         public IQueueAdapterCache GetQueueAdapterCache()
@@ -218,7 +237,7 @@ namespace Orleans.Streaming.Kinesis
         internal async Task<string[]> GetPartitionIdsAsync()
             => await GetPartitionIdsAsync(CancellationToken.None);
 
-        internal async Task<string[]> GetPartitionIdsAsync(CancellationToken cancellationToken)
+        internal virtual async Task<string[]> GetPartitionIdsAsync(CancellationToken cancellationToken)
             => await GetPartitionIdsAsync(_client, _options.StreamName, cancellationToken);
 
         internal static Task<string[]> GetPartitionIdsAsync(IAmazonKinesis client, string streamName)
