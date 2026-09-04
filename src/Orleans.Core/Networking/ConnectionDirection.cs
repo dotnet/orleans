@@ -9,14 +9,30 @@ internal enum ConnectionDirection : byte
     GatewayToClient
 }
 
+/// <summary>
+/// Identifies the Orleans messaging protocol carried by a transport.
+/// </summary>
 public enum TransportProtocol
 {
+    /// <summary>
+    /// The protocol used for communication between cluster members.
+    /// </summary>
     Cluster,
+
+    /// <summary>
+    /// The protocol used for communication between clients and gateways.
+    /// </summary>
     Gateway
 }
 
+/// <summary>
+/// Exposes the Orleans messaging protocol carried by a transport.
+/// </summary>
 public interface ITransportProtocolFeature
 {
+    /// <summary>
+    /// Gets the protocol carried by the transport.
+    /// </summary>
     public TransportProtocol Protocol { get; }
 }
 

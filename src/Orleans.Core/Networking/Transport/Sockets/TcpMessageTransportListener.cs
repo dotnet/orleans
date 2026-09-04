@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using System.Net;
 using System.Diagnostics;
-using Orleans.Connections.Sockets;
 using Microsoft.Extensions.Options;
 
 namespace Orleans.Connections.Transport.Sockets;
