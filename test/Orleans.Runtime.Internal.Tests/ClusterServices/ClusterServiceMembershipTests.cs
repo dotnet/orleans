@@ -246,17 +246,21 @@ public sealed class ClusterServiceMembershipTests
     }
 
     [Fact]
-    public async Task RefreshViewAsync_CurrentViewAtMinimumVersionCompletesAtConcreteBoundary()
+    public async Task RefreshViewAsync_CurrentViewAtMinimumVersionDoesNotEnumerateUpdates()
     {
         await using var fixture = new ClusterServiceMembershipFixture();
         await fixture.Service.EnumeratorStarted;
         var current = await PublishAndObserve(fixture, CreateSnapshot(7, CreateSilo(1)));
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
 
-        var refresh = fixture.Membership.RefreshViewAsync(new(7), CancellationToken.None).AsTask();
+        var refresh = fixture.Membership.RefreshViewAsync(new(7), cancellation.Token).AsTask();
 
         Assert.True(refresh.IsCompleted);
         Assert.Same(current, await refresh);
-        Assert.Equal(new MembershipVersion(7), Assert.Single(fixture.Service.RefreshCalls).MinimumVersion);
+        var call = Assert.Single(fixture.Service.RefreshCalls);
+        Assert.Equal(new MembershipVersion(7), call.MinimumVersion);
+        Assert.Equal(cancellation.Token, call.CancellationToken);
         Assert.False(fixture.Service.RefreshCompletion.Task.IsCompleted);
     }
 
