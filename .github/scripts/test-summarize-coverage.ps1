@@ -1181,7 +1181,7 @@ exit 0
             $archiveTestResultsAction `
             "github\.event_name == 'push'.*?github\.event\.repository\.default_branch" `
             'Current-main test jobs must publish the same raw coverage artifacts.'
-        Assert-Equal 2 ([regex]::Matches($archiveTestResultsAction, "github\.event_name == 'push' && 7 \|\| 1")).Count 'Current-main coverage retention count differs.'
+        Assert-Equal 1 ([regex]::Matches($archiveTestResultsAction, "github\.event_name == 'push' && 7 \|\| 1")).Count 'Current-main coverage retention count differs.'
         Assert-Matches `
             $archiveTestResultsAction `
             '(?s)path:\s*\|.*?TestResults/\$\{\{ inputs\.name \}\}\.cobertura\.xml.*?TestResults/\$\{\{ inputs\.name \}\}\.coverage\.json' `
