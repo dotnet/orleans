@@ -19,7 +19,7 @@ runs:
     with:
       name: ${{ inputs.name }}
       if-no-files-found: warn
-      retention-days: ${{ inputs.retention-days }}
+      retention-days: ${{ inputs['retention-days'] }}
       path: |
         **/TestResults/*
         !TestResults/*.cobertura.xml
