@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, symlink, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
@@ -919,9 +919,17 @@ describe('DocFX conversion', () => {
     await writeFile(nested, 'Active nested guidance.\n');
     await writeFile(path.join(includesRoot, 'inactive.md'), 'Inactive guidance.\n');
 
-    const targets = await collectIncludeTargets([firstPage, secondPage], contentRoot);
+    const reads = [];
+    const targets = await collectIncludeTargets([firstPage, secondPage], {
+      allowedRoot: contentRoot,
+      readSource: async (file) => {
+        reads.push(file);
+        return readFile(file, 'utf8');
+      },
+    });
 
     expect([...targets].sort()).toEqual([nested, shared].sort());
+    expect(reads.sort()).toEqual([firstPage, nested, secondPage, shared].sort());
   });
 
   test('rejects circular include graphs', async () => {

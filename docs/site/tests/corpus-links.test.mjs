@@ -41,16 +41,21 @@ const excludedDirectoryNames = new Set([
   'obj',
 ]);
 
-function filesUnder(directory, extensions) {
-  return readdirSync(directory, { recursive: true })
-    .filter(
-      (file) =>
-        extensions.some((extension) => file.endsWith(extension)) &&
-        !file
-          .split(/[\\/]/)
-          .some((segment) => excludedDirectoryNames.has(segment)),
-    )
-    .map((file) => path.join(directory, file));
+function filesUnder(directory) {
+  const files = [];
+  const pendingDirectories = [directory];
+  for (const currentDirectory of pendingDirectories) {
+    for (const entry of readdirSync(currentDirectory, { withFileTypes: true })) {
+      if (entry.isDirectory()) {
+        if (!excludedDirectoryNames.has(entry.name)) {
+          pendingDirectories.push(path.join(currentDirectory, entry.name));
+        }
+      } else if (entry.isFile()) {
+        files.push(path.join(currentDirectory, entry.name));
+      }
+    }
+  }
+  return files;
 }
 
 function localTargetExists(sourceFile, url) {
@@ -215,18 +220,34 @@ describe('documentation corpus links', () => {
 
   test('uses fully qualified URLs for Learn content outside Orleans', async () => {
     const failures = [];
-    const documentationFiles = filesUnder(documentationRoot, ['.md']).filter(
+    const documentationCorpus = filesUnder(documentationRoot);
+    const samplesCorpus = filesUnder(samplesRoot);
+    const documentationFiles = documentationCorpus.filter(
       (file) =>
+        file.endsWith('.md') &&
         !isSnippetSupportMarkdown(path.relative(documentationRoot, file)),
     );
-    const includeFiles = await collectIncludeTargets(documentationFiles, sourceRoot);
+    const sourceCache = new Map();
+    function readSource(file) {
+      const resolvedFile = path.resolve(file);
+      let source = sourceCache.get(resolvedFile);
+      if (source === undefined) {
+        source = readFileSync(resolvedFile, 'utf8');
+        sourceCache.set(resolvedFile, source);
+      }
+      return source;
+    }
+    const includeFiles = await collectIncludeTargets(documentationFiles, {
+      allowedRoot: sourceRoot,
+      readSource: async (file) => readSource(file),
+    });
     const auditedMarkdownFiles = new Set([
-      ...filesUnder(documentationRoot, ['.md']),
+      ...documentationCorpus.filter((file) => file.endsWith('.md')),
       ...includeFiles,
-      ...filesUnder(samplesRoot, ['.md']),
+      ...samplesCorpus.filter((file) => file.endsWith('.md')),
     ]);
     for (const file of [...auditedMarkdownFiles].sort()) {
-      for (const item of collectMarkdownUrls(readFileSync(file, 'utf8'), file)) {
+      for (const item of collectMarkdownUrls(readSource(file), file)) {
         failures.push({
           file: path.relative(repositoryRoot, file).replaceAll('\\', '/'),
           line: item.position,
@@ -235,11 +256,15 @@ describe('documentation corpus links', () => {
       }
     }
     const yamlFiles = [
-      ...filesUnder(documentationRoot, ['.yaml', '.yml']),
-      ...filesUnder(samplesRoot, ['.yaml', '.yml']),
+      ...documentationCorpus.filter(
+        (file) => file.endsWith('.yaml') || file.endsWith('.yml'),
+      ),
+      ...samplesCorpus.filter(
+        (file) => file.endsWith('.yaml') || file.endsWith('.yml'),
+      ),
     ];
     for (const file of yamlFiles) {
-      const documents = YAML.parseAllDocuments(readFileSync(file, 'utf8'));
+      const documents = YAML.parseAllDocuments(readSource(file));
       for (const document of documents) {
         if (document.errors.length > 0) {
           throw document.errors[0];
