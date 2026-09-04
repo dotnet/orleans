@@ -21,7 +21,7 @@ public class TypeConverter
     private readonly ITypeNameFilter[] _typeNameFilters;
     private readonly ITypeFilter[] _typeFilters;
     private readonly bool _allowAllTypes;
-    private readonly CompoundTypeAliasTree _compoundTypeAliases;
+    private volatile CompoundTypeAliasTree _compoundTypeAliases;
     private readonly TypeResolver _resolver;
     private readonly RuntimeTypeNameRewriter.Rewriter<ValidationResult> _convertToDisplayName;
     private readonly RuntimeTypeNameRewriter.Rewriter<ValidationResult> _convertFromDisplayName;
@@ -150,6 +150,7 @@ public class TypeConverter
         _allowedTypesConfiguration = allowedTypesConfiguration;
         _wellKnownAliasToType = wellKnownAliasToType;
         _wellKnownTypeToAlias = wellKnownTypeToAlias;
+        _compoundTypeAliases = options.CompoundTypeAliases;
     }
 
     /// <summary>
