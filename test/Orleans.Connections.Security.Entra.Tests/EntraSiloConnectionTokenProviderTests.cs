@@ -1,6 +1,6 @@
+using System.Runtime.CompilerServices;
 using Azure.Core;
 using Orleans.Connections.Security.Entra;
-using System.Runtime.CompilerServices;
 
 namespace Orleans.Connections.Security.Entra.Tests;
 

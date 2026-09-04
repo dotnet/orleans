@@ -74,11 +74,11 @@ namespace Orleans.Connections.Security.Tests
         [Fact]
         public void CanCreateCertificates()
         {
-            var original = TestCertificateHelper.CreateSelfSignedCertificate(
+            using var original = TestCertificateHelper.CreateSelfSignedCertificate(
                 CertificateSubjectName,
                 new[] { TestCertificateHelper.ClientAuthenticationOid, TestCertificateHelper.ServerAuthenticationOid });
             var encoded = TestCertificateHelper.ConvertToBase64(original);
-            var decoded = TestCertificateHelper.ConvertFromBase64(encoded);
+            using var decoded = TestCertificateHelper.ConvertFromBase64(encoded);
             Assert.Equal(original, decoded);
         }
 
@@ -249,7 +249,7 @@ namespace Orleans.Connections.Security.Tests
                     .AddClientBuilderConfigurator<TlsClientConfigurator>();
 
                 // Create a self-signed certificate with specified OIDs
-                var certificate = TestCertificateHelper.CreateSelfSignedCertificate(
+                using var certificate = TestCertificateHelper.CreateSelfSignedCertificate(
                     CertificateSubjectName, oids);
 
                 // Pass certificate through configuration (simulates real deployment)
@@ -296,7 +296,7 @@ namespace Orleans.Connections.Security.Tests
             TestCluster? testCluster = default;
             try
             {
-                var certificate = TestCertificateHelper.CreateSelfSignedCertificate(
+                using var certificate = TestCertificateHelper.CreateSelfSignedCertificate(
                     CertificateSubjectName,
                     [TestCertificateHelper.ClientAuthenticationOid, TestCertificateHelper.ServerAuthenticationOid]);
                 var builder = new TestClusterBuilder()
