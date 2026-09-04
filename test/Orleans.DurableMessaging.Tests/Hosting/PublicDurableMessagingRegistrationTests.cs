@@ -68,6 +68,21 @@ public sealed class PublicDurableMessagingRegistrationTests
     }
 
     [Fact]
+    public void AddDurableMessaging_RejectsConflictingJournalFormat()
+    {
+        var services = new ServiceCollection();
+        services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = "custom-format");
+        services.AddDurableMessaging();
+        using var provider = services.BuildServiceProvider();
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => provider.GetRequiredService<IOptions<JournaledStateManagerOptions>>().Value);
+
+        Assert.Contains("custom-format", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("orleans-binary", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ActivationValidator_RejectsReentrantGrainTypes()
     {
         var validatorType = typeof(IDurableInbox).Assembly.GetType(
