@@ -33,6 +33,7 @@ using Orleans.Runtime.Versions;
 using Orleans.Runtime.Versions.Compatibility;
 using Orleans.Runtime.Versions.Selector;
 using Orleans.Serialization;
+using Orleans.Serialization.Session;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.TypeSystem;
@@ -420,9 +421,12 @@ namespace Orleans.Hosting
             services.AddSingleton<IPostConfigureOptions<OrleansJsonSerializerOptions>, ConfigureOrleansJsonSerializerOptions>();
             services.AddSingleton<OrleansJsonSerializer>();
 
-            services.TryAddTransient<MessageSerializer>(sp => ActivatorUtilities.CreateInstance<MessageSerializer>(
-                sp,
-                sp.GetRequiredService<IOptions<SiloMessagingOptions>>().Value));
+            services.TryAddSingleton<MessageSerializerFactory>(sp =>
+            {
+                var sessionPool = sp.GetRequiredService<SerializerSessionPool>();
+                var options = sp.GetRequiredService<IOptions<SiloMessagingOptions>>();
+                return () => new MessageSerializer(sessionPool, options.Value);
+            });
 
             services.TryAddSingleton<ConnectionFactory, SiloConnectionFactory>();
             services.AddSingleton<ConnectionTrace>();

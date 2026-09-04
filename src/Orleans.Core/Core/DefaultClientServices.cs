@@ -24,6 +24,7 @@ using Orleans.Serialization;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Internal;
 using Orleans.Serialization.Serializers;
+using Orleans.Serialization.Session;
 using Orleans.Statistics;
 
 namespace Orleans
@@ -139,9 +140,12 @@ namespace Orleans
             services.AddSingleton<IPostConfigureOptions<OrleansJsonSerializerOptions>, ConfigureOrleansJsonSerializerOptions>();
             services.AddSingleton<OrleansJsonSerializer>();
 
-            services.TryAddTransient<MessageSerializer>(sp => ActivatorUtilities.CreateInstance<MessageSerializer>(
-                sp,
-                sp.GetRequiredService<IOptions<ClientMessagingOptions>>().Value));
+            services.TryAddSingleton<MessageSerializerFactory>(sp =>
+            {
+                var sessionPool = sp.GetRequiredService<SerializerSessionPool>();
+                var options = sp.GetRequiredService<IOptions<ClientMessagingOptions>>();
+                return () => new MessageSerializer(sessionPool, options.Value);
+            });
             services.TryAddSingleton<ConnectionFactory, ClientOutboundConnectionFactory>();
             services.AddSingleton<ClientMessageCenter>(sp => sp.GetRequiredService<OutsideRuntimeClient>().MessageCenter!);
             services.TryAddFromExisting<IMessageCenter, ClientMessageCenter>();

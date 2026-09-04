@@ -283,6 +283,34 @@ public class MessageTransportLifecycleTests
         second.Return(otherWriteHandler);
     }
 
+    [Fact]
+    public void MessageHandlerShared_AllowsLateSendRequestAfterDispose()
+    {
+        using var serviceProvider = CreateServiceProvider();
+        var shared = CreateMessageHandlerShared(serviceProvider);
+        shared.Dispose();
+
+        var request = shared.GetSendMessageHandler();
+        request.Reset();
+    }
+
+    [Fact]
+    public async Task MessageHandlerShared_DisposeWaitsForBorrowedSerializer()
+    {
+        using var serviceProvider = CreateServiceProvider();
+        var shared = CreateMessageHandlerShared(serviceProvider);
+        var serializer = shared.GetMessageSerializer();
+
+        var disposeTask = Task.Run(shared.Dispose, TestContext.Current.CancellationToken);
+        await Task.Delay(TimeSpan.FromMilliseconds(50), TestContext.Current.CancellationToken);
+        Assert.False(disposeTask.IsCompleted);
+
+        shared.Return(serializer);
+
+        await disposeTask.WaitAsync(TestContext.Current.CancellationToken);
+        Assert.Throws<ObjectDisposedException>(() => shared.GetMessageSerializer());
+    }
+
     [Theory]
     [InlineData(0, 0)]
     [InlineData(-1, 0)]
@@ -534,7 +562,7 @@ public class MessageTransportLifecycleTests
         return new(
             messagingTrace,
             new ConnectionTrace(NullLoggerFactory.Instance),
-            serviceProvider,
+            () => serviceProvider.GetRequiredService<MessageSerializer>(),
             new MessageFactory(serviceProvider.GetRequiredService<DeepCopier>(), NullLogger<MessageFactory>.Instance, messagingTrace),
             Substitute.For<IMessageCenter>(),
             messagingInstruments);

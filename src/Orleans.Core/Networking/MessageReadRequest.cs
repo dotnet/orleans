@@ -125,9 +125,10 @@ internal sealed partial class MessageReadRequest(MessageHandlerShared shared) : 
         Message? message = null;
         var connection = _connection ?? throw new InvalidOperationException("Cannot process a message before a connection is set.");
         var shouldReset = true;
-        var messageSerializer = Shared.GetMessageSerializer();
+        MessageSerializer? messageSerializer = null;
         try
         {
+            messageSerializer = Shared.GetMessageSerializer();
             messageSerializer.ReadHeaders(this, out message);
             message.MessageReceiver = connection;
             connection.MarkMessageReceived();
@@ -166,7 +167,10 @@ internal sealed partial class MessageReadRequest(MessageHandlerShared shared) : 
                 Reset();
             }
 
-            Shared.Return(messageSerializer);
+            if (messageSerializer is not null)
+            {
+                Shared.Return(messageSerializer);
+            }
         }
 
         void HandleReceiveMessageFailure(Message? message, Exception exception)
