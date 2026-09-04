@@ -235,11 +235,12 @@ public sealed class DynamoDBAspireLiveTests
                 Period = TimeSpan.FromMinutes(7),
             };
 
-            var eTag = await reminders.UpsertRow(entry);
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var eTag = await reminders.UpsertRow(entry, cancellationToken);
             Assert.False(string.IsNullOrWhiteSpace(eTag));
             Assert.Equal(eTag, entry.ETag);
 
-            var stored = await reminders.ReadRow(entry.GrainId, entry.ReminderName);
+            var stored = await reminders.ReadRow(entry.GrainId, entry.ReminderName, cancellationToken);
             Assert.NotNull(stored);
             Assert.Equal(entry.GrainId, stored.GrainId);
             Assert.Equal(entry.ReminderName, stored.ReminderName);
@@ -247,9 +248,9 @@ public sealed class DynamoDBAspireLiveTests
             Assert.Equal(entry.Period, stored.Period);
             Assert.Equal(eTag, stored.ETag);
 
-            Assert.True(await reminders.RemoveRow(entry.GrainId, entry.ReminderName, eTag));
-            Assert.Null(await reminders.ReadRow(entry.GrainId, entry.ReminderName));
-            Assert.False(await reminders.RemoveRow(entry.GrainId, entry.ReminderName, eTag));
+            Assert.True(await reminders.RemoveRow(entry.GrainId, entry.ReminderName, eTag, cancellationToken));
+            Assert.Null(await reminders.ReadRow(entry.GrainId, entry.ReminderName, cancellationToken));
+            Assert.False(await reminders.RemoveRow(entry.GrainId, entry.ReminderName, eTag, cancellationToken));
         }
         finally
         {
