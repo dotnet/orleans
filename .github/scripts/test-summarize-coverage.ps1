@@ -1211,29 +1211,15 @@ exit 0
         Assert-Equal 0 ([regex]::Matches($dotnetTestAction, '--project|--test-modules')).Count 'Native test action must discover projects from the solution.'
     }
 
-    Invoke-Test 'publishes Azure Pipelines coverage' {
+    Invoke-Test 'keeps Azure Pipelines tests outside coverage collection' {
         $azureBuildTemplate = Get-Content -Raw -LiteralPath $azureBuildTemplatePath
         $azureVariables = Get-Content -Raw -LiteralPath $azureVariablesPath
-        Assert-Matches `
-            $azureVariables `
-            'DOTNET_COVERAGE_VERSION:\s*\d+\.\d+\.\d+' `
-            'Azure Pipelines must pin the coverage collector version.'
+        Assert-Equal 0 ([regex]::Matches($azureVariables, 'DOTNET_COVERAGE_VERSION')).Count 'Azure Pipelines must not configure duplicate coverage collection.'
+        Assert-Equal 0 ([regex]::Matches($azureBuildTemplate, 'setup-coverage\.ps1|invoke-coverage\.ps1|PublishCodeCoverage')).Count 'Azure Pipelines must not duplicate canonical GitHub coverage.'
         Assert-Matches `
             $azureBuildTemplate `
-            "(?s)'\$\(Agent\.OS\)' -eq 'Linux'.*?'\$\{\{framework\}\}' -eq 'net10\.0'.*?setup-coverage\.ps1.*?invoke-coverage\.ps1.*?coverage-\$\{\{suite\}\}-\$\{\{framework\}\}\.cobertura\.xml" `
-            'Azure Pipelines must collect coverage only from Linux .NET 10 test jobs.'
-        Assert-Equal `
-            0 `
-            ([regex]::Matches($azureBuildTemplate, 'ContinuousIntegrationBuild=false')).Count `
-            'Azure Pipelines coverage must preserve continuous integration build semantics.'
-        Assert-Matches `
-            $azureBuildTemplate `
-            "(?s)job: PublishCodeCoverage.*?condition: and\(succeededOrFailed\(\), eq\(variables\['Agent\.OS'\], 'Linux'\)\).*?DownloadPipelineArtifact@2.*?itemPattern: '\*\*/\*\.cobertura\.xml'" `
-            'Azure Pipelines must publish coverage only on Linux.'
-        Assert-Matches `
-            $azureBuildTemplate `
-            '(?s)PublishCodeCoverageResults@2.*?summaryFileLocation:.*?\*\*/\*\.cobertura\.xml.*?failIfCoverageEmpty: true' `
-            'Azure Pipelines must publish the aggregated coverage and require results.'
+            '(?s)\$executable = \$command\[0\].*?\$arguments = \$command\[1\.\.\(\$command\.Count - 1\)\].*?& \$executable @arguments.*?exit \$LASTEXITCODE' `
+            'Azure Pipelines must execute every test job directly and propagate its exit code.'
     }
 
     Invoke-Test 'validates the coverage tool version' {
