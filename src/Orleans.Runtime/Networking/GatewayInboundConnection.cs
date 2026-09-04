@@ -183,7 +183,7 @@ namespace Orleans.Runtime.Messaging
                     msg,
                     Message.RejectionTypes.Transient,
                     $"Target client {msg.TargetGrain} is unavailable. Message: {msg}. Reason = {reason}",
-                    new ClientNotAvailableException($"Target client {msg.TargetGrain} is unavailable. {reason ?? "Connection terminated."}"));
+                    new ClientNotAvailableException($"Target client {msg.TargetGrain} is unavailable. {reason}"));
             }
             else
             {

@@ -36,8 +36,11 @@ namespace Orleans.Runtime
         private readonly SharedCallbackData sharedCallbackData;
         private readonly SharedCallbackData systemSharedCallbackData;
         private readonly PeriodicTimer callbackTimer;
-        private readonly ReaderWriterLockSlim _requestAdmissionLock = new(LockRecursionPolicy.SupportsRecursion);
-        private int _isStopping;
+        private int _isDisposed;
+        private int _requestAdmissionState;
+
+        private const int RequestAdmissionClosed = 1 << 31;
+        private const int ActiveRequestAdmissionMask = ~RequestAdmissionClosed;
 
         private GrainLocator grainLocator = null!;
         private MessageCenter messageCenter = null!;
@@ -196,7 +199,7 @@ namespace Orleans.Runtime
 
                 // Register a callback for the request.
                 callbackData = new CallbackData(sharedData, context, message, _applicationRequestInstruments);
-                if (Volatile.Read(ref _isStopping) != 0)
+                if (IsRequestAdmissionClosed)
                 {
                     callbackData.OnHostShutdown();
                     return;
@@ -208,37 +211,26 @@ namespace Orleans.Runtime
             else
             {
                 context?.Complete();
-                if (Volatile.Read(ref _isStopping) != 0)
+                if (IsRequestAdmissionClosed)
                 {
                     return;
                 }
             }
 
-            var rejectForShutdown = false;
-            _requestAdmissionLock.EnterReadLock();
+            if (!TryEnterRequestAdmission())
+            {
+                callbackData?.OnHostShutdown();
+                return;
+            }
+
             try
             {
-                // Completing callbacks during shutdown can resume application code which issues follow-up
-                // calls. Admission and sending are serialized with the stopping transition so that no
-                // request, including a one-way request, can be sent after shutdown begins.
-                if (Volatile.Read(ref _isStopping) != 0)
-                {
-                    rejectForShutdown = true;
-                }
-                else
-                {
-                    this.messagingTrace.OnSendRequest(message);
-                    this.MessageCenter.AddressAndSendMessage(message);
-                }
+                this.messagingTrace.OnSendRequest(message);
+                this.MessageCenter.AddressAndSendMessage(message);
             }
             finally
             {
-                _requestAdmissionLock.ExitReadLock();
-            }
-
-            if (rejectForShutdown)
-            {
-                callbackData?.OnHostShutdown();
+                Interlocked.Decrement(ref _requestAdmissionState);
             }
         }
 
@@ -671,21 +663,45 @@ namespace Orleans.Runtime
 
         public void Dispose()
         {
+            if (Interlocked.Exchange(ref _isDisposed, 1) != 0)
+            {
+                return;
+            }
+
             StopRequestAdmission();
             BreakOutstandingMessages();
         }
 
         private void StopRequestAdmission()
         {
-            _requestAdmissionLock.EnterWriteLock();
-            try
+            var previousState = Interlocked.Or(ref _requestAdmissionState, RequestAdmissionClosed);
+            this.callbackTimer.Dispose();
+            if ((previousState & ActiveRequestAdmissionMask) != 0)
             {
-                Volatile.Write(ref _isStopping, 1);
-                this.callbackTimer.Dispose();
+                var spinner = new SpinWait();
+                while ((Volatile.Read(ref _requestAdmissionState) & ActiveRequestAdmissionMask) != 0)
+                {
+                    spinner.SpinOnce();
+                }
             }
-            finally
+        }
+
+        private bool IsRequestAdmissionClosed => Volatile.Read(ref _requestAdmissionState) < 0;
+
+        private bool TryEnterRequestAdmission()
+        {
+            while (true)
             {
-                _requestAdmissionLock.ExitWriteLock();
+                var state = Volatile.Read(ref _requestAdmissionState);
+                if (state < 0)
+                {
+                    return false;
+                }
+
+                if (Interlocked.CompareExchange(ref _requestAdmissionState, state + 1, state) == state)
+                {
+                    return true;
+                }
             }
         }
 
