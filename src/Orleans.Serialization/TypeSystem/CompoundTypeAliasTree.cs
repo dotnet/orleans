@@ -117,6 +117,23 @@ public class CompoundTypeAliasTree
         }
     }
 
+    internal CompoundTypeAliasTree Clone()
+    {
+        var result = new CompoundTypeAliasTree(Key, Value);
+        if (Volatile.Read(ref _children) is { } children)
+        {
+            var clonedChildren = new Dictionary<object, CompoundTypeAliasTree>(children.Count);
+            foreach (var pair in children)
+            {
+                clonedChildren[pair.Key] = pair.Value.Clone();
+            }
+
+            result._children = clonedChildren;
+        }
+
+        return result;
+    }
+
     private CompoundTypeAliasTree AddInternal(object key) => AddInternal(key, default);
     private CompoundTypeAliasTree AddInternal(object key, Type? value)
     {
