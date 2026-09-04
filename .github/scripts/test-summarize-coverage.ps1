@@ -631,6 +631,40 @@ try {
             'Coverage file names must include the complete matrix identity.'
     }
 
+    Invoke-Test 'captures Linux net8 runtime crashes' {
+        $dotnetTestAction = Get-Content -Raw -LiteralPath $dotnetTestActionPath
+        $archiveTestResultsAction = Get-Content -Raw -LiteralPath $archiveTestResultsActionPath
+        $runTestsAction = Get-Content -Raw -LiteralPath $runTestsActionPath
+        Assert-Matches `
+            $dotnetTestAction `
+            "if: runner\.os == 'Linux' && inputs\.framework == 'net8\.0'" `
+            'Runtime crash dumps must be scoped to Linux net8 test jobs.'
+        Assert-Matches `
+            $dotnetTestAction `
+            'DOTNET_DbgEnableMiniDump=1' `
+            'Runtime crash dump collection must be enabled.'
+        Assert-Matches `
+            $dotnetTestAction `
+            'DOTNET_DbgMiniDumpType=2' `
+            'Runtime crash dumps must include the managed heap.'
+        Assert-Matches `
+            $dotnetTestAction `
+            'DOTNET_DbgMiniDumpName=\$\{\{ github\.workspace \}\}/TestResults/dotnet-test\.%p\.dmp' `
+            'Runtime crash dumps must flow through the test diagnostics artifact.'
+        Assert-Matches `
+            $dotnetTestAction `
+            'DOTNET_CreateDumpDiagnostics=1' `
+            'Runtime dump creation must emit diagnostics to the job log.'
+        Assert-Matches `
+            $archiveTestResultsAction `
+            '\*\*/TestResults/\*' `
+            'Runtime crash dumps must be retained by the always-run test diagnostics artifact.'
+        Assert-Matches `
+            $runTestsAction `
+            '(?ms)^  - name: Archive test results\r?\n    if: always\(\)' `
+            'Runtime crash dump upload must run after a failed test coordinator.'
+    }
+
     Invoke-Test 'uses external coverage collection for CI builds' {
         $dotnetTestAction = Get-Content -Raw -LiteralPath $dotnetTestActionPath
         $setupTestEnvironmentAction = Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot '../actions/setup-test-environment/action.yml')
