@@ -36,7 +36,7 @@ internal class StateEntity
             this.TransactionId = transactionId.S;
 
         if (fields.TryGetValue(TRANSACTION_TIMESTAMP_PROPERTY_NAME, out var timestamp))
-            this.TransactionTimestamp = DateTime.Parse(timestamp.S, null, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal);
+            this.TransactionTimestamp = DateTime.Parse(timestamp.S, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal);
 
         if (fields.TryGetValue(TRANSACTION_MANAGER_PROPERTY_NAME, out var transactionManager))
             this.TransactionManager = transactionManager.B.ToArray();
@@ -45,14 +45,14 @@ internal class StateEntity
             this.State = state.B.ToArray();
 
         if (fields.TryGetValue(DynamoDBTransactionalStateConstants.ETAG_PROPERTY_NAME, out var etag))
-            this.ETag = long.Parse(etag.N);
+            this.ETag = long.Parse(etag.N, NumberStyles.Integer, CultureInfo.InvariantCulture);
 
         this.StorageSize = GetItemSize(fields);
     }
 
     public static string MakeRowKey(long sequenceId)
     {
-        return $"{ROW_KEY_PREFIX}{sequenceId.ToString("x16")}";
+        return $"{ROW_KEY_PREFIX}{sequenceId.ToString("x16", CultureInfo.InvariantCulture)}";
     }
 
     public static StateEntity Create<TState>(
@@ -78,7 +78,7 @@ internal class StateEntity
 
     public string RowKey { get; set; } = null!;
 
-    public long SequenceId => long.Parse(this.RowKey.Substring(ROW_KEY_PREFIX.Length), NumberStyles.AllowHexSpecifier);
+    public long SequenceId => long.Parse(this.RowKey.Substring(ROW_KEY_PREFIX.Length), NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture);
 
     public string TransactionId { get; set; } = string.Empty;
 
@@ -112,13 +112,13 @@ internal class StateEntity
             item[TRANSACTION_ID_PROPERTY_NAME] = new AttributeValue { S = this.TransactionId };
 
         if (this.TransactionTimestamp != default)
-            item[TRANSACTION_TIMESTAMP_PROPERTY_NAME] = new AttributeValue { S = this.TransactionTimestamp.ToUniversalTime().ToString("o") };
+            item[TRANSACTION_TIMESTAMP_PROPERTY_NAME] = new AttributeValue { S = this.TransactionTimestamp.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture) };
 
         if (this.TransactionManager is { Length: > 0 })
             item[TRANSACTION_MANAGER_PROPERTY_NAME] = new AttributeValue { B = new MemoryStream(this.TransactionManager) };
 
         if (this.ETag.HasValue)
-            item[DynamoDBTransactionalStateConstants.ETAG_PROPERTY_NAME] = new AttributeValue { N = this.ETag.Value.ToString() };
+            item[DynamoDBTransactionalStateConstants.ETAG_PROPERTY_NAME] = new AttributeValue { N = this.ETag.Value.ToString(CultureInfo.InvariantCulture) };
 
         this.StorageSize = GetItemSize(item);
         return item;

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
 using Amazon.DynamoDBv2;
@@ -98,7 +99,7 @@ public partial class DynamoDBTransactionalStateStorageFactory : ITransactionalSt
 
         try
         {
-            var initMsg = string.Format("Init: Name={0} ServiceId={1} Table={2}", this.name, this.options.ServiceId, this.options.TableName);
+            var initMsg = string.Format(CultureInfo.CurrentCulture, "Init: Name={0} ServiceId={1} Table={2}", this.name, this.options.ServiceId, this.options.TableName);
 
             LogInformationInitializingDynamoDBGrainStorage(logger, this.name, initMsg);
 
