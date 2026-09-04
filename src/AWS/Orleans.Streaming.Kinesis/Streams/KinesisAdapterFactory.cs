@@ -158,13 +158,20 @@ namespace Orleans.Streaming.Kinesis
 
         private KinesisPooledAdapterReceiver GetOrCreateReceiver(QueueId queueId)
         {
+            var receivers = Volatile.Read(ref _receivers);
+            if (receivers is null)
+            {
+                throw new InvalidOperationException(
+                    $"The Kinesis stream provider '{Name}' must complete {nameof(CreateAdapter)} before creating a receiver or cache.");
+            }
+
             if (_checkpointerFactory is null)
             {
                 throw new OrleansConfigurationException(
                     $"No {nameof(IStreamQueueCheckpointerFactory)} is configured for the Kinesis stream provider '{Name}'.");
             }
 
-            return _receivers.GetOrCreate(queueId);
+            return receivers.GetOrCreate(queueId);
         }
 
         private KinesisPooledAdapterReceiver MakeReceiver(QueueId queueId)
