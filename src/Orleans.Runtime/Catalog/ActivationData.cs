@@ -503,7 +503,7 @@ internal sealed partial class ActivationData :
     {
         var currentActivity = Activity.Current;
         var deactivateActivity = activityContext is { } parent
-            ? ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.DeactivateGrain, ActivityKind.Internal, parentContext:parent)
+            ? ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.DeactivateGrain, ActivityKind.Internal, parentContext: parent)
             : ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.DeactivateGrain);
 
         lock (_lock)

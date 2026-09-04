@@ -103,7 +103,7 @@ internal sealed partial class ActivationData
                         // Start a span for OnDeactivateAsync execution
 
                         using var onDeactivateSpan = deactivateCommand.Activity is not null
-                            ? ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.OnDeactivate, ActivityKind.Internal, parentContext:deactivateCommand.Activity.Context)
+                            ? ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.OnDeactivate, ActivityKind.Internal, parentContext: deactivateCommand.Activity.Context)
                             : ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.OnDeactivate, ActivityKind.Internal);
                         if (onDeactivateSpan is { IsAllDataRequested: true })
                         {
