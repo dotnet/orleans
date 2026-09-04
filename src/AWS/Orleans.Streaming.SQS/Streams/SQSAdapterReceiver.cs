@@ -23,6 +23,7 @@ namespace OrleansAWSUtils.Streams
         private readonly ILogger logger;
         private readonly ISQSDataAdapter dataAdapter;
         private readonly List<PendingDelivery> pending = [];
+        private readonly object pendingLock = new();
 
         public QueueId Id { get; private set; }
 
@@ -63,19 +64,28 @@ namespace OrleansAWSUtils.Streams
             try
             {
                 // await the last storage operation, so after we shutdown and stop this receiver we don't get async operation completions from pending storage operations.
-                if (outstandingTask != null)
-                    await outstandingTask.WaitAsync(timeoutCancellation.Token);
+                var pendingTask = outstandingTask;
+                if (pendingTask != null)
+                    await pendingTask.WaitAsync(timeoutCancellation.Token);
 
-                if (queue is not null && pending.Count > 0)
+                var queueRef = queue;
+                SQSMessage[] pendingMessages;
+                lock (pendingLock)
+                {
+                    pendingMessages = pending.Select(static item => item.Message).ToArray();
+                }
+
+                if (queueRef is not null && pendingMessages.Length > 0)
                 {
                     try
                     {
-                        outstandingTask = queue.ReleaseMessages(pending.Select(static item => item.Message));
-                        await outstandingTask.WaitAsync(timeoutCancellation.Token);
+                        var releaseTask = queueRef.ReleaseMessages(pendingMessages);
+                        outstandingTask = releaseTask;
+                        await releaseTask.WaitAsync(timeoutCancellation.Token);
                     }
                     catch (Exception exc)
                     {
-                        LogWarningReleaseMessageException(logger, exc, Id, pending.Count);
+                        LogWarningReleaseMessageException(logger, exc, Id, pendingMessages.Length);
                     }
                 }
             }
@@ -83,7 +93,10 @@ namespace OrleansAWSUtils.Streams
             {
                 // remember that we shut down so we never try to read from the queue again.
                 queue = null;
-                pending.Clear();
+                lock (pendingLock)
+                {
+                    pending.Clear();
+                }
             }
         }
 
@@ -107,18 +120,25 @@ namespace OrleansAWSUtils.Streams
                 var pendingDeliveries = new List<PendingDelivery>();
                 foreach (var message in messages)
                 {
-                    if (!string.IsNullOrEmpty(message.MessageId))
-                    {
-                        pending.RemoveAll(item => string.Equals(item.Message.MessageId, message.MessageId, StringComparison.Ordinal));
-                    }
-
                     var sequenceId = Interlocked.Increment(ref lastReadMessage);
                     var batch = dataAdapter.FromQueueMessage(message, sequenceId);
                     messageBatch.Add(batch);
                     pendingDeliveries.Add(new PendingDelivery(batch, message));
                 }
 
-                pending.AddRange(pendingDeliveries);
+                lock (pendingLock)
+                {
+                    foreach (var delivery in pendingDeliveries)
+                    {
+                        if (!string.IsNullOrEmpty(delivery.Message.MessageId))
+                        {
+                            pending.RemoveAll(item => string.Equals(item.Message.MessageId, delivery.Message.MessageId, StringComparison.Ordinal));
+                        }
+                    }
+
+                    pending.AddRange(pendingDeliveries);
+                }
+
                 return messageBatch;
             }
             finally
@@ -135,13 +155,16 @@ namespace OrleansAWSUtils.Streams
                 if (messages.Count == 0 || queueRef == null) return;
 
                 var cloudQueueMessages = new List<SQSMessage>();
-                foreach (var message in messages)
+                lock (pendingLock)
                 {
-                    var index = pending.FindIndex(item => ReferenceEquals(item.Batch, message));
-                    if (index >= 0)
+                    foreach (var message in messages)
                     {
-                        cloudQueueMessages.Add(pending[index].Message);
-                        pending.RemoveAt(index);
+                        var index = pending.FindIndex(item => ReferenceEquals(item.Batch, message));
+                        if (index >= 0)
+                        {
+                            cloudQueueMessages.Add(pending[index].Message);
+                            pending.RemoveAt(index);
+                        }
                     }
                 }
 
