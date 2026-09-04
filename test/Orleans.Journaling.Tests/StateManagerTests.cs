@@ -760,32 +760,66 @@ public class StateManagerTests : JournalingTestBase
         var sut = CreateTestSystem(storage: storage);
         var dictionary = new DurableDictionary<string, int>("dict", sut.Manager, CreateDictionaryCodec<string, int>());
         var value = new DurableValue<int>("value", sut.Manager, CreateValueCodec<int>());
+        var state = new DurableState<string>(
+            "state",
+            sut.Manager,
+            new OrleansBinaryPersistentStateCommandCodec<string>(CodecProvider.GetCodec<string>(), SessionPool));
+        var completion = new DurableTaskCompletionSource<int>(
+            "completion",
+            sut.Manager,
+            new OrleansBinaryDurableTaskCompletionSourceCommandCodec<int>(
+                CodecProvider.GetCodec<int>(),
+                CodecProvider.GetCodec<Exception>(),
+                SessionPool),
+            ServiceProvider.GetRequiredService<DeepCopier<int>>(),
+            ServiceProvider.GetRequiredService<DeepCopier<Exception>>());
 
         await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         dictionary.Add("attempted", 1);
+        ((IStorage<string>)state).State = "attempted";
         var recovery = Assert.IsAssignableFrom<IJournaledStateWriteRecovery>(sut.Manager);
         var failedWrite = recovery.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
         await storage.AppendEntered.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         dictionary.Add("suffix", 2);
         value.Value = 42;
+        ((IStorage<string>)state).State = "suffix";
+        Assert.True(completion.TrySetResult(17));
         storage.ReleaseAppend.SetResult();
         await Assert.ThrowsAsync<IOException>(() => failedWrite);
 
         Assert.False(await recovery.ReconcilePendingChangesAsync(
             static () => false,
             TestContext.Current.CancellationToken));
+        Assert.False(completion.Task.IsCompleted);
 
         await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(17, await completion.Task);
 
         var recovered = CreateTestSystem(storage: storage);
         var recoveredDictionary = new DurableDictionary<string, int>("dict", recovered.Manager, CreateDictionaryCodec<string, int>());
         var recoveredValue = new DurableValue<int>("value", recovered.Manager, CreateValueCodec<int>());
+        var recoveredState = new DurableState<string>(
+            "state",
+            recovered.Manager,
+            new OrleansBinaryPersistentStateCommandCodec<string>(CodecProvider.GetCodec<string>(), SessionPool));
+        var recoveredCompletion = new DurableTaskCompletionSource<int>(
+            "completion",
+            recovered.Manager,
+            new OrleansBinaryDurableTaskCompletionSourceCommandCodec<int>(
+                CodecProvider.GetCodec<int>(),
+                CodecProvider.GetCodec<Exception>(),
+                SessionPool),
+            ServiceProvider.GetRequiredService<DeepCopier<int>>(),
+            ServiceProvider.GetRequiredService<DeepCopier<Exception>>());
         await recovered.Lifecycle.OnStart(TestContext.Current.CancellationToken);
 
         Assert.Equal(1, recoveredDictionary["attempted"]);
         Assert.Equal(2, recoveredDictionary["suffix"]);
         Assert.Equal(42, recoveredValue.Value);
+        Assert.Equal("suffix", ((IStorage<string>)recoveredState).State);
+        Assert.Equal("2", ((IStorage)recoveredState).Etag);
+        Assert.Equal(17, await recoveredCompletion.Task);
     }
 
     [Fact]

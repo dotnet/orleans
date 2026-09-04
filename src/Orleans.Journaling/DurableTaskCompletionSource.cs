@@ -53,6 +53,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
     private T? _value;
     private Exception? _exception;
     private bool _isDirty;
+    private bool _isRestoredPending;
     private ulong _changeVersion;
     private ulong _stagedChangeVersion;
 
@@ -139,8 +140,11 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
 
     bool IJournaledState.HasPendingChanges => _isDirty;
 
-    void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
+    void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context)
+    {
         context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
+        _isRestoredPending = context.IsPending;
+    }
 
     private void OnValuePersisted()
     {
@@ -165,7 +169,10 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         _isDirty = false;
         _changeVersion = 0;
         _stagedChangeVersion = 0;
-        OnValuePersisted();
+        if (!_isRestoredPending)
+        {
+            OnValuePersisted();
+        }
     }
 
     void IJournaledState.OnWriteCompleted()
@@ -173,6 +180,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         if (_stagedChangeVersion == _changeVersion)
         {
             _isDirty = false;
+            _isRestoredPending = false;
             OnValuePersisted();
         }
     }
@@ -183,6 +191,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         _value = default;
         _exception = null;
         _isDirty = false;
+        _isRestoredPending = false;
         _changeVersion = 0;
         _stagedChangeVersion = 0;
 
