@@ -118,7 +118,7 @@ namespace UnitTests.StreamingTests
             RequestContext.Set(IPlacementDirector.PlacementHintKey, primarySilo.SiloAddress);
             try
             {
-                Assert.Equal(0, await pubSubGrain.ProducerCount(streamId));
+                Assert.Equal(0, await pubSubGrain.ProducerCount(streamId, cancellationToken));
             }
             finally
             {
@@ -126,7 +126,7 @@ namespace UnitTests.StreamingTests
             }
 
             var managementGrain = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);
-            var rendezvousSilo = await managementGrain.GetActivationAddress(pubSubGrain);
+            var rendezvousSilo = await managementGrain.GetActivationAddress(pubSubGrain, cancellationToken);
             Assert.Equal(primarySilo.SiloAddress, rendezvousSilo);
             var restartedSilo = this.fixture.HostedCluster.GetActiveSilos().First(silo => silo.SiloAddress != rendezvousSilo);
             var staleProducer = SystemTargetGrainId.Create(
@@ -135,7 +135,7 @@ namespace UnitTests.StreamingTests
                 "ProviderName_1_test-queue").GrainId;
 
             await pubSubGrain.RegisterProducer(streamId, staleProducer, new MembershipVersion(1), cancellationToken);
-            Assert.Equal(1, await pubSubGrain.ProducerCount(streamId));
+            Assert.Equal(1, await pubSubGrain.ProducerCount(streamId, cancellationToken));
 
             var replacementSilo = await this.fixture.HostedCluster.RestartSiloAsync(restartedSilo);
             Assert.NotNull(replacementSilo);
@@ -147,11 +147,11 @@ namespace UnitTests.StreamingTests
 
             await pubSubGrain.RegisterProducer(streamId, replacementProducer, new MembershipVersion(1), cancellationToken);
 
-            Assert.Equal(1, await pubSubGrain.ProducerCount(streamId));
-            await managementGrain.ForceActivationCollection(TimeSpan.Zero);
-            Assert.Equal(1, await pubSubGrain.ProducerCount(streamId));
-            await pubSubGrain.UnregisterProducer(streamId, replacementProducer);
-            Assert.Equal(0, await pubSubGrain.ProducerCount(streamId));
+            Assert.Equal(1, await pubSubGrain.ProducerCount(streamId, cancellationToken));
+            await managementGrain.ForceActivationCollection(TimeSpan.Zero, cancellationToken);
+            Assert.Equal(1, await pubSubGrain.ProducerCount(streamId, cancellationToken));
+            await pubSubGrain.UnregisterProducer(streamId, replacementProducer, cancellationToken);
+            Assert.Equal(0, await pubSubGrain.ProducerCount(streamId, cancellationToken));
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming"), TestCategory("PubSub")]
@@ -160,9 +160,9 @@ namespace UnitTests.StreamingTests
             var cancellationToken = TestContext.Current.CancellationToken;
             var streamId = new QualifiedStreamId("ProviderName", StreamId.Create("StreamNamespace", Guid.NewGuid()));
             var pubSubGrain = this.fixture.GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamId.ToString());
-            Assert.Equal(0, await pubSubGrain.ProducerCount(streamId));
+            Assert.Equal(0, await pubSubGrain.ProducerCount(streamId, cancellationToken));
             var managementGrain = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);
-            var activeSilo = await managementGrain.GetActivationAddress(pubSubGrain);
+            var activeSilo = await managementGrain.GetActivationAddress(pubSubGrain, cancellationToken);
             Assert.NotNull(activeSilo);
             var defunctSilo = SiloAddress.New(activeSilo.Endpoint, activeSilo.Generation - 1);
             var defunctProducer = SystemTargetGrainId.Create(
@@ -178,11 +178,11 @@ namespace UnitTests.StreamingTests
             await Assert.ThrowsAsync<OrleansException>(
                 () => pubSubGrain.RegisterProducer(streamId, defunctProducer, cancellationToken: cancellationToken));
 
-            Assert.Equal(1, await pubSubGrain.ProducerCount(streamId));
-            await managementGrain.ForceActivationCollection(TimeSpan.Zero);
-            Assert.Equal(1, await pubSubGrain.ProducerCount(streamId));
-            await pubSubGrain.UnregisterProducer(streamId, replacementProducer);
-            Assert.Equal(0, await pubSubGrain.ProducerCount(streamId));
+            Assert.Equal(1, await pubSubGrain.ProducerCount(streamId, cancellationToken));
+            await managementGrain.ForceActivationCollection(TimeSpan.Zero, cancellationToken);
+            Assert.Equal(1, await pubSubGrain.ProducerCount(streamId, cancellationToken));
+            await pubSubGrain.UnregisterProducer(streamId, replacementProducer, cancellationToken);
+            Assert.Equal(0, await pubSubGrain.ProducerCount(streamId, cancellationToken));
         }
 
         [Theory]

@@ -180,6 +180,7 @@ namespace Orleans.Streams
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
+                DeactivateOnIdle();
                 throw;
             }
             catch (Exception exc)
