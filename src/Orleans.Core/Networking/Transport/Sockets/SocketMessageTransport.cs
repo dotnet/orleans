@@ -651,6 +651,10 @@ internal sealed partial class SocketMessageTransport : MessageTransportBase
             ? ProcessOwnedPageReads(receiver)
             : ProcessBufferedReads();
 
+    [SuppressMessage(
+        "Reliability",
+        "CA2000",
+        Justification = "Promoted receivers are published to _multishotReceiver and disposed by DisposeSocketOperations.")]
     private async Task ProcessAdaptiveReads()
     {
         await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
@@ -864,7 +868,7 @@ exit:
             }
 
             _shutdownReason ??= error;
-            _connectionClosingCts.Cancel();
+            await _connectionClosingCts.CancelAsync().ConfigureAwait(false);
 
             if (isGracefulTermination)
             {
@@ -980,7 +984,7 @@ exit:
             }
 
             _shutdownReason ??= error;
-            _connectionClosingCts.Cancel();
+            await _connectionClosingCts.CancelAsync().ConfigureAwait(false);
 
             if (isGracefulTermination)
             {

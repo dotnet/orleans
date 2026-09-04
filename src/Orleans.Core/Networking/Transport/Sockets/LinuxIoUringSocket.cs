@@ -227,6 +227,10 @@ internal sealed unsafe class LinuxIoUringSocketMultishotReceiver : LinuxIoUringO
         }
     }
 
+    [SuppressMessage(
+        "Reliability",
+        "CA2000",
+        Justification = "The cancellation operation is owned by the io_uring engine and disposes itself after completion.")]
     public ValueTask StopAsync()
     {
         lock (_stateLock)
@@ -952,6 +956,10 @@ internal sealed unsafe class LinuxIoUringSocketMultishotReceiver : LinuxIoUringO
         });
     }
 
+    [SuppressMessage(
+        "Reliability",
+        "CA2012",
+        Justification = "Multishot completion is consumed by the io_uring engine and delivered through the receiver's pending read.")]
     private void StartReceive(Socket socket)
     {
         if (IsPending)
@@ -1050,6 +1058,10 @@ internal sealed unsafe class LinuxIoUringCancelOperation : LinuxIoUringOperation
     private readonly Action<int> _completed;
     private readonly Action<Exception> _failed;
 
+    [SuppressMessage(
+        "Reliability",
+        "CA2012",
+        Justification = "Cancellation completion is delivered through the supplied callbacks and the operation disposes itself.")]
     public LinuxIoUringCancelOperation(
         LinuxIoUringEngine engine,
         ulong target,

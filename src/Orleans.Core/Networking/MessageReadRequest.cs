@@ -89,8 +89,6 @@ internal sealed partial class MessageReadRequest(MessageHandlerShared shared) : 
 
     private bool OnRead(ArcBufferReader bufferReader, out int framedLength)
     {
-        Debug.Assert(_connection is not null);
-
         if (bufferReader.Length < Message.LENGTH_HEADER_SIZE)
         {
             framedLength = 0;
@@ -128,6 +126,7 @@ internal sealed partial class MessageReadRequest(MessageHandlerShared shared) : 
         Debug.Assert(_headers.Length == _headerLength);
         Debug.Assert(_body.Length == _bodyLength);
 
+        Debug.Assert(_connection is not null);
         _connection.EnqueueRead();
         ThreadPool.UnsafeQueueUserWorkItem(this, preferLocal: false);
         return true;
