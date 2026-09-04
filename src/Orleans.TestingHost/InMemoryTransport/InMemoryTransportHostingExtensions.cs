@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;

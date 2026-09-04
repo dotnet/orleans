@@ -385,7 +385,8 @@ internal sealed partial class SocketMessageTransport : MessageTransportBase
 
             isGracefulTermination = true;
 exit:
-            /* no op */;
+/* no op */
+            ;
         }
         catch (Exception exception)
         {
@@ -523,7 +524,7 @@ exit:
                     else
                     {
 DequeueRequest:
-                        // Try to get the next request and consume that.
+// Try to get the next request and consume that.
                         if (requests.TryDequeue(out var request))
                         {
                             if (request.Buffers.Length == 0)

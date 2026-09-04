@@ -72,7 +72,7 @@ namespace Orleans.Runtime.Messaging
             private PreambleWriteRequest(ArcBufferWriter buffer)
             {
                 _buffer = buffer;
-                Buffers = new (_buffer);
+                Buffers = new(_buffer);
             }
 
             [System.Diagnostics.CodeAnalysis.SuppressMessage(
@@ -132,7 +132,7 @@ namespace Orleans.Runtime.Messaging
 
             public Task<ConnectionPreamble> Completion => _completion.Task;
 
-            public static PreambleReadRequest Create(Serializer<ConnectionPreamble> preambleSerializer) => new (preambleSerializer);
+            public static PreambleReadRequest Create(Serializer<ConnectionPreamble> preambleSerializer) => new(preambleSerializer);
 
             public void Dispose() { }
             public override void OnError(Exception error) => _completion.SetException(error);
