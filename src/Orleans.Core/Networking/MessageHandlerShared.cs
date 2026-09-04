@@ -69,7 +69,16 @@ internal sealed class MessageHandlerShared(
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal void Return(MessageReadRequest handler) => _receivePool.Enqueue(handler);
+    internal void Return(MessageReadRequest handler)
+    {
+        lock (_poolLock)
+        {
+            if (!_disposed)
+            {
+                _receivePool.Enqueue(handler);
+            }
+        }
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal MessageWriteRequest GetSendMessageHandler()
