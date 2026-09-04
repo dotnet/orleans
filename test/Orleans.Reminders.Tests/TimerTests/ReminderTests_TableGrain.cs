@@ -99,7 +99,9 @@ namespace UnitTests.TimerTests
                     topologyCancellation.IsCancellationRequested
                     && !TestContext.Current.CancellationToken.IsCancellationRequested)
                 {
-                    throw new TimeoutException(exception.Message, exception);
+                    throw new TimeoutException(
+                        $"Reminder startup topology stabilization timed out within {TestConstants.InitTimeout}. Diagnostics: {exception.Message}",
+                        exception);
                 }
             }
 
