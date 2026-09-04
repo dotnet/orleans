@@ -8,8 +8,8 @@ runs:
     if: runner.os == 'Linux'
     shell: bash
     run: |
-      if ! dpkg-query --show --showformat='${Status}' libxml2 2>/dev/null | grep --quiet 'ok installed'; then
-        echo "::error::The GitHub-hosted Linux runner must provide libxml2 for dotnet-coverage."
+      if ! ldconfig -p | grep --fixed-strings 'libxml2.so.2' > /dev/null; then
+        echo "::error::The GitHub-hosted Linux runner must provide libxml2.so.2 for dotnet-coverage."
         exit 1
       fi
   - name: Install dotnet-coverage
