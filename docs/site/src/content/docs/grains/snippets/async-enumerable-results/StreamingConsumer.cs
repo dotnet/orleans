@@ -32,7 +32,7 @@ public static class StreamingConsumer
         try
         {
             await foreach (var row in grain
-                .ExportRows()
+                .ExportRows(cancellationToken)
                 .WithBatchSize(25)
                 .WithCancellation(cancellationToken))
             {
