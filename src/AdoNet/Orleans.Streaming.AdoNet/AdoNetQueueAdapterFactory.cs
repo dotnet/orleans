@@ -29,7 +29,7 @@ internal class AdoNetQueueAdapterFactory : IQueueAdapterFactory, IQueueAdapterCa
     private readonly AdoNetStreamQueueMapper _adoNetQueueMapper;
 
     private RelationalOrleansQueries? _queries;
-    private AdoNetQueueAdapter? _adapter;
+    private IQueueAdapter? _adapter;
 
     /// <summary>
     /// Unfortunate implementation detail to account for lack of async lifetime.
@@ -40,15 +40,15 @@ internal class AdoNetQueueAdapterFactory : IQueueAdapterFactory, IQueueAdapterCa
     /// <summary>
     /// Ensures queries are loaded only once while allowing for recovery if the load fails.
     /// </summary>
-    private ValueTask<RelationalOrleansQueries> GetQueriesAsync()
+    internal virtual ValueTask<RelationalOrleansQueries> GetQueriesAsync()
     {
         // attempt fast path
-        return _queries is not null ? new(_queries) : new(CoreAsync());
+        return Volatile.Read(ref _queries) is { } queries ? new(queries) : new(CoreAsync());
 
         // slow path
         async Task<RelationalOrleansQueries> CoreAsync()
         {
-            await _semaphore.WaitAsync(_streamOptions.InitializationTimeout, _lifetime.ApplicationStopping);
+            await WaitForInitializationLockAsync();
             try
             {
                 // attempt fast path again
@@ -58,9 +58,11 @@ internal class AdoNetQueueAdapterFactory : IQueueAdapterFactory, IQueueAdapterCa
                 }
 
                 // slow path - the member variable will only be set if the call succeeds
-                return _queries = await RelationalOrleansQueries
+                var result = await RelationalOrleansQueries
                     .CreateInstance(_streamOptions.Invariant, _streamOptions.ConnectionString, _streamOptions.DataSource)
                     .WaitAsync(_streamOptions.InitializationTimeout);
+                Volatile.Write(ref _queries, result);
+                return result;
             }
             finally
             {
@@ -71,12 +73,43 @@ internal class AdoNetQueueAdapterFactory : IQueueAdapterFactory, IQueueAdapterCa
 
     public async Task<IQueueAdapter> CreateAdapter()
     {
+        if (Volatile.Read(ref _adapter) is { } adapter)
+        {
+            return adapter;
+        }
+
         var queries = await GetQueriesAsync();
 
-        return _adapter ??= (AdoNetQueueAdapter)AdapterFactory(
-            _serviceProvider,
-            [_name, _streamOptions, _clusterOptions, _cacheOptions, _adoNetQueueMapper, queries]);
+        await WaitForInitializationLockAsync();
+        try
+        {
+            if (_adapter is not null)
+            {
+                return _adapter;
+            }
+
+            var result = await CreateAdapterCore(queries);
+            Volatile.Write(ref _adapter, result);
+            return result;
+        }
+        finally
+        {
+            _semaphore.Release();
+        }
     }
+
+    private async Task WaitForInitializationLockAsync()
+    {
+        if (!await _semaphore.WaitAsync(_streamOptions.InitializationTimeout, _lifetime.ApplicationStopping))
+        {
+            throw new TimeoutException($"Timed out waiting to initialize ADO.NET stream provider '{_name}'.");
+        }
+    }
+
+    internal virtual ValueTask<IQueueAdapter> CreateAdapterCore(RelationalOrleansQueries queries)
+        => new((AdoNetQueueAdapter)AdapterFactory(
+            _serviceProvider,
+            [_name, _streamOptions, _clusterOptions, _cacheOptions, _adoNetQueueMapper, queries]));
 
     public async Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId)
     {
@@ -88,7 +121,7 @@ internal class AdoNetQueueAdapterFactory : IQueueAdapterFactory, IQueueAdapterCa
     public IQueueAdapterCache GetQueueAdapterCache() => this;
 
     public IQueueCache CreateQueueCache(QueueId queueId)
-        => (_adapter ?? throw new InvalidOperationException("The ADO.NET stream adapter must be created before its queue cache."))
+        => ((_adapter as IQueueAdapterCache) ?? throw new InvalidOperationException("The ADO.NET stream adapter must be created before its queue cache."))
             .CreateQueueCache(queueId);
 
     public IStreamQueueMapper GetStreamQueueMapper() => _streamQueueMapper;
