@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 
 namespace Orleans.DurableTasks;
@@ -147,6 +148,7 @@ public abstract class DurableExecutionContext
     /// propagates its failure.
     /// </para>
     /// </remarks>
+    [SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope", Justification = "Ownership of the registration is returned to the caller while the context controls invocation.")]
     public ValueTask<IAsyncDisposable> RegisterCancellationCallbackAsync(
         Func<CancellationToken, ValueTask> callback,
         CancellationToken cancellationToken = default)
@@ -196,6 +198,9 @@ public abstract class DurableExecutionContext
             : operation.Task;
     }
 
+    [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Every cancellation observer failure is aggregated into the durable cancellation result.")]
+    [SuppressMessage("Performance", "CA1849:Call async methods when in an async method", Justification = "CancellationTokenSource.Cancel is intentionally synchronous so ordinary token observers run before durable callbacks.")]
+    [SuppressMessage("Maintainability", "CA1508:Avoid dead conditional code", Justification = "CancellationTokenSource.Cancel can populate the exception list by throwing AggregateException.")]
     private async Task CompleteCancellationAsync(CancellationOperation operation)
     {
         List<Exception>? exceptions = null;
@@ -266,6 +271,7 @@ public abstract class DurableExecutionContext
         }
     }
 
+    [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "The registration records post-completion callback failures for observation during disposal.")]
     private async Task InvokePostCompletionCallbackAsync(
         CancellationOperation operation,
         CancellationRegistration registration)
