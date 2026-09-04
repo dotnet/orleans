@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
 using Orleans.Runtime;
@@ -43,7 +44,7 @@ namespace Orleans.CodeGeneration
                 {
                     if (grainType.IsClass)
                     {
-                        var mapping = grainType.GetInterfaceMap(iType);
+                        var mapping = GetInterfaceMap(grainType, iType);
                         foreach (var methodInfo in iType.GetMethods(BindingFlags.Instance | BindingFlags.Public))
                         {
                             foreach (var info in mapping.TargetMethods)
@@ -100,6 +101,12 @@ namespace Orleans.CodeGeneration
                 return typeof(IAddressable).IsAssignableFrom(t);
             }
         }
+
+        [UnconditionalSuppressMessage(
+            "Trimming",
+            "IL2067",
+            Justification = "Grain interface methods are statically referenced by generated invokables, which cache their MethodInfo and invoke them through strongly typed calls. Interface types reach this boundary through Type.GetInterfaces() or MethodInfo.DeclaringType, neither of which can propagate DynamicallyAccessedMembers annotations.")]
+        internal static InterfaceMapping GetInterfaceMap(Type implementationType, Type interfaceType) => implementationType.GetInterfaceMap(interfaceType);
 
         public static int GetGrainClassTypeCode(Type grainClass) => (int)StableHash.ComputeHash(RuntimeTypeNameFormatter.Format(grainClass));
 
