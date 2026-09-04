@@ -54,6 +54,7 @@ namespace OrleansCodeGen.TestProject
             _target = default;
             _cts?.Dispose();
             _cts = default;
+            Options = default;
             _pool?.Return(this);
         }
 
