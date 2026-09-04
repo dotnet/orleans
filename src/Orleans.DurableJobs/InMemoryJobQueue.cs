@@ -443,6 +443,12 @@ internal sealed class JobBucket
     {
         if (_jobs.TryGetValue(job.Id, out var existing))
         {
+            if (existing.IsReady && existing.Job.Priority == job.Priority)
+            {
+                existing.Replace(job, dequeueCount);
+                return;
+            }
+
             existing.Invalidate();
             RemoveReadyNode(existing);
         }
@@ -608,13 +614,19 @@ internal sealed class JobBucket
             DequeueCount = dequeueCount;
         }
 
-        public DurableJob Job { get; }
+        public DurableJob Job { get; private set; }
 
-        public int DequeueCount { get; }
+        public int DequeueCount { get; private set; }
 
         private int _isCurrent = 1;
 
         public bool IsCurrent => Volatile.Read(ref _isCurrent) != 0;
+
+        public void Replace(DurableJob job, int dequeueCount)
+        {
+            Job = job;
+            DequeueCount = dequeueCount;
+        }
 
         public void Invalidate() => Volatile.Write(ref _isCurrent, 0);
 

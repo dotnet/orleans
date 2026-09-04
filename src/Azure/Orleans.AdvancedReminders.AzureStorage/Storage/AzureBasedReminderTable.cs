@@ -47,7 +47,7 @@ public sealed partial class AzureBasedReminderTable : IReminderTable
             {
                 try
                 {
-                    await remTableManager.InitTableAsync();
+                    await remTableManager.InitTableAsync(cancellationToken);
                     _initializationTask.TrySetResult();
                     return;
                 }

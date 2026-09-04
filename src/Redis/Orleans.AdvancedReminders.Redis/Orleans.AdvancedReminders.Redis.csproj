@@ -2,6 +2,8 @@
 
   <PropertyGroup>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <!-- This is a new package with no released compatibility baseline. -->
+    <EnablePackageValidation>false</EnablePackageValidation>
     <PackageId>Microsoft.Orleans.AdvancedReminders.Redis</PackageId>
     <Title>Microsoft Orleans Advanced Reminders for Redis</Title>
     <Description>Redis provider for Microsoft Orleans Advanced Reminders.</Description>

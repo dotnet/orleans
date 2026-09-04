@@ -4,6 +4,8 @@
     <Title>Microsoft Orleans Advanced Reminders</Title>
     <Description>Advanced reminders for Microsoft Orleans with schedule-based APIs and job-backed delivery.</Description>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <!-- This is a new package with no released compatibility baseline. -->
+    <EnablePackageValidation>false</EnablePackageValidation>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>

@@ -1,6 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <!-- This is a new package with no released compatibility baseline. -->
+    <EnablePackageValidation>false</EnablePackageValidation>
     <PackageId>Microsoft.Orleans.AdvancedReminders.DynamoDB</PackageId>
     <Title>Microsoft Orleans Advanced Reminders for DynamoDB</Title>
     <Description>AWS DynamoDB provider for Microsoft Orleans Advanced Reminders.</Description>
