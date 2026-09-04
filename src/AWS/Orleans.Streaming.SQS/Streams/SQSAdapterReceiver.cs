@@ -163,23 +163,22 @@ namespace OrleansAWSUtils.Streams
                 var queueRef = queue; // store direct ref, in case we are somehow asked to shutdown while we are receiving.
                 if (messages.Count == 0 || queueRef == null) return;
 
-                var cloudQueueMessages = new List<SQSMessage>();
+                var pendingDeliveries = new HashSet<PendingDelivery>(ReferenceEqualityComparer.Instance);
                 lock (pendingLock)
                 {
                     foreach (var message in messages)
                     {
-                        var index = pending.FindIndex(item => ReferenceEquals(item.Batch, message));
-                        if (index >= 0)
+                        var delivery = pending.Find(item => ReferenceEquals(item.Batch, message));
+                        if (delivery is not null)
                         {
-                            cloudQueueMessages.Add(pending[index].Message);
-                            pending.RemoveAt(index);
+                            pendingDeliveries.Add(delivery);
                         }
                     }
                 }
 
-                if (cloudQueueMessages.Count == 0) return;
+                if (pendingDeliveries.Count == 0) return;
 
-                outstandingTask = queueRef.DeleteMessages(cloudQueueMessages);
+                outstandingTask = ConfirmMessagesDeliveredAsync(queueRef, pendingDeliveries);
                 try
                 {
                     await outstandingTask;
@@ -192,6 +191,16 @@ namespace OrleansAWSUtils.Streams
             finally
             {
                 outstandingTask = null;
+            }
+        }
+
+        private async Task ConfirmMessagesDeliveredAsync(SQSStorage queueRef, HashSet<PendingDelivery> deliveries)
+        {
+            await queueRef.DeleteMessages(deliveries.Select(static item => item.Message));
+
+            lock (pendingLock)
+            {
+                pending.RemoveAll(deliveries.Contains);
             }
         }
 

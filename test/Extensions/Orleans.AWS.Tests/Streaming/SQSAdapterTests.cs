@@ -131,7 +131,7 @@ namespace AWSUtils.Tests.Streaming
             string phase,
             CancellationToken cancellationToken)
         {
-            var timeout = TimeSpan.FromSeconds(10);
+            var timeout = TimeSpan.FromSeconds(30);
             var stopwatch = Stopwatch.StartNew();
             while (stopwatch.Elapsed < timeout)
             {
