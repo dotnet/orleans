@@ -287,20 +287,20 @@ internal sealed class OrleansQueries
                expected_version = version
            })
            : _insertMembershipPreparedStatement.Bind(new
-        {
-           partition_key = clusterIdentifier,
-           address = membershipEntry.SiloAddress.Endpoint.Address.ToString(),
-            port = membershipEntry.SiloAddress.Endpoint.Port,
-            generation = membershipEntry.SiloAddress.Generation,
-            silo_name = membershipEntry.SiloName,
-            host_name = membershipEntry.HostName,
-            status = (int)membershipEntry.Status,
-            proxy_port = membershipEntry.ProxyPort,
-            start_time = membershipEntry.StartTime,
-            i_am_alive_time = membershipEntry.IAmAliveTime,
-            new_version = version + 1,
-            expected_version = version
-        });
+           {
+               partition_key = clusterIdentifier,
+               address = membershipEntry.SiloAddress.Endpoint.Address.ToString(),
+               port = membershipEntry.SiloAddress.Endpoint.Port,
+               generation = membershipEntry.SiloAddress.Generation,
+               silo_name = membershipEntry.SiloName,
+               host_name = membershipEntry.HostName,
+               status = (int)membershipEntry.Status,
+               proxy_port = membershipEntry.ProxyPort,
+               start_time = membershipEntry.StartTime,
+               i_am_alive_time = membershipEntry.IAmAliveTime,
+               new_version = version + 1,
+               expected_version = version
+           });
     }
 
     public async ValueTask<IStatement> InsertMembershipVersion(string clusterIdentifier)
@@ -430,23 +430,23 @@ internal sealed class OrleansQueries
                 expected_version = existingVersion.Version,
             })
             : _updateIAmAliveWithTtlPreparedStatement.Bind(new
-        {
-            partition_key = clusterIdentifier,
-            // The same version still needs to be written, to update its cell-level TTL
-            same_version = existingVersion.Version,
-            address = existingEntry.SiloAddress.Endpoint.Address.ToString(),
-            port = existingEntry.SiloAddress.Endpoint.Port,
-            generation = existingEntry.SiloAddress.Generation,
-            silo_name = existingEntry.SiloName,
-            host_name = existingEntry.HostName,
-            status = (int)existingEntry.Status,
-            proxy_port = existingEntry.ProxyPort,
-            suspect_times = GetSuspectTimesString(existingEntry),
-            start_time = existingEntry.StartTime,
-            i_am_alive_time = iAmAliveEntry.IAmAliveTime,
-            // But we still check that the version was the same during the update so we don't stomp on another update
-            expected_version = existingVersion.Version,
-        });
+            {
+                partition_key = clusterIdentifier,
+                // The same version still needs to be written, to update its cell-level TTL
+                same_version = existingVersion.Version,
+                address = existingEntry.SiloAddress.Endpoint.Address.ToString(),
+                port = existingEntry.SiloAddress.Endpoint.Port,
+                generation = existingEntry.SiloAddress.Generation,
+                silo_name = existingEntry.SiloName,
+                host_name = existingEntry.HostName,
+                status = (int)existingEntry.Status,
+                proxy_port = existingEntry.ProxyPort,
+                suspect_times = GetSuspectTimesString(existingEntry),
+                start_time = existingEntry.StartTime,
+                i_am_alive_time = iAmAliveEntry.IAmAliveTime,
+                // But we still check that the version was the same during the update so we don't stomp on another update
+                expected_version = existingVersion.Version,
+            });
 
         // To improve performance, we allow IAmAlive updates to be LocalSerial
         updateIAmAliveTimeWithTtL.SetSerialConsistencyLevel(ConsistencyLevel.LocalSerial);
@@ -521,17 +521,17 @@ internal sealed class OrleansQueries
                 generation = membershipEntry.SiloAddress.Generation
             })
             : _updateMembershipPreparedStatement.Bind(new
-        {
-            partition_key = clusterIdentifier,
-            new_version = version + 1,
-            expected_version = version,
-            status = (int)membershipEntry.Status,
-            suspect_times = GetSuspectTimesString(membershipEntry),
-            i_am_alive_time = membershipEntry.IAmAliveTime,
-            address = membershipEntry.SiloAddress.Endpoint.Address.ToString(),
-            port = membershipEntry.SiloAddress.Endpoint.Port,
-            generation = membershipEntry.SiloAddress.Generation
-        });
+            {
+                partition_key = clusterIdentifier,
+                new_version = version + 1,
+                expected_version = version,
+                status = (int)membershipEntry.Status,
+                suspect_times = GetSuspectTimesString(membershipEntry),
+                i_am_alive_time = membershipEntry.IAmAliveTime,
+                address = membershipEntry.SiloAddress.Endpoint.Address.ToString(),
+                port = membershipEntry.SiloAddress.Endpoint.Port,
+                generation = membershipEntry.SiloAddress.Generation
+            });
     }
 
     public async ValueTask<IStatement> MembershipReadVersion(string clusterIdentifier)
