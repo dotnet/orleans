@@ -284,18 +284,27 @@ internal sealed partial class ActivationData
         }
     }
 
-    ValueTask IGrainManagementExtension.DeactivateOnIdle()
+    ValueTask IGrainManagementExtension.DeactivateOnIdle() =>
+        ((IGrainManagementExtension)this).DeactivateOnIdle(default);
+
+    ValueTask IGrainManagementExtension.DeactivateOnIdle(CancellationToken cancellationToken)
     {
-        Deactivate(new(DeactivationReasonCode.ApplicationRequested, $"{nameof(IGrainManagementExtension.DeactivateOnIdle)} was called."), CancellationToken.None);
+        cancellationToken.ThrowIfCancellationRequested();
+        Deactivate(new(DeactivationReasonCode.ApplicationRequested, $"{nameof(IGrainManagementExtension.DeactivateOnIdle)} was called."), cancellationToken);
         return default;
     }
 
-    ValueTask IGrainManagementExtension.MigrateOnIdle() => MigrateOnIdleAsync(this);
+    ValueTask IGrainManagementExtension.MigrateOnIdle() =>
+        ((IGrainManagementExtension)this).MigrateOnIdle(default);
 
-    private static async ValueTask MigrateOnIdleAsync(ActivationData activation)
+    ValueTask IGrainManagementExtension.MigrateOnIdle(CancellationToken cancellationToken) =>
+        MigrateOnIdleAsync(this, cancellationToken);
+
+    private static async ValueTask MigrateOnIdleAsync(ActivationData activation, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var requestContextData = RequestContext.CallContextData?.Value.Values;
-        var selectedAddress = await PlaceMigratingGrainAsync(activation, requestContextData, CancellationToken.None);
+        var selectedAddress = await PlaceMigratingGrainAsync(activation, requestContextData, cancellationToken);
         if (selectedAddress is null)
         {
             return;
@@ -304,7 +313,7 @@ internal sealed partial class ActivationData
         // Only migrate if a different silo was selected.
         activation.ForwardingAddress = selectedAddress;
         LogDebugMigrating(activation._shared.Logger, activation.GrainId, selectedAddress);
-        activation.Migrate(requestContextData, cancellationToken: CancellationToken.None);
+        activation.Migrate(requestContextData, cancellationToken);
     }
 
     private static async ValueTask<SiloAddress?> PlaceMigratingGrainAsync(
@@ -315,7 +324,8 @@ internal sealed partial class ActivationData
         try
         {
             var placementService = activation._shared.Runtime.ServiceProvider.GetRequiredService<PlacementService>();
-            var selectedAddress = await placementService.PlaceGrainAsync(activation.GrainId, requestContextData, activation.PlacementStrategy);
+            var selectedAddress = await placementService.PlaceGrainAsync(activation.GrainId, requestContextData, activation.PlacementStrategy)
+                .WaitAsync(cancellationToken);
 
             if (selectedAddress is null)
             {
@@ -332,6 +342,10 @@ internal sealed partial class ActivationData
             }
 
             return selectedAddress;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception exception)
         {

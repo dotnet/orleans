@@ -122,10 +122,10 @@ public class ActivationDataStructureTests
     [InlineData("ActivateAsync", typeof(Task), 4)]
     [InlineData("FinishDeactivating", typeof(Task), 3)]
     [InlineData("StartMigrationAsync", typeof(ValueTask<bool>), 4)]
-    [InlineData("MigrateOnIdleAsync", typeof(ValueTask), 1)]
+    [InlineData("MigrateOnIdleAsync", typeof(ValueTask), 2)]
     [InlineData("PlaceMigratingGrainAsync", typeof(ValueTask<SiloAddress>), 3)]
     [InlineData("RunMessageLoop", typeof(Task), 1)]
-    [InlineData("RetryCancellationAfterDelay", typeof(ValueTask), 3)]
+    [InlineData("RetryCancellationAfterDelay", typeof(ValueTask), 4)]
     [InlineData("ProcessOperationsAsync", typeof(Task), 1)]
     [InlineData("DisposeAsync", typeof(ValueTask), 1)]
     public void AsyncCoordinator_IsStaticAndTakesActivation(
