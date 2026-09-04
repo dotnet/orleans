@@ -1325,7 +1325,7 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
             return;
         }
 
-        await _container!.StartAsync();
+        await _container!.StartAsync(TestContext.Current.CancellationToken);
         _client = new AmazonS3Client(
             new BasicAWSCredentials(AccessKey, SecretKey),
             new AmazonS3Config
@@ -1335,7 +1335,9 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
                 AuthenticationRegion = RegionEndpoint.USEast1.SystemName,
             });
         _bucketName = $"{BucketName}-{Guid.NewGuid():N}";
-        await _client.PutBucketAsync(new PutBucketRequest { BucketName = _bucketName });
+        await _client.PutBucketAsync(
+            new PutBucketRequest { BucketName = _bucketName },
+            TestContext.Current.CancellationToken);
     }
 
     public async ValueTask DisposeAsync()

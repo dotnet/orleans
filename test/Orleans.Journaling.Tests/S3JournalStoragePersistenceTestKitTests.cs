@@ -219,7 +219,7 @@ public sealed class S3JournalStoragePersistenceTestKitFixture : IAsyncLifetime
             return;
         }
 
-        await _container!.StartAsync();
+        await _container!.StartAsync(TestContext.Current.CancellationToken);
         _client = new AmazonS3Client(
             new BasicAWSCredentials(AccessKey, SecretKey),
             new AmazonS3Config
@@ -229,7 +229,9 @@ public sealed class S3JournalStoragePersistenceTestKitFixture : IAsyncLifetime
                 AuthenticationRegion = RegionEndpoint.USEast1.SystemName,
             });
         var bucketName = $"journaling-test-kit-{Guid.NewGuid():N}";
-        await _client.PutBucketAsync(new PutBucketRequest { BucketName = bucketName });
+        await _client.PutBucketAsync(
+            new PutBucketRequest { BucketName = bucketName },
+            TestContext.Current.CancellationToken);
         var options = new S3JournalStorageOptions
         {
             BucketName = bucketName,
