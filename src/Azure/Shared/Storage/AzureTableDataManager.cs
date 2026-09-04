@@ -88,6 +88,10 @@ namespace Orleans.GrainDirectory.AzureStorage
                 LogInfoTableCreation(Logger, alreadyExisted ? "Attached to" : "Created", TableName);
                 Table = table;
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (TimeoutException te)
             {
                 LogErrorTableCreationInTimeout(Logger, te, StoragePolicyOptions.CreationTimeout);
