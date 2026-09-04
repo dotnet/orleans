@@ -619,6 +619,9 @@ internal sealed class LocalRateReminderAdmissionGate : IReminderAdmissionGate
 
     public ThrottleBlockMode BlockMode => _config.BlockMode;
 
+    internal static TimeSpan GetPositiveDelay(double seconds)
+        => TimeSpan.FromTicks(Math.Max(1, (long)Math.Ceiling(seconds * TimeSpan.TicksPerSecond)));
+
     public async ValueTask<GateAcquireResult> AcquireAsync(ReminderDeliveryContext context, ReminderAcquireBudget budget, CancellationToken cancellationToken)
     {
         _ = context;
@@ -716,7 +719,7 @@ internal sealed class LocalRateReminderAdmissionGate : IReminderAdmissionGate
 
                 var missingTokens = 1.0 - _tokens;
                 reservation = null!;
-                waitFor = TimeSpan.FromSeconds(missingTokens / _ratePerSecond);
+                waitFor = GetPositiveDelay(missingTokens / _ratePerSecond);
                 return false;
             }
         }
