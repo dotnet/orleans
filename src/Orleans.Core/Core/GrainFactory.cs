@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.GrainReferences;
 using Orleans.Metadata;
 using Orleans.Runtime;
@@ -9,7 +10,7 @@ namespace Orleans
     /// <summary>
     /// Factory for accessing grains.
     /// </summary>
-    internal class GrainFactory : IInternalGrainFactory
+    internal class GrainFactory : IInternalGrainFactory, IGrainTypeAvailability
     {
         private GrainReferenceRuntime? grainReferenceRuntime;
 
@@ -36,6 +37,14 @@ namespace Orleans
         }
 
         private GrainReferenceRuntime GrainReferenceRuntime => this.grainReferenceRuntime ??= (GrainReferenceRuntime)this.runtimeClient.GrainReferenceRuntime;
+
+        ValueTask<GrainType> IGrainTypeAvailability.WaitForGrainTypeAsync(
+            Type grainInterfaceType,
+            string? grainClassNamePrefix,
+            CancellationToken cancellationToken)
+            => this.runtimeClient.ServiceProvider
+                .GetRequiredService<GrainTypeAvailability>()
+                .WaitForGrainTypeAsync(grainInterfaceType, grainClassNamePrefix, cancellationToken);
 
         /// <inheritdoc />
         public TGrainInterface GetGrain<TGrainInterface>(Guid primaryKey, string? grainClassNamePrefix = null) where TGrainInterface : IGrainWithGuidKey
