@@ -165,6 +165,11 @@ internal sealed class ConfiguredDurableTaskCore<TDurableTask> where TDurableTask
 {
     internal readonly TDurableTask Task;
     internal readonly DurableExecutionContext? ParentContext = DurableExecutionContext.CurrentContext;
+#if NET9_0_OR_GREATER
+    private readonly Lock _taskIdLock = new();
+#else
+    private readonly object _taskIdLock = new();
+#endif
     private TaskId _taskId;
 
     public ConfiguredDurableTaskCore(TDurableTask task)
@@ -213,7 +218,7 @@ internal sealed class ConfiguredDurableTaskCore<TDurableTask> where TDurableTask
 
     internal bool TrySetTaskId(string? name)
     {
-        lock (this)
+        lock (_taskIdLock)
         {
             if (!_taskId.IsDefault)
             {
