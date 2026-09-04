@@ -53,9 +53,9 @@ Use heterogeneous grain type registration when a silo cannot host the implementa
 
 Clients obtain cluster type information after connecting. The synchronous <xref:Orleans.IGrainFactory.GetGrain*> methods require the current cluster manifest to contain a compatible grain implementation.
 
-When a client can connect before a specialized silo is available, use <xref:Orleans.ClusterClientGrainResolutionExtensions.GetGrainAsync*>. The operation waits until the cluster advertises the selected grain implementation with the client's interface version, then returns a normal grain reference with its complete, immutable grain identity. Pass a cancellation token or deadline appropriate for application startup.
+When a client or silo can start before a specialized silo is available, use <xref:Orleans.GrainFactoryResolutionExtensions.GetGrainAsync*>. The operation waits until the cluster advertises the selected grain implementation with the caller's interface version, then returns a normal grain reference with its complete, immutable grain identity. Pass a cancellation token or deadline appropriate for application startup.
 
-Use <xref:Orleans.ClusterClientGrainResolutionExtensions.WaitForGrainTypeAsync*> when startup needs an availability barrier without creating a grain reference.
+Use <xref:Orleans.GrainFactoryResolutionExtensions.WaitForGrainTypeAsync*> when startup needs an availability barrier without creating a grain reference.
 
 ## Limitations
 
