@@ -33,7 +33,7 @@ internal sealed class AuthenticationWorkLimiter
 
         public async ValueTask<IDisposable?> TryAcquireAsync(CancellationToken cancellationToken)
         {
-            if (_semaphore.Wait(0))
+            if (_semaphore.Wait(0, cancellationToken))
             {
                 return new Releaser(_semaphore);
             }
