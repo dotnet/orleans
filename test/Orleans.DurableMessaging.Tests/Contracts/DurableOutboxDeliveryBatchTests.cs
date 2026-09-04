@@ -844,16 +844,16 @@ public sealed class DurableOutboxDeliveryBatchTests
             Guid messageId,
             string routeKey = "test",
             GrainId? senderId = null) => new()
-        {
-            MessageId = messageId,
-            SenderId = senderId ?? SenderId,
-            ReceiverId = ReceiverId,
-            RouteKey = routeKey,
-            CorrelationKey = HierarchicalKey.Create("operation/1"),
-            ReplyTo = SenderId,
-            Data = CreateEnvelopeData(),
-            CreatedAt = DateTimeOffset.UnixEpoch
-        };
+            {
+                MessageId = messageId,
+                SenderId = senderId ?? SenderId,
+                ReceiverId = ReceiverId,
+                RouteKey = routeKey,
+                CorrelationKey = HierarchicalKey.Create("operation/1"),
+                ReplyTo = SenderId,
+                Data = CreateEnvelopeData(),
+                CreatedAt = DateTimeOffset.UnixEpoch
+            };
 
         private HashSet<Guid> GetPendingMessageIds() =>
             (HashSet<Guid>)_pendingMessageIdsField.GetValue(_outbox)!;
