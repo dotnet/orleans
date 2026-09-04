@@ -724,15 +724,26 @@ public class AsyncEnumerableGrainCallTests
         var values = new List<string>();
         await Assert.ThrowsAsync<EnumerationAbortedException>(async () =>
         {
-            await foreach (var entry in grain.GetValues(cancellationToken))
+            try
             {
-                values.Add(entry);
-                if (values.Count == 2)
+                await foreach (var entry in grain.GetValues(cancellationToken))
                 {
-                    valuesObserved.TrySetResult();
-                }
+                    values.Add(entry);
+                    if (values.Count == 2)
+                    {
+                        valuesObserved.TrySetResult();
+                    }
 
-                Logger.LogInformation("ObservableGrain_AsyncEnumerable: {Entry}", entry);
+                    Logger.LogInformation("ObservableGrain_AsyncEnumerable: {Entry}", entry);
+                }
+            }
+            finally
+            {
+                if (values.Count < 2)
+                {
+                    valuesObserved.TrySetException(
+                        new InvalidOperationException($"Enumeration ended after observing {values.Count} of 2 values."));
+                }
             }
         }).WaitAsync(cancellationToken);
 
