@@ -8,6 +8,7 @@ using Orleans.DurableMessaging;
 using Orleans.DurableMessaging.Configuration;
 using Orleans.DurableJobs;
 using Orleans.Journaling;
+using Orleans.Journaling.Json;
 using Orleans.Runtime;
 using Orleans.Serialization.Session;
 using Orleans.Timers;
@@ -38,7 +39,18 @@ public static class DurableMessagingExtensions
         services.AddDurableJobs();
         services.TryAddSingleton(TimeProvider.System);
         services.PostConfigure<JournaledStateManagerOptions>(
-            options => options.JournalFormatKey = DurableMessagingJournalFormatKey);
+            options =>
+            {
+                if (string.Equals(options.JournalFormatKey, JsonJournalExtensions.JournalFormatKey, StringComparison.Ordinal))
+                {
+                    options.JournalFormatKey = DurableMessagingJournalFormatKey;
+                }
+                else if (!string.Equals(options.JournalFormatKey, DurableMessagingJournalFormatKey, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException(
+                        $"Durable messaging requires journal format '{DurableMessagingJournalFormatKey}', but '{options.JournalFormatKey}' is configured.");
+                }
+            });
 
         var optionsBuilder = services.AddOptions<DurableInboxOptions>();
         if (configureOptions is not null)
