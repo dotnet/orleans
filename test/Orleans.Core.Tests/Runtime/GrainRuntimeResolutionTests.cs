@@ -238,6 +238,16 @@ public class GrainRuntimeResolutionTests
     }
 
     [Fact, TestCategory("BVT")]
+    public void ActivationContext_InvalidRuntimeOverride_ThrowsArgumentException()
+    {
+        var activation = CreateActivationData(CreateSharedContext(Substitute.For<IGrainRuntime>()));
+
+        var exception = Assert.Throws<ArgumentException>(() => activation.SetComponent(typeof(IGrainRuntime), new object()));
+
+        Assert.Equal("instance", exception.ParamName);
+    }
+
+    [Fact, TestCategory("BVT")]
     public void StatelessWorkerContext_RuntimeOverride_DoesNotMutateSharedContext()
     {
         var defaultRuntime = Substitute.For<IGrainRuntime>();

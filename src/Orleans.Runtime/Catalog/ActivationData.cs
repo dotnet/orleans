@@ -399,6 +399,11 @@ internal sealed partial class ActivationData :
 
     public void SetComponent(Type componentType, object? instance)
     {
+        if (instance is not null && !componentType.IsInstanceOfType(instance))
+        {
+            throw new ArgumentException($"Component instance of type '{instance.GetType()}' is not assignable to component type '{componentType}'.", nameof(instance));
+        }
+
         if (componentType.IsAssignableFrom(GrainInstance?.GetType()))
         {
             throw new ArgumentException("Cannot override a component which is implemented by this grain");
