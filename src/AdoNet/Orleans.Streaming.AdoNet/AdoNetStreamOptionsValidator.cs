@@ -47,6 +47,17 @@ public class AdoNetStreamOptionsValidator(AdoNetStreamOptions options, string na
             throw new OrleansConfigurationException($"Invalid {nameof(AdoNetStreamOptions)} values for ADO.NET Streaming Provider '{name}': {nameof(options.CleanupInterval)} must be between one second and {int.MaxValue} seconds.");
         }
 
+        if (IsInvalidSqlInterval(options.ReplayLeaseDuration))
+        {
+            throw new OrleansConfigurationException($"Invalid {nameof(AdoNetStreamOptions)} values for ADO.NET Streaming Provider '{name}': {nameof(options.ReplayLeaseDuration)} must be between one second and {int.MaxValue} seconds.");
+        }
+
+        if (options.ReplayLeaseRenewalInterval <= TimeSpan.Zero
+            || options.ReplayLeaseRenewalInterval >= options.ReplayLeaseDuration)
+        {
+            throw new OrleansConfigurationException($"Invalid {nameof(AdoNetStreamOptions)} values for ADO.NET Streaming Provider '{name}': {nameof(options.ReplayLeaseRenewalInterval)} must be greater than zero and less than {nameof(options.ReplayLeaseDuration)}.");
+        }
+
         if (options.CleanupBatchSize <= 0)
         {
             throw new OrleansConfigurationException($"Invalid {nameof(AdoNetStreamOptions)} values for ADO.NET Streaming Provider '{name}': {nameof(options.CleanupBatchSize)} must be greater than zero.");

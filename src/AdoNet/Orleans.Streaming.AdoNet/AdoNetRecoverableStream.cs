@@ -1,4 +1,6 @@
+using System.Data.Common;
 using System.Globalization;
+using System.Runtime.ExceptionServices;
 using Orleans.Providers.Streams.Common;
 
 namespace Orleans.Streaming.AdoNet;
@@ -9,13 +11,18 @@ internal sealed partial class AdoNetRecoverableStream(
     string queueId,
     AdoNetStreamOptions options,
     RelationalOrleansQueries queries,
-    ILogger logger) : IRecoverableStreamSource<AdoNetStreamMessage>, IStreamCheckpointStore
+    ILogger logger,
+    TimeProvider? timeProvider = null)
+    : IRecoverableStreamSource<AdoNetStreamMessage>,
+      IRecoverableStreamReplaySourceFactory<AdoNetStreamMessage>,
+      IStreamCheckpointStore
 {
     private AdoNetStreamPartitionState? _partition;
     private long _readOffset;
     private Task<AdoNetStreamPartitionState>? _acquisitionTask;
     private DataNotAvailableException? _retentionFailure;
     private long? _pendingHardDeletedThrough;
+    private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
 
     internal Task AcquisitionCompletion => Volatile.Read(ref _acquisitionTask) ?? Task.CompletedTask;
 
@@ -115,6 +122,7 @@ internal sealed partial class AdoNetRecoverableStream(
             serviceId,
             providerId,
             queueId,
+            _partition!.OwnerEpoch,
             AdoNetStreamTime.ToSqlSeconds(options.RetentionPeriod),
             options.MaximumRetentionPeriod is { } maximum
                 ? AdoNetStreamTime.ToSqlSeconds(maximum)
@@ -132,7 +140,8 @@ internal sealed partial class AdoNetRecoverableStream(
                 cleanup.HardDeletedCount,
                 cleanup.HardDeletedFromMessageId,
                 cleanup.HardDeletedThroughMessageId,
-                cleanup.Checkpoint);
+                cleanup.Checkpoint,
+                cleanup.ActiveReplayWatermark);
         }
 
         var readThrough = messages.Count > 0 ? messages[^1].MessageId : _readOffset;
@@ -186,6 +195,110 @@ internal sealed partial class AdoNetRecoverableStream(
             ? Task.FromCanceled(cancellationToken)
             : Task.CompletedTask;
 
+    public async ValueTask<IRecoverableStreamReplaySource<AdoNetStreamMessage>> Create(
+        StreamId streamId,
+        StreamSequenceToken token,
+        CancellationToken cancellationToken)
+    {
+        if (!TryNormalizeToken(token, out var adoNetToken))
+        {
+            throw new DataNotAvailableException(
+                $"The replay token does not belong to ADO.NET stream partition '{serviceId}/{providerId}/{queueId}'.");
+        }
+
+        if (_partition is not { } partition)
+        {
+            throw new InvalidOperationException(
+                "The ADO.NET stream partition must be acquired before a historical reader is created.");
+        }
+
+        var afterMessageId = adoNetToken.SequenceNumber > 0 ? adoNetToken.SequenceNumber - 1 : 0;
+        var readerId = Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture);
+        var leaseDurationSeconds = AdoNetStreamTime.ToSqlSeconds(options.ReplayLeaseDuration);
+        AdoNetStreamReplayLeaseState lease;
+        try
+        {
+            lease = await queries.AcquireStreamReplayLeaseAsync(
+                serviceId,
+                providerId,
+                queueId,
+                readerId,
+                streamId.FullKey.ToArray(),
+                streamId.Namespace.Length,
+                partition.OwnerEpoch,
+                afterMessageId,
+                leaseDurationSeconds,
+                cancellationToken);
+        }
+        catch (DbException exception)
+        {
+            throw new TransientStreamReplayException(
+                $"ADO.NET replay lease admission temporarily failed for '{serviceId}/{providerId}/{queueId}'.",
+                exception);
+        }
+        ThrowForReplayStatus(lease, readerId, afterMessageId);
+        return new AdoNetReplaySource(
+            serviceId,
+            providerId,
+            queueId,
+            readerId,
+            partition.OwnerEpoch,
+            afterMessageId,
+            leaseDurationSeconds,
+            options.ReplayLeaseRenewalInterval,
+            queries,
+            _timeProvider);
+    }
+
+    private bool TryNormalizeToken(
+        StreamSequenceToken token,
+        out AdoNetStreamSequenceToken normalized)
+    {
+        if (token is AdoNetStreamSequenceToken adoNetToken
+            && string.Equals(adoNetToken.ServiceId, serviceId, StringComparison.Ordinal)
+            && string.Equals(adoNetToken.ProviderId, providerId, StringComparison.Ordinal)
+            && string.Equals(adoNetToken.QueueId, queueId, StringComparison.Ordinal))
+        {
+            normalized = adoNetToken;
+            return true;
+        }
+
+        if (token is PartitionedStreamSequenceToken partitionedToken
+            && string.Equals(
+                partitionedToken.ProviderIdentity,
+                AdoNetStreamSequenceToken.GetProviderIdentity(serviceId, providerId),
+                StringComparison.Ordinal)
+            && string.Equals(partitionedToken.PartitionIdentity, queueId, StringComparison.Ordinal)
+            && long.TryParse(
+                partitionedToken.Position,
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out var sequenceNumber))
+        {
+            normalized = new(
+                serviceId,
+                providerId,
+                queueId,
+                sequenceNumber,
+                partitionedToken.EventIndex);
+            return true;
+        }
+
+        if (token.GetType() == typeof(EventSequenceTokenV2))
+        {
+            normalized = new(
+                serviceId,
+                providerId,
+                queueId,
+                token.SequenceNumber,
+                token.EventIndex);
+            return true;
+        }
+
+        normalized = null!;
+        return false;
+    }
+
     private void ThrowIfRetentionGap(AdoNetStreamPartitionState state)
     {
         if (HasRetentionGap(state))
@@ -208,9 +321,36 @@ internal sealed partial class AdoNetRecoverableStream(
         return checkpoint < earliestAvailablePosition - 1;
     }
 
+    private static void ThrowForReplayStatus(
+        AdoNetStreamReplayLeaseState lease,
+        string readerId,
+        long requestedPosition)
+    {
+        switch (lease.Status)
+        {
+            case AdoNetStreamReplayStatus.Acquired:
+            case AdoNetStreamReplayStatus.Active:
+            case AdoNetStreamReplayStatus.Released:
+                return;
+            case AdoNetStreamReplayStatus.HistoryUnavailable:
+                throw new DataNotAvailableException(
+                    $"ADO.NET replay reader '{readerId}' requested partition position {requestedPosition}, "
+                    + $"but the earliest retained record is {lease.EarliestMessageId?.ToString(CultureInfo.InvariantCulture) ?? "<empty>"}.");
+            case AdoNetStreamReplayStatus.Expired:
+                throw new DataNotAvailableException(
+                    $"ADO.NET replay lease '{readerId}' expired while reading retained partition history.");
+            case AdoNetStreamReplayStatus.OwnershipLost:
+                throw new InvalidOperationException(
+                    $"ADO.NET stream partition ownership was lost while operating replay lease '{readerId}'.");
+            default:
+                throw new InvalidOperationException(
+                    $"ADO.NET replay lease '{readerId}' returned unsupported status '{lease.Status}'.");
+        }
+    }
+
     [LoggerMessage(
         Level = LogLevel.Warning,
-        Message = "Hard stream retention deleted {DeletedCount} records for {ServiceId}/{ProviderId}/{QueueId} from {DeletedFrom} through {DeletedThrough}, crossing checkpoint {Checkpoint}.")]
+        Message = "Hard stream retention deleted {DeletedCount} records for {ServiceId}/{ProviderId}/{QueueId} from {DeletedFrom} through {DeletedThrough}, crossing checkpoint {Checkpoint} or replay watermark {ReplayWatermark}.")]
     private static partial void LogHardRetentionCrossed(
         ILogger logger,
         string serviceId,
@@ -219,14 +359,231 @@ internal sealed partial class AdoNetRecoverableStream(
         int deletedCount,
         long? deletedFrom,
         long? deletedThrough,
-        long? checkpoint);
+        long? checkpoint,
+        long? replayWatermark);
+
+    private sealed class AdoNetReplaySource : IRecoverableStreamReplaySource<AdoNetStreamMessage>
+    {
+        private readonly string _serviceId;
+        private readonly string _providerId;
+        private readonly string _queueId;
+        private readonly string _readerId;
+        private readonly long _ownerEpoch;
+        private readonly int _leaseDurationSeconds;
+        private readonly TimeSpan _renewalInterval;
+        private readonly RelationalOrleansQueries _queries;
+        private readonly TimeProvider _timeProvider;
+        private readonly CancellationTokenSource _cancellation = new();
+        private readonly Task _heartbeatTask;
+        private ExceptionDispatchInfo? _failure;
+        private long _readOffset;
+        private long _safeWatermark;
+        private int _disposed;
+
+        public AdoNetReplaySource(
+            string serviceId,
+            string providerId,
+            string queueId,
+            string readerId,
+            long ownerEpoch,
+            long readOffset,
+            int leaseDurationSeconds,
+            TimeSpan renewalInterval,
+            RelationalOrleansQueries queries,
+            TimeProvider timeProvider)
+        {
+            _serviceId = serviceId;
+            _providerId = providerId;
+            _queueId = queueId;
+            _readerId = readerId;
+            _ownerEpoch = ownerEpoch;
+            _readOffset = readOffset;
+            _safeWatermark = readOffset;
+            _leaseDurationSeconds = leaseDurationSeconds;
+            _renewalInterval = renewalInterval;
+            _queries = queries;
+            _timeProvider = timeProvider;
+            _heartbeatTask = RunHeartbeat();
+        }
+
+        public async ValueTask<RecoverableStreamReplayReadResult<AdoNetStreamMessage>> Read(
+            int maxCount,
+            CancellationToken cancellationToken)
+        {
+            ThrowIfFailed();
+            using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken,
+                _cancellation.Token);
+            AdoNetStreamReplayPage page;
+            try
+            {
+                page = await _queries.ReadStreamReplayMessagesAsync(
+                    _serviceId,
+                    _providerId,
+                    _queueId,
+                    _readerId,
+                    _ownerEpoch,
+                    _readOffset,
+                    maxCount,
+                    _leaseDurationSeconds,
+                    linkedCancellation.Token);
+            }
+            catch (DbException exception)
+            {
+                throw new TransientStreamReplayException(
+                    $"ADO.NET replay reader '{_readerId}' temporarily failed.",
+                    exception);
+            }
+            ThrowForReplayStatus(page.Lease, _readerId, _readOffset);
+            var isAtTail = page.Lease.TailMessageId is not { } tail
+                || page.Messages.Count == 0 && _readOffset >= tail
+                || page.Messages.Count > 0 && page.Messages[^1].MessageId >= tail;
+            return new(page.Messages, isAtTail);
+        }
+
+        public void MessagesAdded(IReadOnlyList<AdoNetStreamMessage> messages)
+        {
+            if (messages.Count > 0)
+            {
+                _readOffset = messages[^1].MessageId;
+            }
+        }
+
+        public void UpdateProgress(StreamSequenceToken token)
+        {
+            if (token is not AdoNetStreamSequenceToken adoNetToken
+                || !string.Equals(adoNetToken.ServiceId, _serviceId, StringComparison.Ordinal)
+                || !string.Equals(adoNetToken.ProviderId, _providerId, StringComparison.Ordinal)
+                || !string.Equals(adoNetToken.QueueId, _queueId, StringComparison.Ordinal))
+            {
+                throw new ArgumentOutOfRangeException(nameof(token));
+            }
+
+            var current = Volatile.Read(ref _safeWatermark);
+            while (current < adoNetToken.SequenceNumber)
+            {
+                var previous = Interlocked.CompareExchange(
+                    ref _safeWatermark,
+                    adoNetToken.SequenceNumber,
+                    current);
+                if (previous == current)
+                {
+                    break;
+                }
+
+                current = previous;
+            }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            {
+                return;
+            }
+
+            try
+            {
+                await StopHeartbeat();
+                var result = await _queries.ReleaseStreamReplayLeaseAsync(
+                    _serviceId,
+                    _providerId,
+                    _queueId,
+                    _readerId,
+                    _ownerEpoch,
+                    CancellationToken.None);
+                ThrowForReplayStatus(result, _readerId, _safeWatermark);
+            }
+            finally
+            {
+                _cancellation.Dispose();
+            }
+        }
+
+        public async ValueTask ShutdownAsync(CancellationToken cancellationToken)
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            {
+                return;
+            }
+
+            try
+            {
+                await StopHeartbeat();
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+            finally
+            {
+                _cancellation.Dispose();
+            }
+        }
+
+        private async Task RunHeartbeat()
+        {
+            try
+            {
+                while (true)
+                {
+                    await Task.Delay(_renewalInterval, _timeProvider, _cancellation.Token);
+                    var watermark = Volatile.Read(ref _safeWatermark);
+                    AdoNetStreamReplayLeaseState result;
+                    try
+                    {
+                        result = await _queries.UpdateStreamReplayLeaseAsync(
+                            _serviceId,
+                            _providerId,
+                            _queueId,
+                            _readerId,
+                            _ownerEpoch,
+                            watermark,
+                            _leaseDurationSeconds,
+                            _cancellation.Token);
+                    }
+                    catch (DbException exception)
+                    {
+                        throw new TransientStreamReplayException(
+                            $"ADO.NET replay lease '{_readerId}' renewal temporarily failed.",
+                            exception);
+                    }
+                    ThrowForReplayStatus(result, _readerId, watermark);
+                }
+            }
+            catch (OperationCanceledException) when (_cancellation.IsCancellationRequested)
+            {
+            }
+            catch (Exception exception)
+            {
+                Volatile.Write(ref _failure, ExceptionDispatchInfo.Capture(exception));
+                _cancellation.Cancel();
+            }
+        }
+
+        private async Task StopHeartbeat()
+        {
+            _cancellation.Cancel();
+            await _heartbeatTask;
+            ThrowIfFailed();
+        }
+
+        private void ThrowIfFailed() => Volatile.Read(ref _failure)?.Throw();
+    }
 }
 
 internal sealed class AdoNetRecoverableStreamDataAdapter(
+    string serviceId,
+    string providerId,
+    string queueId,
     Serializer<AdoNetBatchContainer> serializer) : IRecoverableStreamDataAdapter<AdoNetStreamMessage>
 {
+    public AdoNetRecoverableStreamDataAdapter(Serializer<AdoNetBatchContainer> serializer)
+        : this(string.Empty, string.Empty, string.Empty, serializer)
+    {
+    }
+
     public StreamPosition GetStreamPosition(AdoNetStreamMessage queueMessage)
-        => new(queueMessage.StreamId, new EventSequenceTokenV2(queueMessage.MessageId));
+        => new(
+            queueMessage.StreamId,
+            new AdoNetStreamSequenceToken(serviceId, providerId, queueId, queueMessage.MessageId));
 
     public CachedMessage FromQueueMessage(
         StreamPosition streamPosition,
@@ -254,9 +611,9 @@ internal sealed class AdoNetRecoverableStreamDataAdapter(
         var offset = 0;
         var payload = SegmentBuilder.ReadNextBytes(cachedMessage.Segment, ref offset).ToArray();
         var message = new AdoNetStreamMessage(
-            string.Empty,
-            string.Empty,
-            string.Empty,
+            serviceId,
+            providerId,
+            queueId,
             cachedMessage.SequenceNumber,
             cachedMessage.StreamId.FullKey.ToArray(),
             cachedMessage.StreamId.Namespace.Length,
@@ -266,14 +623,90 @@ internal sealed class AdoNetRecoverableStreamDataAdapter(
     }
 
     public StreamSequenceToken GetSequenceToken(ref CachedMessage cachedMessage)
-        => new EventSequenceTokenV2(cachedMessage.SequenceNumber, cachedMessage.EventIndex);
+        => new AdoNetStreamSequenceToken(
+            serviceId,
+            providerId,
+            queueId,
+            cachedMessage.SequenceNumber,
+            cachedMessage.EventIndex);
+
+    public int Compare(ref CachedMessage cachedMessage, StreamSequenceToken token)
+    {
+        if (!TryNormalizeToken(token, out var adoNetToken))
+        {
+            throw new ArgumentOutOfRangeException(nameof(token));
+        }
+
+        var difference = cachedMessage.SequenceNumber.CompareTo(adoNetToken.SequenceNumber);
+        return difference != 0 ? difference : cachedMessage.EventIndex.CompareTo(adoNetToken.EventIndex);
+    }
 
     public string GetOffset(ref CachedMessage cachedMessage)
         => cachedMessage.SequenceNumber.ToString(CultureInfo.InvariantCulture);
 
     public bool TryGetOffset(StreamSequenceToken token, out string offset)
     {
-        offset = token.SequenceNumber.ToString(CultureInfo.InvariantCulture);
-        return token is EventSequenceTokenV2;
+        if (TryNormalizeToken(token, out var adoNetToken))
+        {
+            offset = token.SequenceNumber.ToString(CultureInfo.InvariantCulture);
+            return true;
+        }
+
+        offset = string.Empty;
+        return false;
+    }
+
+    public StreamSequenceToken GetRecordToken(StreamSequenceToken token)
+        => TryNormalizeToken(token, out var adoNetToken)
+            ? adoNetToken.CreateSequenceTokenForEvent(0)
+            : throw new ArgumentOutOfRangeException(nameof(token));
+
+    private bool TryNormalizeToken(
+        StreamSequenceToken token,
+        out AdoNetStreamSequenceToken normalized)
+    {
+        if (token is AdoNetStreamSequenceToken adoNetToken
+            && string.Equals(adoNetToken.ServiceId, serviceId, StringComparison.Ordinal)
+            && string.Equals(adoNetToken.ProviderId, providerId, StringComparison.Ordinal)
+            && string.Equals(adoNetToken.QueueId, queueId, StringComparison.Ordinal))
+        {
+            normalized = adoNetToken;
+            return true;
+        }
+
+        if (token is PartitionedStreamSequenceToken partitionedToken
+            && string.Equals(
+                partitionedToken.ProviderIdentity,
+                AdoNetStreamSequenceToken.GetProviderIdentity(serviceId, providerId),
+                StringComparison.Ordinal)
+            && string.Equals(partitionedToken.PartitionIdentity, queueId, StringComparison.Ordinal)
+            && long.TryParse(
+                partitionedToken.Position,
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out var sequenceNumber))
+        {
+            normalized = new(
+                serviceId,
+                providerId,
+                queueId,
+                sequenceNumber,
+                partitionedToken.EventIndex);
+            return true;
+        }
+
+        if (token.GetType() == typeof(EventSequenceTokenV2))
+        {
+            normalized = new(
+                serviceId,
+                providerId,
+                queueId,
+                token.SequenceNumber,
+                token.EventIndex);
+            return true;
+        }
+
+        normalized = null!;
+        return false;
     }
 }

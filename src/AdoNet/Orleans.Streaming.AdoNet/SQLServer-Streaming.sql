@@ -1,5 +1,5 @@
 /*
-ADO.NET streaming schema version 2.
+ADO.NET streaming schema version 3.
 
 This alpha schema is intentionally incompatible with the former destructive queue schema.
 Drop the former streaming tables, sequence, routines, and OrleansQuery rows before applying
@@ -8,6 +8,7 @@ this script. Existing queue rows are not migrated.
 
 IF OBJECT_ID(N'OrleansStreamPartition', N'U') IS NOT NULL
     OR OBJECT_ID(N'OrleansStreamMessage', N'U') IS NOT NULL
+    OR OBJECT_ID(N'OrleansStreamReplayLease', N'U') IS NOT NULL
     OR OBJECT_ID(N'OrleansStreamDeadLetter', N'U') IS NOT NULL
     OR OBJECT_ID(N'OrleansStreamControl', N'U') IS NOT NULL
     OR OBJECT_ID(N'OrleansStreamMessageSequence', N'SO') IS NOT NULL
@@ -27,7 +28,7 @@ IF OBJECT_ID(N'OrleansStreamPartition', N'U') IS NOT NULL
         )
     )
 BEGIN
-    THROW 51001, 'Incompatible alpha ADO.NET streaming schema. Drop old streaming tables, sequence, routines, and OrleansQuery rows before applying version 2; no in-place migration is supported.', 1;
+    THROW 51001, 'Incompatible alpha ADO.NET streaming schema. Drop old streaming tables, sequence, routines, and OrleansQuery rows before applying version 3; no in-place migration is supported.', 1;
 END;
 GO
 
@@ -72,6 +73,34 @@ CREATE TABLE OrleansStreamMessage
         MessageId
     )
 );
+GO
+
+CREATE TABLE OrleansStreamReplayLease
+(
+    ServiceId NVARCHAR(150) NOT NULL,
+    ProviderId NVARCHAR(150) NOT NULL,
+    QueueId NVARCHAR(150) NOT NULL,
+    ReaderId NVARCHAR(150) NOT NULL,
+    StreamIdBytes VARBINARY(MAX) NOT NULL,
+    StreamNamespaceLength INT NOT NULL,
+    OwnerEpoch BIGINT NOT NULL,
+    Watermark BIGINT NOT NULL,
+    ExpiresOn DATETIME2(7) NOT NULL,
+    CreatedOn DATETIME2(7) NOT NULL,
+    ModifiedOn DATETIME2(7) NOT NULL,
+
+    CONSTRAINT PK_OrleansStreamReplayLease PRIMARY KEY NONCLUSTERED
+    (
+        ServiceId,
+        ProviderId,
+        QueueId,
+        ReaderId
+    )
+);
+GO
+
+CREATE INDEX IX_OrleansStreamReplayLease_Active
+    ON OrleansStreamReplayLease (ServiceId, ProviderId, QueueId, ExpiresOn, Watermark);
 GO
 
 CREATE PROCEDURE AppendStreamMessage
@@ -516,10 +545,423 @@ BEGIN
 END;
 GO
 
+CREATE PROCEDURE AcquireStreamReplayLease
+    @ServiceId NVARCHAR(150),
+    @ProviderId NVARCHAR(150),
+    @QueueId NVARCHAR(150),
+    @ReaderId NVARCHAR(150),
+    @StreamIdBytes VARBINARY(MAX),
+    @StreamNamespaceLength INT,
+    @OwnerEpoch BIGINT,
+    @AfterMessageId BIGINT,
+    @ReplayLeaseDurationSeconds INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    DECLARE @StartedTransaction BIT = 0;
+    DECLARE @Now DATETIME2(7);
+    DECLARE @CurrentOwnerEpoch BIGINT;
+    DECLARE @NextMessageId BIGINT;
+    DECLARE @Checkpoint BIGINT;
+    DECLARE @EarliestMessageId BIGINT;
+    DECLARE @TailMessageId BIGINT;
+    DECLARE @LeaseOwnerEpoch BIGINT;
+    DECLARE @Watermark BIGINT;
+    DECLARE @ExpiresOn DATETIME2(7);
+    DECLARE @Status VARCHAR(32);
+
+    BEGIN TRY
+        IF @@TRANCOUNT = 0
+        BEGIN
+            BEGIN TRANSACTION;
+            SET @StartedTransaction = 1;
+        END;
+
+        SELECT
+            @CurrentOwnerEpoch = OwnerEpoch,
+            @NextMessageId = NextMessageId,
+            @Checkpoint = [Checkpoint]
+        FROM OrleansStreamPartition WITH (UPDLOCK, HOLDLOCK, ROWLOCK)
+        WHERE ServiceId = @ServiceId
+            AND ProviderId = @ProviderId
+            AND QueueId = @QueueId;
+
+        SET @Now = SYSUTCDATETIME();
+
+        SELECT
+            @LeaseOwnerEpoch = OwnerEpoch,
+            @Watermark = Watermark,
+            @ExpiresOn = ExpiresOn
+        FROM OrleansStreamReplayLease WITH (UPDLOCK, HOLDLOCK, ROWLOCK)
+        WHERE ServiceId = @ServiceId
+            AND ProviderId = @ProviderId
+            AND QueueId = @QueueId
+            AND ReaderId = @ReaderId;
+
+        SELECT
+            @EarliestMessageId = MIN(MessageId),
+            @TailMessageId = MAX(MessageId)
+        FROM OrleansStreamMessage WITH (UPDLOCK, HOLDLOCK, ROWLOCK)
+        WHERE ServiceId = @ServiceId
+            AND ProviderId = @ProviderId
+            AND QueueId = @QueueId;
+
+        IF @CurrentOwnerEpoch IS NULL OR @CurrentOwnerEpoch <> @OwnerEpoch
+            OR (@LeaseOwnerEpoch IS NOT NULL AND @LeaseOwnerEpoch <> @OwnerEpoch AND @ExpiresOn > @Now)
+        BEGIN
+            SET @Status = 'OwnershipLost';
+        END
+        ELSE IF @AfterMessageId < COALESCE(@EarliestMessageId, @NextMessageId) - 1
+        BEGIN
+            SET @Status = 'HistoryUnavailable';
+        END
+        ELSE
+        BEGIN
+            IF @LeaseOwnerEpoch IS NOT NULL AND (@LeaseOwnerEpoch <> @OwnerEpoch OR @ExpiresOn <= @Now)
+            BEGIN
+                DELETE FROM OrleansStreamReplayLease
+                WHERE ServiceId = @ServiceId
+                    AND ProviderId = @ProviderId
+                    AND QueueId = @QueueId
+                    AND ReaderId = @ReaderId;
+                SET @LeaseOwnerEpoch = NULL;
+            END;
+
+            IF @LeaseOwnerEpoch IS NULL
+            BEGIN
+                SET @Watermark = @AfterMessageId;
+                SET @ExpiresOn = DATEADD(SECOND, @ReplayLeaseDurationSeconds, @Now);
+                INSERT INTO OrleansStreamReplayLease
+                (
+                    ServiceId, ProviderId, QueueId, ReaderId, StreamIdBytes,
+                    StreamNamespaceLength, OwnerEpoch, Watermark, ExpiresOn, CreatedOn, ModifiedOn
+                )
+                VALUES
+                (
+                    @ServiceId, @ProviderId, @QueueId, @ReaderId, @StreamIdBytes,
+                    @StreamNamespaceLength, @OwnerEpoch, @Watermark, @ExpiresOn, @Now, @Now
+                );
+            END
+            ELSE
+            BEGIN
+                SET @Watermark = CASE WHEN @Watermark < @AfterMessageId THEN @AfterMessageId ELSE @Watermark END;
+                SET @ExpiresOn = DATEADD(SECOND, @ReplayLeaseDurationSeconds, @Now);
+                UPDATE OrleansStreamReplayLease
+                SET
+                    Watermark = @Watermark,
+                    ExpiresOn = @ExpiresOn,
+                    ModifiedOn = @Now
+                WHERE ServiceId = @ServiceId
+                    AND ProviderId = @ProviderId
+                    AND QueueId = @QueueId
+                    AND ReaderId = @ReaderId
+                    AND OwnerEpoch = @OwnerEpoch;
+            END;
+            SET @Status = 'Acquired';
+        END;
+
+        IF @StartedTransaction = 1 COMMIT TRANSACTION;
+
+        SELECT
+            @Status AS Status,
+            @ServiceId AS ServiceId,
+            @ProviderId AS ProviderId,
+            @QueueId AS QueueId,
+            @ReaderId AS ReaderId,
+            @CurrentOwnerEpoch AS OwnerEpoch,
+            @Watermark AS Watermark,
+            @ExpiresOn AS ExpiresOn,
+            @NextMessageId AS NextMessageId,
+            @Checkpoint AS [Checkpoint],
+            @EarliestMessageId AS EarliestMessageId,
+            @TailMessageId AS TailMessageId;
+    END TRY
+    BEGIN CATCH
+        IF @StartedTransaction = 1 AND XACT_STATE() <> 0 ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH;
+END;
+GO
+
+CREATE PROCEDURE ReadStreamReplayMessages
+    @ServiceId NVARCHAR(150),
+    @ProviderId NVARCHAR(150),
+    @QueueId NVARCHAR(150),
+    @ReaderId NVARCHAR(150),
+    @OwnerEpoch BIGINT,
+    @AfterMessageId BIGINT,
+    @MaxCount INT,
+    @ReplayLeaseDurationSeconds INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    DECLARE @StartedTransaction BIT = 0;
+    DECLARE @Now DATETIME2(7);
+    DECLARE @CurrentOwnerEpoch BIGINT;
+    DECLARE @NextMessageId BIGINT;
+    DECLARE @Checkpoint BIGINT;
+    DECLARE @EarliestMessageId BIGINT;
+    DECLARE @TailMessageId BIGINT;
+    DECLARE @LeaseOwnerEpoch BIGINT;
+    DECLARE @Watermark BIGINT;
+    DECLARE @ExpiresOn DATETIME2(7);
+    DECLARE @Status VARCHAR(32);
+    DECLARE @Messages TABLE
+    (
+        MessageId BIGINT,
+        StreamIdBytes VARBINARY(MAX),
+        StreamNamespaceLength INT,
+        CreatedOn DATETIME2(7),
+        Payload VARBINARY(MAX)
+    );
+
+    BEGIN TRY
+        IF @@TRANCOUNT = 0
+        BEGIN
+            BEGIN TRANSACTION;
+            SET @StartedTransaction = 1;
+        END;
+
+        SELECT
+            @CurrentOwnerEpoch = OwnerEpoch,
+            @NextMessageId = NextMessageId,
+            @Checkpoint = [Checkpoint]
+        FROM OrleansStreamPartition WITH (UPDLOCK, HOLDLOCK, ROWLOCK)
+        WHERE ServiceId = @ServiceId
+            AND ProviderId = @ProviderId
+            AND QueueId = @QueueId;
+
+        SET @Now = SYSUTCDATETIME();
+
+        SELECT
+            @LeaseOwnerEpoch = OwnerEpoch,
+            @Watermark = Watermark,
+            @ExpiresOn = ExpiresOn
+        FROM OrleansStreamReplayLease WITH (UPDLOCK, HOLDLOCK, ROWLOCK)
+        WHERE ServiceId = @ServiceId
+            AND ProviderId = @ProviderId
+            AND QueueId = @QueueId
+            AND ReaderId = @ReaderId;
+
+        SELECT
+            @EarliestMessageId = MIN(MessageId),
+            @TailMessageId = MAX(MessageId)
+        FROM OrleansStreamMessage WITH (UPDLOCK, HOLDLOCK, ROWLOCK)
+        WHERE ServiceId = @ServiceId
+            AND ProviderId = @ProviderId
+            AND QueueId = @QueueId;
+
+        IF @CurrentOwnerEpoch IS NULL OR @CurrentOwnerEpoch <> @OwnerEpoch
+            OR @LeaseOwnerEpoch IS NULL OR @LeaseOwnerEpoch <> @OwnerEpoch
+            SET @Status = 'OwnershipLost';
+        ELSE IF @ExpiresOn <= @Now
+            SET @Status = 'Expired';
+        ELSE IF @AfterMessageId < COALESCE(@EarliestMessageId, @NextMessageId) - 1
+            SET @Status = 'HistoryUnavailable';
+        ELSE
+        BEGIN
+            SET @ExpiresOn = DATEADD(SECOND, @ReplayLeaseDurationSeconds, @Now);
+            UPDATE OrleansStreamReplayLease
+            SET ExpiresOn = @ExpiresOn, ModifiedOn = @Now
+            WHERE ServiceId = @ServiceId
+                AND ProviderId = @ProviderId
+                AND QueueId = @QueueId
+                AND ReaderId = @ReaderId
+                AND OwnerEpoch = @OwnerEpoch;
+
+            INSERT INTO @Messages
+            SELECT TOP (@MaxCount) MessageId, StreamIdBytes, StreamNamespaceLength, CreatedOn, Payload
+            FROM OrleansStreamMessage WITH (UPDLOCK, HOLDLOCK, ROWLOCK)
+            WHERE ServiceId = @ServiceId
+                AND ProviderId = @ProviderId
+                AND QueueId = @QueueId
+                AND MessageId > @AfterMessageId
+            ORDER BY MessageId;
+            SET @Status = 'Active';
+        END;
+
+        IF @StartedTransaction = 1 COMMIT TRANSACTION;
+
+        SELECT
+            @Status AS Status,
+            @CurrentOwnerEpoch AS OwnerEpoch,
+            @Watermark AS Watermark,
+            @ExpiresOn AS ExpiresOn,
+            @NextMessageId AS NextMessageId,
+            @Checkpoint AS [Checkpoint],
+            @EarliestMessageId AS EarliestMessageId,
+            @TailMessageId AS TailMessageId,
+            MessageId,
+            StreamIdBytes,
+            StreamNamespaceLength,
+            CreatedOn,
+            Payload
+        FROM @Messages
+        UNION ALL
+        SELECT
+            @Status, @CurrentOwnerEpoch, @Watermark, @ExpiresOn, @NextMessageId,
+            @Checkpoint, @EarliestMessageId, @TailMessageId,
+            NULL, NULL, NULL, NULL, NULL
+        WHERE NOT EXISTS (SELECT 1 FROM @Messages)
+        ORDER BY MessageId;
+    END TRY
+    BEGIN CATCH
+        IF @StartedTransaction = 1 AND XACT_STATE() <> 0 ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH;
+END;
+GO
+
+CREATE PROCEDURE UpdateStreamReplayLease
+    @ServiceId NVARCHAR(150),
+    @ProviderId NVARCHAR(150),
+    @QueueId NVARCHAR(150),
+    @ReaderId NVARCHAR(150),
+    @OwnerEpoch BIGINT,
+    @Watermark BIGINT,
+    @ReplayLeaseDurationSeconds INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    DECLARE @StartedTransaction BIT = 0;
+    DECLARE @Now DATETIME2(7);
+    DECLARE @CurrentOwnerEpoch BIGINT;
+    DECLARE @NextMessageId BIGINT;
+    DECLARE @Checkpoint BIGINT;
+    DECLARE @EarliestMessageId BIGINT;
+    DECLARE @TailMessageId BIGINT;
+    DECLARE @LeaseOwnerEpoch BIGINT;
+    DECLARE @CurrentWatermark BIGINT;
+    DECLARE @ExpiresOn DATETIME2(7);
+    DECLARE @Status VARCHAR(32);
+
+    BEGIN TRY
+        IF @@TRANCOUNT = 0
+        BEGIN
+            BEGIN TRANSACTION;
+            SET @StartedTransaction = 1;
+        END;
+
+        SELECT @CurrentOwnerEpoch = OwnerEpoch, @NextMessageId = NextMessageId, @Checkpoint = [Checkpoint]
+        FROM OrleansStreamPartition WITH (UPDLOCK, HOLDLOCK, ROWLOCK)
+        WHERE ServiceId = @ServiceId AND ProviderId = @ProviderId AND QueueId = @QueueId;
+        SET @Now = SYSUTCDATETIME();
+
+        SELECT @LeaseOwnerEpoch = OwnerEpoch, @CurrentWatermark = Watermark, @ExpiresOn = ExpiresOn
+        FROM OrleansStreamReplayLease WITH (UPDLOCK, HOLDLOCK, ROWLOCK)
+        WHERE ServiceId = @ServiceId AND ProviderId = @ProviderId AND QueueId = @QueueId AND ReaderId = @ReaderId;
+
+        SELECT @EarliestMessageId = MIN(MessageId), @TailMessageId = MAX(MessageId)
+        FROM OrleansStreamMessage WITH (UPDLOCK, HOLDLOCK, ROWLOCK)
+        WHERE ServiceId = @ServiceId AND ProviderId = @ProviderId AND QueueId = @QueueId;
+
+        IF @CurrentOwnerEpoch IS NULL OR @CurrentOwnerEpoch <> @OwnerEpoch
+            OR @LeaseOwnerEpoch IS NULL OR @LeaseOwnerEpoch <> @OwnerEpoch
+            SET @Status = 'OwnershipLost';
+        ELSE IF @ExpiresOn <= @Now
+            SET @Status = 'Expired';
+        ELSE IF @Watermark < COALESCE(@EarliestMessageId, @NextMessageId) - 1
+            SET @Status = 'HistoryUnavailable';
+        ELSE
+        BEGIN
+            SET @CurrentWatermark = CASE WHEN @CurrentWatermark < @Watermark THEN @Watermark ELSE @CurrentWatermark END;
+            SET @ExpiresOn = DATEADD(SECOND, @ReplayLeaseDurationSeconds, @Now);
+            UPDATE OrleansStreamReplayLease
+            SET Watermark = @CurrentWatermark, ExpiresOn = @ExpiresOn, ModifiedOn = @Now
+            WHERE ServiceId = @ServiceId AND ProviderId = @ProviderId AND QueueId = @QueueId
+                AND ReaderId = @ReaderId AND OwnerEpoch = @OwnerEpoch;
+            SET @Status = 'Active';
+        END;
+
+        IF @StartedTransaction = 1 COMMIT TRANSACTION;
+
+        SELECT @Status AS Status, @CurrentOwnerEpoch AS OwnerEpoch, @CurrentWatermark AS Watermark,
+            @ExpiresOn AS ExpiresOn, @NextMessageId AS NextMessageId, @Checkpoint AS [Checkpoint],
+            @EarliestMessageId AS EarliestMessageId, @TailMessageId AS TailMessageId;
+    END TRY
+    BEGIN CATCH
+        IF @StartedTransaction = 1 AND XACT_STATE() <> 0 ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH;
+END;
+GO
+
+CREATE PROCEDURE ReleaseStreamReplayLease
+    @ServiceId NVARCHAR(150),
+    @ProviderId NVARCHAR(150),
+    @QueueId NVARCHAR(150),
+    @ReaderId NVARCHAR(150),
+    @OwnerEpoch BIGINT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    DECLARE @StartedTransaction BIT = 0;
+    DECLARE @CurrentOwnerEpoch BIGINT;
+    DECLARE @NextMessageId BIGINT;
+    DECLARE @Checkpoint BIGINT;
+    DECLARE @EarliestMessageId BIGINT;
+    DECLARE @TailMessageId BIGINT;
+    DECLARE @LeaseOwnerEpoch BIGINT;
+    DECLARE @Watermark BIGINT;
+    DECLARE @ExpiresOn DATETIME2(7);
+    DECLARE @Status VARCHAR(32);
+
+    BEGIN TRY
+        IF @@TRANCOUNT = 0
+        BEGIN
+            BEGIN TRANSACTION;
+            SET @StartedTransaction = 1;
+        END;
+
+        SELECT @CurrentOwnerEpoch = OwnerEpoch, @NextMessageId = NextMessageId, @Checkpoint = [Checkpoint]
+        FROM OrleansStreamPartition WITH (UPDLOCK, HOLDLOCK, ROWLOCK)
+        WHERE ServiceId = @ServiceId AND ProviderId = @ProviderId AND QueueId = @QueueId;
+
+        SELECT @LeaseOwnerEpoch = OwnerEpoch, @Watermark = Watermark, @ExpiresOn = ExpiresOn
+        FROM OrleansStreamReplayLease WITH (UPDLOCK, HOLDLOCK, ROWLOCK)
+        WHERE ServiceId = @ServiceId AND ProviderId = @ProviderId AND QueueId = @QueueId AND ReaderId = @ReaderId;
+
+        SELECT @EarliestMessageId = MIN(MessageId), @TailMessageId = MAX(MessageId)
+        FROM OrleansStreamMessage WITH (UPDLOCK, HOLDLOCK, ROWLOCK)
+        WHERE ServiceId = @ServiceId AND ProviderId = @ProviderId AND QueueId = @QueueId;
+
+        IF @CurrentOwnerEpoch IS NULL OR @CurrentOwnerEpoch <> @OwnerEpoch
+            OR (@LeaseOwnerEpoch IS NOT NULL AND @LeaseOwnerEpoch <> @OwnerEpoch)
+            SET @Status = 'OwnershipLost';
+        ELSE
+        BEGIN
+            DELETE FROM OrleansStreamReplayLease
+            WHERE ServiceId = @ServiceId AND ProviderId = @ProviderId AND QueueId = @QueueId
+                AND ReaderId = @ReaderId AND OwnerEpoch = @OwnerEpoch;
+            SET @Status = 'Released';
+        END;
+
+        IF @StartedTransaction = 1 COMMIT TRANSACTION;
+
+        SELECT @Status AS Status, @CurrentOwnerEpoch AS OwnerEpoch, @Watermark AS Watermark,
+            @ExpiresOn AS ExpiresOn, @NextMessageId AS NextMessageId, @Checkpoint AS [Checkpoint],
+            @EarliestMessageId AS EarliestMessageId, @TailMessageId AS TailMessageId;
+    END TRY
+    BEGIN CATCH
+        IF @StartedTransaction = 1 AND XACT_STATE() <> 0 ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH;
+END;
+GO
+
 CREATE PROCEDURE CleanupStreamMessages
     @ServiceId NVARCHAR(150),
     @ProviderId NVARCHAR(150),
     @QueueId NVARCHAR(150),
+    @OwnerEpoch BIGINT,
     @RetentionPeriodSeconds INT,
     @MaximumRetentionPeriodSeconds INT = NULL,
     @CleanupIntervalSeconds INT,
@@ -530,8 +972,13 @@ BEGIN
     SET XACT_ABORT ON;
 
     DECLARE @StartedTransaction BIT = 0;
-    DECLARE @Now DATETIME2(7) = SYSUTCDATETIME();
+    DECLARE @Now DATETIME2(7);
+    DECLARE @CurrentOwnerEpoch BIGINT;
     DECLARE @Checkpoint BIGINT;
+    DECLARE @CleanupOn DATETIME2(7);
+    DECLARE @ActiveReplayWatermark BIGINT;
+    DECLARE @EarliestMessageId BIGINT;
+    DECLARE @TailMessageId BIGINT;
     DECLARE @Deleted TABLE (MessageId BIGINT NOT NULL, HardDeleted BIT NOT NULL);
 
     BEGIN TRY
@@ -541,23 +988,41 @@ BEGIN
             SET @StartedTransaction = 1;
         END;
 
-        UPDATE OrleansStreamPartition WITH (UPDLOCK, ROWLOCK)
-        SET
-            CleanupOn = DATEADD(SECOND, @CleanupIntervalSeconds, @Now),
-            ModifiedOn = @Now,
-            @Checkpoint = [Checkpoint]
+        SELECT
+            @CurrentOwnerEpoch = OwnerEpoch,
+            @Checkpoint = [Checkpoint],
+            @CleanupOn = CleanupOn
+        FROM OrleansStreamPartition WITH (UPDLOCK, HOLDLOCK, ROWLOCK)
+        WHERE ServiceId = @ServiceId
+            AND ProviderId = @ProviderId
+            AND QueueId = @QueueId;
+
+        SET @Now = SYSUTCDATETIME();
+
+        IF @CurrentOwnerEpoch = @OwnerEpoch
+        BEGIN
+            DELETE FROM OrleansStreamReplayLease
+            WHERE ServiceId = @ServiceId
+                AND ProviderId = @ProviderId
+                AND QueueId = @QueueId
+                AND ExpiresOn <= @Now;
+        END;
+
+        SELECT @ActiveReplayWatermark = MIN(Watermark)
+        FROM OrleansStreamReplayLease WITH (UPDLOCK, HOLDLOCK, ROWLOCK)
         WHERE ServiceId = @ServiceId
             AND ProviderId = @ProviderId
             AND QueueId = @QueueId
-            AND CleanupOn <= @Now;
+            AND ExpiresOn > @Now;
 
-        IF @@ROWCOUNT = 0
+        SELECT @EarliestMessageId = MIN(MessageId), @TailMessageId = MAX(MessageId)
+        FROM OrleansStreamMessage WITH (UPDLOCK, HOLDLOCK, ROWLOCK)
+        WHERE ServiceId = @ServiceId
+            AND ProviderId = @ProviderId
+            AND QueueId = @QueueId;
+
+        IF @CurrentOwnerEpoch IS NULL OR @CurrentOwnerEpoch <> @OwnerEpoch OR @CleanupOn > @Now
         BEGIN
-            SELECT @Checkpoint = [Checkpoint]
-            FROM OrleansStreamPartition
-            WHERE ServiceId = @ServiceId
-                AND ProviderId = @ProviderId
-                AND QueueId = @QueueId;
 
             SELECT
                 CAST(0 AS BIT) AS Ran,
@@ -567,12 +1032,9 @@ BEGIN
                 CAST(NULL AS BIGINT) AS HardDeletedFromMessageId,
                 CAST(NULL AS BIGINT) AS HardDeletedThroughMessageId,
                 @Checkpoint AS [Checkpoint],
-                MIN(MessageId) AS EarliestMessageId,
-                MAX(MessageId) AS TailMessageId
-            FROM OrleansStreamMessage
-            WHERE ServiceId = @ServiceId
-                AND ProviderId = @ProviderId
-                AND QueueId = @QueueId;
+                @ActiveReplayWatermark AS ActiveReplayWatermark,
+                @EarliestMessageId AS EarliestMessageId,
+                @TailMessageId AS TailMessageId;
 
             IF @StartedTransaction = 1
             BEGIN
@@ -581,6 +1043,13 @@ BEGIN
 
             RETURN;
         END;
+
+        UPDATE OrleansStreamPartition WITH (UPDLOCK, ROWLOCK)
+        SET CleanupOn = DATEADD(SECOND, @CleanupIntervalSeconds, @Now), ModifiedOn = @Now
+        WHERE ServiceId = @ServiceId
+            AND ProviderId = @ProviderId
+            AND QueueId = @QueueId
+            AND OwnerEpoch = @OwnerEpoch;
 
         ;WITH Candidate AS
         (
@@ -596,6 +1065,7 @@ BEGIN
                         @Checkpoint IS NOT NULL
                         AND MessageId <= @Checkpoint
                         AND CheckpointedOn < DATEADD(SECOND, -@RetentionPeriodSeconds, @Now)
+                        AND (@ActiveReplayWatermark IS NULL OR MessageId <= @ActiveReplayWatermark)
                     )
                     OR
                     (
@@ -609,7 +1079,17 @@ BEGIN
         OUTPUT
             Deleted.MessageId,
             CASE
-                WHEN @Checkpoint IS NULL OR Deleted.MessageId > @Checkpoint THEN CAST(1 AS BIT)
+                WHEN
+                    @MaximumRetentionPeriodSeconds IS NOT NULL
+                    AND Deleted.CreatedOn < DATEADD(SECOND, -@MaximumRetentionPeriodSeconds, @Now)
+                    AND NOT
+                    (
+                        @Checkpoint IS NOT NULL
+                        AND Deleted.MessageId <= @Checkpoint
+                        AND Deleted.CheckpointedOn < DATEADD(SECOND, -@RetentionPeriodSeconds, @Now)
+                        AND (@ActiveReplayWatermark IS NULL OR Deleted.MessageId <= @ActiveReplayWatermark)
+                    )
+                    THEN CAST(1 AS BIT)
                 ELSE CAST(0 AS BIT)
             END
         INTO @Deleted (MessageId, HardDeleted)
@@ -628,6 +1108,7 @@ BEGIN
             MIN(CASE WHEN HardDeleted = 1 THEN MessageId END) AS HardDeletedFromMessageId,
             MAX(CASE WHEN HardDeleted = 1 THEN MessageId END) AS HardDeletedThroughMessageId,
             @Checkpoint AS [Checkpoint],
+            @ActiveReplayWatermark AS ActiveReplayWatermark,
             (
                 SELECT MIN(MessageId)
                 FROM OrleansStreamMessage
@@ -662,11 +1143,15 @@ GO
 
 INSERT INTO OrleansQuery (QueryKey, QueryText)
 VALUES
-    ('StreamSchemaVersionKey', '2'),
+    ('StreamSchemaVersionKey', '3'),
     ('AppendStreamMessageKey', 'EXECUTE AppendStreamMessage @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @StreamIdBytes = @StreamIdBytes, @StreamNamespaceLength = @StreamNamespaceLength, @Payload = @Payload'),
     ('AcquireStreamPartitionKey', 'EXECUTE AcquireStreamPartition @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @StartFromNow = @StartFromNow'),
     ('ReadStreamMessagesKey', 'SELECT ServiceId, ProviderId, QueueId, MessageId, StreamIdBytes, StreamNamespaceLength, CreatedOn, Payload FROM OrleansStreamMessage WHERE ServiceId = @ServiceId AND ProviderId = @ProviderId AND QueueId = @QueueId AND MessageId > @AfterMessageId ORDER BY MessageId OFFSET 0 ROWS FETCH NEXT @MaxCount ROWS ONLY'),
     ('AdvanceStreamCheckpointKey', 'EXECUTE AdvanceStreamCheckpoint @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @OwnerEpoch = @OwnerEpoch, @Checkpoint = @Checkpoint'),
     ('GetStreamPartitionBoundsKey', 'SELECT P.ServiceId, P.ProviderId, P.QueueId, P.OwnerEpoch, P.NextMessageId, P.[Checkpoint] AS [Checkpoint], MIN(M.MessageId) AS EarliestMessageId, MAX(M.MessageId) AS TailMessageId FROM OrleansStreamPartition AS P LEFT JOIN OrleansStreamMessage AS M ON M.ServiceId = P.ServiceId AND M.ProviderId = P.ProviderId AND M.QueueId = P.QueueId WHERE P.ServiceId = @ServiceId AND P.ProviderId = @ProviderId AND P.QueueId = @QueueId GROUP BY P.ServiceId, P.ProviderId, P.QueueId, P.OwnerEpoch, P.NextMessageId, P.[Checkpoint]'),
-    ('CleanupStreamMessagesKey', 'EXECUTE CleanupStreamMessages @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @RetentionPeriodSeconds = @RetentionPeriodSeconds, @MaximumRetentionPeriodSeconds = @MaximumRetentionPeriodSeconds, @CleanupIntervalSeconds = @CleanupIntervalSeconds, @CleanupBatchSize = @CleanupBatchSize');
+    ('AcquireStreamReplayLeaseKey', 'EXECUTE AcquireStreamReplayLease @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @ReaderId = @ReaderId, @StreamIdBytes = @StreamIdBytes, @StreamNamespaceLength = @StreamNamespaceLength, @OwnerEpoch = @OwnerEpoch, @AfterMessageId = @AfterMessageId, @ReplayLeaseDurationSeconds = @ReplayLeaseDurationSeconds'),
+    ('ReadStreamReplayMessagesKey', 'EXECUTE ReadStreamReplayMessages @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @ReaderId = @ReaderId, @OwnerEpoch = @OwnerEpoch, @AfterMessageId = @AfterMessageId, @MaxCount = @MaxCount, @ReplayLeaseDurationSeconds = @ReplayLeaseDurationSeconds'),
+    ('UpdateStreamReplayLeaseKey', 'EXECUTE UpdateStreamReplayLease @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @ReaderId = @ReaderId, @OwnerEpoch = @OwnerEpoch, @Watermark = @Watermark, @ReplayLeaseDurationSeconds = @ReplayLeaseDurationSeconds'),
+    ('ReleaseStreamReplayLeaseKey', 'EXECUTE ReleaseStreamReplayLease @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @ReaderId = @ReaderId, @OwnerEpoch = @OwnerEpoch'),
+    ('CleanupStreamMessagesKey', 'EXECUTE CleanupStreamMessages @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @OwnerEpoch = @OwnerEpoch, @RetentionPeriodSeconds = @RetentionPeriodSeconds, @MaximumRetentionPeriodSeconds = @MaximumRetentionPeriodSeconds, @CleanupIntervalSeconds = @CleanupIntervalSeconds, @CleanupBatchSize = @CleanupBatchSize');
 GO

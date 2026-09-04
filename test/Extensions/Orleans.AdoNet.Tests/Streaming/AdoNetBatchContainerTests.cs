@@ -61,8 +61,16 @@ public class AdoNetBatchContainerTests(TestEnvironmentFixture fixture)
         Assert.Equal(streamId, container.StreamId);
         Assert.Equal(events, container.Events);
         Assert.Equal(requestContext, container.RequestContext);
-        Assert.Equal(new EventSequenceTokenV2(123), container.SequenceToken);
+        Assert.Equal(
+            new AdoNetStreamSequenceToken("MyServiceId", "MyProviderId", "MyQueueId", 123),
+            container.SequenceToken);
         Assert.Equal(0, container.Dequeued);
+
+        var restored = serializer.Deserialize(serializer.SerializeToArray(container))!;
+        var restoredToken = Assert.IsType<AdoNetStreamSequenceToken>(restored.SequenceToken);
+        Assert.Equal("MyServiceId", restoredToken.ServiceId);
+        Assert.Equal("MyProviderId", restoredToken.ProviderId);
+        Assert.Equal("MyQueueId", restoredToken.QueueId);
     }
 
     [Fact]
@@ -106,7 +114,7 @@ public class AdoNetBatchContainerTests(TestEnvironmentFixture fixture)
             streamId.Namespace.Length,
             DateTime.UtcNow,
             payload);
-        var adapter = new AdoNetRecoverableStreamDataAdapter(serializer);
+        var adapter = new AdoNetRecoverableStreamDataAdapter("service", "provider", "queue", serializer);
 
         var position = adapter.GetStreamPosition(message);
         var cached = adapter.FromQueueMessage(
@@ -120,7 +128,7 @@ public class AdoNetBatchContainerTests(TestEnvironmentFixture fixture)
         var batch = Assert.IsType<AdoNetBatchContainer>(adapter.GetBatchContainer(ref cached));
         Assert.Equal(streamId, batch.StreamId);
         Assert.Equal([new TestModel(1)], batch.GetEvents<TestModel>().Select(item => item.Item1));
-        Assert.Equal(new EventSequenceTokenV2(42), batch.SequenceToken);
+        Assert.Equal(new AdoNetStreamSequenceToken("service", "provider", "queue", 42), batch.SequenceToken);
     }
 
     [Fact]
@@ -163,9 +171,13 @@ public class AdoNetBatchContainerTests(TestEnvironmentFixture fixture)
 
         // assert
         Assert.Equal([new TestModel(1), new TestModel(3)], container.GetEvents<TestModel>().Select(x => x.Item1));
-        Assert.Equal([new EventSequenceTokenV2(123, 0), new EventSequenceTokenV2(123, 1)], container.GetEvents<TestModel>().Select(x => x.Item2));
+        Assert.Equal(
+            [new AdoNetStreamSequenceToken("MyServiceId", "MyProviderId", "MyQueueId", 123, 0), new AdoNetStreamSequenceToken("MyServiceId", "MyProviderId", "MyQueueId", 123, 2)],
+            container.GetEvents<TestModel>().Select(x => x.Item2));
         Assert.Equal([new OtherModel(2), new OtherModel(4)], container.GetEvents<OtherModel>().Select(x => x.Item1));
-        Assert.Equal([new EventSequenceTokenV2(123, 0), new EventSequenceTokenV2(123, 1)], container.GetEvents<OtherModel>().Select(x => x.Item2));
+        Assert.Equal(
+            [new AdoNetStreamSequenceToken("MyServiceId", "MyProviderId", "MyQueueId", 123, 1), new AdoNetStreamSequenceToken("MyServiceId", "MyProviderId", "MyQueueId", 123, 3)],
+            container.GetEvents<OtherModel>().Select(x => x.Item2));
     }
 
     [Fact]

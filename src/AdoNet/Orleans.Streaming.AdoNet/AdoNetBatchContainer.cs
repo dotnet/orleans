@@ -51,8 +51,11 @@ internal class AdoNetBatchContainer : IBatchContainer
         return SequenceToken is null
             ? throw new InvalidOperationException($"Cannot get events from a half-baked {nameof(AdoNetBatchContainer)}")
             : Events
-                .OfType<T>()
-                .Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, SequenceToken.CreateSequenceTokenForEvent(i)));
+                .Select((item, index) => (item, index))
+                .Where(static entry => entry.item is T)
+                .Select(entry => Tuple.Create<T, StreamSequenceToken>(
+                    (T)entry.item,
+                    SequenceToken.CreateSequenceTokenForEvent(entry.index)));
     }
 
     public bool ImportRequestContext()
@@ -80,7 +83,11 @@ internal class AdoNetBatchContainer : IBatchContainer
 
         // A stored stream message always contains a serialized batch container.
         var container = serializer.Deserialize(message.Payload)!;
-        container.SequenceToken = new(message.MessageId);
+        container.SequenceToken = new AdoNetStreamSequenceToken(
+            message.ServiceId,
+            message.ProviderId,
+            message.QueueId,
+            message.MessageId);
         container.Dequeued = 0;
 
         return container;

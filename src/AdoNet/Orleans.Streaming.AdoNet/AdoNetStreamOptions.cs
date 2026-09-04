@@ -76,6 +76,20 @@ public class AdoNetStreamOptions
     public TimeSpan CleanupInterval { get; set; } = TimeSpan.FromMinutes(1);
 
     /// <summary>
+    /// Gets or sets the duration of a provider-visible historical replay lease.
+    /// </summary>
+    /// <remarks>
+    /// Active leases protect retained partition history across silos. Fractional values are rounded upward
+    /// to whole database seconds.
+    /// </remarks>
+    public TimeSpan ReplayLeaseDuration { get; set; } = TimeSpan.FromMinutes(1);
+
+    /// <summary>
+    /// Gets or sets the interval at which an active historical reader renews its replay lease.
+    /// </summary>
+    public TimeSpan ReplayLeaseRenewalInterval { get; set; } = TimeSpan.FromSeconds(20);
+
+    /// <summary>
     /// Gets or sets the maximum number of stream records deleted by one cleanup operation.
     /// </summary>
     public int CleanupBatchSize { get; set; } = 1_000;

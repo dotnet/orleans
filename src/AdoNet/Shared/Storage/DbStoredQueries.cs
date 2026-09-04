@@ -32,7 +32,7 @@ namespace Orleans.Tests.SqlUtils
     internal class DbStoredQueries
     {
 #if STREAMING_ADONET || TESTER_SQLUTILS
-        private const string CurrentStreamingSchemaVersion = "2";
+        private const string CurrentStreamingSchemaVersion = "3";
 
         private static readonly string[] RequiredStreamingQueryKeys =
         [
@@ -42,7 +42,11 @@ namespace Orleans.Tests.SqlUtils
             nameof(ReadStreamMessagesKey),
             nameof(AdvanceStreamCheckpointKey),
             nameof(GetStreamPartitionBoundsKey),
-            nameof(CleanupStreamMessagesKey)
+            nameof(CleanupStreamMessagesKey),
+            nameof(AcquireStreamReplayLeaseKey),
+            nameof(ReadStreamReplayMessagesKey),
+            nameof(UpdateStreamReplayLeaseKey),
+            nameof(ReleaseStreamReplayLeaseKey)
         ];
 
         private static readonly string[] LegacyStreamingQueryKeys =
@@ -97,7 +101,7 @@ namespace Orleans.Tests.SqlUtils
                 $"The ADO.NET streaming schema is incompatible. Expected stream partition schema version {CurrentStreamingSchemaVersion}, " +
                 $"but detected '{detectedVersion}'. Missing query keys: {missingDescription}. Legacy query keys: {legacyDescription}. " +
                 "This alpha schema has no in-place migration. Drop the legacy OrleansStreamMessage, " +
-                "OrleansStreamDeadLetter, OrleansStreamControl, and OrleansStreamMessageSequence objects, drop OrleansStreamPartition if it " +
+                "OrleansStreamDeadLetter, OrleansStreamControl, and OrleansStreamMessageSequence objects, drop OrleansStreamReplayLease and OrleansStreamPartition if they " +
                 "exists, remove the streaming routines and OrleansQuery rows, and then apply the current SQL Server, PostgreSQL, or MySQL " +
                 "streaming script. Existing alpha queue rows are not compatible and will not be migrated.");
         }
@@ -233,6 +237,26 @@ namespace Orleans.Tests.SqlUtils
         /// A query template to perform bounded stream partition retention cleanup.
         /// </summary>
         internal string CleanupStreamMessagesKey => queries[nameof(CleanupStreamMessagesKey)];
+
+        /// <summary>
+        /// A query template to atomically validate retained history and acquire a replay lease.
+        /// </summary>
+        internal string AcquireStreamReplayLeaseKey => queries[nameof(AcquireStreamReplayLeaseKey)];
+
+        /// <summary>
+        /// A query template to read retained records through an active replay lease.
+        /// </summary>
+        internal string ReadStreamReplayMessagesKey => queries[nameof(ReadStreamReplayMessagesKey)];
+
+        /// <summary>
+        /// A query template to advance and renew a replay lease.
+        /// </summary>
+        internal string UpdateStreamReplayLeaseKey => queries[nameof(UpdateStreamReplayLeaseKey)];
+
+        /// <summary>
+        /// A query template to release a replay lease owned by the current partition epoch.
+        /// </summary>
+        internal string ReleaseStreamReplayLeaseKey => queries[nameof(ReleaseStreamReplayLeaseKey)];
 
 #endif
 
@@ -624,6 +648,21 @@ namespace Orleans.Tests.SqlUtils
             internal int CleanupBatchSize
             {
                 set => Add(nameof(CleanupBatchSize), value);
+            }
+
+            internal string ReaderId
+            {
+                set => Add(nameof(ReaderId), value);
+            }
+
+            internal long Watermark
+            {
+                set => Add(nameof(Watermark), value);
+            }
+
+            internal int ReplayLeaseDurationSeconds
+            {
+                set => Add(nameof(ReplayLeaseDurationSeconds), value);
             }
 
             internal string EventIds

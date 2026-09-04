@@ -11,5 +11,6 @@ internal record AdoNetStreamCleanupResult(
     long? HardDeletedFromMessageId,
     long? HardDeletedThroughMessageId,
     long? Checkpoint,
+    long? ActiveReplayWatermark,
     long? EarliestMessageId,
     long? TailMessageId);

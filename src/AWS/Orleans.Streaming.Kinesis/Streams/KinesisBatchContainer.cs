@@ -47,6 +47,8 @@ namespace Orleans.Streaming.Kinesis
             byte[] rawRecord,
             Serializer<KinesisBatchContainer.Body> serializer,
             StreamId streamId,
+            string streamName,
+            string shardId,
             string shardSequence,
             long sequenceId)
         {
@@ -54,7 +56,7 @@ namespace Orleans.Streaming.Kinesis
             _rawRecord = rawRecord;
             _streamId = streamId;
             _hasStreamId = true;
-            Token = new KinesisSequenceToken(shardSequence, sequenceId, 0);
+            Token = new KinesisSequenceToken(streamName, shardId, shardSequence, sequenceId, 0);
         }
 
         [GeneratedActivatorConstructor]
@@ -82,7 +84,12 @@ namespace Orleans.Streaming.Kinesis
         /// <returns></returns>
         public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()
         {
-            return GetPayload().Events.OfType<T>().Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, new KinesisSequenceToken(Token.ShardSequence, Token.SequenceNumber, i)));
+            return GetPayload().Events
+                .Select((item, index) => (item, index))
+                .Where(static entry => entry.item is T)
+                .Select(entry => Tuple.Create<T, StreamSequenceToken>(
+                    (T)entry.item,
+                    Token.CreateSequenceTokenForEvent(entry.index)));
         }
 
         /// <summary>
@@ -138,8 +145,10 @@ namespace Orleans.Streaming.Kinesis
             Serializer<KinesisBatchContainer.Body> serializer,
             StreamId streamId,
             byte[] rawRecord,
+            string streamName,
+            string shardId,
             string shardSequence,
             long sequenceId)
-            => new(rawRecord, serializer, streamId, shardSequence, sequenceId);
+            => new(rawRecord, serializer, streamId, streamName, shardId, shardSequence, sequenceId);
     }
 }

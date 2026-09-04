@@ -32,6 +32,10 @@ namespace Orleans.Configuration
 
         public int MaxMessagesPerRead { get { throw null; } set { } }
 
+        public System.TimeSpan ReplayLeaseDuration { get { throw null; } set { } }
+
+        public System.TimeSpan ReplayLeaseRenewalInterval { get { throw null; } set { } }
+
         public System.TimeSpan RetentionPeriod { get { throw null; } set { } }
 
         public bool StartFromNow { get { throw null; } set { } }
@@ -56,6 +60,8 @@ namespace Orleans.Hosting
         public ClusterClientAdoNetStreamConfigurator ConfigureCache(int cacheSize = 4096) { throw null; }
 
         public ClusterClientAdoNetStreamConfigurator ConfigurePartitioning(int partitions = 8) { throw null; }
+
+        public ClusterClientAdoNetStreamConfigurator ConfigureReplay(System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.RecoverableStreamReplayOptions>> configureOptions) { throw null; }
     }
 
     public static partial class ClusterClientAdoNetStreamExtensions
@@ -74,6 +80,8 @@ namespace Orleans.Hosting
         public SiloAdoNetStreamConfigurator ConfigureCache(int cacheSize = 4096) { throw null; }
 
         public SiloAdoNetStreamConfigurator ConfigurePartitioning(int partitions = 8) { throw null; }
+
+        public SiloAdoNetStreamConfigurator ConfigureReplay(System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.RecoverableStreamReplayOptions>> configureOptions) { throw null; }
     }
 
     public static partial class SiloBuilderAdoNetStreamExtensions

@@ -35,6 +35,16 @@ namespace Orleans.Hosting
         {
             configurator.Configure(configureOptions);
         }
+
+        /// <summary>
+        /// Configures retained-history replay for a reliable stream provider.
+        /// </summary>
+        /// <param name="configurator">The configuration builder.</param>
+        /// <param name="configureOptions">The configuration delegate.</param>
+        public static void ConfigureReplay(this ISiloRecoverableStreamConfigurator configurator, Action<OptionsBuilder<RecoverableStreamReplayOptions>> configureOptions)
+        {
+            configurator.Configure(configureOptions);
+        }
     }
 
     /// <summary>
@@ -56,7 +66,8 @@ namespace Orleans.Hosting
         {
             this.ConfigureDelegate(services => services
                 .ConfigureNamedOptionForLogging<StreamStatisticOptions>(name)
-                .ConfigureNamedOptionForLogging<StreamCacheEvictionOptions>(name));
+                .ConfigureNamedOptionForLogging<StreamCacheEvictionOptions>(name)
+                .ConfigureNamedOptionForLogging<RecoverableStreamReplayOptions>(name));
         }
     }
 }

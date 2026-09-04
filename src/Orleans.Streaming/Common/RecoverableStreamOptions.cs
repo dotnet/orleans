@@ -4,6 +4,37 @@ using Orleans.Streams;
 namespace Orleans.Configuration
 {
     /// <summary>
+    /// Configuration options for retained-history replay.
+    /// </summary>
+    public class RecoverableStreamReplayOptions
+    {
+        /// <summary>
+        /// Gets or sets the maximum number of independent historical readers for each queue.
+        /// </summary>
+        public int MaxConcurrentReaders { get; set; } = 4;
+
+        /// <summary>
+        /// Gets or sets the maximum number of replay cursors waiting for reader admission for each queue.
+        /// </summary>
+        public int MaxPendingReaders { get; set; } = 32;
+
+        /// <summary>
+        /// Gets or sets the maximum number of raw records retained by each replay fragment.
+        /// </summary>
+        public int CacheSize { get; set; } = 4_096;
+
+        /// <summary>
+        /// Gets or sets the maximum number of raw records fetched by one replay read.
+        /// </summary>
+        public int ReadBatchSize { get; set; } = 256;
+
+        /// <summary>
+        /// Gets or sets the delay before retrying a historical reader which reached a temporary tail.
+        /// </summary>
+        public TimeSpan TemporaryTailRetryDelay { get; set; } = TimeSpan.FromMilliseconds(200);
+    }
+
+    /// <summary>
     /// Configuration options for stream cache eviction.
     /// </summary>
     public class StreamCacheEvictionOptions

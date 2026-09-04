@@ -15,14 +15,17 @@ namespace Orleans.Streaming.JsonConverters
     {
         private const int EventSequenceTokenDiscriminator = 1;
         private const int EventSequenceTokenV2Discriminator = 2;
+        private const int PartitionedStreamSequenceTokenDiscriminator = 3;
         private readonly Type _eventSequenceTokenType = typeof(EventSequenceToken);
         private readonly Type _eventSequenceTokenTypeV2 = typeof(EventSequenceTokenV2);
         private readonly Type _streamSequenceTokenType = typeof(StreamSequenceToken);
+        private readonly Type _partitionedStreamSequenceTokenType = typeof(PartitionedStreamSequenceToken);
 
         /// <inheritdoc />
         public override bool CanConvert(Type typeToConvert) => typeToConvert == _streamSequenceTokenType
                                                                || typeToConvert == _eventSequenceTokenType
-                                                               || typeToConvert == _eventSequenceTokenTypeV2;
+                                                               || typeToConvert == _eventSequenceTokenTypeV2
+                                                               || typeToConvert == _partitionedStreamSequenceTokenType;
 
         /// <inheritdoc />
         public override StreamSequenceToken? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
@@ -35,6 +38,11 @@ namespace Orleans.Streaming.JsonConverters
             }
 
             var tokenType = reader.GetInt32();
+            if (tokenType == PartitionedStreamSequenceTokenDiscriminator)
+            {
+                return ReadPartitionedToken(ref reader, typeToConvert);
+            }
+
             if (!reader.Read() || reader.TokenType != JsonTokenType.Number)
             {
                 throw new JsonException($"Could not deserialize {nameof(StreamSequenceToken)}.");
@@ -87,6 +95,19 @@ namespace Orleans.Streaming.JsonConverters
         public override void Write(Utf8JsonWriter writer, StreamSequenceToken value, JsonSerializerOptions options)
         {
             var runtimeType = value.GetType();
+            if (value is PartitionedStreamSequenceToken partitionedToken)
+            {
+                writer.WriteStartArray();
+                writer.WriteNumberValue(PartitionedStreamSequenceTokenDiscriminator);
+                WriteNullableString(writer, partitionedToken.ProviderIdentity);
+                WriteNullableString(writer, partitionedToken.PartitionIdentity);
+                writer.WriteStringValue(partitionedToken.Position);
+                writer.WriteNumberValue(partitionedToken.SequenceNumber);
+                writer.WriteNumberValue(partitionedToken.EventIndex);
+                writer.WriteEndArray();
+                return;
+            }
+
             if (runtimeType != _eventSequenceTokenType && runtimeType != _eventSequenceTokenTypeV2)
             {
                 throw new NotSupportedException($"Unsupported {nameof(StreamSequenceToken)} type: {runtimeType}");
@@ -101,6 +122,73 @@ namespace Orleans.Streaming.JsonConverters
             }
 
             writer.WriteEndArray();
+        }
+
+        private StreamSequenceToken ReadPartitionedToken(
+            ref Utf8JsonReader reader,
+            Type typeToConvert)
+        {
+            if (typeToConvert != _streamSequenceTokenType
+                && typeToConvert != _partitionedStreamSequenceTokenType)
+            {
+                throw new JsonException(
+                    $"Cannot deserialize {nameof(PartitionedStreamSequenceToken)} as {typeToConvert}.");
+            }
+
+            var providerIdentity = ReadNullableString(ref reader);
+            var partitionIdentity = ReadNullableString(ref reader);
+            if (!reader.Read() || reader.TokenType != JsonTokenType.String)
+            {
+                throw new JsonException($"Could not deserialize {nameof(StreamSequenceToken)}.");
+            }
+
+            var position = reader.GetString()!;
+            if (!reader.Read() || reader.TokenType != JsonTokenType.Number)
+            {
+                throw new JsonException($"Could not deserialize {nameof(StreamSequenceToken)}.");
+            }
+
+            var sequenceNumber = reader.GetInt64();
+            if (!reader.Read() || reader.TokenType != JsonTokenType.Number)
+            {
+                throw new JsonException($"Could not deserialize {nameof(StreamSequenceToken)}.");
+            }
+
+            var eventIndex = reader.GetInt32();
+            if (!reader.Read() || reader.TokenType != JsonTokenType.EndArray)
+            {
+                throw new JsonException($"Could not deserialize {nameof(StreamSequenceToken)}.");
+            }
+
+            return new PartitionedStreamSequenceToken(
+                providerIdentity,
+                partitionIdentity,
+                position,
+                sequenceNumber,
+                eventIndex);
+        }
+
+        private static string? ReadNullableString(ref Utf8JsonReader reader)
+        {
+            if (!reader.Read()
+                || reader.TokenType is not (JsonTokenType.String or JsonTokenType.Null))
+            {
+                throw new JsonException($"Could not deserialize {nameof(StreamSequenceToken)}.");
+            }
+
+            return reader.TokenType == JsonTokenType.Null ? null : reader.GetString();
+        }
+
+        private static void WriteNullableString(Utf8JsonWriter writer, string? value)
+        {
+            if (value is null)
+            {
+                writer.WriteNullValue();
+            }
+            else
+            {
+                writer.WriteStringValue(value);
+            }
         }
     }
 }

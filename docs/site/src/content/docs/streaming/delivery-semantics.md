@@ -1,7 +1,7 @@
 ---
 title: Stream delivery, ordering, replay, and recovery
 description: Design Orleans streaming consumers for provider-specific delivery, ordering, replay, and failure behavior.
-ms.date: 08/24/2026
+ms.date: 09/03/2026
 ms.topic: concept-article
 ---
 
@@ -48,12 +48,18 @@ Use event version numbers or domain sequence numbers when business logic require
 A rewindable provider can start or resume a subscription from a provider sequence token while the corresponding event remains in that provider's retention window. Rewindability isn't the same as durability:
 
 - Memory streams are rewindable only over their transient in-memory cache.
-- Event Hubs and Redis Streams are rewindable over retained external data.
-- Azure Queue, Amazon SQS, ADO.NET, and NATS JetStream providers aren't rewindable.
+- Event Hubs, Kinesis, ADO.NET, and Redis Streams can resume explicit subscriptions from retained provider data.
+- Azure Queue, Amazon SQS, and NATS JetStream providers advance from their live queue behavior.
 
 Explicit subscriptions can resume from retained positions according to the provider's token semantics. An implicit subscription accepts a recovery token when an activation attaches its observer, then advances monotonically for that attachment. Once a delivery call completes successfully, resuming the active implicit handle with a sequence token throws <xref:System.InvalidOperationException>; passing `null` replaces the observer at its current position.
 
-New explicit subscriptions to rewindable persistent streams can also select [a cache-relative start position](subscription-start-positions.md). See the [provider matrix](stream-providers.md#provider-matrix) for provider capabilities.
+Subscription start tokens are inclusive. A delivery token acknowledges its record and resumes after it. Retained-history readers scan their physical partition in order, including records for other streams, until they reach a live-cache boundary pinned against purge. The subscription attaches to the live cursor before replay state is released, preventing a gap. Orleans delivery remains at least once, so a crash can redeliver an acknowledged boundary.
+
+When retention no longer contains an explicitly requested position, the subscription receives <xref:Orleans.Streams.DataNotAvailableException>. Invalid provider, partition, and token identities also fail explicitly.
+
+New explicit subscriptions to rewindable persistent streams can also select [a cache-relative start position](subscription-start-positions.md).
+
+See the [provider matrix](stream-providers.md#provider-matrix) for provider capabilities.
 
 ## Recovery checklist
 
