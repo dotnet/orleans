@@ -282,7 +282,13 @@ public sealed class ReminderTestKitClusterIntegrationTests
             using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(testCancellationToken);
             cancellation.CancelAfter(TimeSpan.FromSeconds(30));
 
-            await grain.RegisterReminderAsync("exact-due-recovery", dueTime, period).WaitAsync(cancellation.Token);
+            await oracle.UpsertRow(new ReminderEntry
+            {
+                GrainId = grainId,
+                ReminderName = "exact-due-recovery",
+                StartAt = firstTickTime,
+                Period = period,
+            }).WaitAsync(cancellation.Token);
             Assert.Equal(0, observer.GetActiveReminderCount(grainId, "exact-due-recovery"));
 
             await using var blockedRead = oracle.BlockNext(ReminderTableOperationKind.ReadRange);
@@ -295,7 +301,11 @@ public sealed class ReminderTestKitClusterIntegrationTests
             blockedRead.Release();
             await activated;
             await observer.WaitForLocalReminderScheduleAsync(grainId, "exact-due-recovery", cancellation.Token);
-            Assert.Equal(["exact-due-recovery"], await grain.GetReminderNamesAsync().WaitAsync(cancellation.Token));
+            var persisted = Assert.Single(oracle.Snapshot());
+            Assert.Equal(grainId, persisted.GrainId);
+            Assert.Equal("exact-due-recovery", persisted.ReminderName);
+            Assert.Equal(firstTickTime, persisted.StartAt);
+            Assert.Equal(period, persisted.Period);
 
             var tick = observer.WaitForReminderTickAsync(grainId, cancellation.Token, "exact-due-recovery");
             await clock.AdvanceAsync(clock.RefreshReminderListPeriod, cancellation.Token);
