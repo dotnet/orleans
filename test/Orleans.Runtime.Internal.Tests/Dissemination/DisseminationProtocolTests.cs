@@ -2034,6 +2034,24 @@ public class DisseminationProtocolTests
         var fastResponseReturned = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var slowExchangeStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var slowCancellationObserved = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var timeoutMetric = new TaskCompletionSource<long>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var listener = new MeterListener();
+        listener.InstrumentPublished = (instrument, meterListener) =>
+        {
+            if (instrument.Meter.Name == DisseminationInstruments.MeterName
+                && instrument.Name == DisseminationInstruments.AntiEntropyFailuresName)
+            {
+                meterListener.EnableMeasurementEvents(instrument);
+            }
+        };
+        listener.SetMeasurementEventCallback<long>((instrument, measurement, tags, state) =>
+        {
+            if (tags.Any(static tag => tag.Key == "reason" && Equals(tag.Value, "timeout")))
+            {
+                timeoutMetric.TrySetResult(measurement);
+            }
+        });
+        listener.Start();
         var repair = ns.CreateItem(fastPeer, FakeNamespace.DefaultKey, sequence: 1);
         transport.ExchangeAntiEntropyHandler = async (target, _, cancellationToken) =>
         {
@@ -2072,6 +2090,9 @@ public class DisseminationProtocolTests
         await slowCancellationObserved.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         await round.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         await ns.ApplyObserved.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.Equal(
+            1,
+            await timeoutMetric.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
         Assert.Equal(1, ns.GetVersion(FakeNamespace.DefaultKey));
     }
 
@@ -5554,7 +5575,7 @@ public class DisseminationProtocolTests
     [Fact]
     public async Task PeerQueueAdmissionRejectionIncrementsBoundedReasonMetric()
     {
-        const string instrumentName = "orleans.dissemination.queue.admission.rejected";
+        const string instrumentName = DisseminationInstruments.QueueAdmissionRejectedName;
         var local = CreateSilo(36031);
         var peer = CreateSilo(36032);
         var transport = new FakeTransport(local, peer);
@@ -5568,7 +5589,7 @@ public class DisseminationProtocolTests
         using var listener = new MeterListener();
         listener.InstrumentPublished = (instrument, meterListener) =>
         {
-            if (instrument.Meter.Name == DisseminationEvents.ListenerName && instrument.Name == instrumentName)
+            if (instrument.Meter.Name == DisseminationInstruments.MeterName && instrument.Name == instrumentName)
             {
                 publishedInstrument = instrument;
                 meterListener.EnableMeasurementEvents(instrument);
@@ -5612,6 +5633,68 @@ public class DisseminationProtocolTests
             tag => tag.Key == "reason" && Equals(tag.Value, DisseminationEvents.NamespacePendingLimitReason));
         releaseSend.TrySetResult();
         await queue.StopAsync(TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public void DisseminationFailureMetricsUseBoundedDimensionsOnTheOrleansMeter()
+    {
+        var expectedInstruments = new HashSet<string>
+        {
+            DisseminationInstruments.BroadcastSendFailuresName,
+            DisseminationInstruments.BroadcastScheduledName,
+            DisseminationInstruments.AntiEntropyFailuresName,
+            DisseminationInstruments.PumpFailuresName,
+            DisseminationInstruments.PublicationsName,
+        };
+        var observations = new ConcurrentDictionary<string, (long Measurement, KeyValuePair<string, object?>[] Tags)>();
+        using var listener = new MeterListener();
+        listener.InstrumentPublished = (instrument, meterListener) =>
+        {
+            if (instrument.Meter.Name == DisseminationInstruments.MeterName
+                && expectedInstruments.Contains(instrument.Name))
+            {
+                meterListener.EnableMeasurementEvents(instrument);
+            }
+        };
+        listener.SetMeasurementEventCallback<long>((instrument, measurement, tags, state) =>
+            observations[instrument.Name] = (measurement, tags.ToArray()));
+        listener.Start();
+
+        DisseminationInstruments.OnBroadcastSendFailure(DisseminationFailureReason.Timeout);
+        DisseminationInstruments.OnBroadcastScheduled(DisseminationBroadcastScheduleReason.Retry);
+        DisseminationInstruments.OnAntiEntropyFailure(DisseminationFailureReason.Error);
+        DisseminationInstruments.OnPumpFailure(DisseminationPumpFailureStatus.Permanent);
+        DisseminationInstruments.OnPublication(
+            new DisseminationNamespace("test"),
+            accepted: false,
+            reason: "disabled");
+
+        Assert.Equal(expectedInstruments.Order(), observations.Keys.Order());
+        AssertMetric(DisseminationInstruments.BroadcastSendFailuresName, "reason", "timeout");
+        AssertMetric(DisseminationInstruments.BroadcastScheduledName, "reason", "retry");
+        AssertMetric(DisseminationInstruments.AntiEntropyFailuresName, "reason", "error");
+        AssertMetric(DisseminationInstruments.PumpFailuresName, "status", "permanent");
+        AssertMetric(
+            DisseminationInstruments.PublicationsName,
+            ("namespace", new DisseminationNamespace("test")),
+            ("result", "rejected"),
+            ("reason", "disabled"));
+
+        void AssertMetric(string name, string tagName, string tagValue) =>
+            AssertMetric(name, (tagName, (object)tagValue));
+
+        void AssertMetric(string name, params (string Name, object Value)[] expectedTags)
+        {
+            var observation = observations[name];
+            Assert.Equal(1, observation.Measurement);
+            Assert.Equal(expectedTags.Length, observation.Tags.Length);
+            foreach (var expectedTag in expectedTags)
+            {
+                Assert.Contains(
+                    observation.Tags,
+                    tag => tag.Key == expectedTag.Name && Equals(tag.Value, expectedTag.Value));
+            }
+        }
     }
 
     [Fact]
@@ -6241,6 +6324,21 @@ public class DisseminationProtocolTests
         var ns = new FakeNamespace(local);
         var protocol = CreateProtocol(transport, ns);
         var unsupported = new DisseminationNamespace("unsupported");
+        var receivedNamespaces = new ConcurrentBag<object?>();
+        using var listener = new MeterListener();
+        listener.InstrumentPublished = (instrument, meterListener) =>
+        {
+            if (instrument.Meter.Name == DisseminationInstruments.MeterName
+                && instrument.Name == DisseminationInstruments.ValuesReceivedName)
+            {
+                meterListener.EnableMeasurementEvents(instrument);
+            }
+        };
+        listener.SetMeasurementEventCallback<long>((instrument, measurement, tags, state) =>
+        {
+            receivedNamespaces.Add(tags.ToArray().Single(static tag => tag.Key == "namespace").Value);
+        });
+        listener.Start();
         var batch = new DisseminationBroadcastBatch
         {
             Sender = peer,
@@ -6271,6 +6369,7 @@ public class DisseminationProtocolTests
         Assert.Equal(new DisseminationKey("supported-key"), digest.Key);
         Assert.Equal(3, digest.Version);
         Assert.Equal([unsupported], response.UnsupportedNamespaces);
+        Assert.Equal([ns.Name], receivedNamespaces);
     }
 
     [Fact]

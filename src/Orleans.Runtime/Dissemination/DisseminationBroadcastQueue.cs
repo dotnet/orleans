@@ -355,6 +355,7 @@ internal sealed partial class DisseminationBroadcastQueue
         {
             if (scheduled is { } info)
             {
+                DisseminationInstruments.OnBroadcastScheduled(info.Reason);
                 try
                 {
                     DisseminationEvents.EmitBroadcastScheduled(_owner._localSilo, Peer, info.Reason, info.DueTime, info.Attempt, info.Epoch);
@@ -627,6 +628,7 @@ internal sealed partial class DisseminationBroadcastQueue
             }
             catch (Exception exception)
             {
+                DisseminationInstruments.OnPumpFailure(DisseminationPumpFailureStatus.Recovered);
                 LogDebugBroadcastFlushFailed(_owner._logger, exception);
                 Requeue(work);
                 result = new(RequiresBackoff: true, MadeProgress: false);
@@ -718,6 +720,7 @@ internal sealed partial class DisseminationBroadcastQueue
                     _activeFlushCompletion = null;
                 }
 
+                DisseminationInstruments.OnPumpFailure(DisseminationPumpFailureStatus.Recovered);
                 LogWarningBroadcastPumpIterationFailed(_owner._logger, exception, Peer, scheduled?.DueTime);
                 EmitScheduled(scheduled);
                 activeFlushCompletion?.TrySetResult();
@@ -730,6 +733,7 @@ internal sealed partial class DisseminationBroadcastQueue
                     exception,
                     recoveryException);
                 FailPump(failure);
+                DisseminationInstruments.OnPumpFailure(DisseminationPumpFailureStatus.Permanent);
                 LogErrorBroadcastPumpFailed(_owner._logger, failure, Peer);
                 return false;
             }
@@ -961,11 +965,13 @@ internal sealed partial class DisseminationBroadcastQueue
             }
             catch (OperationCanceledException) when (lifetimeCancellation.IsCancellationRequested)
             {
+                DisseminationInstruments.OnBroadcastSendFailure(DisseminationFailureReason.Timeout);
                 LogDebugBroadcastTransportLifetimeExpired(_owner._logger, Peer, transportLifetime);
                 return null;
             }
             catch (Exception exception)
             {
+                DisseminationInstruments.OnBroadcastSendFailure(DisseminationFailureReason.Error);
                 LogDebugDisseminationSendFailed(_owner._logger, exception, Peer);
                 return null;
             }

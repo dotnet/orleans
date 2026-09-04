@@ -64,6 +64,10 @@ internal sealed partial class DisseminationProtocol
         var options = _options.CurrentValue;
         if (!options.Enabled || !disseminationNamespace.Options.Enabled)
         {
+            DisseminationInstruments.OnPublication(
+                disseminationNamespace.Name,
+                accepted: false,
+                reason: "disabled");
             return false;
         }
 
@@ -76,7 +80,10 @@ internal sealed partial class DisseminationProtocol
             out var publishedVersion,
             out var reason))
         {
-            DisseminationInstruments.OnFallback(disseminationNamespace.Name, reason);
+            DisseminationInstruments.OnPublication(
+                disseminationNamespace.Name,
+                accepted: false,
+                reason: reason);
             return false;
         }
 
@@ -86,6 +93,10 @@ internal sealed partial class DisseminationProtocol
             cancellationToken);
         if (membership is null)
         {
+            DisseminationInstruments.OnPublication(
+                disseminationNamespace.Name,
+                accepted: false,
+                "membership-unavailable");
             return false;
         }
 
@@ -96,6 +107,10 @@ internal sealed partial class DisseminationProtocol
             _broadcastQueue.Notify(peer, disseminationNamespace, key);
         }
 
+        DisseminationInstruments.OnPublication(
+            disseminationNamespace.Name,
+            accepted: true,
+            reason: "none");
         return true;
     }
 
@@ -113,8 +128,6 @@ internal sealed partial class DisseminationProtocol
             };
         }
 
-        DisseminationInstruments.OnBroadcastReceived(batch.Values, "tree");
-
         var receivedKeys = new Dictionary<IDisseminationNamespace, HashSet<DisseminationKey>>();
         var unsupportedNamespaces = new List<DisseminationNamespace>();
         foreach (var (namespaceName, values) in batch.Values)
@@ -125,6 +138,7 @@ internal sealed partial class DisseminationProtocol
                 continue;
             }
 
+            DisseminationInstruments.OnBroadcastReceived(disseminationNamespace.Name, "tree", values.Count);
             ConfirmPeerNamespaces(batch.Sender, [namespaceName]);
             var namespaceKeys = new HashSet<DisseminationKey>();
             receivedKeys.Add(disseminationNamespace, namespaceKeys);
@@ -228,7 +242,9 @@ internal sealed partial class DisseminationProtocol
                 request.Key,
                 request.Value,
                 GetDigestCount(request.Value.Digests),
-                exchangeCancellation.Token))
+                exchangeCancellation.Token,
+                cancellationToken,
+                lifetimeCancellation.Token))
             .ToArray();
         DisseminationAntiEntropyResponse?[] responses;
         try
@@ -400,7 +416,9 @@ internal sealed partial class DisseminationProtocol
         SiloAddress peer,
         DisseminationAntiEntropyRequest request,
         int requestDigestCount,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        CancellationToken callerCancellationToken,
+        CancellationToken lifetimeCancellationToken)
     {
         try
         {
@@ -414,13 +432,19 @@ internal sealed partial class DisseminationProtocol
                 response.Truncated);
             return response;
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (callerCancellationToken.IsCancellationRequested)
         {
+            return null;
+        }
+        catch (OperationCanceledException) when (lifetimeCancellationToken.IsCancellationRequested)
+        {
+            DisseminationInstruments.OnAntiEntropyFailure(DisseminationFailureReason.Timeout);
             return null;
         }
         catch (Exception exception)
         {
             // Anti-entropy transport failures are isolated to the peer; random peer selection naturally spreads retries.
+            DisseminationInstruments.OnAntiEntropyFailure(DisseminationFailureReason.Error);
             LogDebugDisseminationSendFailed(_logger, exception, peer);
             return null;
         }

@@ -5,19 +5,33 @@ namespace Orleans.Runtime.Dissemination;
 
 internal static class DisseminationInstruments
 {
-    private static readonly Meter Meter = new("Microsoft.Orleans.Dissemination");
-    private static readonly Counter<long> BroadcastSent = Meter.CreateCounter<long>("orleans.dissemination.broadcast.sent", "messages");
-    private static readonly Counter<long> BroadcastReceived = Meter.CreateCounter<long>("orleans.dissemination.broadcast.received", "messages");
-    private static readonly Counter<long> ValuesSent = Meter.CreateCounter<long>("orleans.dissemination.values.sent", "values");
-    private static readonly Counter<long> ValuesApplied = Meter.CreateCounter<long>("orleans.dissemination.values.applied", "values");
-    private static readonly Counter<long> BytesSent = Meter.CreateCounter<long>("orleans.dissemination.bytes.sent", "bytes");
-    private static readonly Counter<long> AntiEntropyExchanges = Meter.CreateCounter<long>("orleans.dissemination.anti_entropy.exchanges", "operations");
-    private static readonly Counter<long> AntiEntropyDigests = Meter.CreateCounter<long>("orleans.dissemination.anti_entropy.digests", "digests");
-    private static readonly Counter<long> AntiEntropyValues = Meter.CreateCounter<long>("orleans.dissemination.anti_entropy.values", "values");
-    private static readonly Counter<long> Fallbacks = Meter.CreateCounter<long>("orleans.dissemination.fallbacks", "operations");
-    private static readonly Counter<long> PayloadDropped = Meter.CreateCounter<long>("orleans.dissemination.payload.dropped", "values");
+    internal const string MeterName = "Microsoft.Orleans";
+    internal const string BroadcastSendFailuresName = "orleans-dissemination-broadcast-send-failures";
+    internal const string BroadcastScheduledName = "orleans-dissemination-broadcast-scheduled";
+    internal const string AntiEntropyFailuresName = "orleans-dissemination-anti-entropy-failures";
+    internal const string PumpFailuresName = "orleans-dissemination-pump-failures";
+    internal const string PublicationsName = "orleans-dissemination-publications";
+    internal const string QueueAdmissionRejectedName = "orleans-dissemination-queue-admission-rejected";
+    internal const string ValuesReceivedName = "orleans-dissemination-values-received";
+
+    private static readonly Meter Meter = new(MeterName);
+    private static readonly Counter<long> BroadcastSent = Meter.CreateCounter<long>("orleans-dissemination-broadcast-sent", "messages");
+    private static readonly Counter<long> BroadcastReceived = Meter.CreateCounter<long>("orleans-dissemination-broadcast-received", "messages");
+    private static readonly Counter<long> ValuesSent = Meter.CreateCounter<long>("orleans-dissemination-values-sent", "values");
+    private static readonly Counter<long> ValuesReceived = Meter.CreateCounter<long>(ValuesReceivedName, "values");
+    private static readonly Counter<long> ValuesApplied = Meter.CreateCounter<long>("orleans-dissemination-values-applied", "values");
+    private static readonly Counter<long> BytesSent = Meter.CreateCounter<long>("orleans-dissemination-bytes-sent", "bytes");
+    private static readonly Counter<long> BroadcastSendFailures = Meter.CreateCounter<long>(BroadcastSendFailuresName, "attempts");
+    private static readonly Counter<long> BroadcastScheduled = Meter.CreateCounter<long>(BroadcastScheduledName, "schedules");
+    private static readonly Counter<long> AntiEntropyExchanges = Meter.CreateCounter<long>("orleans-dissemination-anti-entropy-exchanges", "operations");
+    private static readonly Counter<long> AntiEntropyDigests = Meter.CreateCounter<long>("orleans-dissemination-anti-entropy-digests", "digests");
+    private static readonly Counter<long> AntiEntropyValues = Meter.CreateCounter<long>("orleans-dissemination-anti-entropy-values", "values");
+    private static readonly Counter<long> AntiEntropyFailures = Meter.CreateCounter<long>(AntiEntropyFailuresName, "operations");
+    private static readonly Counter<long> PumpFailures = Meter.CreateCounter<long>(PumpFailuresName, "failures");
+    private static readonly Counter<long> Publications = Meter.CreateCounter<long>(PublicationsName, "operations");
+    private static readonly Counter<long> PayloadDropped = Meter.CreateCounter<long>("orleans-dissemination-payload-dropped", "values");
     private static readonly Counter<long> QueueAdmissionRejected = Meter.CreateCounter<long>(
-        "orleans.dissemination.queue.admission.rejected",
+        QueueAdmissionRejectedName,
         "keys");
 
     public static void OnBroadcastSent(DisseminationNamespace namespaceName, string kind, int itemCount, int byteCount)
@@ -64,8 +78,8 @@ internal static class DisseminationInstruments
     public static void OnBroadcastReceived(DisseminationNamespace namespaceName, string kind, int itemCount)
     {
         var broadcastReceivedEnabled = BroadcastReceived.Enabled;
-        var valuesAppliedEnabled = ValuesApplied.Enabled;
-        if (!broadcastReceivedEnabled && !valuesAppliedEnabled)
+        var valuesReceivedEnabled = ValuesReceived.Enabled;
+        if (!broadcastReceivedEnabled && !valuesReceivedEnabled)
         {
             return;
         }
@@ -76,22 +90,25 @@ internal static class DisseminationInstruments
             BroadcastReceived.Add(1, namespaceTag, Tag("kind", kind));
         }
 
-        if (valuesAppliedEnabled)
+        if (valuesReceivedEnabled)
         {
-            ValuesApplied.Add(itemCount, namespaceTag, Tag("result", "received"));
+            ValuesReceived.Add(itemCount, namespaceTag, Tag("kind", kind));
         }
     }
 
-    public static void OnBroadcastReceived(Dictionary<DisseminationNamespace, List<DisseminationBroadcastValue>> valuesByNamespace, string kind)
+    public static void OnBroadcastSendFailure(DisseminationFailureReason reason)
     {
-        if (!BroadcastReceived.Enabled && !ValuesApplied.Enabled)
+        if (BroadcastSendFailures.Enabled)
         {
-            return;
+            BroadcastSendFailures.Add(1, Tag("reason", GetFailureReason(reason)));
         }
+    }
 
-        foreach (var (namespaceName, values) in valuesByNamespace)
+    public static void OnBroadcastScheduled(DisseminationBroadcastScheduleReason reason)
+    {
+        if (BroadcastScheduled.Enabled)
         {
-            OnBroadcastReceived(namespaceName, kind, values.Count);
+            BroadcastScheduled.Add(1, Tag("reason", GetScheduleReason(reason)));
         }
     }
 
@@ -102,7 +119,7 @@ internal static class DisseminationInstruments
             return;
         }
 
-        ValuesApplied.Add(1, Tag("namespace", namespaceName), Tag("result", result.ToString()));
+        ValuesApplied.Add(1, Tag("namespace", namespaceName), Tag("result", GetApplyResult(result)));
     }
 
     public static void OnAntiEntropyExchange(string direction, int digestCount, int itemCount, bool truncated)
@@ -132,11 +149,33 @@ internal static class DisseminationInstruments
         }
     }
 
-    public static void OnFallback(DisseminationNamespace namespaceName, string reason)
+    public static void OnAntiEntropyFailure(DisseminationFailureReason reason, int count = 1)
     {
-        if (Fallbacks.Enabled)
+        if (AntiEntropyFailures.Enabled && count > 0)
         {
-            Fallbacks.Add(1, Tag("namespace", namespaceName), Tag("reason", reason));
+            AntiEntropyFailures.Add(count, Tag("reason", GetFailureReason(reason)));
+        }
+    }
+
+    public static void OnPumpFailure(DisseminationPumpFailureStatus status)
+    {
+        if (PumpFailures.Enabled)
+        {
+            PumpFailures.Add(
+                1,
+                Tag("status", status == DisseminationPumpFailureStatus.Recovered ? "recovered" : "permanent"));
+        }
+    }
+
+    public static void OnPublication(DisseminationNamespace namespaceName, bool accepted, string reason)
+    {
+        if (Publications.Enabled)
+        {
+            Publications.Add(
+                1,
+                Tag("namespace", namespaceName),
+                Tag("result", accepted ? "accepted" : "rejected"),
+                Tag("reason", reason));
         }
     }
 
@@ -159,5 +198,38 @@ internal static class DisseminationInstruments
         }
     }
 
+    private static string GetFailureReason(DisseminationFailureReason reason) =>
+        reason == DisseminationFailureReason.Timeout ? "timeout" : "error";
+
+    private static string GetApplyResult(DisseminationApplyResult result) => result switch
+    {
+        DisseminationApplyResult.Applied => "applied",
+        DisseminationApplyResult.Duplicate => "duplicate",
+        DisseminationApplyResult.Obsolete => "obsolete",
+        DisseminationApplyResult.Rejected => "rejected",
+        _ => "unknown",
+    };
+
+    private static string GetScheduleReason(DisseminationBroadcastScheduleReason reason) => reason switch
+    {
+        DisseminationBroadcastScheduleReason.Immediate => "immediate",
+        DisseminationBroadcastScheduleReason.Coalesce => "coalesce",
+        DisseminationBroadcastScheduleReason.Retry => "retry",
+        DisseminationBroadcastScheduleReason.Priority => "priority",
+        _ => "unknown",
+    };
+
     private static KeyValuePair<string, object?> Tag(string name, object value) => new(name, value);
+}
+
+internal enum DisseminationFailureReason
+{
+    Timeout,
+    Error,
+}
+
+internal enum DisseminationPumpFailureStatus
+{
+    Recovered,
+    Permanent,
 }
