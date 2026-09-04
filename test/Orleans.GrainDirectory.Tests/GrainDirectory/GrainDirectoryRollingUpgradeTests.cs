@@ -1705,7 +1705,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                 "LogErrorPublishingClientRoutingTableToSilo",
                 StringComparison.Ordinal)
             && string.Equals(entry.ExceptionType, typeof(SiloUnavailableException).FullName, StringComparison.Ordinal)
-            && entry.ClientDirectoryTargetSilo is { } targetSilo
+            && entry.LogSiloAddress is { } targetSilo
             && retiredAddresses.Contains(targetSilo))
         {
             return true;
@@ -2268,7 +2268,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
             {
                 if (IsEnabled(logLevel))
                 {
-                    var (handoffSilo, handoffCount, clientDirectoryTargetSilo) = GetLogProperties(state);
+                    var (handoffSilo, handoffCount, logSiloAddress) = GetLogProperties(state);
                     capture.Add(
                         siloName,
                         category,
@@ -2278,11 +2278,11 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                         exception,
                         handoffSilo,
                         handoffCount,
-                        clientDirectoryTargetSilo);
+                        logSiloAddress);
                 }
             }
 
-            private static (string? HandoffSilo, int? HandoffCount, SiloAddress? ClientDirectoryTargetSilo)
+            private static (string? HandoffSilo, int? HandoffCount, SiloAddress? LogSiloAddress)
                 GetLogProperties<TState>(TState state)
             {
                 if (state is not IEnumerable<KeyValuePair<string, object?>> properties)
@@ -2292,7 +2292,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
 
                 string? silo = null;
                 int? count = null;
-                SiloAddress? clientDirectoryTargetSilo = null;
+                SiloAddress? logSiloAddress = null;
                 foreach (var property in properties)
                 {
                     if (property.Key is "Silo" or "AddedSilo")
@@ -2305,11 +2305,11 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                     }
                     else if (property.Key == "SiloAddress" && property.Value is SiloAddress targetSilo)
                     {
-                        clientDirectoryTargetSilo = targetSilo;
+                        logSiloAddress = targetSilo;
                     }
                 }
 
-                return (silo, count, clientDirectoryTargetSilo);
+                return (silo, count, logSiloAddress);
             }
         }
     }
@@ -2328,7 +2328,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
             Exception? exception,
             string? handoffSilo,
             int? handoffCount,
-            SiloAddress? clientDirectoryTargetSilo)
+            SiloAddress? logSiloAddress)
         {
             var baseException = exception?.GetBaseException();
             _entries.Enqueue(
@@ -2344,7 +2344,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                     baseException?.Message,
                     handoffSilo,
                     handoffCount,
-                    clientDirectoryTargetSilo));
+                    logSiloAddress));
             Interlocked.Exchange(ref _entryAdded, CreateEntryAddedSignal()).TrySetResult(true);
         }
 
@@ -2394,12 +2394,13 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         string? ExceptionMessage,
         string? HandoffSilo,
         int? HandoffCount,
-        SiloAddress? ClientDirectoryTargetSilo)
+        SiloAddress? LogSiloAddress)
     {
         public override string ToString() =>
             $"{Timestamp:O} phase='{Phase}' silo='{SiloName}' [{Level}] [{Category}] ({EventId.Id}:{EventId.Name}) "
             + $"{Message}"
-            + (ExceptionType is null ? string.Empty : $" | {ExceptionType}: {ExceptionMessage}");
+            + (ExceptionType is null ? string.Empty : $" | {ExceptionType}: {ExceptionMessage}")
+            + (LogSiloAddress is null ? string.Empty : $" | logSiloAddress={LogSiloAddress}");
     }
 }
 
