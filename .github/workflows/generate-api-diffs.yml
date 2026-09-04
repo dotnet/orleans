@@ -26,7 +26,9 @@ jobs:
 
           # Find all csproj files excluding specific paths
           find src -name '*.csproj' | egrep -v 'Orleans.Analyzers|Orleans.CodeGenerator' | while read proj; do
-            export CI=false && dotnet build "$proj" -f net8.0 --configuration Release --no-incremental /t:"Build;GenAPIGenerateReferenceAssemblySource"
+            export CI=false
+            dotnet restore "$proj" --configfile .github/NuGet.GenAPI.Config -p:GenerateOrleansApiSource=true &&
+              dotnet build "$proj" -f net8.0 --configuration Release --no-incremental --no-restore -p:GenerateOrleansApiSource=true /t:"Build;GenAPIGenerateReferenceAssemblySource"
           done
         continue-on-error: true
 

@@ -20,3 +20,11 @@
 - Run the normal Release pack again without `GenerateCompatibilitySuppressionFile` and require it to pass. Do not resolve compatibility failures by disabling package validation or adding `CP*`/`PKV*` diagnostics to `NoWarn`.
 - For an intentional target-framework removal, add a package-specific `PackageValidationBaselineFrameworkToIgnore` item instead of an API suppression.
 - After a release containing the break becomes the configured baseline, regenerate or remove the suppression file so obsolete entries do not accumulate.
+
+# Generated API surfaces
+
+- Files under `src/api` are generated public API surfaces. Do not edit them manually.
+- After changing public API in a packable source project, regenerate that project's API file using the same restore configuration and GenAPI target as CI:
+  `dotnet restore <project> --configfile .github/NuGet.GenAPI.Config -p:GenerateOrleansApiSource=true`,
+  then `dotnet build <project> --framework net8.0 --configuration Release --no-incremental --no-restore -p:GenerateOrleansApiSource=true /t:"Build;GenAPIGenerateReferenceAssemblySource"`.
+- Review and commit the generated `src/api` change with the implementation. The `GenerateOrleansApiSource` property activates the GenAPI package, and the dedicated NuGet config maps that package to its public transport feed; ordinary restores use only the repository's CFS source.

@@ -47,7 +47,7 @@
     <OrleansContractsPath Condition="'$(OrleansContractsPath)' == ''">$(MSBuildProjectDirectory)\OrleansContracts.txt</OrleansContractsPath>
   </PropertyGroup>
 
-  <ItemGroup>
+  <ItemGroup Condition="'$(GenerateOrleansApiSource)' == 'true'">
     <PackageReference Include="Microsoft.DotNet.GenAPI.Task" PrivateAssets="All" />
   </ItemGroup>
 
