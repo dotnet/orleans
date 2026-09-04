@@ -66,7 +66,16 @@ namespace OrleansAWSUtils.Streams
                 // await the last storage operation, so after we shutdown and stop this receiver we don't get async operation completions from pending storage operations.
                 var pendingTask = outstandingTask;
                 if (pendingTask != null)
-                    await pendingTask.WaitAsync(timeoutCancellation.Token);
+                {
+                    try
+                    {
+                        await pendingTask.WaitAsync(timeoutCancellation.Token);
+                    }
+                    catch (Exception exception)
+                    {
+                        LogWarningPendingOperationException(logger, exception, Id);
+                    }
+                }
 
                 var queueRef = queue;
                 SQSMessage[] pendingMessages;
@@ -191,6 +200,12 @@ namespace OrleansAWSUtils.Streams
             Message = "Exception upon DeleteMessage on queue {Id}. Ignoring."
         )]
         private static partial void LogWarningDeleteMessageException(ILogger logger, Exception exception, QueueId id);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Exception while awaiting a pending operation for queue {Id}. Continuing shutdown cleanup."
+        )]
+        private static partial void LogWarningPendingOperationException(ILogger logger, Exception exception, QueueId id);
 
         [LoggerMessage(
             Level = LogLevel.Warning,
