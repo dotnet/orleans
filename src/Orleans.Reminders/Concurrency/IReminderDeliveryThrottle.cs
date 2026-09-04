@@ -7,7 +7,7 @@ namespace Orleans.Reminders.Concurrency;
 /// Service provider interface (SPI) for controlling the rate and concurrency of reminder
 /// tick deliveries within a silo. Implementations are resolved as a singleton from DI and
 /// invoked once per reminder tick, immediately before the call to
-/// <see cref="IRemindable.ReceiveReminder"/>.
+/// <see cref="IRemindable.ReceiveReminder(string, Runtime.TickStatus, CancellationToken)"/>.
 /// </summary>
 /// <remarks>
 /// <para>The default registration is <see cref="NoOpReminderDeliveryThrottle"/>, which admits

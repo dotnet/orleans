@@ -50,7 +50,7 @@ public sealed class ReminderConcurrencyControlClusterTests
         });
 
         await using var cluster = builder.Build();
-        await cluster.DeployAsync();
+        await cluster.DeployAsync(TestContext.Current.CancellationToken);
 
         foreach (var silo in cluster.Silos)
         {
@@ -81,7 +81,7 @@ public sealed class ReminderConcurrencyControlClusterTests
         });
 
         await using var cluster = builder.Build();
-        await cluster.DeployAsync();
+        await cluster.DeployAsync(TestContext.Current.CancellationToken);
 
         foreach (var silo in cluster.Silos)
         {
@@ -114,7 +114,7 @@ public sealed class ReminderConcurrencyControlClusterTests
         });
 
         await using var cluster = builder.Build();
-        var ex = await Assert.ThrowsAnyAsync<Exception>(() => cluster.DeployAsync());
+        var ex = await Assert.ThrowsAnyAsync<Exception>(() => cluster.DeployAsync(TestContext.Current.CancellationToken));
         Assert.Contains("AddReminderConcurrencyControl", FlattenMessages(ex));
     }
 
@@ -125,10 +125,9 @@ public sealed class ReminderConcurrencyControlClusterTests
     [Fact]
     public async Task RemindersStillFire_WithPermissiveConcurrencyControl()
     {
-        var observer = ReminderDiagnosticObserver.Create();
-        using var _o = observer;
-
         var builder = new InProcessTestClusterBuilder(initialSilosCount: 1);
+        var observer = ReminderDiagnosticObserver.Create(builder);
+        using var _o = observer;
         var clock = builder.AddReminderTestClock(minimumReminderPeriod: TimeSpan.FromMilliseconds(100));
         builder.ConfigureSilo((_, sb) =>
         {
@@ -140,7 +139,7 @@ public sealed class ReminderConcurrencyControlClusterTests
         });
 
         await using var cluster = builder.Build();
-        await cluster.DeployAsync();
+        await cluster.DeployAsync(TestContext.Current.CancellationToken);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(1));
         foreach (var silo in cluster.Silos)
@@ -183,25 +182,25 @@ public sealed class ReminderConcurrencyControlClusterTests
     [Fact]
     public async Task TickSkipped_EventsFireWhenRateLimitIsExceeded()
     {
+        const string reminderName = "burst";
         var skipped = new ConcurrentBag<ReminderEvents.TickSkipped>();
         var completed = new ConcurrentBag<ReminderEvents.TickCompleted>();
         using var subscription = ReminderEvents.AllEvents.Subscribe(evt =>
         {
             switch (evt)
             {
-                case ReminderEvents.TickSkipped s:
+                case ReminderEvents.TickSkipped s when s.ReminderName == reminderName:
                     skipped.Add(s);
                     break;
-                case ReminderEvents.TickCompleted c:
+                case ReminderEvents.TickCompleted c when c.ReminderName == reminderName:
                     completed.Add(c);
                     break;
             }
         });
 
-        var observer = ReminderDiagnosticObserver.Create();
-        using var _o = observer;
-
         var builder = new InProcessTestClusterBuilder(initialSilosCount: 1);
+        var observer = ReminderDiagnosticObserver.Create(builder);
+        using var _o = observer;
         var clock = builder.AddReminderTestClock(minimumReminderPeriod: TimeSpan.FromMilliseconds(100));
         builder.ConfigureSilo((_, sb) =>
         {
@@ -214,7 +213,7 @@ public sealed class ReminderConcurrencyControlClusterTests
         });
 
         await using var cluster = builder.Build();
-        await cluster.DeployAsync();
+        await cluster.DeployAsync(TestContext.Current.CancellationToken);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
         foreach (var silo in cluster.Silos)
@@ -223,7 +222,6 @@ public sealed class ReminderConcurrencyControlClusterTests
         }
 
         const int reminderCount = 6;
-        const string reminderName = "burst";
         var period = TimeSpan.FromMilliseconds(500);
 
         // Register all reminders.
@@ -283,11 +281,11 @@ public sealed class ReminderConcurrencyControlClusterTests
     [Fact]
     public async Task SiloShutdown_CompletesPromptly_WhenThrottleWaitsAreInFlight()
     {
-        var observer = ReminderDiagnosticObserver.Create();
-        using var _o = observer;
         var blockingThrottle = new BlockingReminderDeliveryThrottle();
 
         var builder = new InProcessTestClusterBuilder(initialSilosCount: 1);
+        var observer = ReminderDiagnosticObserver.Create(builder);
+        using var _o = observer;
         var clock = builder.AddReminderTestClock(minimumReminderPeriod: TimeSpan.FromMilliseconds(100));
         builder.ConfigureSilo((_, sb) =>
         {
@@ -299,7 +297,7 @@ public sealed class ReminderConcurrencyControlClusterTests
         });
 
         var cluster = builder.Build();
-        await cluster.DeployAsync();
+        await cluster.DeployAsync(TestContext.Current.CancellationToken);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
         foreach (var silo in cluster.Silos)
@@ -337,6 +335,7 @@ public sealed class ReminderConcurrencyControlClusterTests
     [Fact]
     public async Task NoTickFiringEvent_WhenTickIsSkippedByThrottle()
     {
+        const string reminderName = "burst2";
         var skipped = new ConcurrentBag<ReminderEvents.TickSkipped>();
         var firings = new ConcurrentBag<ReminderEvents.TickFiring>();
         var tardinessMeasurements = new ConcurrentBag<double>();
@@ -344,19 +343,18 @@ public sealed class ReminderConcurrencyControlClusterTests
         {
             switch (evt)
             {
-                case ReminderEvents.TickSkipped s:
+                case ReminderEvents.TickSkipped s when s.ReminderName == reminderName:
                     skipped.Add(s);
                     break;
-                case ReminderEvents.TickFiring f:
+                case ReminderEvents.TickFiring f when f.ReminderName == reminderName:
                     firings.Add(f);
                     break;
             }
         });
 
-        var observer = ReminderDiagnosticObserver.Create();
-        using var _o = observer;
-
         var builder = new InProcessTestClusterBuilder(initialSilosCount: 1);
+        var observer = ReminderDiagnosticObserver.Create(builder);
+        using var _o = observer;
         var clock = builder.AddReminderTestClock(minimumReminderPeriod: TimeSpan.FromMilliseconds(100));
         builder.ConfigureSilo((_, sb) =>
         {
@@ -369,7 +367,7 @@ public sealed class ReminderConcurrencyControlClusterTests
         });
 
         await using var cluster = builder.Build();
-        await cluster.DeployAsync();
+        await cluster.DeployAsync(TestContext.Current.CancellationToken);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
         foreach (var silo in cluster.Silos)
@@ -392,7 +390,6 @@ public sealed class ReminderConcurrencyControlClusterTests
         meterListener.Start();
 
         const int reminderCount = 6;
-        const string reminderName = "burst2";
         var period = TimeSpan.FromHours(1);
 
         var grains = Enumerable.Range(0, reminderCount)
@@ -442,6 +439,7 @@ public sealed class ReminderConcurrencyControlClusterTests
     [Fact]
     public async Task SkippedOccurrence_IsNotRetriedBeforeTheNextPeriod()
     {
+        const string reminderName = "skip_once";
         var skipped = new ConcurrentBag<ReminderEvents.TickSkipped>();
         var firings = new ConcurrentBag<ReminderEvents.TickFiring>();
         var firstSkipped = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -450,22 +448,22 @@ public sealed class ReminderConcurrencyControlClusterTests
         {
             switch (evt)
             {
-                case ReminderEvents.TickSkipped s:
+                case ReminderEvents.TickSkipped s when s.ReminderName == reminderName:
                     skipped.Add(s);
                     firstSkipped.TrySetResult();
                     break;
-                case ReminderEvents.TickFiring f:
+                case ReminderEvents.TickFiring f when f.ReminderName == reminderName:
                     firings.Add(f);
                     firstFiring.TrySetResult();
                     break;
             }
         });
 
-        var observer = ReminderDiagnosticObserver.Create();
-        using var _o = observer;
         var throttle = new SkipFirstReminderDeliveryThrottle();
 
         var builder = new InProcessTestClusterBuilder(initialSilosCount: 1);
+        var observer = ReminderDiagnosticObserver.Create(builder);
+        using var _o = observer;
         var clock = builder.AddReminderTestClock(minimumReminderPeriod: TimeSpan.FromMilliseconds(100));
         builder.ConfigureSilo((_, sb) =>
         {
@@ -477,7 +475,7 @@ public sealed class ReminderConcurrencyControlClusterTests
         });
 
         await using var cluster = builder.Build();
-        await cluster.DeployAsync();
+        await cluster.DeployAsync(TestContext.Current.CancellationToken);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
         foreach (var silo in cluster.Silos)
@@ -485,7 +483,6 @@ public sealed class ReminderConcurrencyControlClusterTests
             await observer.WaitForReminderServiceStartedAsync(cts.Token, silo.SiloAddress);
         }
 
-        const string reminderName = "skip_once";
         var grain = cluster.Client.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
         var registered = observer.WaitForReminderRegisteredAsync(grain.GetGrainId(), reminderName, cts.Token);
         var period = TimeSpan.FromSeconds(1);
@@ -513,20 +510,21 @@ public sealed class ReminderConcurrencyControlClusterTests
     [Fact]
     public async Task StaleSchedule_DoesNotEmitTickSkipped()
     {
+        const string reminderName = "stale_skip";
         var skipped = new ConcurrentBag<ReminderEvents.TickSkipped>();
         using var subscription = ReminderEvents.AllEvents.Subscribe(evt =>
         {
-            if (evt is ReminderEvents.TickSkipped value)
+            if (evt is ReminderEvents.TickSkipped value && value.ReminderName == reminderName)
             {
                 skipped.Add(value);
             }
         });
 
-        var observer = ReminderDiagnosticObserver.Create();
-        using var _o = observer;
         var throttle = new DelayedSkipReminderDeliveryThrottle();
 
         var builder = new InProcessTestClusterBuilder(initialSilosCount: 1);
+        var observer = ReminderDiagnosticObserver.Create(builder);
+        using var _o = observer;
         var clock = builder.AddReminderTestClock(minimumReminderPeriod: TimeSpan.FromMilliseconds(100));
         builder.ConfigureSilo((_, sb) =>
         {
@@ -538,7 +536,7 @@ public sealed class ReminderConcurrencyControlClusterTests
         });
 
         await using var cluster = builder.Build();
-        await cluster.DeployAsync();
+        await cluster.DeployAsync(TestContext.Current.CancellationToken);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
         foreach (var silo in cluster.Silos)
@@ -546,7 +544,6 @@ public sealed class ReminderConcurrencyControlClusterTests
             await observer.WaitForReminderServiceStartedAsync(cts.Token, silo.SiloAddress);
         }
 
-        const string reminderName = "stale_skip";
         var grain = cluster.Client.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
         var registered = observer.WaitForReminderRegisteredAsync(grain.GetGrainId(), reminderName, cts.Token);
         await grain.StartReminder(reminderName, TimeSpan.Zero, TimeSpan.FromHours(1)).WaitAsync(cts.Token);
@@ -575,20 +572,20 @@ public sealed class ReminderConcurrencyControlClusterTests
     [Fact]
     public async Task RespectOverload_SkipsTicks_WhenOverloadDetectorReportsOverload()
     {
+        const string reminderName = "overload_test";
         var skipped = new ConcurrentBag<ReminderEvents.TickSkipped>();
         using var subscription = ReminderEvents.AllEvents.Subscribe(evt =>
         {
-            if (evt is ReminderEvents.TickSkipped s)
+            if (evt is ReminderEvents.TickSkipped s && s.ReminderName == reminderName)
             {
                 skipped.Add(s);
             }
         });
 
-        var observer = ReminderDiagnosticObserver.Create();
-        using var _o = observer;
-
         var fakeDetector = new FakeClusterOverloadDetector { IsOverloaded = true };
         var builder = new InProcessTestClusterBuilder(initialSilosCount: 1);
+        var observer = ReminderDiagnosticObserver.Create(builder);
+        using var _o = observer;
         var clock = builder.AddReminderTestClock(minimumReminderPeriod: TimeSpan.FromMilliseconds(100));
         builder.ConfigureSilo((_, sb) =>
         {
@@ -603,7 +600,7 @@ public sealed class ReminderConcurrencyControlClusterTests
         });
 
         await using var cluster = builder.Build();
-        await cluster.DeployAsync();
+        await cluster.DeployAsync(TestContext.Current.CancellationToken);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
         foreach (var silo in cluster.Silos)
@@ -613,8 +610,6 @@ public sealed class ReminderConcurrencyControlClusterTests
 
         var grain = cluster.Client.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
         var grainId = grain.GetGrainId();
-        const string reminderName = "overload_test";
-
         var registered = observer.WaitForReminderRegisteredAsync(grainId, reminderName, cts.Token);
         var handle = await grain.StartReminder(reminderName, TimeSpan.FromMilliseconds(500), validate: true).WaitAsync(cts.Token);
         await registered;
@@ -651,19 +646,19 @@ public sealed class ReminderConcurrencyControlClusterTests
     [Fact]
     public async Task SlowStart_LimitsInitialFanOut()
     {
+        const string reminderName = "slow_start_test";
         var skipped = new ConcurrentBag<ReminderEvents.TickSkipped>();
         using var subscription = ReminderEvents.AllEvents.Subscribe(evt =>
         {
-            if (evt is ReminderEvents.TickSkipped s)
+            if (evt is ReminderEvents.TickSkipped s && s.ReminderName == reminderName)
             {
                 skipped.Add(s);
             }
         });
 
-        var observer = ReminderDiagnosticObserver.Create();
-        using var _o = observer;
-
         var builder = new InProcessTestClusterBuilder(initialSilosCount: 1);
+        var observer = ReminderDiagnosticObserver.Create(builder);
+        using var _o = observer;
         var clock = builder.AddReminderTestClock(minimumReminderPeriod: TimeSpan.FromMilliseconds(100));
         builder.ConfigureSilo((_, sb) =>
         {
@@ -680,7 +675,7 @@ public sealed class ReminderConcurrencyControlClusterTests
         });
 
         await using var cluster = builder.Build();
-        await cluster.DeployAsync();
+        await cluster.DeployAsync(TestContext.Current.CancellationToken);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
         foreach (var silo in cluster.Silos)
@@ -689,8 +684,6 @@ public sealed class ReminderConcurrencyControlClusterTests
         }
 
         const int reminderCount = 5;
-        const string reminderName = "slow_start_test";
-
         var grains = Enumerable.Range(0, reminderCount)
             .Select(_ => cluster.Client.GetGrain<IReminderTestGrain2>(Guid.NewGuid()))
             .ToArray();
@@ -730,10 +723,10 @@ public sealed class ReminderConcurrencyControlClusterTests
     [Fact]
     public async Task SlowStart_RampBeginsAfterInitialReminderLoad()
     {
-        var observer = ReminderDiagnosticObserver.Create();
-        using var _o = observer;
         var reminderTable = new BlockingInitialReadReminderTable();
         var builder = new InProcessTestClusterBuilder(initialSilosCount: 1);
+        var observer = ReminderDiagnosticObserver.Create(builder);
+        using var _o = observer;
         var clock = builder.AddReminderTestClock(minimumReminderPeriod: TimeSpan.FromMilliseconds(100));
         builder.ConfigureSilo((_, sb) =>
         {
@@ -752,7 +745,7 @@ public sealed class ReminderConcurrencyControlClusterTests
 
         await using var cluster = builder.Build();
         using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
-        var deployTask = cluster.DeployAsync();
+        var deployTask = cluster.DeployAsync(TestContext.Current.CancellationToken);
         await reminderTable.WaitForInitialReadAsync(cts.Token);
 
         await clock.AdvanceAsync(TimeSpan.FromMinutes(1), cts.Token);
