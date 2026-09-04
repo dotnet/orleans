@@ -24,7 +24,7 @@ env:
   DYNAMODB_IMAGE: amazon/dynamodb-local:latest
   ELASTICMQ_IMAGE: softwaremill/elasticmq-native:latest
   MINISTACK_IMAGE: ministackorg/ministack:1.4.11@sha256:8b05715b9effc23d998d4a4e0c0a0c4af7f9435f0ff076a30cf27a77326f14b1
-  MSSQL_IMAGE: mcr.microsoft.com/mssql/server:latest
+  MSSQL_IMAGE: mcr.microsoft.com/mssql/server:2022-CU26-ubuntu-22.04@sha256:ba4c8329f48fb8f02e1416be6a930ebfd71268caee78aa985f3af4315e457c89
   NATS_IMAGE: nats:latest
   POSTGRES_IMAGE: postgres
   REDIS_IMAGE: redis
@@ -294,7 +294,7 @@ jobs:
       if: failure()
       shell: bash
       run: |
-        docker inspect --format 'status={{.State.Status}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}} restartCount={{.RestartCount}} oomKilled={{.State.OOMKilled}} exitCode={{.State.ExitCode}} error={{json .State.Error}}' mssql || true
+        docker inspect --format 'image={{.Config.Image}} imageId={{.Image}} status={{.State.Status}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}} restartCount={{.RestartCount}} oomKilled={{.State.OOMKilled}} exitCode={{.State.ExitCode}} error={{json .State.Error}}' mssql || true
         docker inspect --format '{{if .State.Health}}{{range .State.Health.Log}}{{println .Start "exitCode=" .ExitCode .Output}}{{end}}{{end}}' mssql || true
         docker logs --timestamps mssql || true
     - name: Clean up SQL Server
