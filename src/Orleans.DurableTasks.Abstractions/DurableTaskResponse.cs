@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.ExceptionServices;
 
 namespace Orleans.DurableTasks;
@@ -65,6 +66,7 @@ public abstract class DurableTaskResponse
     public abstract DurableTaskResponseKind ResponseKind { get; }
 
     /// <summary>Gets the untyped result, or throws if the task did not complete successfully.</summary>
+    [SuppressMessage("Naming", "CA1721:Property names should not match get methods", Justification = "Result provides untyped inspection while GetResult<T> validates and returns a typed result.")]
     public abstract object? Result { get; }
 
     /// <summary>Gets the declared result type, if any.</summary>

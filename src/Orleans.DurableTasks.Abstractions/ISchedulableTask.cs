@@ -37,7 +37,7 @@ public interface IScheduledTaskHandle
 }
 
 /// <summary>Configures a polling operation.</summary>
-public readonly struct PollingOptions
+public readonly struct PollingOptions : IEquatable<PollingOptions>
 {
     private readonly TimeSpan? _pollTimeout;
 
@@ -54,4 +54,19 @@ public readonly struct PollingOptions
             _pollTimeout = value;
         }
     }
+
+    /// <inheritdoc />
+    public bool Equals(PollingOptions other) => PollTimeout == other.PollTimeout;
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is PollingOptions other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => PollTimeout.GetHashCode();
+
+    /// <summary>Returns whether two polling configurations are equivalent.</summary>
+    public static bool operator ==(PollingOptions left, PollingOptions right) => left.Equals(right);
+
+    /// <summary>Returns whether two polling configurations differ.</summary>
+    public static bool operator !=(PollingOptions left, PollingOptions right) => !left.Equals(right);
 }
