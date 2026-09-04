@@ -9,6 +9,7 @@ using System.Reflection;
 using System.Reflection.Emit;
 #if NET10_0_OR_GREATER
 using System.Reflection.Metadata;
+using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
 #endif
 using Orleans.Serialization.Internal;
@@ -92,10 +93,20 @@ public sealed class ReferencedAssemblyProviderTests
             .Single(method => metadata.GetString(method.Name) == nameof(ReferencedAssemblyProvider.AddFromDependencyContext));
         var attributeNames = method.GetCustomAttributes()
             .Select(handle => GetAttributeTypeName(metadata, metadata.GetCustomAttribute(handle)));
+        var assemblyFilesAvailableGetter = providerType.GetMethods()
+            .Single(handle => metadata.GetString(metadata.GetMethodDefinition(handle).Name) == "get_AssemblyFilesAvailable");
+        var getRelevantAssemblies = providerType.GetMethods()
+            .Select(handle => (Handle: handle, Definition: metadata.GetMethodDefinition(handle)))
+            .Single(method => metadata.GetString(method.Definition.Name) == nameof(ReferencedAssemblyProvider.GetRelevantAssemblies));
+        var methodBody = peReader.GetMethodBody(getRelevantAssemblies.Definition.RelativeVirtualAddress);
+        var expectedCall = new byte[5];
+        expectedCall[0] = 0x28;
+        BitConverter.TryWriteBytes(expectedCall.AsSpan(1), MetadataTokens.GetToken(assemblyFilesAvailableGetter));
 
         Assert.Contains(
             "System.Diagnostics.CodeAnalysis.RequiresAssemblyFilesAttribute",
             attributeNames);
+        Assert.True(methodBody.GetILBytes().AsSpan().IndexOf(expectedCall) >= 0);
     }
 #endif
 

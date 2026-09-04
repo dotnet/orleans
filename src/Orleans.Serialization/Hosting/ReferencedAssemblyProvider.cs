@@ -31,14 +31,10 @@ namespace Orleans.Serialization.Internal
                 AddAssembly(parts, entryAssembly);
             }
 
-#if NET5_0_OR_GREATER
             if (AssemblyFilesAvailable)
             {
                 AddFromDependencyContext(parts, entryAssembly);
             }
-#else
-            AddFromDependencyContext(parts, entryAssembly);
-#endif
 
 #if NETCOREAPP3_1_OR_GREATER
             AddFromAssemblyLoadContext(parts);
@@ -208,16 +204,17 @@ namespace Orleans.Serialization.Internal
             }
         }
 
-#if NET5_0_OR_GREATER
 #if NET9_0_OR_GREATER
         [FeatureGuard(typeof(RequiresAssemblyFilesAttribute))]
 #endif
         internal static bool AssemblyFilesAvailable => AreAssemblyFilesAvailable(Assembly.GetEntryAssembly());
 
+#if NET5_0_OR_GREATER
         [UnconditionalSuppressMessage(
             "SingleFile",
             "IL3000",
             Justification = "Assembly.Location is used only as the documented availability check for bundled assembly files.")]
+#endif
         internal static bool AreAssemblyFilesAvailable(Assembly? entryAssembly)
         {
             var assembly = entryAssembly is null || entryAssembly.IsDynamic
@@ -225,7 +222,6 @@ namespace Orleans.Serialization.Internal
                 : entryAssembly;
             return !string.IsNullOrEmpty(assembly.Location);
         }
-#endif
 
         private static IEnumerable<Assembly> GetApplicationPartAssemblies(Assembly assembly)
         {
