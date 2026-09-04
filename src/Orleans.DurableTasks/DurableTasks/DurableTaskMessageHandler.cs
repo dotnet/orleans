@@ -69,7 +69,6 @@ internal sealed class DurableTaskMessageHandler(
                     context.Envelope.SenderId,
                     cancellation.TaskId,
                     runtime.GetCancellationAcknowledgementResponse(cancellation.TaskId));
-                await transport.CommitAsync(cancellationToken);
                 break;
             case DurableTaskMessageTransport.CancellationAcknowledgementRoute:
                 if (!context.Envelope.Data.TryGetBody<DurableTaskCancellationAcknowledgementMessage>(out var acknowledgement) || acknowledgement is null)
