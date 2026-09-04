@@ -44,6 +44,10 @@ namespace Orleans.Runtime
             }
         }
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage(
+            "Reliability",
+            "CA2000:Dispose objects before losing scope",
+            Justification = "The serializer is borrowed from and returned to MessageHandlerShared.")]
         private object? GetBodyObjectSafe()
         {
             if (_bodyObject is MessageReadRequest readRequest)
@@ -68,6 +72,10 @@ namespace Orleans.Runtime
             return _bodyObject;
         }
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage(
+            "Reliability",
+            "CA2000:Dispose objects before losing scope",
+            Justification = "The serializer is borrowed from and returned to MessageHandlerShared.")]
         private void DeserializeRequestBody(MessageReadRequest readRequest)
         {
             _bodyObject = null;

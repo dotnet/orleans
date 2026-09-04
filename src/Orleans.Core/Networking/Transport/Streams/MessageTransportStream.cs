@@ -15,6 +15,10 @@ namespace Orleans.Connections.Transport.Streams;
 /// </summary>
 internal sealed class MessageTransportStream(MessageTransport transport, MemoryPool<byte> memoryPool) : Stream
 {
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Usage",
+        "CA2213:Disposable fields should be disposed",
+        Justification = "The transport lifecycle is owned by TlsMessageTransport; this stream only adapts I/O.")]
     private readonly MessageTransport _transport = transport;
     private readonly StreamWriteRequest _writeRequest = new();
     private readonly StreamReadRequest _readRequest = new();
@@ -115,7 +119,22 @@ internal sealed class MessageTransportStream(MessageTransport transport, MemoryP
     }
 
     /// <inheritdoc/>
-    public override ValueTask DisposeAsync() => default;
+    public override ValueTask DisposeAsync()
+    {
+        Dispose(disposing: true);
+        GC.SuppressFinalize(this);
+        return default;
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _writeRequest.Dispose();
+        }
+
+        base.Dispose(disposing);
+    }
 
     /// <inheritdoc/>
     public override Task FlushAsync(CancellationToken cancellationToken) => Task.CompletedTask;
@@ -146,7 +165,7 @@ internal sealed class MessageTransportStream(MessageTransport transport, MemoryP
         }
     }
 
-    private sealed class StreamWriteRequest : WriteRequest, IValueTaskSource
+    private sealed class StreamWriteRequest : WriteRequest, IValueTaskSource, IDisposable
     {
         private ManualResetValueTaskSourceCore<bool> _signal = new()
         {
@@ -168,6 +187,7 @@ internal sealed class MessageTransportStream(MessageTransport transport, MemoryP
         public ValueTaskSourceStatus GetStatus(short token) => _signal.GetStatus(token);
         public void OnCompleted(Action<object?> continuation, object? state, short token, ValueTaskSourceOnCompletedFlags flags) => _signal.OnCompleted(continuation, state, token, flags);
         public void Reset() => _signal.Reset();
+        public void Dispose() => _bufferWriter.Dispose();
     }
 
     private sealed class StreamReadRequest : ReadRequest, IValueTaskSource<int>

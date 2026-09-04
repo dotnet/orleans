@@ -19,6 +19,10 @@ internal abstract partial class TlsMessageTransport : StreamMessageTransport
     private readonly MessageTransport _innerTransport;
     private readonly TlsOptions _options;
     private readonly ILogger _logger;
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Usage",
+        "CA2213:Disposable fields should be disposed",
+        Justification = "SslStream owns and disposes the adapter because leaveInnerStreamOpen is false.")]
     private readonly MessageTransportStream _networkTransportStream;
     private readonly SslStream _sslStream;
     private readonly TlsConnectionFeature _tlsConnectionFeature = new();
