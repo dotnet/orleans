@@ -254,7 +254,10 @@ internal sealed partial class ActivationData
                     {
                         command.Cancel();
                     }
-                    catch (Exception exception) when (exception is not ObjectDisposedException)
+                    catch (ObjectDisposedException)
+                    {
+                    }
+                    catch (Exception exception)
                     {
                         onError(exception, command);
                     }

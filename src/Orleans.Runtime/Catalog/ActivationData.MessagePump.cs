@@ -218,7 +218,7 @@ internal sealed partial class ActivationData
             OnCompletedRequest(message);
         }
 
-        static async ValueTask OnCompleteAsync(ActivationData activation, Message message, Task task)
+        static async Task OnCompleteAsync(ActivationData activation, Message message, Task task)
         {
             try
             {
@@ -313,17 +313,25 @@ internal sealed partial class ActivationData
         }
     }
 
-    ValueTask IGrainCallCancellationExtension.CancelRequestAsync(GrainId senderGrainId, CorrelationId messageId)
+    ValueTask IGrainCallCancellationExtension.CancelRequestAsync(
+        GrainId senderGrainId,
+        CorrelationId messageId,
+        CancellationToken cancellationToken)
         => this.RunOrQueueTask(
-            static state => CancelRequestAsyncCore(state.activation, state.senderGrainId, state.messageId),
-            (activation: this, senderGrainId, messageId));
+            static state => CancelRequestAsyncCore(state.activation, state.senderGrainId, state.messageId, state.cancellationToken),
+            (activation: this, senderGrainId, messageId, cancellationToken));
 
-    private static ValueTask CancelRequestAsyncCore(ActivationData activation, GrainId senderGrainId, CorrelationId messageId)
+    private static ValueTask CancelRequestAsyncCore(
+        ActivationData activation,
+        GrainId senderGrainId,
+        CorrelationId messageId,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (!TryCancelRequest(activation, senderGrainId, messageId))
         {
             // The message being canceled may not have arrived yet, so retry a few times.
-            return RetryCancellationAfterDelay(activation, senderGrainId, messageId);
+            return RetryCancellationAfterDelay(activation, senderGrainId, messageId, cancellationToken);
         }
 
         return ValueTask.CompletedTask;
@@ -332,12 +340,13 @@ internal sealed partial class ActivationData
     private static async ValueTask RetryCancellationAfterDelay(
         ActivationData activation,
         GrainId senderGrainId,
-        CorrelationId messageId)
+        CorrelationId messageId,
+        CancellationToken cancellationToken)
     {
         var attemptsRemaining = 3;
         do
         {
-            await Task.Delay(1_000);
+            await Task.Delay(1_000, cancellationToken);
         } while (!TryCancelRequest(activation, senderGrainId, messageId) && --attemptsRemaining > 0);
     }
 

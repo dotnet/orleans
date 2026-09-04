@@ -571,7 +571,12 @@ internal sealed partial class ActivationData :
 
     public void Deactivate(DeactivationReason reason, CancellationToken cancellationToken = default) => Deactivate(reason, Activity.Current?.Context, cancellationToken);
 
-    public void Dispose() => DisposeAsync().AsTask().Wait();
+    public void Dispose()
+    {
+#pragma warning disable RS0030 // IDisposable requires synchronously completing activation cleanup.
+        DisposeAsync().AsTask().Wait();
+#pragma warning restore RS0030
+    }
 
     public ValueTask DisposeAsync() => DisposeAsync(this);
 
