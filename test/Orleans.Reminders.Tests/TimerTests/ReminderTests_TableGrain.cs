@@ -50,12 +50,11 @@ namespace UnitTests.TimerTests
         public class Fixture : BaseInProcessTestClusterFixture
         {
             private ReminderTestClock? _reminderClock;
-            private readonly ReminderLifecycleHarness _startupHarness = new();
             private IReadOnlyList<SiloAddress>? _startedReminderServices;
             internal ReminderTestClock ReminderClock => _reminderClock ?? throw new InvalidOperationException($"{nameof(ReminderTestClock)} has not been configured.");
             internal ReminderTableReadController ReadController { get; } = new();
             internal IReadOnlyList<SiloAddress> StartedReminderServices => _startedReminderServices
-                ?? throw new InvalidOperationException("Reminder services have not completed startup.");
+                ?? throw new InvalidOperationException("Reminder services have not reached startup topology.");
 
             protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
             {
@@ -85,10 +84,25 @@ namespace UnitTests.TimerTests
                     return;
                 }
 
-                _startedReminderServices = await _startupHarness.WaitForServicesReadyAsync(
-                    HostedCluster.Silos,
-                    TestConstants.InitTimeout,
-                    TestContext.Current.CancellationToken);
+                using var topologyCancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+                topologyCancellation.CancelAfter(TestConstants.InitTimeout);
+                try
+                {
+                    var startedSilos = await ReminderTopologyStabilizer.WaitForStartupTopologyAsync(
+                        HostedCluster,
+                        ReminderClock.DiagnosticObserver,
+                        HostedCluster.Silos,
+                        topologyCancellation.Token);
+                    _startedReminderServices = startedSilos.Select(static silo => silo.SiloAddress).ToArray();
+                }
+                catch (OperationCanceledException exception) when (
+                    topologyCancellation.IsCancellationRequested
+                    && !TestContext.Current.CancellationToken.IsCancellationRequested)
+                {
+                    throw new TimeoutException(
+                        $"Reminder startup topology stabilization timed out within {TestConstants.InitTimeout}. Diagnostics: {exception.Message}",
+                        exception);
+                }
             }
 
             public override async ValueTask DisposeAsync()
@@ -101,7 +115,6 @@ namespace UnitTests.TimerTests
                 finally
                 {
                     _reminderClock?.Dispose();
-                    _startupHarness.Dispose();
                 }
 
             }
@@ -125,11 +138,15 @@ namespace UnitTests.TimerTests
         // Basic tests
 
         [Fact]
-        public void Fixture_WaitsForReminderServicesToStart()
+        public async Task Fixture_WaitsForReminderStartupTopologyBeforeGrainCalls()
         {
             Assert.All(
                 HostedCluster.Silos,
                 silo => Assert.Contains(silo.SiloAddress, _fixture.StartedReminderServices));
+
+            using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+            cancellation.CancelAfter(TestConstants.InitTimeout);
+            await ClearReminderTableAsync(cancellation.Token);
         }
 
         [Fact]
