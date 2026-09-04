@@ -36,14 +36,13 @@ public interface IDurableInbox
 
     /// <summary>
     /// Registers a handler that will be evaluated using its CanHandle method.
-    /// Handlers are evaluated in registration order (first-match-wins).
+    /// When no exact route is registered, handlers are evaluated in registration order (first-match-wins).
     /// </summary>
     /// <param name="handler">The handler implementation.</param>
     /// <remarks>
     /// <para>
-    /// This is the recommended registration method. Handlers are stored in a list and
-    /// evaluated in registration order. The first handler whose CanHandle method returns
-    /// true will process the message.
+    /// Handlers are stored in a list and evaluated in registration order after exact-route
+    /// lookup. The first handler whose CanHandle method returns true will process the message.
     /// </para>
     /// <para>
     /// For best performance, register more specific handlers before more general ones.
@@ -60,7 +59,7 @@ public interface IDurableInbox
     /// <remarks>
     /// This overload adapts the handler to exact, ordinal route matching. Use
     /// <see cref="RegisterHandler(IInboxHandler)"/> for metadata-based matching. An exact route
-    /// can only be registered once for an inbox.
+    /// can only be registered once for an inbox and takes precedence over generic handlers.
     /// </remarks>
     /// <exception cref="InvalidOperationException">
     /// An exact route handler is already registered for <paramref name="routeKey"/>.
