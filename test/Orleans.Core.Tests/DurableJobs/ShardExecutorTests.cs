@@ -222,25 +222,32 @@ public class ShardExecutorTests
     [Fact]
     public async Task RunShardAsync_WaitsForShardStartTime_BeforeProcessing()
     {
+        var timeProvider = new TimerTrackingFakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var startDelay = TimeSpan.FromMinutes(1);
         var options = CreateOptions(maxConcurrentJobs: 10);
         var overloadDetector = CreateOverloadDetector(isOverloaded: false);
-        var jobs = CreateJobs(1);
-        var futureStartTime = DateTimeOffset.UtcNow.AddMilliseconds(200);
-        var shard = CreateJobShard(jobs, startTime: futureStartTime);
+        var jobs = CreateJobs(1, timeProvider.GetUtcNow().AddSeconds(-1));
+        var shard = CreateJobShard(jobs, startTime: timeProvider.GetUtcNow().Add(startDelay));
         var grainFactory = CreateGrainFactory();
-        var executor = new ShardExecutor(grainFactory, options, overloadDetector, NullLogger<ShardExecutor>.Instance);
+        var executor = new ShardExecutor(grainFactory, options, overloadDetector, NullLogger<ShardExecutor>.Instance, timeProvider);
 
         var completedJobs = new List<string>();
         ConfigureGrainFactoryToTrackCompletions(grainFactory, completedJobs);
+        var timerCreated = timeProvider.TimerCreated.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
-        var startTime = DateTimeOffset.UtcNow;
+        var runTask = executor.RunShardAsync(shard, CancellationToken.None);
 
-        await executor.RunShardAsync(shard, CancellationToken.None);
+        await timerCreated;
+        Assert.False(runTask.IsCompleted);
+        Assert.Empty(completedJobs);
 
-        // Verify executor waited for shard start time before processing
-        var elapsed = DateTimeOffset.UtcNow - startTime;
-        Assert.True(elapsed.TotalMilliseconds >= 150,
-            $"Expected to wait for shard start time, but elapsed only {elapsed.TotalMilliseconds}ms");
+        timeProvider.Advance(startDelay - TimeSpan.FromTicks(1));
+        Assert.False(runTask.IsCompleted);
+        Assert.Empty(completedJobs);
+
+        timeProvider.Advance(TimeSpan.FromTicks(1));
+
+        await runTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         Assert.Single(completedJobs);
     }
 
