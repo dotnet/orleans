@@ -50,7 +50,7 @@ namespace Tests.GeoClusterTests
                         {
                             options.TableServiceClient = GetTableServiceClient();
                         }))
-                        .AddMemoryGrainStorage("MemoryStore"); 
+                        .AddMemoryGrainStorage("MemoryStore");
                 }
 
                 private static TableServiceClient GetTableServiceClient()
