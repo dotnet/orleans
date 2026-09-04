@@ -16,6 +16,8 @@ using Orleans.Connections.Transport;
 using Orleans.Connections.Transport.Streams;
 using Orleans.Connections.Transport.Sockets;
 using Orleans.Connections.Transport.Security;
+using Orleans.Messaging;
+using Orleans.Placement.Repartitioning;
 using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
 using Orleans.Serialization;
@@ -284,14 +286,14 @@ public class MessageTransportLifecycleTests
     }
 
     [Fact]
-    public void MessageHandlerShared_AllowsLateSendRequestAfterDispose()
+    public void MessageHandlerShared_RejectsHandlerAcquisitionAfterDispose()
     {
         using var serviceProvider = CreateServiceProvider();
         var shared = CreateMessageHandlerShared(serviceProvider);
         shared.Dispose();
 
-        var request = shared.GetSendMessageHandler();
-        request.Reset();
+        Assert.Throws<ObjectDisposedException>(() => shared.GetSendMessageHandler());
+        Assert.Throws<ObjectDisposedException>(() => shared.GetReceiveMessageHandler());
     }
 
     [Fact]
@@ -309,6 +311,74 @@ public class MessageTransportLifecycleTests
 
         await disposeTask.WaitAsync(TestContext.Current.CancellationToken);
         Assert.Throws<ObjectDisposedException>(() => shared.GetMessageSerializer());
+    }
+
+    [Fact]
+    public async Task Connection_CloseAsyncWaitsForActiveSendWorker()
+    {
+        using var serviceProvider = CreateServiceProvider();
+        var shared = CreateMessageHandlerShared(serviceProvider);
+        var connectionShared = CreateConnectionCommon(serviceProvider, shared);
+        await using var transport = new CapturingTransport();
+        using var connection = new BlockingSendConnection(
+            transport,
+            connectionShared,
+            shared.MessageCenter,
+            TestContext.Current.CancellationToken);
+        connection.Send(new Message());
+        await connection.PrepareEntered.WaitAsync(TestContext.Current.CancellationToken);
+
+        var closeTask = connection.CloseAsync(null);
+        await Task.Delay(TimeSpan.FromMilliseconds(50), TestContext.Current.CancellationToken);
+        Assert.False(closeTask.IsCompleted);
+
+        connection.ReleaseSend();
+        await closeTask.WaitAsync(TestContext.Current.CancellationToken);
+
+        shared.Dispose();
+    }
+
+    [Fact]
+    public async Task MessageHandlerShared_DisposeWaitsForQueuedSendWorker()
+    {
+        using var serviceProvider = CreateServiceProvider();
+        var shared = CreateMessageHandlerShared(serviceProvider);
+        var connectionShared = CreateConnectionCommon(serviceProvider, shared);
+        await using var transport = new CapturingTransport();
+        using var connection = new BlockingSendConnection(
+            transport,
+            connectionShared,
+            shared.MessageCenter,
+            TestContext.Current.CancellationToken);
+        connection.Send(new Message());
+        await connection.PrepareEntered.WaitAsync(TestContext.Current.CancellationToken);
+
+        var disposeTask = Task.Run(shared.Dispose, TestContext.Current.CancellationToken);
+        await Task.Delay(TimeSpan.FromMilliseconds(50), TestContext.Current.CancellationToken);
+        Assert.False(disposeTask.IsCompleted);
+
+        connection.ReleaseSend();
+        await disposeTask.WaitAsync(TestContext.Current.CancellationToken);
+        await connection.CloseAsync(null).WaitAsync(TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task MessageHandlerShared_DisposeAllowsLeasedSendWorkToFinish()
+    {
+        using var serviceProvider = CreateServiceProvider();
+        var shared = CreateMessageHandlerShared(serviceProvider);
+        Assert.True(shared.TryAcquireSendWork());
+
+        var disposeTask = Task.Run(shared.Dispose, TestContext.Current.CancellationToken);
+        await Task.Delay(TimeSpan.FromMilliseconds(50), TestContext.Current.CancellationToken);
+        Assert.False(disposeTask.IsCompleted);
+
+        var request = shared.GetSendMessageHandler();
+        request.Reset();
+        shared.ReleaseSendWork();
+
+        await disposeTask.WaitAsync(TestContext.Current.CancellationToken);
+        Assert.Throws<ObjectDisposedException>(() => shared.GetSendMessageHandler());
     }
 
     [Theory]
@@ -548,6 +618,7 @@ public class MessageTransportLifecycleTests
         .AddSerializer()
         .AddSingleton<OrleansInstruments>()
         .AddSingleton<MessagingInstruments>()
+        .AddSingleton<NetworkingInstruments>()
         .AddSingleton<MessagingProcessingInstruments>()
         .AddTransient(sp => new MessageSerializer(sp.GetRequiredService<SerializerSessionPool>(), options ?? new SiloMessagingOptions()))
         .BuildServiceProvider();
@@ -566,6 +637,50 @@ public class MessageTransportLifecycleTests
             new MessageFactory(serviceProvider.GetRequiredService<DeepCopier>(), NullLogger<MessageFactory>.Instance, messagingTrace),
             Substitute.For<IMessageCenter>(),
             messagingInstruments);
+    }
+
+    private static ConnectionCommon CreateConnectionCommon(IServiceProvider serviceProvider, MessageHandlerShared shared)
+    {
+        var connectionServices = Substitute.For<IServiceProvider>();
+        connectionServices.GetService(typeof(MessageHandlerShared)).Returns(shared);
+        return new(
+            connectionServices,
+            shared.MessageFactory,
+            shared.MessagingTrace,
+            shared.ConnectionTrace,
+            shared.MessagingInstruments,
+            serviceProvider.GetRequiredService<NetworkingInstruments>(),
+            new NoOpMessageStatisticsSink());
+    }
+
+    private sealed class BlockingSendConnection(
+        MessageTransport transport,
+        ConnectionCommon shared,
+        IMessageCenter messageCenter,
+        CancellationToken cancellationToken) : Connection(transport, shared), IDisposable
+    {
+        private readonly TaskCompletionSource _prepareEntered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly ManualResetEventSlim _releaseSend = new();
+
+        public Task PrepareEntered => _prepareEntered.Task;
+        protected override ConnectionDirection ConnectionDirection => ConnectionDirection.SiloToSilo;
+        protected override TimeSpan CloseConnectionTimeout => TimeSpan.FromSeconds(1);
+        protected override IMessageCenter MessageCenter => messageCenter;
+
+        public void ReleaseSend() => _releaseSend.Set();
+
+        protected override bool PrepareMessageForSend(Message msg)
+        {
+            _prepareEntered.TrySetResult();
+            _releaseSend.Wait(cancellationToken);
+            return true;
+        }
+
+        protected override void RetryMessage(Message msg, Exception? ex = null) => msg.Dispose();
+        protected internal override void OnReceivedMessage(Message message) { }
+        protected internal override void RecordMessageReceive(Message message, int totalBytes, int headerBytes) { }
+        protected internal override void RecordMessageSend(Message message, int totalBytes, int headerBytes) { }
+        public void Dispose() => _releaseSend.Dispose();
     }
 
     private sealed class CancelableTransport : MessageTransport

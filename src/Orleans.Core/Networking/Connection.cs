@@ -158,6 +158,7 @@ namespace Orleans.Runtime.Messaging
         private async Task CloseAsync()
         {
             NetworkingMetrics.OnClosedSocket(ConnectionDirection);
+            var sendWorkerTask = _sendWorker.StopAsync();
 
             try
             {
@@ -180,6 +181,8 @@ namespace Orleans.Runtime.Messaging
                     LogWarningExceptionProcessingIncomingMessages(Log, processIncomingException, this);
                 }
             }
+
+            await sendWorkerTask.ConfigureAwait(false);
 
             try
             {
@@ -212,16 +215,52 @@ namespace Orleans.Runtime.Messaging
             private readonly ConcurrentQueue<Message> _workItems = new();
             private readonly Action<Message>? _messageObserver = connection._shared.MessageObserver;
             private readonly Connection _connection = connection;
+            private readonly TaskCompletionSource _stopped = new(TaskCreationOptions.RunContinuationsAsynchronously);
             private int _active;
+            private int _scheduling;
+            private int _stopping;
 
             public void Schedule(Message message)
             {
-                _workItems.Enqueue(message);
-
-                if (Interlocked.CompareExchange(ref _active, 1, 0) == 0)
+                if (!_connection._shared.MessageHandlerShared.TryAcquireSendWork())
                 {
-                    ThreadPool.UnsafeQueueUserWorkItem(this, preferLocal: true);
+                    _connection.RerouteMessage(message, new ConnectionClosedException());
+                    return;
                 }
+
+                var queued = false;
+                Interlocked.Increment(ref _scheduling);
+                try
+                {
+                    if (Volatile.Read(ref _stopping) != 0)
+                    {
+                        _connection.RerouteMessage(message, new ConnectionClosedException());
+                        return;
+                    }
+
+                    _workItems.Enqueue(message);
+                    queued = true;
+                    Activate();
+                }
+                finally
+                {
+                    if (!queued)
+                    {
+                        _connection._shared.MessageHandlerShared.ReleaseSendWork();
+                    }
+
+                    if (Interlocked.Decrement(ref _scheduling) == 0 && Volatile.Read(ref _stopping) != 0)
+                    {
+                        Activate();
+                    }
+                }
+            }
+
+            public Task StopAsync()
+            {
+                Volatile.Write(ref _stopping, 1);
+                Activate();
+                return _stopped.Task;
             }
 
             [System.Diagnostics.CodeAnalysis.SuppressMessage(
@@ -230,54 +269,99 @@ namespace Orleans.Runtime.Messaging
                 Justification = "Each dequeued message is transferred to the write request or handled by the rejection/reroute path.")]
             void IThreadPoolWorkItem.Execute()
             {
-                var writeRequest = _connection._shared.MessageHandlerShared.GetSendMessageHandler(_connection);
-                var attempts = 0;
-                while (attempts++ < MaxMessagesPerBatch
-                    && writeRequest.Length < SoftMaxBatchBytes
-                    && !writeRequest.HasLargeMessages
-                    && _workItems.TryDequeue(out var message))
+                try
                 {
-                    if (!_connection.PrepareMessageForSend(message))
+                    if (Volatile.Read(ref _stopping) != 0)
                     {
-                        continue;
+                        while (_workItems.TryDequeue(out var message))
+                        {
+                            try
+                            {
+                                _connection.RerouteMessage(message, new ConnectionClosedException());
+                            }
+                            finally
+                            {
+                                _connection._shared.MessageHandlerShared.ReleaseSendWork();
+                            }
+                        }
+
+                        return;
                     }
 
-                    try
+                    var writeRequest = _connection._shared.MessageHandlerShared.GetSendMessageHandler(_connection);
+                    var attempts = 0;
+                    while (attempts++ < MaxMessagesPerBatch
+                        && writeRequest.Length < SoftMaxBatchBytes
+                        && !writeRequest.HasLargeMessages
+                        && _workItems.TryDequeue(out var message))
                     {
-                        writeRequest.WriteMessage(message);
-                        _messageObserver?.Invoke(message);
+                        try
+                        {
+                            if (Volatile.Read(ref _stopping) != 0)
+                            {
+                                _connection.RerouteMessage(message, new ConnectionClosedException());
+                                continue;
+                            }
+
+                            if (!_connection.PrepareMessageForSend(message))
+                            {
+                                continue;
+                            }
+
+                            try
+                            {
+                                writeRequest.WriteMessage(message);
+                                _messageObserver?.Invoke(message);
+                            }
+                            catch (Exception exception)
+                            {
+                                _connection.OnMessageSerializationFailure(message, exception);
+                                break;
+                            }
+                        }
+                        finally
+                        {
+                            _connection._shared.MessageHandlerShared.ReleaseSendWork();
+                        }
                     }
-                    catch (Exception exception)
+
+                    writeRequest.CompleteWriting();
+                    if (writeRequest.MessageCount == 0)
                     {
-                        _connection.OnMessageSerializationFailure(message, exception);
-                        break;
+                        writeRequest.Reset();
+                    }
+                    else if (!_connection._transport.EnqueueWrite(writeRequest))
+                    {
+                        _connection.StartClosing(new ConnectionClosedException());
+                        for (var i = 0; i < writeRequest.MessageCount; i++)
+                        {
+                            _connection.RerouteMessage(writeRequest.GetMessage(i));
+                        }
+
+                        writeRequest.Reset();
                     }
                 }
-
-                writeRequest.CompleteWriting();
-                if (writeRequest.MessageCount == 0)
+                finally
                 {
-                    writeRequest.Reset();
-                }
-                else if (!_connection._transport.EnqueueWrite(writeRequest))
-                {
-                    _connection.StartClosing(new ConnectionClosedException());
-                    for (var i = 0; i < writeRequest.MessageCount; i++)
+                    Volatile.Write(ref _active, 0);
+                    if (!_workItems.IsEmpty || Volatile.Read(ref _scheduling) != 0)
                     {
-                        _connection.RerouteMessage(writeRequest.GetMessage(i));
+                        Activate();
                     }
-
-                    writeRequest.Reset();
+                    else if (Volatile.Read(ref _stopping) != 0)
+                    {
+                        _stopped.TrySetResult();
+                    }
                 }
+            }
 
-                _active = 0;
-                Thread.MemoryBarrier();
-                if (!_workItems.IsEmpty && Interlocked.CompareExchange(ref _active, 1, 0) == 0)
+            private void Activate()
+            {
+                if (Interlocked.CompareExchange(ref _active, 1, 0) == 0)
                 {
                     ThreadPool.UnsafeQueueUserWorkItem(this, preferLocal: true);
                 }
             }
-
         }
 
         public override string ToString() => $"{nameof(Connection)}(Id: {_id}, Transport: {_transport})";
