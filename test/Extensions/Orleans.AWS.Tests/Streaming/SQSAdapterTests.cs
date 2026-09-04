@@ -32,6 +32,7 @@ namespace AWSUtils.Tests.Streaming
         private const int NumBatches = 20;
         private const int NumMessagesPerBatch = 20;
         private readonly string clusterId;
+        private bool usesFifoQueue;
         public static readonly string SQS_STREAM_PROVIDER_NAME = "SQSAdapterTests";
         private readonly TimeSpan QueuePollRate = TimeSpan.FromSeconds(1);
 
@@ -53,18 +54,12 @@ namespace AWSUtils.Tests.Streaming
         {
             if (!string.IsNullOrWhiteSpace(AWSTestConstants.SqsConnectionString))
             {
-                await Task.WhenAll(
-                    SQSStreamProviderUtils.DeleteAllUsedQueues(
-                        SQS_STREAM_PROVIDER_NAME,
-                        this.clusterId,
-                        AWSTestConstants.SqsConnectionString,
-                        NullLoggerFactory.Instance),
-                    SQSStreamProviderUtils.DeleteAllUsedQueues(
-                        SQS_STREAM_PROVIDER_NAME,
-                        this.clusterId,
-                        AWSTestConstants.SqsConnectionString,
-                        NullLoggerFactory.Instance,
-                        fifoQueue: true));
+                await SQSStreamProviderUtils.DeleteAllUsedQueues(
+                    SQS_STREAM_PROVIDER_NAME,
+                    this.clusterId,
+                    AWSTestConstants.SqsConnectionString,
+                    NullLoggerFactory.Instance,
+                    usesFifoQueue);
             }
         }
 
@@ -85,6 +80,7 @@ namespace AWSUtils.Tests.Streaming
         [Fact]
         public async Task ShutdownReleasesFifoMessages()
         {
+            usesFifoQueue = true;
             var options = new SqsOptions
             {
                 ConnectionString = AWSTestConstants.SqsConnectionString,
