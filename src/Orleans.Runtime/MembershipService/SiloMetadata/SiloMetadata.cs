@@ -39,14 +39,12 @@ public record SiloMetadata
         AddMetadata(metadata);
     }
 
-    [Id(0)]
-    private ImmutableDictionary<string, string> MetadataStorage { get; set; } = ImmutableDictionary<string, string>.Empty;
-
     /// <summary>
     /// Gets the metadata key-value pairs associated with the silo.
     /// </summary>
-    public IReadOnlyDictionary<string, string> Metadata => MetadataStorage;
+    [Id(0)]
+    public ImmutableDictionary<string, string> Metadata { get; private set; } = ImmutableDictionary<string, string>.Empty;
 
-    internal void AddMetadata(IEnumerable<KeyValuePair<string, string>> metadata) => MetadataStorage = MetadataStorage.SetItems(metadata);
-    internal void AddMetadata(string key, string value) => MetadataStorage = MetadataStorage.SetItem(key, value);
+    internal void AddMetadata(IEnumerable<KeyValuePair<string, string>> metadata) => Metadata = Metadata.SetItems(metadata);
+    internal void AddMetadata(string key, string value) => Metadata = Metadata.SetItem(key, value);
 }
