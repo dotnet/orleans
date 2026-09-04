@@ -158,6 +158,7 @@ public readonly struct TaskId : IEquatable<TaskId>, IParsable<TaskId>, ISpanPars
     public static explicit operator string(TaskId value) => value.ToString();
 
     /// <summary>Parses an escaped hierarchical path.</summary>
+    [SuppressMessage("Usage", "CA2225:Operator overloads have named alternates", Justification = "TaskId implements IParsable and exposes Parse and TryParse as the named alternatives.")]
     public static explicit operator TaskId(string value) => Parse(value);
 }
 
