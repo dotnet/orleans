@@ -1383,7 +1383,7 @@ namespace Orleans.Runtime.ReminderService
                             var activeLeaseRecorded = false;
                             try
                             {
-                                _shared._throttleInstruments.RecordAcquireDuration(lease.TierName, lease.Outcome, lease.WaitedFor);
+                                _shared._throttleInstruments.RecordAcquireDuration(_shared._deliveryThrottle, lease);
 
                                 if (!IsTickStillValid(scheduledTick.ScheduleVersion, entry))
                                 {

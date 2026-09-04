@@ -71,6 +71,37 @@ public sealed class ReminderThrottleInstrumentsTests
     [TestSuite("BVT")]
     [TestProvider("None")]
     [Fact]
+    public void AcquireDuration_DoesNotRecordForDefaultNoOpThrottle()
+    {
+        var services = new ServiceCollection();
+        services.AddMetrics();
+
+        using var serviceProvider = services.BuildServiceProvider();
+        var orleansInstruments = new OrleansInstruments(serviceProvider.GetRequiredService<IMeterFactory>());
+        var instruments = new ReminderThrottleInstruments(orleansInstruments);
+        var measurements = new List<double>();
+        using var listener = new MeterListener();
+        listener.InstrumentPublished = (instrument, meterListener) =>
+        {
+            if (ReferenceEquals(instrument.Meter, orleansInstruments.Meter)
+                && instrument.Name == "orleans-reminders-throttle-queued-duration")
+            {
+                meterListener.EnableMeasurementEvents(instrument);
+            }
+        };
+        listener.SetMeasurementEventCallback<double>((_, measurement, _, _) => measurements.Add(measurement));
+        listener.Start();
+
+        instruments.RecordAcquireDuration(
+            NoOpReminderDeliveryThrottle.Instance,
+            ReminderDeliveryLease.NoOpAdmitted);
+
+        Assert.Empty(measurements);
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
     public void ActiveLeases_ReportsCurrentValue_WhenListenerStartsAfterAcquire()
     {
         var services = new ServiceCollection();
