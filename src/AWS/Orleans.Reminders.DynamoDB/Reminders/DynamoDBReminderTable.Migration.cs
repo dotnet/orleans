@@ -70,6 +70,26 @@ internal sealed partial class DynamoDBReminderTable
         useV2OnlyWrites = state?.Status == MigrationStatus.Retired;
     }
 
+    private async Task ValidateLegacyModeMigrationState()
+    {
+        MigrationState? state;
+        try
+        {
+            state = await ReadMigrationState();
+        }
+        catch (ResourceNotFoundException)
+        {
+            return;
+        }
+
+        if (state?.Status is MigrationStatus.Cutover or MigrationStatus.Retired)
+        {
+            throw new OrleansConfigurationException(
+                $"DynamoDB reminder table '{options.TableName}' for service '{serviceId}' has reached migration state "
+                + $"'{state.Status}' and cannot start in {DynamoDBReminderTableMode.Legacy} mode.");
+        }
+    }
+
     private async Task InitializeMigration(CancellationToken cancellationToken)
     {
         var state = await ReadMigrationState();

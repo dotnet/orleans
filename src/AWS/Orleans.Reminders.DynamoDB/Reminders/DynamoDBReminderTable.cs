@@ -167,6 +167,7 @@ namespace Orleans.Reminders.DynamoDB
 
             if (options.TableMode == DynamoDBReminderTableMode.Legacy)
             {
+                await ValidateLegacyModeMigrationState();
                 return;
             }
 
