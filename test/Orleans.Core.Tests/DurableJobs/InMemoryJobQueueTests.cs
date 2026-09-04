@@ -203,6 +203,25 @@ public class InMemoryJobQueueTests
     }
 
     [Fact]
+    public async Task RetryJobLater_WhenNextDueTimeMovesEarlier_WakesWaitingEnumerator()
+    {
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var queue = new InMemoryJobQueue(timeProvider);
+        var job = CreateJob("job1", timeProvider.GetUtcNow().AddHours(1));
+        queue.Enqueue(job, 0);
+
+        await using var enumerator = queue.GetAsyncEnumerator(TestContext.Current.CancellationToken);
+        var moveNextTask = enumerator.MoveNextAsync().AsTask();
+        Assert.False(moveNextTask.IsCompleted);
+
+        Assert.True(queue.RetryJobLater(job.Id, timeProvider.GetUtcNow(), 3));
+
+        Assert.True(await moveNextTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+        Assert.Equal(job.Id, enumerator.Current.Job.Id);
+        Assert.Equal(4, enumerator.Current.DequeueCount);
+    }
+
+    [Fact]
     public async Task GetAsyncEnumerator_CompletesWhenQueueIsMarkedComplete()
     {
         var queue = new InMemoryJobQueue();
@@ -541,6 +560,27 @@ public class InMemoryJobQueueTests
         Assert.True(queue.RemoveJob(replacement.Id));
 
         Assert.False(await enumerator.MoveNextAsync());
+        Assert.Equal(0, queue.Count);
+    }
+
+    [Fact]
+    public async Task RemoveLastDequeuedJob_AfterCompletion_WakesWaitingEnumerator()
+    {
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 8, 16, 0, 0, 0, TimeSpan.Zero));
+        var queue = new InMemoryJobQueue(timeProvider);
+        var job = CreateJob("in-flight", timeProvider.GetUtcNow().AddMilliseconds(-100));
+        queue.Enqueue(job, 0);
+
+        await using var enumerator = queue.GetAsyncEnumerator(TestContext.Current.CancellationToken);
+        Assert.True(await enumerator.MoveNextAsync());
+        Assert.Equal(1, queue.Count);
+
+        queue.MarkAsComplete();
+        var completion = enumerator.MoveNextAsync().AsTask();
+        Assert.False(completion.IsCompleted);
+
+        Assert.True(queue.RemoveJob(job.Id));
+        Assert.False(await completion.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
         Assert.Equal(0, queue.Count);
     }
 
