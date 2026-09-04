@@ -91,6 +91,33 @@ public sealed class CosmosAspireIntegrationTests
     }
 
     [Fact]
+    public async Task AspireConfiguration_MissingKeyedCosmosClient_ThrowsProviderSpecificError()
+    {
+        const string serviceKey = "missing-cosmos-client";
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Orleans:Clustering:ProviderType"] = "Development",
+                ["Orleans:Reminders:ProviderType"] = "AzureCosmosDB",
+                ["Orleans:Reminders:ServiceKey"] = serviceKey,
+            })
+            .Build();
+        var hostBuilder = Host.CreateApplicationBuilder();
+        hostBuilder.Configuration.AddConfiguration(configuration);
+        hostBuilder.UseOrleans();
+        using var host = hostBuilder.Build();
+        var options = host.Services.GetRequiredService<IOptions<CosmosReminderTableOptions>>().Value;
+
+        var exception = await Assert.ThrowsAsync<OrleansConfigurationException>(
+            () => options.CreateClient(host.Services).AsTask());
+
+        Assert.Contains("Orleans:Reminders", exception.Message, StringComparison.Ordinal);
+        Assert.Contains(serviceKey, exception.Message, StringComparison.Ordinal);
+        Assert.Contains("keyed CosmosClient", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("ConnectionName or ConnectionString", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task AspireResourceConfiguration_HandlesExplicitNullEnvironmentValue()
     {
         await using var builder = DistributedApplicationTestingBuilder.Create();
