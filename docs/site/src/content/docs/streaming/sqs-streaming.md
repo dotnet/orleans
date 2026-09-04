@@ -1,7 +1,7 @@
 ---
 title: Stream with Amazon SQS
 description: Configure Amazon SQS streams for Orleans, including FIFO ordering, custom data adapters, and operational settings.
-ms.date: 08/21/2026
+ms.date: 09/04/2026
 ms.topic: how-to
 ---
 
@@ -66,6 +66,6 @@ Serialized Orleans batches must fit within the [SQS message quotas](https://docs
 
 ## Permissions and operations
 
-The runtime looks up and creates mapped queues, sends and receives messages, and deletes delivered messages in batches. Grant the application the corresponding `sqs:GetQueueUrl`, `sqs:CreateQueue`, `sqs:SendMessage`, `sqs:ReceiveMessage`, and `sqs:DeleteMessage` permissions for its queue-name scope. The `sqs:DeleteMessage` action authorizes both single and batch deletion APIs. Administrative cleanup through <xref:OrleansAWSUtils.Streams.SQSStreamProviderUtils.DeleteAllUsedQueues*> also requires `sqs:DeleteQueue`.
+The runtime looks up and creates mapped queues, sends and receives messages, deletes delivered messages in batches, and resets pending-message visibility during receiver handoff so a replacement receiver can resume delivery promptly. Grant the application the corresponding `sqs:GetQueueUrl`, `sqs:CreateQueue`, `sqs:SendMessage`, `sqs:ReceiveMessage`, `sqs:DeleteMessage`, and `sqs:ChangeMessageVisibility` permissions for its queue-name scope. The `sqs:DeleteMessage` and `sqs:ChangeMessageVisibility` actions authorize their respective single-message and batch APIs. Administrative cleanup through <xref:OrleansAWSUtils.Streams.SQSStreamProviderUtils.DeleteAllUsedQueues*> also requires `sqs:DeleteQueue`.
 
 Monitor SQS queue depth, age of the oldest message, receive count, empty receives, deletion failures, and dead-letter movement together with [Orleans streaming metrics](streaming-operations.md#observe-health). Rising oldest-message age indicates that pulling agents or consumers aren't keeping pace. Repeated receives indicate processing failures, acknowledgement failures, or a visibility timeout shorter than end-to-end delivery latency.
