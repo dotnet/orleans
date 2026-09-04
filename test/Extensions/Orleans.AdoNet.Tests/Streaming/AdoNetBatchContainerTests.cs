@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Text.Json;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
@@ -96,6 +97,20 @@ public class AdoNetBatchContainerTests(TestEnvironmentFixture fixture)
         Assert.True(original.Equals(restored));
         Assert.True(restored.Equals(original));
         Assert.Equal(original.GetHashCode(), restored.GetHashCode());
+    }
+
+    [Fact]
+    public void AdoNetToken_SerializerIdsFollowBaseTokenIds()
+    {
+        Assert.Equal(2u, GetId(nameof(AdoNetStreamSequenceToken.ServiceId)));
+        Assert.Equal(3u, GetId(nameof(AdoNetStreamSequenceToken.ProviderId)));
+        Assert.Equal(4u, GetId(nameof(AdoNetStreamSequenceToken.QueueId)));
+
+        static uint GetId(string propertyName)
+            => typeof(AdoNetStreamSequenceToken)
+                .GetProperty(propertyName)!
+                .GetCustomAttribute<Orleans.IdAttribute>()!
+                .Id;
     }
 
     [Fact]
