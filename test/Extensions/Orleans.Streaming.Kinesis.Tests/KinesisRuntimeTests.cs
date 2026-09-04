@@ -114,6 +114,37 @@ public sealed class KinesisRuntimeTests
     }
 
     [Fact]
+    public async Task ConcurrentCreateAdapterCallsInitializeOnce()
+    {
+        const int callerCount = 8;
+        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        using var factory = new BlockingKinesisAdapterFactory(
+            services.GetRequiredService<Serializer<KinesisBatchContainer.Body>>());
+        var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var invoked = new CountdownEvent(callerCount);
+        var tasks = Enumerable.Range(0, callerCount).Select(async _ =>
+        {
+            await start.Task;
+            var operation = factory.CreateAdapter(TestContext.Current.CancellationToken);
+            invoked.Signal();
+            return await operation;
+        }).ToArray();
+
+        start.SetResult();
+        await Task.Run(
+            () => invoked.Wait(TestContext.Current.CancellationToken),
+            TestContext.Current.CancellationToken);
+
+        var partitionDiscoveryCount = factory.PartitionDiscoveryCount;
+        factory.CompletePartitionDiscovery();
+
+        var adapters = await Task.WhenAll(tasks);
+        Assert.Equal(1, partitionDiscoveryCount);
+        Assert.Equal(1, factory.PartitionDiscoveryCount);
+        Assert.All(adapters, adapter => Assert.Same(factory, adapter));
+    }
+
+    [Fact]
     public async Task PooledReceiver_ReadsAndDisposesLifecycleCancellationOnShutdown()
     {
         var client = Substitute.For<IAmazonKinesis>();
@@ -164,6 +195,37 @@ public sealed class KinesisRuntimeTests
 
         Assert.True(lifecycleCancellationToken.IsCancellationRequested);
         Assert.Throws<ObjectDisposedException>(() => _ = receiver.LifecycleCancellationToken);
+    }
+
+    private sealed class BlockingKinesisAdapterFactory(Serializer<KinesisBatchContainer.Body> serializer)
+        : KinesisAdapterFactory(
+            "Kinesis",
+            new KinesisStreamOptions
+            {
+                StreamName = "stream",
+                Service = "http://localhost:4566",
+                AccessKey = "access-key",
+                SecretKey = "secret-key",
+            },
+            new SimpleQueueCacheOptions(),
+            serializer,
+            checkpointerFactory: null,
+            NullLoggerFactory.Instance)
+    {
+        private readonly TaskCompletionSource _partitionDiscovery =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int _partitionDiscoveryCount;
+
+        public int PartitionDiscoveryCount => Volatile.Read(ref _partitionDiscoveryCount);
+
+        public void CompletePartitionDiscovery() => _partitionDiscovery.SetResult();
+
+        internal override async Task<string[]> GetPartitionIdsAsync(CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref _partitionDiscoveryCount);
+            await _partitionDiscovery.Task.WaitAsync(cancellationToken);
+            return ["shard-1"];
+        }
     }
 
     [Fact]
