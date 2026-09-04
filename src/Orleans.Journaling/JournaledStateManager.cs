@@ -312,7 +312,10 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                                                 ThrowIfMigrationBlockedByRetiredStates();
                                             }
 
-                                            AppendPendingStateChanges();
+                                            if (reconcileStorageFailures)
+                                            {
+                                                AppendPendingStateChanges();
+                                            }
 
                                             // The map of state ids is itself stored as a durable state with the id 0.
                                             // This must be stored first, since it includes the identities of all other states, which are needed when replaying the journal.
@@ -887,7 +890,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         }
 
         var buffer = new JournalBufferReader(pendingBuffer.Reader, isCompleted: true);
-        _shared.JournalFormat.Replay(buffer, new JournalReplayContext(this));
+        _shared.JournalFormat.Replay(buffer, new JournalReplayContext(this, isPending: true));
         if (buffer.Length > 0)
         {
             throw new InvalidOperationException("The journal format did not read all pending journal data.");
