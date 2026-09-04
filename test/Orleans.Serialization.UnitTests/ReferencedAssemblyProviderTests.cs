@@ -75,7 +75,7 @@ public sealed class ReferencedAssemblyProviderTests
     [Fact]
     public void AssemblyFileAvailabilityIsFalseForMemoryLoadedAssembly()
     {
-        var assembly = Assembly.Load(File.ReadAllBytes(typeof(ReferencedAssemblyProviderTests).Assembly.Location));
+        var assembly = Assembly.Load(File.ReadAllBytes(typeof(Enumerable).Assembly.Location));
 
         Assert.Empty(assembly.Location);
         Assert.False(ReferencedAssemblyProvider.AreAssemblyFilesAvailable(assembly));
