@@ -32,19 +32,19 @@ namespace Microsoft.Extensions.Hosting
 
 namespace Orleans
 {
-    public static partial class ClusterClientGrainResolutionExtensions
+    public static partial class GrainFactoryResolutionExtensions
     {
-        public static System.Threading.Tasks.ValueTask<TGrainInterface> GetGrainAsync<TGrainInterface>(this IClusterClient client, System.Guid primaryKey, string? grainClassNamePrefix = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
+        public static System.Threading.Tasks.ValueTask<TGrainInterface> GetGrainAsync<TGrainInterface>(this IGrainFactory grainFactory, System.Guid primaryKey, string? grainClassNamePrefix = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
             where TGrainInterface : IGrainWithGuidKey { throw null; }
-        public static System.Threading.Tasks.ValueTask<TGrainInterface> GetGrainAsync<TGrainInterface>(this IClusterClient client, long primaryKey, string? grainClassNamePrefix = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
+        public static System.Threading.Tasks.ValueTask<TGrainInterface> GetGrainAsync<TGrainInterface>(this IGrainFactory grainFactory, long primaryKey, string? grainClassNamePrefix = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
             where TGrainInterface : IGrainWithIntegerKey { throw null; }
-        public static System.Threading.Tasks.ValueTask<TGrainInterface> GetGrainAsync<TGrainInterface>(this IClusterClient client, string primaryKey, string? grainClassNamePrefix = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
+        public static System.Threading.Tasks.ValueTask<TGrainInterface> GetGrainAsync<TGrainInterface>(this IGrainFactory grainFactory, string primaryKey, string? grainClassNamePrefix = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
             where TGrainInterface : IGrainWithStringKey { throw null; }
-        public static System.Threading.Tasks.ValueTask<TGrainInterface> GetGrainAsync<TGrainInterface>(this IClusterClient client, System.Guid primaryKey, string keyExtension, string? grainClassNamePrefix = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
+        public static System.Threading.Tasks.ValueTask<TGrainInterface> GetGrainAsync<TGrainInterface>(this IGrainFactory grainFactory, System.Guid primaryKey, string keyExtension, string? grainClassNamePrefix = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
             where TGrainInterface : IGrainWithGuidCompoundKey { throw null; }
-        public static System.Threading.Tasks.ValueTask<TGrainInterface> GetGrainAsync<TGrainInterface>(this IClusterClient client, long primaryKey, string keyExtension, string? grainClassNamePrefix = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
+        public static System.Threading.Tasks.ValueTask<TGrainInterface> GetGrainAsync<TGrainInterface>(this IGrainFactory grainFactory, long primaryKey, string keyExtension, string? grainClassNamePrefix = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
             where TGrainInterface : IGrainWithIntegerCompoundKey { throw null; }
-        public static System.Threading.Tasks.ValueTask<Runtime.GrainType> WaitForGrainTypeAsync<TGrainInterface>(this IClusterClient client, string? grainClassNamePrefix = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
+        public static System.Threading.Tasks.ValueTask<Runtime.GrainType> WaitForGrainTypeAsync<TGrainInterface>(this IGrainFactory grainFactory, string? grainClassNamePrefix = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
             where TGrainInterface : IGrain { throw null; }
     }
 
