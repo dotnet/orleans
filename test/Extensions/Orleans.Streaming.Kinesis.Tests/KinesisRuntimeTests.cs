@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 using Orleans.Configuration;
+using Orleans.Providers.Streams.Common;
 using Orleans.Serialization;
 using Orleans.Streaming.Kinesis;
 using Orleans.Streams;
@@ -302,6 +303,464 @@ public sealed class KinesisRuntimeTests
             Arg.Is<GetShardIteratorRequest>(request =>
                 request.ShardIteratorType == ShardIteratorType.AFTER_SEQUENCE_NUMBER
                 && request.StartingSequenceNumber == "123"),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ReplayReader_UsesInclusiveStartAndRenewsAfterAcceptedRecord()
+    {
+        var client = Substitute.For<IAmazonKinesis>();
+        client.GetShardIteratorAsync(
+                Arg.Any<GetShardIteratorRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns(
+                new GetShardIteratorResponse { ShardIterator = "iterator-1" },
+                new GetShardIteratorResponse { ShardIterator = "iterator-2" });
+        client.GetRecordsAsync(
+                Arg.Any<GetRecordsRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns(
+                Task.FromResult(new GetRecordsResponse
+                {
+                    NextShardIterator = "iterator-expired",
+                    MillisBehindLatest = 1,
+                    Records =
+                    [
+                        new Amazon.Kinesis.Model.Record
+                        {
+                            SequenceNumber = "170141183460469231731687303715884105727",
+                            Data = new MemoryStream(),
+                        },
+                    ],
+                }),
+                Task.FromException<GetRecordsResponse>(new ExpiredIteratorException("expired")),
+                Task.FromResult(new GetRecordsResponse
+                {
+                    NextShardIterator = "iterator-3",
+                    MillisBehindLatest = 0,
+                    Records = [],
+                }));
+        var timeProvider = new FakeTimeProvider
+        {
+            AutoAdvanceAmount = TimeSpan.FromMilliseconds(200),
+        };
+        var topologyMonitor = new KinesisShardTopologyMonitor(
+            client,
+            "stream",
+            ["shard-1"],
+            TimeSpan.FromMinutes(1),
+            timeProvider,
+            NullLogger<KinesisShardTopologyMonitor>.Instance);
+        var factory = new KinesisReplaySourceFactory(
+            () => client,
+            "stream",
+            "shard-1",
+            topologyMonitor,
+            new KinesisShardReadThrottle(TimeSpan.FromMilliseconds(200), timeProvider));
+        var requested = new KinesisSequenceToken(
+            "stream",
+            "shard-1",
+            "170141183460469231731687303715884105727",
+            sequenceNumber: 42,
+            eventIndex: 0);
+        await using var source = await factory.Create(
+            StreamId.Create("namespace", Guid.NewGuid()),
+            requested,
+            TestContext.Current.CancellationToken);
+
+        var first = await source.Read(10, TestContext.Current.CancellationToken);
+        source.MessagesAdded(first.Messages);
+        var second = await source.Read(10, TestContext.Current.CancellationToken);
+
+        Assert.Single(first.Messages);
+        Assert.False(first.IsAtTail);
+        Assert.Empty(second.Messages);
+        Assert.True(second.IsAtTail);
+        await client.Received(1).GetShardIteratorAsync(
+            Arg.Is<GetShardIteratorRequest>(request =>
+                request.ShardIteratorType == ShardIteratorType.AT_SEQUENCE_NUMBER
+                && request.StartingSequenceNumber == requested.ShardSequence),
+            Arg.Any<CancellationToken>());
+        await client.Received(1).GetShardIteratorAsync(
+            Arg.Is<GetShardIteratorRequest>(request =>
+                request.ShardIteratorType == ShardIteratorType.AFTER_SEQUENCE_NUMBER
+                && request.StartingSequenceNumber == requested.ShardSequence),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ReplayReader_RetriesShardThrottlingAtTheSharedReadRate()
+    {
+        var client = Substitute.For<IAmazonKinesis>();
+        client.GetShardIteratorAsync(
+                Arg.Any<GetShardIteratorRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new GetShardIteratorResponse { ShardIterator = "iterator" });
+        client.GetRecordsAsync(
+                Arg.Any<GetRecordsRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns(
+                Task.FromException<GetRecordsResponse>(
+                    new ProvisionedThroughputExceededException("throttled")),
+                Task.FromResult(new GetRecordsResponse
+                {
+                    NextShardIterator = "iterator",
+                    MillisBehindLatest = 0,
+                    Records =
+                    [
+                        new Amazon.Kinesis.Model.Record
+                        {
+                            SequenceNumber = "1",
+                            Data = new MemoryStream(),
+                        },
+                    ],
+                }));
+        var timeProvider = new FakeTimeProvider
+        {
+            AutoAdvanceAmount = TimeSpan.FromMilliseconds(200),
+        };
+        var topologyMonitor = new KinesisShardTopologyMonitor(
+            client,
+            "stream",
+            ["shard-1"],
+            TimeSpan.FromMinutes(1),
+            timeProvider,
+            NullLogger<KinesisShardTopologyMonitor>.Instance);
+        var factory = new KinesisReplaySourceFactory(
+            () => client,
+            "stream",
+            "shard-1",
+            topologyMonitor,
+            new KinesisShardReadThrottle(TimeSpan.FromMilliseconds(200), timeProvider));
+        await using var source = await factory.Create(
+            StreamId.Create("namespace", Guid.NewGuid()),
+            new KinesisSequenceToken("stream", "shard-1", "1", 0, 0),
+            TestContext.Current.CancellationToken);
+
+        var result = await source.Read(10, TestContext.Current.CancellationToken);
+
+        Assert.Single(result.Messages);
+        Assert.True(result.IsAtTail);
+        await client.Received(2).GetRecordsAsync(
+            Arg.Any<GetRecordsRequest>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task PooledReceiver_ReplaysOlderThanCacheAndHandsOffInShardOrder()
+    {
+        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = services.GetRequiredService<Serializer<KinesisBatchContainer.Body>>();
+        var streamId = StreamId.Create("namespace", Guid.NewGuid());
+        var liveClient = Substitute.For<IAmazonKinesis>();
+        var replayClient = Substitute.For<IAmazonKinesis>();
+        var clients = new Queue<IAmazonKinesis>([liveClient, replayClient]);
+        ConfigureIterator(liveClient, "live-iterator");
+        ConfigureIterator(replayClient, "replay-iterator");
+        liveClient.GetRecordsAsync(Arg.Any<GetRecordsRequest>(), Arg.Any<CancellationToken>())
+            .Returns(new GetRecordsResponse
+            {
+                NextShardIterator = "live-iterator",
+                MillisBehindLatest = 0,
+                Records = [CreateRecord(5), CreateRecord(6)],
+            });
+        replayClient.GetRecordsAsync(Arg.Any<GetRecordsRequest>(), Arg.Any<CancellationToken>())
+            .Returns(new GetRecordsResponse
+            {
+                NextShardIterator = "replay-iterator",
+                MillisBehindLatest = 0,
+                Records = [CreateRecord(2), CreateRecord(3), CreateRecord(4), CreateRecord(5), CreateRecord(6)],
+            });
+        var checkpointer = Substitute.For<IStreamQueueCheckpointer<string>>();
+        checkpointer.Load(Arg.Any<CancellationToken>()).Returns(string.Empty);
+        var checkpointerFactory = Substitute.For<IStreamQueueCheckpointerFactory>();
+        checkpointerFactory.Create("shard-1", Arg.Any<CancellationToken>()).Returns(checkpointer);
+        var timeProvider = new FakeTimeProvider { AutoAdvanceAmount = TimeSpan.FromMilliseconds(200) };
+        var topologyMonitor = new KinesisShardTopologyMonitor(
+            liveClient,
+            "stream",
+            ["shard-1"],
+            TimeSpan.FromMinutes(1),
+            timeProvider,
+            NullLogger<KinesisShardTopologyMonitor>.Instance);
+        var receiver = new KinesisPooledAdapterReceiver(
+            () => clients.Dequeue(),
+            "stream",
+            "shard-1",
+            checkpointerFactory,
+            new SimpleQueueCacheOptions { CacheSize = 10 },
+            serializer,
+            NullLoggerFactory.Instance,
+            topologyMonitor,
+            TimeSpan.FromMilliseconds(200),
+            timeProvider,
+            new RecoverableStreamReplayOptions
+            {
+                MaxConcurrentReaders = 2,
+                MaxPendingReaders = 2,
+                CacheSize = 10,
+                ReadBatchSize = 10,
+                TemporaryTailRetryDelay = TimeSpan.Zero,
+            });
+        await receiver.Initialize(TimeSpan.FromSeconds(5));
+        _ = await receiver.GetQueueMessagesAsync(10, TestContext.Current.CancellationToken);
+
+        using var cursor = Assert.IsAssignableFrom<IAsyncQueueCacheCursor>(
+            receiver.GetCacheCursor(streamId, new KinesisSequenceToken("stream", "shard-1", "2", 0, 0)));
+        var delivered = new List<string>();
+        while (true)
+        {
+            var moveResult = await cursor.MoveNextAsync(TestContext.Current.CancellationToken);
+            if (moveResult == QueueCacheCursorMoveNextResult.Completed)
+            {
+                if (cursor.MoveNext())
+                {
+                    moveResult = QueueCacheCursorMoveNextResult.ItemAvailable;
+                }
+                else
+                {
+                    break;
+                }
+            }
+
+            if (moveResult != QueueCacheCursorMoveNextResult.ItemAvailable)
+            {
+                break;
+            }
+
+            var batch = Assert.IsType<KinesisBatchContainer>(cursor.GetCurrent(out var exception));
+            Assert.Null(exception);
+            delivered.Add(Assert.IsType<KinesisSequenceToken>(batch.SequenceToken).ShardSequence);
+        }
+
+        Assert.Equal(["2", "3", "4", "5", "6"], delivered);
+        await replayClient.Received(1).GetShardIteratorAsync(
+            Arg.Is<GetShardIteratorRequest>(request =>
+                request.ShardIteratorType == ShardIteratorType.AT_SEQUENCE_NUMBER
+                && request.StartingSequenceNumber == "2"),
+            Arg.Any<CancellationToken>());
+        await receiver.Shutdown(TimeSpan.FromSeconds(5));
+
+        Amazon.Kinesis.Model.Record CreateRecord(long sequence)
+            => new()
+            {
+                SequenceNumber = sequence.ToString(),
+                Data = new MemoryStream(KinesisBatchContainer.ToKinesisPayload(
+                    serializer,
+                    streamId,
+                    [sequence],
+                    requestContext: null)),
+            };
+
+        static void ConfigureIterator(IAmazonKinesis client, string iterator)
+            => client.GetShardIteratorAsync(
+                    Arg.Any<GetShardIteratorRequest>(),
+                    Arg.Any<CancellationToken>())
+                .Returns(new GetShardIteratorResponse { ShardIterator = iterator });
+    }
+
+    [Fact]
+    public async Task ReplayReader_InvalidTokenAndExpiredSequence_SurfaceDataNotAvailable()
+    {
+        var client = Substitute.For<IAmazonKinesis>();
+        client.GetShardIteratorAsync(
+                Arg.Any<GetShardIteratorRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns<Task<GetShardIteratorResponse>>(
+                _ => throw new Amazon.Kinesis.Model.InvalidArgumentException("expired"));
+        var timeProvider = new FakeTimeProvider();
+        var topologyMonitor = new KinesisShardTopologyMonitor(
+            client,
+            "stream",
+            ["shard-1"],
+            TimeSpan.FromMinutes(1),
+            timeProvider,
+            NullLogger<KinesisShardTopologyMonitor>.Instance);
+        var factory = new KinesisReplaySourceFactory(
+            () => client,
+            "stream",
+            "shard-1",
+            topologyMonitor,
+            new KinesisShardReadThrottle(TimeSpan.Zero, timeProvider));
+
+        await Assert.ThrowsAsync<DataNotAvailableException>(
+            async () => await factory.Create(
+                StreamId.Create("namespace", Guid.NewGuid()),
+                new EventSequenceTokenV2(1),
+                TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<DataNotAvailableException>(
+            async () => await factory.Create(
+                StreamId.Create("namespace", Guid.NewGuid()),
+                new KinesisSequenceToken("stream", "other-shard", "1", 0, 0),
+                TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<DataNotAvailableException>(
+            async () => await factory.Create(
+                StreamId.Create("namespace", Guid.NewGuid()),
+                new KinesisSequenceToken("other-stream", "shard-1", "1", 0, 0),
+                TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<DataNotAvailableException>(
+            async () => await factory.Create(
+                StreamId.Create("namespace", Guid.NewGuid()),
+                new KinesisSequenceToken("stream", "shard-1", "1", 0, 0),
+                TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task ReplayReader_RejectsTrimHorizonFallbackForExpiredStart()
+    {
+        var client = Substitute.For<IAmazonKinesis>();
+        client.GetShardIteratorAsync(
+                Arg.Any<GetShardIteratorRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new GetShardIteratorResponse { ShardIterator = "iterator" });
+        client.GetRecordsAsync(
+                Arg.Any<GetRecordsRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new GetRecordsResponse
+            {
+                NextShardIterator = "iterator",
+                MillisBehindLatest = 0,
+                Records =
+                [
+                    new Amazon.Kinesis.Model.Record
+                    {
+                        SequenceNumber = "2",
+                        Data = new MemoryStream(),
+                    },
+                ],
+            });
+        var timeProvider = new FakeTimeProvider();
+        var factory = new KinesisReplaySourceFactory(
+            () => client,
+            "stream",
+            "shard-1",
+            new KinesisShardTopologyMonitor(
+                client,
+                "stream",
+                ["shard-1"],
+                TimeSpan.FromMinutes(1),
+                timeProvider,
+                NullLogger<KinesisShardTopologyMonitor>.Instance),
+            new KinesisShardReadThrottle(TimeSpan.Zero, timeProvider));
+        await using var source = await factory.Create(
+            StreamId.Create("namespace", Guid.NewGuid()),
+            new KinesisSequenceToken("stream", "shard-1", "1", 0, 0),
+            TestContext.Current.CancellationToken);
+
+        var exception = await Assert.ThrowsAsync<DataNotAvailableException>(
+            async () => await source.Read(10, TestContext.Current.CancellationToken));
+
+        Assert.Contains("requested retained position '1'", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ReplayReader_EmptyResponseKeepsInclusiveStartPending()
+    {
+        var client = Substitute.For<IAmazonKinesis>();
+        client.GetShardIteratorAsync(
+                Arg.Any<GetShardIteratorRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new GetShardIteratorResponse { ShardIterator = "iterator" });
+        client.GetRecordsAsync(
+                Arg.Any<GetRecordsRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns(
+                new GetRecordsResponse
+                {
+                    NextShardIterator = "iterator",
+                    MillisBehindLatest = 0,
+                    Records = [],
+                },
+                new GetRecordsResponse
+                {
+                    NextShardIterator = "iterator",
+                    MillisBehindLatest = 0,
+                    Records =
+                    [
+                        new Amazon.Kinesis.Model.Record
+                        {
+                            SequenceNumber = "1",
+                            Data = new MemoryStream(),
+                        },
+                    ],
+                });
+        var timeProvider = new FakeTimeProvider();
+        var factory = new KinesisReplaySourceFactory(
+            () => client,
+            "stream",
+            "shard-1",
+            new KinesisShardTopologyMonitor(
+                client,
+                "stream",
+                ["shard-1"],
+                TimeSpan.FromMinutes(1),
+                timeProvider,
+                NullLogger<KinesisShardTopologyMonitor>.Instance),
+            new KinesisShardReadThrottle(TimeSpan.Zero, timeProvider));
+        await using var source = await factory.Create(
+            StreamId.Create("namespace", Guid.NewGuid()),
+            new KinesisSequenceToken("stream", "shard-1", "1", 0, 0),
+            TestContext.Current.CancellationToken);
+
+        var empty = await source.Read(10, TestContext.Current.CancellationToken);
+        var record = await source.Read(10, TestContext.Current.CancellationToken);
+
+        Assert.Empty(empty.Messages);
+        Assert.False(empty.IsAtTail);
+        Assert.Single(record.Messages);
+        Assert.True(record.IsAtTail);
+    }
+
+    [Fact]
+    public async Task ReplayReader_NormalizesIdentitylessLegacyToken()
+    {
+        var client = Substitute.For<IAmazonKinesis>();
+        client.GetShardIteratorAsync(
+                Arg.Any<GetShardIteratorRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new GetShardIteratorResponse { ShardIterator = "iterator" });
+        client.GetRecordsAsync(
+                Arg.Any<GetRecordsRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new GetRecordsResponse
+            {
+                NextShardIterator = "iterator",
+                MillisBehindLatest = 0,
+                Records =
+                [
+                    new Amazon.Kinesis.Model.Record
+                    {
+                        SequenceNumber = "1",
+                        Data = new MemoryStream(),
+                    },
+                ],
+            });
+        var timeProvider = new FakeTimeProvider();
+        var factory = new KinesisReplaySourceFactory(
+            () => client,
+            "stream",
+            "shard-1",
+            new KinesisShardTopologyMonitor(
+                client,
+                "stream",
+                ["shard-1"],
+                TimeSpan.FromMinutes(1),
+                timeProvider,
+                NullLogger<KinesisShardTopologyMonitor>.Instance),
+            new KinesisShardReadThrottle(TimeSpan.Zero, timeProvider));
+        await using var source = await factory.Create(
+            StreamId.Create("namespace", Guid.NewGuid()),
+            new KinesisSequenceToken("1", 0, 0),
+            TestContext.Current.CancellationToken);
+
+        var result = await source.Read(10, TestContext.Current.CancellationToken);
+
+        Assert.Single(result.Messages);
+        await client.Received(1).GetShardIteratorAsync(
+            Arg.Is<GetShardIteratorRequest>(request =>
+                request.ShardId == "shard-1"
+                && request.StartingSequenceNumber == "1"
+                && request.ShardIteratorType == ShardIteratorType.AT_SEQUENCE_NUMBER),
             Arg.Any<CancellationToken>());
     }
 

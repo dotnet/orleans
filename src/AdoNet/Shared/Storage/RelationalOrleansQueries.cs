@@ -590,6 +590,173 @@ namespace Orleans.Tests.SqlUtils
                 result => result.SingleOrDefault());
         }
 
+        internal Task<AdoNetStreamReplayLeaseState> AcquireStreamReplayLeaseAsync(
+            string serviceId,
+            string providerId,
+            string queueId,
+            string readerId,
+            byte[] streamIdBytes,
+            int streamNamespaceLength,
+            long ownerEpoch,
+            long afterMessageId,
+            int replayLeaseDurationSeconds,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(serviceId);
+            ArgumentNullException.ThrowIfNull(providerId);
+            ArgumentNullException.ThrowIfNull(queueId);
+            ArgumentNullException.ThrowIfNull(readerId);
+            ArgumentNullException.ThrowIfNull(streamIdBytes);
+            ArgumentOutOfRangeException.ThrowIfNegative(streamNamespaceLength);
+            ArgumentOutOfRangeException.ThrowIfLessThan(ownerEpoch, 1);
+            ArgumentOutOfRangeException.ThrowIfNegative(afterMessageId);
+            ArgumentOutOfRangeException.ThrowIfLessThan(replayLeaseDurationSeconds, 1);
+
+            return ReadAsync(
+                dbStoredQueries.AcquireStreamReplayLeaseKey,
+                record => ReadReplayLeaseState(record, includeIdentity: true),
+                command => new DbStoredQueries.Columns(command)
+                {
+                    ServiceId = serviceId,
+                    ProviderId = providerId,
+                    QueueId = queueId,
+                    ReaderId = readerId,
+                    StreamIdBytes = streamIdBytes,
+                    StreamNamespaceLength = streamNamespaceLength,
+                    OwnerEpoch = ownerEpoch,
+                    AfterMessageId = afterMessageId,
+                    ReplayLeaseDurationSeconds = replayLeaseDurationSeconds
+                },
+                result => result.Single(),
+                cancellationToken);
+        }
+
+        internal Task<AdoNetStreamReplayPage> ReadStreamReplayMessagesAsync(
+            string serviceId,
+            string providerId,
+            string queueId,
+            string readerId,
+            long ownerEpoch,
+            long afterMessageId,
+            int maxCount,
+            int replayLeaseDurationSeconds,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(serviceId);
+            ArgumentNullException.ThrowIfNull(providerId);
+            ArgumentNullException.ThrowIfNull(queueId);
+            ArgumentNullException.ThrowIfNull(readerId);
+            ArgumentOutOfRangeException.ThrowIfLessThan(ownerEpoch, 1);
+            ArgumentOutOfRangeException.ThrowIfNegative(afterMessageId);
+            ArgumentOutOfRangeException.ThrowIfLessThan(maxCount, 1);
+            ArgumentOutOfRangeException.ThrowIfLessThan(replayLeaseDurationSeconds, 1);
+
+            return ReadAsync<AdoNetStreamReplayRow, AdoNetStreamReplayPage>(
+                dbStoredQueries.ReadStreamReplayMessagesKey,
+                record =>
+                {
+                    var lease = ReadReplayLeaseState(record, includeIdentity: false);
+                    if (GetNullableInt64(record, nameof(AdoNetStreamMessage.MessageId)) is not { } messageId)
+                    {
+                        return new(lease, null);
+                    }
+
+                    return new(
+                        lease,
+                        new AdoNetStreamMessage(
+                            serviceId,
+                            providerId,
+                            queueId,
+                            messageId,
+                            GetNullableBytes(record, nameof(AdoNetStreamMessage.StreamIdBytes))!,
+                            GetNullableInt32(record, nameof(AdoNetStreamMessage.StreamNamespaceLength))!.Value,
+                            GetNullableDateTime(record, nameof(AdoNetStreamMessage.CreatedOn))!.Value,
+                            GetNullableBytes(record, nameof(AdoNetStreamMessage.Payload))!));
+                },
+                command => new DbStoredQueries.Columns(command)
+                {
+                    ServiceId = serviceId,
+                    ProviderId = providerId,
+                    QueueId = queueId,
+                    ReaderId = readerId,
+                    OwnerEpoch = ownerEpoch,
+                    AfterMessageId = afterMessageId,
+                    MaxCount = maxCount,
+                    ReplayLeaseDurationSeconds = replayLeaseDurationSeconds
+                },
+                result =>
+                {
+                    var rows = result.ToList();
+                    var first = rows[0];
+                    return new(first.Lease, rows.Where(static row => row.Message is not null).Select(static row => row.Message!).ToList());
+                },
+                cancellationToken);
+        }
+
+        internal Task<AdoNetStreamReplayLeaseState> UpdateStreamReplayLeaseAsync(
+            string serviceId,
+            string providerId,
+            string queueId,
+            string readerId,
+            long ownerEpoch,
+            long watermark,
+            int replayLeaseDurationSeconds,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(serviceId);
+            ArgumentNullException.ThrowIfNull(providerId);
+            ArgumentNullException.ThrowIfNull(queueId);
+            ArgumentNullException.ThrowIfNull(readerId);
+            ArgumentOutOfRangeException.ThrowIfLessThan(ownerEpoch, 1);
+            ArgumentOutOfRangeException.ThrowIfNegative(watermark);
+            ArgumentOutOfRangeException.ThrowIfLessThan(replayLeaseDurationSeconds, 1);
+
+            return ReadAsync(
+                dbStoredQueries.UpdateStreamReplayLeaseKey,
+                record => ReadReplayLeaseState(record, includeIdentity: false),
+                command => new DbStoredQueries.Columns(command)
+                {
+                    ServiceId = serviceId,
+                    ProviderId = providerId,
+                    QueueId = queueId,
+                    ReaderId = readerId,
+                    OwnerEpoch = ownerEpoch,
+                    Watermark = watermark,
+                    ReplayLeaseDurationSeconds = replayLeaseDurationSeconds
+                },
+                result => result.Single(),
+                cancellationToken);
+        }
+
+        internal Task<AdoNetStreamReplayLeaseState> ReleaseStreamReplayLeaseAsync(
+            string serviceId,
+            string providerId,
+            string queueId,
+            string readerId,
+            long ownerEpoch,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(serviceId);
+            ArgumentNullException.ThrowIfNull(providerId);
+            ArgumentNullException.ThrowIfNull(queueId);
+            ArgumentNullException.ThrowIfNull(readerId);
+            ArgumentOutOfRangeException.ThrowIfLessThan(ownerEpoch, 1);
+
+            return ReadAsync(
+                dbStoredQueries.ReleaseStreamReplayLeaseKey,
+                record => ReadReplayLeaseState(record, includeIdentity: false),
+                command => new DbStoredQueries.Columns(command)
+                {
+                    ServiceId = serviceId,
+                    ProviderId = providerId,
+                    QueueId = queueId,
+                    ReaderId = readerId,
+                    OwnerEpoch = ownerEpoch
+                },
+                result => result.Single(),
+                cancellationToken);
+        }
+
         /// <summary>
         /// Deletes an ordered, bounded batch of retained stream records.
         /// </summary>
@@ -597,6 +764,7 @@ namespace Orleans.Tests.SqlUtils
             string serviceId,
             string providerId,
             string queueId,
+            long ownerEpoch,
             int retentionPeriodSeconds,
             int? maximumRetentionPeriodSeconds,
             int cleanupIntervalSeconds,
@@ -606,6 +774,7 @@ namespace Orleans.Tests.SqlUtils
             ArgumentNullException.ThrowIfNull(serviceId);
             ArgumentNullException.ThrowIfNull(providerId);
             ArgumentNullException.ThrowIfNull(queueId);
+            ArgumentOutOfRangeException.ThrowIfLessThan(ownerEpoch, 1);
             ArgumentOutOfRangeException.ThrowIfLessThan(retentionPeriodSeconds, 1);
             ArgumentOutOfRangeException.ThrowIfLessThan(cleanupIntervalSeconds, 1);
             ArgumentOutOfRangeException.ThrowIfLessThan(cleanupBatchSize, 1);
@@ -624,6 +793,7 @@ namespace Orleans.Tests.SqlUtils
                     GetNullableInt64(record, nameof(AdoNetStreamCleanupResult.HardDeletedFromMessageId)),
                     GetNullableInt64(record, nameof(AdoNetStreamCleanupResult.HardDeletedThroughMessageId)),
                     GetNullableInt64(record, nameof(AdoNetStreamCleanupResult.Checkpoint)),
+                    GetNullableInt64(record, nameof(AdoNetStreamCleanupResult.ActiveReplayWatermark)),
                     GetNullableInt64(record, nameof(AdoNetStreamCleanupResult.EarliestMessageId)),
                     GetNullableInt64(record, nameof(AdoNetStreamCleanupResult.TailMessageId))),
                 command => new DbStoredQueries.Columns(command)
@@ -631,6 +801,7 @@ namespace Orleans.Tests.SqlUtils
                     ServiceId = serviceId,
                     ProviderId = providerId,
                     QueueId = queueId,
+                    OwnerEpoch = ownerEpoch,
                     RetentionPeriodSeconds = retentionPeriodSeconds,
                     MaximumRetentionPeriodSeconds = maximumRetentionPeriodSeconds,
                     CleanupIntervalSeconds = cleanupIntervalSeconds,
@@ -645,6 +816,47 @@ namespace Orleans.Tests.SqlUtils
             var ordinal = record.GetOrdinal(fieldName);
             return record.IsDBNull(ordinal) ? null : Convert.ToInt64(record.GetValue(ordinal));
         }
+
+        private static int? GetNullableInt32(IDataRecord record, string fieldName)
+        {
+            var ordinal = record.GetOrdinal(fieldName);
+            return record.IsDBNull(ordinal) ? null : Convert.ToInt32(record.GetValue(ordinal));
+        }
+
+        private static DateTime? GetNullableDateTime(IDataRecord record, string fieldName)
+        {
+            var ordinal = record.GetOrdinal(fieldName);
+            return record.IsDBNull(ordinal) ? null : record.GetDateTimeValue(fieldName);
+        }
+
+        private static byte[]? GetNullableBytes(IDataRecord record, string fieldName)
+        {
+            var ordinal = record.GetOrdinal(fieldName);
+            return record.IsDBNull(ordinal) ? null : (byte[])record.GetValue(ordinal);
+        }
+
+        private static string? GetNullableString(IDataRecord record, string fieldName)
+        {
+            var ordinal = record.GetOrdinal(fieldName);
+            return record.IsDBNull(ordinal) ? null : Convert.ToString(record.GetValue(ordinal));
+        }
+
+        private static AdoNetStreamReplayLeaseState ReadReplayLeaseState(
+            IDataRecord record,
+            bool includeIdentity)
+            => new(
+                Convert.ToString(record[nameof(AdoNetStreamReplayLeaseState.Status)])!,
+                includeIdentity ? GetNullableString(record, nameof(AdoNetStreamReplayLeaseState.ServiceId)) : null,
+                includeIdentity ? GetNullableString(record, nameof(AdoNetStreamReplayLeaseState.ProviderId)) : null,
+                includeIdentity ? GetNullableString(record, nameof(AdoNetStreamReplayLeaseState.QueueId)) : null,
+                includeIdentity ? GetNullableString(record, nameof(AdoNetStreamReplayLeaseState.ReaderId)) : null,
+                GetNullableInt64(record, nameof(AdoNetStreamReplayLeaseState.OwnerEpoch)),
+                GetNullableInt64(record, nameof(AdoNetStreamReplayLeaseState.Watermark)),
+                GetNullableDateTime(record, nameof(AdoNetStreamReplayLeaseState.ExpiresOn)),
+                GetNullableInt64(record, nameof(AdoNetStreamReplayLeaseState.NextMessageId)),
+                GetNullableInt64(record, nameof(AdoNetStreamReplayLeaseState.Checkpoint)),
+                GetNullableInt64(record, nameof(AdoNetStreamReplayLeaseState.EarliestMessageId)),
+                GetNullableInt64(record, nameof(AdoNetStreamReplayLeaseState.TailMessageId)));
 
 #endif
 

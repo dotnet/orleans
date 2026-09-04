@@ -155,6 +155,7 @@ public abstract class StreamPartitionCleanupBenchmark(string invariant, string d
     private byte[] _payload = [];
     private byte[] _streamIdBytes = [];
     private string[] _partitionIds = [];
+    private long[] _ownerEpochs = [];
 
     [Params(1, 8)]
     public int PartitionCount { get; set; }
@@ -175,6 +176,7 @@ public abstract class StreamPartitionCleanupBenchmark(string invariant, string d
         new Random(42).NextBytes(_payload);
         _streamIdBytes = "benchmarkstream-0"u8.ToArray();
         _partitionIds = Enumerable.Range(0, PartitionCount).Select(i => $"QueueId-{i}").ToArray();
+        _ownerEpochs = new long[PartitionCount];
 
         var testing = RelationalStorageForTesting.SetupInstance(invariant, database).GetAwaiter().GetResult();
         if (IsNullOrEmpty(testing.CurrentConnectionString))
@@ -210,6 +212,7 @@ public abstract class StreamPartitionCleanupBenchmark(string invariant, string d
                 "ProviderId-0",
                 _partitionIds[partition],
                 startFromNow: false).GetAwaiter().GetResult();
+            _ownerEpochs[partition] = state.OwnerEpoch;
             _queries.AdvanceStreamCheckpointAsync(
                 "ServiceId-0",
                 "ProviderId-0",
@@ -249,11 +252,12 @@ public abstract class StreamPartitionCleanupBenchmark(string invariant, string d
     [BenchmarkCategory("Cleanup", "CleanupImpact")]
     public async Task CleanupStreamPartitions()
     {
-        var results = await Task.WhenAll(_partitionIds.Select(partitionId =>
+        var results = await Task.WhenAll(_partitionIds.Select((partitionId, index) =>
             _queries.CleanupStreamMessagesAsync(
                 "ServiceId-0",
                 "ProviderId-0",
                 partitionId,
+                _ownerEpochs[index],
                 retentionPeriodSeconds: 86_400,
                 maximumRetentionPeriodSeconds: null,
                 cleanupIntervalSeconds: 60,

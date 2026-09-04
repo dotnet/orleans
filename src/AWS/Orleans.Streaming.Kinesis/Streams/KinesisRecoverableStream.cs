@@ -1,3 +1,4 @@
+using System.Net;
 using Amazon.Kinesis;
 using Amazon.Kinesis.Model;
 using Orleans.Providers.Streams.Common;
@@ -27,26 +28,58 @@ internal sealed class KinesisRecoverableStreamSource(
     string streamName,
     string partition,
     KinesisShardTopologyMonitor topologyMonitor,
-    TimeSpan getRecordsInterval,
-    TimeProvider timeProvider) : IRecoverableStreamSource<KinesisCacheRecord>
+    KinesisShardReadThrottle readThrottle)
+    : IRecoverableStreamSource<KinesisCacheRecord>, IRecoverableStreamReplaySource<KinesisCacheRecord>
 {
     private string? _shardIterator;
     private string? _readOffset;
     private long _nextSequenceNumber;
-    private DateTimeOffset _nextGetRecordsUtc;
     private bool _shardExhausted;
     private bool _topologyCheckRequired;
     private bool _resetRequired;
+    private bool _readOffsetInclusive;
 
     public async Task Initialize(
         RecoverableStreamStartPosition position,
         CancellationToken cancellationToken)
     {
         _readOffset = position.Checkpoint;
+        _readOffsetInclusive = false;
         await ResetShardIterator(cancellationToken);
     }
 
     public async Task<IReadOnlyList<KinesisCacheRecord>> Read(
+        int maxCount,
+        CancellationToken cancellationToken)
+        => (await ReadCore(maxCount, cancellationToken)).Messages;
+
+    public async Task InitializeReplay(
+        KinesisSequenceToken token,
+        CancellationToken cancellationToken)
+    {
+        _readOffset = token.ShardSequence;
+        _readOffsetInclusive = true;
+        await ResetShardIterator(cancellationToken);
+    }
+
+    async ValueTask<RecoverableStreamReplayReadResult<KinesisCacheRecord>>
+        IRecoverableStreamReplaySource<KinesisCacheRecord>.Read(
+            int maxCount,
+            CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await ReadCore(maxCount, cancellationToken);
+        }
+        catch (Amazon.Kinesis.Model.InvalidArgumentException exception)
+        {
+            throw new DataNotAvailableException(
+                $"Kinesis rejected shard sequence '{_readOffset}' for shard '{partition}'.",
+                exception);
+        }
+    }
+
+    private async Task<RecoverableStreamReplayReadResult<KinesisCacheRecord>> ReadCore(
         int maxCount,
         CancellationToken cancellationToken)
     {
@@ -58,16 +91,15 @@ internal sealed class KinesisRecoverableStreamSource(
 
         if (!await topologyMonitor.CheckTopology(_topologyCheckRequired, cancellationToken))
         {
-            return [];
+            return new([], isAtTail: false);
         }
 
         _topologyCheckRequired = false;
         if (_shardExhausted)
         {
-            return [];
+            return new([], isAtTail: true);
         }
 
-        await WaitForGetRecordsInterval(cancellationToken);
         var request = new GetRecordsRequest
         {
             Limit = maxCount,
@@ -75,21 +107,31 @@ internal sealed class KinesisRecoverableStreamSource(
         };
 
         GetRecordsResponse response;
-        try
+        while (true)
         {
-            response = await client.GetRecordsAsync(request, cancellationToken);
-        }
-        catch (ExpiredIteratorException)
-        {
-            await ResetShardIterator(cancellationToken);
-            if (_shardExhausted)
-            {
-                return [];
-            }
-
-            await WaitForGetRecordsInterval(cancellationToken);
+            await readThrottle.Wait(cancellationToken);
             request.ShardIterator = _shardIterator;
-            response = await client.GetRecordsAsync(request, cancellationToken);
+            try
+            {
+                response = await client.GetRecordsAsync(request, cancellationToken);
+                break;
+            }
+            catch (ExpiredIteratorException)
+            {
+                await ResetShardIterator(cancellationToken);
+                if (_shardExhausted)
+                {
+                    return new([], isAtTail: true);
+                }
+            }
+            catch (ProvisionedThroughputExceededException)
+            {
+            }
+            catch (AmazonKinesisException exception)
+                when (exception.StatusCode == HttpStatusCode.TooManyRequests
+                    || (int)exception.StatusCode >= 500)
+            {
+            }
         }
 
         _shardIterator = response.NextShardIterator;
@@ -101,7 +143,16 @@ internal sealed class KinesisRecoverableStreamSource(
 
         if (response.Records is not { Count: > 0 } records)
         {
-            return [];
+            return new([], _readOffsetInclusive ? false : response.MillisBehindLatest <= 0);
+        }
+
+        if (_readOffsetInclusive
+            && KinesisSequenceToken.CompareShardSequences(
+                records[0].SequenceNumber,
+                _readOffset!) != 0)
+        {
+            throw new DataNotAvailableException(
+                $"Kinesis returned shard sequence '{records[0].SequenceNumber}' after the requested retained position '{_readOffset}' in shard '{partition}'.");
         }
 
         var result = new List<KinesisCacheRecord>(records.Count);
@@ -110,7 +161,7 @@ internal sealed class KinesisRecoverableStreamSource(
             result.Add(new KinesisCacheRecord(records[i], _nextSequenceNumber + i));
         }
 
-        return result;
+        return new(result, response.MillisBehindLatest <= 0);
     }
 
     public void MessagesAdded(IReadOnlyList<KinesisCacheRecord> messages)
@@ -122,6 +173,7 @@ internal sealed class KinesisRecoverableStreamSource(
 
         _nextSequenceNumber += messages.Count;
         _readOffset = messages[^1].Record.SequenceNumber;
+        _readOffsetInclusive = false;
     }
 
     public void MessagesAddFailed(IReadOnlyList<KinesisCacheRecord> messages)
@@ -145,7 +197,9 @@ internal sealed class KinesisRecoverableStreamSource(
             ShardId = partition,
             ShardIteratorType = string.IsNullOrEmpty(_readOffset)
                 ? ShardIteratorType.TRIM_HORIZON
-                : ShardIteratorType.AFTER_SEQUENCE_NUMBER,
+                : _readOffsetInclusive
+                    ? ShardIteratorType.AT_SEQUENCE_NUMBER
+                    : ShardIteratorType.AFTER_SEQUENCE_NUMBER,
             StartingSequenceNumber = _readOffset,
         };
         var response = await client.GetShardIteratorAsync(request, cancellationToken);
@@ -153,27 +207,139 @@ internal sealed class KinesisRecoverableStreamSource(
         _shardExhausted = string.IsNullOrEmpty(_shardIterator);
     }
 
-    private async Task WaitForGetRecordsInterval(CancellationToken cancellationToken)
+    public ValueTask DisposeAsync() => new(Shutdown(CancellationToken.None));
+}
+
+internal sealed class KinesisShardReadThrottle(
+    TimeSpan interval,
+    TimeProvider timeProvider)
+{
+    private readonly SemaphoreSlim _lock = new(1, 1);
+    private DateTimeOffset _nextReadUtc;
+
+    public async ValueTask Wait(CancellationToken cancellationToken)
     {
-        var delay = _nextGetRecordsUtc - timeProvider.GetUtcNow();
-        if (delay > TimeSpan.Zero)
+        await _lock.WaitAsync(cancellationToken);
+        try
         {
-            await Task.Delay(delay, timeProvider, cancellationToken);
+            var delay = _nextReadUtc - timeProvider.GetUtcNow();
+            if (delay > TimeSpan.Zero)
+            {
+                await Task.Delay(delay, timeProvider, cancellationToken);
+            }
+
+            _nextReadUtc = timeProvider.GetUtcNow() + interval;
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+}
+
+internal sealed class KinesisReplaySourceFactory(
+    Func<IAmazonKinesis> clientFactory,
+    string streamName,
+    string partition,
+    KinesisShardTopologyMonitor topologyMonitor,
+    KinesisShardReadThrottle readThrottle)
+    : IRecoverableStreamReplaySourceFactory<KinesisCacheRecord>
+{
+    public async ValueTask<IRecoverableStreamReplaySource<KinesisCacheRecord>> Create(
+        StreamId streamId,
+        StreamSequenceToken token,
+        CancellationToken cancellationToken)
+    {
+        if (!TryNormalizeToken(token, out var kinesisToken))
+        {
+            throw new DataNotAvailableException(
+                $"The replay token does not belong to Kinesis shard '{partition}'.");
         }
 
-        _nextGetRecordsUtc = timeProvider.GetUtcNow() + getRecordsInterval;
+        var source = new KinesisRecoverableStreamSource(
+            clientFactory(),
+            streamName,
+            partition,
+            topologyMonitor,
+            readThrottle);
+        try
+        {
+            await source.InitializeReplay(kinesisToken, cancellationToken);
+            return source;
+        }
+        catch (Amazon.Kinesis.Model.InvalidArgumentException exception)
+        {
+            await source.DisposeAsync();
+            throw new DataNotAvailableException(
+                $"Kinesis rejected shard sequence '{kinesisToken.ShardSequence}' for shard '{partition}'.",
+                exception);
+        }
+        catch
+        {
+            await source.DisposeAsync();
+            throw;
+        }
+    }
+
+    private bool TryNormalizeToken(
+        StreamSequenceToken token,
+        out KinesisSequenceToken normalized)
+    {
+        if (token is KinesisSequenceToken kinesisToken
+            && string.Equals(kinesisToken.StreamName, streamName, StringComparison.Ordinal)
+            && string.Equals(kinesisToken.ShardId, partition, StringComparison.Ordinal))
+        {
+            normalized = kinesisToken;
+            return true;
+        }
+
+        if (token is PartitionedStreamSequenceToken partitionedToken
+            && string.Equals(partitionedToken.ProviderIdentity, streamName, StringComparison.Ordinal)
+            && string.Equals(partitionedToken.PartitionIdentity, partition, StringComparison.Ordinal))
+        {
+            normalized = new(
+                streamName,
+                partition,
+                partitionedToken.Position,
+                partitionedToken.SequenceNumber,
+                partitionedToken.EventIndex);
+            return true;
+        }
+
+        if (token is KinesisSequenceToken { StreamName: null, ShardId: null } legacyToken)
+        {
+            normalized = new(
+                streamName,
+                partition,
+                legacyToken.ShardSequence,
+                legacyToken.SequenceNumber,
+                legacyToken.EventIndex);
+            return true;
+        }
+
+        normalized = null!;
+        return false;
     }
 }
 
 internal sealed class KinesisRecoverableStreamDataAdapter(
+    string streamName,
+    string partition,
     Serializer<KinesisBatchContainer.Body> serializer) : IRecoverableStreamDataAdapter<KinesisCacheRecord>
 {
+    public KinesisRecoverableStreamDataAdapter(Serializer<KinesisBatchContainer.Body> serializer)
+        : this(string.Empty, string.Empty, serializer)
+    {
+    }
+
     public StreamPosition GetStreamPosition(KinesisCacheRecord queueMessage)
     {
         queueMessage.Body ??= serializer.Deserialize(queueMessage.RawPayload)!;
         return new(
             queueMessage.Body.StreamId,
             new KinesisSequenceToken(
+                streamName,
+                partition,
                 queueMessage.Record.SequenceNumber,
                 queueMessage.SequenceNumber,
                 0));
@@ -212,6 +378,8 @@ internal sealed class KinesisRecoverableStreamDataAdapter(
             serializer,
             cachedMessage.StreamId,
             payload,
+            streamName,
+            partition,
             shardSequence,
             cachedMessage.SequenceNumber);
     }
@@ -220,7 +388,12 @@ internal sealed class KinesisRecoverableStreamDataAdapter(
     {
         var offset = 0;
         var shardSequence = SegmentBuilder.ReadNextString(cachedMessage.Segment, ref offset)!;
-        return new KinesisSequenceToken(shardSequence, cachedMessage.SequenceNumber, cachedMessage.EventIndex);
+        return new KinesisSequenceToken(
+            streamName,
+            partition,
+            shardSequence,
+            cachedMessage.SequenceNumber,
+            cachedMessage.EventIndex);
     }
 
     public int Compare(ref CachedMessage cachedMessage, StreamSequenceToken token)
@@ -230,30 +403,15 @@ internal sealed class KinesisRecoverableStreamDataAdapter(
             throw new ArgumentOutOfRangeException(nameof(token));
         }
 
+        if (!IsPartitionMatch(kinesisToken))
+        {
+            throw new ArgumentOutOfRangeException(nameof(token));
+        }
+
         var offset = 0;
         var shardSequence = SegmentBuilder.ReadNextString(cachedMessage.Segment, ref offset)!;
-        var difference = CompareShardSequences(shardSequence, kinesisToken.ShardSequence);
+        var difference = KinesisSequenceToken.CompareShardSequences(shardSequence, kinesisToken.ShardSequence);
         return difference != 0 ? difference : cachedMessage.EventIndex.CompareTo(kinesisToken.EventIndex);
-    }
-
-    private static int CompareShardSequences(string left, string right)
-    {
-        var leftStart = 0;
-        while (leftStart < left.Length && left[leftStart] == '0')
-        {
-            leftStart++;
-        }
-
-        var rightStart = 0;
-        while (rightStart < right.Length && right[rightStart] == '0')
-        {
-            rightStart++;
-        }
-
-        var lengthComparison = (left.Length - leftStart).CompareTo(right.Length - rightStart);
-        return lengthComparison != 0
-            ? lengthComparison
-            : left.AsSpan(leftStart).SequenceCompareTo(right.AsSpan(rightStart));
     }
 
     public string GetOffset(ref CachedMessage cachedMessage)
@@ -264,13 +422,59 @@ internal sealed class KinesisRecoverableStreamDataAdapter(
 
     public bool TryGetOffset(StreamSequenceToken token, out string offset)
     {
-        if (token is KinesisSequenceToken kinesisToken)
+        if (token is KinesisSequenceToken kinesisToken && IsPartitionMatch(kinesisToken))
         {
             offset = kinesisToken.ShardSequence;
             return true;
         }
 
         offset = string.Empty;
+        return false;
+    }
+
+    public StreamSequenceToken GetRecordToken(StreamSequenceToken token)
+        => TryNormalizeToken(token, out var normalized)
+            ? normalized.CreateSequenceTokenForEvent(0)
+            : throw new ArgumentOutOfRangeException(nameof(token));
+
+    private bool IsPartitionMatch(KinesisSequenceToken token)
+        => string.IsNullOrEmpty(partition)
+            ? string.IsNullOrEmpty(token.StreamName) && string.IsNullOrEmpty(token.ShardId)
+            : (string.Equals(token.StreamName, streamName, StringComparison.Ordinal)
+                && string.Equals(token.ShardId, partition, StringComparison.Ordinal))
+                || (token.StreamName is null && token.ShardId is null);
+
+    private bool TryNormalizeToken(
+        StreamSequenceToken token,
+        out KinesisSequenceToken normalized)
+    {
+        if (token is KinesisSequenceToken kinesisToken && IsPartitionMatch(kinesisToken))
+        {
+            normalized = kinesisToken.StreamName is null
+                ? new(
+                    streamName,
+                    partition,
+                    kinesisToken.ShardSequence,
+                    kinesisToken.SequenceNumber,
+                    kinesisToken.EventIndex)
+                : kinesisToken;
+            return true;
+        }
+
+        if (token is PartitionedStreamSequenceToken partitionedToken
+            && string.Equals(partitionedToken.ProviderIdentity, streamName, StringComparison.Ordinal)
+            && string.Equals(partitionedToken.PartitionIdentity, partition, StringComparison.Ordinal))
+        {
+            normalized = new(
+                streamName,
+                partition,
+                partitionedToken.Position,
+                partitionedToken.SequenceNumber,
+                partitionedToken.EventIndex);
+            return true;
+        }
+
+        normalized = null!;
         return false;
     }
 }

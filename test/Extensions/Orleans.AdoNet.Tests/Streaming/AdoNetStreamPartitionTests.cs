@@ -658,6 +658,336 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
 
     #endregion Bounds
 
+    #region Replay leases
+
+    [Fact]
+    public async Task ReplayLease_AcquiresInclusivePositionAndReadsOrderedPartitionRecords()
+    {
+        var serviceId = RandomServiceId();
+        var providerId = RandomProviderId();
+        var queueId = RandomQueueId();
+        var (streamIdBytes, namespaceLength) = RandomStreamKey();
+        var first = await _queries.AppendStreamMessageAsync(
+            serviceId,
+            providerId,
+            queueId,
+            streamIdBytes,
+            namespaceLength,
+            RandomPayload());
+        var second = await AppendAsync(serviceId, providerId, queueId);
+        var partition = await _queries.AcquireStreamPartitionAsync(
+            serviceId,
+            providerId,
+            queueId,
+            startFromNow: false);
+        var readerId = Guid.NewGuid().ToString("N");
+
+        var lease = await _queries.Inner.AcquireStreamReplayLeaseAsync(
+            serviceId,
+            providerId,
+            queueId,
+            readerId,
+            streamIdBytes,
+            namespaceLength,
+            partition.OwnerEpoch,
+            afterMessageId: first.MessageId - 1,
+            replayLeaseDurationSeconds: 60,
+            TestContext.Current.CancellationToken);
+        var page = await _queries.Inner.ReadStreamReplayMessagesAsync(
+            serviceId,
+            providerId,
+            queueId,
+            readerId,
+            partition.OwnerEpoch,
+            afterMessageId: first.MessageId - 1,
+            maxCount: 10,
+            replayLeaseDurationSeconds: 60,
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(AdoNetStreamReplayStatus.Acquired, lease.Status);
+        Assert.Equal(first.MessageId - 1, lease.Watermark);
+        Assert.Equal(AdoNetStreamReplayStatus.Active, page.Lease.Status);
+        Assert.Equal([first.MessageId, second.MessageId], page.Messages.Select(static message => message.MessageId));
+        Assert.Equal(streamIdBytes, page.Messages[0].StreamIdBytes);
+        Assert.True(page.Lease.ExpiresOn > DateTime.UtcNow);
+    }
+
+    [Fact]
+    public async Task ReplayLease_ProtectsCleanupUntilSafeWatermarkAdvances()
+    {
+        var serviceId = RandomServiceId();
+        var providerId = RandomProviderId();
+        var queueId = RandomQueueId();
+        var (streamIdBytes, namespaceLength) = RandomStreamKey();
+        var messages = new[]
+        {
+            await AppendAsync(serviceId, providerId, queueId),
+            await AppendAsync(serviceId, providerId, queueId),
+            await AppendAsync(serviceId, providerId, queueId),
+        };
+        var partition = await _queries.AcquireStreamPartitionAsync(
+            serviceId,
+            providerId,
+            queueId,
+            startFromNow: false);
+        await _queries.AdvanceStreamCheckpointAsync(
+            serviceId,
+            providerId,
+            queueId,
+            partition.OwnerEpoch,
+            messages[^1].MessageId);
+        await AgeCheckpointedMessagesAsync(serviceId, providerId, queueId);
+        var readerId = Guid.NewGuid().ToString("N");
+        var lease = await _queries.Inner.AcquireStreamReplayLeaseAsync(
+            serviceId,
+            providerId,
+            queueId,
+            readerId,
+            streamIdBytes,
+            namespaceLength,
+            partition.OwnerEpoch,
+            afterMessageId: 0,
+            replayLeaseDurationSeconds: 60,
+            TestContext.Current.CancellationToken);
+        Assert.Equal(AdoNetStreamReplayStatus.Acquired, lease.Status);
+
+        var protectedCleanup = await _queries.CleanupStreamMessagesAsync(
+            serviceId,
+            providerId,
+            queueId,
+            partition.OwnerEpoch,
+            retentionPeriodSeconds: 1,
+            maximumRetentionPeriodSeconds: null,
+            cleanupIntervalSeconds: 1,
+            cleanupBatchSize: 100);
+        Assert.Equal(0, protectedCleanup.DeletedCount);
+        Assert.Equal(0, protectedCleanup.ActiveReplayWatermark);
+
+        var update = await _queries.Inner.UpdateStreamReplayLeaseAsync(
+            serviceId,
+            providerId,
+            queueId,
+            readerId,
+            partition.OwnerEpoch,
+            messages[0].MessageId,
+            replayLeaseDurationSeconds: 60,
+            TestContext.Current.CancellationToken);
+        Assert.Equal(AdoNetStreamReplayStatus.Active, update.Status);
+        await MakeCleanupDueAsync(serviceId, providerId, queueId);
+        var advancedCleanup = await _queries.CleanupStreamMessagesAsync(
+            serviceId,
+            providerId,
+            queueId,
+            partition.OwnerEpoch,
+            retentionPeriodSeconds: 1,
+            maximumRetentionPeriodSeconds: null,
+            cleanupIntervalSeconds: 1,
+            cleanupBatchSize: 100);
+
+        Assert.Equal(1, advancedCleanup.DeletedCount);
+        Assert.Equal(messages[0].MessageId, advancedCleanup.DeletedThroughMessageId);
+        Assert.Equal(messages[0].MessageId, advancedCleanup.ActiveReplayWatermark);
+        Assert.Equal(
+            [messages[1].MessageId, messages[2].MessageId],
+            (await _queries.ReadStreamMessagesAsync(serviceId, providerId, queueId, 0, 100))
+                .Select(static message => message.MessageId));
+    }
+
+    [Fact]
+    public async Task ReplayLease_HardRetentionExpiresProtectedHistoryDiagnostically()
+    {
+        var serviceId = RandomServiceId();
+        var providerId = RandomProviderId();
+        var queueId = RandomQueueId();
+        var (streamIdBytes, namespaceLength) = RandomStreamKey();
+        var message = await AppendAsync(serviceId, providerId, queueId);
+        var partition = await _queries.AcquireStreamPartitionAsync(
+            serviceId,
+            providerId,
+            queueId,
+            startFromNow: false);
+        var readerId = Guid.NewGuid().ToString("N");
+        var lease = await _queries.Inner.AcquireStreamReplayLeaseAsync(
+            serviceId,
+            providerId,
+            queueId,
+            readerId,
+            streamIdBytes,
+            namespaceLength,
+            partition.OwnerEpoch,
+            afterMessageId: 0,
+            replayLeaseDurationSeconds: 60,
+            TestContext.Current.CancellationToken);
+        Assert.Equal(AdoNetStreamReplayStatus.Acquired, lease.Status);
+        await AgePartitionMessagesAsync(serviceId, providerId, queueId);
+
+        var cleanup = await _queries.CleanupStreamMessagesAsync(
+            serviceId,
+            providerId,
+            queueId,
+            partition.OwnerEpoch,
+            retentionPeriodSeconds: 60,
+            maximumRetentionPeriodSeconds: 120,
+            cleanupIntervalSeconds: 1,
+            cleanupBatchSize: 100);
+        var page = await _queries.Inner.ReadStreamReplayMessagesAsync(
+            serviceId,
+            providerId,
+            queueId,
+            readerId,
+            partition.OwnerEpoch,
+            afterMessageId: 0,
+            maxCount: 10,
+            replayLeaseDurationSeconds: 60,
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, cleanup.HardDeletedCount);
+        Assert.Equal(message.MessageId, cleanup.HardDeletedFromMessageId);
+        Assert.Equal(message.MessageId, cleanup.HardDeletedThroughMessageId);
+        Assert.Equal(0, cleanup.ActiveReplayWatermark);
+        Assert.Equal(AdoNetStreamReplayStatus.HistoryUnavailable, page.Lease.Status);
+        Assert.Empty(page.Messages);
+    }
+
+    [Fact]
+    public async Task ReplayLease_ReleaseIsIdempotentAndStaleOwnerCannotReleaseSuccessorLease()
+    {
+        var serviceId = RandomServiceId();
+        var providerId = RandomProviderId();
+        var queueId = RandomQueueId();
+        var (streamIdBytes, namespaceLength) = RandomStreamKey();
+        await AppendAsync(serviceId, providerId, queueId);
+        var firstOwner = await _queries.AcquireStreamPartitionAsync(
+            serviceId,
+            providerId,
+            queueId,
+            startFromNow: false);
+        var readerId = Guid.NewGuid().ToString("N");
+        var acquired = await _queries.Inner.AcquireStreamReplayLeaseAsync(
+            serviceId,
+            providerId,
+            queueId,
+            readerId,
+            streamIdBytes,
+            namespaceLength,
+            firstOwner.OwnerEpoch,
+            afterMessageId: 0,
+            replayLeaseDurationSeconds: 60,
+            TestContext.Current.CancellationToken);
+        Assert.Equal(AdoNetStreamReplayStatus.Acquired, acquired.Status);
+
+        var released = await _queries.Inner.ReleaseStreamReplayLeaseAsync(
+            serviceId,
+            providerId,
+            queueId,
+            readerId,
+            firstOwner.OwnerEpoch,
+            TestContext.Current.CancellationToken);
+        var releasedAgain = await _queries.Inner.ReleaseStreamReplayLeaseAsync(
+            serviceId,
+            providerId,
+            queueId,
+            readerId,
+            firstOwner.OwnerEpoch,
+            TestContext.Current.CancellationToken);
+        Assert.Equal(AdoNetStreamReplayStatus.Released, released.Status);
+        Assert.Equal(AdoNetStreamReplayStatus.Released, releasedAgain.Status);
+
+        var secondOwner = await _queries.AcquireStreamPartitionAsync(
+            serviceId,
+            providerId,
+            queueId,
+            startFromNow: false);
+        var successor = await _queries.Inner.AcquireStreamReplayLeaseAsync(
+            serviceId,
+            providerId,
+            queueId,
+            readerId,
+            streamIdBytes,
+            namespaceLength,
+            secondOwner.OwnerEpoch,
+            afterMessageId: 0,
+            replayLeaseDurationSeconds: 60,
+            TestContext.Current.CancellationToken);
+        Assert.Equal(AdoNetStreamReplayStatus.Acquired, successor.Status);
+
+        var staleRelease = await _queries.Inner.ReleaseStreamReplayLeaseAsync(
+            serviceId,
+            providerId,
+            queueId,
+            readerId,
+            firstOwner.OwnerEpoch,
+            TestContext.Current.CancellationToken);
+        var successorPage = await _queries.Inner.ReadStreamReplayMessagesAsync(
+            serviceId,
+            providerId,
+            queueId,
+            readerId,
+            secondOwner.OwnerEpoch,
+            afterMessageId: 0,
+            maxCount: 10,
+            replayLeaseDurationSeconds: 60,
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(AdoNetStreamReplayStatus.OwnershipLost, staleRelease.Status);
+        Assert.Equal(AdoNetStreamReplayStatus.Active, successorPage.Lease.Status);
+        Assert.Single(successorPage.Messages);
+    }
+
+    [Fact]
+    public async Task ReplayAdmissionAndCleanup_AreSerializedWithoutAnUnprotectedSuccess()
+    {
+        var serviceId = RandomServiceId();
+        var providerId = RandomProviderId();
+        var queueId = RandomQueueId();
+        var (streamIdBytes, namespaceLength) = RandomStreamKey();
+        await AppendAsync(serviceId, providerId, queueId);
+        var partition = await _queries.AcquireStreamPartitionAsync(
+            serviceId,
+            providerId,
+            queueId,
+            startFromNow: false);
+        await _queries.AdvanceStreamCheckpointAsync(
+            serviceId,
+            providerId,
+            queueId,
+            partition.OwnerEpoch,
+            checkpoint: 1);
+        await AgeCheckpointedMessagesAsync(serviceId, providerId, queueId);
+        var readerId = Guid.NewGuid().ToString("N");
+
+        var admission = _queries.Inner.AcquireStreamReplayLeaseAsync(
+            serviceId,
+            providerId,
+            queueId,
+            readerId,
+            streamIdBytes,
+            namespaceLength,
+            partition.OwnerEpoch,
+            afterMessageId: 0,
+            replayLeaseDurationSeconds: 60,
+            TestContext.Current.CancellationToken);
+        var cleanup = _queries.CleanupStreamMessagesAsync(
+            serviceId,
+            providerId,
+            queueId,
+            partition.OwnerEpoch,
+            retentionPeriodSeconds: 1,
+            maximumRetentionPeriodSeconds: null,
+            cleanupIntervalSeconds: 1,
+            cleanupBatchSize: 100);
+        await Task.WhenAll(admission, cleanup);
+        var admissionResult = await admission;
+        var cleanupResult = await cleanup;
+
+        Assert.True(
+            admissionResult.Status == AdoNetStreamReplayStatus.Acquired && cleanupResult.DeletedCount == 0
+            || admissionResult.Status == AdoNetStreamReplayStatus.HistoryUnavailable && cleanupResult.DeletedCount == 1,
+            $"Unexpected race result: admission={admissionResult.Status}, deleted={cleanupResult.DeletedCount}.");
+    }
+
+    #endregion Replay leases
+
     #region Cleanup: retention, hard ceiling diagnostics, batching, and throttling
 
     [Fact]
@@ -680,6 +1010,7 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
 
         var result = await _queries.CleanupStreamMessagesAsync(
             serviceId, providerId, queueId,
+            state.OwnerEpoch,
             retentionPeriodSeconds: 1,
             maximumRetentionPeriodSeconds: null,
             cleanupIntervalSeconds: 60,
@@ -719,6 +1050,7 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
             serviceId,
             providerId,
             queueId,
+            state.OwnerEpoch,
             retentionPeriodSeconds: 60,
             maximumRetentionPeriodSeconds: null,
             cleanupIntervalSeconds: 60,
@@ -751,9 +1083,15 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
         // only the hard retention ceiling can force their removal, and that removal must be
         // reported distinctly from a normal, checkpoint-driven cleanup.
         await AgePartitionMessagesAsync(serviceId, providerId, queueId);
+        var state = await _queries.AcquireStreamPartitionAsync(
+            serviceId,
+            providerId,
+            queueId,
+            startFromNow: false);
 
         var result = await _queries.CleanupStreamMessagesAsync(
             serviceId, providerId, queueId,
+            state.OwnerEpoch,
             retentionPeriodSeconds: 60,
             maximumRetentionPeriodSeconds: 120,
             cleanupIntervalSeconds: 60,
@@ -792,6 +1130,7 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
             serviceId,
             providerId,
             queueId,
+            initial.OwnerEpoch,
             retentionPeriodSeconds: 60,
             maximumRetentionPeriodSeconds: 120,
             cleanupIntervalSeconds: 60,
@@ -825,19 +1164,19 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
 
         await AgeCheckpointedMessagesAsync(serviceId, providerId, queueId);
 
-        var first = await _queries.CleanupStreamMessagesAsync(serviceId, providerId, queueId, 1, null, cleanupIntervalSeconds: 1, cleanupBatchSize: 2);
+        var first = await _queries.CleanupStreamMessagesAsync(serviceId, providerId, queueId, state.OwnerEpoch, 1, null, cleanupIntervalSeconds: 1, cleanupBatchSize: 2);
         Assert.True(first.Ran);
         Assert.Equal(2, first.DeletedCount);
 
         await MakeCleanupDueAsync(serviceId, providerId, queueId);
 
-        var second = await _queries.CleanupStreamMessagesAsync(serviceId, providerId, queueId, 1, null, cleanupIntervalSeconds: 1, cleanupBatchSize: 2);
+        var second = await _queries.CleanupStreamMessagesAsync(serviceId, providerId, queueId, state.OwnerEpoch, 1, null, cleanupIntervalSeconds: 1, cleanupBatchSize: 2);
         Assert.True(second.Ran);
         Assert.Equal(2, second.DeletedCount);
 
         await MakeCleanupDueAsync(serviceId, providerId, queueId);
 
-        var third = await _queries.CleanupStreamMessagesAsync(serviceId, providerId, queueId, 1, null, cleanupIntervalSeconds: 1, cleanupBatchSize: 2);
+        var third = await _queries.CleanupStreamMessagesAsync(serviceId, providerId, queueId, state.OwnerEpoch, 1, null, cleanupIntervalSeconds: 1, cleanupBatchSize: 2);
         Assert.True(third.Ran);
         Assert.Equal(1, third.DeletedCount); // the final, partial batch
 
@@ -852,15 +1191,22 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
         var providerId = RandomProviderId();
         var queueId = RandomQueueId();
         await AppendAsync(serviceId, providerId, queueId);
+        var state = await _queries.AcquireStreamPartitionAsync(
+            serviceId,
+            providerId,
+            queueId,
+            startFromNow: false);
 
         var first = await _queries.CleanupStreamMessagesAsync(
             serviceId, providerId, queueId,
+            state.OwnerEpoch,
             retentionPeriodSeconds: 1, maximumRetentionPeriodSeconds: null, cleanupIntervalSeconds: 60, cleanupBatchSize: 100);
         Assert.True(first.Ran);
 
         // Immediately repeating the call must be throttled by CleanupInterval and not run again.
         var second = await _queries.CleanupStreamMessagesAsync(
             serviceId, providerId, queueId,
+            state.OwnerEpoch,
             retentionPeriodSeconds: 1, maximumRetentionPeriodSeconds: null, cleanupIntervalSeconds: 60, cleanupBatchSize: 100);
         Assert.False(second.Ran);
         Assert.Equal(0, second.DeletedCount);
@@ -874,22 +1220,23 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
         var queueId = RandomQueueId();
 
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
-            _queries.CleanupStreamMessagesAsync(serviceId, providerId, queueId, retentionPeriodSeconds: 0, maximumRetentionPeriodSeconds: null, cleanupIntervalSeconds: 1, cleanupBatchSize: 1));
+            _queries.CleanupStreamMessagesAsync(serviceId, providerId, queueId, ownerEpoch: 1, retentionPeriodSeconds: 0, maximumRetentionPeriodSeconds: null, cleanupIntervalSeconds: 1, cleanupBatchSize: 1));
 
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
-            _queries.CleanupStreamMessagesAsync(serviceId, providerId, queueId, retentionPeriodSeconds: 1, maximumRetentionPeriodSeconds: null, cleanupIntervalSeconds: 0, cleanupBatchSize: 1));
+            _queries.CleanupStreamMessagesAsync(serviceId, providerId, queueId, ownerEpoch: 1, retentionPeriodSeconds: 1, maximumRetentionPeriodSeconds: null, cleanupIntervalSeconds: 0, cleanupBatchSize: 1));
 
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
-            _queries.CleanupStreamMessagesAsync(serviceId, providerId, queueId, retentionPeriodSeconds: 1, maximumRetentionPeriodSeconds: null, cleanupIntervalSeconds: 1, cleanupBatchSize: 0));
+            _queries.CleanupStreamMessagesAsync(serviceId, providerId, queueId, ownerEpoch: 1, retentionPeriodSeconds: 1, maximumRetentionPeriodSeconds: null, cleanupIntervalSeconds: 1, cleanupBatchSize: 0));
 
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
-            _queries.CleanupStreamMessagesAsync(serviceId, providerId, queueId, retentionPeriodSeconds: 10, maximumRetentionPeriodSeconds: 5, cleanupIntervalSeconds: 1, cleanupBatchSize: 1));
+            _queries.CleanupStreamMessagesAsync(serviceId, providerId, queueId, ownerEpoch: 1, retentionPeriodSeconds: 10, maximumRetentionPeriodSeconds: 5, cleanupIntervalSeconds: 1, cleanupBatchSize: 1));
 
         // Valid boundaries must NOT throw: retentionPeriodSeconds/cleanupIntervalSeconds/cleanupBatchSize
         // of exactly 1 (the smallest legal values), and a maximumRetentionPeriodSeconds exactly equal to
         // retentionPeriodSeconds (the ceiling may legitimately coincide with the normal retention period).
         await AppendAsync(serviceId, providerId, queueId);
-        var result = await _queries.CleanupStreamMessagesAsync(serviceId, providerId, queueId, retentionPeriodSeconds: 1, maximumRetentionPeriodSeconds: 1, cleanupIntervalSeconds: 1, cleanupBatchSize: 1);
+        var state = await _queries.AcquireStreamPartitionAsync(serviceId, providerId, queueId, startFromNow: false);
+        var result = await _queries.CleanupStreamMessagesAsync(serviceId, providerId, queueId, state.OwnerEpoch, retentionPeriodSeconds: 1, maximumRetentionPeriodSeconds: 1, cleanupIntervalSeconds: 1, cleanupBatchSize: 1);
         Assert.True(result.Ran);
     }
 
@@ -1201,6 +1548,7 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
             string serviceId,
             string providerId,
             string queueId,
+            long ownerEpoch,
             int retentionPeriodSeconds,
             int? maximumRetentionPeriodSeconds,
             int cleanupIntervalSeconds,
@@ -1209,6 +1557,7 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
                 serviceId,
                 providerId,
                 queueId,
+                ownerEpoch,
                 retentionPeriodSeconds,
                 maximumRetentionPeriodSeconds,
                 cleanupIntervalSeconds,

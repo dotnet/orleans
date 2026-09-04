@@ -104,7 +104,7 @@ public abstract class AdoNetQueueAdapterFactoryTests(string invariant, TestEnvir
         Assert.NotNull(adapter);
         Assert.IsType<AdoNetQueueAdapter>(adapter);
         Assert.Equal(name, adapter.Name);
-        Assert.False(adapter.IsRewindable);
+        Assert.True(adapter.IsRewindable);
         Assert.Equal(StreamProviderDirection.ReadWrite, adapter.Direction);
         var queueId = factory.GetStreamQueueMapper().GetAllQueues().First();
         Assert.Same(

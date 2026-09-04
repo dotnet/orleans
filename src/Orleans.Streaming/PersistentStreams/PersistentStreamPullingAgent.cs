@@ -442,12 +442,14 @@ namespace Orleans.Streams
                     {
                         var isDeliveryToken = requestedHandshakeToken is DeliveryToken;
                         cursorStartToken = isDeliveryToken
-                            ? cacheToken ?? consumerData.PendingStartToken ?? requestedToken
+                            ? queueAdapter.IsRewindable
+                                ? requestedToken
+                                : cacheToken ?? consumerData.PendingStartToken ?? requestedToken
                             : requestedToken;
                         consumerData.SafeDisposeCursor(logger);
                         try
                         {
-                            var newCursor = queueCache.GetCacheCursor(consumerData.StreamId, cursorStartToken);
+                            var newCursor = GetCacheCursor(consumerData.StreamId, cursorStartToken);
                             if (isDeliveryToken)
                             {
                                 if (newCursor is IQueueCacheCursorProgress progressCursor)
@@ -460,7 +462,7 @@ namespace Orleans.Streams
                                     {
                                         newCursor.Dispose();
                                         cursorStartToken = requestedToken;
-                                        newCursor = queueCache.GetCacheCursor(consumerData.StreamId, requestedToken);
+                                        newCursor = GetCacheCursor(consumerData.StreamId, requestedToken);
                                     }
                                     consumerData.PendingBatch = AdvanceCursorPastToken(
                                         newCursor,
@@ -483,9 +485,10 @@ namespace Orleans.Streams
                             }
 
                             consumerData.Cursor = newCursor;
+                            consumerData.IsReplayUnavailable = false;
                             cursorRepositioned = true;
                         }
-                        catch (QueueCacheMissException) when (cacheToken is not null)
+                        catch (QueueCacheMissException) when (cacheToken is not null && !queueAdapter.IsRewindable)
                         {
                             // A cold stream's triggering batch is the receiver's first available
                             // message, so resume there if the consumer's prior token was evicted.
@@ -511,7 +514,8 @@ namespace Orleans.Streams
                         var registrationToken = cacheToken ?? consumerData.PendingStartToken;
                         if (consumerData.Cursor == null) // if the consumer did not ask for a specific token and we already have a cursor, just keep using it.
                         {
-                            consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, registrationToken);
+                            consumerData.Cursor = GetCacheCursor(consumerData.StreamId, registrationToken);
+                            consumerData.IsReplayUnavailable = false;
                             cursorRepositioned = true;
                         }
                     }
@@ -534,6 +538,12 @@ namespace Orleans.Streams
                         forceFaultSubscription
                             || effectiveHandshakeToken is StartPositionToken
                                 && exceptionOccured is NotSupportedException);
+                    if (exceptionOccured is DataNotAvailableException)
+                    {
+                        consumerData.IsReplayUnavailable = true;
+                        return false;
+                    }
+
                     var providerFallbackAllowed = providerDefaultRequest
                         && SubscriptionMarker.IsImplicitSubscription(consumerData.SubscriptionId.Guid);
                     if (faultedSubscription
@@ -555,10 +565,11 @@ namespace Orleans.Streams
                 {
                     var registrationToken = cacheToken ?? consumerData.PendingStartToken;
                     cursorStartToken = registrationToken;
-                    consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, registrationToken);
+                    consumerData.Cursor = GetCacheCursor(consumerData.StreamId, registrationToken);
+                    consumerData.IsReplayUnavailable = false;
                     cursorRepositioned = true;
                 }
-                catch (Exception)
+                catch (Exception) when (!queueAdapter.IsRewindable || cursorStartToken is null)
                 {
                     consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, null); // just in case last GetCacheCursor failed.
                     cursorStartToken = null;
@@ -635,7 +646,7 @@ namespace Orleans.Streams
                 {
                     return GetCursorAfterProcessedToken(consumerData, lastProcessedToken);
                 }
-                catch (QueueCacheMissException)
+                catch (QueueCacheMissException) when (!queueAdapter.IsRewindable)
                 {
                     return queueCache!.GetCacheCursor(consumerData.StreamId, null);
                 }
@@ -657,9 +668,9 @@ namespace Orleans.Streams
                         return GetCursorAfterProcessedToken(consumerData, handshakeSequenceToken);
                     }
 
-                    return queueCache!.GetCacheCursor(consumerData.StreamId, handshakeSequenceToken);
+                    return GetCacheCursor(consumerData.StreamId, handshakeSequenceToken);
                 }
-                catch (QueueCacheMissException)
+                catch (QueueCacheMissException) when (!queueAdapter.IsRewindable)
                 {
                     return queueCache!.GetCacheCursor(consumerData.StreamId, null);
                 }
@@ -676,9 +687,9 @@ namespace Orleans.Streams
             IQueueCacheCursor cursor;
             try
             {
-                cursor = queueCache!.GetCacheCursor(consumerData.StreamId, restartToken);
+                cursor = GetCacheCursor(consumerData.StreamId, restartToken);
             }
-            catch (QueueCacheMissException)
+            catch (QueueCacheMissException) when (!queueAdapter.IsRewindable)
             {
                 try
                 {
@@ -701,7 +712,7 @@ namespace Orleans.Streams
                 if (!Equals(restartToken, processedToken))
                 {
                     cursor.Dispose();
-                    cursor = queueCache.GetCacheCursor(consumerData.StreamId, processedToken);
+                    cursor = GetCacheCursor(consumerData.StreamId, processedToken);
                 }
 
                 consumerData.PendingBatch = AdvanceCursorPastToken(cursor, processedToken);
@@ -997,9 +1008,19 @@ namespace Orleans.Streams
 
                 foreach (var consumer in streamConsumers.AllConsumers())
                 {
+                    if (consumer.IsReplayUnavailable)
+                    {
+                        continue;
+                    }
+
                     if (!consumer.IsRegistered)
                     {
                         return false;
+                    }
+
+                    if (consumer.Cursor is IQueueCacheCursorReplayState { IsReplaying: true })
+                    {
+                        continue;
                     }
 
                     var current = consumer.Cursor is IQueueCacheCursorProgress
@@ -1046,6 +1067,20 @@ namespace Orleans.Streams
         }
 
         private static bool IsBefore(StreamSequenceToken current, StreamSequenceToken other) => current.CompareTo(other) < 0;
+
+        private IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken? token)
+        {
+            try
+            {
+                return queueCache!.GetCacheCursor(streamId, token);
+            }
+            catch (ArgumentException exception) when (queueAdapter.IsRewindable && token is not null)
+            {
+                throw new DataNotAvailableException(
+                    $"The requested token '{token}' is not valid for stream '{streamId}' in provider '{streamProviderName}'.",
+                    exception);
+            }
+        }
 
         private static void UpdateCursorProgress(
             StreamConsumerData consumerData,
@@ -1223,11 +1258,13 @@ namespace Orleans.Streams
 
                 consumerData.State = StreamConsumerDataState.Active;
                 var deliveredAny = false;
+                var replayRetryAttempt = 0;
                 while (!IsShutdown && !cancellationToken.IsCancellationRequested && consumerData.Cursor is not null)
                 {
-                    var progressCursor = consumerData.Cursor as IQueueCacheCursorProgress;
+                    var activeCursor = consumerData.Cursor;
+                    var progressCursor = activeCursor as IQueueCacheCursorProgress;
                     var batchCursor = options.BatchContainerBatchSize > 1
-                        ? consumerData.Cursor as IQueueCacheCursorBatchDelivery
+                        ? activeCursor as IQueueCacheCursorBatchDelivery
                         : null;
                     using var deliveryBatch = batchCursor?.ProtectDeliveryBatch();
                     ConsumerBatch nextBatch = default;
@@ -1235,8 +1272,26 @@ namespace Orleans.Streams
                     var forceFaultSubscription = false;
                     try
                     {
-                        nextBatch = GetBatchForConsumer(consumerData);
+                        var pendingBatch = GetBatchForConsumer(
+                            consumerData,
+                            activeCursor,
+                            cancellationToken);
+                        nextBatch = pendingBatch.IsCompletedSuccessfully
+                            ? pendingBatch.Result
+                            : await pendingBatch;
+                        if (!ReferenceEquals(consumerData.Cursor, activeCursor))
+                        {
+                            consumerData.State = StreamConsumerDataState.Inactive;
+                            return;
+                        }
+                        replayRetryAttempt = 0;
+                        replayRetryAttempt = 0;
                         UpdateCursorProgress(consumerData, progressCursor);
+                        if (nextBatch.ShouldRetry)
+                        {
+                            continue;
+                        }
+
                         if (!nextBatch.HasProgress)
                         {
                             // Only emit cursor-drained when we transitioned from delivering to empty,
@@ -1254,9 +1309,70 @@ namespace Orleans.Streams
                     }
                     catch (Exception exc)
                     {
+                        if (!ReferenceEquals(consumerData.Cursor, activeCursor))
+                        {
+                            consumerData.State = StreamConsumerDataState.Inactive;
+                            return;
+                        }
+
                         exceptionOccured = exc;
+                        var wasReplaying = activeCursor is IQueueCacheCursorReplayState { IsReplaying: true };
                         consumerData.SafeDisposeCursor(logger);
-                        consumerData.Cursor = GetRecoveryCursor(consumerData);
+                        consumerData.IsReplayUnavailable = wasReplaying && exc is DataNotAvailableException;
+                        if (wasReplaying && exc is TransientStreamReplayException)
+                        {
+                            var resumeToken = consumerData.LastSafePartitionToken
+                                ?? consumerData.CursorStartToken;
+                            if (resumeToken is not null)
+                            {
+                                try
+                                {
+                                    var retryCursor = GetCacheCursor(consumerData.StreamId, resumeToken);
+                                    if (consumerData.LastSafePartitionToken is { } deliveredThrough
+                                        && retryCursor is IQueueCacheCursorProgress retryProgress)
+                                    {
+                                        retryProgress.SetDeliveredThrough(deliveredThrough);
+                                    }
+
+                                    consumerData.Cursor = retryCursor;
+                                }
+                                catch (DataNotAvailableException retryException)
+                                {
+                                    exceptionOccured = retryException;
+                                    consumerData.IsReplayUnavailable = true;
+                                }
+                            }
+                        }
+                        else if (!wasReplaying)
+                        {
+                            consumerData.Cursor = GetRecoveryCursor(consumerData);
+                        }
+                    }
+
+                    if (exceptionOccured is not null)
+                    {
+                        var faultedSubscription = await ErrorProtocol(
+                            consumerData,
+                            exceptionOccured,
+                            false,
+                            null,
+                            consumerData.CursorStartToken,
+                            cancellationToken: cancellationToken);
+                        if (faultedSubscription || consumerData.Cursor is null)
+                        {
+                            consumerData.State = StreamConsumerDataState.Inactive;
+                            return;
+                        }
+
+                        if (exceptionOccured is TransientStreamReplayException)
+                        {
+                            var retryDelay = deliveryBackoffProvider.Next(replayRetryAttempt++);
+                            if (retryDelay > TimeSpan.Zero)
+                            {
+                                await Task.Delay(retryDelay, _timeProvider, cancellationToken);
+                            }
+                        }
+                        continue;
                     }
 
                     if (exceptionOccured is null)
@@ -1329,7 +1445,7 @@ namespace Orleans.Streams
                                         consumerData.LastProcessedToken = sequenceToken;
                                         try
                                         {
-                                            newCursor = queueCache!.GetCacheCursor(consumerData.StreamId, sequenceToken);
+                                            newCursor = GetCacheCursor(consumerData.StreamId, sequenceToken);
                                             // An implicit recovery token identifies the last event processed by the prior activation.
                                             if (newCursor is IQueueCacheCursorProgress progress)
                                             {
@@ -1340,18 +1456,18 @@ namespace Orleans.Streams
                                                 pendingBatch = AdvanceCursorPastToken(newCursor, sequenceToken);
                                             }
                                         }
-                                        catch (QueueCacheMissException)
+                                        catch (QueueCacheMissException) when (!queueAdapter.IsRewindable)
                                         {
                                             // The current batch is the receiver's first available message.
                                             // Keep it pending when the prior activation's token was evicted.
-                                            newCursor = queueCache!.GetCacheCursor(consumerData.StreamId, batch.SequenceToken);
+                                            newCursor = GetCacheCursor(consumerData.StreamId, batch.SequenceToken);
                                             resumedFromFallback = true;
                                         }
                                     }
                                     else
                                     {
                                         consumerData.LastProcessedToken = null;
-                                        newCursor = queueCache!.GetCacheCursor(consumerData.StreamId, sequenceToken);
+                                        newCursor = GetCacheCursor(consumerData.StreamId, sequenceToken);
                                     }
                                 }
                                 else if (newToken is DeliveryToken)
@@ -1362,7 +1478,7 @@ namespace Orleans.Streams
                                     try
                                     {
                                         var restartToken = previousSafePartitionToken ?? sequenceToken;
-                                        newCursor = queueCache!.GetCacheCursor(consumerData.StreamId, restartToken); // queueCache must be non-null here: consumerData.Cursor was only ever populated via queueCache.GetCacheCursor.
+                                        newCursor = GetCacheCursor(consumerData.StreamId, restartToken);
                                         if (newCursor is IQueueCacheCursorProgress progress)
                                         {
                                             progress.SetDeliveredThrough(sequenceToken);
@@ -1372,17 +1488,17 @@ namespace Orleans.Streams
                                             if (!Equals(restartToken, sequenceToken))
                                             {
                                                 newCursor.Dispose();
-                                                newCursor = queueCache.GetCacheCursor(consumerData.StreamId, sequenceToken);
+                                                newCursor = GetCacheCursor(consumerData.StreamId, sequenceToken);
                                             }
 
                                             pendingBatch = AdvanceCursorPastToken(newCursor, sequenceToken);
                                         }
                                     }
-                                    catch (QueueCacheMissException)
+                                    catch (QueueCacheMissException) when (!queueAdapter.IsRewindable)
                                     {
                                         // The current batch is the receiver's first available message.
                                         // Keep it pending when the consumer resumes from an evicted token.
-                                        newCursor = queueCache!.GetCacheCursor(consumerData.StreamId, batch.SequenceToken);
+                                        newCursor = GetCacheCursor(consumerData.StreamId, batch.SequenceToken);
                                         resumedFromFallback = true;
                                     }
                                 }
@@ -1466,20 +1582,38 @@ namespace Orleans.Streams
 
         private readonly struct ConsumerBatch
         {
-            public ConsumerBatch(IBatchContainer? batch, StreamSequenceToken? progressToken)
+            public ConsumerBatch(
+                IBatchContainer? batch,
+                StreamSequenceToken? progressToken,
+                bool shouldRetry = false)
             {
                 Batch = batch;
                 ProgressToken = progressToken;
+                ShouldRetry = shouldRetry;
             }
 
             public IBatchContainer? Batch { get; }
             public StreamSequenceToken? ProgressToken { get; }
             public bool HasProgress => ProgressToken is not null;
+            public bool ShouldRetry { get; }
         }
 
-        private ConsumerBatch GetBatchForConsumer(StreamConsumerData consumerData)
+        private ValueTask<ConsumerBatch> GetBatchForConsumer(
+            StreamConsumerData consumerData,
+            IQueueCacheCursor cursor,
+            CancellationToken cancellationToken)
+            => cursor is IAsyncQueueCacheCursor asyncCursor
+                ? GetBatchForConsumerAsync(
+                    asyncCursor,
+                    consumerData.StreamId.StreamId,
+                    consumerData.FilterData,
+                    cancellationToken)
+                : ValueTask.FromResult(GetBatchForConsumerSynchronously(consumerData, cursor));
+
+        private ConsumerBatch GetBatchForConsumerSynchronously(
+            StreamConsumerData consumerData,
+            IQueueCacheCursor cursor)
         {
-            var cursor = consumerData.Cursor!;
             var streamId = consumerData.StreamId.StreamId;
             var filterData = consumerData.FilterData;
             var pendingBatch = consumerData.PendingBatch;
@@ -1544,6 +1678,104 @@ namespace Orleans.Streams
                 }
 
                 return i == 0
+                    ? new ConsumerBatch(null, progressToken)
+                    : new ConsumerBatch(new BatchContainerBatch(batchContainers), progressToken);
+            }
+
+            return default;
+        }
+
+        private async ValueTask<ConsumerBatch> GetBatchForConsumerAsync(
+            IAsyncQueueCacheCursor cursor,
+            StreamId streamId,
+            string? filterData,
+            CancellationToken cancellationToken)
+        {
+            if (this.options.BatchContainerBatchSize <= 1)
+            {
+                var result = await cursor.MoveNextAsync(cancellationToken);
+                if (result == QueueCacheCursorMoveNextResult.TemporaryTail)
+                {
+                    return new ConsumerBatch(null, null, shouldRetry: true);
+                }
+
+                if (result == QueueCacheCursorMoveNextResult.Completed)
+                {
+                    return cursor is IQueueCacheCursorReplayState { HasPendingLiveHandoff: true }
+                        ? new ConsumerBatch(null, null, shouldRetry: true)
+                        : default;
+                }
+
+                var batchContainer = cursor.GetCurrent(out var exception);
+                if (exception is not null)
+                {
+                    throw exception;
+                }
+
+                if (batchContainer is null)
+                {
+                    throw new InvalidOperationException("An asynchronous queue cache cursor advanced without a current record.");
+                }
+
+                return ShouldDeliverBatch(streamId, batchContainer, filterData)
+                    ? new ConsumerBatch(batchContainer, batchContainer.SequenceToken)
+                    : new ConsumerBatch(null, batchContainer.SequenceToken);
+            }
+
+            if (this.options.BatchContainerBatchSize > 1)
+            {
+                var batchContainers = new List<IBatchContainer>();
+                StreamSequenceToken? progressToken = null;
+                var handoffPending = false;
+                while (batchContainers.Count < this.options.BatchContainerBatchSize)
+                {
+                    var result = await cursor.MoveNextAsync(cancellationToken);
+                    if (result == QueueCacheCursorMoveNextResult.TemporaryTail)
+                    {
+                        return progressToken is null
+                            ? new ConsumerBatch(null, null, shouldRetry: true)
+                            : batchContainers.Count == 0
+                                ? new ConsumerBatch(null, progressToken)
+                                : new ConsumerBatch(new BatchContainerBatch(batchContainers), progressToken);
+                    }
+
+                    if (result == QueueCacheCursorMoveNextResult.Completed)
+                    {
+                        handoffPending = cursor is IQueueCacheCursorReplayState { HasPendingLiveHandoff: true };
+                        break;
+                    }
+
+                    var batchContainer = cursor.GetCurrent(out var exception);
+                    if (exception is not null)
+                    {
+                        throw exception;
+                    }
+
+                    if (batchContainer is null)
+                    {
+                        throw new InvalidOperationException("An asynchronous queue cache cursor advanced without a current record.");
+                    }
+
+                    progressToken = batchContainer.SequenceToken;
+                    if (ShouldDeliverBatch(streamId, batchContainer, filterData))
+                    {
+                        batchContainers.Add(batchContainer);
+                    }
+
+                    if (cursor is IQueueCacheCursorReplayState { IsReplaying: true })
+                    {
+                        break;
+                    }
+                }
+
+                if (progressToken is null)
+                {
+                    return handoffPending
+                        ? new ConsumerBatch(null, null, shouldRetry: true)
+                        : default;
+                }
+
+                return batchContainers.Count == 0
                     ? new ConsumerBatch(null, progressToken)
                     : new ConsumerBatch(new BatchContainerBatch(batchContainers), progressToken);
             }

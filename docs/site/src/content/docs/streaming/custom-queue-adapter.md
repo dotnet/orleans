@@ -1,7 +1,7 @@
 ---
 title: Write a custom persistent-stream queue adapter
 description: Implement and register an Orleans persistent-stream queue adapter for an external queue technology.
-ms.date: 08/18/2026
+ms.date: 09/03/2026
 ms.topic: how-to
 ---
 
@@ -49,7 +49,11 @@ The factory composes the adapter with queue mapping, caching, and failure handli
 
 :::code language="csharp" source="snippets/streaming/CustomQueueAdapter.cs" id="custom_queue_factory":::
 
-`SimpleQueueAdapterCache` is suitable for a non-rewindable adapter whose queue remains the durability boundary. A rewindable adapter usually needs a cache and sequence-token implementation which can position cursors at retained historical messages.
+`SimpleQueueAdapterCache` is suitable when subscription cursors only use the live cache. A retained-history adapter can compose <xref:Orleans.Providers.Streams.Common.RecoverableStreamReceiver`1>, <xref:Orleans.Providers.Streams.Common.IRecoverableStreamReplaySourceFactory`1>, and <xref:Orleans.Providers.Streams.Common.IRecoverableStreamReplaySource`1>. The singleton live source owns the durable queue checkpoint. Each historical source owns an independent read position and cancellation lifetime.
+
+The receiver returns <xref:Orleans.Streams.IAsyncQueueCacheCursor> when a token predates the live cache. Its non-reentrant `MoveNextAsync` call distinguishes an available item, a temporary provider tail, and completed handoff to live delivery. The receiver bounds concurrent readers, queued admissions, replay cache capacity, and read batch size through <xref:Orleans.Configuration.RecoverableStreamReplayOptions>. Overlapping cursors reuse retained partition fragments when their ranges are compatible.
+
+Use provider tokens which encode enough identity to reject a token from another provider or partition. Validate retention and establish any external replay protection atomically during reader admission. Surface expired or malformed positions as <xref:Orleans.Streams.DataNotAvailableException>. Treat throttling, iterator renewal, and transient transport errors according to the provider's retry contract.
 
 `AddPersistentStreams` leaves checkpointing to the adapter. The non-rewindable example acknowledges completed messages through its receiver and therefore has no independent checkpoint. For a partitioned stream transport, implement an <xref:Orleans.Streams.IStreamQueueCheckpointerFactory>, have the receiver or cache load and update the stream partition position, and register it as a named component with `ConfigureComponent`. Treat a requested cursor start as inclusive: selecting that position does not confirm its record. Persist only the earliest contiguous partition position which every subscription has delivered, intentionally filtered, or safely scanned as belonging to another stream. A no-op checkpointer is suitable only when replay position is deliberately disposable.
 
