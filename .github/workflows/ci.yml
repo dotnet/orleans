@@ -79,8 +79,6 @@ jobs:
   test-redis:
     name: Redis provider tests
     runs-on: ubuntu-latest
-    env:
-      BuildExternalAssets: "false"
     strategy:
       fail-fast: false
       matrix:
@@ -118,7 +116,6 @@ jobs:
     name: Cassandra provider tests
     runs-on: ubuntu-latest
     env:
-      BuildExternalAssets: "false"
       CASSANDRA_IMAGE: cassandra:${{ matrix.dbversion }}
     strategy:
       fail-fast: false
@@ -146,7 +143,6 @@ jobs:
     name: PostgreSQL provider tests
     runs-on: ubuntu-latest
     env:
-      BuildExternalAssets: "false"
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
       POSTGRES_PASSWORD: postgres
     strategy:
@@ -189,7 +185,6 @@ jobs:
     name: MariaDB/MySQL provider tests
     runs-on: ubuntu-latest
     env:
-      BuildExternalAssets: "false"
       # The official MariaDB 10.6 image is not published to GHCR. Prefer Google's Docker Hub
       # mirror, with Docker Hub as a fallback, and pin both references to the same digest.
       MARIADB_IMAGE: mirror.gcr.io/library/mariadb:10.6@sha256:daacc2f260f8ec999daa5e03a017a23a7e6fa3fb982aaf26e8b72f24daf03bc9
@@ -202,10 +197,6 @@ jobs:
         framework: ["net8.0", "net10.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
-    - name: Setup Node.js
-      uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
-      with:
-        node-version: '24.x'
     - name: Start MariaDB
       shell: bash
       run: |
@@ -258,7 +249,6 @@ jobs:
     name: Microsoft SQL Server provider tests
     runs-on: ubuntu-latest
     env:
-      BuildExternalAssets: "false"
       ACCEPT_EULA: "Y"
       MSSQL_PID: "Developer"
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
@@ -325,8 +315,6 @@ jobs:
   test-azure-storage:
     name: Azure Storage provider tests
     runs-on: ubuntu-latest
-    env:
-      BuildExternalAssets: "false"
     strategy:
       fail-fast: false
       matrix:
@@ -367,8 +355,6 @@ jobs:
   test-azure-eventhubs:
     name: Azure Event Hubs provider tests
     runs-on: ubuntu-latest
-    env:
-      BuildExternalAssets: "false"
     strategy:
       fail-fast: false
       matrix:
@@ -433,8 +419,6 @@ jobs:
   test-azure-cosmosdb:
     name: Azure Cosmos DB provider tests
     runs-on: ubuntu-latest
-    env:
-      BuildExternalAssets: "false"
     strategy:
       fail-fast: false
       matrix:
@@ -491,8 +475,6 @@ jobs:
   test-consul:
     name: Consul provider tests
     runs-on: ubuntu-latest
-    env:
-      BuildExternalAssets: "false"
     strategy:
       fail-fast: false
       matrix:
@@ -515,8 +497,6 @@ jobs:
   test-zookeeper:
     name: ZooKeeper provider tests
     runs-on: ubuntu-latest
-    env:
-      BuildExternalAssets: "false"
     strategy:
       fail-fast: false
       matrix:
@@ -552,7 +532,6 @@ jobs:
     name: AWS DynamoDB provider tests
     runs-on: ubuntu-latest
     env:
-      BuildExternalAssets: "false"
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
       AWS_ACCESS_KEY_ID: root
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
@@ -600,7 +579,6 @@ jobs:
     name: AWS SQS provider tests
     runs-on: ubuntu-latest
     env:
-      BuildExternalAssets: "false"
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
       AWS_ACCESS_KEY_ID: root
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
@@ -662,8 +640,6 @@ jobs:
   test-nats:
     name: NATS stream provider tests
     runs-on: ubuntu-latest
-    env:
-      BuildExternalAssets: "false"
     strategy:
       fail-fast: false
       matrix:
@@ -711,7 +687,6 @@ jobs:
     name: AWS Kinesis provider tests
     runs-on: ubuntu-latest
     env:
-      BuildExternalAssets: "false"
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
       AWS_ACCESS_KEY_ID: test
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
@@ -783,6 +758,7 @@ jobs:
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Setup Node.js
+      if: matrix.suite == 'BVT'
       uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
       with:
         node-version: '24.x'
@@ -790,6 +766,7 @@ jobs:
       uses: ./.github/actions/run-tests
       with:
         artifact-name: test_output_${{ github.job }}_${{ matrix.suite }}_${{ matrix.os }}_${{ matrix.framework }}
+        build-external-assets: ${{ matrix.suite == 'BVT' && 'true' || 'false' }}
         filter-query: /[(Provider=None)&(Suite=${{ matrix.suite }})&(Area!=CodeGen)]
         framework: ${{ matrix.framework }}
   test-codegenerator:
