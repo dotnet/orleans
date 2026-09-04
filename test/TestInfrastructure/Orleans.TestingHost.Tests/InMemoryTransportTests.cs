@@ -13,6 +13,12 @@ namespace Orleans.TestingHost.Tests;
 public class InMemoryTransportTests
 {
     [Fact]
+    public void TestClusterOptions_DefaultConnectionTransport_IsInMemory()
+    {
+        Assert.Equal(ConnectionTransportType.InMemory, new TestClusterOptions().ConnectionTransport);
+    }
+
+    [Fact]
     public async Task ConnectorWaitsForListenerRegistration()
     {
         var hub = new InMemoryTransportConnectionHub();

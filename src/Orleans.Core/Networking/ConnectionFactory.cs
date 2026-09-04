@@ -27,7 +27,7 @@ internal abstract class ConnectionFactory
     public virtual async ValueTask<Connection> ConnectAsync(SiloAddress address, CancellationToken cancellationToken)
     {
         // Connect to the endpoint.
-        var transport = await _transportConnector.CreateAsync(GetEndPoint(address), cancellationToken);
+        var transport = await _transportConnector.CreateAsync(GetEndPoint(address), cancellationToken).ConfigureAwait(false);
 
         // Create a connection object to represent the connection.
         try
@@ -36,7 +36,7 @@ internal abstract class ConnectionFactory
         }
         catch
         {
-            await transport.DisposeAsync();
+            await transport.DisposeAsync().ConfigureAwait(false);
             throw;
         }
     }
