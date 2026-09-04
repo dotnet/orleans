@@ -7,10 +7,19 @@
     <PackageDescription>MessagePack integration for Orleans.Serialization</PackageDescription>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
+    <!-- Set during project evaluation because the validation-only reference below participates in restore. -->
+    <EnablePackageValidation Condition="'$(EnablePackageValidation)' == '' and '$(IsPackable)' == 'true'">true</EnablePackageValidation>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="MessagePack" />
+    <PackageReference Include="Microsoft.NET.StringTools" GeneratePathProperty="true" PrivateAssets="all" Condition="'$(EnablePackageValidation)' == 'true'" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(EnablePackageValidation)' == 'true'">
+    <PackageValidationReferencePath Include="$(PkgMicrosoft_NET_StringTools)\ref\net8.0" TargetFramework="net8.0" />
+    <PackageValidationReferencePath Include="$(PkgMicrosoft_NET_StringTools)\ref\net8.0" TargetFramework="net10.0" />
+    <PackageValidationReferencePath Include="$(PkgMicrosoft_NET_StringTools)\ref\netstandard2.0" TargetFramework="netstandard2.1" />
   </ItemGroup>
 
   <ItemGroup>

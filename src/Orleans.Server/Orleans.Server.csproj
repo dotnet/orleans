@@ -7,6 +7,8 @@
     <NoPackageAnalysis>true</NoPackageAnalysis>
     <IncludeSymbols>false</IncludeSymbols>
     <IncludeSource>false</IncludeSource>
+    <!-- This metapackage contains dependency metadata and no API assemblies. -->
+    <EnablePackageValidation>false</EnablePackageValidation>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>

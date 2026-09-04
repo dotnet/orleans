@@ -24,6 +24,12 @@
     <CompilerVisibleItemMetadata Include="AdditionalFiles" MetadataName="OrleansContractsFileExists" />
   </ItemGroup>
 
+  <PropertyGroup Condition="'$(IsPackable)' == 'true' and '$(OrleansPackageValidationBaselineVersion)' != ''">
+    <EnablePackageValidation Condition="'$(EnablePackageValidation)' == ''">true</EnablePackageValidation>
+    <PackageValidationBaselineVersion Condition="'$(EnablePackageValidation)' == 'true' and '$(PackageValidationBaselineVersion)' == '' and '$(OrleansPackageValidationBaselineSuffix)' != ''">$(OrleansPackageValidationBaselineVersion)-$(OrleansPackageValidationBaselineSuffix)</PackageValidationBaselineVersion>
+    <PackageValidationBaselineVersion Condition="'$(EnablePackageValidation)' == 'true' and '$(PackageValidationBaselineVersion)' == ''">$(OrleansPackageValidationBaselineVersion)</PackageValidationBaselineVersion>
+  </PropertyGroup>
+
   <ItemGroup Condition="'$(IsPackable)'=='true' and '$(SourceLinkCreate)'=='true' and '$(IncludeBuildOutput)'=='true'">
     <PackageReference Include="Microsoft.SourceLink.AzureRepos.Git" PrivateAssets="All"/>
     <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="all" />

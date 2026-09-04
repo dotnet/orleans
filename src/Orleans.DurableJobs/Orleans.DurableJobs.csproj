@@ -10,6 +10,7 @@
     <DefineConstants>$(DefineConstants)</DefineConstants>
     <VersionSuffix Condition="$(VersionSuffix) != ''">$(VersionSuffix).alpha.1</VersionSuffix>
     <VersionSuffix Condition="$(VersionSuffix) == ''">alpha.1</VersionSuffix>
+    <OrleansPackageValidationBaselineSuffix>alpha.1</OrleansPackageValidationBaselineSuffix>
     <Nullable>enable</Nullable>
     <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
   </PropertyGroup>
@@ -33,4 +34,3 @@
     <InternalsVisibleTo Include="Orleans.Runtime.Tests" />
   </ItemGroup>
 </Project>
-
