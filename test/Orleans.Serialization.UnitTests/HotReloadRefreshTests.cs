@@ -112,6 +112,19 @@ public class HotReloadRefreshTests : IDisposable
         Assert.Equal(1, serializer.Deserialize<HotReloadScenario.HotReloadAddedType>(serializer.SerializeToArray(value))!.Value);
     }
 
+    [Fact]
+    public void RefreshPublishesCollectionSnapshots()
+    {
+        var options = _services.GetRequiredService<IOptions<TypeManifestOptions>>().Value;
+        var previousAllowedTypes = options.AllowedTypes;
+        var previousCount = previousAllowedTypes.Count;
+
+        Refresh();
+
+        Assert.NotSame(previousAllowedTypes, options.AllowedTypes);
+        Assert.Equal(previousCount, previousAllowedTypes.Count);
+    }
+
     private void Refresh() => _refresher.Refresh(new HashSet<System.Reflection.Assembly> { typeof(HotReloadRefreshTests).Assembly });
 
     private static void RemoveScenarioTypes(TypeManifestOptions options)

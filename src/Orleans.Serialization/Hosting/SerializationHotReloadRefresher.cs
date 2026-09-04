@@ -111,7 +111,7 @@ internal sealed class SerializationHotReloadRefresher : IHotReloadRefreshPartici
                     continue;
                 }
 
-                Merge(_manifest, scratch);
+                _manifest.MergeFrom(scratch);
             }
 
             _codecProvider.OnManifestUpdated(_manifest);
@@ -163,32 +163,6 @@ internal sealed class SerializationHotReloadRefresher : IHotReloadRefreshPartici
     {
         System.Diagnostics.Debug.WriteLine($"{message} {exception}");
         RefreshFailed?.Invoke(message, exception);
-    }
-
-    private static void Merge(TypeManifestOptions live, TypeManifestOptions scratch)
-    {
-        live.Activators.UnionWith(scratch.Activators);
-        live.FieldCodecs.UnionWith(scratch.FieldCodecs);
-        live.Serializers.UnionWith(scratch.Serializers);
-        live.Copiers.UnionWith(scratch.Copiers);
-        live.Converters.UnionWith(scratch.Converters);
-        live.Interfaces.UnionWith(scratch.Interfaces);
-        live.InterfaceProxies.UnionWith(scratch.InterfaceProxies);
-        live.InterfaceImplementations.UnionWith(scratch.InterfaceImplementations);
-        live.AllowedTypes.UnionWith(scratch.AllowedTypes);
-        live.AllowedAssemblies.UnionWith(scratch.AllowedAssemblies);
-
-        foreach (var pair in scratch.WellKnownTypeIds)
-        {
-            live.WellKnownTypeIds[pair.Key] = pair.Value;
-        }
-
-        foreach (var pair in scratch.WellKnownTypeAliases)
-        {
-            live.WellKnownTypeAliases[pair.Key] = pair.Value;
-        }
-
-        live.CompoundTypeAliases.MergeFrom(scratch.CompoundTypeAliases);
     }
 
     public void Dispose() => HotReloadMetadataUpdateHandler.Unregister(this);
