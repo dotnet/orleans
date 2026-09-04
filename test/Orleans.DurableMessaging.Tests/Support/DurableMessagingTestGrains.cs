@@ -71,7 +71,8 @@ public sealed record DurableEndpointSnapshot(
     [property: Id(11)] int ReplacementExactRouteHandlerCalls,
     [property: Id(12)] string? OutboxJobId,
     [property: Id(13)] int NullReferenceMessageCalls,
-    [property: Id(14)] int NullNullableValueMessageCalls);
+    [property: Id(14)] int NullNullableValueMessageCalls,
+    [property: Id(15)] int GenericExactRouteHandlerCalls);
 
 [GenerateSerializer, Immutable]
 public sealed record DurableDeadLetterSnapshot(
@@ -100,6 +101,7 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
     private int _maxConcurrentHandlers;
     private int _firstExactRouteHandlerCalls;
     private int _replacementExactRouteHandlerCalls;
+    private int _genericExactRouteHandlerCalls;
     private int _nullReferenceMessageCalls;
     private int _nullNullableValueMessageCalls;
     private int _handlerSelectionCalls;
@@ -203,6 +205,7 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
     {
         var first = new CountingHandler(() => _firstExactRouteHandlerCalls++);
         var replacement = new CountingHandler(() => _replacementExactRouteHandlerCalls++);
+        _inbox.RegisterHandler(new RouteSpecificCountingHandler(route, () => _genericExactRouteHandlerCalls++));
         _inbox.RegisterHandler(route, first);
         var exception = GetDuplicateRegistrationException(route, replacement);
         var retained = false;
@@ -355,7 +358,8 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
             _replacementExactRouteHandlerCalls,
             _outboxJobId.Value,
             _nullReferenceMessageCalls,
-            _nullNullableValueMessageCalls);
+            _nullNullableValueMessageCalls,
+            _genericExactRouteHandlerCalls);
 
     private static DurableDeadLetterSnapshot ToSnapshot(DurableDeadLetter deadLetter) =>
         new(
@@ -476,6 +480,18 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
     private sealed class CountingHandler(Action onCall) : IInboxHandler
     {
         public bool CanHandle(IInboxHandlerContext context) => true;
+
+        public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
+        {
+            onCall();
+            return default;
+        }
+    }
+
+    private sealed class RouteSpecificCountingHandler(string route, Action onCall) : IInboxHandler
+    {
+        public bool CanHandle(IInboxHandlerContext context) =>
+            string.Equals(context.Envelope.RouteKey, route, StringComparison.Ordinal);
 
         public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
