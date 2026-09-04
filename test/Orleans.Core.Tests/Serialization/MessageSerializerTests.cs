@@ -289,9 +289,13 @@ namespace UnitTests.Serialization
                 var reader = buffer.Slice();
                 this.messageSerializer.Read(in reader, headerSize, bodySize, out var deserializedMessage);
                 return deserializedMessage;
+            }
+            finally
+            {
+                buffer.Dispose();
+            }
         }
 
-<<<<<<< HEAD
         private Message RoundTripMessage(
             Message message,
             out (long Started, long Completed) serialization,
@@ -317,11 +321,6 @@ namespace UnitTests.Serialization
 
         [TestSuite("Functional")]
         [TestProvider("None")]
-||||||| parent of dc13c60977 (feat(networking): introduce message-oriented networking transports)
-        [TestSuite("Functional")]
-        [TestProvider("None")]
-=======
->>>>>>> dc13c60977 (feat(networking): introduce message-oriented networking transports)
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
         [InlineData(0, 0)]
         [InlineData(1, 1)]
@@ -333,6 +332,8 @@ namespace UnitTests.Serialization
             Assert.Equal(expected, MessageSerializer.GetRequestContextInitialCapacity(size));
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]
         public void Message_RequestContextBeyondInitialCapacity_RoundTrips()
         {
