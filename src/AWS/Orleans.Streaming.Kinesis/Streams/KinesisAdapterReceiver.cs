@@ -165,7 +165,12 @@ namespace Orleans.Streaming.Kinesis
             {
                 // Retain the receiver-local ordinal for compatibility with existing serialized tokens.
                 // KinesisSequenceToken orders records using the durable shard sequence.
-                batch.Add(KinesisBatchContainer.FromKinesisRecord(_serializer, record, _lastReadMessage++));
+                batch.Add(KinesisBatchContainer.FromKinesisRecord(
+                    _serializer,
+                    record,
+                    _streamName,
+                    _partition,
+                    _lastReadMessage++));
             }
 
             return batch;
