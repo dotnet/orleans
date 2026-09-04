@@ -1,4 +1,7 @@
 using System;
+#if NET10_0_OR_GREATER
+using System.Buffers.Binary;
+#endif
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 #if NET10_0_OR_GREATER
@@ -100,7 +103,9 @@ public sealed class ReferencedAssemblyProviderTests
         var methodBody = peReader.GetMethodBody(getRelevantAssemblies.Definition.RelativeVirtualAddress);
         var expectedCall = new byte[5];
         expectedCall[0] = 0x28;
-        BitConverter.TryWriteBytes(expectedCall.AsSpan(1), MetadataTokens.GetToken(assemblyFilesAvailableGetter));
+        BinaryPrimitives.WriteInt32LittleEndian(
+            expectedCall.AsSpan(1),
+            MetadataTokens.GetToken(assemblyFilesAvailableGetter));
 
         Assert.Contains(
             "System.Diagnostics.CodeAnalysis.RequiresAssemblyFilesAttribute",
