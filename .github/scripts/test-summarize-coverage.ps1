@@ -1129,7 +1129,7 @@ exit 0
             $reportingWorkflow `
             '(?s)Download covered source.*?Verify trusted coverage inputs.*?get-coverage-input-fingerprint\.ps1.*?Summarize coverage' `
             'Pull request coverage inputs must match the pinned trusted reporter before aggregation.'
-        Assert-Equal 13 (@(Get-Content -LiteralPath $coverageInputsPath)).Count 'Trusted coverage input count differs.'
+        Assert-Equal 12 (@(Get-Content -LiteralPath $coverageInputsPath)).Count 'Trusted coverage input count differs.'
         Assert-Matches `
             $reportingWorkflow `
             'github\.event\.workflow_run\.conclusion == ''success''' `
