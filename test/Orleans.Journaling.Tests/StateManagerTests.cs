@@ -864,13 +864,15 @@ public class StateManagerTests : JournalingTestBase
             {
                 handler.ApplySet("partial", firstPartial);
                 throw firstFailure;
-            }),
+            }
+        ),
             ("second-failure", handler =>
             {
                 handler.ApplySet("partial", secondPartial);
                 secondFailureObserved.SetResult();
                 throw secondFailure;
-            }),
+            }
+        ),
             ("recovered", handler => handler.ApplySet("value", recovered)),
             ("final", handler => handler.ApplySet("value", final)));
         var storage = new CapturingStorage { ConcatenateReads = true };

@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 using System;
 using Microsoft.Extensions.Logging;
 using Orleans.Serialization;

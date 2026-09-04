@@ -1,4 +1,4 @@
-﻿using System.Distributed.DurableTasks;
+using System.Distributed.DurableTasks;
 using Orleans.Journaling;
 
 namespace WorkflowsApp.Service;

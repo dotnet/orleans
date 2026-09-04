@@ -1,4 +1,4 @@
-﻿
+
 namespace System.Distributed.DurableTasks;
 
 public static class DurableTaskRuntimeHelper

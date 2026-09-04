@@ -1,4 +1,4 @@
-﻿using System.Runtime.CompilerServices;
+using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 
 namespace System.Distributed.DurableTasks;

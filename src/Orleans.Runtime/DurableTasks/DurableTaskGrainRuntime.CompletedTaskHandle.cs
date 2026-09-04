@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 using System.Distributed.DurableTasks;
 using System.Threading;
 using System.Threading.Tasks;

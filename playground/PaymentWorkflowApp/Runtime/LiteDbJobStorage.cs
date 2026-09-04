@@ -1,4 +1,4 @@
-﻿using System.Diagnostics.CodeAnalysis;
+using System.Diagnostics.CodeAnalysis;
 using System.Distributed.DurableTasks;
 using LiteDB;
 using Orleans.Serialization;

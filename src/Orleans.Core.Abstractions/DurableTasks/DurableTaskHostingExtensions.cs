@@ -1,4 +1,4 @@
-﻿using System.Distributed.DurableTasks;
+using System.Distributed.DurableTasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization;
 using Orleans.Serialization.Configuration;

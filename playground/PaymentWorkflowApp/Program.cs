@@ -1,4 +1,4 @@
-﻿using System.Distributed.DurableTasks;
+using System.Distributed.DurableTasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;

@@ -1,4 +1,4 @@
-﻿namespace System.Distributed.DurableTasks;
+namespace System.Distributed.DurableTasks;
 
 /// <summary>
 /// Interface implemented by <see cref="DurableTask"/> and <see cref="DurableTask{TResult}"/> implementations allowing them to be scheduled.

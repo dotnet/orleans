@@ -1,4 +1,4 @@
-﻿namespace WorkflowsApp.Service;
+namespace WorkflowsApp.Service;
 
 [Alias("IDictionaryGrain`2")]
 public interface IDictionaryGrain<K, V> : IGrainWithStringKey where K : notnull

@@ -1,4 +1,4 @@
-﻿using Orleans.DurableTasks;
+using Orleans.DurableTasks;
 
 namespace WorkflowsApp.Service;
 
