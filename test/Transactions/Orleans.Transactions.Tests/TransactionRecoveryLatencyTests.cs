@@ -182,6 +182,195 @@ public class TransactionRecoveryLatencyTests
     }
 
     [Fact]
+    public async Task AbortingQueuedTransactionRemovesAllPendingOperations()
+    {
+        var queue = new GatedCancelTransactionQueue(
+            CreateParticipant("resource", ParticipantId.Role.Resource),
+            new TestActivationLifetime());
+        var currentTransactionId = Guid.NewGuid();
+        var abortedTransactionId = Guid.NewGuid();
+        var nextTransactionId = Guid.NewGuid();
+        var priority = DateTime.UtcNow;
+        var transactionTimeout = TimeSpan.FromMinutes(1);
+        var abortedOperationCount = 0;
+
+        await queue.RWLock.EnterLock(
+            currentTransactionId,
+            priority,
+            transactionTimeout,
+            new AccessCounter(),
+            isRead: false,
+            exclusiveLock: false,
+            static () => 0);
+        var firstAbortedOperation = queue.RWLock.EnterLock(
+            abortedTransactionId,
+            priority,
+            transactionTimeout,
+            new AccessCounter(),
+            isRead: false,
+            exclusiveLock: false,
+            () => ++abortedOperationCount);
+        var secondAbortedOperation = queue.RWLock.EnterLock(
+            abortedTransactionId,
+            priority,
+            transactionTimeout,
+            new AccessCounter { Writes = 1 },
+            isRead: false,
+            exclusiveLock: false,
+            () => ++abortedOperationCount);
+
+        Assert.False(firstAbortedOperation.IsCompleted);
+        Assert.False(secondAbortedOperation.IsCompleted);
+
+        queue.RWLock.Rollback(abortedTransactionId);
+
+        await Assert.ThrowsAsync<OrleansCascadingAbortException>(
+            () => firstAbortedOperation.WaitAsync(TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<OrleansCascadingAbortException>(
+            () => secondAbortedOperation.WaitAsync(TestContext.Current.CancellationToken));
+        Assert.Equal(0, abortedOperationCount);
+
+        var nextOperation = queue.RWLock.EnterLock(
+            nextTransactionId,
+            priority,
+            transactionTimeout,
+            new AccessCounter(),
+            isRead: false,
+            exclusiveLock: false,
+            static () => 42);
+
+        Assert.False(nextOperation.IsCompleted);
+
+        queue.RWLock.Rollback(currentTransactionId);
+        queue.RWLock.Notify();
+
+        Assert.Equal(42, await nextOperation.WaitAsync(TestContext.Current.CancellationToken));
+        Assert.Equal(0, abortedOperationCount);
+    }
+
+    [Fact]
+    public async Task QueuedWriteUpgradeAbortsConflictingTransactionOperations()
+    {
+        var queue = new GatedCancelTransactionQueue(
+            CreateParticipant("resource", ParticipantId.Role.Resource),
+            new TestActivationLifetime());
+        var currentTransactionId = Guid.NewGuid();
+        var upgradingTransactionId = Guid.NewGuid();
+        var conflictingTransactionId = Guid.NewGuid();
+        var priority = new DateTime(2026, 8, 21, 12, 0, 0, DateTimeKind.Utc);
+        var transactionTimeout = TimeSpan.FromMinutes(1);
+        var conflictingOperationCount = 0;
+
+        await queue.RWLock.EnterLock(
+            currentTransactionId,
+            priority,
+            transactionTimeout,
+            new AccessCounter(),
+            isRead: false,
+            exclusiveLock: false,
+            static () => 0);
+        var queuedRead = queue.RWLock.EnterLock(
+            upgradingTransactionId,
+            priority,
+            transactionTimeout,
+            new AccessCounter(),
+            isRead: true,
+            exclusiveLock: false,
+            static () => 1);
+        var conflictingRead = queue.RWLock.EnterLock(
+            conflictingTransactionId,
+            priority,
+            transactionTimeout,
+            new AccessCounter(),
+            isRead: true,
+            exclusiveLock: false,
+            () => ++conflictingOperationCount);
+        var queuedWrite = queue.RWLock.EnterLock(
+            upgradingTransactionId,
+            priority,
+            transactionTimeout,
+            new AccessCounter { Reads = 1 },
+            isRead: false,
+            exclusiveLock: false,
+            static () => 2);
+
+        await Assert.ThrowsAsync<OrleansCascadingAbortException>(
+            () => conflictingRead.WaitAsync(TestContext.Current.CancellationToken));
+        Assert.Equal(0, conflictingOperationCount);
+        Assert.False(queuedRead.IsCompleted);
+        Assert.False(queuedWrite.IsCompleted);
+
+        queue.RWLock.Rollback(currentTransactionId);
+        queue.RWLock.Notify();
+
+        Assert.Equal(1, await queuedRead.WaitAsync(TestContext.Current.CancellationToken));
+        Assert.Equal(2, await queuedWrite.WaitAsync(TestContext.Current.CancellationToken));
+        Assert.Equal(0, conflictingOperationCount);
+    }
+
+    [Fact]
+    public async Task UnresolvableQueuedWriteUpgradeAbortsItsPendingOperations()
+    {
+        var queue = new GatedCancelTransactionQueue(
+            CreateParticipant("resource", ParticipantId.Role.Resource),
+            new TestActivationLifetime());
+        var currentTransactionId = Guid.NewGuid();
+        var upgradingTransactionId = Guid.NewGuid();
+        var conflictingTransactionId = Guid.NewGuid();
+        var higherPriority = new DateTime(2026, 8, 21, 12, 0, 0, DateTimeKind.Utc);
+        var lowerPriority = higherPriority.AddTicks(1);
+        var transactionTimeout = TimeSpan.FromMinutes(1);
+        var upgradingOperationCount = 0;
+        var conflictingOperationCount = 0;
+
+        await queue.RWLock.EnterLock(
+            currentTransactionId,
+            higherPriority,
+            transactionTimeout,
+            new AccessCounter(),
+            isRead: false,
+            exclusiveLock: false,
+            static () => 0);
+        var queuedRead = queue.RWLock.EnterLock(
+            upgradingTransactionId,
+            lowerPriority,
+            transactionTimeout,
+            new AccessCounter(),
+            isRead: true,
+            exclusiveLock: false,
+            () => ++upgradingOperationCount);
+        var conflictingRead = queue.RWLock.EnterLock(
+            conflictingTransactionId,
+            higherPriority,
+            transactionTimeout,
+            new AccessCounter(),
+            isRead: true,
+            exclusiveLock: false,
+            () => ++conflictingOperationCount);
+
+        await Assert.ThrowsAsync<OrleansTransactionLockUpgradeException>(
+            () => queue.RWLock.EnterLock(
+                upgradingTransactionId,
+                lowerPriority,
+                transactionTimeout,
+                new AccessCounter { Reads = 1 },
+                isRead: false,
+                exclusiveLock: false,
+                static () => 0));
+        await Assert.ThrowsAsync<OrleansCascadingAbortException>(
+            () => queuedRead.WaitAsync(TestContext.Current.CancellationToken));
+        Assert.Equal(0, upgradingOperationCount);
+        Assert.False(conflictingRead.IsCompleted);
+
+        queue.RWLock.Rollback(currentTransactionId);
+        queue.RWLock.Notify();
+
+        Assert.Equal(1, await conflictingRead.WaitAsync(TestContext.Current.CancellationToken));
+        Assert.Equal(0, upgradingOperationCount);
+        Assert.Equal(1, conflictingOperationCount);
+    }
+
+    [Fact]
     public async Task LocalAbortCompletesManagerDecisionAfterDispatchAndBeforeCleanupSettles()
     {
         var manager = CreateParticipant(
