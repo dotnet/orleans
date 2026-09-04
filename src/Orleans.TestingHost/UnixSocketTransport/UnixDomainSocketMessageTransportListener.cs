@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Net.Sockets;
 using System.Threading;
@@ -74,7 +75,6 @@ internal class UnixDomainSocketMessageTransportListener : MessageTransportListen
 
         var options = _listenerOptions.Get(ListenerName);
         var path = options.Path;
-        DeleteStaleSocketFile(path);
         var bound = false;
         try
         {
@@ -161,29 +161,6 @@ internal class UnixDomainSocketMessageTransportListener : MessageTransportListen
         {
             File.Delete(path);
         }
-    }
-
-    private static void DeleteStaleSocketFile(string path)
-    {
-        if (!File.Exists(path))
-        {
-            return;
-        }
-
-        using var socket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
-        try
-        {
-            socket.Connect(new UnixDomainSocketEndPoint(path));
-        }
-        catch (SocketException exception) when (exception.SocketErrorCode == SocketError.ConnectionRefused)
-        {
-            File.Delete(path);
-            return;
-        }
-
-        throw new AddressInUseException(
-            $"A Unix domain socket listener is already bound to '{path}'.",
-            new SocketException((int)SocketError.AddressAlreadyInUse));
     }
 
     public override ValueTask UnbindAsync(CancellationToken cancellationToken)
