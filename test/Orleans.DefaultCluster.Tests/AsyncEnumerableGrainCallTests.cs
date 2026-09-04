@@ -708,15 +708,16 @@ public class AsyncEnumerableGrainCallTests
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var grain = GrainFactory.GetGrain<IObservableGrain>(Guid.NewGuid());
+        var valuesObserved = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
         var producer = Task.Run(async () =>
         {
             foreach (var value in Enumerable.Range(0, 2))
             {
-                await Task.Delay(200, cancellationToken);
                 await grain.OnNext(value.ToString());
             }
 
+            await valuesObserved.Task.WaitAsync(cancellationToken);
             await grain.Deactivate();
         }, cancellationToken);
 
@@ -726,10 +727,16 @@ public class AsyncEnumerableGrainCallTests
             await foreach (var entry in grain.GetValues(cancellationToken))
             {
                 values.Add(entry);
+                if (values.Count == 2)
+                {
+                    valuesObserved.TrySetResult();
+                }
+
                 Logger.LogInformation("ObservableGrain_AsyncEnumerable: {Entry}", entry);
             }
         }).WaitAsync(cancellationToken);
 
+        await producer.WaitAsync(cancellationToken);
         Assert.Equal(2, values.Count);
     }
 
