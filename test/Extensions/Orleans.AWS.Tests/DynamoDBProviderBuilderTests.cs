@@ -834,261 +834,261 @@ public sealed class DynamoDBStorageCredentialTests
     }
 }
 
-    [TestSuite("BVT")]
-    [TestProvider("DynamoDB")]
-    [TestArea("Storage")]
-    [TestCategory("AWS"), TestCategory("DynamoDB"), TestCategory("BVT")]
-    public sealed class DynamoDBProviderRegistrationTests
+[TestSuite("BVT")]
+[TestProvider("DynamoDB")]
+[TestArea("Storage")]
+[TestCategory("AWS"), TestCategory("DynamoDB"), TestCategory("BVT")]
+public sealed class DynamoDBProviderRegistrationTests
+{
+    [Fact]
+    public void RegisterProviderAttributes_ContainDynamoDBClusteringSiloRegistration()
     {
-        [Fact]
-        public void RegisterProviderAttributes_ContainDynamoDBClusteringSiloRegistration()
-        {
-            var registrations = GetRegistrations(typeof(DynamoDBClusteringOptions).Assembly);
+        var registrations = GetRegistrations(typeof(DynamoDBClusteringOptions).Assembly);
 
-            Assert.Equal(2, registrations.Length);
-            AssertRegistration(
-                registrations.Single(registration => registration.Target == "Silo"),
-                kind: "Clustering",
-                target: "Silo",
-                typeof(DynamoDBClusteringProviderBuilder));
-        }
-
-        [Fact]
-        public void RegisterProviderAttributes_ContainDynamoDBClusteringClientRegistration()
-        {
-            var registrations = GetRegistrations(typeof(DynamoDBGatewayOptions).Assembly);
-
-            Assert.Equal(2, registrations.Length);
-            AssertRegistration(
-                registrations.Single(registration => registration.Target == "Client"),
-                kind: "Clustering",
-                target: "Client",
-                typeof(DynamoDBClusteringProviderBuilder));
-        }
-
-        [Fact]
-        public void RegisterProviderAttributes_ContainDynamoDBGrainStorageRegistration()
-        {
-            var registration = Assert.Single(GetRegistrations(typeof(DynamoDBStorageOptions).Assembly));
-
-            AssertRegistration(
-                registration,
-                kind: "GrainStorage",
-                target: "Silo",
-                typeof(DynamoDBGrainStorageProviderBuilder));
-        }
-
-        [Fact]
-        public void RegisterProviderAttributes_ContainDynamoDBReminderRegistration()
-        {
-            var registration = Assert.Single(GetRegistrations(typeof(DynamoDBReminderStorageOptions).Assembly));
-
-            AssertRegistration(
-                registration,
-                kind: "Reminders",
-                target: "Silo",
-                typeof(DynamoDBRemindersProviderBuilder));
-        }
-
-        private static RegisterProviderAttribute[] GetRegistrations(Assembly assembly)
-            => assembly.GetCustomAttributes<RegisterProviderAttribute>().ToArray();
-
-        private static void AssertRegistration(
-            RegisterProviderAttribute registration,
-            string kind,
-            string target,
-            Type builderType)
-        {
-            Assert.Equal("DynamoDB", registration.Name);
-            Assert.Equal(kind, registration.Kind);
-            Assert.Equal(target, registration.Target);
-            Assert.Equal(builderType, registration.Type);
-        }
+        Assert.Equal(2, registrations.Length);
+        AssertRegistration(
+            registrations.Single(registration => registration.Target == "Silo"),
+            kind: "Clustering",
+            target: "Silo",
+            typeof(DynamoDBClusteringProviderBuilder));
     }
 
-    [TestSuite("BVT")]
-    [TestProvider("DynamoDB")]
-    [TestArea("Storage")]
-    [TestCategory("AWS"), TestCategory("DynamoDB"), TestCategory("BVT")]
-    public sealed class DynamoDBProviderBuilderTests
+    [Fact]
+    public void RegisterProviderAttributes_ContainDynamoDBClusteringClientRegistration()
     {
-        [Fact]
-        public void ClusteringSiloBuilder_Configure_RegistersMembershipAndBindsOptions()
-        {
-            using var host = BuildSiloHost(
-                new()
-                {
-                    ["Provider:Service"] = "us-west-2",
-                    ["Provider:TableName"] = "phase-two-silos",
-                    ["Provider:ReadCapacityUnits"] = "13",
-                    ["Provider:WriteCapacityUnits"] = "7",
-                    ["Provider:UseProvisionedThroughput"] = "false",
-                    ["Provider:CreateIfNotExists"] = "false",
-                    ["Provider:UpdateIfExists"] = "false",
-                },
-                (context, silo) => new DynamoDBClusteringProviderBuilder().Configure(
-                    silo,
-                    name: null,
-                    context.Configuration.GetSection("Provider")));
+        var registrations = GetRegistrations(typeof(DynamoDBGatewayOptions).Assembly);
 
-            var membership = host.Services.GetRequiredService<IMembershipTable>();
-            var options = host.Services.GetRequiredService<IOptions<DynamoDBClusteringOptions>>().Value;
-            var validator = GetValidator(host, "DynamoDBClusteringOptionsValidator");
-
-            Assert.Equal("DynamoDBMembershipTable", membership.GetType().Name);
-            Assert.Equal("us-west-2", options.Service);
-            Assert.Equal("phase-two-silos", options.TableName);
-            Assert.Equal(13, options.ReadCapacityUnits);
-            Assert.Equal(7, options.WriteCapacityUnits);
-            Assert.False(options.UseProvisionedThroughput);
-            Assert.False(options.CreateIfNotExists);
-            Assert.False(options.UpdateIfExists);
-            validator.ValidateConfiguration();
-        }
-
-        [Fact]
-        public void ClusteringClientBuilder_Configure_RegistersGatewayAndBindsOptions()
-        {
-            using var host = BuildClientHost(
-                new()
-                {
-                    ["Provider:Service"] = "eu-central-1",
-                    ["Provider:TableName"] = "phase-two-gateways",
-                    ["Provider:ReadCapacityUnits"] = "19",
-                    ["Provider:WriteCapacityUnits"] = "11",
-                    ["Provider:UseProvisionedThroughput"] = "false",
-                    ["Provider:CreateIfNotExists"] = "false",
-                    ["Provider:UpdateIfExists"] = "false",
-                },
-                (context, client) => new DynamoDBClusteringProviderBuilder().Configure(
-                    client,
-                    name: null,
-                    context.Configuration.GetSection("Provider")));
-
-            var gateway = host.Services.GetRequiredService<Orleans.Messaging.IGatewayListProvider>();
-            var options = host.Services.GetRequiredService<IOptions<DynamoDBGatewayOptions>>().Value;
-            var validator = GetValidator(host, "DynamoDBGatewayOptionsValidator");
-
-            Assert.Equal("DynamoDBGatewayListProvider", gateway.GetType().Name);
-            Assert.Equal("eu-central-1", options.Service);
-            Assert.Equal("phase-two-gateways", options.TableName);
-            Assert.Equal(19, options.ReadCapacityUnits);
-            Assert.Equal(11, options.WriteCapacityUnits);
-            Assert.False(options.UseProvisionedThroughput);
-            Assert.False(options.CreateIfNotExists);
-            Assert.False(options.UpdateIfExists);
-            validator.ValidateConfiguration();
-        }
-
-        [Fact]
-        public void GrainStorageBuilder_Configure_RegistersNamedStorageAndBindsOptions()
-        {
-            const string providerName = "phase-two-storage";
-            const string serializerKey = "phase-two-serializer";
-            var serializer = new PhaseTwoGrainStorageSerializer();
-            using var host = BuildSiloHost(
-                new()
-                {
-                    ["Provider:Service"] = "ap-northeast-1",
-                    ["Provider:ServiceId"] = "phase-two-service",
-                    ["Provider:TableName"] = "phase-two-grain-state",
-                    ["Provider:ReadCapacityUnits"] = "23",
-                    ["Provider:WriteCapacityUnits"] = "17",
-                    ["Provider:UseProvisionedThroughput"] = "false",
-                    ["Provider:CreateIfNotExists"] = "false",
-                    ["Provider:UpdateIfExists"] = "false",
-                    ["Provider:DeleteStateOnClear"] = "true",
-                    ["Provider:TimeToLive"] = "02:03:04",
-                    ["Provider:SerializerKey"] = serializerKey,
-                },
-                (context, silo) =>
-                {
-                    silo.ConfigureServices(services =>
-                        services.AddKeyedSingleton<IGrainStorageSerializer>(serializerKey, serializer));
-                    new DynamoDBGrainStorageProviderBuilder().Configure(
-                        silo,
-                        providerName,
-                        context.Configuration.GetSection("Provider"));
-                });
-
-            var storage = host.Services.GetRequiredKeyedService<IGrainStorage>(providerName);
-            var options = host.Services.GetRequiredService<IOptionsMonitor<DynamoDBStorageOptions>>().Get(providerName);
-            var validator = GetValidator(host, nameof(DynamoDBGrainStorageOptionsValidator));
-
-            Assert.IsType<DynamoDBGrainStorage>(storage);
-            Assert.Equal("ap-northeast-1", options.Service);
-            Assert.Equal("phase-two-service", options.ServiceId);
-            Assert.Equal("phase-two-grain-state", options.TableName);
-            Assert.Equal(23, options.ReadCapacityUnits);
-            Assert.Equal(17, options.WriteCapacityUnits);
-            Assert.False(options.UseProvisionedThroughput);
-            Assert.False(options.CreateIfNotExists);
-            Assert.False(options.UpdateIfExists);
-            Assert.True(options.DeleteStateOnClear);
-            Assert.Equal(new TimeSpan(2, 3, 4), options.TimeToLive);
-            Assert.Same(serializer, options.GrainStorageSerializer);
-            validator.ValidateConfiguration();
-        }
-
-        [Fact]
-        public void RemindersBuilder_Configure_RegistersReminderTableAndBindsOptions()
-        {
-            using var host = BuildSiloHost(
-                new()
-                {
-                    ["Provider:Service"] = "ca-central-1",
-                    ["Provider:TableName"] = "phase-two-reminders",
-                    ["Provider:ReadCapacityUnits"] = "29",
-                    ["Provider:WriteCapacityUnits"] = "21",
-                    ["Provider:UseProvisionedThroughput"] = "false",
-                    ["Provider:CreateIfNotExists"] = "false",
-                    ["Provider:UpdateIfExists"] = "false",
-                },
-                (context, silo) => new DynamoDBRemindersProviderBuilder().Configure(
-                    silo,
-                    name: null,
-                    context.Configuration.GetSection("Provider")));
-
-            var reminderTable = host.Services.GetRequiredService<IReminderTable>();
-            var options = host.Services.GetRequiredService<IOptions<DynamoDBReminderStorageOptions>>().Value;
-            var validator = GetValidator(host, "DynamoDBReminderStorageOptionsValidator");
-
-            Assert.Equal("DynamoDBReminderTable", reminderTable.GetType().Name);
-            Assert.Equal("ca-central-1", options.Service);
-            Assert.Equal("phase-two-reminders", options.TableName);
-            Assert.Equal(29, options.ReadCapacityUnits);
-            Assert.Equal(21, options.WriteCapacityUnits);
-            Assert.False(options.UseProvisionedThroughput);
-            Assert.False(options.CreateIfNotExists);
-            Assert.False(options.UpdateIfExists);
-            validator.ValidateConfiguration();
-        }
-
-        private static IHost BuildSiloHost(
-            Dictionary<string, string?> values,
-            Action<HostBuilderContext, ISiloBuilder> configure)
-            => new HostBuilder()
-                .ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(values))
-                .UseOrleans(configure)
-                .Build();
-
-        private static IHost BuildClientHost(
-            Dictionary<string, string?> values,
-            Action<HostBuilderContext, IClientBuilder> configure)
-            => new HostBuilder()
-                .ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(values))
-                .UseOrleansClient(configure)
-                .Build();
-
-        private static IConfigurationValidator GetValidator(IHost host, string typeName)
-            => host.Services
-                .GetServices<IConfigurationValidator>()
-                .Single(validator => validator.GetType().Name == typeName);
-
-        private sealed class PhaseTwoGrainStorageSerializer : IGrainStorageSerializer
-        {
-            public BinaryData Serialize<T>(T? input) => throw new NotSupportedException();
-
-            public T? Deserialize<T>(BinaryData input) => throw new NotSupportedException();
-        }
+        Assert.Equal(2, registrations.Length);
+        AssertRegistration(
+            registrations.Single(registration => registration.Target == "Client"),
+            kind: "Clustering",
+            target: "Client",
+            typeof(DynamoDBClusteringProviderBuilder));
     }
+
+    [Fact]
+    public void RegisterProviderAttributes_ContainDynamoDBGrainStorageRegistration()
+    {
+        var registration = Assert.Single(GetRegistrations(typeof(DynamoDBStorageOptions).Assembly));
+
+        AssertRegistration(
+            registration,
+            kind: "GrainStorage",
+            target: "Silo",
+            typeof(DynamoDBGrainStorageProviderBuilder));
+    }
+
+    [Fact]
+    public void RegisterProviderAttributes_ContainDynamoDBReminderRegistration()
+    {
+        var registration = Assert.Single(GetRegistrations(typeof(DynamoDBReminderStorageOptions).Assembly));
+
+        AssertRegistration(
+            registration,
+            kind: "Reminders",
+            target: "Silo",
+            typeof(DynamoDBRemindersProviderBuilder));
+    }
+
+    private static RegisterProviderAttribute[] GetRegistrations(Assembly assembly)
+        => assembly.GetCustomAttributes<RegisterProviderAttribute>().ToArray();
+
+    private static void AssertRegistration(
+        RegisterProviderAttribute registration,
+        string kind,
+        string target,
+        Type builderType)
+    {
+        Assert.Equal("DynamoDB", registration.Name);
+        Assert.Equal(kind, registration.Kind);
+        Assert.Equal(target, registration.Target);
+        Assert.Equal(builderType, registration.Type);
+    }
+}
+
+[TestSuite("BVT")]
+[TestProvider("DynamoDB")]
+[TestArea("Storage")]
+[TestCategory("AWS"), TestCategory("DynamoDB"), TestCategory("BVT")]
+public sealed class DynamoDBProviderBuilderTests
+{
+    [Fact]
+    public void ClusteringSiloBuilder_Configure_RegistersMembershipAndBindsOptions()
+    {
+        using var host = BuildSiloHost(
+            new()
+            {
+                ["Provider:Service"] = "us-west-2",
+                ["Provider:TableName"] = "phase-two-silos",
+                ["Provider:ReadCapacityUnits"] = "13",
+                ["Provider:WriteCapacityUnits"] = "7",
+                ["Provider:UseProvisionedThroughput"] = "false",
+                ["Provider:CreateIfNotExists"] = "false",
+                ["Provider:UpdateIfExists"] = "false",
+            },
+            (context, silo) => new DynamoDBClusteringProviderBuilder().Configure(
+                silo,
+                name: null,
+                context.Configuration.GetSection("Provider")));
+
+        var membership = host.Services.GetRequiredService<IMembershipTable>();
+        var options = host.Services.GetRequiredService<IOptions<DynamoDBClusteringOptions>>().Value;
+        var validator = GetValidator(host, "DynamoDBClusteringOptionsValidator");
+
+        Assert.Equal("DynamoDBMembershipTable", membership.GetType().Name);
+        Assert.Equal("us-west-2", options.Service);
+        Assert.Equal("phase-two-silos", options.TableName);
+        Assert.Equal(13, options.ReadCapacityUnits);
+        Assert.Equal(7, options.WriteCapacityUnits);
+        Assert.False(options.UseProvisionedThroughput);
+        Assert.False(options.CreateIfNotExists);
+        Assert.False(options.UpdateIfExists);
+        validator.ValidateConfiguration();
+    }
+
+    [Fact]
+    public void ClusteringClientBuilder_Configure_RegistersGatewayAndBindsOptions()
+    {
+        using var host = BuildClientHost(
+            new()
+            {
+                ["Provider:Service"] = "eu-central-1",
+                ["Provider:TableName"] = "phase-two-gateways",
+                ["Provider:ReadCapacityUnits"] = "19",
+                ["Provider:WriteCapacityUnits"] = "11",
+                ["Provider:UseProvisionedThroughput"] = "false",
+                ["Provider:CreateIfNotExists"] = "false",
+                ["Provider:UpdateIfExists"] = "false",
+            },
+            (context, client) => new DynamoDBClusteringProviderBuilder().Configure(
+                client,
+                name: null,
+                context.Configuration.GetSection("Provider")));
+
+        var gateway = host.Services.GetRequiredService<Orleans.Messaging.IGatewayListProvider>();
+        var options = host.Services.GetRequiredService<IOptions<DynamoDBGatewayOptions>>().Value;
+        var validator = GetValidator(host, "DynamoDBGatewayOptionsValidator");
+
+        Assert.Equal("DynamoDBGatewayListProvider", gateway.GetType().Name);
+        Assert.Equal("eu-central-1", options.Service);
+        Assert.Equal("phase-two-gateways", options.TableName);
+        Assert.Equal(19, options.ReadCapacityUnits);
+        Assert.Equal(11, options.WriteCapacityUnits);
+        Assert.False(options.UseProvisionedThroughput);
+        Assert.False(options.CreateIfNotExists);
+        Assert.False(options.UpdateIfExists);
+        validator.ValidateConfiguration();
+    }
+
+    [Fact]
+    public void GrainStorageBuilder_Configure_RegistersNamedStorageAndBindsOptions()
+    {
+        const string providerName = "phase-two-storage";
+        const string serializerKey = "phase-two-serializer";
+        var serializer = new PhaseTwoGrainStorageSerializer();
+        using var host = BuildSiloHost(
+            new()
+            {
+                ["Provider:Service"] = "ap-northeast-1",
+                ["Provider:ServiceId"] = "phase-two-service",
+                ["Provider:TableName"] = "phase-two-grain-state",
+                ["Provider:ReadCapacityUnits"] = "23",
+                ["Provider:WriteCapacityUnits"] = "17",
+                ["Provider:UseProvisionedThroughput"] = "false",
+                ["Provider:CreateIfNotExists"] = "false",
+                ["Provider:UpdateIfExists"] = "false",
+                ["Provider:DeleteStateOnClear"] = "true",
+                ["Provider:TimeToLive"] = "02:03:04",
+                ["Provider:SerializerKey"] = serializerKey,
+            },
+            (context, silo) =>
+            {
+                silo.ConfigureServices(services =>
+                    services.AddKeyedSingleton<IGrainStorageSerializer>(serializerKey, serializer));
+                new DynamoDBGrainStorageProviderBuilder().Configure(
+                    silo,
+                    providerName,
+                    context.Configuration.GetSection("Provider"));
+            });
+
+        var storage = host.Services.GetRequiredKeyedService<IGrainStorage>(providerName);
+        var options = host.Services.GetRequiredService<IOptionsMonitor<DynamoDBStorageOptions>>().Get(providerName);
+        var validator = GetValidator(host, nameof(DynamoDBGrainStorageOptionsValidator));
+
+        Assert.IsType<DynamoDBGrainStorage>(storage);
+        Assert.Equal("ap-northeast-1", options.Service);
+        Assert.Equal("phase-two-service", options.ServiceId);
+        Assert.Equal("phase-two-grain-state", options.TableName);
+        Assert.Equal(23, options.ReadCapacityUnits);
+        Assert.Equal(17, options.WriteCapacityUnits);
+        Assert.False(options.UseProvisionedThroughput);
+        Assert.False(options.CreateIfNotExists);
+        Assert.False(options.UpdateIfExists);
+        Assert.True(options.DeleteStateOnClear);
+        Assert.Equal(new TimeSpan(2, 3, 4), options.TimeToLive);
+        Assert.Same(serializer, options.GrainStorageSerializer);
+        validator.ValidateConfiguration();
+    }
+
+    [Fact]
+    public void RemindersBuilder_Configure_RegistersReminderTableAndBindsOptions()
+    {
+        using var host = BuildSiloHost(
+            new()
+            {
+                ["Provider:Service"] = "ca-central-1",
+                ["Provider:TableName"] = "phase-two-reminders",
+                ["Provider:ReadCapacityUnits"] = "29",
+                ["Provider:WriteCapacityUnits"] = "21",
+                ["Provider:UseProvisionedThroughput"] = "false",
+                ["Provider:CreateIfNotExists"] = "false",
+                ["Provider:UpdateIfExists"] = "false",
+            },
+            (context, silo) => new DynamoDBRemindersProviderBuilder().Configure(
+                silo,
+                name: null,
+                context.Configuration.GetSection("Provider")));
+
+        var reminderTable = host.Services.GetRequiredService<IReminderTable>();
+        var options = host.Services.GetRequiredService<IOptions<DynamoDBReminderStorageOptions>>().Value;
+        var validator = GetValidator(host, "DynamoDBReminderStorageOptionsValidator");
+
+        Assert.Equal("DynamoDBReminderTable", reminderTable.GetType().Name);
+        Assert.Equal("ca-central-1", options.Service);
+        Assert.Equal("phase-two-reminders", options.TableName);
+        Assert.Equal(29, options.ReadCapacityUnits);
+        Assert.Equal(21, options.WriteCapacityUnits);
+        Assert.False(options.UseProvisionedThroughput);
+        Assert.False(options.CreateIfNotExists);
+        Assert.False(options.UpdateIfExists);
+        validator.ValidateConfiguration();
+    }
+
+    private static IHost BuildSiloHost(
+        Dictionary<string, string?> values,
+        Action<HostBuilderContext, ISiloBuilder> configure)
+        => new HostBuilder()
+            .ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(values))
+            .UseOrleans(configure)
+            .Build();
+
+    private static IHost BuildClientHost(
+        Dictionary<string, string?> values,
+        Action<HostBuilderContext, IClientBuilder> configure)
+        => new HostBuilder()
+            .ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(values))
+            .UseOrleansClient(configure)
+            .Build();
+
+    private static IConfigurationValidator GetValidator(IHost host, string typeName)
+        => host.Services
+            .GetServices<IConfigurationValidator>()
+            .Single(validator => validator.GetType().Name == typeName);
+
+    private sealed class PhaseTwoGrainStorageSerializer : IGrainStorageSerializer
+    {
+        public BinaryData Serialize<T>(T? input) => throw new NotSupportedException();
+
+        public T? Deserialize<T>(BinaryData input) => throw new NotSupportedException();
+    }
+}
