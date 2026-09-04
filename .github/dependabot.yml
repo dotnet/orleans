@@ -8,6 +8,7 @@ registries:
     type: "python-index"
     url: "https://packagefeedproxy.microsoft.io/pypi/simple/"
     replaces-base: true
+# Dependabot reads the checked-in .npmrc files for anonymous CFS npm access.
 updates:
   - package-ecosystem: "dotnet-sdk"
     directory: "/"
