@@ -2,6 +2,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Runtime;
 using StackExchange.Redis;
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using System.Threading.Tasks;
 using Orleans.Configuration;
@@ -41,17 +42,24 @@ namespace Orleans.Clustering.Redis
         /// <summary>
         /// The default multiplexer creation delegate.
         /// </summary>
+        /// <param name="options">The Redis clustering options.</param>
+        /// <returns>A task containing the created multiplexer and an indication that the provider owns it.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="options"/> is <see langword="null"/>.</exception>
         public static async Task<(IConnectionMultiplexer Multiplexer, bool IsShared)> DefaultCreateMultiplexer(RedisClusteringOptions options)
         {
+            ArgumentNullException.ThrowIfNull(options);
             return (await ConnectionMultiplexer.ConnectAsync(options.ConfigurationOptions!), false);
         }
 
         /// <summary>
-        /// The default multiplexer creation redis key for RedisMembershipTable.
+        /// Creates the default Redis key for <see cref="RedisMembershipTable"/>.
         /// </summary>
-        /// <returns></returns>
+        /// <param name="clusterOptions">The cluster identity options.</param>
+        /// <returns>The Redis membership table key.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="clusterOptions"/> is <see langword="null"/>.</exception>
         public static RedisKey DefaultCreateRedisKey(ClusterOptions clusterOptions)
         {
+            ArgumentNullException.ThrowIfNull(clusterOptions);
             return Encoding.UTF8.GetBytes($"{clusterOptions.ServiceId}/members/{clusterOptions.ClusterId}");
         }
     }
@@ -72,6 +80,7 @@ namespace Orleans.Clustering.Redis
         /// Initializes a new instance of the <see cref="RedisClusteringOptionsValidator"/> class.
         /// </summary>
         /// <param name="options">The options to validate.</param>
+        [SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "Microsoft.Extensions.DependencyInjection supplies the resolved options instance.")]
         public RedisClusteringOptionsValidator(IOptions<RedisClusteringOptions> options)
         {
             _options = options.Value;
