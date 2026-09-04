@@ -607,13 +607,55 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
         }
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
+    public async Task StartupTopologyBarrier_UsesCompletedInitialLoadForSingleSilo()
+    {
+        var silo = Assert.Single(fixture.HostedCluster.Silos);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cancellation.CancelAfter(TestConstants.InitTimeout);
+        await ReminderTopologyStabilizer.WaitForStartupTopologyAsync(
+            fixture.HostedCluster,
+            fixture.DiagnosticObserver,
+            [silo],
+            cancellation.Token);
+
+        var reminderService = silo.ServiceProvider.GetRequiredService<LocalReminderService>();
+        var schedulerBlocked = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var releaseScheduler = new ManualResetEventSlim();
+        var blockingTask = new Task(() =>
+        {
+            schedulerBlocked.TrySetResult();
+            releaseScheduler.Wait(cancellation.Token);
+        });
+        reminderService.Scheduler.QueueTask(blockingTask);
+        await schedulerBlocked.Task.WaitAsync(cancellation.Token);
+
+        try
+        {
+            await ReminderTopologyStabilizer.WaitForStartupTopologyAsync(
+                fixture.HostedCluster,
+                fixture.DiagnosticObserver,
+                [silo],
+                cancellation.Token);
+        }
+        finally
+        {
+            releaseScheduler.Set();
+            await blockingTask.WaitAsync(cancellation.Token);
+        }
+    }
+
     public sealed class Fixture : BaseInProcessTestClusterFixture
     {
         public ReminderLifecycleHarness ReminderHarness { get; } = new();
+        public ReminderDiagnosticObserver DiagnosticObserver { get; private set; } = null!;
 
         protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
         {
             builder.Options.InitialSilosCount = 1;
+            DiagnosticObserver = ReminderDiagnosticObserver.Create(builder);
             builder.ConfigureSilo((_, siloBuilder) =>
             {
                 siloBuilder.AddReminders();
@@ -636,6 +678,7 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
             finally
             {
                 ReminderHarness.Dispose();
+                DiagnosticObserver.Dispose();
             }
         }
     }

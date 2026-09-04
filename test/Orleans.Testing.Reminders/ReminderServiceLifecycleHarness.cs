@@ -59,7 +59,11 @@ public sealed class ReminderServiceLifecycleHarness
 
     /// <inheritdoc />
     public Task WaitForStartupReadinessAsync(CancellationToken cancellationToken)
-        => StabilizeTopologyAsync(_cluster.GetActiveSilos(), cancellationToken);
+        => ReminderTopologyStabilizer.WaitForStartupTopologyAsync(
+            _cluster,
+            _observer,
+            _cluster.GetActiveSilos(),
+            cancellationToken);
 
     /// <inheritdoc />
     public Task AdvanceAsync(TimeSpan amount, CancellationToken cancellationToken)
