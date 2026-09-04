@@ -35,7 +35,7 @@ namespace Orleans.Runtime.Messaging
 
         protected override Connection CreateConnection(MessageTransport transport)
         {
-            var gateway = _gateway!;
+            var gateway = _gateway ?? throw new InvalidOperationException("A gateway connection cannot be created because this silo has no gateway endpoint.");
             return new GatewayInboundConnection(
                 transport,
                 gateway,
