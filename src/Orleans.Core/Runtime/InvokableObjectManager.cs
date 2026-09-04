@@ -117,6 +117,18 @@ namespace Orleans
 
             IServiceProvider IGrainContext.ActivationServices => throw new NotSupportedException();
 
+            IGrainRuntime? IGrainContext.GrainRuntime
+            {
+                get => null;
+                set
+                {
+                    if (value is not null)
+                    {
+                        throw new ArgumentException("Local observer contexts do not have a grain runtime.", nameof(value));
+                    }
+                }
+            }
+
             IGrainLifecycle IGrainContext.ObservableLifecycle => throw new NotImplementedException();
 
             public IWorkItemScheduler Scheduler => throw new NotImplementedException();

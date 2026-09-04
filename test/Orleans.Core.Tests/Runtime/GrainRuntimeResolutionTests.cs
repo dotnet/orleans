@@ -260,6 +260,17 @@ public class GrainRuntimeResolutionTests
         Assert.Same(defaultRuntime, shared.Runtime);
     }
 
+    [Fact, TestCategory("BVT")]
+    public void LocalObserverContext_DoesNotAccessUnsupportedActivationServices()
+    {
+        var context = (IGrainContext)RuntimeHelpers.GetUninitializedObject(typeof(InvokableObjectManager.LocalObjectData));
+
+        Assert.Null(context.GrainRuntime);
+        var exception = Assert.Throws<ArgumentException>(() => context.GrainRuntime = Substitute.For<IGrainRuntime>());
+
+        Assert.Equal("value", exception.ParamName);
+    }
+
     private static GrainTypeSharedContext CreateSharedContext(IGrainRuntime runtime)
     {
         var shared = (GrainTypeSharedContext)RuntimeHelpers.GetUninitializedObject(typeof(GrainTypeSharedContext));
