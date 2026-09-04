@@ -438,6 +438,9 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         var testHooks = activeSilos
             .Select(static silo => (ITestHooks)silo.ServiceProvider.GetRequiredService<TestHooksSystemTarget>())
             .ToArray();
+        var manifestProviders = activeSilos
+            .Select(static silo => silo.ServiceProvider.GetRequiredService<IClusterManifestProvider>())
+            .ToArray();
         var gatewayManager = Client.ServiceProvider.GetRequiredService<GatewayManager>();
         if (!GrainDirectoryObserver.CanObserve(activeSilos))
         {
@@ -459,13 +462,22 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
                 $"Membership, gateway, and grain-directory views did not converge within {timeout}. Expected active silos: {expectedSilos}.");
         }
 
-        var manifestConverged = await ClusterManifestStabilizationHelper
-            .WaitForExpectedClusterManifestAsync(activeSilos, testHooks, timeout)
-            .WaitAsync(cancellationToken);
-        if (!manifestConverged)
+        try
         {
-            throw new TimeoutException(
-                $"Cluster manifests did not converge within {timeout}. Expected active silos: {expectedSilos}.");
+            await ClusterManifestStabilizationHelper.WaitForExpectedClusterManifestAsync(
+                activeSilos,
+                manifestProviders,
+                cancellationToken);
+        }
+        catch (OperationCanceledException exception) when (cancellationToken.IsCancellationRequested)
+        {
+            var observedManifests = activeSilos.Select((silo, index) =>
+                $"{silo.SiloAddress}=[{string.Join(", ", manifestProviders[index].Current.Silos.Keys.Order())}]");
+            throw new OperationCanceledException(
+                $"Cluster manifests did not converge before cancellation. Expected active silos: {expectedSilos}. "
+                + $"Observed manifests: {string.Join("; ", observedManifests)}.",
+                exception,
+                cancellationToken);
         }
     }
 

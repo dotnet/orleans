@@ -170,7 +170,18 @@ public static class ReminderTopologyStabilizer
             .OrderBy(silo => silo.SiloAddress)
             .ToArray();
         var states = observed.Select(silo =>
-            silo.ServiceProvider.GetRequiredService<LocalReminderService>().TestOnlyDescribeTopologyState());
+        {
+            var reminderState = silo.ServiceProvider
+                .GetRequiredService<LocalReminderService>()
+                .TestOnlyDescribeTopologyState();
+            var manifestSilos = silo.ServiceProvider
+                .GetRequiredService<IClusterManifestProvider>()
+                .Current
+                .Silos
+                .Keys
+                .Order();
+            return $"{reminderState}, manifestSilos=[{string.Join(", ", manifestSilos)}]";
+        });
         return $"Reminder topology stabilization was canceled during '{phase}'. "
             + $"Expected active silos: [{string.Join(", ", expected)}]. "
             + $"Observed active silos: [{string.Join(", ", observed.Select(silo => silo.SiloAddress.ToString()))}]. "
