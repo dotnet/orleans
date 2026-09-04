@@ -250,7 +250,7 @@ namespace OrleansAWSUtils.Streams
 
         [LoggerMessage(
             Level = LogLevel.Warning,
-            Message = "Failed to release {MessageCount} pending messages while shutting down receiver for queue {Id}."
+            Message = "An error occurred while releasing up to {MessageCount} pending messages for queue {Id}."
         )]
         private static partial void LogWarningReleaseMessageException(ILogger logger, Exception exception, QueueId id, int messageCount);
 
