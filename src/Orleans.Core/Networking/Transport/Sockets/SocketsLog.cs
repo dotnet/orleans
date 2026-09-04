@@ -5,9 +5,8 @@
 
 using System;
 using Microsoft.Extensions.Logging;
-using Orleans.Connections.Transport.Sockets;
 
-namespace Orleans.Connections.Sockets;
+namespace Orleans.Connections.Transport.Sockets;
 
 internal static partial class SocketsLog
 {

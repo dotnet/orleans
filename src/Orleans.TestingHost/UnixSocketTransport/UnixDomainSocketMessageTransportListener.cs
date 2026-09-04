@@ -8,7 +8,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans.Connections.Sockets;
 using Orleans.Connections.Transport;
 using Orleans.Connections.Transport.Sockets;
 
