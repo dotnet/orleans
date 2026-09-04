@@ -6,23 +6,20 @@ namespace Orleans.Runtime
     internal static class RuntimeVersion
     {
         /// <summary>
-        /// The full version string of the Orleans runtime, eg: '2012.5.9.51607 Build:12345 Timestamp: 20120509-185359'
+        /// The informational version of the Orleans runtime and its build configuration,
+        /// or the assembly version when informational version metadata is unavailable.
         /// </summary>
-        public static string Current
+        public static string Current => GetVersion(typeof(RuntimeVersion).Assembly);
+
+        internal static string GetVersion(Assembly assembly)
         {
-            get
-            {
-                Assembly thisProg = typeof(RuntimeVersion).Assembly;
-                var ApiVersion = thisProg.GetName().Version!.ToString();
-                if (string.IsNullOrWhiteSpace(thisProg.Location))
-                {
-                    return ApiVersion;
-                }
-                FileVersionInfo progVersionInfo = FileVersionInfo.GetVersionInfo(thisProg.Location);
-                bool isDebug = IsAssemblyDebugBuild(thisProg);
-                string productVersion = progVersionInfo.ProductVersion + (isDebug ? " (Debug)." : " (Release)."); // progVersionInfo.IsDebug; does not work
-                return string.IsNullOrEmpty(productVersion) ? ApiVersion : productVersion;
-            }
+            ArgumentNullException.ThrowIfNull(assembly);
+
+            var apiVersion = assembly.GetName().Version!.ToString();
+            var productVersion = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+            return string.IsNullOrWhiteSpace(productVersion)
+                ? apiVersion
+                : productVersion + (IsAssemblyDebugBuild(assembly) ? " (Debug)." : " (Release).");
         }
 
         /// <summary>

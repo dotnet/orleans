@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyModel;
 using System;
 using System.Buffers;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
 
@@ -23,8 +24,17 @@ namespace Orleans.Serialization.Internal
         public static IEnumerable<Assembly> GetRelevantAssemblies()
         {
             var parts = new HashSet<Assembly>();
+            var entryAssembly = Assembly.GetEntryAssembly();
 
-            AddFromDependencyContext(parts);
+            if (entryAssembly is not null)
+            {
+                AddAssembly(parts, entryAssembly);
+            }
+
+            if (AssemblyFilesAvailable)
+            {
+                AddFromDependencyContext(parts, entryAssembly);
+            }
 
 #if NETCOREAPP3_1_OR_GREATER
             AddFromAssemblyLoadContext(parts);
@@ -59,8 +69,6 @@ namespace Orleans.Serialization.Internal
             {
                 return;
             }
-
-            AddAssembly(parts, assembly);
 
             // Add all referenced application parts.
             foreach (var referencedAsm in GetApplicationPartAssemblies(assembly))
@@ -120,6 +128,7 @@ namespace Orleans.Serialization.Internal
         /// <param name="assembly">
         /// The assembly whose dependency context is inspected, or <see langword="null"/> to use the entry assembly.
         /// </param>
+        [RequiresAssemblyFiles("Dependency-context discovery reads assembly files. Use " + nameof(GetRelevantAssemblies) + " for single-file-compatible discovery.")]
         public static void AddFromDependencyContext(HashSet<Assembly> parts, Assembly? assembly = null)
         {
             assembly ??= Assembly.GetEntryAssembly();
@@ -191,6 +200,25 @@ namespace Orleans.Serialization.Internal
                     // Ignore any exceptions thrown during non-explicit assembly loading.
                 }
             }
+        }
+
+#if NET9_0_OR_GREATER
+        [FeatureGuard(typeof(RequiresAssemblyFilesAttribute))]
+#endif
+        internal static bool AssemblyFilesAvailable => AreAssemblyFilesAvailable(Assembly.GetEntryAssembly());
+
+#if NET5_0_OR_GREATER
+        [UnconditionalSuppressMessage(
+            "SingleFile",
+            "IL3000",
+            Justification = "Assembly.Location is used only as the documented availability check for bundled assembly files.")]
+#endif
+        internal static bool AreAssemblyFilesAvailable(Assembly? entryAssembly)
+        {
+            var assembly = entryAssembly is null || entryAssembly.IsDynamic
+                ? typeof(ReferencedAssemblyProvider).Assembly
+                : entryAssembly;
+            return File.Exists(assembly.Location);
         }
 
         private static IEnumerable<Assembly> GetApplicationPartAssemblies(Assembly assembly)

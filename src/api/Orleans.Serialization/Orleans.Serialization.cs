@@ -3451,6 +3451,7 @@ namespace Orleans.Serialization.Internal
 
         public static void AddFromAssemblyLoadContext(System.Collections.Generic.HashSet<System.Reflection.Assembly> parts, System.Runtime.Loader.AssemblyLoadContext context) { }
 
+        [System.Diagnostics.CodeAnalysis.RequiresAssemblyFilesAttribute("Dependency-context discovery reads assembly files. Use GetRelevantAssemblies for single-file-compatible discovery.")]
         public static void AddFromDependencyContext(System.Collections.Generic.HashSet<System.Reflection.Assembly> parts, System.Reflection.Assembly? assembly = null) { }
 
         public static System.Collections.Generic.IEnumerable<System.Reflection.Assembly> GetRelevantAssemblies() { throw null; }
