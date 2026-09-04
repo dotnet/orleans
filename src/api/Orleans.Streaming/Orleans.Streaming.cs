@@ -986,6 +986,8 @@ namespace Orleans.Providers.Streams.Common
 
         public Orleans.Streams.IQueueCacheCursor GetCacheCursor(Runtime.StreamId streamId, Orleans.Streams.StreamSequenceToken? token) { throw null; }
 
+        public Orleans.Streams.IQueueCacheCursor GetCacheCursorAtPosition(Runtime.StreamId streamId, Orleans.Streams.StreamSubscriptionStartPosition startPosition) { throw null; }
+
         public int GetMaxAddCount() { throw null; }
 
         public bool IsUnderPressure() { throw null; }
@@ -1012,6 +1014,8 @@ namespace Orleans.Providers.Streams.Common
         public void AddToCache(System.Collections.Generic.IList<Orleans.Streams.IBatchContainer> messages) { }
 
         public Orleans.Streams.IQueueCacheCursor GetCacheCursor(Runtime.StreamId streamId, Orleans.Streams.StreamSequenceToken? token) { throw null; }
+
+        public Orleans.Streams.IQueueCacheCursor GetCacheCursorAtPosition(Runtime.StreamId streamId, Orleans.Streams.StreamSubscriptionStartPosition startPosition) { throw null; }
 
         public int GetMaxAddCount() { throw null; }
 
@@ -2476,7 +2480,6 @@ namespace Orleans.Streams
         public TransientStreamReplayException() { }
 
         public TransientStreamReplayException(string message, System.Exception innerException) { }
-        public TransientStreamReplayException(string message) { }
         public TransientStreamReplayException(string message) { }
     }
 }
