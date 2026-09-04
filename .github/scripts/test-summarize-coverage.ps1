@@ -649,7 +649,7 @@ try {
             'Runtime crash dumps must include the managed heap.'
         Assert-Matches `
             $dotnetTestAction `
-            "New-Item -ItemType Directory -Force -Path '\$\{\{ github\.workspace \}\}/TestResults'" `
+            'New-Item -ItemType Directory -Force -Path ''\$\{\{ github\.workspace \}\}/TestResults''' `
             'The absolute runtime crash dump directory must exist before test launch.'
         Assert-Matches `
             $dotnetTestAction `
