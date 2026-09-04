@@ -86,11 +86,15 @@ namespace OrleansAWSUtils.Streams
 
                 if (queueRef is not null && pendingMessages.Length > 0)
                 {
+                    var releaseTask = queueRef.ReleaseMessages(pendingMessages);
                     try
                     {
-                        var releaseTask = queueRef.ReleaseMessages(pendingMessages);
-                        outstandingTask = releaseTask;
                         await releaseTask.WaitAsync(timeoutCancellation.Token);
+                    }
+                    catch (OperationCanceledException exception) when (timeoutCancellation.IsCancellationRequested)
+                    {
+                        releaseTask.Ignore();
+                        LogWarningReleaseMessageException(logger, exception, Id, pendingMessages.Length);
                     }
                     catch (Exception exc)
                     {
