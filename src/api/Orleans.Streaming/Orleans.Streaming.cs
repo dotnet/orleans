@@ -870,13 +870,13 @@ namespace Orleans.Providers.Streams.Common
 
         public PartitionedStreamSequenceToken(string? providerIdentity, string? partitionIdentity, string position, long sequenceNumber, int eventIndex = 0) { }
 
-        [Id(1)]
+        [Id(3)]
         public string? PartitionIdentity { get { throw null; } }
 
-        [Id(2)]
+        [Id(4)]
         public string Position { get { throw null; } }
 
-        [Id(0)]
+        [Id(2)]
         public string? ProviderIdentity { get { throw null; } }
 
         public override int CompareTo(Orleans.Streams.StreamSequenceToken? other) { throw null; }
@@ -1019,7 +1019,7 @@ namespace Orleans.Providers.Streams.Common
         public void UpdateReplayProgress(Orleans.Streams.StreamSequenceToken token, bool inclusive, System.DateTime utcNow) { }
     }
 
-    public sealed partial class RecoverableStreamReceiver<TQueueMessage> : Orleans.Streams.IQueueAdapterReceiver, Orleans.Streams.IQueueCache, Orleans.Streams.IQueueFlowController
+    public sealed partial class RecoverableStreamReceiver<TQueueMessage> : Orleans.Streams.IQueueAdapterReceiver, Orleans.Streams.IQueueCache, Orleans.Streams.IQueueFlowController, Orleans.Streams.IQueueCacheRetainedReplay
     {
         public RecoverableStreamReceiver(IRecoverableStreamSource<TQueueMessage> source, IRecoverableStreamDataAdapter<TQueueMessage> dataAdapter, IRecoverableStreamQueueCache<TQueueMessage> cache, Orleans.Streams.IStreamQueueCheckpointer<string> checkpointer, bool startFromNow, IRecoverableStreamReplaySourceFactory<TQueueMessage>? replaySourceFactory, System.Func<IRecoverableStreamQueueCache<TQueueMessage>>? replayCacheFactory, Configuration.RecoverableStreamReplayOptions? replayOptions) { }
 
@@ -1028,6 +1028,8 @@ namespace Orleans.Providers.Streams.Common
         public RecoverableStreamReceiver(IRecoverableStreamSource<TQueueMessage> source, IRecoverableStreamDataAdapter<TQueueMessage> dataAdapter, RecoverableStreamQueueCache<TQueueMessage> cache, Orleans.Streams.IStreamQueueCheckpointer<string> checkpointer, bool startFromNow, IRecoverableStreamReplaySourceFactory<TQueueMessage>? replaySourceFactory, System.Func<IRecoverableStreamQueueCache<TQueueMessage>>? replayCacheFactory, Configuration.RecoverableStreamReplayOptions? replayOptions) { }
 
         public RecoverableStreamReceiver(IRecoverableStreamSource<TQueueMessage> source, IRecoverableStreamDataAdapter<TQueueMessage> dataAdapter, RecoverableStreamQueueCache<TQueueMessage> cache, Orleans.Streams.IStreamQueueCheckpointer<string> checkpointer, bool startFromNow) { }
+
+        public bool SupportsRetainedReplay { get { throw null; } }
 
         public void AddToCache(System.Collections.Generic.IList<Orleans.Streams.IBatchContainer> messages) { }
 
@@ -1920,6 +1922,11 @@ namespace Orleans.Streams
 
         void RecordDeliverySuccess();
         void SetDeliveredThrough(StreamSequenceToken token);
+    }
+
+    public partial interface IQueueCacheRetainedReplay
+    {
+        bool SupportsRetainedReplay { get; }
     }
 
     public partial interface IQueueDataAdapter<TQueueMessage>

@@ -129,6 +129,7 @@ namespace Orleans.Streaming.JsonConverters
             Type typeToConvert)
         {
             if (typeToConvert != _streamSequenceTokenType
+                && typeToConvert != _eventSequenceTokenTypeV2
                 && typeToConvert != _partitionedStreamSequenceTokenType)
             {
                 throw new JsonException(
