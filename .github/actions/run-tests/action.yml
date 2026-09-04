@@ -61,3 +61,4 @@ runs:
     uses: ./.github/actions/archive-test-results
     with:
       name: ${{ inputs.artifact-name }}
+      retention-days: ${{ steps.test.outcome == 'failure' && 14 || 1 }}
