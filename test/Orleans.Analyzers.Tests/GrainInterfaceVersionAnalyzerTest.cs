@@ -2902,7 +2902,30 @@ interface Outer.IInnerGrain [Version(1)]
         }
         finally
         {
-            Directory.Delete(tempDirectory, recursive: true);
+            await DeleteDirectoryWithRetriesAsync(tempDirectory);
+        }
+    }
+
+    private static async Task DeleteDirectoryWithRetriesAsync(string path)
+    {
+        const int maxAttempts = 10;
+        var retryDelay = TimeSpan.FromMilliseconds(100);
+
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                Directory.Delete(path, recursive: true);
+                return;
+            }
+            catch (IOException) when (attempt < maxAttempts)
+            {
+                await Task.Delay(retryDelay, TestContext.Current.CancellationToken);
+            }
+            catch (UnauthorizedAccessException) when (attempt < maxAttempts)
+            {
+                await Task.Delay(retryDelay, TestContext.Current.CancellationToken);
+            }
         }
     }
 
