@@ -4,11 +4,32 @@ using Orleans.Streams;
 namespace Orleans.Providers.Streams.Common;
 
 /// <summary>
+/// Exposes provider and partition identity for a stream sequence token.
+/// </summary>
+public interface IPartitionedStreamSequenceToken
+{
+    /// <summary>
+    /// Gets the provider identity.
+    /// </summary>
+    string? ProviderIdentity { get; }
+
+    /// <summary>
+    /// Gets the partition identity.
+    /// </summary>
+    string? PartitionIdentity { get; }
+
+    /// <summary>
+    /// Gets the provider position.
+    /// </summary>
+    string Position { get; }
+}
+
+/// <summary>
 /// Represents a provider and partition scoped stream position which can be persisted as JSON.
 /// </summary>
 [Serializable]
 [GenerateSerializer]
-public class PartitionedStreamSequenceToken : EventSequenceTokenV2
+public class PartitionedStreamSequenceToken : EventSequenceTokenV2, IPartitionedStreamSequenceToken
 {
     /// <summary>
     /// Initializes a new instance of the <see cref="PartitionedStreamSequenceToken"/> class.
@@ -59,11 +80,11 @@ public class PartitionedStreamSequenceToken : EventSequenceTokenV2
 
     /// <inheritdoc />
     public override bool Equals(StreamSequenceToken? other)
-        => other is PartitionedStreamSequenceToken token
+        => other is IPartitionedStreamSequenceToken token
             && string.Equals(ProviderIdentity, token.ProviderIdentity, StringComparison.Ordinal)
             && string.Equals(PartitionIdentity, token.PartitionIdentity, StringComparison.Ordinal)
-            && string.Equals(Position, token.Position, StringComparison.Ordinal)
-            && EventIndex == token.EventIndex;
+            && ComparePositions(Position, token.Position) == 0
+            && EventIndex == ((StreamSequenceToken)token).EventIndex;
 
     /// <inheritdoc />
     public override bool Equals(object? obj)
@@ -77,7 +98,7 @@ public class PartitionedStreamSequenceToken : EventSequenceTokenV2
             return 1;
         }
 
-        if (other is not PartitionedStreamSequenceToken token
+        if (other is not IPartitionedStreamSequenceToken token
             || !string.Equals(ProviderIdentity, token.ProviderIdentity, StringComparison.Ordinal)
             || !string.Equals(PartitionIdentity, token.PartitionIdentity, StringComparison.Ordinal))
         {
@@ -85,12 +106,16 @@ public class PartitionedStreamSequenceToken : EventSequenceTokenV2
         }
 
         var difference = ComparePositions(Position, token.Position);
-        return difference != 0 ? difference : EventIndex.CompareTo(token.EventIndex);
+        return difference != 0 ? difference : EventIndex.CompareTo(((StreamSequenceToken)token).EventIndex);
     }
 
     /// <inheritdoc />
     public override int GetHashCode()
-        => HashCode.Combine(ProviderIdentity, PartitionIdentity, Position, EventIndex);
+        => HashCode.Combine(
+            ProviderIdentity,
+            PartitionIdentity,
+            GetPositionHashCode(Position),
+            EventIndex);
 
     /// <inheritdoc />
     public override string ToString()
@@ -128,5 +153,19 @@ public class PartitionedStreamSequenceToken : EventSequenceTokenV2
         }
 
         return string.CompareOrdinal(left, right);
+    }
+
+    internal static int GetPositionHashCode(string position)
+    {
+        var start = 0;
+        while (start < position.Length && position[start] == '0')
+        {
+            start++;
+        }
+
+        var value = position.AsSpan(start);
+        return value.Length == 0 || value.IndexOfAnyExceptInRange('0', '9') < 0
+            ? string.GetHashCode(value, StringComparison.Ordinal)
+            : StringComparer.Ordinal.GetHashCode(position);
     }
 }

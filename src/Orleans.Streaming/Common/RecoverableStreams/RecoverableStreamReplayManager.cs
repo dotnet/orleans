@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Configuration;
@@ -22,6 +23,8 @@ internal sealed class RecoverableStreamReplayManager<TQueueMessage>
     private readonly HashSet<Task> _backgroundTasks = [];
     private readonly List<Exception> _backgroundFailures = [];
     private int _activeReaders;
+    private int _disposingReaders;
+    private int _replacementAdmissions;
     private bool _shutdown;
 
     public RecoverableStreamReplayManager(
@@ -143,19 +146,19 @@ internal sealed class RecoverableStreamReplayManager<TQueueMessage>
                 return cursor;
             }
 
+            if (CanWaitForFragmentLocked(cursor))
+            {
+                EnqueuePendingLocked(cursor);
+                return cursor;
+            }
+
             if (_activeReaders < _options.MaxConcurrentReaders)
             {
                 StartReaderLocked(cursor);
                 return cursor;
             }
 
-            if (_pending.Count >= _options.MaxPendingReaders)
-            {
-                throw new InvalidOperationException(
-                    $"The retained-history replay admission queue reached its configured limit of {_options.MaxPendingReaders} cursors.");
-            }
-
-            cursor.PendingNode = _pending.AddLast(cursor);
+            EnqueuePendingLocked(cursor);
             return cursor;
         }
     }
@@ -171,7 +174,11 @@ internal sealed class RecoverableStreamReplayManager<TQueueMessage>
         {
             foreach (var fragment in _fragments)
             {
-                fragment.LiveBoundary ??= positions[0].SequenceToken;
+                if (fragment.LiveBoundary is null)
+                {
+                    fragment.LiveBoundary = positions[0].SequenceToken;
+                    fragment.LiveBoundaryEstablishedAfterTail = fragment.AtProviderTail;
+                }
             }
         }
     }
@@ -231,8 +238,16 @@ internal sealed class RecoverableStreamReplayManager<TQueueMessage>
     {
         foreach (var fragment in _fragments)
         {
-            if (cursor.StartToken.CompareTo(fragment.StartToken) < 0
+            if (fragment.Failure is not null
+                || IsReclaimed(fragment, cursor.StartToken)
+                || cursor.StartToken.CompareTo(fragment.StartToken) < 0
                 || fragment.LiveBoundary is { } boundary && cursor.StartToken.CompareTo(boundary) >= 0)
+            {
+                continue;
+            }
+
+            if (!fragment.Cache.TryGetNewestPosition(out var newest, out _)
+                || newest.CompareTo(cursor.StartToken) < 0)
             {
                 continue;
             }
@@ -240,6 +255,7 @@ internal sealed class RecoverableStreamReplayManager<TQueueMessage>
             try
             {
                 var inner = fragment.Cache.GetCacheCursor(cursor.StreamId, cursor.StartToken);
+                fragment.Cache.RegisterReplayStream(cursor.StreamId);
                 fragment.Cursors.Add(cursor);
                 cursor.Attach(fragment, inner);
                 return true;
@@ -251,6 +267,14 @@ internal sealed class RecoverableStreamReplayManager<TQueueMessage>
 
         return false;
     }
+
+    private bool CanWaitForFragmentLocked(ReplayCursor cursor)
+        => _fragments.Any(fragment =>
+            fragment.Failure is null
+            && !IsReclaimed(fragment, cursor.StartToken)
+            && cursor.StartToken.CompareTo(fragment.StartToken) >= 0
+            && (fragment.LiveBoundary is null
+                || cursor.StartToken.CompareTo(fragment.LiveBoundary) < 0));
 
     private void StartReaderLocked(ReplayCursor cursor)
     {
@@ -279,12 +303,20 @@ internal sealed class RecoverableStreamReplayManager<TQueueMessage>
 
                 _liveCache.TryGetOldestPosition(out var liveBoundary, out _);
                 var replayCursor = cache.GetCacheCursor(cursor.StreamId, cursor.StartToken);
+                if (replayCursor is not IQueueCacheCursorProgress)
+                {
+                    replayCursor.Dispose();
+                    throw new InvalidOperationException(
+                        $"Replay cache cursors must implement {nameof(IQueueCacheCursorProgress)}.");
+                }
+
                 var fragment = new ReplayFragment(
                     cursor.StartToken,
                     source,
                     cache,
                     liveBoundary,
                     CancellationTokenSource.CreateLinkedTokenSource(_shutdownToken));
+                cache.RegisterReplayStream(cursor.StreamId);
                 fragment.Cursors.Add(cursor);
                 cursor.Attach(fragment, replayCursor);
                 _fragments.Add(fragment);
@@ -344,31 +376,77 @@ internal sealed class RecoverableStreamReplayManager<TQueueMessage>
 
     private void PromotePendingLocked()
     {
-        while (_pending.First is { } node)
+        for (var node = _pending.First; node is not null;)
         {
+            var next = node.Next;
             var cursor = node.Value;
             if (cursor.IsDisposed)
             {
-                _pending.RemoveFirst();
+                _pending.Remove(node);
                 cursor.PendingNode = null;
+                ReleaseReplacementAdmissionLocked(cursor);
+                node = next;
                 continue;
             }
 
             if (TryAttachLocked(cursor))
             {
-                _pending.RemoveFirst();
+                _pending.Remove(node);
                 cursor.PendingNode = null;
-                continue;
+                ReleaseReplacementAdmissionLocked(cursor);
             }
 
-            if (_activeReaders >= _options.MaxConcurrentReaders)
+            node = next;
+        }
+
+        while (_activeReaders < _options.MaxConcurrentReaders)
+        {
+            LinkedListNode<ReplayCursor>? selected = null;
+            for (var node = _pending.First; node is not null; node = node.Next)
+            {
+                if (!CanWaitForFragmentLocked(node.Value))
+                {
+                    selected = node;
+                    break;
+                }
+            }
+
+            if (selected is null)
             {
                 return;
             }
 
-            _pending.RemoveFirst();
+            var cursor = selected.Value;
+            _pending.Remove(selected);
             cursor.PendingNode = null;
+            ReleaseReplacementAdmissionLocked(cursor);
             StartReaderLocked(cursor);
+        }
+    }
+
+    private void EnqueuePendingLocked(ReplayCursor cursor)
+    {
+        if (_pending.Count >= _options.MaxPendingReaders)
+        {
+            if (_replacementAdmissions >= _disposingReaders)
+            {
+                throw new InvalidOperationException(
+                    $"The retained-history replay admission queue reached its configured limit of {_options.MaxPendingReaders} cursors.");
+            }
+
+            cursor.IsReplacementAdmission = true;
+            _replacementAdmissions++;
+        }
+
+        cursor.PendingNode = _pending.AddLast(cursor);
+    }
+
+    private void ReleaseReplacementAdmissionLocked(ReplayCursor cursor)
+    {
+        if (cursor.IsReplacementAdmission)
+        {
+            cursor.IsReplacementAdmission = false;
+            _replacementAdmissions--;
         }
     }
 
@@ -471,6 +549,7 @@ internal sealed class RecoverableStreamReplayManager<TQueueMessage>
                         if (admitted.Count > 0)
                         {
                             _ = fragment.Cache.Add(admitted, DateTime.UtcNow);
+                            PromotePendingLocked();
                         }
 
                         fragment.AtProviderTail |= read.IsAtTail;
@@ -486,13 +565,37 @@ internal sealed class RecoverableStreamReplayManager<TQueueMessage>
                     }
                 }
             }
-            catch
+            catch (OperationCanceledException) when (linkedCancellation.IsCancellationRequested)
             {
                 if (readCompleted && read.Messages.Count > 0)
                 {
                     fragment.Source.MessagesAddFailed(read.Messages);
                 }
 
+                throw;
+            }
+            catch (Exception exception)
+            {
+                Exception failure = exception;
+                if (readCompleted && read.Messages.Count > 0)
+                {
+                    try
+                    {
+                        fragment.Source.MessagesAddFailed(read.Messages);
+                    }
+                    catch (Exception callbackException)
+                    {
+                        failure = new AggregateException(failure, callbackException);
+                    }
+                }
+
+                lock (_gate)
+                {
+                    fragment.Failure = ExceptionDispatchInfo.Capture(failure);
+                    _fragments.Remove(fragment);
+                }
+
+                ExceptionDispatchInfo.Capture(failure).Throw();
                 throw;
             }
             finally
@@ -533,6 +636,8 @@ internal sealed class RecoverableStreamReplayManager<TQueueMessage>
             return true;
         }
 
+        fragment.Failure?.Throw();
+
         if (replayCursor.MoveNext())
         {
             var current = replayCursor.GetCurrent(out var exception);
@@ -561,7 +666,8 @@ internal sealed class RecoverableStreamReplayManager<TQueueMessage>
         ReclaimFragmentLocked(fragment);
         var safeToken = (replayCursor as IQueueCacheCursorProgress)?.SafeSequenceToken;
         if (fragment.LiveBoundary is { } liveBoundary
-            && (fragment.ReachedLiveBoundary
+            && (fragment.LiveBoundaryEstablishedAfterTail
+                || fragment.ReachedLiveBoundary
                 || safeToken is not null && safeToken.CompareTo(liveBoundary) >= 0))
         {
             HandoffLocked(cursor, fragment);
@@ -603,6 +709,7 @@ internal sealed class RecoverableStreamReplayManager<TQueueMessage>
         cursor.LiveCursor = liveCursor;
         cursor.HasPendingLiveHandoff = true;
         fragment.Cursors.Remove(cursor);
+        UnregisterReplayStreamIfUnused(fragment, cursor.StreamId);
         if (fragment.Cursors.Count == 0)
         {
             BeginFragmentDisposalLocked(fragment);
@@ -612,24 +719,43 @@ internal sealed class RecoverableStreamReplayManager<TQueueMessage>
     private void ReclaimFragmentLocked(ReplayFragment fragment)
     {
         StreamSequenceToken? earliest = null;
+        var inclusive = true;
         foreach (var cursor in fragment.Cursors)
         {
-            if (cursor.HistoricalCursor is not IQueueCacheCursorProgress progress
-                || progress.SafeSequenceToken is not { } safe)
+            StreamSequenceToken current;
+            var currentInclusive = true;
+            if (cursor.HistoricalCursor is IQueueCacheCursorProgress progress
+                && progress.SafeSequenceToken is { } safe)
             {
-                return;
+                current = safe;
+            }
+            else
+            {
+                current = cursor.StartToken;
+                currentInclusive = false;
             }
 
-            if (earliest is null || safe.CompareTo(earliest) < 0)
+            var comparison = earliest is null ? -1 : current.CompareTo(earliest);
+            if (earliest is null || comparison < 0)
             {
-                earliest = safe;
+                earliest = current;
+                inclusive = currentInclusive;
+            }
+            else if (comparison == 0)
+            {
+                inclusive &= currentInclusive;
             }
         }
 
         if (earliest is not null)
         {
-            fragment.Cache.UpdateDeliveryProgress(earliest, DateTime.UtcNow);
-            fragment.Source.UpdateProgress(earliest);
+            fragment.Cache.UpdateReplayProgress(earliest, inclusive, DateTime.UtcNow);
+            fragment.ReclaimedBoundary = earliest;
+            fragment.ReclaimedBoundaryInclusive = inclusive;
+            if (inclusive)
+            {
+                fragment.Source.UpdateProgress(earliest);
+            }
         }
     }
 
@@ -646,6 +772,7 @@ internal sealed class RecoverableStreamReplayManager<TQueueMessage>
             {
                 _pending.Remove(pendingNode);
                 cursor.PendingNode = null;
+                ReleaseReplacementAdmissionLocked(cursor);
             }
 
             cursor.HistoricalCursor?.Dispose();
@@ -655,6 +782,7 @@ internal sealed class RecoverableStreamReplayManager<TQueueMessage>
             if (cursor.Fragment is { } fragment)
             {
                 fragment.Cursors.Remove(cursor);
+                UnregisterReplayStreamIfUnused(fragment, cursor.StreamId);
                 cursor.Fragment = null;
                 if (fragment.Cursors.Count == 0)
                 {
@@ -669,13 +797,39 @@ internal sealed class RecoverableStreamReplayManager<TQueueMessage>
 
     private void BeginFragmentDisposalLocked(ReplayFragment fragment)
     {
-        if (!_fragments.Remove(fragment))
+        if (fragment.DisposalStarted)
         {
             return;
         }
 
+        fragment.DisposalStarted = true;
+        _fragments.Remove(fragment);
         fragment.Cancellation.Cancel();
+        _disposingReaders++;
         TrackBackgroundTaskLocked(DisposeFragment(fragment));
+    }
+
+    private static bool IsReclaimed(
+        ReplayFragment fragment,
+        StreamSequenceToken token)
+    {
+        if (fragment.ReclaimedBoundary is not { } boundary)
+        {
+            return false;
+        }
+
+        var comparison = token.CompareTo(boundary);
+        return comparison < 0 || comparison == 0 && fragment.ReclaimedBoundaryInclusive;
+    }
+
+    private static void UnregisterReplayStreamIfUnused(
+        ReplayFragment fragment,
+        StreamId streamId)
+    {
+        if (!fragment.Cursors.Any(cursor => cursor.StreamId.Equals(streamId)))
+        {
+            fragment.Cache.UnregisterReplayStream(streamId);
+        }
     }
 
     private async Task DisposeFragment(ReplayFragment fragment)
@@ -719,6 +873,7 @@ internal sealed class RecoverableStreamReplayManager<TQueueMessage>
         lock (_gate)
         {
             _activeReaders--;
+            _disposingReaders--;
             PromotePendingLocked();
         }
 
@@ -767,7 +922,12 @@ internal sealed class RecoverableStreamReplayManager<TQueueMessage>
         public HashSet<ReplayCursor> Cursors { get; } = [];
         public bool ReachedLiveBoundary { get; set; }
         public bool AtProviderTail { get; set; }
+        public bool LiveBoundaryEstablishedAfterTail { get; set; }
         public bool ReceiverShutdown { get; set; }
+        public bool DisposalStarted { get; set; }
+        public ExceptionDispatchInfo? Failure { get; set; }
+        public StreamSequenceToken? ReclaimedBoundary { get; set; }
+        public bool ReclaimedBoundaryInclusive { get; set; }
     }
 
     private sealed class ReplayCursor : IAsyncQueueCacheCursor, IQueueCacheCursorProgress, IQueueCacheCursorReplayState
@@ -802,6 +962,7 @@ internal sealed class RecoverableStreamReplayManager<TQueueMessage>
         public bool IsDisposed => Volatile.Read(ref _disposed) != 0;
         public bool IsReplaying => LiveCursor is null && !IsDisposed;
         public bool HasPendingLiveHandoff { get; set; }
+        public bool IsReplacementAdmission { get; set; }
 
         public StreamSequenceToken? SafeSequenceToken
             => (LiveCursor ?? HistoricalCursor) is IQueueCacheCursorProgress progress

@@ -1,6 +1,7 @@
 using System.Net;
 using Amazon.Kinesis;
 using Amazon.Kinesis.Model;
+using Amazon.Runtime;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Serialization;
@@ -75,6 +76,12 @@ internal sealed class KinesisRecoverableStreamSource(
         {
             throw new DataNotAvailableException(
                 $"Kinesis rejected shard sequence '{_readOffset}' for shard '{partition}'.",
+                exception);
+        }
+        catch (Exception exception) when (KinesisReplayErrors.IsTransient(exception))
+        {
+            throw new TransientStreamReplayException(
+                $"Kinesis historical read temporarily failed for shard '{partition}'.",
                 exception);
         }
     }
@@ -237,6 +244,17 @@ internal sealed class KinesisShardReadThrottle(
     }
 }
 
+internal static class KinesisReplayErrors
+{
+    public static bool IsTransient(Exception exception)
+        => exception is HttpRequestException or IOException or TimeoutException
+            || exception is AmazonServiceException serviceException
+                && (serviceException.StatusCode == 0
+                    || serviceException.StatusCode == HttpStatusCode.RequestTimeout
+                    || serviceException.StatusCode == HttpStatusCode.TooManyRequests
+                    || (int)serviceException.StatusCode >= 500);
+}
+
 internal sealed class KinesisReplaySourceFactory(
     Func<IAmazonKinesis> clientFactory,
     string streamName,
@@ -274,12 +292,21 @@ internal sealed class KinesisReplaySourceFactory(
                 $"Kinesis rejected shard sequence '{kinesisToken.ShardSequence}' for shard '{partition}'.",
                 exception);
         }
+        catch (Exception exception) when (KinesisReplayErrors.IsTransient(exception))
+        {
+            await source.DisposeAsync();
+            throw new TransientStreamReplayException(
+                $"Kinesis historical reader initialization temporarily failed for shard '{partition}'.",
+                exception);
+        }
         catch
         {
             await source.DisposeAsync();
             throw;
         }
     }
+
+
 
     private bool TryNormalizeToken(
         StreamSequenceToken token,

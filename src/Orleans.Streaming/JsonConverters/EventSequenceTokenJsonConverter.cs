@@ -95,15 +95,15 @@ namespace Orleans.Streaming.JsonConverters
         public override void Write(Utf8JsonWriter writer, StreamSequenceToken value, JsonSerializerOptions options)
         {
             var runtimeType = value.GetType();
-            if (value is PartitionedStreamSequenceToken partitionedToken)
+            if (value is IPartitionedStreamSequenceToken partitionedToken)
             {
                 writer.WriteStartArray();
                 writer.WriteNumberValue(PartitionedStreamSequenceTokenDiscriminator);
                 WriteNullableString(writer, partitionedToken.ProviderIdentity);
                 WriteNullableString(writer, partitionedToken.PartitionIdentity);
                 writer.WriteStringValue(partitionedToken.Position);
-                writer.WriteNumberValue(partitionedToken.SequenceNumber);
-                writer.WriteNumberValue(partitionedToken.EventIndex);
+                writer.WriteNumberValue(value.SequenceNumber);
+                writer.WriteNumberValue(value.EventIndex);
                 writer.WriteEndArray();
                 return;
             }

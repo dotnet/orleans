@@ -8,6 +8,7 @@ namespace Orleans.Streaming.AdoNet;
 internal sealed class AdoNetQueueAdapterReceiver : IQueueAdapterReceiver, IQueueCache
 {
     private const int BufferSize = 1024 * 1024;
+    private static readonly TimeSpan ReplayMetadataRetention = TimeSpan.FromDays(3650);
     private readonly RecoverableStreamReceiver<AdoNetStreamMessage> _inner;
     private readonly AdoNetRecoverableStream _source;
     private int _shutdownNotified;
@@ -48,11 +49,12 @@ internal sealed class AdoNetQueueAdapterReceiver : IQueueAdapterReceiver, IQueue
             queueId,
             serializer);
         var bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(BufferSize));
-        var cache = CreateCache(cacheOptions.CacheSize, bufferPool);
+        var cache = CreateCache(cacheOptions.CacheSize, bufferPool, trackPurgedMetadata: false);
         IRecoverableStreamQueueCache<AdoNetStreamMessage> CreateReplayCache()
             => CreateCache(
                 replayOptions.CacheSize,
-                new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(BufferSize)));
+                new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(BufferSize)),
+                trackPurgedMetadata: true);
         _inner = new RecoverableStreamReceiver<AdoNetStreamMessage>(
             _source,
             dataAdapter,
@@ -65,7 +67,8 @@ internal sealed class AdoNetQueueAdapterReceiver : IQueueAdapterReceiver, IQueue
 
         RecoverableStreamQueueCache<AdoNetStreamMessage> CreateCache(
             int cacheSize,
-            IObjectPool<FixedSizeBuffer> pool)
+            IObjectPool<FixedSizeBuffer> pool,
+            bool trackPurgedMetadata)
         {
             var evictionStrategy = new ChronologicalEvictionStrategy(
                 logger,
@@ -78,6 +81,7 @@ internal sealed class AdoNetQueueAdapterReceiver : IQueueAdapterReceiver, IQueue
                 dataAdapter,
                 evictionStrategy,
                 logger,
+                metadataMinTimeInCache: trackPurgedMetadata ? ReplayMetadataRetention : null,
                 maxCacheSize: cacheSize);
         }
     }

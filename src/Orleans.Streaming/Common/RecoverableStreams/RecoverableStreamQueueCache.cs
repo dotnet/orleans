@@ -20,6 +20,8 @@ namespace Orleans.Providers.Streams.Common
         private readonly IQueueFlowController? _flowController;
         private readonly int? _maxCacheSize;
         private readonly PooledQueueCache _cache;
+        private readonly HashSet<StreamId> _replayStreams = [];
+        private bool _selectiveMetadataTracking;
         private FixedSizeBuffer? _currentBuffer;
 
         /// <summary>
@@ -59,6 +61,7 @@ namespace Orleans.Providers.Streams.Common
                 cacheMonitor,
                 cacheMonitorWriteInterval,
                 metadataMinTimeInCache);
+            _cache.ShouldTrackPurgedMetadata = ShouldTrackPurgedMetadata;
             _evictionStrategy.PurgeObservable = _cache;
             _evictionStrategy.OnPurged = OnPurged;
         }
@@ -72,6 +75,8 @@ namespace Orleans.Providers.Streams.Common
         /// Gets the number of records currently held in the cache.
         /// </summary>
         public int ItemCount => _cache.ItemCount;
+
+        internal int PurgedMetadataCount => _cache.PurgedMetadataCount;
 
         /// <summary>
         /// Tries to get the newest cached provider position.
@@ -259,6 +264,51 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <inheritdoc />
+        public void UpdateReplayProgress(
+            StreamSequenceToken token,
+            bool inclusive,
+            DateTime utcNow)
+        {
+            CachedMessage? lastPurged = null;
+            var itemsPurged = 0;
+            while (_cache.Oldest is { } oldest)
+            {
+                var comparison = _dataAdapter.Compare(ref oldest, token);
+                if (comparison > 0 || comparison == 0 && !inclusive)
+                {
+                    break;
+                }
+
+                LastPurgedOffset = _dataAdapter.GetOffset(ref oldest);
+                lastPurged = oldest;
+                itemsPurged++;
+                _cache.RemoveOldestMessage();
+            }
+
+            _evictionStrategy.OnPurgeCompleted(lastPurged, itemsPurged);
+            if (_cache.IsEmpty)
+            {
+                _currentBuffer = null;
+            }
+        }
+
+        /// <inheritdoc />
+        public void RegisterReplayStream(StreamId streamId)
+        {
+            _selectiveMetadataTracking = true;
+            _replayStreams.Add(streamId);
+        }
+
+        /// <inheritdoc />
+        public void UnregisterReplayStream(StreamId streamId)
+        {
+            if (_replayStreams.Remove(streamId))
+            {
+                _cache.RemovePurgedMetadata(streamId);
+            }
+        }
+
+        /// <inheritdoc />
         public void Dispose()
         {
             CachedMessage? lastPurged = null;
@@ -282,6 +332,9 @@ namespace Orleans.Providers.Streams.Common
                 LastPurgedOffset = _dataAdapter.GetOffset(ref message);
             }
         }
+
+        private bool ShouldTrackPurgedMetadata(StreamId streamId)
+            => !_selectiveMetadataTracking || _replayStreams.Contains(streamId);
 
         private sealed class Cursor : IQueueCacheCursor, IQueueCacheCursorProgress
         {
