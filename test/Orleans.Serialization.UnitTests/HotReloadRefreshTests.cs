@@ -80,6 +80,7 @@ public class HotReloadRefreshTests : IDisposable
         Assert.ThrowsAny<Exception>(() => typeConverter.Parse(formatted));
         Assert.ThrowsAny<Exception>(() => typeConverter.Parse(formatted));
 
+        _scenarioFilter.AllowScenarioTypes();
         Refresh();
 
         Assert.Equal(typeof(HotReloadScenario.HotReloadAddedType), typeConverter.Parse(formatted));
@@ -87,8 +88,16 @@ public class HotReloadRefreshTests : IDisposable
 
     private sealed class ScenarioTypeNameFilter : Orleans.Serialization.ITypeNameFilter
     {
+        private bool _denyScenarioTypes = true;
+
+        public void AllowScenarioTypes() => _denyScenarioTypes = false;
+
         public bool? IsTypeNameAllowed(string typeName, string assemblyName)
-            => typeName is not null && typeName.Contains(ScenarioNamespaceFragment, StringComparison.Ordinal) ? false : null;
+            => _denyScenarioTypes
+                && typeName is not null
+                && typeName.Contains(ScenarioNamespaceFragment, StringComparison.Ordinal)
+                    ? false
+                    : null;
     }
 
     [Fact]
