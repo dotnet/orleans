@@ -672,17 +672,19 @@ namespace Orleans.Runtime.Messaging
 
             private void RejectClaimedRequest(Message request, SiloAddress deadSilo)
             {
+                Message rejection;
                 lock (_requestLock)
                 {
                     if (_pendingRequests.Contains(request.Id))
                     {
                         return;
                     }
+
+                    _gateway._messagingInstruments.OnRejectedMessage(request);
+                    rejection = _gateway.CreateDeadSiloRejection(request, deadSilo);
+                    SendSyntheticResponse(rejection);
                 }
 
-                _gateway._messagingInstruments.OnRejectedMessage(request);
-                var rejection = _gateway.CreateDeadSiloRejection(request, deadSilo);
-                SendSyntheticResponse(rejection);
                 try
                 {
                     GatewayEvents.EmitDeadSiloRequestRejected(_gateway.siloAddress, Id.GrainId, rejection);
