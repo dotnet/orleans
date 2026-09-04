@@ -33,5 +33,15 @@ namespace Orleans.Providers.Streams.Common
         /// Tries to extract a provider offset from a delivery token.
         /// </summary>
         bool TryGetOffset(StreamSequenceToken token, out string offset);
+
+        /// <summary>
+        /// Gets the inclusive source-record position represented by a token.
+        /// </summary>
+        /// <param name="token">The provider token.</param>
+        /// <returns>The token normalized to the containing source record.</returns>
+        StreamSequenceToken GetRecordToken(StreamSequenceToken token)
+            => token is EventSequenceTokenV2 eventToken
+                ? eventToken.CreateSequenceTokenForEvent(0)
+                : token;
     }
 }

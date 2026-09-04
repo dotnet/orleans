@@ -24,6 +24,7 @@ namespace Orleans.Hosting
             {
                 services.ConfigureNamedOptionForLogging<KinesisStreamOptions>(name)
                     .ConfigureNamedOptionForLogging<SimpleQueueCacheOptions>(name)
+                    .ConfigureNamedOptionForLogging<RecoverableStreamReplayOptions>(name)
                     .ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name)
                     .AddTransient<IConfigurationValidator>(sp => new KinesisStreamOptionsValidator(sp.GetOptionsByName<KinesisStreamOptions>(name), name))
                 .AddTransient<IConfigurationValidator>(sp => new KinesisStreamCheckpointerConfigurationValidator(sp, name));
@@ -51,6 +52,17 @@ namespace Orleans.Hosting
         public SiloKinesisStreamConfigurator ConfigureKinesis(Action<KinesisStreamOptions> configureOptions)
         {
             this.ConfigureKinesis(ob => ob.Configure(configureOptions));
+            return this;
+        }
+
+        /// <summary>
+        /// Configures retained-history readers and replay buffering for this provider.
+        /// </summary>
+        /// <param name="configureOptions">The replay configuration delegate.</param>
+        /// <returns>This configurator.</returns>
+        public SiloKinesisStreamConfigurator ConfigureReplay(Action<OptionsBuilder<RecoverableStreamReplayOptions>> configureOptions)
+        {
+            this.Configure(configureOptions);
             return this;
         }
 

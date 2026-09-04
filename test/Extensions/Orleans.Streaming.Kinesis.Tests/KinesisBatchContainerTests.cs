@@ -39,8 +39,12 @@ public sealed class KinesisBatchContainerTests
         };
         var batch = KinesisBatchContainer.FromKinesisRecord(serializer, record, sequenceId: 0);
 
-        Assert.Equal([1, 3], batch.GetEvents<int>().Select(item => item.Item1));
-        Assert.Equal(["two"], batch.GetEvents<string>().Select(item => item.Item1));
+        var integers = batch.GetEvents<int>().ToArray();
+        var strings = batch.GetEvents<string>().ToArray();
+        Assert.Equal([1, 3], integers.Select(item => item.Item1));
+        Assert.Equal([0, 2], integers.Select(item => item.Item2.EventIndex));
+        Assert.Equal(["two"], strings.Select(item => item.Item1));
+        Assert.Equal([1], strings.Select(item => item.Item2.EventIndex));
 
         Assert.False(batch.ImportRequestContext());
     }

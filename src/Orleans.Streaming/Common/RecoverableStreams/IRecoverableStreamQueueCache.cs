@@ -25,5 +25,17 @@ namespace Orleans.Providers.Streams.Common
         bool TryGetNewestPosition(
             [NotNullWhen(true)] out StreamSequenceToken? token,
             [NotNullWhen(true)] out string? offset);
+
+        /// <summary>
+        /// Tries to get the oldest cached provider position.
+        /// </summary>
+        bool TryGetOldestPosition(
+            [NotNullWhen(true)] out StreamSequenceToken? token,
+            [NotNullWhen(true)] out string? offset)
+        {
+            token = null;
+            offset = null;
+            return false;
+        }
     }
 }

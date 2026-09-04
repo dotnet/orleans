@@ -8,3 +8,10 @@ internal interface IQueueCacheCursorProgress
 
     void RecordDeliverySuccess();
 }
+
+internal interface IQueueCacheCursorReplayState
+{
+    bool IsReplaying { get; }
+
+    bool HasPendingLiveHandoff { get; }
+}

@@ -316,6 +316,36 @@ public sealed class AdoNetOptionsValidatorTests
         AssertStreamingValidation(false, options, nameof(AdoNetStreamOptions.CleanupInterval));
     }
 
+    [Theory]
+    [InlineData(60, 20, true)]
+    [InlineData(60, 60, false)]
+    [InlineData(60, 61, false)]
+    [InlineData(60, 0, false)]
+    public void Streaming_ValidatesReplayLeaseRenewalBeforeExpiry(
+        int leaseDurationSeconds,
+        int renewalSeconds,
+        bool valid)
+    {
+        var options = ValidStreamOptions();
+        options.ReplayLeaseDuration = TimeSpan.FromSeconds(leaseDurationSeconds);
+        options.ReplayLeaseRenewalInterval = TimeSpan.FromSeconds(renewalSeconds);
+
+        AssertStreamingValidation(
+            valid,
+            options,
+            nameof(AdoNetStreamOptions.ReplayLeaseRenewalInterval));
+    }
+
+    [Fact]
+    public void Streaming_RejectsSubSecondReplayLeaseDuration()
+    {
+        var options = ValidStreamOptions();
+        options.ReplayLeaseDuration = TimeSpan.FromMilliseconds(500);
+        options.ReplayLeaseRenewalInterval = TimeSpan.FromMilliseconds(250);
+
+        AssertStreamingValidation(false, options, nameof(AdoNetStreamOptions.ReplayLeaseDuration));
+    }
+
     [Fact]
     public void Streaming_RejectsRetentionWhoseCeilingExceedsSqlIntegerRange()
     {
@@ -357,6 +387,8 @@ public sealed class AdoNetOptionsValidatorTests
         Assert.False(options.StartFromNow);
         Assert.Equal(TimeSpan.FromDays(1), options.RetentionPeriod);
         Assert.Null(options.MaximumRetentionPeriod);
+        Assert.Equal(TimeSpan.FromMinutes(1), options.ReplayLeaseDuration);
+        Assert.Equal(TimeSpan.FromSeconds(20), options.ReplayLeaseRenewalInterval);
     }
 
     private static AdoNetStreamOptions ValidStreamOptions() => new()
@@ -368,6 +400,8 @@ public sealed class AdoNetOptionsValidatorTests
         RetentionPeriod = TimeSpan.FromMinutes(1),
         MaximumRetentionPeriod = TimeSpan.FromMinutes(5),
         CleanupInterval = TimeSpan.FromMinutes(1),
+        ReplayLeaseDuration = TimeSpan.FromMinutes(1),
+        ReplayLeaseRenewalInterval = TimeSpan.FromSeconds(20),
         CleanupBatchSize = 1000,
     };
 

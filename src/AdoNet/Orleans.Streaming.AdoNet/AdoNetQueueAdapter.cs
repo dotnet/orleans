@@ -8,6 +8,7 @@ internal partial class AdoNetQueueAdapter : IQueueAdapter, IQueueAdapterCache
     private readonly AdoNetStreamOptions _streamOptions;
     private readonly ClusterOptions _clusterOptions;
     private readonly SimpleQueueCacheOptions _cacheOptions;
+    private readonly RecoverableStreamReplayOptions _replayOptions;
     private readonly AdoNetStreamQueueMapper _mapper;
     private readonly RelationalOrleansQueries _queries;
     private readonly Serializer<AdoNetBatchContainer> _serializer;
@@ -25,11 +26,37 @@ internal partial class AdoNetQueueAdapter : IQueueAdapter, IQueueAdapterCache
         Serializer<AdoNetBatchContainer> serializer,
         ILogger<AdoNetQueueAdapter> logger,
         IServiceProvider serviceProvider)
+        : this(
+            name,
+            streamOptions,
+            clusterOptions,
+            cacheOptions,
+            new RecoverableStreamReplayOptions(),
+            mapper,
+            queries,
+            serializer,
+            logger,
+            serviceProvider)
+    {
+    }
+
+    public AdoNetQueueAdapter(
+        string name,
+        AdoNetStreamOptions streamOptions,
+        ClusterOptions clusterOptions,
+        SimpleQueueCacheOptions cacheOptions,
+        RecoverableStreamReplayOptions replayOptions,
+        AdoNetStreamQueueMapper mapper,
+        RelationalOrleansQueries queries,
+        Serializer<AdoNetBatchContainer> serializer,
+        ILogger<AdoNetQueueAdapter> logger,
+        IServiceProvider serviceProvider)
     {
         Name = name;
         _streamOptions = streamOptions;
         _clusterOptions = clusterOptions;
         _cacheOptions = cacheOptions;
+        _replayOptions = replayOptions;
         _mapper = mapper;
         _queries = queries;
         _serializer = serializer;
@@ -44,9 +71,9 @@ internal partial class AdoNetQueueAdapter : IQueueAdapter, IQueueAdapterCache
     public string Name { get; }
 
     /// <summary>
-    /// The ADO.NET partitioned stream provider resumes from its durable partition checkpoint.
+    /// The ADO.NET partitioned stream provider replays retained records from explicit subscription tokens.
     /// </summary>
-    public bool IsRewindable => false;
+    public bool IsRewindable => true;
 
     /// <summary>
     /// The ADO.NET provider works both ways.
@@ -108,6 +135,7 @@ internal partial class AdoNetQueueAdapter : IQueueAdapter, IQueueAdapterCache
             _streamOptions,
             _clusterOptions,
             _cacheOptions,
+            _replayOptions,
             _queries);
         receiver.OnShutdown = current => _receivers.Remove(queueId, current);
         return receiver;

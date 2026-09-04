@@ -1,10 +1,13 @@
 using System.Data;
 using System.Reflection;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 using Orleans.Configuration;
 using Orleans.Providers.Streams.Common;
+using Orleans.Serialization;
 using Orleans.Streaming.AdoNet;
 using Orleans.Streaming.AdoNet.Storage;
 using Orleans.Streams;
@@ -229,7 +232,7 @@ public class AdoNetRecoverableStreamTests
                 break;
             case StreamQueryKind.Cleanup:
                 _ = await queries.CleanupStreamMessagesAsync(
-                    "service", "provider", "queue", 1, 2, 3, 4, cancellation.Token);
+                    "service", "provider", "queue", 1, 1, 2, 3, 4, cancellation.Token);
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(queryKind));
@@ -257,6 +260,7 @@ public class AdoNetRecoverableStreamTests
             CreateQueries(storage),
             NullLogger.Instance);
 
+        _ = await source.Load(TestContext.Current.CancellationToken);
         Assert.Empty(await source.Read(10, TestContext.Current.CancellationToken));
 
         var parameters = storage.Parameters[nameof(DbStoredQueries.CleanupStreamMessagesKey)];
@@ -293,6 +297,7 @@ public class AdoNetRecoverableStreamTests
                     (nameof(AdoNetStreamCleanupResult.HardDeletedFromMessageId), 1L),
                     (nameof(AdoNetStreamCleanupResult.HardDeletedThroughMessageId), 100L),
                     (nameof(AdoNetStreamCleanupResult.Checkpoint), 0L),
+                    (nameof(AdoNetStreamCleanupResult.ActiveReplayWatermark), null),
                     (nameof(AdoNetStreamCleanupResult.EarliestMessageId), 101L),
                     (nameof(AdoNetStreamCleanupResult.TailMessageId), 101L)),
             ],
@@ -343,6 +348,7 @@ public class AdoNetRecoverableStreamTests
                     (nameof(AdoNetStreamCleanupResult.HardDeletedFromMessageId), 1L),
                     (nameof(AdoNetStreamCleanupResult.HardDeletedThroughMessageId), 10L),
                     (nameof(AdoNetStreamCleanupResult.Checkpoint), 0L),
+                    (nameof(AdoNetStreamCleanupResult.ActiveReplayWatermark), null),
                     (nameof(AdoNetStreamCleanupResult.EarliestMessageId), 11L),
                     (nameof(AdoNetStreamCleanupResult.TailMessageId), 11L)),
             ],
@@ -363,6 +369,279 @@ public class AdoNetRecoverableStreamTests
 
         Assert.Contains("cache admission failed", failure.Message);
         Assert.Equal(readsAfterFailure, storage.ReadCallCount);
+    }
+
+    [Fact]
+    public async Task ReplaySource_RenewsSafeWatermarkAndReleasesOnCursorDisposal()
+    {
+        var storage = new CapturingRelationalStorage();
+        storage.ReplayMessages.Add(new(
+            "service",
+            "provider",
+            "queue",
+            1,
+            [1],
+            0,
+            DateTime.UtcNow,
+            []));
+        var timeProvider = new FakeTimeProvider();
+        var source = new AdoNetRecoverableStream(
+            "service",
+            "provider",
+            "queue",
+            new AdoNetStreamOptions
+            {
+                ReplayLeaseDuration = TimeSpan.FromSeconds(3),
+                ReplayLeaseRenewalInterval = TimeSpan.FromSeconds(1),
+            },
+            CreateQueries(storage),
+            NullLogger.Instance,
+            timeProvider);
+        _ = await source.Load(TestContext.Current.CancellationToken);
+        var streamId = StreamId.Create("namespace", Guid.NewGuid());
+        var replay = await ((IRecoverableStreamReplaySourceFactory<AdoNetStreamMessage>)source).Create(
+            streamId,
+            new AdoNetStreamSequenceToken("service", "provider", "queue", 1),
+            TestContext.Current.CancellationToken);
+
+        var page = await replay.Read(10, TestContext.Current.CancellationToken);
+        replay.MessagesAdded(page.Messages);
+        replay.UpdateProgress(new AdoNetStreamSequenceToken("service", "provider", "queue", 1));
+        timeProvider.Advance(TimeSpan.FromSeconds(1));
+        await storage.ReplayLeaseUpdated.Task.WaitAsync(
+            TimeSpan.FromSeconds(5),
+            TestContext.Current.CancellationToken);
+        await replay.DisposeAsync();
+
+        Assert.True(page.IsAtTail);
+        Assert.Equal(1, Assert.Single(page.Messages).MessageId);
+        Assert.Equal(
+            1L,
+            Assert.IsType<long>(
+                storage.Parameters[nameof(DbStoredQueries.UpdateStreamReplayLeaseKey)][nameof(DbStoredQueries.Columns.Watermark)]));
+        Assert.Equal(1, storage.CallCounts[nameof(DbStoredQueries.ReleaseStreamReplayLeaseKey)]);
+    }
+
+    [Fact]
+    public async Task ReplaySource_ReceiverShutdownPreservesLeaseForOwnershipTransfer()
+    {
+        var storage = new CapturingRelationalStorage();
+        var source = new AdoNetRecoverableStream(
+            "service",
+            "provider",
+            "queue",
+            new AdoNetStreamOptions(),
+            CreateQueries(storage),
+            NullLogger.Instance);
+        _ = await source.Load(TestContext.Current.CancellationToken);
+        var replay = await ((IRecoverableStreamReplaySourceFactory<AdoNetStreamMessage>)source).Create(
+            StreamId.Create("namespace", Guid.NewGuid()),
+            new AdoNetStreamSequenceToken("service", "provider", "queue", 1),
+            TestContext.Current.CancellationToken);
+
+        await replay.ShutdownAsync(TestContext.Current.CancellationToken);
+
+        Assert.False(storage.CallCounts.ContainsKey(nameof(DbStoredQueries.ReleaseStreamReplayLeaseKey)));
+    }
+
+    [Theory]
+    [InlineData(AdoNetStreamReplayStatus.HistoryUnavailable, typeof(DataNotAvailableException))]
+    [InlineData(AdoNetStreamReplayStatus.Expired, typeof(DataNotAvailableException))]
+    [InlineData(AdoNetStreamReplayStatus.OwnershipLost, typeof(InvalidOperationException))]
+    public async Task ReplaySource_AdmissionFailuresSurfacePreciseErrors(
+        string status,
+        Type exceptionType)
+    {
+        var storage = new CapturingRelationalStorage
+        {
+            ReplayAcquireStatus = status,
+        };
+        var source = new AdoNetRecoverableStream(
+            "service",
+            "provider",
+            "queue",
+            new AdoNetStreamOptions(),
+            CreateQueries(storage),
+            NullLogger.Instance);
+        _ = await source.Load(TestContext.Current.CancellationToken);
+
+        var exception = await Assert.ThrowsAsync(
+            exceptionType,
+            async () => await ((IRecoverableStreamReplaySourceFactory<AdoNetStreamMessage>)source).Create(
+                StreamId.Create("namespace", Guid.NewGuid()),
+                new AdoNetStreamSequenceToken("service", "provider", "queue", 1),
+                TestContext.Current.CancellationToken));
+
+        Assert.Contains("replay", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Receiver_ReplaysOlderAdoNetHistoryAndHandsOffWithoutGap()
+    {
+        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = services.GetRequiredService<Serializer<AdoNetBatchContainer>>();
+        var streamId = StreamId.Create("namespace", Guid.NewGuid());
+        AdoNetStreamMessage CreateMessage(long messageId)
+            => new(
+                "service",
+                "provider",
+                "queue",
+                messageId,
+                streamId.FullKey.ToArray(),
+                streamId.Namespace.Length,
+                DateTime.UtcNow,
+                AdoNetBatchContainer.ToMessagePayload(
+                    serializer,
+                    streamId,
+                    [messageId],
+                    requestContext: null));
+
+        var storage = new CapturingRelationalStorage();
+        storage.LiveMessages.AddRange([CreateMessage(4), CreateMessage(5)]);
+        storage.ReplayMessages.AddRange(
+            [CreateMessage(1), CreateMessage(2), CreateMessage(3), CreateMessage(4), CreateMessage(5)]);
+        var receiver = new AdoNetQueueAdapterReceiver(
+            "provider",
+            "queue",
+            new AdoNetStreamOptions
+            {
+                ReplayLeaseDuration = TimeSpan.FromSeconds(30),
+                ReplayLeaseRenewalInterval = TimeSpan.FromSeconds(10),
+            },
+            new ClusterOptions { ServiceId = "service" },
+            new SimpleQueueCacheOptions { CacheSize = 10 },
+            CreateQueries(storage),
+            serializer,
+            NullLogger<AdoNetQueueAdapterReceiver>.Instance,
+            new RecoverableStreamReplayOptions
+            {
+                MaxConcurrentReaders = 2,
+                MaxPendingReaders = 2,
+                CacheSize = 10,
+                ReadBatchSize = 10,
+                TemporaryTailRetryDelay = TimeSpan.Zero,
+            });
+        await receiver.Initialize(TimeSpan.FromSeconds(5));
+        _ = await receiver.GetQueueMessagesAsync(10, TestContext.Current.CancellationToken);
+        using var cursor = Assert.IsAssignableFrom<IAsyncQueueCacheCursor>(
+            receiver.GetCacheCursor(
+                streamId,
+                new AdoNetStreamSequenceToken("service", "provider", "queue", 2)));
+        var delivered = new List<long>();
+        while (true)
+        {
+            var moveResult = await cursor.MoveNextAsync(TestContext.Current.CancellationToken);
+            if (moveResult == QueueCacheCursorMoveNextResult.Completed)
+            {
+                if (cursor.MoveNext())
+                {
+                    moveResult = QueueCacheCursorMoveNextResult.ItemAvailable;
+                }
+                else
+                {
+                    break;
+                }
+            }
+
+            if (moveResult != QueueCacheCursorMoveNextResult.ItemAvailable)
+            {
+                break;
+            }
+
+            var batch = Assert.IsType<AdoNetBatchContainer>(cursor.GetCurrent(out var exception));
+            Assert.Null(exception);
+            delivered.Add(batch.SequenceToken.SequenceNumber);
+        }
+
+        await receiver.Shutdown(TimeSpan.FromSeconds(5));
+
+        Assert.Equal([2, 3, 4, 5], delivered);
+        Assert.Equal(1, storage.CallCounts[nameof(DbStoredQueries.AcquireStreamReplayLeaseKey)]);
+        Assert.Equal(1, storage.CallCounts[nameof(DbStoredQueries.ReleaseStreamReplayLeaseKey)]);
+    }
+
+    [Fact]
+    public async Task ReplaySource_RejectsForeignAdoNetTokensBeforeLeaseAdmission()
+    {
+        var storage = new CapturingRelationalStorage();
+        var source = new AdoNetRecoverableStream(
+            "service",
+            "provider",
+            "queue",
+            new AdoNetStreamOptions(),
+            CreateQueries(storage),
+            NullLogger.Instance);
+        _ = await source.Load(TestContext.Current.CancellationToken);
+        var factory = (IRecoverableStreamReplaySourceFactory<AdoNetStreamMessage>)source;
+        var streamId = StreamId.Create("namespace", Guid.NewGuid());
+
+        await Assert.ThrowsAsync<DataNotAvailableException>(
+            async () => await factory.Create(
+                streamId,
+                new EventSequenceToken(1),
+                TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<DataNotAvailableException>(
+            async () => await factory.Create(
+                streamId,
+                new AdoNetStreamSequenceToken("other-service", "provider", "queue", 1),
+                TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<DataNotAvailableException>(
+            async () => await factory.Create(
+                streamId,
+                new AdoNetStreamSequenceToken("service", "other-provider", "queue", 1),
+                TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<DataNotAvailableException>(
+            async () => await factory.Create(
+                streamId,
+                new AdoNetStreamSequenceToken("service", "provider", "other-queue", 1),
+                TestContext.Current.CancellationToken));
+
+        Assert.False(storage.CallCounts.ContainsKey(nameof(DbStoredQueries.AcquireStreamReplayLeaseKey)));
+    }
+
+    [Fact]
+    public async Task ReplaySource_AcceptsLegacyEventSequenceTokenV2()
+    {
+        var storage = new CapturingRelationalStorage();
+        var source = new AdoNetRecoverableStream(
+            "service",
+            "provider",
+            "queue",
+            new AdoNetStreamOptions(),
+            CreateQueries(storage),
+            NullLogger.Instance);
+        _ = await source.Load(TestContext.Current.CancellationToken);
+
+        await using var replay = await ((IRecoverableStreamReplaySourceFactory<AdoNetStreamMessage>)source).Create(
+            StreamId.Create("namespace", Guid.NewGuid()),
+            new EventSequenceTokenV2(1),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, storage.CallCounts[nameof(DbStoredQueries.AcquireStreamReplayLeaseKey)]);
+    }
+
+    [Fact]
+    public async Task LiveReader_HardRetentionBeyondMaterializedPageSurfacesDataNotAvailable()
+    {
+        var storage = new CapturingRelationalStorage
+        {
+            CleanupHardDeletedCount = 2,
+            CleanupHardDeletedThroughMessageId = 2,
+        };
+        var source = new AdoNetRecoverableStream(
+            "service",
+            "provider",
+            "queue",
+            new AdoNetStreamOptions(),
+            CreateQueries(storage),
+            NullLogger.Instance);
+        _ = await source.Load(TestContext.Current.CancellationToken);
+
+        var exception = await Assert.ThrowsAsync<DataNotAvailableException>(
+            () => source.Read(10, TestContext.Current.CancellationToken));
+
+        Assert.Contains("materialized through 0", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("through 2", exception.Message, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -395,7 +674,7 @@ public class AdoNetRecoverableStreamTests
         var queryValues = typeof(DbStoredQueries)
             .GetProperties(BindingFlags.Instance | BindingFlags.NonPublic)
             .ToDictionary(property => property.Name, property =>
-                property.Name == nameof(DbStoredQueries.StreamSchemaVersionKey) ? "2" : property.Name);
+                property.Name == nameof(DbStoredQueries.StreamSchemaVersionKey) ? "3" : property.Name);
         return new RelationalOrleansQueries(storage, new DbStoredQueries(queryValues));
     }
 
@@ -544,6 +823,14 @@ public class AdoNetRecoverableStreamTests
         public CancellationToken CapturedCancellationToken { get; private set; }
 
         public Dictionary<string, Dictionary<string, object?>> Parameters { get; } = [];
+        public Dictionary<string, int> CallCounts { get; } = [];
+        public TaskCompletionSource ReplayLeaseUpdated { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public string ReplayAcquireStatus { get; init; } = AdoNetStreamReplayStatus.Acquired;
+        public List<AdoNetStreamMessage> LiveMessages { get; } = [];
+        public List<AdoNetStreamMessage> ReplayMessages { get; } = [];
+        public int CleanupHardDeletedCount { get; init; }
+        public long? CleanupHardDeletedThroughMessageId { get; init; }
 
         public IReadOnlyList<IDataRecord> ReadRecords { get; init; } = [];
 
@@ -569,9 +856,38 @@ public class AdoNetRecoverableStreamTests
             Parameters[query] = command.Parameters.Cast<SqlParameter>()
                 .ToDictionary(parameter => parameter.ParameterName, parameter =>
                     parameter.Value is DBNull ? null : parameter.Value);
+            CallCounts[query] = CallCounts.GetValueOrDefault(query) + 1;
             var records = query switch
             {
-                nameof(DbStoredQueries.ReadStreamMessagesKey) => ReadRecords,
+                nameof(DbStoredQueries.AcquireStreamPartitionKey) => [PartitionRecord()],
+                nameof(DbStoredQueries.ReadStreamMessagesKey) => ReadRecords.Count > 0
+                    ? ReadRecords
+                    : LiveMessages.Select(MessageRecord).ToArray(),
+                nameof(DbStoredQueries.AcquireStreamReplayLeaseKey) =>
+                [
+                    ReplayLeaseRecord(
+                        ReplayAcquireStatus,
+                        includeIdentity: true,
+                        watermark: 0,
+                        tailMessageId: 1),
+                ],
+                nameof(DbStoredQueries.ReadStreamReplayMessagesKey) => ReplayReadRecords(Parameters[query]),
+                nameof(DbStoredQueries.UpdateStreamReplayLeaseKey) =>
+                [
+                    ReplayLeaseRecord(
+                        AdoNetStreamReplayStatus.Active,
+                        includeIdentity: false,
+                        watermark: Convert.ToInt64(Parameters[query][nameof(DbStoredQueries.Columns.Watermark)]),
+                        tailMessageId: 1),
+                ],
+                nameof(DbStoredQueries.ReleaseStreamReplayLeaseKey) =>
+                [
+                    ReplayLeaseRecord(
+                        AdoNetStreamReplayStatus.Released,
+                        includeIdentity: false,
+                        watermark: 1,
+                        tailMessageId: 1),
+                ],
                 nameof(DbStoredQueries.AdvanceStreamCheckpointKey) =>
                 [
                     Record(
@@ -589,10 +905,11 @@ public class AdoNetRecoverableStreamTests
                         (nameof(AdoNetStreamCleanupResult.Ran), true),
                         (nameof(AdoNetStreamCleanupResult.DeletedCount), 0),
                         (nameof(AdoNetStreamCleanupResult.DeletedThroughMessageId), null),
-                        (nameof(AdoNetStreamCleanupResult.HardDeletedCount), 0),
+                        (nameof(AdoNetStreamCleanupResult.HardDeletedCount), CleanupHardDeletedCount),
                         (nameof(AdoNetStreamCleanupResult.HardDeletedFromMessageId), null),
-                        (nameof(AdoNetStreamCleanupResult.HardDeletedThroughMessageId), null),
+                        (nameof(AdoNetStreamCleanupResult.HardDeletedThroughMessageId), CleanupHardDeletedThroughMessageId),
                         (nameof(AdoNetStreamCleanupResult.Checkpoint), 0L),
+                        (nameof(AdoNetStreamCleanupResult.ActiveReplayWatermark), null),
                         (nameof(AdoNetStreamCleanupResult.EarliestMessageId), null),
                         (nameof(AdoNetStreamCleanupResult.TailMessageId), null)),
                 ],
@@ -604,6 +921,11 @@ public class AdoNetRecoverableStreamTests
                 results.Add(await selector(record, 0, cancellationToken));
             }
 
+            if (query == nameof(DbStoredQueries.UpdateStreamReplayLeaseKey))
+            {
+                ReplayLeaseUpdated.TrySetResult();
+            }
+
             return results;
         }
 
@@ -613,6 +935,101 @@ public class AdoNetRecoverableStreamTests
             CommandBehavior commandBehavior = CommandBehavior.Default,
             CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
+        private IDataRecord PartitionRecord()
+        {
+            var messages = LiveMessages.Concat(ReplayMessages).ToArray();
+            return Record(
+                (nameof(AdoNetStreamPartitionState.ServiceId), "service"),
+                (nameof(AdoNetStreamPartitionState.ProviderId), "provider"),
+                (nameof(AdoNetStreamPartitionState.QueueId), "queue"),
+                (nameof(AdoNetStreamPartitionState.OwnerEpoch), 1L),
+                (nameof(AdoNetStreamPartitionState.NextMessageId), messages.Length == 0 ? 1L : messages.Max(static message => message.MessageId) + 1),
+                (nameof(AdoNetStreamPartitionState.Checkpoint), 0L),
+                (nameof(AdoNetStreamPartitionState.EarliestMessageId), messages.Length == 0 ? null : messages.Min(static message => message.MessageId)),
+                (nameof(AdoNetStreamPartitionState.TailMessageId), messages.Length == 0 ? null : messages.Max(static message => message.MessageId)));
+        }
+
+        private IDataRecord[] ReplayReadRecords(IReadOnlyDictionary<string, object?> parameters)
+        {
+            var afterMessageId = Convert.ToInt64(parameters[nameof(DbStoredQueries.Columns.AfterMessageId)]);
+            var maxCount = Convert.ToInt32(parameters[nameof(DbStoredQueries.Columns.MaxCount)]);
+            var tailMessageId = ReplayMessages.Count == 0 ? 0 : ReplayMessages.Max(static message => message.MessageId);
+            var messages = ReplayMessages
+                .Where(message => message.MessageId > afterMessageId)
+                .Take(maxCount)
+                .ToArray();
+            return messages.Length == 0
+                ?
+                [
+                    ReplayLeaseRecord(
+                        AdoNetStreamReplayStatus.Active,
+                        includeIdentity: false,
+                        watermark: afterMessageId,
+                        tailMessageId),
+                ]
+                : messages.Select(message => ReplayLeaseRecord(
+                    AdoNetStreamReplayStatus.Active,
+                    includeIdentity: false,
+                    watermark: afterMessageId,
+                    tailMessageId,
+                    message)).ToArray();
+        }
+
+        private static IDataRecord MessageRecord(AdoNetStreamMessage message)
+            => Record(
+                (nameof(AdoNetStreamMessage.ServiceId), message.ServiceId),
+                (nameof(AdoNetStreamMessage.ProviderId), message.ProviderId),
+                (nameof(AdoNetStreamMessage.QueueId), message.QueueId),
+                (nameof(AdoNetStreamMessage.MessageId), message.MessageId),
+                (nameof(AdoNetStreamMessage.StreamIdBytes), message.StreamIdBytes),
+                (nameof(AdoNetStreamMessage.StreamNamespaceLength), message.StreamNamespaceLength),
+                (nameof(AdoNetStreamMessage.CreatedOn), message.CreatedOn),
+                (nameof(AdoNetStreamMessage.Payload), message.Payload));
+
+        private static IDataRecord ReplayLeaseRecord(
+            string status,
+            bool includeIdentity,
+            long watermark,
+            long tailMessageId,
+            AdoNetStreamMessage? message = null)
+        {
+            var values = new List<(string Name, object? Value)>
+            {
+                (nameof(AdoNetStreamReplayLeaseState.Status), status),
+                (nameof(AdoNetStreamReplayLeaseState.OwnerEpoch), 1L),
+                (nameof(AdoNetStreamReplayLeaseState.Watermark), watermark),
+                (nameof(AdoNetStreamReplayLeaseState.ExpiresOn), DateTime.UtcNow.AddMinutes(1)),
+                (nameof(AdoNetStreamReplayLeaseState.NextMessageId), tailMessageId + 1),
+                (nameof(AdoNetStreamReplayLeaseState.Checkpoint), 0L),
+                (nameof(AdoNetStreamReplayLeaseState.EarliestMessageId), 1L),
+                (nameof(AdoNetStreamReplayLeaseState.TailMessageId), tailMessageId),
+            };
+            if (includeIdentity)
+            {
+                values.Add((nameof(AdoNetStreamReplayLeaseState.ServiceId), "service"));
+                values.Add((nameof(AdoNetStreamReplayLeaseState.ProviderId), "provider"));
+                values.Add((nameof(AdoNetStreamReplayLeaseState.QueueId), "queue"));
+                values.Add((nameof(AdoNetStreamReplayLeaseState.ReaderId), "reader"));
+            }
+
+            if (message is not null)
+            {
+                values.Add((nameof(AdoNetStreamMessage.MessageId), message.MessageId));
+                values.Add((nameof(AdoNetStreamMessage.StreamIdBytes), message.StreamIdBytes));
+                values.Add((nameof(AdoNetStreamMessage.StreamNamespaceLength), message.StreamNamespaceLength));
+                values.Add((nameof(AdoNetStreamMessage.CreatedOn), message.CreatedOn));
+                values.Add((nameof(AdoNetStreamMessage.Payload), message.Payload));
+            }
+            else if (!includeIdentity)
+            {
+                values.Add((nameof(AdoNetStreamMessage.MessageId), null));
+                values.Add((nameof(AdoNetStreamMessage.StreamIdBytes), null));
+                values.Add((nameof(AdoNetStreamMessage.StreamNamespaceLength), null));
+                values.Add((nameof(AdoNetStreamMessage.CreatedOn), null));
+                values.Add((nameof(AdoNetStreamMessage.Payload), null));
+            }
+            return Record([.. values]);
+        }
     }
 
     private sealed class ReservedReceiver : IQueueAdapterReceiver, IQueueCache

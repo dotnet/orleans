@@ -4,6 +4,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Orleans.Configuration;
 using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.Common
@@ -20,7 +21,9 @@ namespace Orleans.Providers.Streams.Common
         private readonly IStreamQueueCheckpointer<string> _checkpointer;
         private readonly bool _startFromNow;
         private readonly object _lifecycleLock = new();
+        private readonly object _cacheLock = new();
         private readonly CancellationTokenSource _lifecycleCancellation = new();
+        private readonly RecoverableStreamReplayManager<TQueueMessage>? _replayManager;
         private Task? _initializeTask;
         private CancellationToken _initializeTaskOwnerToken;
         private int _running;
@@ -35,7 +38,48 @@ namespace Orleans.Providers.Streams.Common
             RecoverableStreamQueueCache<TQueueMessage> cache,
             IStreamQueueCheckpointer<string> checkpointer,
             bool startFromNow)
-            : this(source, dataAdapter, (IRecoverableStreamQueueCache<TQueueMessage>)cache, checkpointer, startFromNow)
+            : this(
+                source,
+                dataAdapter,
+                cache,
+                checkpointer,
+                startFromNow,
+                replaySourceFactory: null,
+                replayCacheFactory: null,
+                replayOptions: null)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="RecoverableStreamReceiver{TQueueMessage}"/> class
+        /// with retained-history replay.
+        /// </summary>
+        /// <param name="source">The singleton live partition source.</param>
+        /// <param name="dataAdapter">The source-record cache adapter.</param>
+        /// <param name="cache">The live partition cache.</param>
+        /// <param name="checkpointer">The durable live checkpoint.</param>
+        /// <param name="startFromNow">The initial live-source policy when no checkpoint exists.</param>
+        /// <param name="replaySourceFactory">The independent historical-reader factory.</param>
+        /// <param name="replayCacheFactory">The replay-fragment cache factory.</param>
+        /// <param name="replayOptions">The replay admission and memory limits.</param>
+        public RecoverableStreamReceiver(
+            IRecoverableStreamSource<TQueueMessage> source,
+            IRecoverableStreamDataAdapter<TQueueMessage> dataAdapter,
+            RecoverableStreamQueueCache<TQueueMessage> cache,
+            IStreamQueueCheckpointer<string> checkpointer,
+            bool startFromNow,
+            IRecoverableStreamReplaySourceFactory<TQueueMessage>? replaySourceFactory,
+            Func<IRecoverableStreamQueueCache<TQueueMessage>>? replayCacheFactory,
+            RecoverableStreamReplayOptions? replayOptions)
+            : this(
+                source,
+                dataAdapter,
+                (IRecoverableStreamQueueCache<TQueueMessage>)cache,
+                checkpointer,
+                startFromNow,
+                replaySourceFactory,
+                replayCacheFactory,
+                replayOptions)
         {
         }
 
@@ -48,12 +92,62 @@ namespace Orleans.Providers.Streams.Common
             IRecoverableStreamQueueCache<TQueueMessage> cache,
             IStreamQueueCheckpointer<string> checkpointer,
             bool startFromNow)
+            : this(
+                source,
+                dataAdapter,
+                cache,
+                checkpointer,
+                startFromNow,
+                replaySourceFactory: null,
+                replayCacheFactory: null,
+                replayOptions: null)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="RecoverableStreamReceiver{TQueueMessage}"/> class
+        /// with retained-history replay.
+        /// </summary>
+        /// <param name="source">The singleton live partition source.</param>
+        /// <param name="dataAdapter">The source-record cache adapter.</param>
+        /// <param name="cache">The live partition cache.</param>
+        /// <param name="checkpointer">The durable live checkpoint.</param>
+        /// <param name="startFromNow">The initial live-source policy when no checkpoint exists.</param>
+        /// <param name="replaySourceFactory">The independent historical-reader factory.</param>
+        /// <param name="replayCacheFactory">The replay-fragment cache factory.</param>
+        /// <param name="replayOptions">The replay admission and memory limits.</param>
+        public RecoverableStreamReceiver(
+            IRecoverableStreamSource<TQueueMessage> source,
+            IRecoverableStreamDataAdapter<TQueueMessage> dataAdapter,
+            IRecoverableStreamQueueCache<TQueueMessage> cache,
+            IStreamQueueCheckpointer<string> checkpointer,
+            bool startFromNow,
+            IRecoverableStreamReplaySourceFactory<TQueueMessage>? replaySourceFactory,
+            Func<IRecoverableStreamQueueCache<TQueueMessage>>? replayCacheFactory,
+            RecoverableStreamReplayOptions? replayOptions)
         {
             _source = source ?? throw new ArgumentNullException(nameof(source));
             _dataAdapter = dataAdapter ?? throw new ArgumentNullException(nameof(dataAdapter));
             _cache = cache ?? throw new ArgumentNullException(nameof(cache));
             _checkpointer = checkpointer ?? throw new ArgumentNullException(nameof(checkpointer));
             _startFromNow = startFromNow;
+            if (replaySourceFactory is null != (replayCacheFactory is null))
+            {
+                throw new ArgumentException(
+                    "A replay source factory and replay cache factory must be configured together.");
+            }
+
+            if (replaySourceFactory is not null && replayCacheFactory is not null)
+            {
+                _replayManager = new(
+                    _cacheLock,
+                    _cache,
+                    _dataAdapter,
+                    replaySourceFactory,
+                    replayCacheFactory,
+                    replayOptions ?? new RecoverableStreamReplayOptions(),
+                    _lifecycleCancellation.Token);
+            }
         }
 
         /// <inheritdoc />
@@ -165,7 +259,12 @@ namespace Orleans.Providers.Streams.Common
             IReadOnlyList<StreamPosition> positions;
             try
             {
-                positions = _cache.Add(messages, DateTime.UtcNow);
+                lock (_cacheLock)
+                {
+                    positions = _cache.Add(messages, DateTime.UtcNow);
+                    _replayManager?.OnLiveMessagesAdded(positions);
+                }
+
                 _source.MessagesAdded(messages);
             }
             catch
@@ -234,6 +333,18 @@ namespace Orleans.Providers.Streams.Common
 
             try
             {
+                if (_replayManager is not null)
+                {
+                    await _replayManager.Shutdown().WaitAsync(cancellationToken);
+                }
+            }
+            catch (Exception exception)
+            {
+                (exceptions ??= []).Add(exception);
+            }
+
+            try
+            {
                 await _checkpointer.FlushAsync(cancellationToken);
             }
             catch (Exception exception)
@@ -252,7 +363,10 @@ namespace Orleans.Providers.Streams.Common
 
             try
             {
-                _cache.Dispose();
+                lock (_cacheLock)
+                {
+                    _cache.Dispose();
+                }
             }
             catch (Exception exception)
             {
@@ -271,7 +385,13 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <inheritdoc />
-        public int GetMaxAddCount() => _cache.GetMaxAddCount();
+        public int GetMaxAddCount()
+        {
+            lock (_cacheLock)
+            {
+                return _cache.GetMaxAddCount();
+            }
+        }
 
         /// <inheritdoc />
         public void AddToCache(IList<IBatchContainer> messages)
@@ -280,20 +400,48 @@ namespace Orleans.Providers.Streams.Common
 
         /// <inheritdoc />
         public bool TryPurgeFromCache([MaybeNullWhen(false)] out IList<IBatchContainer> purgedItems)
-            => _cache.TryPurgeFromCache(out purgedItems);
+        {
+            lock (_cacheLock)
+            {
+                if (_replayManager?.HasPinnedLiveBoundary is true)
+                {
+                    purgedItems = null;
+                    return false;
+                }
+
+                return _cache.TryPurgeFromCache(out purgedItems);
+            }
+        }
 
         /// <inheritdoc />
         public IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken? token)
-            => _cache.GetCacheCursor(streamId, token);
+        {
+            lock (_cacheLock)
+            {
+                return _replayManager?.GetCursor(streamId, token)
+                    ?? _cache.GetCacheCursor(streamId, token);
+            }
+        }
 
         /// <inheritdoc />
         public IQueueCacheCursor GetCacheCursorAtPosition(
             StreamId streamId,
             StreamSubscriptionStartPosition startPosition)
-            => _cache.GetCacheCursorAtPosition(streamId, startPosition);
+        {
+            lock (_cacheLock)
+            {
+                return _cache.GetCacheCursorAtPosition(streamId, startPosition);
+            }
+        }
 
         /// <inheritdoc />
-        public bool IsUnderPressure() => _cache.IsUnderPressure();
+        public bool IsUnderPressure()
+        {
+            lock (_cacheLock)
+            {
+                return _cache.IsUnderPressure();
+            }
+        }
 
         /// <inheritdoc />
         public void UpdateDeliveryProgress(StreamSequenceToken? earliestSubscriptionToken, DateTime utcNow)
@@ -310,7 +458,14 @@ namespace Orleans.Providers.Streams.Common
                 _ = _cache.TryGetNewestPosition(out progressToken, out offset);
             }
 
-            _cache.UpdateDeliveryProgress(progressToken, utcNow);
+            lock (_cacheLock)
+            {
+                if (_replayManager?.HasPinnedLiveBoundary is not true)
+                {
+                    _cache.UpdateDeliveryProgress(progressToken, utcNow);
+                }
+            }
+
             if (progressToken is not null
                 && (offset is not null || _dataAdapter.TryGetOffset(progressToken, out offset)))
             {

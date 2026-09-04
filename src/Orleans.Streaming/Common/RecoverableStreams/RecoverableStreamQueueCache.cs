@@ -92,6 +92,23 @@ namespace Orleans.Providers.Streams.Common
             return true;
         }
 
+        /// <inheritdoc />
+        public bool TryGetOldestPosition(
+            [NotNullWhen(true)] out StreamSequenceToken? token,
+            [NotNullWhen(true)] out string? offset)
+        {
+            if (_cache.Oldest is not { } oldest)
+            {
+                token = null;
+                offset = null;
+                return false;
+            }
+
+            token = _dataAdapter.GetSequenceToken(ref oldest);
+            offset = _dataAdapter.GetOffset(ref oldest);
+            return true;
+        }
+
         /// <summary>
         /// Packs and adds ordered source records to the cache.
         /// </summary>
