@@ -439,11 +439,14 @@ public sealed class IdealizedReminderTableTests : ReminderTableTestRunner
                 nameof(Oracle_FreezeReads_CanTargetOneReadKind),
                 TestContext.Current.CancellationToken);
 
-            var live = await ReminderTable.ReadRow(grainId, "selective-stale-snapshot").WaitAsync(TestContext.Current.CancellationToken);
+            var live = await ReminderTable.ReadRow(
+                grainId,
+                "selective-stale-snapshot",
+                TestContext.Current.CancellationToken);
             Assert.NotNull(live);
             Assert.Equal(updated, live.ETag);
 
-            var stale = await ReminderTable.ReadRows(0, 0).WaitAsync(TestContext.Current.CancellationToken);
+            var stale = await ReminderTable.ReadRows(0, 0, TestContext.Current.CancellationToken);
             Assert.Equal(original, Assert.Single(stale.Reminders).ETag);
         }
     }
