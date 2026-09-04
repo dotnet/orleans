@@ -1350,6 +1350,11 @@ namespace UnitTests.StreamingTests
                 HasActiveSubscriptions = hasActiveSubscriptions;
             }
 
+            public void UpdateDeliveryProgress(StreamSequenceToken? earliestSubscriptionToken, DateTime utcNow)
+            {
+                CheckpointedToken = earliestSubscriptionToken;
+            }
+
             public void Purge()
             {
                 if (cache.IsEmpty)
