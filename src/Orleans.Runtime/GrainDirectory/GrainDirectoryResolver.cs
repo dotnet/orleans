@@ -35,7 +35,7 @@ namespace Orleans.Runtime.GrainDirectory
 
             this.directoryPerName.TryGetValue(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, out var defaultDirectory);
             this.DefaultGrainDirectory = defaultDirectory;
-            this.Directories = this.directoryPerName.Values.Distinct<IGrainDirectory>(ReferenceEqualityComparer.Instance).ToArray();
+            this.Directories = this.directoryPerName.Values.Distinct(ReferenceEqualsComparer<IGrainDirectory>.Default).ToArray();
             this.grainPropertiesResolver = grainPropertiesResolver;
         }
 
