@@ -509,13 +509,16 @@ public sealed class ReminderTestKitClusterIntegrationTests
     {
         await cluster.DeployAsync(cancellationToken);
         var initialSilo = Assert.Single(cluster.Silos);
-        await observer.WaitForReminderServiceStartedAsync(cancellationToken, initialSilo.SiloAddress);
-
-        var joinedSilo = Assert.Single(await cluster.StartSilosAsync(1, cancellationToken));
         using var topologyCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         topologyCancellation.CancelAfter(TimeSpan.FromSeconds(30));
         try
         {
+            await ReminderTopologyStabilizer.WaitForStartupTopologyAsync(
+                cluster,
+                observer,
+                [initialSilo],
+                topologyCancellation.Token);
+            var joinedSilo = Assert.Single(await cluster.StartSilosAsync(1, topologyCancellation.Token));
             await ReminderTopologyStabilizer.WaitForStableTopologyAsync(
                 cluster,
                 observer,
