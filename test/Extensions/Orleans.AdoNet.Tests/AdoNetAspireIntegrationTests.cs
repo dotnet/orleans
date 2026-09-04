@@ -143,6 +143,31 @@ public sealed class AdoNetAspireIntegrationTests
         Assert.Contains("configure exactly one of ConnectionString or DataSource", exception.Message, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("not-an-integer")]
+    [InlineData("0")]
+    [InlineData("-1")]
+    public void InvalidPartitionCount_FailsWithConfigurationPath(string partitionCount)
+    {
+        const string providerName = "streams";
+        var sectionPath = $"Orleans:Streaming:{providerName}";
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [$"{sectionPath}:ProviderType"] = "AdoNet",
+                [$"{sectionPath}:Invariant"] = "Microsoft.Data.SqlClient",
+                [$"{sectionPath}:ConnectionString"] = "Server=localhost;Database=orleans",
+                [$"{sectionPath}:PartitionCount"] = partitionCount,
+            })
+            .Build();
+
+        var exception = Assert.Throws<OrleansConfigurationException>(() => CreateSiloHost(configuration));
+
+        Assert.Contains(sectionPath, exception.Message, StringComparison.Ordinal);
+        Assert.Contains("PartitionCount", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("positive integer", exception.Message, StringComparison.Ordinal);
+    }
+
     private static IHost CreateSiloHost(IConfiguration configuration)
     {
         var builder = Host.CreateApplicationBuilder();
