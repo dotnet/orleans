@@ -214,10 +214,18 @@ public abstract class ReminderServiceLifecycleTestRunner
             cancellationToken,
             async () =>
             {
-                await grain.RegisterOrUpdateAsync(Name, TimeSpan.FromSeconds(3), Period).WaitAsync(cancellationToken);
+                var initialDue = TimeSpan.FromSeconds(3);
+                var originalExpectedStart = _harness.UtcNow.UtcDateTime + initialDue;
+                await grain.RegisterOrUpdateAsync(Name, initialDue, Period).WaitAsync(cancellationToken);
                 await WaitForOwnersAfterRefreshAsync([(grain, Name)], cancellationToken);
                 await _harness.WaitForScheduleAsync(grain.GetGrainId(), Name, cancellationToken);
-                var original = await ReadRequiredAsync(Guarantee, grain.GetGrainId(), Name, cancellationToken);
+                var original = await AssertPersistedAsync(
+                    Guarantee,
+                    grain.GetGrainId(),
+                    Name,
+                    originalExpectedStart,
+                    Period,
+                    cancellationToken);
                 var owners = _harness.GetOwners(grain.GetGrainId(), Name).ToArray();
                 var starts = _harness.GetLocalStartCount(grain.GetGrainId(), Name);
                 var stops = _harness.GetLocalStopCount(grain.GetGrainId(), Name);
@@ -234,18 +242,27 @@ public abstract class ReminderServiceLifecycleTestRunner
                 await _harness.RefreshAsync(cancellationToken);
                 await changed;
                 await _harness.WaitForScheduleAsync(grain.GetGrainId(), Name, cancellationToken);
-                var updated = await ReadRequiredAsync(Guarantee, grain.GetGrainId(), Name, cancellationToken);
+                var updated = await AssertPersistedAsync(
+                    Guarantee,
+                    grain.GetGrainId(),
+                    Name,
+                    expectedStart,
+                    Period + TimeSpan.FromMinutes(1),
+                    cancellationToken,
+                    original.ETag);
 
                 if (!owners.SequenceEqual(_harness.GetOwners(grain.GetGrainId(), Name))
                     || starts != _harness.GetLocalStartCount(grain.GetGrainId(), Name)
                     || stops != _harness.GetLocalStopCount(grain.GetGrainId(), Name)
                     || string.Equals(original.ETag, updated.ETag, StringComparison.Ordinal)
-                    || updated.StartAt != expectedStart
+                    || NormalizeStartAt(updated.StartAt) != NormalizeStartAt(expectedStart)
                     || updated.Period != Period + TimeSpan.FromMinutes(1))
                 {
                     Fail(Guarantee, "RegisterOrUpdateReminder")
                         .WithIdentity(grain.GetGrainId(), Name)
-                        .WithExpected($"same single owner, starts={starts}, stops={stops}, rotated ETag, StartAt={expectedStart:O}")
+                        .WithExpected(
+                            $"same single owner, starts={starts}, stops={stops}, rotated ETag, "
+                            + $"StartAt={NormalizeStartAt(expectedStart):O} at whole-second precision")
                         .WithObserved(
                             $"owners=[{string.Join(", ", _harness.GetOwners(grain.GetGrainId(), Name))}], "
                             + $"starts={_harness.GetLocalStartCount(grain.GetGrainId(), Name)}, "
@@ -305,9 +322,7 @@ public abstract class ReminderServiceLifecycleTestRunner
         const string Guarantee = nameof(ReminderService_ExactDueRecovery);
         const string Name = "exact-due-recovery";
         var grain = CreateGrain(Guarantee);
-        var due = _harness.ReminderLoadingWindow
-            + _harness.ReminderRefreshPeriod
-            + _harness.ReminderRefreshPeriod;
+        var due = _harness.ReminderLoadingWindow + TimeSpan.FromSeconds(3);
         await ExecuteWithCleanupAsync(
             Guarantee,
             cancellationToken,
@@ -631,15 +646,11 @@ public abstract class ReminderServiceLifecycleTestRunner
                     sentinel.RegisterOrUpdateAsync(SentinelName, TimeSpan.FromMinutes(1), Period).WaitAsync(cancellationToken),
                     subject.RegisterOrUpdateAsync(SubjectName, TimeSpan.FromMinutes(1), Period).WaitAsync(cancellationToken));
                 await CleanupAsync(Guarantee, subject, SubjectName, cancellationToken);
-                var sentinelRow = await _harness.ReminderTable.ReadRow(sentinel.GetGrainId(), SentinelName).WaitAsync(cancellationToken);
-                if (sentinelRow is null)
-                {
-                    Fail(Guarantee, "cleanup")
-                        .WithIdentity(sentinel.GetGrainId(), SentinelName)
-                        .WithExpected("unrelated sentinel remains registered")
-                        .WithObserved("sentinel row was removed")
-                        .Throw();
-                }
+                _ = await ReadRequiredAsync(
+                    Guarantee,
+                    sentinel.GetGrainId(),
+                    SentinelName,
+                    cancellationToken);
             },
             async cleanupToken =>
             {
@@ -785,6 +796,7 @@ public abstract class ReminderServiceLifecycleTestRunner
             return;
         }
 
+        RequireETag(guarantee, grainId, name, row!);
         if (!await _harness.ReminderTable.RemoveRow(grainId, name, row.ETag!, cancellationToken).WaitAsync(cancellationToken))
         {
             Fail(guarantee, "scenario cleanup remove")
@@ -796,25 +808,44 @@ public abstract class ReminderServiceLifecycleTestRunner
         }
     }
 
-    private async Task AssertPersistedAsync(
+    private async Task<ReminderEntry> AssertPersistedAsync(
         string guarantee,
         GrainId grainId,
         string name,
         DateTime expectedStart,
         TimeSpan expectedPeriod,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? previousETag = null)
     {
-        var row = await ReadRequiredAsync(guarantee, grainId, name, cancellationToken);
-        if (row.StartAt != expectedStart || row.Period != expectedPeriod || string.IsNullOrEmpty(row.ETag))
+        var row = await _harness.ReminderTable.ReadRow(grainId, name, cancellationToken).WaitAsync(cancellationToken);
+        if (row is null)
         {
             Fail(guarantee, "ReadRow")
                 .WithIdentity(grainId, name)
-                .WithExpected($"StartAt={expectedStart:O}, Period={expectedPeriod}, non-empty ETag")
-                .WithObserved(Describe(row))
-                .WithSchedule(row.StartAt, row.Period)
-                .WithETags(row.ETag)
+                .WithExpected("one immediately visible persisted row")
+                .WithObserved("<null>")
                 .Throw();
         }
+
+        var persisted = row!;
+        RequireETag(guarantee, grainId, name, persisted);
+        if (NormalizeStartAt(persisted.StartAt) != NormalizeStartAt(expectedStart)
+            || persisted.Period != expectedPeriod
+            || previousETag is not null && StringComparer.Ordinal.Equals(previousETag, persisted.ETag))
+        {
+            Fail(guarantee, "ReadRow")
+                .WithIdentity(grainId, name)
+                .WithExpected(
+                    $"immediately visible StartAt={NormalizeStartAt(expectedStart):O} at whole-second precision, "
+                    + $"Period={expectedPeriod}, "
+                    + (previousETag is null ? "non-empty ETag" : $"ETag different from '{previousETag}'"))
+                .WithObserved(Describe(persisted))
+                .WithSchedule(persisted.StartAt, persisted.Period)
+                .WithETags(persisted.ETag, previousETag)
+                .Throw();
+        }
+
+        return persisted;
     }
 
     private async Task<ReminderEntry> ReadRequiredAsync(
@@ -828,11 +859,12 @@ public abstract class ReminderServiceLifecycleTestRunner
         {
             Fail(guarantee, "ReadRow")
                 .WithIdentity(grainId, name)
-                .WithExpected("one persisted row")
+                .WithExpected("one immediately visible persisted row")
                 .WithObserved("<null>")
                 .Throw();
         }
 
+        RequireETag(guarantee, grainId, name, row!);
         return row!;
     }
 
@@ -847,12 +879,30 @@ public abstract class ReminderServiceLifecycleTestRunner
         {
             Fail(guarantee, "cleanup")
                 .WithIdentity(grainId, name)
-                .WithExpected("row absent")
+                .WithExpected("row immediately absent")
                 .WithObserved(Describe(row))
                 .WithETags(row.ETag)
                 .Throw();
         }
     }
+
+    private void RequireETag(string guarantee, GrainId grainId, string name, ReminderEntry row)
+    {
+        if (string.IsNullOrEmpty(row.ETag))
+        {
+            Fail(guarantee, "ReadRow")
+                .WithIdentity(grainId, name)
+                .WithExpected("every persisted row has a non-empty ETag")
+                .WithObserved(Describe(row))
+                .WithETags(row.ETag)
+                .Throw();
+        }
+    }
+
+    private static DateTime NormalizeStartAt(DateTime value)
+        => new(
+            ReminderTableEntrySnapshot.NormalizeStartAtTicks(value, supportsSubSecondPrecision: false),
+            DateTimeKind.Utc);
 
     private void AssertCounts(
         string guarantee,
