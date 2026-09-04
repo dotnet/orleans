@@ -541,7 +541,6 @@ internal sealed partial class JournaledStateManager :
 
                                     // Clear storage.
                                     await DeleteStorageAsync(_shutdownCancellation.Token).ConfigureAwait(true);
-                                    IJournaledStateObserver[] observers;
 
                                     lock (_lock)
                                     {
@@ -1602,6 +1601,11 @@ internal sealed partial class JournaledStateManager :
         Level = LogLevel.Error,
         Message = "Journaled state observer callback {Callback} failed.")]
     private static partial void LogObserverError(ILogger logger, Exception exception, string callback);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Journaled state {StateType} failed its write-completion callback.")]
+    private static partial void LogStateCallbackError(ILogger logger, Exception exception, string stateType);
 
     [LoggerMessage(
         Level = LogLevel.Information,
