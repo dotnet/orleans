@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.IO;
 using System.Reflection;
@@ -176,7 +177,22 @@ namespace Orleans.TestingHost
         /// <param name="assembly">The entry point for spawned silos. If the provided assembly is a library (dll), then its executable sibling assembly will be invoked instead.</param>
         public static Func<string, IConfiguration, Task<SiloHandle>> CreateForAssembly(Assembly assembly)
         {
-            var executablePath = assembly.Location;
+            var executablePath = GetExecutablePath(
+                assembly,
+                GetAssemblyLocation(assembly),
+                ReferenceEquals(assembly, Assembly.GetEntryAssembly()),
+                Environment.ProcessPath);
+            return CreateDelegate(executablePath);
+        }
+
+        internal static string GetExecutablePath(Assembly assembly, string assemblyLocation, bool isEntryAssembly, string? processPath)
+        {
+            var executablePath = string.IsNullOrEmpty(assemblyLocation) && isEntryAssembly ? processPath : assemblyLocation;
+            if (string.IsNullOrEmpty(executablePath))
+            {
+                throw new FileNotFoundException($"Cannot find assembly location for assembly {assembly}");
+            }
+
             var originalFileInfo = new FileInfo(executablePath);
             if (!originalFileInfo.Exists)
             {
@@ -206,8 +222,14 @@ namespace Orleans.TestingHost
                 throw new FileNotFoundException($"Target assembly \"{target.FullName}\" does not exist");
             }
 
-            return CreateDelegate(target.FullName);
+            return target.FullName;
         }
+
+        [UnconditionalSuppressMessage(
+            "SingleFile",
+            "IL3000:Avoid accessing Assembly file path when publishing as a single file",
+            Justification = "CreateForAssembly handles the empty location of a bundled entry assembly using the current process path.")]
+        private static string GetAssemblyLocation(Assembly assembly) => assembly.Location;
 
         private async Task StartAsync()
         {
