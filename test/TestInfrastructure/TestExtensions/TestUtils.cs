@@ -16,9 +16,12 @@ namespace Tester
         {
             if (UseAadAuthentication)
             {
-                if (!GetValue(nameof(TableEndpoint), out _))
+                GetValue(nameof(TableEndpoint), out var tableEndpoint);
+                GetValue(nameof(DataBlobUri), out var dataBlobUri);
+                GetValue(nameof(DataQueueUri), out var dataQueueUri);
+                if (GetAzureStorageAadConfigurationError(tableEndpoint, dataBlobUri, dataQueueUri) is { } error)
                 {
-                    throw Xunit.Sdk.SkipException.ForSkip("No Azure Storage table endpoint was configured. Skipping.");
+                    throw Xunit.Sdk.SkipException.ForSkip(error);
                 }
 
                 return;
@@ -36,6 +39,29 @@ namespace Tester
                 const string errorMessage = "Azure Storage Emulator could not be started.";
                 Console.WriteLine(errorMessage);
                 throw Xunit.Sdk.SkipException.ForSkip(errorMessage);
+            }
+        }
+
+        internal static string? GetAzureStorageAadConfigurationError(
+            string? tableEndpoint,
+            string? dataBlobUri,
+            string? dataQueueUri)
+        {
+            var invalidSettings = new List<string>(3);
+            AddInvalidAbsoluteUri(invalidSettings, nameof(TableEndpoint), tableEndpoint);
+            AddInvalidAbsoluteUri(invalidSettings, nameof(DataBlobUri), dataBlobUri);
+            AddInvalidAbsoluteUri(invalidSettings, nameof(DataQueueUri), dataQueueUri);
+
+            return invalidSettings.Count == 0
+                ? null
+                : $"AAD Azure Storage tests require valid absolute service endpoints. Missing or invalid settings: {string.Join(", ", invalidSettings)}.";
+        }
+
+        private static void AddInvalidAbsoluteUri(List<string> invalidSettings, string settingName, string? value)
+        {
+            if (!Uri.TryCreate(value, UriKind.Absolute, out _))
+            {
+                invalidSettings.Add(settingName);
             }
         }
 
