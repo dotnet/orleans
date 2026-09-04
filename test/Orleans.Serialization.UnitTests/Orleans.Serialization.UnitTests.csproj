@@ -43,7 +43,7 @@
   <Target
     Name="CopyNetStandardSerializationAsset"
     AfterTargets="Build"
-    Condition="'$(TargetFramework)' == 'net10.0'">
+    Condition="'$(TargetFramework)' == 'net10.0' and '$(DesignTimeBuild)' != 'true'">
     <MSBuild
       Projects="$(SourceRoot)src\Orleans.Serialization\Orleans.Serialization.csproj"
       Targets="Build"
@@ -51,7 +51,8 @@
       Properties="Configuration=$(Configuration);TargetFramework=netstandard2.1" />
     <Copy
       SourceFiles="$(SourceRoot)src\Orleans.Serialization\bin\$(Configuration)\netstandard2.1\Orleans.Serialization.dll"
-      DestinationFolder="$(TargetDir)TestAssets" />
+      DestinationFolder="$(TargetDir)TestAssets"
+      SkipUnchangedFiles="true" />
   </Target>
 
 </Project>
