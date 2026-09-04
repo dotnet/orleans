@@ -76,11 +76,17 @@ public class AdaptivePingBenchmark : IDisposable
                     gatewayPort: 30000 + i,
                     primarySiloEndpoint: primary);
 
-                // For SiloToSilo mode: remove grains from primary silo to force cross-silo calls
-                if (i == 0 && grainsOnSecondariesOnly)
+                siloBuilder.Configure<GrainTypeOptions>(options =>
                 {
-                    siloBuilder.Configure<GrainTypeOptions>(options => options.Classes.Remove(typeof(PingGrain)));
-                }
+                    options.Interfaces.Add(typeof(IPingGrain));
+                    options.Classes.Add(typeof(PingGrain));
+
+                    // For SiloToSilo mode: remove grains from primary silo to force cross-silo calls
+                    if (i == 0 && grainsOnSecondariesOnly)
+                    {
+                        options.Classes.Remove(typeof(PingGrain));
+                    }
+                });
             });
 
             var host = hostBuilder.Build();
