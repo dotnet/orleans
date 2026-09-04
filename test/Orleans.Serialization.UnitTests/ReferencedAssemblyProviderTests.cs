@@ -4,9 +4,7 @@ using System.Buffers.Binary;
 #endif
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
-#if NET10_0_OR_GREATER
 using System.IO;
-#endif
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -72,6 +70,15 @@ public sealed class ReferencedAssemblyProviderTests
         Assert.Equal(
             ReferencedAssemblyProvider.AreAssemblyFilesAvailable(null),
             ReferencedAssemblyProvider.AreAssemblyFilesAvailable(dynamicAssembly));
+    }
+
+    [Fact]
+    public void AssemblyFileAvailabilityIsFalseForMemoryLoadedAssembly()
+    {
+        var assembly = Assembly.Load(File.ReadAllBytes(typeof(ReferencedAssemblyProviderTests).Assembly.Location));
+
+        Assert.Empty(assembly.Location);
+        Assert.False(ReferencedAssemblyProvider.AreAssemblyFilesAvailable(assembly));
     }
 
 #if NET10_0_OR_GREATER

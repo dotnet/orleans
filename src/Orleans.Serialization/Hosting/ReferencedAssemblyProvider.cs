@@ -220,7 +220,7 @@ namespace Orleans.Serialization.Internal
             var assembly = entryAssembly is null || entryAssembly.IsDynamic
                 ? typeof(ReferencedAssemblyProvider).Assembly
                 : entryAssembly;
-            return !string.IsNullOrEmpty(assembly.Location);
+            return File.Exists(assembly.Location);
         }
 
         private static IEnumerable<Assembly> GetApplicationPartAssemblies(Assembly assembly)
