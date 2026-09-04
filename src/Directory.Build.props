@@ -23,10 +23,6 @@
     <IsPackable>true</IsPackable>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(IsPackable)' == 'true' and '$(OrleansPackageValidationBaselineVersion)' != ''">
-    <EnablePackageValidation Condition="'$(EnablePackageValidation)' == ''">true</EnablePackageValidation>
-  </PropertyGroup>
-
   <PropertyGroup>
     <ReadMePath>$(MSBuildProjectDirectory)\README.md</ReadMePath>
     <ReadMeExists Condition="Exists('$(ReadMePath)')">true</ReadMeExists>

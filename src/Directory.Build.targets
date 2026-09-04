@@ -25,6 +25,7 @@
   </ItemGroup>
 
   <PropertyGroup Condition="'$(IsPackable)' == 'true' and '$(OrleansPackageValidationBaselineVersion)' != ''">
+    <EnablePackageValidation Condition="'$(EnablePackageValidation)' == ''">true</EnablePackageValidation>
     <PackageValidationBaselineVersion Condition="'$(EnablePackageValidation)' == 'true' and '$(PackageValidationBaselineVersion)' == '' and '$(OrleansPackageValidationBaselineSuffix)' != ''">$(OrleansPackageValidationBaselineVersion)-$(OrleansPackageValidationBaselineSuffix)</PackageValidationBaselineVersion>
     <PackageValidationBaselineVersion Condition="'$(EnablePackageValidation)' == 'true' and '$(PackageValidationBaselineVersion)' == ''">$(OrleansPackageValidationBaselineVersion)</PackageValidationBaselineVersion>
   </PropertyGroup>
