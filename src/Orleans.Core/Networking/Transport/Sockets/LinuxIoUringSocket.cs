@@ -1777,6 +1777,10 @@ internal abstract class LinuxIoUringOperation : IValueTaskSource, IDisposable
     }
 }
 
+[SuppressMessage(
+    "Design",
+    "CA1001:Types that own disposable fields should be disposable",
+    Justification = "Engines are process-lifetime singletons backed by background threads.")]
 internal sealed unsafe partial class LinuxIoUringEngine
 {
     internal const byte SendOperation = 26;

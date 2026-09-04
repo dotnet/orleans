@@ -41,6 +41,10 @@ internal sealed partial class SocketMessageTransport : MessageTransportBase
     private readonly ISocketSender _socketSender;
     private ISocketSender? _largeSocketSender;
     private readonly ISocketReceiver _socketReceiver;
+    [SuppressMessage(
+        "Usage",
+        "CA2213:Disposable fields should be disposed",
+        Justification = "DisposeSocketOperations disposes the owned-page receiver through the receiver lifecycle.")]
     private readonly IOwnedPageSocketReceiver? _ownedPageReceiver;
     private readonly LinuxIoUringEngine? _ioUringReceiveEngine;
     private readonly Socket _socket;
@@ -70,6 +74,10 @@ internal sealed partial class SocketMessageTransport : MessageTransportBase
     private int _adaptiveMultishot;
     private int _adaptivePromotionCount;
     private int _adaptiveDemotionCount;
+    [SuppressMessage(
+        "Usage",
+        "CA2213:Disposable fields should be disposed",
+        Justification = "DisposeSocketOperations disposes the published multishot receiver exactly once.")]
     private LinuxIoUringSocketMultishotReceiver? _multishotReceiver;
     private Task? _processingTask;
     private bool _receiverShutdownStarted;
