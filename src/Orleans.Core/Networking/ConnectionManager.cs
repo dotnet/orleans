@@ -321,7 +321,11 @@ namespace Orleans.Runtime.Messaging
                     if (closeTasks.Count > 0)
                     {
                         await Task.WhenAll(closeTasks).WaitAsync(ct).SuppressThrowing();
-                        if (ct.IsCancellationRequested) break;
+                        if (ct.IsCancellationRequested)
+                        {
+                            shutdownCompleted = IsQuiescent();
+                            break;
+                        }
                     }
                     else if (!pendingConnections)
                     {
@@ -330,7 +334,12 @@ namespace Orleans.Runtime.Messaging
                     }
 
                     await Task.Delay(10, ct).SuppressThrowing();
-                    if (ct.IsCancellationRequested) break;
+                    if (ct.IsCancellationRequested)
+                    {
+                        shutdownCompleted = IsQuiescent();
+                        break;
+                    }
+
                     if (++cycles > 100 && cycles % 500 == 0 && this.ConnectionCount is var remaining and > 0)
                     {
                         LogWarningWaitingForConnectionsToTerminate(this.logger, remaining);
@@ -349,6 +358,19 @@ namespace Orleans.Runtime.Messaging
                 }
 
                 this.closedTaskCompletionSource.TrySetResult(0);
+            }
+
+            bool IsQuiescent()
+            {
+                foreach (var entry in connections.Values)
+                {
+                    if (entry.PendingConnection is not null || !entry.Connections.IsEmpty)
+                    {
+                        return false;
+                    }
+                }
+
+                return true;
             }
         }
 

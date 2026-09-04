@@ -19,11 +19,7 @@ using static Orleans.Runtime.Message;
 
 namespace Orleans.Runtime.Messaging
 {
-    [System.Diagnostics.CodeAnalysis.SuppressMessage(
-        "Design",
-        "CA1001:Types that own disposable fields should be disposable",
-        Justification = "Each write resets the reusable buffer writer and releases any rented buffers. Making the transient serializer disposable would extend its lifetime through container tracking; the transport replacement in #10846 removes this field.")]
-    internal sealed class MessageSerializer
+    internal sealed class MessageSerializer : IDisposable
     {
         private const int FramingLength = Message.LENGTH_HEADER_SIZE;
         private const int MessageSizeHint = 4096;
@@ -40,6 +36,7 @@ namespace Orleans.Runtime.Messaging
         private readonly int _maxBodyLength;
         private readonly DictionaryCodec<string, object> _requestContextCodec;
         private readonly PrefixingBufferWriter _bufferWriter;
+        private bool _disposed;
 
         public MessageSerializer(
             SerializerSessionPool sessionPool,
@@ -54,6 +51,19 @@ namespace Orleans.Runtime.Messaging
             _requestContextCodec = OrleansGeneratedCodeHelper.GetService<DictionaryCodec<string, object>>(this, sessionPool.CodecProvider);
             _grainAddressCacheUpdateCodec = OrleansGeneratedCodeHelper.GetService<IFieldCodec<GrainAddressCacheUpdate>>(this, sessionPool.CodecProvider);
             _bufferWriter = new(FramingLength, MessageSizeHint, memoryPool.Pool);
+        }
+
+        public void Dispose()
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            _bufferWriter.Dispose();
+            _serializationSession.Dispose();
+            _deserializationSession.Dispose();
         }
 
         public (int RequiredBytes, int HeaderLength, int BodyLength) TryRead(ref ReadOnlySequence<byte> input, out Message? message)
