@@ -39,6 +39,10 @@ namespace Orleans
 
         public IInternalGrainFactory InternalGrainFactory { get; private set; } = null!;
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage(
+            "Usage",
+            "CA2213:Disposable fields should be disposed",
+            Justification = "This field is a non-owning view of the singleton registered in the service provider. The client coordinates StopAsync, and the service provider owns disposal.")]
         private ClientClusterManifestProvider? _manifestProvider;
         private MessageFactory? messageFactory;
         private readonly LocalClientDetails _localClientDetails;
@@ -436,7 +440,7 @@ namespace Orleans
             this.disposing = true;
             Volatile.Write(ref _isStopping, 1);
 
-            Utils.SafeExecute(() => this.callbackTimer.Dispose());
+            this.callbackTimer.Dispose();
             BreakOutstandingMessages();
 
             Utils.SafeExecute(() => MessageCenter?.Dispose());

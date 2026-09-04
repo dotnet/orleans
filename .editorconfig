@@ -666,6 +666,12 @@ dotnet_diagnostic.CA1873.severity = warning
 [src/Orleans.Core/**.cs]
 dotnet_diagnostic.CA1873.severity = warning
 
+# CA1001: Types that own disposable fields should be disposable
+# CA2213: Disposable fields should be disposed
+[src/Orleans.Core/**.cs]
+dotnet_diagnostic.CA1001.severity = warning
+dotnet_diagnostic.CA2213.severity = warning
+
 [src/Orleans.Runtime/Networking/**.cs]
 dotnet_diagnostic.CA1848.severity = warning
 dotnet_diagnostic.CA1849.severity = warning

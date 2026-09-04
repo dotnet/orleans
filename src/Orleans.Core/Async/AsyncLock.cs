@@ -44,7 +44,10 @@ namespace Orleans
     /// 3) LockReleaser is IDisposable to implement the "using" pattern.
     /// 4) LockReleaser does NOT have to implement the Finalizer function. If users forget to Dispose the LockReleaser (analogous to forgetting to release a mutex)
     /// the AsyncLock will remain locked, which may potentially cause deadlock. This is OK, since these are the exact regular mutex semantics - if one forgets to unlock the mutex, it stays locked.
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1001:TypesThatOwnDisposableFieldsShouldBeDisposable")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Design",
+        "CA1001:Types that own disposable fields should be disposable",
+        Justification = "AsyncLock has mutex lifetime semantics: the semaphore remains available for every outstanding releaser and is reclaimed with the lock.")]
     internal class AsyncLock
     {
         private readonly SemaphoreSlim semaphore;

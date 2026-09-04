@@ -291,7 +291,8 @@ namespace Orleans.Runtime.Messaging
             await Task.Yield();
 
             Exception? error = default;
-            var serializer = this.shared.ServiceProvider.GetRequiredService<MessageSerializer>();
+            using var serializerScope = this.shared.ServiceProvider.CreateScope();
+            var serializer = serializerScope.ServiceProvider.GetRequiredService<MessageSerializer>();
             var prevBufferLength = 0L;
             try
             {
@@ -366,7 +367,8 @@ namespace Orleans.Runtime.Messaging
             await Task.Yield();
 
             Exception? error = default;
-            var serializer = this.shared.ServiceProvider.GetRequiredService<MessageSerializer>();
+            using var serializerScope = this.shared.ServiceProvider.CreateScope();
+            var serializer = serializerScope.ServiceProvider.GetRequiredService<MessageSerializer>();
             var messageObserver = this.shared.MessageStatisticsSink.GetMessageObserver();
             try
             {
