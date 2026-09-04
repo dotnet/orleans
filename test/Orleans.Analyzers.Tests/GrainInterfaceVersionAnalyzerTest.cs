@@ -2924,11 +2924,13 @@ interface Outer.IInnerGrain [Version(1)]
             }
             catch (IOException) when (attempt < maxAttempts)
             {
-                await Task.Delay(retryDelay, cancellationToken);
+                await Task.Delay(retryDelay, cancellationToken)
+                    .ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
             }
             catch (UnauthorizedAccessException) when (attempt < maxAttempts)
             {
-                await Task.Delay(retryDelay, cancellationToken);
+                await Task.Delay(retryDelay, cancellationToken)
+                    .ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
             }
         }
     }
