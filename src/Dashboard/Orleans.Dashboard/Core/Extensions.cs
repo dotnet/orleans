@@ -13,8 +13,9 @@ internal static class Extensions
         if (grainRef.IsPrimaryKeyBasedOnLong()) // Long
         {
             var longKey = grainRef.GetPrimaryKeyLong(out var longExt);
+            var key = longKey.ToString(CultureInfo.InvariantCulture);
 
-            return longExt != null ? $"{longKey} + {longExt}" : longKey.ToString();
+            return longExt != null ? $"{key} + {longExt}" : key;
         }
 
         var stringKey = grainRef.GetPrimaryKeyString();
@@ -29,7 +30,7 @@ internal static class Extensions
         return stringKey;
     }
 
-    public static string ToPeriodString(this DateTime value) => value.ToString("yyyy-MM-ddTHH:mm:ss");
+    public static string ToPeriodString(this DateTime value) => value.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture);
 
     public static long ToPeriodNumber(this DateTime value) => (long)value.Subtract(UnixStart).TotalSeconds;
 

@@ -1,8 +1,9 @@
-using Orleans.Core;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Reflection;
+using Orleans.Core;
 
 namespace Orleans.Dashboard.Implementation.Helpers;
 
@@ -29,12 +30,12 @@ internal static class GrainStateHelper
                 if (splitedGrainId.Length != 2)
                     throw new InvalidOperationException("Inform grain id in format {id},{additionalKey}");
 
-                grainId = Convert.ToInt64(splitedGrainId.First());
+                grainId = Convert.ToInt64(splitedGrainId.First(), CultureInfo.InvariantCulture);
                 keyExtension = splitedGrainId.Last();
             }
             else if (implementationType.IsAssignableTo(typeof(IGrainWithIntegerKey)))
             {
-                grainId = Convert.ToInt64(id);
+                grainId = Convert.ToInt64(id, CultureInfo.InvariantCulture);
             }
             else if (implementationType.IsAssignableTo(typeof(IGrainWithGuidKey)))
             {

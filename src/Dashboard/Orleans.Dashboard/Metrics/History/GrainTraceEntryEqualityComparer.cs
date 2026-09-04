@@ -1,6 +1,6 @@
-using Orleans.Dashboard.Model;
 using System;
 using System.Collections.Generic;
+using Orleans.Dashboard.Model;
 
 namespace Orleans.Dashboard.Metrics.History;
 
@@ -50,19 +50,19 @@ internal sealed class GrainTraceEqualityComparer : IEqualityComparer<GrainTraceE
 
         var hashCode = 17;
 
-        if (obj.Grain != null)
+        if (obj.Grain is { } grain)
         {
-            hashCode = hashCode * 23 + (obj.Grain?.GetHashCode() ?? 0);
+            hashCode = hashCode * 23 + grain.GetHashCode(StringComparison.OrdinalIgnoreCase);
         }
 
-        if (obj.Grain != null)
+        if (obj.Method is { } method)
         {
-            hashCode = hashCode * 23 + (obj.Method?.GetHashCode() ?? 0);
+            hashCode = hashCode * 23 + method.GetHashCode(StringComparison.OrdinalIgnoreCase);
         }
 
-        if (obj.Grain != null && _withSiloAddress)
+        if (_withSiloAddress && obj.SiloAddress is { } siloAddress)
         {
-            hashCode = hashCode * 23 + (obj.SiloAddress?.GetHashCode() ?? 0);
+            hashCode = hashCode * 23 + siloAddress.GetHashCode(StringComparison.OrdinalIgnoreCase);
         }
 
         return hashCode;

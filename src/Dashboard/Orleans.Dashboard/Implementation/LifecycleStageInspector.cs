@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
@@ -64,7 +65,8 @@ internal static class LifecycleStageInspector
             .Select(group => new LifecycleStageInfo
             {
                 Stage = group.Key,
-                StageName = group.Select(e => e.StageName).FirstOrDefault(s => !string.IsNullOrEmpty(s)) ?? group.Key.ToString(),
+                StageName = group.Select(e => e.StageName).FirstOrDefault(s => !string.IsNullOrEmpty(s))
+                    ?? group.Key.ToString(CultureInfo.CurrentCulture),
                 IsNamedStage = NamedStageValues.Contains(group.Key),
                 Observers = group.Select(e => BuildObserver(e.Name, e.InnerObserver)).ToArray(),
             })
@@ -168,7 +170,7 @@ internal static class LifecycleStageInspector
         if (d is null) return true;
         if (ReferenceEquals(d, NoOpStart) || ReferenceEquals(d, NoOpStop)) return true;
         var method = d.Method;
-        if (method.DeclaringType is { } declaring && declaring.Name.Contains("<>c"))
+        if (method.DeclaringType is { } declaring && declaring.Name.Contains("<>c", StringComparison.Ordinal))
         {
             // Lambda. Without analyzing the IL we can't be sure, but it's
             // almost always a no-op when used in lifecycle wiring.
@@ -307,7 +309,7 @@ internal static class LifecycleStageInspector
         if (!type.IsGenericType) return type.FullName ?? type.Name;
         var genericArgs = string.Join(", ", type.GetGenericArguments().Select(FormatType));
         var name = type.Namespace is null ? type.Name : $"{type.Namespace}.{type.Name}";
-        var tickIndex = name.IndexOf('`');
+        var tickIndex = name.IndexOf('`', StringComparison.Ordinal);
         if (tickIndex >= 0) name = name[..tickIndex];
         return $"{name}<{genericArgs}>";
     }

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -112,6 +113,29 @@ public class LifecycleStageInspectorTests
         Assert.Contains("<lambda in", observer.OnStartMethod ?? string.Empty, System.StringComparison.Ordinal);
         Assert.Contains("<lambda in", observer.OnStopMethod ?? string.Empty, System.StringComparison.Ordinal);
         Assert.DoesNotContain("b__", observer.OnStartMethod ?? string.Empty, System.StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void GetStages_FormatsNumericStageUsingCurrentCulture()
+    {
+        var originalCulture = CultureInfo.CurrentCulture;
+        try
+        {
+            var culture = (CultureInfo)CultureInfo.InvariantCulture.Clone();
+            culture.NumberFormat.NegativeSign = "~";
+            CultureInfo.CurrentCulture = culture;
+            var subject = new SiloLifecycleSubject(NullLogger<SiloLifecycleSubject>.Instance);
+            subject.Subscribe("CustomStage", -4242, Start, Stop);
+
+            var stage = Assert.Single(LifecycleStageInspector.GetStages(subject));
+
+            Assert.Equal("~4242", stage.StageName);
+            Assert.False(stage.IsNamedStage);
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = originalCulture;
+        }
     }
 
     private static Task Start(CancellationToken ct) => Task.CompletedTask;

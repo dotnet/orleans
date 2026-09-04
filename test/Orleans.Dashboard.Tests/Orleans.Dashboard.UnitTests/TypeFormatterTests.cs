@@ -1,3 +1,4 @@
+using System.Globalization;
 using Orleans.Dashboard.Metrics.TypeFormatting;
 using Xunit;
 
@@ -67,6 +68,24 @@ namespace UnitTests
             var name = TypeFormatter.Parse(example);
 
             Assert.Equal(".Program.Progress", name);
+        }
+
+        [Fact]
+        public void Parse_FormatsTypeSyntaxIndependentlyOfCurrentCulture()
+        {
+            var originalCulture = CultureInfo.CurrentCulture;
+            try
+            {
+                CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("tr-TR");
+
+                var name = TypeFormatter.Parse("CultureTests.GenericGrain`1[[System.String,mscorlib]]");
+
+                Assert.Equal("CultureTests.GenericGrain<String>", name);
+            }
+            finally
+            {
+                CultureInfo.CurrentCulture = originalCulture;
+            }
         }
     }
 }

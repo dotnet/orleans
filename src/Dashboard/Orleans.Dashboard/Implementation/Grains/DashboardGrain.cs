@@ -305,7 +305,7 @@ internal sealed class DashboardGrain : Grain, IDashboardGrain
         try
         {
             var implementationType = _typeManifestOptions.InterfaceImplementations
-                .FirstOrDefault(w => w.FullName!.Equals(grainType))!;
+                .FirstOrDefault(w => string.Equals(w.FullName, grainType, StringComparison.Ordinal))!;
 
             var mappedGrainId = GrainStateHelper.GetGrainId(id!, implementationType);
             object? grainId = mappedGrainId.Item1;
