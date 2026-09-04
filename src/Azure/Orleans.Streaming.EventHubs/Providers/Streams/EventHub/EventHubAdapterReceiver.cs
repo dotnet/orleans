@@ -624,7 +624,7 @@ internal partial class EventHubAdapterReceiver : IQueueAdapterReceiver, IQueueCa
 
     [LoggerMessage(
         Level = LogLevel.Warning,
-        EventId = (int)OrleansEventHubErrorCode.FailedPartitionRead,
+        EventId = (int)OrleansEventHubErrorCode.RetryReceiverInit,
         Message = "Retrying initialization of EventHub partition {EventHubName}-{Partition}."
     )]
     private partial void LogWarningRetryingInitializationOfEventHubPartition(string eventHubName, string partition);
@@ -638,7 +638,7 @@ internal partial class EventHubAdapterReceiver : IQueueAdapterReceiver, IQueueCa
 
     [LoggerMessage(
         Level = LogLevel.Warning,
-        EventId = (int)OrleansEventHubErrorCode.FailedPartitionRead,
+        EventId = (int)OrleansEventHubErrorCode.RetryReceiverInit,
         Message = "Failed to recover EventHub partition {EventHubName}-{Partition} from an invalid checkpoint. The original read failure will be rethrown."
     )]
     private partial void LogWarningFailedToRecoverFromInvalidCheckpoint(string eventHubName, string partition, Exception exception);
