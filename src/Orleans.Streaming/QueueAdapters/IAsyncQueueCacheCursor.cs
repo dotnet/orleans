@@ -47,6 +47,17 @@ public sealed class TransientStreamReplayException : OrleansException
 }
 
 /// <summary>
+/// Identifies a queue cache which can create retained-history cursors when a token is older than its live data.
+/// </summary>
+public interface IQueueCacheRetainedReplay
+{
+    /// <summary>
+    /// Gets a value indicating whether retained-history cursor creation is enabled.
+    /// </summary>
+    bool SupportsRetainedReplay { get; }
+}
+
+/// <summary>
 /// Describes the result of asynchronously advancing a queue cache cursor.
 /// </summary>
 public enum QueueCacheCursorMoveNextResult

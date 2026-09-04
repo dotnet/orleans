@@ -5,7 +5,7 @@ namespace Orleans.Streaming.AdoNet;
 /// <summary>
 /// Receives records from one stream partition through the recoverable stream partition pipeline.
 /// </summary>
-internal sealed class AdoNetQueueAdapterReceiver : IQueueAdapterReceiver, IQueueCache
+internal sealed class AdoNetQueueAdapterReceiver : IQueueAdapterReceiver, IQueueCache, IQueueCacheRetainedReplay
 {
     private const int BufferSize = 1024 * 1024;
     private static readonly TimeSpan ReplayMetadataRetention = TimeSpan.FromDays(3650);
@@ -14,6 +14,8 @@ internal sealed class AdoNetQueueAdapterReceiver : IQueueAdapterReceiver, IQueue
     private int _shutdownNotified;
 
     internal Action<AdoNetQueueAdapterReceiver>? OnShutdown { get; set; }
+
+    public bool SupportsRetainedReplay => true;
 
     public AdoNetQueueAdapterReceiver(
         string providerId,
