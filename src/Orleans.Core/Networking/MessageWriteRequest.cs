@@ -8,16 +8,21 @@ using System.Collections.Generic;
 
 namespace Orleans.Runtime.Messaging;
 
-internal sealed partial class MessageWriteRequest : WriteRequest
+internal sealed partial class MessageWriteRequest : WriteRequest, IDisposable
 {
     private const int LargeMessageSize = 8 * 1024;
     private const int SendPageSize = 32 * 1024;
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Usage",
+        "CA2213:Disposable fields should be disposed",
+        Justification = "MessageHandlerShared owns and pools this request; the request does not own the shared pool.")]
     private readonly MessageHandlerShared _shared;
     private readonly ArcBufferWriter _buffer = new();
     private readonly List<(Message Message, int TotalLength, int HeaderLength)> _messages = [];
     private Connection? _connection;
     private MessageSerializer? _messageSerializer;
     private bool _hasLargeMessages;
+    private bool _disposed;
 
     public MessageWriteRequest(MessageHandlerShared shared)
     {
@@ -114,6 +119,19 @@ internal sealed partial class MessageWriteRequest : WriteRequest
         _buffer.Reset(nextPageSize);
         _connection = null;
         _shared.Return(this);
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        CompleteWriting();
+        _messages.Clear();
+        _buffer.Dispose();
     }
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Error sending messages {Messages}")]

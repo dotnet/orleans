@@ -12,6 +12,10 @@ namespace Orleans.Connections.Transport.Security;
 /// </summary>
 internal sealed class ClientTlsMessageTransport : TlsMessageTransport
 {
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Usage",
+        "CA2213:Disposable fields should be disposed",
+        Justification = "The certificate is supplied and owned by the caller's TLS options.")]
     private readonly X509Certificate2? _certificate;
     private readonly Func<object, string, X509CertificateCollection, X509Certificate?, string[], X509Certificate2?>? _certificateSelector;
 

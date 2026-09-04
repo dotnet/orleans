@@ -50,6 +50,7 @@ internal sealed partial class SocketMessageTransport : MessageTransportBase
     private volatile bool _socketDisposed;
     private volatile bool _socketShutdown;
     private volatile Exception? _shutdownReason;
+    private int _disposeStarted;
 
     public SocketMessageTransport(Socket socket, ILogger logger)
     {
@@ -297,26 +298,40 @@ internal sealed partial class SocketMessageTransport : MessageTransportBase
 
     public override async ValueTask DisposeAsync()
     {
-        // Ensure socket is shutdown and disposed, even if CloseAsync wasn't called or timed out
-        Shutdown();
-
-        // Signal that we're closing if not already done
-        await _connectionClosingCts.CancelAsync().ConfigureAwait(false);
-        _readSignal.Signal();
-        _writeSignal.Signal();
-
-        if (_processingTask is { } processingTask)
+        if (Interlocked.Exchange(ref _disposeStarted, 1) != 0)
         {
-            await processingTask.ConfigureAwait(false);
-        }
-        else
-        {
-            _socketReceiver.Dispose();
-            _socketSender.Dispose();
-            await _connectionClosedCts.CancelAsync().ConfigureAwait(false);
+            return;
         }
 
-        await base.DisposeAsync().ConfigureAwait(false);
+        try
+        {
+            // Ensure socket is shutdown and disposed, even if CloseAsync wasn't called or timed out
+            Shutdown();
+
+            // Signal that we're closing if not already done
+            await _connectionClosingCts.CancelAsync().ConfigureAwait(false);
+            _readSignal.Signal();
+            _writeSignal.Signal();
+
+            if (_processingTask is { } processingTask)
+            {
+                await processingTask.ConfigureAwait(false);
+            }
+            else
+            {
+                _socketReceiver.Dispose();
+                _socketSender.Dispose();
+                await _connectionClosedCts.CancelAsync().ConfigureAwait(false);
+            }
+
+            await base.DisposeAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            _connectionClosingCts.Dispose();
+            _connectionClosedCts.Dispose();
+            GC.SuppressFinalize(this);
+        }
     }
 
     private async Task ProcessReads()

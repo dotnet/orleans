@@ -12,6 +12,10 @@ namespace Orleans.Runtime.Messaging;
 
 internal sealed partial class MessageReadRequest(MessageHandlerShared shared) : ReadRequest, IThreadPoolWorkItem, IDisposable
 {
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Usage",
+        "CA2213:Disposable fields should be disposed",
+        Justification = "MessageHandlerShared owns and pools this request; the request does not own the shared pool.")]
     internal readonly MessageHandlerShared Shared = shared;
 
     private Connection? _connection;
@@ -65,6 +69,10 @@ internal sealed partial class MessageReadRequest(MessageHandlerShared shared) : 
         OnError(new OperationCanceledException());
     }
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Reliability",
+        "CA2000:Dispose objects before losing scope",
+        Justification = "The serializer is borrowed from and returned to MessageHandlerShared.")]
     public override bool OnRead(ArcBufferReader bufferReader)
     {
         Debug.Assert(_connection is not null);

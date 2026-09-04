@@ -31,6 +31,7 @@ internal abstract partial class StreamMessageTransport : MessageTransportBase
     private bool _readsCompleted;
     private bool _writesCompleted;
     private volatile bool _streamDisposed;
+    private int _disposeStarted;
 
     protected StreamMessageTransport(ILogger logger)
     {
@@ -112,25 +113,38 @@ internal abstract partial class StreamMessageTransport : MessageTransportBase
 
     public override async ValueTask DisposeAsync()
     {
-        // Ensure stream is disposed, even if CloseAsync wasn't called or timed out
-        DisposeStream();
-
-        // Signal that we're closing if not already done
-        await _connectionClosingCts.CancelAsync().ConfigureAwait(false);
-        _readerSignal.Signal();
-        _writerSignal.Signal();
-
-        if (_runTask is { } runTask)
+        if (Interlocked.Exchange(ref _disposeStarted, 1) != 0)
         {
-            await runTask.ConfigureAwait(false);
-        }
-        else
-        {
-            await _connectionClosedCts.CancelAsync().ConfigureAwait(false);
+            return;
         }
 
-        await base.DisposeAsync().ConfigureAwait(false);
-        GC.SuppressFinalize(this);
+        try
+        {
+            // Ensure stream is disposed, even if CloseAsync wasn't called or timed out
+            DisposeStream();
+
+            // Signal that we're closing if not already done
+            await _connectionClosingCts.CancelAsync().ConfigureAwait(false);
+            _readerSignal.Signal();
+            _writerSignal.Signal();
+
+            if (_runTask is { } runTask)
+            {
+                await runTask.ConfigureAwait(false);
+            }
+            else
+            {
+                await _connectionClosedCts.CancelAsync().ConfigureAwait(false);
+            }
+
+            await base.DisposeAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            _connectionClosingCts.Dispose();
+            _connectionClosedCts.Dispose();
+            GC.SuppressFinalize(this);
+        }
     }
 
     public override bool EnqueueRead(ReadRequest request)

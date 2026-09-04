@@ -13,12 +13,14 @@ internal sealed class MessageHandlerShared(
     IServiceProvider serviceProvider,
     MessageFactory messageFactory,
     IMessageCenter messageCenter,
-    MessagingInstruments messagingInstruments)
+    MessagingInstruments messagingInstruments) : IDisposable
 {
     private readonly IServiceProvider _serviceProvider = serviceProvider;
     private readonly ConcurrentQueue<MessageSerializer> _serializerPool = new();
     private readonly ConcurrentQueue<MessageReadRequest> _receivePool = new();
     private readonly ConcurrentQueue<MessageWriteRequest> _sendPool = new();
+    private readonly object _poolLock = new();
+    private volatile bool _disposed;
 
     public MessagingTrace MessagingTrace { get; } = messagingTrace;
     public ConnectionTrace ConnectionTrace { get; } = connectionTrace;
@@ -29,6 +31,7 @@ internal sealed class MessageHandlerShared(
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal MessageSerializer GetMessageSerializer()
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
         if (_serializerPool.TryDequeue(out var result))
         {
             return result;
@@ -38,11 +41,25 @@ internal sealed class MessageHandlerShared(
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal void Return(MessageSerializer serializer) => _serializerPool.Enqueue(serializer);
+    internal void Return(MessageSerializer serializer)
+    {
+        lock (_poolLock)
+        {
+            if (_disposed)
+            {
+                serializer.Dispose();
+            }
+            else
+            {
+                _serializerPool.Enqueue(serializer);
+            }
+        }
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal MessageReadRequest GetReceiveMessageHandler()
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
         if (_receivePool.TryDequeue(out var result))
         {
             return result;
@@ -57,6 +74,7 @@ internal sealed class MessageHandlerShared(
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal MessageWriteRequest GetSendMessageHandler()
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
         if (_sendPool.TryDequeue(out var result))
         {
             return result;
@@ -74,5 +92,42 @@ internal sealed class MessageHandlerShared(
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal void Return(MessageWriteRequest handler) => _sendPool.Enqueue(handler);
+    internal void Return(MessageWriteRequest handler)
+    {
+        lock (_poolLock)
+        {
+            if (_disposed)
+            {
+                handler.Dispose();
+            }
+            else
+            {
+                _sendPool.Enqueue(handler);
+            }
+        }
+    }
+
+    public void Dispose()
+    {
+        lock (_poolLock)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            while (_serializerPool.TryDequeue(out var serializer))
+            {
+                serializer.Dispose();
+            }
+
+            while (_sendPool.TryDequeue(out var handler))
+            {
+                handler.Dispose();
+            }
+
+            _receivePool.Clear();
+        }
+    }
 }
