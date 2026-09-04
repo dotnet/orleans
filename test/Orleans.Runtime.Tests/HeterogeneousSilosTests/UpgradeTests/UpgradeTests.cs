@@ -128,7 +128,10 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
                 var call = caller.ProxyCallVersion2MethodAfterBarrier(target, observer);
                 await barrier.Entered.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
 
-                await ManagementGrain.SetCompatibilityStrategy(interfaceType, StrictVersionCompatible.Singleton);
+                await ManagementGrain.SetCompatibilityStrategy(
+                    interfaceType,
+                    StrictVersionCompatible.Singleton,
+                    TestContext.Current.CancellationToken);
                 barrier.Release();
 
                 Assert.Equal(2, await call);
@@ -155,7 +158,10 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
 
             var resolver = Client.ServiceProvider.GetRequiredService<GrainInterfaceTypeResolver>();
             var interfaceType = resolver.GetGrainInterfaceType(typeof(IVersionUpgradeTestGrain));
-            await ManagementGrain.SetCompatibilityStrategy(interfaceType, AllVersionsCompatible.Singleton);
+            await ManagementGrain.SetCompatibilityStrategy(
+                interfaceType,
+                AllVersionsCompatible.Singleton,
+                TestContext.Current.CancellationToken);
 
             var exception = await Assert.ThrowsAsync<NotSupportedException>(() => caller.ProxyCallVersion2Method(target));
             Assert.Contains("undecoded request with unavailable invokable alias", exception.Message);
@@ -176,7 +182,10 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
 
             var resolver = Client.ServiceProvider.GetRequiredService<GrainInterfaceTypeResolver>();
             var interfaceType = resolver.GetGrainInterfaceType(typeof(IVersionUpgradeTestGrain));
-            await ManagementGrain.SetCompatibilityStrategy(interfaceType, AllVersionsCompatible.Singleton);
+            await ManagementGrain.SetCompatibilityStrategy(
+                interfaceType,
+                AllVersionsCompatible.Singleton,
+                TestContext.Current.CancellationToken);
 
             var targetBarrier = new UpgradeBarrier();
             var targetObserver = Client.CreateObjectReference<IVersionUpgradeTestObserver>(targetBarrier);
@@ -234,7 +243,10 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
                 var call = caller.ProxyCallVersion2OneWayMethodAfterBarrier(target, callerObserver, deliveryObserver);
                 await callerBarrier.Entered.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
 
-                await ManagementGrain.SetCompatibilityStrategy(interfaceType, StrictVersionCompatible.Singleton);
+                await ManagementGrain.SetCompatibilityStrategy(
+                    interfaceType,
+                    StrictVersionCompatible.Singleton,
+                    TestContext.Current.CancellationToken);
                 callerBarrier.Release();
 
                 await call.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
