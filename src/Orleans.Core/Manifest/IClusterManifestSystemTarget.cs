@@ -29,12 +29,14 @@ namespace Orleans.Runtime
         /// Gets a hash summary for the current cluster manifest.
         /// </summary>
         /// <returns>The current cluster manifest hash summary.</returns>
+        [Alias("25AE6E4A")]
         ValueTask<ClusterManifestHashSummary> GetClusterManifestHashSummary();
 
         /// <summary>
         /// Gets the hash of the local silo manifest.
         /// </summary>
         /// <returns>The hash of the local silo manifest.</returns>
+        [Alias("3D9B7FE6")]
         ValueTask<ManifestHash> GetSiloManifestHash();
 
         /// <summary>
@@ -42,6 +44,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="hash">The expected manifest hash.</param>
         /// <returns>The local silo manifest, or <see langword="null"/> if the hash does not match.</returns>
+        [Alias("93B8854F")]
         ValueTask<GrainManifest?> GetSiloManifestByHash(ManifestHash hash);
     }
 
