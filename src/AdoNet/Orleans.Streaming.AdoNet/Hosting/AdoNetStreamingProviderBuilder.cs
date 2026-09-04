@@ -66,7 +66,7 @@ internal sealed class AdoNetStreamingProviderBuilder : IProviderBuilder<ISiloBui
 
     private static void ConfigurePartitioning(SiloAdoNetStreamConfigurator configurator, IConfigurationSection configurationSection)
     {
-        if (int.TryParse(configurationSection["PartitionCount"], out var partitionCount))
+        if (GetPartitionCount(configurationSection) is { } partitionCount)
         {
             configurator.ConfigurePartitioning(partitionCount);
         }
@@ -74,9 +74,26 @@ internal sealed class AdoNetStreamingProviderBuilder : IProviderBuilder<ISiloBui
 
     private static void ConfigurePartitioning(ClusterClientAdoNetStreamConfigurator configurator, IConfigurationSection configurationSection)
     {
-        if (int.TryParse(configurationSection["PartitionCount"], out var partitionCount))
+        if (GetPartitionCount(configurationSection) is { } partitionCount)
         {
             configurator.ConfigurePartitioning(partitionCount);
         }
+    }
+
+    private static int? GetPartitionCount(IConfigurationSection configurationSection)
+    {
+        var value = configurationSection["PartitionCount"];
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        if (!int.TryParse(value, out var partitionCount) || partitionCount <= 0)
+        {
+            throw new OrleansConfigurationException(
+                $"ADO.NET streaming configuration section '{configurationSection.Path}' setting 'PartitionCount' must be a positive integer.");
+        }
+
+        return partitionCount;
     }
 }
