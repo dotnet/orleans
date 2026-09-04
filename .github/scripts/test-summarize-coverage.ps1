@@ -649,6 +649,10 @@ try {
             'Runtime crash dumps must include the managed heap.'
         Assert-Matches `
             $dotnetTestAction `
+            "New-Item -ItemType Directory -Force -Path '\$\{\{ github\.workspace \}\}/TestResults'" `
+            'The absolute runtime crash dump directory must exist before test launch.'
+        Assert-Matches `
+            $dotnetTestAction `
             'DOTNET_DbgMiniDumpName=\$\{\{ github\.workspace \}\}/TestResults/dotnet-test\.%p\.dmp' `
             'Runtime crash dumps must flow through the test diagnostics artifact.'
         Assert-Matches `

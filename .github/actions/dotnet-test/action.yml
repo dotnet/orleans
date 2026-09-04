@@ -26,7 +26,7 @@ runs:
     if: runner.os == 'Linux' && inputs.framework == 'net8.0'
     shell: pwsh
     run: |
-      New-Item -ItemType Directory -Force -Path TestResults | Out-Null
+      New-Item -ItemType Directory -Force -Path '${{ github.workspace }}/TestResults' | Out-Null
       @(
         'DOTNET_DbgEnableMiniDump=1'
         'DOTNET_DbgMiniDumpType=2'
