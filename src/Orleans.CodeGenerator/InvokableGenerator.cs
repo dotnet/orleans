@@ -681,6 +681,12 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
         {
             body.Add(
                 ExpressionStatement(
+                    AssignmentExpression(
+                        SyntaxKind.SimpleAssignmentExpression,
+                        IdentifierName("Options"),
+                        LiteralExpression(SyntaxKind.DefaultLiteralExpression))));
+            body.Add(
+                ExpressionStatement(
                     ConditionalAccessExpression(
                         IdentifierName(poolField.FieldName),
                         InvocationExpression(
