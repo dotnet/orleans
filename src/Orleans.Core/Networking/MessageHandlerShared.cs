@@ -7,20 +7,23 @@ using Orleans.Connections;
 
 namespace Orleans.Runtime.Messaging;
 
+internal delegate MessageSerializer MessageSerializerFactory();
+
 internal sealed class MessageHandlerShared(
     MessagingTrace messagingTrace,
     ConnectionTrace connectionTrace,
-    IServiceProvider serviceProvider,
+    MessageSerializerFactory serializerFactory,
     MessageFactory messageFactory,
     IMessageCenter messageCenter,
     MessagingInstruments messagingInstruments) : IDisposable
 {
-    private readonly IServiceProvider _serviceProvider = serviceProvider;
+    private readonly MessageSerializerFactory _serializerFactory = serializerFactory;
     private readonly ConcurrentQueue<MessageSerializer> _serializerPool = new();
     private readonly ConcurrentQueue<MessageReadRequest> _receivePool = new();
     private readonly ConcurrentQueue<MessageWriteRequest> _sendPool = new();
     private readonly object _poolLock = new();
     private volatile bool _disposed;
+    private int _activeSerializers;
 
     public MessagingTrace MessagingTrace { get; } = messagingTrace;
     public ConnectionTrace ConnectionTrace { get; } = connectionTrace;
@@ -31,13 +34,25 @@ internal sealed class MessageHandlerShared(
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal MessageSerializer GetMessageSerializer()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-        if (_serializerPool.TryDequeue(out var result))
+        lock (_poolLock)
         {
-            return result;
-        }
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            _activeSerializers++;
+            if (_serializerPool.TryDequeue(out var result))
+            {
+                return result;
+            }
 
-        return _serviceProvider.GetRequiredService<MessageSerializer>();
+            try
+            {
+                return _serializerFactory();
+            }
+            catch
+            {
+                _activeSerializers--;
+                throw;
+            }
+        }
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -45,6 +60,7 @@ internal sealed class MessageHandlerShared(
     {
         lock (_poolLock)
         {
+            _activeSerializers--;
             if (_disposed)
             {
                 serializer.Dispose();
@@ -53,13 +69,17 @@ internal sealed class MessageHandlerShared(
             {
                 _serializerPool.Enqueue(serializer);
             }
+
+            if (_activeSerializers == 0)
+            {
+                Monitor.PulseAll(_poolLock);
+            }
         }
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal MessageReadRequest GetReceiveMessageHandler()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         if (_receivePool.TryDequeue(out var result))
         {
             return result;
@@ -83,7 +103,6 @@ internal sealed class MessageHandlerShared(
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal MessageWriteRequest GetSendMessageHandler()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         if (_sendPool.TryDequeue(out var result))
         {
             return result;
@@ -137,6 +156,10 @@ internal sealed class MessageHandlerShared(
             }
 
             _receivePool.Clear();
+            while (_activeSerializers > 0)
+            {
+                Monitor.Wait(_poolLock);
+            }
         }
     }
 }

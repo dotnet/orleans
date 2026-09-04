@@ -53,9 +53,10 @@ namespace Orleans.Runtime
             if (_bodyObject is MessageReadRequest readRequest)
             {
                 _bodyObject = null;
-                var messageSerializer = readRequest.Shared.GetMessageSerializer();
+                MessageSerializer? messageSerializer = null;
                 try
                 {
+                    messageSerializer = readRequest.Shared.GetMessageSerializer();
                     messageSerializer.ReadBodyObject(this, readRequest);
                 }
                 catch (Exception exception)
@@ -64,7 +65,11 @@ namespace Orleans.Runtime
                 }
                 finally
                 {
-                    readRequest.Shared.Return(messageSerializer);
+                    if (messageSerializer is not null)
+                    {
+                        readRequest.Shared.Return(messageSerializer);
+                    }
+
                     readRequest.Reset();
                 }
             }
@@ -79,9 +84,10 @@ namespace Orleans.Runtime
         private void DeserializeRequestBody(MessageReadRequest readRequest)
         {
             _bodyObject = null;
-            var messageSerializer = readRequest.Shared.GetMessageSerializer();
+            MessageSerializer? messageSerializer = null;
             try
             {
+                messageSerializer = readRequest.Shared.GetMessageSerializer();
                 messageSerializer.ReadBodyObject(this, readRequest);
             }
             catch (Exception exception) when (Direction == Directions.Response)
@@ -90,7 +96,11 @@ namespace Orleans.Runtime
             }
             finally
             {
-                readRequest.Shared.Return(messageSerializer);
+                if (messageSerializer is not null)
+                {
+                    readRequest.Shared.Return(messageSerializer);
+                }
+
                 readRequest.Reset();
             }
         }
