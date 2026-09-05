@@ -1,0 +1,3 @@
+[*.cs]
+# The assembly name retains the Microsoft prefix while its public API follows Orleans namespaces.
+dotnet_diagnostic.IDE0130.severity = none
