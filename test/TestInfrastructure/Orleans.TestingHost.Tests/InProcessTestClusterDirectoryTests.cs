@@ -26,9 +26,7 @@ public sealed class InProcessTestClusterDirectoryTests
     public async Task DistributedDirectoryCanBeEnabled()
     {
         var builder = new InProcessTestClusterBuilder(1);
-#pragma warning disable ORLEANSEXP003
         builder.Options.UseDistributedGrainDirectory = true;
-#pragma warning restore ORLEANSEXP003
 
         await using var cluster = builder.Build();
         await cluster.DeployAsync(TestContext.Current.CancellationToken);
@@ -42,10 +40,8 @@ public sealed class InProcessTestClusterDirectoryTests
     public async Task DistributedDirectoryCanBeEnabledWhenNamedDirectoryExists()
     {
         var builder = new InProcessTestClusterBuilder(1);
-#pragma warning disable ORLEANSEXP003
         builder.Options.UseDistributedGrainDirectory = true;
         builder.ConfigureSilo(static (_, siloBuilder) => siloBuilder.AddDistributedGrainDirectory("named"));
-#pragma warning restore ORLEANSEXP003
 
         await using var cluster = builder.Build();
         await cluster.DeployAsync(TestContext.Current.CancellationToken);
@@ -55,6 +51,56 @@ public sealed class InProcessTestClusterDirectoryTests
         Assert.Same(namedDirectory, defaultDirectory);
         Assert.Single(
             cluster.Silos[0].ServiceProvider.GetServices<ILifecycleParticipant<ISiloLifecycle>>(),
+            static participant => participant.GetType().Name == "DistributedGrainDirectory");
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
+    public async Task DistributedDirectoryCanBeRegisteredWithMultipleNames()
+    {
+        var builder = new InProcessTestClusterBuilder(1);
+        builder.ConfigureSilo(static (_, siloBuilder) =>
+        {
+            siloBuilder.AddDistributedGrainDirectory("first");
+            siloBuilder.AddDistributedGrainDirectory("second");
+        });
+
+        await using var cluster = builder.Build();
+        await cluster.DeployAsync(TestContext.Current.CancellationToken);
+
+        var services = cluster.Silos[0].ServiceProvider;
+        var first = services.GetRequiredKeyedService<IGrainDirectory>("first");
+        var second = services.GetRequiredKeyedService<IGrainDirectory>("second");
+        Assert.Same(first, second);
+        Assert.Equal("InProcessGrainDirectory", GetDefaultDirectory(cluster).GetType().Name);
+        Assert.Single(
+            services.GetServices<ILifecycleParticipant<ISiloLifecycle>>(),
+            static participant => participant.GetType().Name == "DistributedGrainDirectory");
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
+    public async Task DistributedDirectoryCanBeRegisteredAsDefaultBeforeNamed()
+    {
+        var builder = new InProcessTestClusterBuilder(1);
+        builder.Options.UseDistributedGrainDirectory = true;
+        builder.ConfigureSilo(static (_, siloBuilder) =>
+        {
+            siloBuilder.AddDistributedGrainDirectory();
+            siloBuilder.AddDistributedGrainDirectory("named");
+        });
+
+        await using var cluster = builder.Build();
+        await cluster.DeployAsync(TestContext.Current.CancellationToken);
+
+        var services = cluster.Silos[0].ServiceProvider;
+        var defaultDirectory = GetDefaultDirectory(cluster);
+        var namedDirectory = services.GetRequiredKeyedService<IGrainDirectory>("named");
+        Assert.Same(defaultDirectory, namedDirectory);
+        Assert.Single(
+            services.GetServices<ILifecycleParticipant<ISiloLifecycle>>(),
             static participant => participant.GetType().Name == "DistributedGrainDirectory");
     }
 
@@ -90,9 +136,7 @@ public sealed class InProcessTestClusterDirectoryTests
             var builder = new InProcessTestClusterBuilder(1);
             builder.Options.ConfigureFileLogging = false;
             builder.Options.InitializeClientOnDeploy = false;
-#pragma warning disable ORLEANSEXP003
             builder.Options.UseDistributedGrainDirectory = true;
-#pragma warning restore ORLEANSEXP003
 
             await using var cluster = builder.Build();
             await cluster.DeployAsync(cancellationToken);
@@ -156,9 +200,7 @@ public sealed class InProcessTestClusterDirectoryTests
         var builder = new InProcessTestClusterBuilder(1);
         builder.Options.ConfigureFileLogging = false;
         builder.Options.InitializeClientOnDeploy = false;
-#pragma warning disable ORLEANSEXP003
         builder.Options.UseDistributedGrainDirectory = true;
-#pragma warning restore ORLEANSEXP003
 
         await using var cluster = builder.Build();
         await cluster.DeployAsync(cancellationToken);
