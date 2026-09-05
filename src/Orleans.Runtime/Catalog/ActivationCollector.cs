@@ -251,7 +251,7 @@ namespace Orleans.Runtime
                     switch (result.Action)
                     {
                         case ActivationCollectionAction.StartedDeactivation:
-                            claim.Registration.TryCompleteClaim(claim.Generation);
+                            claim.Registration.TryCompleteClaim(claim.SourceBucket);
                             condemned ??= [];
                             condemned.Add(activation);
                             break;
@@ -259,7 +259,7 @@ namespace Orleans.Runtime
                             RescheduleClaim(claim, result.RescheduleAfter, now);
                             break;
                         default:
-                            claim.Registration.TryCompleteClaim(claim.Generation);
+                            claim.Registration.TryCompleteClaim(claim.SourceBucket);
                             break;
                     }
                 }
@@ -311,23 +311,26 @@ namespace Orleans.Runtime
 
         private void RescheduleClaim(CollectionClaim claim, TimeSpan timeout, DateTime now)
         {
-            while (claim.Registration.IsClaimed(claim.Generation))
+            while (claim.Registration.IsClaimed(claim.SourceBucket))
             {
                 if (!TryMakeTicketFromTimeSpan(timeout, now, out var ticket))
                 {
-                    claim.Registration.TryCompleteClaim(claim.Generation);
-                    TryScheduleCollection(claim.Registration, timeout, _timeProvider.GetUtcNow().UtcDateTime, throwIfExpired: false);
-                    return;
+                    now = GetInternalScheduleBaseline();
+                    continue;
                 }
 
                 var bucket = GetOrCreateBucket(ticket);
-                if (claim.Registration.TryRescheduleClaim(claim.Generation, bucket))
+                if (claim.Registration.TryRescheduleClaim(claim.SourceBucket, bucket))
                 {
                     if (IsExpired(ticket))
                     {
-                        claim.Registration.TryCancel();
                         bucket.CloseForCleanup();
-                        TryScheduleCollection(claim.Registration, timeout, _timeProvider.GetUtcNow().UtcDateTime, throwIfExpired: false);
+                        if (claim.Registration.TryClaim(bucket, out var retryClaim))
+                        {
+                            claim = retryClaim;
+                            now = GetInternalScheduleBaseline();
+                            continue;
+                        }
                     }
 
                     return;
@@ -336,9 +339,7 @@ namespace Orleans.Runtime
                 if (IsExpired(ticket))
                 {
                     bucket.CloseForCleanup();
-                    claim.Registration.TryCompleteClaim(claim.Generation);
-                    TryScheduleCollection(claim.Registration, timeout, _timeProvider.GetUtcNow().UtcDateTime, throwIfExpired: false);
-                    return;
+                    now = GetInternalScheduleBaseline();
                 }
             }
         }
@@ -822,7 +823,7 @@ namespace Orleans.Runtime
             _memBasedDeactivationTimer?.Dispose();
         }
 
-        private readonly record struct CollectionClaim(CollectionRegistration Registration, long Generation);
+        private readonly record struct CollectionClaim(CollectionRegistration Registration, Bucket SourceBucket);
 
         private enum CollectionRegistrationState
         {
@@ -840,7 +841,6 @@ namespace Orleans.Runtime
             private readonly object _lock = new();
 #endif
             private Bucket? _bucket;
-            private long _generation;
             private CollectionRegistrationState _state;
 
             public ICollectibleGrainContext Context { get; } = context;
@@ -894,7 +894,6 @@ namespace Orleans.Runtime
 
                     _bucket = bucket;
                     _state = CollectionRegistrationState.Scheduled;
-                    _generation++;
                     return true;
                 }
             }
@@ -935,7 +934,6 @@ namespace Orleans.Runtime
 
                     _bucket!.TryRemove(this);
                     _bucket = bucket;
-                    _generation++;
                     return true;
                 }
             }
@@ -952,7 +950,6 @@ namespace Orleans.Runtime
                     _bucket?.TryRemove(this);
                     _bucket = null;
                     _state = CollectionRegistrationState.None;
-                    _generation++;
                     return true;
                 }
             }
@@ -964,7 +961,6 @@ namespace Orleans.Runtime
                     _bucket?.TryRemove(this);
                     _bucket = null;
                     _state = CollectionRegistrationState.Retired;
-                    _generation++;
                 }
             }
 
@@ -976,11 +972,11 @@ namespace Orleans.Runtime
                 }
             }
 
-            public bool IsClaimed(long generation)
+            public bool IsClaimed(Bucket sourceBucket)
             {
                 lock (_lock)
                 {
-                    return _state is CollectionRegistrationState.Claimed && _generation == generation;
+                    return _state is CollectionRegistrationState.Claimed && ReferenceEquals(_bucket, sourceBucket);
                 }
             }
 
@@ -994,34 +990,33 @@ namespace Orleans.Runtime
                         return false;
                     }
 
-                    _bucket = null;
+                    // Buckets close permanently before claiming, so their identity uniquely identifies this claim.
                     _state = CollectionRegistrationState.Claimed;
-                    var generation = ++_generation;
-                    claim = new CollectionClaim(this, generation);
+                    claim = new CollectionClaim(this, bucket);
                     return true;
                 }
             }
 
-            public bool TryCompleteClaim(long generation)
+            public bool TryCompleteClaim(Bucket sourceBucket)
             {
                 lock (_lock)
                 {
-                    if (_state is not CollectionRegistrationState.Claimed || _generation != generation)
+                    if (_state is not CollectionRegistrationState.Claimed || !ReferenceEquals(_bucket, sourceBucket))
                     {
                         return false;
                     }
 
+                    _bucket = null;
                     _state = CollectionRegistrationState.None;
-                    _generation++;
                     return true;
                 }
             }
 
-            public bool TryRescheduleClaim(long generation, Bucket bucket)
+            public bool TryRescheduleClaim(Bucket sourceBucket, Bucket bucket)
             {
                 lock (_lock)
                 {
-                    if (_state is not CollectionRegistrationState.Claimed || _generation != generation)
+                    if (_state is not CollectionRegistrationState.Claimed || !ReferenceEquals(_bucket, sourceBucket))
                     {
                         return false;
                     }
@@ -1033,7 +1028,6 @@ namespace Orleans.Runtime
 
                     _bucket = bucket;
                     _state = CollectionRegistrationState.Scheduled;
-                    _generation++;
                     return true;
                 }
             }

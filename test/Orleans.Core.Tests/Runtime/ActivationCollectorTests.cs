@@ -168,6 +168,137 @@ namespace UnitTests.Runtime
         [Theory, TestCategory("Activation")]
         [InlineData(false)]
         [InlineData(true)]
+        public async Task CollectStaleActivations_OldClaimCannotModifyNewClaim(bool rescheduleOldClaim)
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var timeout = TimeSpan.FromSeconds(30);
+            var ageLimit = TimeSpan.FromMinutes(1);
+            var activation = Substitute.For<ICollectibleGrainContext>();
+            ConfigureCollectionRegistrationSlot(activation);
+            activation.CollectionAgeLimit.Returns(ageLimit);
+            var firstClaimEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var secondClaimEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var releaseFirstClaim = new ManualResetEventSlim();
+            using var releaseSecondClaim = new ManualResetEventSlim();
+            var claimCount = 0;
+            activation.TryDeactivateForCollection(
+                    Arg.Any<DeactivationReason>(),
+                    Arg.Any<DateTime>(),
+                    Arg.Any<TimeSpan>(),
+                    Arg.Any<bool>(),
+                    Arg.Any<CancellationToken>())
+                .Returns(_ =>
+                {
+                    var claimNumber = Interlocked.Increment(ref claimCount);
+                    if (claimNumber == 1)
+                    {
+                        firstClaimEntered.SetResult();
+                        if (!releaseFirstClaim.Wait(timeout, cancellationToken))
+                        {
+                            throw new TimeoutException("Timed out releasing the first collection claim.");
+                        }
+
+                        return rescheduleOldClaim
+                            ? ActivationCollectionResult.Reschedule(ageLimit)
+                            : ActivationCollectionResult.Remove;
+                    }
+
+                    Assert.Equal(2, claimNumber);
+                    secondClaimEntered.SetResult();
+                    if (!releaseSecondClaim.Wait(timeout, cancellationToken))
+                    {
+                        throw new TimeoutException("Timed out releasing the second collection claim.");
+                    }
+
+                    return ActivationCollectionResult.Reschedule(ageLimit);
+                });
+
+            var now = timeProvider.GetUtcNow().UtcDateTime;
+            collector.ScheduleCollection(activation, ageLimit, now);
+            var registration = activation.CollectionRegistration;
+            timeProvider.Advance(ageLimit);
+            var firstScan = Task.Run(() => collector.CollectStaleActivations(cancellationToken), cancellationToken);
+            Task secondScan = Task.CompletedTask;
+            try
+            {
+                await firstClaimEntered.Task.WaitAsync(timeout, cancellationToken);
+                Assert.True(collector.TryCancelCollection(activation));
+                collector.ScheduleCollection(activation, ageLimit, timeProvider.GetUtcNow().UtcDateTime);
+                timeProvider.Advance(ageLimit);
+                secondScan = Task.Run(() => collector.CollectStaleActivations(cancellationToken), cancellationToken);
+                await secondClaimEntered.Task.WaitAsync(timeout, cancellationToken);
+
+                releaseFirstClaim.Set();
+                await firstScan.WaitAsync(timeout, cancellationToken);
+                Assert.Equal(default, collector.GetCollectionTicketForTesting(activation));
+
+                releaseSecondClaim.Set();
+                await secondScan.WaitAsync(timeout, cancellationToken);
+                Assert.Equal(now.AddMinutes(3), collector.GetCollectionTicketForTesting(activation));
+                Assert.Same(registration, activation.CollectionRegistration);
+                Assert.Equal(2, Volatile.Read(ref claimCount));
+            }
+            finally
+            {
+                releaseFirstClaim.Set();
+                releaseSecondClaim.Set();
+                await Task.WhenAll(firstScan, secondScan).WaitAsync(timeout, CancellationToken.None);
+            }
+        }
+
+        [Fact, TestCategory("Activation")]
+        public async Task CollectStaleActivations_ClaimRetriesAfterCursorAdvances()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var timeout = TimeSpan.FromSeconds(30);
+            var ageLimit = TimeSpan.FromMinutes(1);
+            var activation = Substitute.For<ICollectibleGrainContext>();
+            ConfigureCollectionRegistrationSlot(activation);
+            activation.CollectionAgeLimit.Returns(ageLimit);
+            var claimEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var releaseClaim = new ManualResetEventSlim();
+            activation.TryDeactivateForCollection(
+                    Arg.Any<DeactivationReason>(),
+                    Arg.Any<DateTime>(),
+                    Arg.Any<TimeSpan>(),
+                    Arg.Any<bool>(),
+                    Arg.Any<CancellationToken>())
+                .Returns(_ =>
+                {
+                    claimEntered.SetResult();
+                    if (!releaseClaim.Wait(timeout, cancellationToken))
+                    {
+                        throw new TimeoutException("Timed out releasing the collection claim after cursor advancement.");
+                    }
+
+                    return ActivationCollectionResult.Reschedule(ageLimit);
+                });
+
+            var now = timeProvider.GetUtcNow().UtcDateTime;
+            collector.ScheduleCollection(activation, ageLimit, now);
+            timeProvider.Advance(ageLimit);
+            var scan = Task.Run(() => collector.CollectStaleActivations(cancellationToken), cancellationToken);
+            try
+            {
+                await claimEntered.Task.WaitAsync(timeout, cancellationToken);
+                timeProvider.Advance(TimeSpan.FromMinutes(2));
+                await collector.CollectStaleActivations(cancellationToken).WaitAsync(timeout, cancellationToken);
+                releaseClaim.Set();
+                await scan.WaitAsync(timeout, cancellationToken);
+                Assert.Equal(now.AddMinutes(5), collector.GetCollectionTicketForTesting(activation));
+                Assert.True(collector.TryCancelCollection(activation));
+                Assert.Equal(default, collector.GetCollectionTicketForTesting(activation));
+            }
+            finally
+            {
+                releaseClaim.Set();
+                await scan.WaitAsync(timeout, CancellationToken.None);
+            }
+        }
+
+        [Theory, TestCategory("Activation")]
+        [InlineData(false)]
+        [InlineData(true)]
         public async Task CollectionScans_VisitEveryRegistrationDuringRemoval(bool scanStale)
         {
             var cancellationToken = TestContext.Current.CancellationToken;
