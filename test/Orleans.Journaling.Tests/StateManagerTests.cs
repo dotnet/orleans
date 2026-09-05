@@ -701,6 +701,63 @@ public class StateManagerTests : JournalingTestBase
     }
 
     [Fact]
+    public async Task StateManager_RecoveryRejectsWritesQueuedBeforeMutationsWereDiscarded()
+    {
+        var storage = new BlockingAppendStorage
+        {
+            FirstAppendException = new InconsistentStateException("Expected write conflict.")
+        };
+        var sut = CreateTestSystem(storage: storage);
+        var value = new DurableValue<int>("value", sut.Manager, CreateValueCodec<int>());
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+        value.Value = 1;
+
+        var conflictingWrite = sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
+        await storage.FirstAppendStarted.Task.WaitAsync(
+            TimeSpan.FromSeconds(10),
+            TestContext.Current.CancellationToken);
+        value.Value = 2;
+        var queuedWrite = sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
+
+        storage.AllowFirstAppend.TrySetResult();
+
+        await Assert.ThrowsAsync<InconsistentStateException>(
+            () => conflictingWrite.WaitAsync(
+                TimeSpan.FromSeconds(10),
+                TestContext.Current.CancellationToken));
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => queuedWrite.WaitAsync(
+                TimeSpan.FromSeconds(10),
+                TestContext.Current.CancellationToken));
+
+        Assert.Contains("queued before recovery discarded its mutations", exception.Message, StringComparison.Ordinal);
+        Assert.Empty(storage.Appends);
+    }
+
+    [Fact]
+    public async Task StateManager_InconsistentStateDuringExplicitRevertRemainsFenced()
+    {
+        var storage = new CapturingStorage();
+        var sut = CreateTestSystem(storage: storage);
+        var value = new DurableValue<int>("value", sut.Manager, CreateValueCodec<int>());
+
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+        value.Value = 1;
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        value.Value = 2;
+        storage.NextReadException = new InconsistentStateException("Expected explicit recovery conflict.");
+
+        await Assert.ThrowsAsync<InconsistentStateException>(
+            () => sut.Manager.RevertPendingChangesAsync(TestContext.Current.CancellationToken).AsTask());
+        var writeException = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask());
+        Assert.Contains("fenced", writeException.Message, StringComparison.OrdinalIgnoreCase);
+
+        await sut.Manager.RevertPendingChangesAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(1, value.Value);
+    }
+
+    [Fact]
     public async Task StateManager_RevertAgainstEmptyJournalResetsUncommittedState()
     {
         var storage = new CapturingStorage();
@@ -2083,6 +2140,8 @@ public class StateManagerTests : JournalingTestBase
 
         public TaskCompletionSource AllowFirstAppend { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+        public Exception? FirstAppendException { get; init; }
+
         public List<byte[]> Appends { get; } = [];
 
         public bool IsCompactionRequested => false;
@@ -2102,6 +2161,10 @@ public class StateManagerTests : JournalingTestBase
             {
                 FirstAppendStarted.SetResult();
                 await AllowFirstAppend.Task.WaitAsync(cancellationToken);
+                if (FirstAppendException is { } exception)
+                {
+                    throw exception;
+                }
             }
 
             Appends.Add(value.ToArray());
