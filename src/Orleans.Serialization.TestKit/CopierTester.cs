@@ -24,7 +24,8 @@ namespace Orleans.Serialization.TestKit
         /// <summary>
         /// Initializes a new <see cref="CopierTester{TValue, TCopier}"/> instance.
         /// </summary>
-        protected CopierTester(ITestOutputHelper output) : base(output)
+        /// <exception cref="ArgumentNullException"><paramref name="output"/> is <see langword="null"/>.</exception>
+        protected CopierTester(ITestOutputHelper output) : base(output ?? throw new ArgumentNullException(nameof(output)))
         {
             output.WriteLine($"Random seed: {RandomSeed}");
             _codecProvider = ServiceProvider.GetRequiredService<CodecProvider>();
@@ -33,7 +34,8 @@ namespace Orleans.Serialization.TestKit
         /// <summary>
         /// Initializes a new <see cref="CopierTester{TValue, TCopier}"/> instance.
         /// </summary>
-        protected CopierTester(ITestOutputHelper output, SerializationTesterFixture fixture) : base(output, fixture)
+        /// <exception cref="ArgumentNullException"><paramref name="output"/> or <paramref name="fixture"/> is <see langword="null"/>.</exception>
+        protected CopierTester(ITestOutputHelper output, SerializationTesterFixture fixture) : base(output ?? throw new ArgumentNullException(nameof(output)), fixture)
         {
             output.WriteLine($"Random seed: {RandomSeed}");
             _codecProvider = ServiceProvider.GetRequiredService<CodecProvider>();
