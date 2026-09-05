@@ -209,7 +209,7 @@ internal sealed partial class ActivationData :
             exception,
             exception.Message);
 
-        lock (this)
+        lock (_lock)
         {
             SetState(ActivationState.Invalid);
         }
