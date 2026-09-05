@@ -151,11 +151,47 @@ public sealed class DurableRpcProtocolTests
 
         var request = Assert.Single(jobs.Requests);
         Assert.Equal(DurableTaskMessageTransport.ResumeJobName, request.JobName);
+        Assert.Equal(
+            DurableTaskMessageTransport.CreateStableResumeJobId(target, taskId, 7),
+            GetStableJobId(request));
         Assert.Equal(target, request.Target);
         Assert.Equal(dueTime, request.DueTime);
         Assert.Equal(taskId.ToString(), request.Metadata![DurableTaskMessageTransport.ResumeTaskIdMetadata]);
         Assert.Equal("7", request.Metadata[DurableTaskMessageTransport.ResumeGenerationMetadata]);
     }
+
+    [Theory]
+    [InlineData("target", "one", "root/delay", 7)]
+    [InlineData("target", "two", "root/delay", 7)]
+    [InlineData("target", "one", "root/other", 7)]
+    [InlineData("target", "one", "root/delay", 8)]
+    public void ResumeJobIdIsStableForExactIdentityAndDistinctForChangedIdentity(
+        string grainType,
+        string grainKey,
+        string taskIdValue,
+        long generation)
+    {
+        var baseline = DurableTaskMessageTransport.CreateStableResumeJobId(
+            GrainId.Create("target", "one"),
+            TaskId.Parse("root/delay"),
+            7);
+        var candidate = DurableTaskMessageTransport.CreateStableResumeJobId(
+            GrainId.Create(grainType, grainKey),
+            TaskId.Parse(taskIdValue),
+            generation);
+
+        Assert.Equal(
+            grainType == "target"
+                && grainKey == "one"
+                && taskIdValue == "root/delay"
+                && generation == 7,
+            string.Equals(baseline, candidate, StringComparison.Ordinal));
+    }
+
+    private static string? GetStableJobId(ScheduleJobRequest request) =>
+        (string?)typeof(ScheduleJobRequest)
+            .GetProperty("JobId", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(request);
 
     [Fact]
     public void CompletionAcknowledgementUsesDedicatedDurableRoute()
@@ -415,7 +451,7 @@ public sealed class DurableRpcProtocolTests
     }
 
     [Fact]
-    public async Task PollAsync_TombstonedTask_ReturnsExpiredTerminalFailure()
+    public async Task PollAsync_TombstonedTask_ThrowsTypedNotFound()
     {
         var taskId = TaskId.Parse("root/expired-client-poll");
         var grain = new TombstoneResponseDurableTaskServer(taskId);
@@ -425,28 +461,23 @@ public sealed class DurableRpcProtocolTests
             grain,
             lastResponse: null);
 
-        var response = await handle.PollAsync(
-            new PollingOptions { PollTimeout = TimeSpan.Zero },
-            TestContext.Current.CancellationToken);
+        var failure = await Assert.ThrowsAsync<DurableTaskNotFoundException>(
+            () => handle.PollAsync(
+                new PollingOptions { PollTimeout = TimeSpan.Zero },
+                TestContext.Current.CancellationToken).AsTask());
 
-        var failedResponse = Assert.IsType<ExceptionDurableTaskResponse>(response);
-        var failure = Assert.IsType<DurableTaskTerminalFailure>(failedResponse.Exception);
-        Assert.True(failedResponse.IsCompleted);
-        Assert.Equal(DurableTaskResponseKind.Failed, failedResponse.ResponseKind);
-        Assert.Equal(DurableTaskStatus.Failed, failedResponse.Status);
-        Assert.Equal(DurableTaskTerminalFailureCode.ExpiredOrTombstoned, failure.Code);
         Assert.Equal(taskId, failure.TaskId);
         Assert.Equal(
-            $"Durable task '{taskId}' has expired and its result is no longer available.",
+            $"Durable task '{taskId}' was not found or its retained state has expired.",
             failure.Message);
-        Assert.Same(response, handle.LastResponse);
+        Assert.Null(handle.LastResponse);
         Assert.Equal(1, grain.SubscribeOrPollCallCount);
         Assert.Equal(taskId, grain.LastRequestedTaskId);
         Assert.Equal(TimeSpan.Zero, grain.LastPollTimeout);
     }
 
     [Fact]
-    public async Task WaitAsync_TombstonedTask_ReturnsExpiredTerminalFailureWithoutRepolling()
+    public async Task WaitAsync_TombstonedTask_ThrowsTypedNotFoundWithoutRepolling()
     {
         var taskId = TaskId.Parse("root/expired-client-wait");
         var grain = new TombstoneResponseDurableTaskServer(taskId);
@@ -456,22 +487,57 @@ public sealed class DurableRpcProtocolTests
             grain,
             lastResponse: null);
 
-        var response = await handle.WaitAsync(TestContext.Current.CancellationToken);
+        var failure = await Assert.ThrowsAsync<DurableTaskNotFoundException>(
+            () => handle.WaitAsync(TestContext.Current.CancellationToken).AsTask());
 
-        var failedResponse = Assert.IsType<ExceptionDurableTaskResponse>(response);
-        var failure = Assert.IsType<DurableTaskTerminalFailure>(failedResponse.Exception);
-        Assert.True(failedResponse.IsCompleted);
-        Assert.Equal(DurableTaskResponseKind.Failed, failedResponse.ResponseKind);
-        Assert.Equal(DurableTaskStatus.Failed, failedResponse.Status);
-        Assert.Equal(DurableTaskTerminalFailureCode.ExpiredOrTombstoned, failure.Code);
         Assert.Equal(taskId, failure.TaskId);
         Assert.Equal(
-            $"Durable task '{taskId}' has expired and its result is no longer available.",
+            $"Durable task '{taskId}' was not found or its retained state has expired.",
             failure.Message);
-        Assert.Same(response, handle.LastResponse);
+        Assert.Null(handle.LastResponse);
         Assert.Equal(1, grain.SubscribeOrPollCallCount);
         Assert.Equal(taskId, grain.LastRequestedTaskId);
         Assert.Equal(TimeSpan.FromSeconds(5), grain.LastPollTimeout);
+    }
+
+    [Fact]
+    public async Task AttachedDurableTask_MissingTaskReturnsTypedNotFoundWithoutScheduling()
+    {
+        var taskId = TaskId.Parse("root/attached-missing");
+        var grain = new TombstoneResponseDurableTaskServer(taskId);
+        ScheduledTask<int> task = new AttachedScheduledTask<int>(taskId, grain);
+
+        var failure = await Assert.ThrowsAsync<DurableTaskNotFoundException>(
+            () => task.GetResponseAsync(
+                new PollingOptions { PollTimeout = TimeSpan.Zero },
+                TestContext.Current.CancellationToken));
+
+        Assert.Equal(taskId, task.Id);
+        Assert.Equal(taskId, failure.TaskId);
+        Assert.Equal(0, grain.ScheduleCallCount);
+        Assert.Equal(1, grain.SubscribeOrPollCallCount);
+    }
+
+    [Fact]
+    public async Task AttachedDurableTask_StoredNotFoundFailureWithSameTaskIdRemainsWorkflowFailure()
+    {
+        var rootId = TaskId.Parse("root/attached-failed");
+        var grain = new TombstoneResponseDurableTaskServer(
+            rootId,
+            rootId,
+            returnFailureResponse: true);
+        ScheduledTask<int> task = new AttachedScheduledTask<int>(rootId, grain);
+
+        var response = await task.GetResponseAsync(
+            new PollingOptions { PollTimeout = TimeSpan.Zero },
+            TestContext.Current.CancellationToken);
+
+        var failedResponse = Assert.IsType<ExceptionDurableTaskResponse>(response);
+        var failure = Assert.IsType<DurableTaskNotFoundException>(failedResponse.Exception);
+        Assert.Equal(rootId, task.Id);
+        Assert.Equal(rootId, failure.TaskId);
+        Assert.Equal(0, grain.ScheduleCallCount);
+        Assert.Equal(1, grain.SubscribeOrPollCallCount);
     }
 
     private sealed class RecordingOutbox : IDurableOutbox

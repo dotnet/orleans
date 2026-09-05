@@ -103,10 +103,15 @@ internal sealed class FakeGrainReferenceObserver(GrainReferenceShared shared, Id
     }
 }
 
-internal sealed class TombstoneResponseDurableTaskServer(TaskId expectedTaskId) : IDurableTaskServer
+internal sealed class TombstoneResponseDurableTaskServer(
+    TaskId expectedTaskId,
+    TaskId? responseTaskId = null,
+    bool returnFailureResponse = false) : IDurableTaskServer
 {
+    private int _scheduleCallCount;
     private int _subscribeOrPollCallCount;
 
+    public int ScheduleCallCount => Volatile.Read(ref _scheduleCallCount);
     public int SubscribeOrPollCallCount => Volatile.Read(ref _subscribeOrPollCallCount);
     public TaskId LastRequestedTaskId { get; private set; }
     public TimeSpan LastPollTimeout { get; private set; }
@@ -114,8 +119,11 @@ internal sealed class TombstoneResponseDurableTaskServer(TaskId expectedTaskId) 
     public ValueTask<DurableTaskResponse> ScheduleAsync(
         TaskId taskId,
         IDurableTaskRequest request,
-        CancellationToken cancellationToken = default) =>
-        throw new NotSupportedException();
+        CancellationToken cancellationToken = default)
+    {
+        Interlocked.Increment(ref _scheduleCallCount);
+        return new(DurableTaskResponse.Pending);
+    }
 
     public ValueTask<DurableTaskResponse> SubscribeOrPollAsync(
         TaskId taskId,
@@ -131,7 +139,10 @@ internal sealed class TombstoneResponseDurableTaskServer(TaskId expectedTaskId) 
         LastRequestedTaskId = taskId;
         LastPollTimeout = options.PollTimeout;
         Interlocked.Increment(ref _subscribeOrPollCallCount);
-        return new(DurableTaskTerminalFailure.CreateResponse(taskId));
+        var failure = new DurableTaskNotFoundException(responseTaskId ?? taskId);
+        return returnFailureResponse
+            ? new(DurableTaskResponse.FromException(failure))
+            : ValueTask.FromException<DurableTaskResponse>(failure);
     }
 
     public ValueTask CancelAsync(TaskId taskId, CancellationToken cancellationToken = default) =>
