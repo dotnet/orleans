@@ -2951,7 +2951,7 @@ public sealed class DurableTaskRuntimeInvariantTests
 
         public ValueTask<DurableTaskResponse> ScheduleDelayAsync(
             TaskId taskId,
-            TimeSpan duration,
+            DateTimeOffset dueTime,
             CancellationToken cancellationToken)
         {
             _schedulingStarted.TrySetResult(cancellationToken);
@@ -3022,7 +3022,7 @@ public sealed class DurableTaskRuntimeInvariantTests
 
         public ValueTask<DurableTaskResponse> ScheduleDelayAsync(
             TaskId taskId,
-            TimeSpan duration,
+            DateTimeOffset dueTime,
             CancellationToken cancellationToken) => throw new NotSupportedException();
 
         public ValueTask<DurableTaskResponse> ScheduleRemoteAsync(
