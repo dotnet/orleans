@@ -34,9 +34,7 @@ namespace Orleans.Streaming.Kinesis
         private readonly TimeProvider _timeProvider;
         private readonly SemaphoreSlim _initializationSemaphore = new(1);
 
-        private HashRingBasedPartitionedStreamQueueMapper _streamQueueMapper = null!;
-        private KinesisShardTopologyMonitor _topologyMonitor = null!;
-        private QueueAdapterReceiverRegistry<KinesisPooledAdapterReceiver> _receivers = null!;
+        private InitializationState? _initializationState;
         private int _disposed;
 
         public KinesisAdapterFactory(
@@ -92,7 +90,7 @@ namespace Orleans.Streaming.Kinesis
 
         public async Task<IQueueAdapter> CreateAdapter(CancellationToken cancellationToken)
         {
-            if (Volatile.Read(ref _streamQueueMapper) is not null)
+            if (Volatile.Read(ref _initializationState) is not null)
             {
                 return this;
             }
@@ -100,7 +98,7 @@ namespace Orleans.Streaming.Kinesis
             await _initializationSemaphore.WaitAsync(cancellationToken);
             try
             {
-                if (_streamQueueMapper is not null)
+                if (_initializationState is not null)
                 {
                     return this;
                 }
@@ -114,11 +112,11 @@ namespace Orleans.Streaming.Kinesis
                     _options.TopologyCheckInterval,
                     _timeProvider,
                     _loggerFactory.CreateLogger<KinesisShardTopologyMonitor>());
-                var receivers = new QueueAdapterReceiverRegistry<KinesisPooledAdapterReceiver>(MakeReceiver);
+                QueueAdapterReceiverRegistry<KinesisPooledAdapterReceiver>? receivers = null;
+                receivers = new(
+                    queueId => MakeReceiver(queueId, queueMapper, topologyMonitor, receivers!));
 
-                _topologyMonitor = topologyMonitor;
-                _receivers = receivers;
-                Volatile.Write(ref _streamQueueMapper, queueMapper);
+                Volatile.Write(ref _initializationState, new(queueMapper, receivers));
                 return this;
             }
             finally
@@ -131,7 +129,7 @@ namespace Orleans.Streaming.Kinesis
             => this;
 
         public IStreamQueueMapper GetStreamQueueMapper()
-            => _streamQueueMapper;
+            => GetInitializationState().StreamQueueMapper;
 
         public Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId)
             => Task.FromResult<IStreamFailureHandler>(new NoOpStreamDeliveryFailureHandler(false));
@@ -158,25 +156,22 @@ namespace Orleans.Streaming.Kinesis
 
         private KinesisPooledAdapterReceiver GetOrCreateReceiver(QueueId queueId)
         {
-            var receivers = Volatile.Read(ref _receivers);
-            if (receivers is null)
-            {
-                throw new InvalidOperationException(
-                    $"The Kinesis stream provider '{Name}' must complete {nameof(CreateAdapter)} before creating a receiver or cache.");
-            }
-
             if (_checkpointerFactory is null)
             {
                 throw new OrleansConfigurationException(
                     $"No {nameof(IStreamQueueCheckpointerFactory)} is configured for the Kinesis stream provider '{Name}'.");
             }
 
-            return receivers.GetOrCreate(queueId);
+            return GetInitializationState().Receivers.GetOrCreate(queueId);
         }
 
-        private KinesisPooledAdapterReceiver MakeReceiver(QueueId queueId)
+        private KinesisPooledAdapterReceiver MakeReceiver(
+            QueueId queueId,
+            HashRingBasedPartitionedStreamQueueMapper streamQueueMapper,
+            KinesisShardTopologyMonitor topologyMonitor,
+            QueueAdapterReceiverRegistry<KinesisPooledAdapterReceiver> receivers)
         {
-            var partition = _streamQueueMapper.QueueToPartition(queueId);
+            var partition = streamQueueMapper.QueueToPartition(queueId);
             return new KinesisPooledAdapterReceiver(
                 CreateClient(),
                 _options.StreamName,
@@ -185,12 +180,17 @@ namespace Orleans.Streaming.Kinesis
                 _cacheOptions,
                 _serializer,
                 _loggerFactory,
-                _topologyMonitor,
+                topologyMonitor,
                 _options.GetRecordsInterval,
                 _timeProvider,
-                receiver => _receivers.Remove(queueId, receiver)
+                receiver => receivers.Remove(queueId, receiver)
                 );
         }
+
+        private InitializationState GetInitializationState()
+            => Volatile.Read(ref _initializationState)
+                ?? throw new InvalidOperationException(
+                    $"The Kinesis stream provider '{Name}' must complete {nameof(CreateAdapter)} before accessing initialized adapter state.");
 
         internal IAmazonKinesis CreateClient() => CreateClient(_options);
 
@@ -283,5 +283,9 @@ namespace Orleans.Streaming.Kinesis
                 _client.Dispose();
             }
         }
+
+        private sealed record InitializationState(
+            HashRingBasedPartitionedStreamQueueMapper StreamQueueMapper,
+            QueueAdapterReceiverRegistry<KinesisPooledAdapterReceiver> Receivers);
     }
 }
