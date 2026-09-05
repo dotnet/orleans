@@ -20,6 +20,8 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Benchmarks" />
+    <InternalsVisibleTo Include="Orleans.DurableMessaging" />
+    <InternalsVisibleTo Include="Orleans.DurableMessaging.Tests" />
     <InternalsVisibleTo Include="Orleans.Journaling.Tests" />
     <InternalsVisibleTo Include="Orleans.Journaling.Json.Tests" />
   </ItemGroup>

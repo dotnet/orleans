@@ -1,4 +1,8 @@
 {
   "description": "Generated API assemblies which are not currently published as standalone NuGet packages.",
-  "packages": {}
+  "packages": {
+    "Microsoft.Orleans.DurableMessaging": "The new package is awaiting its first NuGet publication.",
+    "Microsoft.Orleans.DurableTasks": "The incubating assembly is not published as a standalone NuGet package.",
+    "Orleans.DurableTasks.Abstractions": "The incubating assembly is not published as a standalone NuGet package."
+  }
 }

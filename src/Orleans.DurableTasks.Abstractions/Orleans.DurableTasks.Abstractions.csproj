@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <IsPackable>false</IsPackable>
+    <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
+    <OrleansBuildTimeCodeGen>false</OrleansBuildTimeCodeGen>
+    <EnableOrleansContractsAnalyzer>false</EnableOrleansContractsAnalyzer>
+    <GenAPITargetDirectory>$(SourceRoot)src\api\Orleans.DurableTasks.Abstractions\</GenAPITargetDirectory>
+    <GenAPITargetPath>$(GenAPITargetDirectory)$(AssemblyName).cs</GenAPITargetPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Remove="Orleans.Metadata.FrameworkPartAttribute" />
+    <InternalsVisibleTo Include="Microsoft.Orleans.DurableTasks" />
+  </ItemGroup>
+</Project>
