@@ -49,10 +49,10 @@ interface [GrainInterfaceType("Orleans.Placement.Repartitioning.IActivationRepar
 
 interface [GrainInterfaceType("Orleans.Runtime.IClusterManifestSystemTarget")] Orleans.Runtime.IClusterManifestSystemTarget [Version(0)]
   40D39F85: GetClusterManifest(System.Threading.CancellationToken) -> ValueTask<Orleans.Metadata.ClusterManifest>
-  25AE6E4A: GetClusterManifestHashSummary() -> ValueTask<Orleans.Runtime.ClusterManifestHashSummary>
+  25AE6E4A: GetClusterManifestHashSummary(System.Threading.CancellationToken) -> ValueTask<Orleans.Runtime.ClusterManifestHashSummary>
   4EFCA109: GetClusterManifestUpdate(Orleans.Metadata.MajorMinorVersion, System.Threading.CancellationToken) -> ValueTask<Orleans.Runtime.ClusterManifestUpdate?>
-  93B8854F: GetSiloManifestByHash(Orleans.Runtime.ManifestHash) -> ValueTask<Orleans.Metadata.GrainManifest?>
-  3D9B7FE6: GetSiloManifestHash() -> ValueTask<Orleans.Runtime.ManifestHash>
+  93B8854F: GetSiloManifestByHash(Orleans.Runtime.ManifestHash, System.Threading.CancellationToken) -> ValueTask<Orleans.Metadata.GrainManifest?>
+  3D9B7FE6: GetSiloManifestHash(System.Threading.CancellationToken) -> ValueTask<Orleans.Runtime.ManifestHash>
 
 interface [GrainInterfaceType("Orleans.Runtime.IDeploymentLoadPublisher")] Orleans.Runtime.IDeploymentLoadPublisher [Version(0)]
   C5255F0C: UpdateRuntimeStatistics(Orleans.Runtime.SiloAddress, Orleans.Runtime.SiloRuntimeStatistics, System.Threading.CancellationToken) -> Task
