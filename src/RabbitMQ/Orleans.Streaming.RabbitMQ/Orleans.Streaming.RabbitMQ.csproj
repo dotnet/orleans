@@ -11,6 +11,8 @@
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <VersionSuffix Condition="$(VersionSuffix) != ''">$(VersionSuffix).alpha.1</VersionSuffix>
     <VersionSuffix Condition="$(VersionSuffix) == ''">alpha.1</VersionSuffix>
+    <!-- This new package has no published baseline. Enable validation after its first release. -->
+    <EnablePackageValidation>false</EnablePackageValidation>
   </PropertyGroup>
 
   <ItemGroup>
