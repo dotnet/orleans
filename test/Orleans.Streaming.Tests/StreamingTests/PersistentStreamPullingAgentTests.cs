@@ -730,11 +730,6 @@ namespace UnitTests.StreamingTests
                 return new EmptyCursor();
             }
 
-            public QueueCacheCursorResult<IQueueCacheCursor> TryGetCacheCursor(
-                StreamId streamId,
-                StreamSequenceToken? token)
-                => QueueCacheCursorResult<IQueueCacheCursor>.FromCursor(GetCacheCursor(streamId, token));
-
             public IQueueCacheCursor GetCacheCursorAtPosition(StreamId streamId, StreamSubscriptionStartPosition startPosition)
             {
                 startPositionRequested.TrySetResult(startPosition);
@@ -744,16 +739,6 @@ namespace UnitTests.StreamingTests
                 }
 
                 return new EmptyCursor();
-            }
-
-            public QueueCacheCursorResult<IQueueCacheCursor> TryGetCacheCursorAtPosition(
-                StreamId streamId,
-                StreamSubscriptionStartPosition startPosition)
-            {
-                startPositionRequested.TrySetResult(startPosition);
-                return supportsEarliestAvailable
-                    ? QueueCacheCursorResult<IQueueCacheCursor>.FromCursor(new EmptyCursor())
-                    : QueueCacheCursorResult<IQueueCacheCursor>.NotSupported;
             }
 
             public bool IsUnderPressure() => false;

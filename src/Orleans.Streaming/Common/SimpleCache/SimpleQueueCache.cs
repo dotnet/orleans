@@ -239,11 +239,6 @@ namespace Orleans.Providers.Streams.Common
                 throw new ArgumentOutOfRangeException(nameof(startPosition), startPosition, "The subscription start position is not defined.");
             }
 
-            if (GetType() != typeof(SimpleQueueCache))
-            {
-                return QueueCacheCursorResult<IQueueCacheCursor>.NotSupported;
-            }
-
             var cursor = new SimpleQueueCacheCursor(this, streamId, logger);
             InitializeCursorAtEarliestAvailable(cursor);
             return QueueCacheCursorResult<IQueueCacheCursor>.FromCursor(cursor);

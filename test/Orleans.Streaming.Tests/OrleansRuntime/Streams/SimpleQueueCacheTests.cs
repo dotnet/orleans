@@ -177,32 +177,108 @@ public class SimpleQueueCacheTests
     }
 
     [Fact, TestCategory("BVT"), TestCategory("Streaming")]
-    public void TryGetCacheCursorAtPositionDoesNotBypassDerivedCursorOverride()
+    public void EarliestAvailablePreservesDerivedCachePositioning()
     {
         var cache = new DerivedSimpleQueueCache();
+        var stream = StreamId.Create("namespace", Guid.NewGuid());
+        cache.AddToCache([new TestBatchContainer(stream, 1), new TestBatchContainer(stream, 2)]);
 
         var result = ((IQueueCache)cache).TryGetCacheCursorAtPosition(
-            default,
+            stream,
             StreamSubscriptionStartPosition.EarliestAvailable);
 
-        Assert.Equal(QueueCacheCursorResultKind.NotSupported, result.Kind);
+        Assert.Equal(QueueCacheCursorResultKind.Success, result.Kind);
         Assert.False(cache.GetCacheCursorCalled);
-        Assert.Null(result.Cursor);
+        using var cursor = Assert.IsType<SimpleQueueCacheCursor>(result.Cursor);
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
+        Assert.Equal(1, cursor.GetCurrent(out _)!.SequenceToken.SequenceNumber);
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
+        Assert.Equal(2, cursor.GetCurrent(out _)!.SequenceToken.SequenceNumber);
+        Assert.Equal(QueueCacheCursorMoveResultKind.NoData, cursor.MoveNextWithResult().Kind);
     }
 
     [Fact, TestCategory("BVT"), TestCategory("Streaming")]
-    public void GetCacheCursorAtPositionPreservesLegacyResultBehavior()
+    public void EarliestAvailablePreservesInheritedCursorBehavior()
     {
-        IQueueCache cache = new CacheMissPositionQueueCache();
+        IQueueCache cache = new PressureOverrideSimpleQueueCache();
+        var stream = StreamId.Create("namespace", Guid.NewGuid());
+        cache.AddToCache([new TestBatchContainer(stream, 1)]);
 
+        var result = cache.TryGetCacheCursorAtPosition(stream, StreamSubscriptionStartPosition.EarliestAvailable);
+
+        Assert.Equal(QueueCacheCursorResultKind.Success, result.Kind);
+        using var cursor = Assert.IsType<SimpleQueueCacheCursor>(result.Cursor);
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
+        Assert.Equal(1, cursor.GetCurrent(out _)!.SequenceToken.SequenceNumber);
+        Assert.Equal(QueueCacheCursorMoveResultKind.NoData, cursor.MoveNextWithResult().Kind);
+    }
+
+    [Theory]
+    [InlineData(StreamSubscriptionStartPosition.Latest)]
+    [InlineData(StreamSubscriptionStartPosition.EarliestAvailable)]
+    public void TypedPositionDispatchesToLegacyProvider(StreamSubscriptionStartPosition position)
+    {
+        var provider = new LegacyPositionQueueCache();
+        IQueueCache cache = provider;
+        var stream = StreamId.Create("namespace", Guid.NewGuid());
+
+        var result = cache.TryGetCacheCursorAtPosition(stream, position);
+
+        Assert.Equal(QueueCacheCursorResultKind.Success, result.Kind);
+        Assert.Same(provider.Cursor, result.Cursor);
+        Assert.Null(result.CacheMiss);
+        Assert.Equal((stream, position), provider.Request);
+    }
+
+    [Fact]
+    public void TypedPositionAdaptsLegacyFailures()
+    {
+        var expected = new QueueCacheMissException("requested", "low", "high");
+        var provider = new LegacyPositionQueueCache { PositionException = expected };
+        IQueueCache cache = provider;
+
+        var result = cache.TryGetCacheCursorAtPosition(default, StreamSubscriptionStartPosition.EarliestAvailable);
+
+        Assert.Equal(QueueCacheCursorResultKind.CacheMiss, result.Kind);
+        Assert.Null(result.Cursor);
+        var miss = Assert.NotNull(result.CacheMiss);
+        Assert.Equal("requested", miss.Requested);
+        Assert.Equal("low", miss.Low);
+        Assert.Equal("high", miss.High);
 #pragma warning disable CS0618 // Verify compatibility of the obsolete wrapper.
-        var exception = Assert.Throws<QueueCacheMissException>(
-            () => cache.GetCacheCursorAtPosition(default, StreamSubscriptionStartPosition.EarliestAvailable));
+        Assert.Same(expected, Assert.Throws<QueueCacheMissException>(
+            () => cache.GetCacheCursorAtPosition(default, StreamSubscriptionStartPosition.EarliestAvailable)));
 #pragma warning restore CS0618
 
-        Assert.Equal("requested", exception.Requested);
-        Assert.Equal("low", exception.Low);
-        Assert.Equal("high", exception.High);
+        provider.PositionException = new NotSupportedException();
+        result = cache.TryGetCacheCursorAtPosition(default, StreamSubscriptionStartPosition.EarliestAvailable);
+        Assert.Equal(QueueCacheCursorResultKind.NotSupported, result.Kind);
+        Assert.Null(result.Cursor);
+        Assert.Null(result.CacheMiss);
+
+        var failure = new InvalidOperationException("Provider failure");
+        provider.PositionException = failure;
+        Assert.Same(failure, Assert.Throws<InvalidOperationException>(
+            () => cache.TryGetCacheCursorAtPosition(default, StreamSubscriptionStartPosition.Latest)));
+    }
+
+    [Fact]
+    public void TypedPositionPreservesLegacyDefaults()
+    {
+        IQueueCache cache = new LegacyThrowingQueueCache(new QueueCacheMissException("requested", "low", "high"));
+
+        var latest = cache.TryGetCacheCursorAtPosition(default, StreamSubscriptionStartPosition.Latest);
+        Assert.Equal(QueueCacheCursorResultKind.CacheMiss, latest.Kind);
+        Assert.Null(latest.Cursor);
+        Assert.Equal("requested", Assert.NotNull(latest.CacheMiss).Requested);
+
+        var earliest = cache.TryGetCacheCursorAtPosition(default, StreamSubscriptionStartPosition.EarliestAvailable);
+        Assert.Equal(QueueCacheCursorResultKind.NotSupported, earliest.Kind);
+        Assert.Null(earliest.Cursor);
+        Assert.Null(earliest.CacheMiss);
+
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => cache.TryGetCacheCursorAtPosition(default, (StreamSubscriptionStartPosition)123));
     }
 
     [Fact, TestCategory("BVT"), TestCategory("Streaming")]
@@ -265,8 +341,17 @@ public class SimpleQueueCacheTests
         }
     }
 
-    private sealed class CacheMissPositionQueueCache : IQueueCache
+    private sealed class PressureOverrideSimpleQueueCache() : SimpleQueueCache(10, NullLogger.Instance)
     {
+        public override bool IsUnderPressure() => false;
+    }
+
+    private sealed class LegacyPositionQueueCache : IQueueCache
+    {
+        public IQueueCacheCursor Cursor { get; } = new EmptyCursor();
+        public Exception? PositionException { get; set; }
+        public (StreamId, StreamSubscriptionStartPosition)? Request { get; private set; }
+
         public void AddToCache(IList<IBatchContainer> messages)
         {
         }
@@ -274,12 +359,20 @@ public class SimpleQueueCacheTests
         public int GetMaxAddCount() => 1;
 
         public IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken? token)
-            => new EmptyCursor();
+            => throw new InvalidOperationException("Positioning must use the legacy position method.");
 
-        public QueueCacheCursorResult<IQueueCacheCursor> TryGetCacheCursorAtPosition(
+        IQueueCacheCursor IQueueCache.GetCacheCursorAtPosition(
             StreamId streamId,
             StreamSubscriptionStartPosition startPosition)
-            => QueueCacheCursorResult<IQueueCacheCursor>.FromCacheMiss(new("requested", "low", "high"));
+        {
+            Request = (streamId, startPosition);
+            if (PositionException is { } exception)
+            {
+                throw exception;
+            }
+
+            return Cursor;
+        }
 
         public bool IsUnderPressure() => false;
 

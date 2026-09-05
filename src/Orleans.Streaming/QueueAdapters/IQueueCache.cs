@@ -69,22 +69,31 @@ namespace Orleans.Streams
         /// A successful result containing the acquired cursor, a cache-miss result containing the unavailable
         /// position and current cache bounds, or <see cref="QueueCacheCursorResultKind.NotSupported"/>.
         /// </returns>
+        /// <remarks>
+        /// The default implementation adapts <see cref="GetCacheCursorAtPosition"/> so that existing
+        /// providers retain their positioning behavior. Providers implementing this method directly
+        /// should also implement the obsolete positioning method for legacy callers.
+        /// </remarks>
         /// <exception cref="ArgumentOutOfRangeException"><paramref name="startPosition"/> is not defined.</exception>
         QueueCacheCursorResult<IQueueCacheCursor> TryGetCacheCursorAtPosition(
             StreamId streamId,
             StreamSubscriptionStartPosition startPosition)
         {
-            if (startPosition == StreamSubscriptionStartPosition.Latest)
+            try
             {
-                return TryGetCacheCursor(streamId, null);
+#pragma warning disable CS0618 // Preserve positioning implemented by existing providers.
+                return QueueCacheCursorResult<IQueueCacheCursor>.FromCursor(GetCacheCursorAtPosition(streamId, startPosition));
+#pragma warning restore CS0618
             }
-
-            if (startPosition != StreamSubscriptionStartPosition.EarliestAvailable)
+            catch (QueueCacheMissException exception)
             {
-                throw new ArgumentOutOfRangeException(nameof(startPosition), startPosition, "The subscription start position is not defined.");
+                return QueueCacheCursorResult<IQueueCacheCursor>.FromCacheMiss(
+                    new(exception.Requested, exception.Low, exception.High));
             }
-
-            return QueueCacheCursorResult<IQueueCacheCursor>.NotSupported;
+            catch (NotSupportedException)
+            {
+                return QueueCacheCursorResult<IQueueCacheCursor>.NotSupported;
+            }
         }
 
         /// <summary>
@@ -112,15 +121,13 @@ namespace Orleans.Streams
 #pragma warning restore CS0618
             }
 
-            var result = TryGetCacheCursorAtPosition(streamId, startPosition);
-            return result.Kind switch
+            if (startPosition != StreamSubscriptionStartPosition.EarliestAvailable)
             {
-                QueueCacheCursorResultKind.Success => result.Cursor!,
-                QueueCacheCursorResultKind.CacheMiss => throw result.CacheMiss!.Value.ToException(),
-                QueueCacheCursorResultKind.NotSupported => throw new NotSupportedException(
-                    $"{GetType().FullName} does not support {startPosition} cursor positioning."),
-                _ => throw new InvalidOperationException("The cursor result is not initialized."),
-            };
+                throw new ArgumentOutOfRangeException(nameof(startPosition), startPosition, "The subscription start position is not defined.");
+            }
+
+            throw new NotSupportedException(
+                $"{GetType().FullName} does not support {startPosition} cursor positioning.");
         }
 
         /// <summary>
