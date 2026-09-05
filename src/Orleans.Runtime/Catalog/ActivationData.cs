@@ -194,7 +194,7 @@ internal sealed partial class ActivationData :
     {
         get
         {
-            lock (this)
+            lock (_lock)
             {
                 return _requestTracker?.WaitingCount ?? 0;
             }
@@ -205,7 +205,7 @@ internal sealed partial class ActivationData :
     {
         get
         {
-            lock (this)
+            lock (_lock)
             {
                 return _requestTracker is null or { IsEmpty: true };
             }
@@ -515,7 +515,7 @@ internal sealed partial class ActivationData :
 
     internal int GetRequestCount()
     {
-        lock (this)
+        lock (_lock)
         {
             return _requestTracker?.Count ?? 0;
         }
