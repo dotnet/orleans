@@ -77,13 +77,15 @@ namespace Orleans.Runtime
         {
             if (oldStatus != GrainServiceStatus.Started && newStatus == GrainServiceStatus.Started)
             {
-                ring.SubscribeToRangeChangeEvents(this);
+                SubscribeToRangeChangeEvents();
             }
             if (oldStatus != GrainServiceStatus.Stopped && newStatus == GrainServiceStatus.Stopped)
             {
                 ring.UnSubscribeFromRangeChangeEvents(this);
             }
         }
+
+        private protected void SubscribeToRangeChangeEvents() => ring.SubscribeToRangeChangeEvents(this);
 
         /// <summary>Invoked when service is being started</summary>
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>
@@ -122,7 +124,14 @@ namespace Orleans.Runtime
         /// <inheritdoc/>
         void IRingRangeListener.RangeChangeNotification(IRingRange oldRange, IRingRange newRange, bool increased)
         {
-            this.WorkItemGroup.QueueTask(() => OnRangeChange(oldRange, newRange, increased), this).Ignore();
+            if (this is IGrainServiceRangeChangeQueue rangeChangeQueue)
+            {
+                rangeChangeQueue.QueueRangeChange(oldRange, newRange, increased);
+            }
+            else
+            {
+                this.WorkItemGroup.QueueTask(() => OnRangeChange(oldRange, newRange, increased), this).Ignore();
+            }
         }
 
         /// <summary>
@@ -177,5 +186,10 @@ namespace Orleans.Runtime
             /// <summary>Service has been stopped</summary>
             Stopped,
         }
+    }
+
+    internal interface IGrainServiceRangeChangeQueue
+    {
+        void QueueRangeChange(IRingRange oldRange, IRingRange newRange, bool increased);
     }
 }

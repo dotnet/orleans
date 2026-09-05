@@ -16,7 +16,7 @@ using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime.ReminderService
 {
-    internal sealed partial class LocalReminderService : GrainService, IReminderService, ILifecycleParticipant<ISiloLifecycle>
+    internal sealed partial class LocalReminderService : GrainService, IReminderService, ILifecycleParticipant<ISiloLifecycle>, IGrainServiceRangeChangeQueue
     {
         private const int InitialReadRetryCountBeforeFastFailForUpdates = 2;
         private static readonly TimeSpan InitialReadMaxWaitTimeForUpdates = TimeSpan.FromSeconds(20);
@@ -392,32 +392,22 @@ namespace Orleans.Runtime.ReminderService
             return task;
         }
 
-        internal Task TestOnlyStartRefresh() => QueueRefresh();
+        internal Task<Task> TestOnlyStartRefresh() => QueueRefresh();
 
         internal Task TestOnlyRefresh() => QueueRefresh().Unwrap();
 
         internal bool TestOnlyIsStarted => Status == GrainServiceStatus.Started;
 
-        internal Task TestOnlyWaitForSchedulerTurn()
-            => this.QueueAction(static _ => { }, state: 0);
-
         private Task<Task> QueueRefresh()
         {
-            var refreshStarted = new TaskCompletionSource<Task>(TaskCreationOptions.RunContinuationsAsynchronously);
-            _ = this.QueueAction(
-                static state =>
-                {
-                    try
-                    {
-                        state.RefreshStarted.SetResult(state.Service.TrackReconciliation(state.Service.ReadAndUpdateReminders));
-                    }
-                    catch (Exception exception)
-                    {
-                        state.RefreshStarted.SetException(exception);
-                    }
-                },
-                (Service: this, RefreshStarted: refreshStarted));
-            return refreshStarted.Task;
+            try
+            {
+                return Task.FromResult(QueueTrackedReconciliation(ReadAndUpdateReminders));
+            }
+            catch (Exception exception)
+            {
+                return Task.FromException<Task>(exception);
+            }
         }
 
         internal Task TestOnlyWaitForSiloStatusListeners(CancellationToken cancellationToken)
@@ -461,6 +451,18 @@ namespace Orleans.Runtime.ReminderService
         }
 
         public override Task OnRangeChange(IRingRange oldRange, IRingRange newRange, bool increased)
+            => TrackReconciliation(() => ApplyRangeChange(oldRange, newRange, increased));
+
+        void IGrainServiceRangeChangeQueue.QueueRangeChange(IRingRange oldRange, IRingRange newRange, bool increased)
+            => QueueTrackedRangeChange(oldRange, newRange, increased).Ignore();
+
+        private Task QueueTrackedRangeChange(IRingRange oldRange, IRingRange newRange, bool increased)
+            => QueueTrackedReconciliation(() => ApplyRangeChange(oldRange, newRange, increased));
+
+        private Task QueueTrackedReconciliation(Func<Task> reconciliation)
+            => TrackReconciliation(() => this.QueueTask(reconciliation));
+
+        private Task ApplyRangeChange(IRingRange oldRange, IRingRange newRange, bool increased)
         {
             CheckRuntimeContext();
 
@@ -468,7 +470,7 @@ namespace Orleans.Runtime.ReminderService
             var status = Status;
             if (status == GrainServiceStatus.Started)
             {
-                return TrackReconciliation(ReadAndUpdateReminders);
+                return ReadAndUpdateReminders();
             }
 
             LogIgnoringRangeChange(status);
@@ -478,26 +480,32 @@ namespace Orleans.Runtime.ReminderService
         private Task TrackReconciliation(Func<Task> reconciliation)
         {
             var reconciliationTaskSource = new TaskCompletionSource<Task>(TaskCreationOptions.RunContinuationsAsynchronously);
-            TaskCompletionSource previousGenerationChanged;
-            lock (_reconciliationLock)
-            {
-                previousGenerationChanged = reconciliationGenerationChanged;
-                reconciliationGenerationChanged = new(TaskCreationOptions.RunContinuationsAsynchronously);
-                reconciliationGeneration++;
-                reconciliationTask = reconciliationTaskSource.Task.Unwrap();
-            }
-
-            previousGenerationChanged.TrySetResult();
+            TaskCompletionSource? previousGenerationChanged = null;
             try
             {
-                var task = reconciliation();
-                reconciliationTaskSource.SetResult(task);
-                return task;
+                lock (_reconciliationLock)
+                {
+                    previousGenerationChanged = reconciliationGenerationChanged;
+                    reconciliationGenerationChanged = new(TaskCreationOptions.RunContinuationsAsynchronously);
+                    reconciliationGeneration++;
+                    reconciliationTask = reconciliationTaskSource.Task.Unwrap();
+
+                    try
+                    {
+                        var task = reconciliation();
+                        reconciliationTaskSource.SetResult(task);
+                        return task;
+                    }
+                    catch (Exception exception)
+                    {
+                        reconciliationTaskSource.SetException(exception);
+                        throw;
+                    }
+                }
             }
-            catch (Exception exception)
+            finally
             {
-                reconciliationTaskSource.SetException(exception);
-                throw;
+                previousGenerationChanged?.TrySetResult();
             }
         }
 
@@ -535,11 +543,10 @@ namespace Orleans.Runtime.ReminderService
         }
 
         internal Task TestOnlyChangeRange(IRingRange oldRange, IRingRange newRange, bool increased)
-            => this.QueueTask(() => OnRangeChange(oldRange, newRange, increased));
+            => QueueTrackedRangeChange(oldRange, newRange, increased);
 
         private async Task RunAsync()
         {
-            await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.ForceYielding);
             var initialRefreshStagger = reminderOptions.RefreshReminderListPeriod < InitialReadRetryPeriod
                 ? reminderOptions.RefreshReminderListPeriod
                 : InitialReadRetryPeriod;
@@ -549,21 +556,8 @@ namespace Orleans.Runtime.ReminderService
             {
                 try
                 {
-                    CheckRuntimeContext();
-
                     overrideDelay = null;
-                    switch (Status)
-                    {
-                        case GrainServiceStatus.Booting:
-                            await DoInitialReadAndUpdateReminders();
-                            break;
-                        case GrainServiceStatus.Started:
-                            await TrackReconciliation(ReadAndUpdateReminders);
-                            break;
-                        default:
-                            listRefreshTimer.Dispose();
-                            return;
-                    }
+                    await QueueTrackedReconciliation(ProcessRefreshTick);
 
                     consecutiveFailures = 0;
                 }
@@ -578,14 +572,36 @@ namespace Orleans.Runtime.ReminderService
                         cap: TimeSpan.FromSeconds(80));
                 }
             }
+
+            async Task ProcessRefreshTick()
+            {
+                CheckRuntimeContext();
+
+                switch (Status)
+                {
+                    case GrainServiceStatus.Booting:
+                        await DoInitialReadAndUpdateReminders();
+                        break;
+                    case GrainServiceStatus.Started:
+                        await ReadAndUpdateReminders();
+                        break;
+                    default:
+                        listRefreshTimer.Dispose();
+                        break;
+                }
+            }
         }
 
         protected override async Task StartInBackground()
         {
             CheckRuntimeContext();
 
+            // Observe the ring before loading so readiness covers the current range, including changes during the read.
+            SubscribeToRangeChangeEvents();
+            await this.QueueAction(static _ => { }, state: 0);
             await DoInitialReadAndUpdateReminders();
-            this.runTask = RunAsync();
+            using var suppressExecutionContext = new ExecutionContextSuppressor();
+            this.runTask = Task.Run(RunAsync);
         }
 
         private async Task DoInitialReadAndUpdateReminders()
@@ -597,7 +613,15 @@ namespace Orleans.Runtime.ReminderService
                 if (StoppedCancellationTokenSource.IsCancellationRequested) return;
 
                 initialReadCallCount++;
-                await this.ReadAndUpdateReminders();
+                while (true)
+                {
+                    var rangeSerialNumber = RangeSerialNumber;
+                    await this.ReadAndUpdateReminders();
+                    if (rangeSerialNumber == RangeSerialNumber)
+                    {
+                        break;
+                    }
+                }
 
                 Status = GrainServiceStatus.Started;
                 startedTask.TrySetResult(true);
