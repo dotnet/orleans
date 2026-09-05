@@ -190,10 +190,14 @@ public sealed class RecoveryCacheMemoryOptionsTests
                 case nameof(DbStoredQueries.GetStreamPartitionBoundsKey):
                     rows.Add(new()
                     {
-                        ["ServiceId"] = "service", ["ProviderId"] = "provider", ["QueueId"] = queue,
-                        ["OwnerEpoch"] = 1L, ["NextMessageId"] = (long)partition.Payloads.Length + 1,
+                        ["ServiceId"] = "service",
+                        ["ProviderId"] = "provider",
+                        ["QueueId"] = queue,
+                        ["OwnerEpoch"] = 1L,
+                        ["NextMessageId"] = (long)partition.Payloads.Length + 1,
                         ["Checkpoint"] = Checkpoints.GetValueOrDefault(queue),
-                        ["EarliestMessageId"] = 1L, ["TailMessageId"] = (long)partition.Payloads.Length,
+                        ["EarliestMessageId"] = 1L,
+                        ["TailMessageId"] = (long)partition.Payloads.Length,
                     });
                     break;
                 case nameof(DbStoredQueries.ReadStreamMessagesKey):
@@ -204,11 +208,14 @@ public sealed class RecoveryCacheMemoryOptionsTests
                     {
                         rows.Add(new()
                         {
-                            ["ServiceId"] = "service", ["ProviderId"] = "provider", ["QueueId"] = queue,
+                            ["ServiceId"] = "service",
+                            ["ProviderId"] = "provider",
+                            ["QueueId"] = queue,
                             ["MessageId"] = (long)i + 1,
                             ["StreamIdBytes"] = partition.Stream.FullKey.ToArray(),
                             ["StreamNamespaceLength"] = partition.Stream.Namespace.Length,
-                            ["CreatedOn"] = DateTime.UnixEpoch, ["Payload"] = partition.Payloads[i],
+                            ["CreatedOn"] = DateTime.UnixEpoch,
+                            ["Payload"] = partition.Payloads[i],
                         });
                     }
 
@@ -216,10 +223,15 @@ public sealed class RecoveryCacheMemoryOptionsTests
                 case nameof(DbStoredQueries.CleanupStreamMessagesKey):
                     rows.Add(new()
                     {
-                        ["Ran"] = false, ["DeletedCount"] = 0, ["DeletedThroughMessageId"] = null,
-                        ["HardDeletedCount"] = 0, ["HardDeletedFromMessageId"] = null,
-                        ["HardDeletedThroughMessageId"] = null, ["Checkpoint"] = Checkpoints.GetValueOrDefault(queue),
-                        ["EarliestMessageId"] = 1L, ["TailMessageId"] = (long)partition.Payloads.Length,
+                        ["Ran"] = false,
+                        ["DeletedCount"] = 0,
+                        ["DeletedThroughMessageId"] = null,
+                        ["HardDeletedCount"] = 0,
+                        ["HardDeletedFromMessageId"] = null,
+                        ["HardDeletedThroughMessageId"] = null,
+                        ["Checkpoint"] = Checkpoints.GetValueOrDefault(queue),
+                        ["EarliestMessageId"] = 1L,
+                        ["TailMessageId"] = (long)partition.Payloads.Length,
                     });
                     break;
                 case nameof(DbStoredQueries.AdvanceStreamCheckpointKey):
@@ -227,8 +239,12 @@ public sealed class RecoveryCacheMemoryOptionsTests
                     Checkpoints[queue] = checkpoint;
                     rows.Add(new()
                     {
-                        ["ServiceId"] = "service", ["ProviderId"] = "provider", ["QueueId"] = queue,
-                        ["OwnerEpoch"] = 1L, ["Checkpoint"] = checkpoint, ["Updated"] = true,
+                        ["ServiceId"] = "service",
+                        ["ProviderId"] = "provider",
+                        ["QueueId"] = queue,
+                        ["OwnerEpoch"] = 1L,
+                        ["Checkpoint"] = checkpoint,
+                        ["Updated"] = true,
                     });
                     break;
                 default:
