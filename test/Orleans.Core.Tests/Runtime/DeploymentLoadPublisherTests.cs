@@ -1,3 +1,5 @@
+#nullable enable
+
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -114,7 +116,7 @@ public class DeploymentLoadPublisherTests
         var timer = Substitute.For<IGrainTimer>();
         timer.When(value => value.Dispose()).Do(_ => timerCancellation.Cancel());
         var timerRegistry = Substitute.For<ITimerRegistry>();
-        Func<CancellationToken, Task> tick = null;
+        Func<CancellationToken, Task>? tick = null;
         timerRegistry.RegisterGrainTimer(
             Arg.Any<IGrainContext>(),
             Arg.Any<Func<Func<CancellationToken, Task>, CancellationToken, Task>>(),
@@ -182,7 +184,7 @@ public class DeploymentLoadPublisherTests
         Assert.Empty(rig.Publisher.PeriodicStatistics);
     }
 
-    private static TestRig CreateTestRig(TimeSpan refreshTime, ITimerRegistry timerRegistry = null)
+    private static TestRig CreateTestRig(TimeSpan refreshTime, ITimerRegistry? timerRegistry = null)
     {
         var localSilo = SiloAddress.FromParsableString("127.0.0.1:100@100");
         var remoteSilo = SiloAddress.FromParsableString("127.0.0.1:200@100");
