@@ -121,7 +121,7 @@ internal sealed class InProcessMembershipTable(string clusterId) : IMembershipTa
                     return false;
                 }
 
-                if (!_tableVersion.VersionEtag.Equals(version.VersionEtag))
+                if (!_tableVersion.VersionEtag.Equals(version.VersionEtag, StringComparison.Ordinal))
                 {
                     return false;
                 }
@@ -141,7 +141,7 @@ internal sealed class InProcessMembershipTable(string clusterId) : IMembershipTa
                     return false;
                 }
 
-                if (!data.ETag.Equals(etag) || !_tableVersion.VersionEtag.Equals(version.VersionEtag))
+                if (!data.ETag.Equals(etag, StringComparison.Ordinal) || !_tableVersion.VersionEtag.Equals(version.VersionEtag, StringComparison.Ordinal))
                 {
                     return false;
                 }

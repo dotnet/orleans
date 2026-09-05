@@ -288,7 +288,7 @@ namespace UnitTests.CancellationTests
                 target = fixture.GrainFactory.GetGrain<ILongRunningTaskGrain<T1>>(Guid.NewGuid());
                 targetInstanceId = await target.GetRuntimeInstanceId();
                 RequestContext.Clear();
-            } while (placeOnDifferentSilos && instanceId.Equals(targetInstanceId) || !placeOnDifferentSilos && !instanceId.Equals(targetInstanceId));
+            } while (placeOnDifferentSilos && instanceId.Equals(targetInstanceId, StringComparison.Ordinal) || !placeOnDifferentSilos && !instanceId.Equals(targetInstanceId, StringComparison.Ordinal));
 
             return new Tuple<ILongRunningTaskGrain<T1>, ILongRunningTaskGrain<T1>>(grain, target);
         }

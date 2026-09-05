@@ -8,7 +8,7 @@ namespace UnitTests.GrainInterfaces
 
         public bool IsMatch(string streamNamespace)
         {
-            return streamNamespace.StartsWith("red");
+            return streamNamespace.StartsWith("red", StringComparison.Ordinal);
         }
     }
 }

@@ -24,7 +24,7 @@ namespace Orleans.EventSourcing.Common
         /// <returns></returns>
         public static bool GetBit(string writeVector, string Replica)
         {
-            var pos = writeVector.IndexOf(Replica);
+            var pos = writeVector.IndexOf(Replica, StringComparison.Ordinal);
             return pos != -1 && writeVector[pos - 1] == ',';
         }
 
@@ -36,7 +36,7 @@ namespace Orleans.EventSourcing.Common
         /// <returns>the state of the bit after flipping it</returns>
         public static bool FlipBit(ref string writeVector, string Replica)
         {
-            var pos = writeVector.IndexOf(Replica);
+            var pos = writeVector.IndexOf(Replica, StringComparison.Ordinal);
             if (pos != -1 && writeVector[pos - 1] == ',')
             {
                 var pos2 = writeVector.IndexOf(',', pos + 1);

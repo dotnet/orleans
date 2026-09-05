@@ -114,7 +114,7 @@ namespace UnitTests.Management
             Assert.True(stats.Length > 0, "Got some grain statistics: " + stats.Length);
             foreach (var s in stats)
             {
-                Assert.False(s.GrainType.EndsWith("Activation"), "Grain type name should not end with 'Activation' - " + s.GrainType);
+                Assert.False(s.GrainType.EndsWith("Activation", StringComparison.Ordinal), "Grain type name should not end with 'Activation' - " + s.GrainType);
             }
         }
 

@@ -111,7 +111,7 @@ namespace UnitTests
             Assert.Contains("exit:A", log);
             Assert.Contains("exit:B", log);
 
-            var firstExit = log.FindIndex(x => x.StartsWith("exit"));
+            var firstExit = log.FindIndex(x => x.StartsWith("exit", StringComparison.Ordinal));
             Assert.True(firstExit >= 2, $"Expected both methods to enter before exiting. Log: {string.Join(", ", log)}");
         }
 

@@ -51,7 +51,7 @@ namespace Tester.HeterogeneousSilosTests
                         var cfg = hostBuilder.GetConfiguration();
 
                         // The blocklist is only intended for the primary silo in these tests.
-                        if (string.Equals(siloOptions.Value.SiloName, Silo.PrimarySiloName))
+                        if (string.Equals(siloOptions.Value.SiloName, Silo.PrimarySiloName, StringComparison.Ordinal))
                         {
                             var typeNames = cfg["BlockedGrainTypes"]!.Split('|').ToList();
                             foreach (var typeName in typeNames)

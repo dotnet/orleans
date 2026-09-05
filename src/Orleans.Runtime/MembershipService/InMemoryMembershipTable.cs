@@ -47,7 +47,7 @@ namespace Orleans.Runtime.MembershipService
         {
             siloTable.TryGetValue(entry.SiloAddress, out var data);
             if (data != null) return false;
-            if (!tableVersion.VersionEtag.Equals(version.VersionEtag)) return false;
+            if (!tableVersion.VersionEtag.Equals(version.VersionEtag, StringComparison.Ordinal)) return false;
 
             siloTable[entry.SiloAddress] = new Tuple<MembershipEntry, string>(
                 entry, lastETagCounter++.ToString(CultureInfo.InvariantCulture));
@@ -59,7 +59,7 @@ namespace Orleans.Runtime.MembershipService
         {
             siloTable.TryGetValue(entry.SiloAddress, out var data);
             if (data == null) return false;
-            if (!data.Item2.Equals(etag) || !tableVersion.VersionEtag.Equals(version.VersionEtag)) return false;
+            if (!data.Item2.Equals(etag, StringComparison.Ordinal) || !tableVersion.VersionEtag.Equals(version.VersionEtag, StringComparison.Ordinal)) return false;
 
             siloTable[entry.SiloAddress] = new Tuple<MembershipEntry, string>(
                 entry, lastETagCounter++.ToString(CultureInfo.InvariantCulture));

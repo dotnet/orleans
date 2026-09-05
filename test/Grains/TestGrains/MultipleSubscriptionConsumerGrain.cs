@@ -181,7 +181,7 @@ namespace UnitTests.Grains
             {
                 logger.LogInformation("Got next event {Item} on handle {Handle}", item.Item, countCapture);
                 var contextValue = RequestContext.Get(SampleStreaming_ProducerGrain.RequestContextKey) as string;
-                if (!string.Equals(contextValue, SampleStreaming_ProducerGrain.RequestContextValue))
+                if (!string.Equals(contextValue, SampleStreaming_ProducerGrain.RequestContextValue, StringComparison.Ordinal))
                 {
                     throw new Exception($"Got the wrong RequestContext value {contextValue}.");
                 }

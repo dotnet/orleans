@@ -302,7 +302,7 @@ namespace UnitTests.ActivationsLifeCycleTests
                     RequestContext.Remove(IPlacementDirector.PlacementHintKey);
                 }
 
-                if (this.testCluster.Primary!.SiloAddress.ToString().Equals(siloHostingActivation))
+                if (this.testCluster.Primary!.SiloAddress.ToString().Equals(siloHostingActivation, StringComparison.Ordinal))
                 {
                     continue;
                 }

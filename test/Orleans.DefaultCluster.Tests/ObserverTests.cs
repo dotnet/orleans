@@ -157,7 +157,7 @@ namespace DefaultCluster.Tests.General
                 Exception baseException = exc.GetBaseException();
                 this.Logger.LogInformation(baseException, "Received exception");
                 Assert.IsAssignableFrom<OrleansException>(baseException);
-                if (!baseException.Message.StartsWith("Cannot subscribe already subscribed observer"))
+                if (!baseException.Message.StartsWith("Cannot subscribe already subscribed observer", StringComparison.Ordinal))
                 {
                     Assert.Fail("Unexpected exception message: " + baseException);
                 }

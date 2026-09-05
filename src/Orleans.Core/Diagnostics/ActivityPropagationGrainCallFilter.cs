@@ -33,7 +33,7 @@ namespace Orleans.Runtime
                     return ActivitySources.ApplicationGrainSource;
 
                 default:
-                    return interfaceType.Namespace?.StartsWith(OrleansNamespacePrefix) == true
+                    return interfaceType.Namespace?.StartsWith(OrleansNamespacePrefix, StringComparison.Ordinal) == true
                         ? ActivitySources.RuntimeGrainSource
                         : ActivitySources.ApplicationGrainSource;
             }

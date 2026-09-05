@@ -200,7 +200,7 @@ namespace Orleans.TestingHost
             }
 
             FileInfo target;
-            if (string.Equals(".dll", originalFileInfo.Extension))
+            if (string.Equals(".dll", originalFileInfo.Extension, StringComparison.Ordinal))
             {
                 if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 {

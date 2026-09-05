@@ -224,7 +224,7 @@ namespace Orleans.Runtime.MembershipService
             string mySiloName = this.localSiloDetails.Name;
             MembershipEntry? mostRecentPreviousEntry = null;
             // look for silo instances that are same as me, find most recent with Generation before me.
-            foreach (var entry in snapshot.Entries.Select(entry => entry.Value).Where(data => mySiloName.Equals(data.SiloName)))
+            foreach (var entry in snapshot.Entries.Select(entry => entry.Value).Where(data => mySiloName.Equals(data.SiloName, StringComparison.Ordinal)))
             {
                 bool iAmLater = myAddress.Generation.CompareTo(entry.SiloAddress.Generation) > 0;
                 // more recent
@@ -234,7 +234,7 @@ namespace Orleans.Runtime.MembershipService
 
             if (mostRecentPreviousEntry is not null)
             {
-                bool physicalHostChanged = !myHostname.Equals(mostRecentPreviousEntry.HostName) || !myAddress.Endpoint.Equals(mostRecentPreviousEntry.SiloAddress.Endpoint);
+                bool physicalHostChanged = !myHostname.Equals(mostRecentPreviousEntry.HostName, StringComparison.Ordinal) || !myAddress.Endpoint.Equals(mostRecentPreviousEntry.SiloAddress.Endpoint);
                 if (physicalHostChanged)
                 {
                     LogWarningNodeMigrated(this.log, mySiloName, myHostname, myAddress, mostRecentPreviousEntry.HostName, mostRecentPreviousEntry.SiloAddress);

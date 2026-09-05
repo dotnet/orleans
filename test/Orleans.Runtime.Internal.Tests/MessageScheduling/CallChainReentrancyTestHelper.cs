@@ -199,7 +199,7 @@ namespace UnitTests.General
             public async Task WaitForOperationAsync(CallChainOperation operationType, string grain, int callIndex, CancellationToken cancellationToken = default)
             {
                 // First check if we've already seen this operation
-                if (_allOperations.Any(op => op.Operation == operationType && op.Grain.Equals(grain) && op.CallIndex == callIndex))
+                if (_allOperations.Any(op => op.Operation == operationType && op.Grain.Equals(grain, StringComparison.Ordinal) && op.CallIndex == callIndex))
                 {
                     return;
                 }
@@ -210,7 +210,7 @@ namespace UnitTests.General
                     Assert.True(operations.TryRead(out var operation));
                     _allOperations.Add(operation);
 
-                    if (operation.Operation == operationType && operation.Grain.Equals(grain) && operation.CallIndex == callIndex)
+                    if (operation.Operation == operationType && operation.Grain.Equals(grain, StringComparison.Ordinal) && operation.CallIndex == callIndex)
                     {
                         return;
                     }

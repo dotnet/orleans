@@ -20,7 +20,7 @@ public class CommonCodecTypeFilter
     public static bool IsAbstractOrFrameworkType(Type type)
     {
         if (type.IsAbstract
-            || type.GetCustomAttributes<GeneratedCodeAttribute>().Any(a => a.Tool!.Equals("OrleansCodeGen"))
+            || type.GetCustomAttributes<GeneratedCodeAttribute>().Any(a => a.Tool!.Equals("OrleansCodeGen", StringComparison.Ordinal))
             || type.Assembly.GetCustomAttribute<FrameworkPartAttribute>() is not null)
         {
             return true;

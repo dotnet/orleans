@@ -401,7 +401,7 @@ public class TypeConverter
 
         foreach (var (displayName, runtimeName) in WellKnownTypeAliases)
         {
-            if (displayName.Equals(type.Type) || runtimeName.Equals(type.Type))
+            if (displayName.Equals(type.Type, StringComparison.Ordinal) || runtimeName.Equals(type.Type, StringComparison.Ordinal))
             {
                 return true;
             }

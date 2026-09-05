@@ -176,8 +176,8 @@ namespace NonSilo.Tests.Membership
 
             calls = membershipTable.Calls.Skip(2).ToList();
             Assert.NotEmpty(calls);
-            Assert.Contains(calls, call => call.Method.Equals(nameof(IMembershipTable.InsertRow)));
-            Assert.Contains(calls, call => call.Method.Equals(nameof(IMembershipTable.ReadAll)));
+            Assert.Contains(calls, call => call.Method.Equals(nameof(IMembershipTable.InsertRow), StringComparison.Ordinal));
+            Assert.Contains(calls, call => call.Method.Equals(nameof(IMembershipTable.ReadAll), StringComparison.Ordinal));
 
             {
                 // Check that a timer is being requested and that after it expires a call to
@@ -188,7 +188,7 @@ namespace NonSilo.Tests.Membership
                 membershipTable.ClearCalls();
                 completion.TrySetResult(true);
                 while (membershipTable.Calls.Count == 0) await Task.Delay(10, cancellationToken);
-                Assert.Contains(membershipTable.Calls, c => c.Method.Equals(nameof(IMembershipTable.ReadAll)));
+                Assert.Contains(membershipTable.Calls, c => c.Method.Equals(nameof(IMembershipTable.ReadAll), StringComparison.Ordinal));
             }
 
             using var shutdownCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -271,7 +271,7 @@ namespace NonSilo.Tests.Membership
             Assert.NotEmpty(calls);
             Assert.True(calls.Count >= 2);
             Assert.Equal(nameof(IMembershipTable.InitializeMembershipTable), calls[0].Method);
-            Assert.Contains(calls, call => call.Method.Equals(nameof(IMembershipTable.ReadAll)));
+            Assert.Contains(calls, call => call.Method.Equals(nameof(IMembershipTable.ReadAll), StringComparison.Ordinal));
 
             // During initialization, the table is read and predecessor entries are declared dead
             // before the table snapshot is published to other components.
@@ -300,8 +300,8 @@ namespace NonSilo.Tests.Membership
 
             calls = membershipTable.Calls.Skip(2).ToList();
             Assert.NotEmpty(calls);
-            Assert.Contains(calls, call => call.Method.Equals(nameof(IMembershipTable.InsertRow)));
-            Assert.Contains(calls, call => call.Method.Equals(nameof(IMembershipTable.ReadAll)));
+            Assert.Contains(calls, call => call.Method.Equals(nameof(IMembershipTable.InsertRow), StringComparison.Ordinal));
+            Assert.Contains(calls, call => call.Method.Equals(nameof(IMembershipTable.ReadAll), StringComparison.Ordinal));
 
             await this.lifecycle.OnStop(cancellationToken);
             this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);

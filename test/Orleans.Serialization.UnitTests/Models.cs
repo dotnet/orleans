@@ -416,8 +416,8 @@ namespace Orleans.Serialization.UnitTests
 
         public override string ToString() => $"{nameof(SubTypeProperty)}: {SubTypeProperty}, {base.ToString()}";
         public bool Equals(MyNewtonsoftJsonClass? other) => other is not null && base.Equals(other) && string.Equals(SubTypeProperty, other.SubTypeProperty, StringComparison.Ordinal) && EqualityComparer<TestId>.Default.Equals(Id, other.Id)
-            && string.Equals(JsonConvert.SerializeObject(JsonArray), JsonConvert.SerializeObject(other.JsonArray))
-            && string.Equals(JsonConvert.SerializeObject(JsonObject), JsonConvert.SerializeObject(other.JsonObject));
+            && string.Equals(JsonConvert.SerializeObject(JsonArray), JsonConvert.SerializeObject(other.JsonArray), StringComparison.Ordinal)
+            && string.Equals(JsonConvert.SerializeObject(JsonObject), JsonConvert.SerializeObject(other.JsonObject), StringComparison.Ordinal);
         public override bool Equals(object? obj) => Equals(obj as MyJsonClass);
         public override int GetHashCode() => HashCode.Combine(base.GetHashCode(), SubTypeProperty);
     }
@@ -439,8 +439,8 @@ namespace Orleans.Serialization.UnitTests
 
         public override string ToString() => $"{nameof(SubTypeProperty)}: {SubTypeProperty}, {base.ToString()}";
         public bool Equals(MyJsonClass? other) => other is not null && base.Equals(other) && string.Equals(SubTypeProperty, other.SubTypeProperty, StringComparison.Ordinal) && EqualityComparer<TestId>.Default.Equals(Id, other.Id)
-            && string.Equals(System.Text.Json.JsonSerializer.Serialize(JsonArray), System.Text.Json.JsonSerializer.Serialize(other.JsonArray))
-            && string.Equals(System.Text.Json.JsonSerializer.Serialize(JsonObject), System.Text.Json.JsonSerializer.Serialize(other.JsonObject));
+            && string.Equals(System.Text.Json.JsonSerializer.Serialize(JsonArray), System.Text.Json.JsonSerializer.Serialize(other.JsonArray), StringComparison.Ordinal)
+            && string.Equals(System.Text.Json.JsonSerializer.Serialize(JsonObject), System.Text.Json.JsonSerializer.Serialize(other.JsonObject), StringComparison.Ordinal);
         public override bool Equals(object? obj) => Equals(obj as MyJsonClass);
         public override int GetHashCode() => HashCode.Combine(base.GetHashCode(), SubTypeProperty);
     }
