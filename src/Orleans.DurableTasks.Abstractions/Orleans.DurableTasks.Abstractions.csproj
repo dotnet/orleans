@@ -8,6 +8,8 @@
     <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
     <OrleansBuildTimeCodeGen>false</OrleansBuildTimeCodeGen>
     <EnableOrleansContractsAnalyzer>false</EnableOrleansContractsAnalyzer>
+    <!-- Enable baseline API comparisons after the first NuGet publication. -->
+    <EnablePackageValidation>false</EnablePackageValidation>
     <VersionSuffix Condition="$(VersionSuffix) != ''">$(VersionSuffix).alpha.1</VersionSuffix>
     <VersionSuffix Condition="$(VersionSuffix) == ''">alpha.1</VersionSuffix>
     <GenAPITargetDirectory>$(SourceRoot)src\api\Orleans.DurableTasks.Abstractions\</GenAPITargetDirectory>
