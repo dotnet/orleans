@@ -90,7 +90,7 @@ namespace Tester.AzureUtils.Streaming
             adapterFactory.Init();
 
             var cancellationToken = TestContext.Current.CancellationToken;
-            var adapter = await adapterFactory.CreateAdapter();
+            var adapter = await ((IQueueAdapterFactory)adapterFactory).CreateAdapter(cancellationToken);
             var queueId = Assert.Single(adapterFactory.GetStreamQueueMapper().GetAllQueues());
             var receiver = adapter.CreateReceiver(queueId);
             await receiver.Initialize(TimeSpan.FromSeconds(10), cancellationToken);

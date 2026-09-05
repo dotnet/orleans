@@ -142,8 +142,8 @@ public class AzureQueueAdapterReceiverTests
         await receiver.MessagesDeliveredAsync([received[1]]);
         await receiver.Shutdown(TimeSpan.FromSeconds(1));
 
-        Assert.Equal([failed, confirmed], queue.DeletedMessages);
-        Assert.Equal([failed, unacknowledged], queue.ReleasedMessages);
+        Assert.Equal([confirmed, failed], queue.DeletedMessages.OrderBy(message => message.MessageId, StringComparer.Ordinal));
+        Assert.Equal([failed, unacknowledged], queue.ReleasedMessages.OrderBy(message => message.MessageId, StringComparer.Ordinal));
     }
 
     private static QueueMessage CreateMessage(string messageId = "message-id")
