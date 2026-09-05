@@ -7,11 +7,13 @@
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <AssemblyName>Orleans.Clustering.ZooKeeper</AssemblyName>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <WarningsAsErrors>$(WarningsAsErrors);CA1062</WarningsAsErrors>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Orleans.Runtime\Orleans.Runtime.csproj" />
     <PackageReference Include="ZooKeeperNetEx" />
+    <InternalsVisibleTo Include="Orleans.Clustering.ZooKeeper.Tests" />
   </ItemGroup>
 
 </Project>
