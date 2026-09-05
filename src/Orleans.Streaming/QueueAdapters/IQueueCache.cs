@@ -30,7 +30,71 @@ namespace Orleans.Streams
         /// <param name="streamId">The stream identifier.</param>
         /// <param name="token">The token.</param>
         /// <returns>The queue cache cursor.</returns>
+        /// <exception cref="QueueCacheMissException">
+        /// The requested token is older than the messages retained by the cache.
+        /// </exception>
+        [Obsolete("Use TryGetCacheCursor instead.")]
         IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken? token);
+
+        /// <summary>
+        /// Attempts to acquire a stream message cursor at the location indicated by the provided token.
+        /// </summary>
+        /// <param name="streamId">The stream identifier.</param>
+        /// <param name="token">The token.</param>
+        /// <returns>
+        /// A successful result containing the acquired cursor, or a cache-miss result containing the
+        /// unavailable position and current cache bounds.
+        /// </returns>
+        QueueCacheCursorResult<IQueueCacheCursor> TryGetCacheCursor(StreamId streamId, StreamSequenceToken? token)
+        {
+            try
+            {
+#pragma warning disable CS0618 // Required for compatibility with providers which only implement the legacy method.
+                return QueueCacheCursorResult<IQueueCacheCursor>.FromCursor(GetCacheCursor(streamId, token));
+#pragma warning restore CS0618
+            }
+            catch (QueueCacheMissException exception)
+            {
+                return QueueCacheCursorResult<IQueueCacheCursor>.FromCacheMiss(
+                    new(exception.Requested, exception.Low, exception.High));
+            }
+        }
+
+        /// <summary>
+        /// Attempts to acquire a stream message cursor at the specified subscription start position.
+        /// </summary>
+        /// <param name="streamId">The stream identifier.</param>
+        /// <param name="startPosition">The initial subscription position.</param>
+        /// <returns>
+        /// A successful result containing the acquired cursor, a cache-miss result containing the unavailable
+        /// position and current cache bounds, or <see cref="QueueCacheCursorResultKind.NotSupported"/>.
+        /// </returns>
+        /// <remarks>
+        /// The default implementation adapts <see cref="GetCacheCursorAtPosition"/> so that existing
+        /// providers retain their positioning behavior. Providers implementing this method directly
+        /// should also implement the obsolete positioning method for legacy callers.
+        /// </remarks>
+        /// <exception cref="ArgumentOutOfRangeException"><paramref name="startPosition"/> is not defined.</exception>
+        QueueCacheCursorResult<IQueueCacheCursor> TryGetCacheCursorAtPosition(
+            StreamId streamId,
+            StreamSubscriptionStartPosition startPosition)
+        {
+            try
+            {
+#pragma warning disable CS0618 // Preserve positioning implemented by existing providers.
+                return QueueCacheCursorResult<IQueueCacheCursor>.FromCursor(GetCacheCursorAtPosition(streamId, startPosition));
+#pragma warning restore CS0618
+            }
+            catch (QueueCacheMissException exception)
+            {
+                return QueueCacheCursorResult<IQueueCacheCursor>.FromCacheMiss(
+                    new(exception.Requested, exception.Low, exception.High));
+            }
+            catch (NotSupportedException)
+            {
+                return QueueCacheCursorResult<IQueueCacheCursor>.NotSupported;
+            }
+        }
 
         /// <summary>
         /// Acquires a stream message cursor at the specified subscription start position.
@@ -38,14 +102,23 @@ namespace Orleans.Streams
         /// <param name="streamId">The stream identifier.</param>
         /// <param name="startPosition">The initial subscription position.</param>
         /// <returns>The queue cache cursor.</returns>
-        /// <exception cref="NotSupportedException">
-        /// Thrown when <paramref name="startPosition"/> is not supported by this cache.
+        /// <exception cref="ArgumentOutOfRangeException"><paramref name="startPosition"/> is not defined.</exception>
+        /// <exception cref="QueueCacheMissException">
+        /// The requested position is older than the messages retained by the cache.
         /// </exception>
-        IQueueCacheCursor GetCacheCursorAtPosition(StreamId streamId, StreamSubscriptionStartPosition startPosition)
+        /// <exception cref="NotSupportedException">
+        /// The cache does not support <paramref name="startPosition"/>.
+        /// </exception>
+        [Obsolete("Use TryGetCacheCursorAtPosition instead.")]
+        IQueueCacheCursor GetCacheCursorAtPosition(
+            StreamId streamId,
+            StreamSubscriptionStartPosition startPosition)
         {
             if (startPosition == StreamSubscriptionStartPosition.Latest)
             {
+#pragma warning disable CS0618 // Preserve the exact legacy exception and cursor behavior.
                 return GetCacheCursor(streamId, null);
+#pragma warning restore CS0618
             }
 
             if (startPosition != StreamSubscriptionStartPosition.EarliestAvailable)
@@ -54,7 +127,7 @@ namespace Orleans.Streams
             }
 
             throw new NotSupportedException(
-                $"{GetType().FullName} does not support {StreamSubscriptionStartPosition.EarliestAvailable} cursor positioning.");
+                $"{GetType().FullName} does not support {startPosition} cursor positioning.");
         }
 
         /// <summary>

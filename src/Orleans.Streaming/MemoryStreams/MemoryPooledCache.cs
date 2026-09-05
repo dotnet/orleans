@@ -108,7 +108,7 @@ namespace Orleans.Providers
                 StreamSequenceToken? token)
             {
                 this.cache = cache;
-                cursor = cache.GetCursor(streamId, token);
+                cursor = GetCursorOrThrow(cache, streamId, token);
             }
 
             public Cursor(PooledQueueCache cache, object cursor)
@@ -127,16 +127,29 @@ namespace Orleans.Providers
                 return current;
             }
 
+            [Obsolete("Use MoveNextWithResult instead.")]
             public bool MoveNext()
             {
-                IBatchContainer? next;
-                if (!cache.TryGetNextMessage(cursor, out next))
+                var result = cache.TryGetNextMessageWithResult(cursor, out var next);
+                if (result.CacheMiss is { } cacheMiss)
                 {
-                    return false;
+                    throw cacheMiss.ToException();
                 }
 
-                current = next;
-                return true;
+                current = result.Kind == QueueCacheCursorMoveResultKind.Success ? next : null;
+                return result.Kind switch
+                {
+                    QueueCacheCursorMoveResultKind.Success => true,
+                    QueueCacheCursorMoveResultKind.NoData => false,
+                    _ => throw new InvalidOperationException("The cursor move result is not initialized."),
+                };
+            }
+
+            public QueueCacheCursorMoveResult MoveNextWithResult()
+            {
+                var result = cache.TryGetNextMessageWithResult(cursor, out var next);
+                current = result.Kind == QueueCacheCursorMoveResultKind.Success ? next : null;
+                return result;
             }
 
             public void Refresh(StreamSequenceToken token)
@@ -146,6 +159,20 @@ namespace Orleans.Providers
 
             public void RecordDeliveryFailure()
             {
+            }
+
+            private static object GetCursorOrThrow(
+                PooledQueueCache cache,
+                StreamId streamId,
+                StreamSequenceToken? token)
+            {
+                var result = cache.TryGetCursor(streamId, token);
+                return result.Kind switch
+                {
+                    QueueCacheCursorResultKind.Success => result.Cursor!,
+                    QueueCacheCursorResultKind.CacheMiss => throw result.CacheMiss!.Value.ToException(),
+                    _ => throw new InvalidOperationException($"Unexpected cursor result: {result.Kind}."),
+                };
             }
         }
 
@@ -176,15 +203,45 @@ namespace Orleans.Providers
         }
 
         /// <inheritdoc/>
+        [Obsolete("Use IQueueCache.TryGetCacheCursor instead.")]
         public IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken? token)
         {
             return new Cursor(cache, streamId, token);
         }
 
-        IQueueCacheCursor IQueueCache.GetCacheCursorAtPosition(StreamId streamId, StreamSubscriptionStartPosition startPosition)
+        QueueCacheCursorResult<IQueueCacheCursor> IQueueCache.TryGetCacheCursor(
+            StreamId streamId,
+            StreamSequenceToken? token)
         {
-            return new Cursor(cache, cache.GetCursorAtPosition(streamId, startPosition));
+            return WrapCursorResult(cache.TryGetCursor(streamId, token));
         }
+
+        QueueCacheCursorResult<IQueueCacheCursor> IQueueCache.TryGetCacheCursorAtPosition(
+            StreamId streamId,
+            StreamSubscriptionStartPosition startPosition)
+        {
+            return WrapCursorResult(cache.TryGetCursorAtPosition(streamId, startPosition));
+        }
+
+        /// <inheritdoc />
+        [Obsolete("Use IQueueCache.TryGetCacheCursorAtPosition instead.")]
+        IQueueCacheCursor IQueueCache.GetCacheCursorAtPosition(
+            StreamId streamId,
+            StreamSubscriptionStartPosition startPosition)
+        {
+#pragma warning disable CS0618 // Translate the pooled cache result for legacy callers.
+            return new Cursor(cache, cache.GetCursorAtPosition(streamId, startPosition));
+#pragma warning restore CS0618
+        }
+
+        private QueueCacheCursorResult<IQueueCacheCursor> WrapCursorResult(QueueCacheCursorResult<object> result)
+            => result.Kind switch
+            {
+                QueueCacheCursorResultKind.Success => QueueCacheCursorResult<IQueueCacheCursor>.FromCursor(new Cursor(cache, result.Cursor!)),
+                QueueCacheCursorResultKind.CacheMiss => QueueCacheCursorResult<IQueueCacheCursor>.FromCacheMiss(result.CacheMiss!.Value),
+                QueueCacheCursorResultKind.NotSupported => QueueCacheCursorResult<IQueueCacheCursor>.NotSupported,
+                _ => throw new InvalidOperationException("The cursor result is not initialized."),
+            };
 
         /// <inheritdoc/>
         public bool IsUnderPressure()

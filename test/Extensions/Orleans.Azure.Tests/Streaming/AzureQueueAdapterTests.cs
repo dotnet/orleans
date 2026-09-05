@@ -168,11 +168,14 @@ namespace Tester.AzureUtils.Streaming
                 foreach (StreamId streamGuid in kvp.Value)
                 {
                     // read all messages in cache for stream
-                    IQueueCacheCursor cursor = qCache.GetCacheCursor(streamGuid, firstInCache);
+                    var cursorResult = qCache.TryGetCacheCursor(streamGuid, firstInCache);
+                    Assert.Equal(QueueCacheCursorResultKind.Success, cursorResult.Kind);
+                    var cursor = cursorResult.Cursor;
+                    Assert.NotNull(cursor);
                     int messageCount = 0;
                     StreamSequenceToken? tenthInCache = null;
                     StreamSequenceToken lastToken = firstInCache;
-                    while (cursor.MoveNext())
+                    while (MoveNext(cursor))
                     {
                         Exception? ex;
                         messageCount++;
@@ -191,9 +194,12 @@ namespace Tester.AzureUtils.Streaming
                     Assert.NotNull(tenthInCache);
 
                     // read all messages from the 10th
-                    cursor = qCache.GetCacheCursor(streamGuid, tenthInCache);
+                    cursorResult = qCache.TryGetCacheCursor(streamGuid, tenthInCache);
+                    Assert.Equal(QueueCacheCursorResultKind.Success, cursorResult.Kind);
+                    cursor = cursorResult.Cursor;
+                    Assert.NotNull(cursor);
                     messageCount = 0;
-                    while (cursor.MoveNext())
+                    while (MoveNext(cursor))
                     {
                         messageCount++;
                     }
@@ -202,6 +208,18 @@ namespace Tester.AzureUtils.Streaming
                     Assert.Equal(expected, messageCount);
                 }
             }
+        }
+
+        private static bool MoveNext(IQueueCacheCursor cursor)
+        {
+            var result = cursor.MoveNextWithResult();
+            return result.Kind switch
+            {
+                QueueCacheCursorMoveResultKind.Success => true,
+                QueueCacheCursorMoveResultKind.NoData => false,
+                QueueCacheCursorMoveResultKind.CacheMiss => throw result.CacheMiss!.Value.ToException(),
+                _ => throw new InvalidOperationException("The cursor move result is not initialized."),
+            };
         }
 
         private List<object> CreateEvents(int count)

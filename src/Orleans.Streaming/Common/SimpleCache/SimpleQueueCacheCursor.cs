@@ -73,6 +73,7 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <inheritdoc />
+        [Obsolete("Use MoveNextWithResult instead.")]
         public virtual bool MoveNext()
         {
             if (current == null && IsSet && IsInStream(Element!.Value.Batch)) // IsSet is true, so Element is non-null.
@@ -94,6 +95,22 @@ namespace Orleans.Providers.Streams.Common
 
             deliveryBatch?.Track(Element!);
             return true;
+        }
+
+        /// <inheritdoc />
+        public virtual QueueCacheCursorMoveResult MoveNextWithResult()
+        {
+            try
+            {
+#pragma warning disable CS0618 // Preserve virtual dispatch for derived cursors which override the legacy method.
+                return MoveNext() ? QueueCacheCursorMoveResult.Success : QueueCacheCursorMoveResult.NoData;
+#pragma warning restore CS0618
+            }
+            catch (QueueCacheMissException exception)
+            {
+                return QueueCacheCursorMoveResult.FromCacheMiss(
+                    new(exception.Requested, exception.Low, exception.High));
+            }
         }
 
         /// <inheritdoc />

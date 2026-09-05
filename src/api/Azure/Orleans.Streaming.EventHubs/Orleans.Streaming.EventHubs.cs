@@ -482,17 +482,26 @@ namespace Orleans.Streaming.EventHubs
 
         public void Dispose() { }
 
+        [System.Obsolete("Use TryGetCursor instead.")]
         public object GetCursor(Runtime.StreamId streamId, Streams.StreamSequenceToken? sequenceToken) { throw null; }
 
         public int GetMaxAddCount() { throw null; }
 
+        [System.Obsolete("Use TryGetCursorAtPosition instead.")]
         object IEventHubQueueCache.GetCursorAtPosition(Runtime.StreamId streamId, Streams.StreamSubscriptionStartPosition startPosition) { throw null; }
 
         public void Refresh(object cursor, Streams.StreamSequenceToken? sequenceToken) { }
 
         public void SignalPurge() { }
 
+        public Streams.QueueCacheCursorResult<object> TryGetCursor(Runtime.StreamId streamId, Streams.StreamSequenceToken? sequenceToken) { throw null; }
+
+        public Streams.QueueCacheCursorResult<object> TryGetCursorAtPosition(Runtime.StreamId streamId, Streams.StreamSubscriptionStartPosition startPosition) { throw null; }
+
+        [System.Obsolete("Use TryGetNextMessageWithResult instead.")]
         public bool TryGetNextMessage(object cursorObj, out Streams.IBatchContainer? message) { throw null; }
+
+        public Streams.QueueCacheCursorMoveResult TryGetNextMessageWithResult(object cursorObj, out Streams.IBatchContainer? message) { throw null; }
     }
 
     public partial class EventHubQueueCacheFactory : IEventHubQueueCacheFactory
@@ -571,11 +580,17 @@ namespace Orleans.Streaming.EventHubs
     {
         System.Collections.Generic.List<Streams.StreamPosition> Add(System.Collections.Generic.List<Azure.Messaging.EventHubs.EventData> message, System.DateTime dequeueTimeUtc);
         void AddCachePressureMonitor(ICachePressureMonitor monitor);
+        [System.Obsolete("Use TryGetCursor instead.")]
         object GetCursor(Runtime.StreamId streamId, Streams.StreamSequenceToken? sequenceToken);
+        [System.Obsolete("Use TryGetCursorAtPosition instead.")]
         object GetCursorAtPosition(Runtime.StreamId streamId, Streams.StreamSubscriptionStartPosition startPosition);
         void Refresh(object cursor, Streams.StreamSequenceToken? sequenceToken);
         void SignalPurge();
+        Streams.QueueCacheCursorResult<object> TryGetCursor(Runtime.StreamId streamId, Streams.StreamSequenceToken? sequenceToken);
+        Streams.QueueCacheCursorResult<object> TryGetCursorAtPosition(Runtime.StreamId streamId, Streams.StreamSubscriptionStartPosition startPosition);
+        [System.Obsolete("Use TryGetNextMessageWithResult instead.")]
         bool TryGetNextMessage(object cursorObj, out Streams.IBatchContainer? message);
+        Streams.QueueCacheCursorMoveResult TryGetNextMessageWithResult(object cursorObj, out Streams.IBatchContainer? message);
     }
 
     public partial interface IEventHubQueueCacheFactory
