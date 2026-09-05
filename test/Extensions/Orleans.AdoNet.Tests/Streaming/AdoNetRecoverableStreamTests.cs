@@ -623,6 +623,38 @@ public class AdoNetRecoverableStreamTests
     }
 
     [Fact]
+    public async Task ReplaySource_RejectsNegativeSequenceTokensBeforeLeaseAdmission()
+    {
+        var storage = new CapturingRelationalStorage();
+        var source = new AdoNetRecoverableStream(
+            "service",
+            "provider",
+            "queue",
+            new AdoNetStreamOptions(),
+            CreateQueries(storage),
+            NullLogger.Instance);
+        _ = await source.Load(TestContext.Current.CancellationToken);
+        var factory = (IRecoverableStreamReplaySourceFactory<AdoNetStreamMessage>)source;
+        var streamId = StreamId.Create("namespace", Guid.NewGuid());
+        StreamSequenceToken[] tokens =
+        [
+            new EventSequenceTokenV2(-1),
+            new AdoNetStreamSequenceToken("service", "provider", "queue", -1),
+        ];
+
+        foreach (var token in tokens)
+        {
+            await Assert.ThrowsAsync<DataNotAvailableException>(
+                async () => await factory.Create(
+                    streamId,
+                    token,
+                    TestContext.Current.CancellationToken));
+        }
+
+        Assert.False(storage.CallCounts.ContainsKey(nameof(DbStoredQueries.AcquireStreamReplayLeaseKey)));
+    }
+
+    [Fact]
     public async Task LiveReader_HardRetentionBeyondMaterializedPageSurfacesDataNotAvailable()
     {
         var storage = new CapturingRelationalStorage

@@ -240,11 +240,11 @@ public sealed class KinesisSequenceTokenTests
     }
 
     [Fact]
-    public void SerializerIdsFollowBaseTokenIds()
+    public void SerializerIdsPreserveLegacyShardSequenceAndAllocateNewFields()
     {
-        Assert.Equal(2u, GetId(nameof(KinesisSequenceToken.ShardSequence)));
-        Assert.Equal(3u, GetId(nameof(KinesisSequenceToken.ShardId)));
-        Assert.Equal(4u, GetId(nameof(KinesisSequenceToken.StreamName)));
+        Assert.Equal(0u, GetId(nameof(KinesisSequenceToken.ShardSequence)));
+        Assert.Equal(1u, GetId(nameof(KinesisSequenceToken.ShardId)));
+        Assert.Equal(2u, GetId(nameof(KinesisSequenceToken.StreamName)));
 
         static uint GetId(string propertyName)
             => typeof(KinesisSequenceToken)
