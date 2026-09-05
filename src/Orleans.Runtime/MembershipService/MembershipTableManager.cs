@@ -44,6 +44,7 @@ namespace Orleans.Runtime.MembershipService
         private readonly AsyncEnumerable<MembershipTableSnapshot> updates;
         private readonly IAsyncTimer membershipUpdateTimer;
         private readonly CancellationTokenSource _shutdownCts = new();
+        private readonly CancellationTokenSource _lifetimeCts = new();
 
         private readonly Task _suspectOrKillsListTask;
         private readonly Channel<SuspectOrKillRequest> _trySuspectOrKillChannel = Channel.CreateBounded<SuspectOrKillRequest>(new BoundedChannelOptions(100) { FullMode = BoundedChannelFullMode.DropOldest });
@@ -125,8 +126,8 @@ namespace Orleans.Runtime.MembershipService
                 var pending = this.pendingRefresh;
                 if (pending is null || pending.IsCompleted)
                 {
-                    // The refresh is shared: only the manager's lifetime can cancel its work.
-                    pending = this.pendingRefresh = this.RefreshInternal(requireCleanup: false, _shutdownCts.Token);
+                    // Shared reads remain available during shutdown; disposal ends their lifetime.
+                    pending = this.pendingRefresh = this.RefreshInternal(requireCleanup: false, _lifetimeCts.Token);
                 }
 
                 await WaitForOperation(pending, cancellationToken);
@@ -1070,6 +1071,10 @@ namespace Orleans.Runtime.MembershipService
 
         public void Dispose()
         {
+            if (!_lifetimeCts.IsCancellationRequested)
+            {
+                _lifetimeCts.Cancel();
+            }
             if (!_shutdownCts.IsCancellationRequested)
             {
                 _shutdownCts.Cancel();
@@ -1077,6 +1082,7 @@ namespace Orleans.Runtime.MembershipService
             this.updates.Dispose();
             this.membershipUpdateTimer.Dispose();
             _shutdownCts.Dispose();
+            _lifetimeCts.Dispose();
         }
 
         private readonly struct WithoutDuplicateDeadsLogValue(MembershipTableData table)

@@ -203,9 +203,10 @@ public class DeploymentLoadPublisherTests
             Constants.DeploymentLoadPublisherSystemTargetType, remoteSilo).Returns(directTarget);
         var environmentStatistics = Substitute.For<IEnvironmentStatisticsProvider>();
         var loadSheddingOptions = Options.Create(new LoadSheddingOptions());
+        var initialStatistics = new SiloRuntimeStatistics(
+            0, 0, environmentStatistics, loadSheddingOptions, DateTime.UnixEpoch);
         var control = Substitute.For<ISiloControl>();
-        control.GetRuntimeStatistics(Arg.Any<CancellationToken>()).Returns(Task.FromResult(new SiloRuntimeStatistics(
-            0, 0, environmentStatistics, loadSheddingOptions, DateTime.UnixEpoch)));
+        control.GetRuntimeStatistics(Arg.Any<CancellationToken>()).Returns(Task.FromResult(initialStatistics));
         grainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlType, Arg.Any<SiloAddress>()).Returns(control);
         var dissemination = Substitute.For<IDisseminationService>();
         dissemination.Publish(

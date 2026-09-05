@@ -129,7 +129,7 @@ Caller cancellation owns public operation lifetime and is checked before each re
 
 Dissemination and manifest RPC contracts carry cancellation through their implementations and callers. Background loops receive their owned shutdown token explicitly. Deployment-load timer callbacks forward the timer's cancellation token through publication and direct statistics RPCs, and disposing the timer cancels an active publication. Completion-only fault observers follow the underlying operation through its terminal result so cancellation preserves fault observation and resource cleanup.
 
-Shared membership refreshes use the manager's shutdown lifetime, while each caller controls its own wait. Terminal membership-status publication uses a separate bounded cleanup token after the heartbeat loop stops. Cancellation bounds the wait for legacy membership-storage operations while those operations retain their provider-defined completion semantics.
+Shared membership refreshes use the manager's disposal lifetime, while each caller controls its own wait. This keeps explicit refreshes available during shutdown after periodic maintenance stops. Terminal membership-status publication uses a separate bounded cleanup token after the heartbeat loop stops. Cancellation bounds the wait for legacy membership-storage operations while those operations retain their provider-defined completion semantics.
 
 ## Observability
 

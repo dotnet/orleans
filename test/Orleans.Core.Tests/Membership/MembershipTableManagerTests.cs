@@ -1498,8 +1498,8 @@ namespace NonSilo.Tests.Membership
             var timer = new DelegateAsyncTimer(_ => Task.FromResult(false));
             var gossipStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             var releaseGossip = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var updateCreated = new TaskCompletionSource<Task>(TaskCreationOptions.RunContinuationsAsynchronously);
             CancellationToken gossipCancellationToken = default;
-            Task? deadStatusUpdate = null;
 
             using var callerCancellation = new CancellationTokenSource();
 
@@ -1514,10 +1514,10 @@ namespace NonSilo.Tests.Membership
                 {
                     gossipCancellationToken = call.ArgAt<CancellationToken>(4);
                     gossipStarted.TrySetResult(true);
-                    return releaseGossip.Task;
+                    return releaseGossip.Task.WaitAsync(gossipCancellationToken);
                 });
 
-            var manager = new MembershipTableManager(
+            using var manager = new MembershipTableManager(
                 localSiloDetails: this.localSiloDetails,
                 clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
                 membershipTable: systemTargetMembershipTable,
@@ -1534,33 +1534,38 @@ namespace NonSilo.Tests.Membership
                 _ => Task.CompletedTask,
                 _ =>
                 {
-                    // UpdateLocalStatus intentionally does not forward the caller's cancellation token to
-                    // the terminating status gossip; its own internal deadline remains authoritative.
-                    deadStatusUpdate = ((IMembershipManager)manager).UpdateLocalStatus(SiloStatus.Dead, callerCancellation.Token);
-                    return deadStatusUpdate;
+                    var operation = ((IMembershipManager)manager).UpdateLocalStatus(SiloStatus.Dead, callerCancellation.Token);
+                    updateCreated.TrySetResult(operation);
+                    return operation;
                 });
 
             await this.lifecycle.OnStart(TestContext.Current.CancellationToken);
             var stopTask = this.lifecycle.OnStop(TestContext.Current.CancellationToken);
-            await gossipStarted.Task;
+            try
+            {
+                await gossipStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+                var deadStatusUpdate = await updateCreated.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+                callerCancellation.Cancel();
 
-            callerCancellation.Cancel();
-
-            Assert.NotEqual(callerCancellation.Token, gossipCancellationToken);
-            Assert.False(gossipCancellationToken.IsCancellationRequested);
-            Assert.False(deadStatusUpdate!.IsCompleted);
-
-            releaseGossip.TrySetResult(true);
-            await stopTask;
-
-            Assert.True(deadStatusUpdate.IsCompletedSuccessfully);
-            Assert.Equal(SiloStatus.Dead, manager.CurrentStatus);
-            await this.membershipGossiper.Received(1).GossipToRemoteSilos(
-                Arg.Is<List<SiloAddress>>(partners => partners.SequenceEqual(new[] { remoteSilo })),
-                manager.MembershipTableSnapshot,
-                this.localSilo,
-                SiloStatus.Dead,
-                Arg.Is<CancellationToken>(token => token == gossipCancellationToken));
+                Assert.NotEqual(callerCancellation.Token, gossipCancellationToken);
+                Assert.True(gossipCancellationToken.IsCancellationRequested);
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+                    deadStatusUpdate.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+                Assert.True(deadStatusUpdate.IsCanceled);
+                Assert.False(releaseGossip.Task.IsCompleted);
+                Assert.Equal(SiloStatus.Dead, manager.CurrentStatus);
+                await this.membershipGossiper.Received(1).GossipToRemoteSilos(
+                    Arg.Is<List<SiloAddress>>(partners => partners.SequenceEqual(new[] { remoteSilo })),
+                    manager.MembershipTableSnapshot,
+                    this.localSilo,
+                    SiloStatus.Dead,
+                    Arg.Is<CancellationToken>(token => token == gossipCancellationToken));
+            }
+            finally
+            {
+                releaseGossip.TrySetResult(true);
+                await stopTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            }
         }
 
         [Fact]
