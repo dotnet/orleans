@@ -42,6 +42,8 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
 
         protected virtual short SiloCount => 2;
 
+        protected virtual bool WaitForCancellationAcknowledgement => false;
+
         protected UpgradeTestsBase()
         {
             var testDirectory = new DirectoryInfo(GetType().Assembly.Location);
@@ -198,6 +200,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
                 builder.Properties[nameof(RefreshInterval)] = RefreshInterval.ToString();
                 builder.Properties[nameof(VersionSelectorStrategy)] = this.VersionSelectorStrategy.Name;
                 builder.Properties[nameof(CompatibilityStrategy)] = this.CompatibilityStrategy.Name;
+                builder.Properties[nameof(WaitForCancellationAcknowledgement)] = this.WaitForCancellationAcknowledgement.ToString();
                 builder.Properties["GrainAssembly"] = grainAssembly.FullName;
                 builder.Properties[StandaloneSiloHandle.ExecutablePathConfigKey] = grainAssembly.FullName;
 
@@ -296,6 +299,9 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 clientBuilder.Configure<GatewayOptions>(options => options.PreferredGatewayIndex = 0);
+                clientBuilder.Configure<ClientMessagingOptions>(
+                    options => options.WaitForCancellationAcknowledgement =
+                        bool.Parse(configuration[nameof(WaitForCancellationAcknowledgement)]!));
             }
         }
     }
