@@ -45,6 +45,9 @@ namespace Orleans.Storage
         private readonly string name;
 
         /// <summary> Default constructor </summary>
+        /// <exception cref="ArgumentNullException">
+        /// <paramref name="options"/> or <paramref name="clusterOptions"/> is <see langword="null"/>.
+        /// </exception>
         public AzureTableGrainStorage(
             string name,
             AzureTableStorageOptions options,
@@ -52,6 +55,9 @@ namespace Orleans.Storage
             ILogger<AzureTableGrainStorage> logger,
             IActivatorProvider activatorProvider)
         {
+            ArgumentNullException.ThrowIfNull(options);
+            ArgumentNullException.ThrowIfNull(clusterOptions);
+
             this.options = options;
             this.clusterOptions = clusterOptions.Value;
             this.name = name;
@@ -62,8 +68,14 @@ namespace Orleans.Storage
 
         /// <summary> Read state data function for this storage provider. </summary>
         /// <see cref="IGrainStorage.ReadStateAsync{T}(string, GrainId, IGrainState{T})"/>
+        /// <exception cref="ArgumentNullException">
+        /// <paramref name="grainType"/> or <paramref name="grainState"/> is <see langword="null"/>.
+        /// </exception>
         public async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
+            ArgumentNullException.ThrowIfNull(grainType);
+            ArgumentNullException.ThrowIfNull(grainState);
+
             if (tableDataManager == null) throw new ArgumentException("GrainState-Table property not initialized");
 
             string pk = GetKeyString(grainId);
@@ -88,8 +100,14 @@ namespace Orleans.Storage
 
         /// <summary> Write state data function for this storage provider. </summary>
         /// <see cref="IGrainStorage.WriteStateAsync{T}(string, GrainId, IGrainState{T})"/>
+        /// <exception cref="ArgumentNullException">
+        /// <paramref name="grainType"/> or <paramref name="grainState"/> is <see langword="null"/>.
+        /// </exception>
         public async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
+            ArgumentNullException.ThrowIfNull(grainType);
+            ArgumentNullException.ThrowIfNull(grainState);
+
             if (tableDataManager == null) throw new ArgumentException("GrainState-Table property not initialized");
 
             string pk = GetKeyString(grainId);
@@ -122,8 +140,14 @@ namespace Orleans.Storage
         /// cleared by overwriting with default / null values.
         /// </remarks>
         /// <see cref="IGrainStorage.ClearStateAsync{T}(string, GrainId, IGrainState{T})"/>
+        /// <exception cref="ArgumentNullException">
+        /// <paramref name="grainType"/> or <paramref name="grainState"/> is <see langword="null"/>.
+        /// </exception>
         public async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
+            ArgumentNullException.ThrowIfNull(grainType);
+            ArgumentNullException.ThrowIfNull(grainState);
+
             if (tableDataManager == null) throw new ArgumentException("GrainState-Table property not initialized");
 
             string pk = GetKeyString(grainId);

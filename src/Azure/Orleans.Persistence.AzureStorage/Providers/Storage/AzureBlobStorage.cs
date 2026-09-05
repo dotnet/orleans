@@ -29,6 +29,7 @@ namespace Orleans.Storage
         private readonly IGrainStorageSerializer grainStorageSerializer;
 
         /// <summary> Default constructor </summary>
+        /// <exception cref="ArgumentNullException"><paramref name="options"/> is <see langword="null"/>.</exception>
         public AzureBlobGrainStorage(
             string name,
             AzureBlobStorageOptions options,
@@ -36,6 +37,8 @@ namespace Orleans.Storage
             IActivatorProvider activatorProvider,
             ILogger<AzureBlobGrainStorage> logger)
         {
+            ArgumentNullException.ThrowIfNull(options);
+
             this.name = name;
             this.options = options;
             this.blobContainerFactory = blobContainerFactory;
@@ -46,8 +49,14 @@ namespace Orleans.Storage
 
         /// <summary> Read state data function for this storage provider. </summary>
         /// <see cref="IGrainStorage.ReadStateAsync{T}(string, GrainId, IGrainState{T})"/>
+        /// <exception cref="ArgumentNullException">
+        /// <paramref name="grainType"/> or <paramref name="grainState"/> is <see langword="null"/>.
+        /// </exception>
         public async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
+            ArgumentNullException.ThrowIfNull(grainType);
+            ArgumentNullException.ThrowIfNull(grainState);
+
             var blobName = GetBlobName(grainType, grainId);
             var container = this.blobContainerFactory.GetBlobContainerClient(grainId);
 
@@ -96,8 +105,14 @@ namespace Orleans.Storage
 
         /// <summary> Write state data function for this storage provider. </summary>
         /// <see cref="IGrainStorage.WriteStateAsync{T}(string, GrainId, IGrainState{T})"/>
+        /// <exception cref="ArgumentNullException">
+        /// <paramref name="grainType"/> or <paramref name="grainState"/> is <see langword="null"/>.
+        /// </exception>
         public async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
+            ArgumentNullException.ThrowIfNull(grainType);
+            ArgumentNullException.ThrowIfNull(grainState);
+
             var blobName = GetBlobName(grainType, grainId);
             var container = this.blobContainerFactory.GetBlobContainerClient(grainId);
 
@@ -129,8 +144,14 @@ namespace Orleans.Storage
 
         /// <summary> Clear / Delete state data function for this storage provider. </summary>
         /// <see cref="IGrainStorage.ClearStateAsync{T}(string, GrainId, IGrainState{T})"/>
+        /// <exception cref="ArgumentNullException">
+        /// <paramref name="grainType"/> or <paramref name="grainState"/> is <see langword="null"/>.
+        /// </exception>
         public async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
+            ArgumentNullException.ThrowIfNull(grainType);
+            ArgumentNullException.ThrowIfNull(grainState);
+
             var blobName = GetBlobName(grainType, grainId);
             var container = this.blobContainerFactory.GetBlobContainerClient(grainId);
 
