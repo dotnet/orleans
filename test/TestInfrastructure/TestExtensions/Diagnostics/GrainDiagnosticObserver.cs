@@ -21,8 +21,11 @@ public sealed class GrainDiagnosticObserver : IDisposable, IObserver<GrainLifecy
     private readonly ConcurrentBag<GrainLifecycleEvents.Activated> _activatedEvents = new();
     private readonly ConcurrentBag<GrainLifecycleEvents.Deactivating> _deactivatingEvents = new();
     private readonly ConcurrentBag<GrainLifecycleEvents.Deactivated> _deactivatedEvents = new();
+    private readonly object _deactivationWaitersLock = new();
+    private readonly List<DeactivationWaiter> _deactivationWaiters = [];
     private IDisposable? _subscription;
     private int _listenerSubscriptionCount;
+    private bool _disposed;
 
     /// <summary>
     /// Gets the number of Orleans.Grains listeners that have been subscribed to.
@@ -128,38 +131,37 @@ public sealed class GrainDiagnosticObserver : IDisposable, IObserver<GrainLifecy
     /// <param name="predicate">A predicate to match the grain.</param>
     /// <param name="timeout">Maximum time to wait. Defaults to 30 seconds.</param>
     /// <returns>The deactivated event payload.</returns>
-    public async Task<GrainLifecycleEvents.Deactivated> WaitForAnyGrainDeactivatedAsync(Func<GrainLifecycleEvents.Deactivated, bool> predicate, TimeSpan? timeout = null)
+    public async Task<GrainLifecycleEvents.Deactivated> WaitForAnyGrainDeactivatedAsync(
+        Func<GrainLifecycleEvents.Deactivated, bool> predicate,
+        TimeSpan? timeout = null)
     {
         var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(30);
-        using var cts = new CancellationTokenSource(effectiveTimeout);
-
-        // Check if we already have a matching event
-        var existingMatch = _deactivatedEvents.FirstOrDefault(predicate);
-        if (existingMatch != null)
+        DeactivationWaiter waiter;
+        lock (_deactivationWaitersLock)
         {
-            return existingMatch;
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            var existingMatch = _deactivatedEvents.FirstOrDefault(predicate);
+            if (existingMatch is not null)
+            {
+                return existingMatch;
+            }
+
+            waiter = new(predicate);
+            _deactivationWaiters.Add(waiter);
         }
 
-        // Poll for new events (this is a fallback; the event-driven approach is preferred)
-        while (!cts.Token.IsCancellationRequested)
+        try
         {
-            try
+            return await waiter.Task.WaitAsync(effectiveTimeout).ConfigureAwait(false);
+        }
+        finally
+        {
+            lock (_deactivationWaitersLock)
             {
-                await Task.Delay(10, cts.Token);
-            }
-            catch (OperationCanceledException)
-            {
-                break;
-            }
-
-            var match = _deactivatedEvents.FirstOrDefault(predicate);
-            if (match != null)
-            {
-                return match;
+                _deactivationWaiters.Remove(waiter);
             }
         }
-
-        throw new TimeoutException($"Timed out waiting for grain deactivation matching predicate after {effectiveTimeout}");
     }
 
     /// <summary>
@@ -399,6 +401,7 @@ public sealed class GrainDiagnosticObserver : IDisposable, IObserver<GrainLifecy
             case GrainLifecycleEvents.Deactivated deactivated:
                 _deactivatedEvents.Add(deactivated);
                 SignalWaiters(deactivated.GrainContext.GrainId, nameof(GrainLifecycleEvents.Deactivated), deactivated);
+                SignalDeactivationWaiters(deactivated);
                 break;
         }
     }
@@ -411,10 +414,63 @@ public sealed class GrainDiagnosticObserver : IDisposable, IObserver<GrainLifecy
     /// </summary>
     public void Dispose()
     {
-        _subscription?.Dispose();
+        Interlocked.Exchange(ref _subscription, null)?.Dispose();
+
+        lock (_deactivationWaitersLock)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            foreach (var waiter in _deactivationWaiters)
+            {
+                waiter.TrySetException(new ObjectDisposedException(nameof(GrainDiagnosticObserver)));
+            }
+
+            _deactivationWaiters.Clear();
+        }
+    }
+
+    private void SignalDeactivationWaiters(GrainLifecycleEvents.Deactivated deactivated)
+    {
+        lock (_deactivationWaitersLock)
+        {
+            for (var i = _deactivationWaiters.Count - 1; i >= 0; i--)
+            {
+                if (_deactivationWaiters[i].TryComplete(deactivated))
+                {
+                    _deactivationWaiters.RemoveAt(i);
+                }
+            }
+        }
     }
 
     private static string GetGrainTypeName(IGrainContext grainContext) => grainContext.GrainId.Type.ToString();
+
+    private sealed class DeactivationWaiter(Func<GrainLifecycleEvents.Deactivated, bool> predicate)
+    {
+        private readonly TaskCompletionSource<GrainLifecycleEvents.Deactivated> _completion =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task<GrainLifecycleEvents.Deactivated> Task => _completion.Task;
+
+        public bool TryComplete(GrainLifecycleEvents.Deactivated value)
+        {
+            try
+            {
+                return predicate(value) && _completion.TrySetResult(value);
+            }
+            catch (Exception exception)
+            {
+                _completion.TrySetException(exception);
+                return true;
+            }
+        }
+
+        public bool TrySetException(Exception exception) => _completion.TrySetException(exception);
+    }
 }
 
 /// <summary>

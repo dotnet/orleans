@@ -50,11 +50,80 @@ public class DiagnosticInfrastructureRegressionTests
     [TestSuite("BVT")]
     [TestProvider("None")]
     [Fact, TestCategory("BVT")]
+    public async Task GrainDiagnosticObserver_WaitForAnyGrainDeactivatedAsync_ObservesMatchingEvent()
+    {
+        using var observer = GrainDiagnosticObserver.CreateForAllSilos();
+        var expectedContext = Substitute.For<IGrainContext>();
+        expectedContext.GrainId.Returns(GrainId.Create("test", "expected"));
+        var otherContext = Substitute.For<IGrainContext>();
+        otherContext.GrainId.Returns(GrainId.Create("test", "other"));
+
+        var waitTask = observer.WaitForAnyGrainDeactivatedAsync(
+            deactivated => deactivated.GrainContext.GrainId == expectedContext.GrainId,
+            TimeSpan.FromSeconds(1));
+
+        GrainLifecycleEvents.EmitDeactivated(
+            otherContext,
+            new(DeactivationReasonCode.ApplicationRequested, "other"));
+        Assert.False(waitTask.IsCompleted);
+
+        GrainLifecycleEvents.EmitDeactivated(
+            expectedContext,
+            new(DeactivationReasonCode.Migrating, "expected"));
+
+        var result = await waitTask;
+        Assert.Same(expectedContext, result.GrainContext);
+        Assert.Equal(DeactivationReasonCode.Migrating, result.Reason.ReasonCode);
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
     public async Task GrainDiagnosticObserver_WaitForAnyGrainDeactivatedAsync_TimesOut()
     {
         using var observer = GrainDiagnosticObserver.CreateForAllSilos();
 
-        await Assert.ThrowsAsync<TimeoutException>(() => observer.WaitForAnyGrainDeactivatedAsync(_ => false, TimeSpan.FromMilliseconds(100)));
+        await Assert.ThrowsAsync<TimeoutException>(
+            () => observer.WaitForAnyGrainDeactivatedAsync(_ => false, TimeSpan.FromMilliseconds(100)));
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
+    public async Task GrainDiagnosticObserver_PredicateException_DoesNotBlockOtherWaiters()
+    {
+        using var observer = GrainDiagnosticObserver.CreateForAllSilos();
+        var grainContext = Substitute.For<IGrainContext>();
+        grainContext.GrainId.Returns(GrainId.Create("test", "predicate"));
+
+        var throwingWait = observer.WaitForAnyGrainDeactivatedAsync(
+            _ => throw new InvalidOperationException("predicate failed"),
+            TimeSpan.FromSeconds(1));
+        var matchingWait = observer.WaitForAnyGrainDeactivatedAsync(
+            deactivated => deactivated.GrainContext.GrainId == grainContext.GrainId,
+            TimeSpan.FromSeconds(1));
+
+        GrainLifecycleEvents.EmitDeactivated(
+            grainContext,
+            new(DeactivationReasonCode.ApplicationRequested, "test"));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => throwingWait);
+        Assert.Same(grainContext, (await matchingWait).GrainContext);
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
+    public async Task GrainDiagnosticObserver_Dispose_CompletesPredicateWaiters()
+    {
+        var observer = GrainDiagnosticObserver.CreateForAllSilos();
+        var waitTask = observer.WaitForAnyGrainDeactivatedAsync(_ => false, TimeSpan.FromSeconds(1));
+
+        observer.Dispose();
+
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => waitTask);
+        await Assert.ThrowsAsync<ObjectDisposedException>(
+            () => observer.WaitForAnyGrainDeactivatedAsync(_ => true, TimeSpan.FromSeconds(1)));
     }
 
     [TestSuite("BVT")]
