@@ -32,7 +32,7 @@ internal interface ICollectibleGrainContext : IGrainContext
         CancellationToken cancellationToken);
 
     /// <summary>
-    /// Delays activation collection until at least until the specified duration has elapsed.
+    /// Delays activation collection until the specified duration has elapsed.
     /// </summary>
     /// <param name="timeSpan">The period to delay activation collection for.</param>
     void DelayDeactivation(TimeSpan timeSpan);
