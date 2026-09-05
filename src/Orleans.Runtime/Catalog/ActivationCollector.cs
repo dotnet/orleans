@@ -249,6 +249,11 @@ namespace Orleans.Runtime
                 for (var i = 0; i < claims.Count; i++)
                 {
                     var claim = claims[i];
+                    if (!claim.Registration.IsClaimed(claim.SourceBucket))
+                    {
+                        continue;
+                    }
+
                     var activation = claim.Registration.Context;
                     var result = activation.TryDeactivateForCollection(
                         reason,
