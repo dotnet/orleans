@@ -78,7 +78,7 @@ Use a database or search service as the query authority when the workload needs 
 
 Use continuation tokens for resumable paging. A token can carry the routing version, shard or partition, last ordering value, and last grain key. Treat tokens as opaque application contracts and version their encoded form.
 
-Define whether paging observes a query snapshot or a live data set. For snapshot paging, include the query store's snapshot identifier or read timestamp in the token. For live paging, concurrent updates can produce repeated or omitted items; define that behavior and make page processing idempotent. Validate each client-supplied token's structure and authenticate its routing and ordering fields before use.
+Define whether paging observes a query snapshot or a live data set. For snapshot paging, include the query store's snapshot identifier or read timestamp in the token. For live paging, concurrent updates can produce repeated or omitted items; define that behavior and make page processing idempotent. Validate each client-supplied token's structure and integrity, and authorize its routing and ordering values before use.
 
 [Response streaming](../grains/response-streaming.md) progressively delivers one live query result with pull-based flow control. A page with a continuation token provides an explicit resume boundary which a caller can persist before cancellation, timeout, grain deactivation, or process failure.
 
