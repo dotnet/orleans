@@ -682,7 +682,7 @@ dotnet_diagnostic.CA2000.severity = warning
 dotnet_diagnostic.CA2000.severity = warning
 
 # CA1062: Validate arguments of public methods
-[src/Azure/{Orleans.GrainDirectory.AzureStorage,Orleans.Reminders.AzureStorage,Orleans.Reminders.Cosmos,Shared}/**.cs]
+[src/Azure/{Orleans.GrainDirectory.AzureStorage,Orleans.Reminders.AzureStorage,Orleans.Clustering.Cosmos,Orleans.Reminders.Cosmos,Shared}/**.cs]
 dotnet_diagnostic.CA1062.severity = warning
 
 # Production source enforces the correctness baseline. Tests, samples, documentation,
