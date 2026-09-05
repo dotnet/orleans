@@ -126,6 +126,27 @@ namespace Orleans.Connections.Security.Tests
                     RemoteCertificateMode.RequireCertificate));
         }
 
+        [Fact]
+        public void OptionalClientCertificateWithoutPrivateKey_IsIgnored()
+        {
+            using var certificate = TestCertificateHelper.CreateSelfSignedCertificate(
+                CertificateSubjectName,
+                [TestCertificateHelper.ClientAuthenticationOid]);
+#if NET9_0_OR_GREATER
+            using var publicCertificate =
+                System.Security.Cryptography.X509Certificates.X509CertificateLoader.LoadCertificate(certificate.RawData);
+#else
+#pragma warning disable SYSLIB0057
+            using var publicCertificate =
+                new System.Security.Cryptography.X509Certificates.X509Certificate2(certificate.RawData);
+#pragma warning restore SYSLIB0057
+#endif
+
+            Assert.Null(TlsClientConnectionMiddleware.ValidateCertificate(
+                publicCertificate,
+                RemoteCertificateMode.AllowCertificate));
+        }
+
         /// <summary>
         /// Configures TLS for Orleans clients in the test cluster.
         /// Sets up:
