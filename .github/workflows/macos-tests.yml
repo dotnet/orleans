@@ -1,0 +1,49 @@
+name: macOS tests
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 9 * * *'
+permissions:
+  contents: read
+env:
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+  DOTNET_NOLOGO: true
+jobs:
+  test:
+    name: Test
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [BVT, SlowBVT, Functional]
+        framework: ["net8.0", "net10.0"]
+    steps:
+    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+    - name: Setup Node.js
+      if: matrix.suite == 'BVT'
+      uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+      with:
+        node-version: '24.x'
+    - name: Test
+      uses: ./.github/actions/run-tests
+      with:
+        artifact-name: test_output_${{ github.job }}_${{ matrix.suite }}_macos-latest_${{ matrix.framework }}
+        build-external-assets: ${{ matrix.suite == 'BVT' && 'true' || 'false' }}
+        filter-query: /[(Provider=None)&(Suite=${{ matrix.suite }})&(Area!=CodeGen)]
+        framework: ${{ matrix.framework }}
+  test-codegenerator:
+    name: Test Code Generator
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        framework: ["net8.0", "net10.0"]
+    steps:
+    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+    - name: Test Code Generator
+      uses: ./.github/actions/run-tests
+      with:
+        artifact-name: test_output_${{ github.job }}_macos-latest_${{ matrix.framework }}
+        filter-query: /[(Provider=None)&(Area=CodeGen)&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))]
+        framework: ${{ matrix.framework }}
+        static-instrumentation: 'true'
