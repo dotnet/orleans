@@ -25,6 +25,21 @@ The silo registration composes Durable Messaging, Durable Jobs, and Journaling.
 Configure a durable Journaling provider for production. Tests can register
 volatile task storage through `AddVolatileDurableTaskStorage`.
 
+Existing retained tasks can be observed without scheduling a new execution:
+
+```csharp
+var task = grain.GetDurableTask<MyResult>("stable-root-id");
+var response = await task.GetResponseAsync(cancellationToken);
+```
+
+An absent root or a root whose result retention has expired throws
+`DurableTaskNotFoundException`. A returned failed response remains an execution
+failure, including when the stored user exception has that same type.
+
+Repository consumers which need a preview package can opt this project into
+packing with `-p:PackDurableTaskAdapter=true`. The project keeps package
+validation disabled until its first published version establishes a baseline.
+
 ## Runtime guarantees
 
 - `(target GrainId, TaskId)` identifies one execution. A stable request
@@ -39,10 +54,11 @@ volatile task storage through `AddVolatileDurableTaskStorage`.
   results.
 - Cancellation is monotonic, duplicates are idempotent, and the first durable
   terminal result wins a race.
-- Delays persist their due time and generation. Durable Jobs resumes are
-  generation-fenced.
+- Delays persist their logical due time and generation. Durable Jobs resumes
+  use stable job identities and are generation-fenced.
 - Recovery precedes new execution. Child identifiers, selection decisions, and
-  outbound durable messages remain replay-stable.
+  outbound durable messages remain replay-stable. Each execution's logical UTC
+  time is persisted before its effects commit and reused during replay.
 - Activation shutdown stops new execution, cancels adapter-controlled waits,
   drains active execution, and leaves committed work available for replay.
 
