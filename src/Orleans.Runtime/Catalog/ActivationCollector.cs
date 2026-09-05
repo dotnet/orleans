@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -24,7 +23,6 @@ namespace Orleans.Runtime
     {
         private readonly TimeSpan shortestAgeLimit;
         private readonly ConcurrentDictionary<DateTime, Bucket> buckets = new();
-        private readonly ConditionalWeakTable<ICollectibleGrainContext, CollectionRegistration> _registrations = new();
         private readonly CancellationTokenSource _shutdownCts = new();
         private readonly TimeProvider _timeProvider;
         private long _nextTicketTicks;
@@ -125,7 +123,7 @@ namespace Orleans.Runtime
                 return;
             }
 
-            var registration = _registrations.GetValue(item, static item => new(item));
+            var registration = GetOrCreateCollectionRegistration(item);
             if (!TryScheduleCollection(registration, timeout, now, throwIfExpired: true))
             {
                 throw new InvalidOperationException("Call TryCancelCollection before calling ScheduleCollection.");
@@ -142,7 +140,7 @@ namespace Orleans.Runtime
             if (item is null) return false;
             if (item.IsExemptFromCollection) return false;
 
-            return _registrations.TryGetValue(item, out var registration) && registration.TryCancel();
+            return GetCollectionRegistration(item) is { } registration && registration.TryCancel();
         }
 
         /// <summary>
@@ -153,7 +151,7 @@ namespace Orleans.Runtime
         public bool TryRescheduleCollection(ICollectibleGrainContext item)
         {
             if (item.IsExemptFromCollection) return false;
-            if (!_registrations.TryGetValue(item, out var registration)) return false;
+            if (GetCollectionRegistration(item) is not { } registration) return false;
             return TryRescheduleCollection(registration, item.CollectionAgeLimit);
         }
 
@@ -524,6 +522,20 @@ namespace Orleans.Runtime
         private void RemoveClosedBucket(DateTime ticket, Bucket bucket)
             => ((ICollection<KeyValuePair<DateTime, Bucket>>)buckets).Remove(new(ticket, bucket));
 
+        private static CollectionRegistration? GetCollectionRegistration(ICollectibleGrainContext item)
+            => item.CollectionRegistration as CollectionRegistration;
+
+        private static CollectionRegistration GetOrCreateCollectionRegistration(ICollectibleGrainContext item)
+        {
+            if (GetCollectionRegistration(item) is { } existing)
+            {
+                return existing;
+            }
+
+            var candidate = new CollectionRegistration(item);
+            return (CollectionRegistration)item.GetOrSetCollectionRegistration(candidate);
+        }
+
         private bool TryScheduleCollection(CollectionRegistration registration, TimeSpan timeout, DateTime now, bool throwIfExpired)
         {
             while (!registration.IsScheduled && !registration.IsRetired)
@@ -565,10 +577,10 @@ namespace Orleans.Runtime
         }
 
         internal DateTime GetCollectionTicketForTesting(ICollectibleGrainContext item)
-            => _registrations.TryGetValue(item, out var registration) ? registration.Ticket : default;
+            => GetCollectionRegistration(item) is { } registration ? registration.Ticket : default;
 
         internal bool HasActiveCollectionRegistrationForTesting(ICollectibleGrainContext item)
-            => _registrations.TryGetValue(item, out var registration) && !registration.IsRetired;
+            => GetCollectionRegistration(item) is { IsRetired: false };
 
         private void EnsureCollectionScheduled(ICollectibleGrainContext item)
         {
@@ -577,7 +589,7 @@ namespace Orleans.Runtime
                 return;
             }
 
-            var registration = _registrations.GetValue(item, static item => new(item));
+            var registration = GetOrCreateCollectionRegistration(item);
             if (!registration.IsScheduled)
             {
                 TryScheduleCollection(registration, item.CollectionAgeLimit, _timeProvider.GetUtcNow().UtcDateTime, throwIfExpired: false);
@@ -610,7 +622,7 @@ namespace Orleans.Runtime
         void IActivationWorkingSetObserver.OnDeactivating(IActivationWorkingSetMember member)
         {
             if (member is ICollectibleGrainContext activation
-                && _registrations.TryGetValue(activation, out var registration))
+                && GetCollectionRegistration(activation) is { } registration)
             {
                 registration.Retire();
             }
@@ -621,7 +633,7 @@ namespace Orleans.Runtime
             Interlocked.Decrement(ref _activationCount);
             if (member is ICollectibleGrainContext activation)
             {
-                if (_registrations.TryGetValue(activation, out var registration))
+                if (GetCollectionRegistration(activation) is { } registration)
                 {
                     registration.Retire();
                 }
@@ -817,7 +829,7 @@ namespace Orleans.Runtime
             Retired
         }
 
-        private sealed class CollectionRegistration(ICollectibleGrainContext context)
+        private sealed class CollectionRegistration(ICollectibleGrainContext context) : IActivationCollectionRegistration
         {
 #if NET10_0_OR_GREATER
             private readonly Lock _lock = new();

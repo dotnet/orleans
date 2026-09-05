@@ -57,6 +57,7 @@ internal sealed partial class ActivationData :
     private CoarseStopwatch _busyDuration;
     private CoarseStopwatch _idleDuration;
     private GrainReference? _selfReference;
+    private IActivationCollectionRegistration? _collectionRegistration;
 
     // Values which are needed less frequently and do not warrant living directly on activation for object size reasons.
     // The values in this field are typically used to represent termination state of an activation or features which are not
@@ -166,8 +167,15 @@ internal sealed partial class ActivationData :
 
     public GrainId GrainId => Address.GrainId;
     public bool IsExemptFromCollection => _shared.CollectionAgeLimit == Timeout.InfiniteTimeSpan;
+    IActivationCollectionRegistration? ICollectibleGrainContext.CollectionRegistration => Volatile.Read(ref _collectionRegistration);
     private DateTime KeepAliveUntil { get; set; } = DateTime.MinValue;
     public bool IsValid => State is ActivationState.Valid;
+
+    IActivationCollectionRegistration ICollectibleGrainContext.GetOrSetCollectionRegistration(IActivationCollectionRegistration registration)
+    {
+        ArgumentNullException.ThrowIfNull(registration);
+        return Interlocked.CompareExchange(ref _collectionRegistration, registration, null) ?? registration;
+    }
 
     // Currently, the only supported multi-activation grain is one using the StatelessWorkerPlacement strategy.
     internal bool IsStatelessWorker => PlacementStrategy is StatelessWorkerPlacement;

@@ -16,6 +16,18 @@ internal interface ICollectibleGrainContext : IGrainContext
     TimeSpan CollectionAgeLimit { get; }
 
     /// <summary>
+    /// Gets the opaque collection registration associated with this context, if one has been assigned.
+    /// </summary>
+    IActivationCollectionRegistration? CollectionRegistration { get; }
+
+    /// <summary>
+    /// Atomically assigns the collection registration if one has not already been assigned.
+    /// </summary>
+    /// <param name="registration">The registration to assign.</param>
+    /// <returns>The assigned registration.</returns>
+    IActivationCollectionRegistration GetOrSetCollectionRegistration(IActivationCollectionRegistration registration);
+
+    /// <summary>
     /// Atomically evaluates collection eligibility and begins deactivation when the instance is eligible.
     /// </summary>
     /// <param name="reason">The reason for deactivation.</param>
@@ -37,6 +49,11 @@ internal interface ICollectibleGrainContext : IGrainContext
     /// <param name="timeSpan">The period to delay activation collection for.</param>
     void DelayDeactivation(TimeSpan timeSpan);
 }
+
+/// <summary>
+/// Represents opaque activation-collector state whose lifetime is anchored by a grain context.
+/// </summary>
+internal interface IActivationCollectionRegistration;
 
 internal enum ActivationCollectionAction
 {

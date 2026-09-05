@@ -82,6 +82,7 @@ namespace UnitTests.Runtime
             // ActivationData into TryRescheduleCollection, which must be able to move the
             // activation out of the MaxValue bucket without throwing.
             var activation = Substitute.For<ICollectibleGrainContext, IActivationWorkingSetMember>();
+            ConfigureCollectionRegistrationSlot(activation);
             activation.CollectionAgeLimit.Returns(TimeSpan.FromMinutes(5));
             activation.IsExemptFromCollection.Returns(false);
 
@@ -106,6 +107,7 @@ namespace UnitTests.Runtime
         public void ScheduleCollection_DoesNotAcquireContextMonitor()
         {
             var activation = Substitute.For<ICollectibleGrainContext>();
+            ConfigureCollectionRegistrationSlot(activation);
             activation.IsExemptFromCollection.Returns(_ =>
             {
                 Assert.False(Monitor.IsEntered(activation));
@@ -125,6 +127,8 @@ namespace UnitTests.Runtime
             var ageLimit = TimeSpan.FromMinutes(5);
             var first = Substitute.For<ICollectibleGrainContext>();
             var second = Substitute.For<ICollectibleGrainContext>();
+            ConfigureCollectionRegistrationSlot(first);
+            ConfigureCollectionRegistrationSlot(second);
             first.IsExemptFromCollection.Returns(false);
             second.IsExemptFromCollection.Returns(false);
             second.CollectionAgeLimit.Returns(ageLimit);
@@ -169,6 +173,7 @@ namespace UnitTests.Runtime
             var cancellationToken = TestContext.Current.CancellationToken;
             var ageLimit = TimeSpan.FromMinutes(1);
             var activation = Substitute.For<ICollectibleGrainContext>();
+            ConfigureCollectionRegistrationSlot(activation);
             activation.CollectionAgeLimit.Returns(ageLimit);
             activation.IsExemptFromCollection.Returns(false);
             activation.TryDeactivateForCollection(
@@ -201,6 +206,7 @@ namespace UnitTests.Runtime
             var cancellationToken = TestContext.Current.CancellationToken;
             var ageLimit = TimeSpan.FromMinutes(1);
             var activation = Substitute.For<ICollectibleGrainContext>();
+            ConfigureCollectionRegistrationSlot(activation);
             activation.CollectionAgeLimit.Returns(ageLimit);
             activation.IsExemptFromCollection.Returns(false);
             activation.TryDeactivateForCollection(
@@ -617,9 +623,22 @@ namespace UnitTests.Runtime
             return services.BuildServiceProvider().GetRequiredService<CatalogInstruments>();
         }
 
+        private static void ConfigureCollectionRegistrationSlot(ICollectibleGrainContext activation)
+        {
+            IActivationCollectionRegistration? registration = null;
+            activation.CollectionRegistration.Returns(_ => Volatile.Read(ref registration));
+            activation.GetOrSetCollectionRegistration(Arg.Any<IActivationCollectionRegistration>())
+                .Returns(call =>
+                {
+                    var candidate = call.Arg<IActivationCollectionRegistration>();
+                    return Interlocked.CompareExchange(ref registration, candidate, null) ?? candidate;
+                });
+        }
+
         private IActivationWorkingSetMember PrepareActivation(TimeSpan collectionAgeLimit, ActivationCollector collector)
         {
             var activation = Substitute.For<ICollectibleGrainContext, IActivationWorkingSetMember>();
+            ConfigureCollectionRegistrationSlot(activation);
             activation.CollectionAgeLimit.Returns(collectionAgeLimit);
             activation.IsExemptFromCollection.Returns(false);
             activation.TryDeactivateForCollection(
