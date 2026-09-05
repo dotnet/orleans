@@ -803,7 +803,7 @@ namespace Orleans.Runtime
 
             var options = new ParallelOptions
             {
-                // Avoid passing the cancellation token, since we want all of these activations to be deactivated, even if cancellation is triggered.
+                // Continue observing completion when the caller cancels its WaitAsync below.
                 CancellationToken = CancellationToken.None,
                 MaxDegreeOfParallelism = Environment.ProcessorCount * 512
             };
