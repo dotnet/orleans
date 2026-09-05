@@ -3396,6 +3396,65 @@ public class SchedulingTests
     }
 
     [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task ScheduledWhenAnyPreservesWinnerWhenCallerMutatesCandidates(bool generic, bool clear)
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var cancellationToken = Xunit.TestContext.Current.CancellationToken;
+        var loserCompletion = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var winnerCompletion = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var loser = await host.CreateRootDefinition<int>(
+            async _ => DurableTaskResponse.FromResult(await loserCompletion.Task))
+            .ScheduleAsync("snapshot-loser", cancellationToken);
+        var expectedWinner = await host.CreateRootDefinition<int>(
+            async _ => DurableTaskResponse.FromResult(await winnerCompletion.Task))
+            .ScheduleAsync("snapshot-winner", cancellationToken);
+        var candidates = new List<ScheduledTask<int>> { loser, expectedWinner };
+        var whenAny = generic
+            ? AwaitGenericWinnerAsync(candidates, cancellationToken)
+            : ScheduledTask.WhenAny((IReadOnlyList<ScheduledTask>)candidates, cancellationToken);
+
+        try
+        {
+            await Task.WhenAll(
+                host.GetEntry(loser.Id).WaitStarted.Task,
+                host.GetEntry(expectedWinner.Id).WaitStarted.Task)
+                .WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+
+            if (clear)
+            {
+                candidates.Clear();
+            }
+            else
+            {
+                candidates[1] = loser;
+            }
+
+            winnerCompletion.SetResult(42);
+            var winner = await whenAny.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+
+            Assert.Same(expectedWinner, winner);
+            Assert.Equal(42, (await winner.GetResponseAsync(cancellationToken)).GetResult<int>());
+            Assert.Equal(0, host.ActiveWaitCount);
+            Assert.False(host.IsCancellationRequested(loser.Id));
+            Assert.False(loserCompletion.Task.IsCompleted);
+        }
+        finally
+        {
+            loserCompletion.TrySetResult(17);
+            winnerCompletion.TrySetResult(42);
+        }
+
+        static async Task<ScheduledTask> AwaitGenericWinnerAsync(
+            IReadOnlyList<ScheduledTask<int>> tasks,
+            CancellationToken cancellationToken)
+            => await ScheduledTask.WhenAny(tasks, cancellationToken);
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task WhenAnyReplayUsesStableOperationDecisionIdThroughPublicApi(bool generic)
