@@ -58,7 +58,7 @@ internal sealed partial class ActivationWorkingSet : IActivationWorkingSet, ILif
 
     public void OnActivated(IActivationWorkingSetMember member)
     {
-        Debug.Assert(member is not ICollectibleGrainContext collectible || collectible.IsValid);
+        Debug.Assert(member is not ActivationData activation || activation.IsValid);
         if (!_members.TryAdd(member, 0))
         {
             throw new InvalidOperationException($"Member {member} is already a member of the working set");
