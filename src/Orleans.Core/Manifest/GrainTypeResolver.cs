@@ -9,28 +9,21 @@ namespace Orleans.Metadata
     /// <summary>
     /// Associates a <see cref="GrainType"/> with a grain class.
     /// </summary>
-    public class GrainTypeResolver
+    /// <remarks>
+    /// Initializes a new instance of the <see cref="GrainTypeResolver"/> class.
+    /// </remarks>
+    /// <param name="resolvers">
+    /// The grain type name providers.
+    /// </param>
+    /// <param name="argumentFormatter">
+    /// The type converter, used to format generic parameters.
+    /// </param>
+    public class GrainTypeResolver(
+        IEnumerable<IGrainTypeProvider> resolvers,
+        TypeConverter argumentFormatter)
     {
         private const string GrainSuffix = "grain";
-        private readonly IGrainTypeProvider[] _providers;
-        private readonly TypeConverter _typeConverter;
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="GrainTypeResolver"/> class.
-        /// </summary>
-        /// <param name="resolvers">
-        /// The grain type name providers.
-        /// </param>
-        /// <param name="argumentFormatter">
-        /// The type converter, used to format generic parameters.
-        /// </param>
-        public GrainTypeResolver(
-            IEnumerable<IGrainTypeProvider> resolvers,
-            TypeConverter argumentFormatter)
-        {
-            _providers = resolvers.ToArray();
-            _typeConverter = argumentFormatter;
-        }
+        private readonly IGrainTypeProvider[] _providers = resolvers.ToArray();
 
         /// <summary>
         /// Returns the grain type for the provided class.
@@ -96,7 +89,7 @@ namespace Orleans.Metadata
                 && !genericGrainType.IsConstructed)
             {
                 var typeArguments = type.GetGenericArguments();
-                grainType = genericGrainType.Construct(_typeConverter, typeArguments).GrainType;
+                grainType = genericGrainType.Construct(argumentFormatter, typeArguments).GrainType;
             }
 
             return grainType;
