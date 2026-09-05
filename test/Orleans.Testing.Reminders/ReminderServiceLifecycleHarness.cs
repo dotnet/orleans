@@ -94,7 +94,12 @@ public sealed class ReminderServiceLifecycleHarness
         return reminderService.QueueTask(async () =>
         {
             cancellationToken.ThrowIfCancellationRequested();
-            _ = await reminderService.RegisterOrUpdateReminder(grainId, reminderName, dueTime, period);
+            _ = await reminderService.RegisterOrUpdateReminder(
+                grainId,
+                reminderName,
+                dueTime,
+                period,
+                cancellationToken);
         });
     }
 

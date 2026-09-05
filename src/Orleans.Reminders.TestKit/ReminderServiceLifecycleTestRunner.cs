@@ -209,14 +209,31 @@ public abstract class ReminderServiceLifecycleTestRunner
         const string Guarantee = nameof(ReminderService_UpdateDoesNotRestartLocalOwner);
         const string Name = "in-place-update";
         var grain = CreateGrain(Guarantee);
+        if (_harness is not IReminderServiceLifecycleRegistrationTarget registrationTarget)
+        {
+            Fail(Guarantee, "harness capability")
+                .WithExpected(
+                    $"{nameof(IReminderServiceLifecycleRegistrationTarget)} for owner-targeted registration")
+                .WithObserved(_harness.GetType().FullName ?? _harness.GetType().Name)
+                .Throw();
+            return;
+        }
+
         await ExecuteWithCleanupAsync(
             Guarantee,
             cancellationToken,
             async () =>
             {
+                var owner = _harness.ActiveSilos.Single(silo => _harness.IsOwner(silo, grain.GetGrainId()));
                 var initialDue = TimeSpan.FromSeconds(3);
                 var originalExpectedStart = _harness.UtcNow.UtcDateTime + initialDue;
-                await grain.RegisterOrUpdateAsync(Name, initialDue, Period).WaitAsync(cancellationToken);
+                await registrationTarget.RegisterOnSiloAsync(
+                    owner,
+                    grain.GetGrainId(),
+                    Name,
+                    initialDue,
+                    Period,
+                    cancellationToken).WaitAsync(cancellationToken);
                 await WaitForOwnersAfterRefreshAsync([(grain, Name)], cancellationToken);
                 await _harness.WaitForScheduleAsync(grain.GetGrainId(), Name, cancellationToken);
                 var original = await AssertPersistedAsync(
@@ -238,7 +255,13 @@ public abstract class ReminderServiceLifecycleTestRunner
                     Name,
                     scheduleChanges + 1,
                     cancellationToken);
-                await grain.RegisterOrUpdateAsync(Name, due, Period + TimeSpan.FromMinutes(1)).WaitAsync(cancellationToken);
+                await registrationTarget.RegisterOnSiloAsync(
+                    owner,
+                    grain.GetGrainId(),
+                    Name,
+                    due,
+                    Period + TimeSpan.FromMinutes(1),
+                    cancellationToken).WaitAsync(cancellationToken);
                 await _harness.RefreshAsync(cancellationToken);
                 await changed;
                 await _harness.WaitForScheduleAsync(grain.GetGrainId(), Name, cancellationToken);
