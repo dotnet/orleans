@@ -121,6 +121,7 @@ namespace Orleans.Configuration
         /// Constructor
         /// </summary>
         /// <param name="options">The option to be validated.</param>
+        [SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "Microsoft.Extensions.DependencyInjection supplies the registered options instance.")]
         public AzureBlobLeaseProviderOptionsValidator(IOptions<AzureBlobLeaseProviderOptions> options)
         {
             this.options = options.Value;

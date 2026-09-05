@@ -10,7 +10,6 @@
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <DefineConstants>$(DefineConstants);ORLEANS_CLUSTERING</DefineConstants>
     <Nullable>enable</Nullable>
-    <WarningsAsErrors>$(WarningsAsErrors);CA1062</WarningsAsErrors>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 

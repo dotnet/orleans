@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
@@ -25,6 +26,7 @@ namespace Orleans.LeaseProviders
         /// Initializes a new instance of the <see cref="AzureBlobLeaseProvider"/> class.
         /// </summary>
         /// <param name="options">The Azure Blob lease provider options.</param>
+        [SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "Microsoft.Extensions.DependencyInjection supplies the registered options instance.")]
         public AzureBlobLeaseProvider(IOptions<AzureBlobLeaseProviderOptions> options)
             : this(options.Value)
         {
@@ -51,6 +53,8 @@ namespace Orleans.LeaseProviders
         /// <inheritdoc />
         public async Task<AcquireLeaseResult[]> Acquire(string category, LeaseRequest[] leaseRequests)
         {
+            ArgumentNullException.ThrowIfNull(leaseRequests);
+
             await InitContainerIfNotExistsAsync();
             var tasks = new List<Task<AcquireLeaseResult>>(leaseRequests.Length);
             foreach (var leaseRequest in leaseRequests)
@@ -91,6 +95,8 @@ namespace Orleans.LeaseProviders
         /// <inheritdoc />
         public async Task Release(string category, AcquiredLease[] acquiredLeases)
         {
+            ArgumentNullException.ThrowIfNull(acquiredLeases);
+
             await InitContainerIfNotExistsAsync();
             var tasks = new List<Task>(acquiredLeases.Length);
             foreach (var acquiredLease in acquiredLeases)
@@ -109,6 +115,8 @@ namespace Orleans.LeaseProviders
         /// <inheritdoc />
         public async Task<AcquireLeaseResult[]> Renew(string category, AcquiredLease[] acquiredLeases)
         {
+            ArgumentNullException.ThrowIfNull(acquiredLeases);
+
             await InitContainerIfNotExistsAsync();
             var tasks = new List<Task<AcquireLeaseResult>>(acquiredLeases.Length);
             foreach (var acquiredLease in acquiredLeases)

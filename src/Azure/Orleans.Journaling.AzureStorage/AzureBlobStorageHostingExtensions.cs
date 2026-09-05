@@ -14,6 +14,7 @@ public static class AzureBlobStorageHostingExtensions
     /// </summary>
     /// <param name="builder">The silo builder.</param>
     /// <returns>The silo builder.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="builder"/> is <see langword="null"/>.</exception>
     public static ISiloBuilder AddAzureBlobJournalStorage(this ISiloBuilder builder) => builder.AddAzureBlobJournalStorage(configure: null);
 
     /// <summary>
@@ -22,8 +23,11 @@ public static class AzureBlobStorageHostingExtensions
     /// <param name="builder">The silo builder.</param>
     /// <param name="configure">The delegate used to configure the journal storage provider.</param>
     /// <returns>The silo builder.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="builder"/> is <see langword="null"/>.</exception>
     public static ISiloBuilder AddAzureBlobJournalStorage(this ISiloBuilder builder, Action<AzureBlobJournalStorageOptions>? configure)
     {
+        ArgumentNullException.ThrowIfNull(builder);
+
         builder.AddJournalStorage();
 
         var services = builder.Services;

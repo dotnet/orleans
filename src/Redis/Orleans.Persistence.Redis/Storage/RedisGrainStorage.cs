@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq;
 using System.Text;
@@ -38,6 +39,7 @@ namespace Orleans.Persistence
         /// <summary>
         /// Creates a new instance of the <see cref="RedisGrainStorage"/> type.
         /// </summary>
+        [SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "RedisGrainStorageFactory supplies named options and ActivatorUtilities resolves cluster options from dependency injection.")]
         public RedisGrainStorage(
             string name,
             RedisStorageOptions options,
@@ -89,6 +91,9 @@ namespace Orleans.Persistence
         /// <inheritdoc />
         public async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
+            ArgumentNullException.ThrowIfNull(grainType);
+            ArgumentNullException.ThrowIfNull(grainState);
+
             var key = _getKeyFunc(grainType, grainId);
 
             try
@@ -128,6 +133,9 @@ namespace Orleans.Persistence
         /// <inheritdoc />
         public async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
+            ArgumentNullException.ThrowIfNull(grainType);
+            ArgumentNullException.ThrowIfNull(grainState);
+
             const string WriteScript =
                 """
                 local etag = redis.call('HGET', KEYS[1], 'etag')
@@ -200,6 +208,9 @@ namespace Orleans.Persistence
         /// <inheritdoc />
         public async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
+            ArgumentNullException.ThrowIfNull(grainType);
+            ArgumentNullException.ThrowIfNull(grainState);
+
             try
             {
                 RedisValue etag = grainState.ETag ?? "";

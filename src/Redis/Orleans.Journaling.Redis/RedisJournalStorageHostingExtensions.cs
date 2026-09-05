@@ -15,6 +15,7 @@ public static class RedisJournalStorageHostingExtensions
     /// </summary>
     /// <param name="builder">The silo builder.</param>
     /// <returns>The silo builder.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="builder"/> is <see langword="null"/>.</exception>
     public static ISiloBuilder AddRedisJournalStorage(this ISiloBuilder builder) => builder.AddRedisJournalStorage(configure: null);
 
     /// <summary>
@@ -23,8 +24,11 @@ public static class RedisJournalStorageHostingExtensions
     /// <param name="builder">The silo builder.</param>
     /// <param name="configure">The Redis journal storage configuration delegate.</param>
     /// <returns>The silo builder.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="builder"/> is <see langword="null"/>.</exception>
     public static ISiloBuilder AddRedisJournalStorage(this ISiloBuilder builder, Action<RedisJournalStorageOptions>? configure)
     {
+        ArgumentNullException.ThrowIfNull(builder);
+
         builder.AddJournalStorage();
 
         var services = builder.Services;
