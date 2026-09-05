@@ -1,8 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <IsPackable>false</IsPackable>
+    <IsPackable Condition="'$(PackDurableTaskAdapter)' != 'true'">false</IsPackable>
+    <IsPackable Condition="'$(PackDurableTaskAdapter)' == 'true'">true</IsPackable>
     <EnablePackageValidation>false</EnablePackageValidation>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <GenAPITargetDirectory>$(SourceRoot)src\api\Microsoft.Orleans.DurableTasks\</GenAPITargetDirectory>
     <GenAPITargetPath>$(GenAPITargetDirectory)$(AssemblyName).cs</GenAPITargetPath>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
@@ -31,5 +33,9 @@
     <ProjectReference Include="$(SourceRoot)src\Orleans.Journaling\Orleans.Journaling.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Serialization\Orleans.Serialization.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 </Project>
