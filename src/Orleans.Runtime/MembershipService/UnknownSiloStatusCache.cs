@@ -46,18 +46,24 @@ internal sealed partial class UnknownSiloStatusCache
         bool requireFresh = false)
     {
         var result = new Dictionary<SiloAddress, SiloStatus>();
+        Dictionary<SiloAddress, SiloStatusCacheEntry>? observedStatuses = null;
         List<SiloAddress>? unknownSilos = null;
         foreach (var siloAddress in siloAddresses)
         {
             var status = snapshot.GetSiloStatus(siloAddress);
             if (status != SiloStatus.None)
             {
-                result.Add(siloAddress, UpdateCachedStatus(siloAddress, status, snapshot.Version).Status);
+                var observedStatus = UpdateCachedStatus(siloAddress, status, snapshot.Version);
+                result.Add(siloAddress, observedStatus.Status);
+                observedStatuses ??= [];
+                observedStatuses[siloAddress] = observedStatus;
             }
             else if (_siloStatuses.TryGet(siloAddress, out var cachedStatus)
                 && cachedStatus.Status == SiloStatus.Dead)
             {
                 result.Add(siloAddress, SiloStatus.Dead);
+                observedStatuses ??= [];
+                observedStatuses[siloAddress] = cachedStatus;
             }
             else
             {
@@ -80,6 +86,7 @@ internal sealed partial class UnknownSiloStatusCache
         {
             var refresh = GetRefreshOperation(
                 requireFresh ? [.. siloAddresses] : unknownSilos,
+                observedStatuses,
                 cancellationToken);
             var refreshedTableSnapshot = await refresh.Completion.Task.WaitAsync(cancellationToken);
             result.Clear();
@@ -117,6 +124,7 @@ internal sealed partial class UnknownSiloStatusCache
 
     private RefreshOperation GetRefreshOperation(
         IReadOnlyList<SiloAddress> unknownSilos,
+        IReadOnlyDictionary<SiloAddress, SiloStatusCacheEntry>? observedStatuses,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -131,20 +139,20 @@ internal sealed partial class UnknownSiloStatusCache
 
             if (_latestRefresh is { } latest && latest.Generation >= requiredGeneration)
             {
-                latest.AddSilos(unknownSilos);
+                latest.AddSilos(unknownSilos, observedStatuses);
                 return latest;
             }
 
             if (_pendingRefresh is { } pending && pending.Generation >= requiredGeneration)
             {
-                pending.AddSilos(unknownSilos);
+                pending.AddSilos(unknownSilos, observedStatuses);
                 return pending;
             }
 
             var generation = Math.Max(
                 requiredGeneration,
                 (_pendingRefresh ?? _activeRefresh)?.Generation + 1 ?? requiredGeneration);
-            var operation = new RefreshOperation(generation, unknownSilos);
+            var operation = new RefreshOperation(generation, unknownSilos, observedStatuses);
             if (_activeRefresh is null)
             {
                 StartRefresh(operation);
@@ -267,10 +275,14 @@ internal sealed partial class UnknownSiloStatusCache
         private readonly HashSet<SiloAddress> _siloAddresses;
         private readonly Dictionary<SiloAddress, SiloStatusCacheEntry> _observedStatuses = [];
 
-        public RefreshOperation(long generation, IReadOnlyList<SiloAddress> siloAddresses)
+        public RefreshOperation(
+            long generation,
+            IReadOnlyList<SiloAddress> siloAddresses,
+            IReadOnlyDictionary<SiloAddress, SiloStatusCacheEntry>? observedStatuses)
         {
             Generation = generation;
             _siloAddresses = [.. siloAddresses];
+            AddObservations(observedStatuses);
         }
 
         public TaskCompletionSource<MembershipTableSnapshot> Completion { get; } =
@@ -280,12 +292,16 @@ internal sealed partial class UnknownSiloStatusCache
 
         public IEnumerable<SiloAddress> SiloAddresses => _siloAddresses;
 
-        public void AddSilos(IReadOnlyList<SiloAddress> siloAddresses)
+        public void AddSilos(
+            IReadOnlyList<SiloAddress> siloAddresses,
+            IReadOnlyDictionary<SiloAddress, SiloStatusCacheEntry>? observedStatuses)
         {
             foreach (var siloAddress in siloAddresses)
             {
                 _siloAddresses.Add(siloAddress);
             }
+
+            AddObservations(observedStatuses);
         }
 
         public SiloStatusCacheEntry Observe(SiloAddress siloAddress, SiloStatusCacheEntry status)
@@ -316,6 +332,20 @@ internal sealed partial class UnknownSiloStatusCache
             lock (_observedStatuses)
             {
                 return _observedStatuses.TryGetValue(siloAddress, out status);
+            }
+        }
+
+        private void AddObservations(
+            IReadOnlyDictionary<SiloAddress, SiloStatusCacheEntry>? observedStatuses)
+        {
+            if (observedStatuses is null)
+            {
+                return;
+            }
+
+            foreach (var (siloAddress, status) in observedStatuses)
+            {
+                Observe(siloAddress, status);
             }
         }
     }

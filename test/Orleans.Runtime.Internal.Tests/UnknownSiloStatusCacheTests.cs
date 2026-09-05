@@ -180,7 +180,7 @@ public class UnknownSiloStatusCacheTests
     }
 
     [Fact]
-    public async Task PendingRefreshRetainsNewerStatusAfterCacheEviction()
+    public async Task ActiveRefreshRetainsNewerStatusAfterCacheEviction()
     {
         var silo = CreateSiloAddress();
         var membershipManager = new TestMembershipManager(
@@ -221,6 +221,67 @@ public class UnknownSiloStatusCacheTests
         var validation = await validationTask;
         Assert.Equal(SiloStatus.Dead, validation.Statuses[silo]);
         Assert.Equal(1, membershipManager.SourceRefreshCount);
+    }
+
+    [Fact]
+    public async Task NewRefreshRetainsInitiatingStatusAfterCacheEviction()
+    {
+        var silo = CreateSiloAddress();
+        var membershipManager = new TestMembershipManager(
+            CreateMembershipTableSnapshot(
+                10,
+                CreateMembershipEntry(silo, SiloStatus.Active)))
+        {
+            AutoCompleteRefreshes = false,
+        };
+        var cache = new UnknownSiloStatusCache(membershipManager, NullLogger<UnknownSiloStatusCache>.Instance);
+        var validationTask = cache.ValidateSiloStatuses(
+            CreateSnapshot(11, new ClusterMember(silo, SiloStatus.Dead, "silo")),
+            SiloAddresses(silo),
+            CancellationToken.None,
+            requireFresh: true).AsTask();
+        var refresh = await membershipManager.WaitForRefreshAttempt();
+
+        await EvictCacheEntries(cache);
+        refresh.Completion.TrySetResult();
+
+        var validation = await validationTask;
+        Assert.Equal(SiloStatus.Dead, validation.Statuses[silo]);
+        Assert.Equal(1, membershipManager.SourceRefreshCount);
+    }
+
+    [Fact]
+    public async Task PendingRefreshRetainsInitiatingStatusAfterCacheEviction()
+    {
+        var firstSilo = CreateSiloAddress();
+        var silo = CreateSiloAddress(port: 11112);
+        var membershipManager = new TestMembershipManager(
+            CreateMembershipTableSnapshot(
+                10,
+                CreateMembershipEntry(silo, SiloStatus.Active)))
+        {
+            AutoCompleteRefreshes = false,
+        };
+        var cache = new UnknownSiloStatusCache(membershipManager, NullLogger<UnknownSiloStatusCache>.Instance);
+        var activeValidation = cache.GetSiloStatuses(
+            CreateSnapshot(9),
+            SiloAddresses(firstSilo),
+            CancellationToken.None).AsTask();
+        var activeRefresh = await membershipManager.WaitForRefreshAttempt();
+        var pendingValidation = cache.ValidateSiloStatuses(
+            CreateSnapshot(11, new ClusterMember(silo, SiloStatus.Dead, "silo")),
+            SiloAddresses(silo),
+            CancellationToken.None,
+            requireFresh: true).AsTask();
+
+        await EvictCacheEntries(cache, firstPort: 20_000);
+        activeRefresh.Completion.TrySetResult();
+        var pendingRefresh = await membershipManager.WaitForRefreshAttempt();
+        pendingRefresh.Completion.TrySetResult();
+
+        Assert.Equal(SiloStatus.Dead, (await activeValidation)[firstSilo]);
+        Assert.Equal(SiloStatus.Dead, (await pendingValidation).Statuses[silo]);
+        Assert.Equal(2, membershipManager.SourceRefreshCount);
     }
 
     [Fact]
@@ -487,6 +548,22 @@ public class UnknownSiloStatusCacheTests
         SiloAddress.New(new IPEndPoint(IPAddress.Loopback, port), 1);
 
     private static HashSet<SiloAddress> SiloAddresses(params SiloAddress[] addresses) => [.. addresses];
+
+    private static async Task EvictCacheEntries(
+        UnknownSiloStatusCache cache,
+        int firstPort = 20_000)
+    {
+        for (var i = 0; i <= UnknownSiloStatusCache.CacheCapacity; i++)
+        {
+            var otherSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, firstPort + i), 1);
+            Assert.Equal(
+                SiloStatus.Active,
+                (await cache.GetSiloStatuses(
+                    CreateSnapshot(12, new ClusterMember(otherSilo, SiloStatus.Active, "other")),
+                    SiloAddresses(otherSilo),
+                    CancellationToken.None))[otherSilo]);
+        }
+    }
 
     private sealed class TestMembershipManager(MembershipTableSnapshot snapshot) : IMembershipManager
     {
