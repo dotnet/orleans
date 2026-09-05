@@ -66,6 +66,33 @@ internal static class GrainDirectoryEvents
         int partitionIndex,
         MembershipVersion version) : GrainDirectoryEvent(siloAddress, partitionIndex, version, RingRange.Empty);
 
+    internal sealed class IntegrityViolation(
+        SiloAddress siloAddress,
+        int partitionIndex,
+        MembershipVersion version,
+        RingRange range,
+        GrainId grainId,
+        Exception exception) : GrainDirectoryEvent(siloAddress, partitionIndex, version, range)
+    {
+        public readonly GrainId GrainId = grainId;
+        public readonly Exception Exception = exception;
+    }
+
+    internal static void EmitIntegrityViolation(
+        SiloAddress siloAddress,
+        int partitionIndex,
+        MembershipVersion version,
+        RingRange range,
+        GrainId grainId,
+        Exception exception)
+    {
+        if (Listener.IsEnabled(nameof(IntegrityViolation)))
+        {
+            Listener.Write(nameof(IntegrityViolation), new IntegrityViolation(
+                siloAddress, partitionIndex, version, range, grainId, exception));
+        }
+    }
+
     internal static void EmitMembershipVersionApplied(
         SiloAddress siloAddress,
         MembershipVersion version)

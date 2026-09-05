@@ -1,6 +1,7 @@
 #nullable enable
 using System.Diagnostics;
 using System.Globalization;
+using System.Runtime.ExceptionServices;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
@@ -16,14 +17,18 @@ namespace UnitTests.GrainDirectory;
 
 internal interface IMyDirectoryTestGrain : IGrainWithIntegerKey
 {
-    ValueTask Ping();
+    ValueTask Ping(CancellationToken cancellationToken = default);
 }
 
 
 [CollectionAgeLimit(Minutes = 1.01)]
 internal class MyDirectoryTestGrain : Grain, IMyDirectoryTestGrain
 {
-    public ValueTask Ping() => default;
+    public ValueTask Ping(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return ValueTask.CompletedTask;
+    }
 }
 
 [TestCategory("Stress"), TestCategory("Directory")]
@@ -42,152 +47,255 @@ public sealed class GrainDirectoryResilienceTests
     public async Task ElasticChaos()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
+        using var monitor = new DirectoryChaosMonitor();
         var testClusterBuilder = new TestClusterBuilder(1);
         testClusterBuilder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
         var testCluster = testClusterBuilder.Build();
-        await testCluster.DeployAsync(cancellationToken);
-        var log = testCluster.ServiceProvider.GetRequiredService<ILogger<GrainDirectoryResilienceTests>>();
-        log.LogInformation("ServiceId: '{ServiceId}'", testCluster.Options.ServiceId);
-        log.LogInformation("ClusterId: '{ClusterId}'.", testCluster.Options.ClusterId);
-
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        cts.CancelAfter(TimeSpan.FromMinutes(5));
-        var reconfigurationTimer = CoarseStopwatch.StartNew();
-        var upperLimit = 10;
-        var lowerLimit = 1; // Membership is kept on the primary, so we can't go below 1
-        var target = upperLimit;
-        var idBase = 0L;
-        var client = ((InProcessSiloHandle)testCluster.Primary!).SiloHost.Services.GetRequiredService<IGrainFactory>();
-        const int CallsPerIteration = 100;
-        var loadTask = Task.Run(async () =>
-        {
-            while (!cts.IsCancellationRequested)
-            {
-                var time = Stopwatch.StartNew();
-                var tasks = Enumerable.Range(0, CallsPerIteration).Select(i => client.GetGrain<IMyDirectoryTestGrain>(idBase + i).Ping().AsTask()).ToList();
-                var workTask = Task.WhenAll(tasks);
-
-                try
-                {
-                    await workTask.WaitAsync(cts.Token);
-                }
-                catch (OperationCanceledException) when (cts.IsCancellationRequested)
-                {
-                    break;
-                }
-                catch (SiloUnavailableException sue)
-                {
-                    log.LogInformation(sue, "Swallowed transient exception.");
-                }
-                catch (OrleansMessageRejectionException omre)
-                {
-                    log.LogInformation(omre, "Swallowed rejection.");
-                }
-                catch (Exception exception)
-                {
-                    log.LogError(exception, "Unhandled exception.");
-                    throw;
-                }
-
-                idBase += CallsPerIteration;
-            }
-        }, cts.Token);
-
-        var chaosTask = Task.Run(async () =>
-        {
-            var clusterOperation = Task.CompletedTask;
-            while (!cts.IsCancellationRequested)
-            {
-                try
-                {
-                    var remaining = TimeSpan.FromSeconds(10) - reconfigurationTimer.Elapsed;
-                    if (remaining <= TimeSpan.Zero)
-                    {
-                        reconfigurationTimer.Restart();
-                        await clusterOperation.WaitAsync(cts.Token);
-
-                        await CheckIntegrityAsync(testCluster, client, cts.Token);
-
-                        clusterOperation = Task.Run(async () =>
-                        {
-                            var currentCount = testCluster.Silos.Count;
-
-                            if (currentCount > target)
-                            {
-                                // Stop or kill a random silo, but not the primary (since that hosts cluster membership)
-                                var victim = testCluster.SecondarySilos[Random.Shared.Next(testCluster.SecondarySilos.Count)];
-                                if (currentCount % 2 == 0)
-                                {
-                                    log.LogInformation("Stopping '{Silo}'.", victim.SiloAddress);
-                                    await testCluster.StopSiloAsync(victim, cts.Token);
-                                    log.LogInformation("Stopped '{Silo}'.", victim.SiloAddress);
-                                }
-                                else
-                                {
-                                    log.LogInformation("Killing '{Silo}'.", victim.SiloAddress);
-                                    await testCluster.KillSiloAsync(victim).WaitAsync(cts.Token);
-                                    log.LogInformation("Killed '{Silo}'.", victim.SiloAddress);
-                                }
-                            }
-                            else if (currentCount < target)
-                            {
-                                log.LogInformation("Starting new silo.");
-                                var result = await testCluster.StartAdditionalSiloAsync().WaitAsync(cts.Token);
-                                log.LogInformation("Started '{Silo}'.", result.SiloAddress);
-                            }
-
-                            if (currentCount <= lowerLimit)
-                            {
-                                target = upperLimit;
-                            }
-                            else if (currentCount >= upperLimit)
-                            {
-                                target = lowerLimit;
-                            }
-                        }, cts.Token);
-                    }
-                    else
-                    {
-                        await Task.Delay(remaining, cts.Token);
-                    }
-                }
-                catch (Exception exception)
-                {
-                    log.LogInformation(exception, "Ignoring chaos exception.");
-                }
-            }
-        }, cts.Token);
-
+        var loadTask = Task.CompletedTask;
+        var chaosTask = Task.CompletedTask;
+        var failures = new List<Exception>();
+        var phase = "deploying the initial silo";
         try
         {
-            await await Task.WhenAny(loadTask, chaosTask).WaitAsync(cancellationToken);
+            await testCluster.DeployAsync(cancellationToken);
+            foreach (var silo in testCluster.Silos)
+            {
+                monitor.TrackSilo(silo.SiloAddress);
+            }
+
+            var log = testCluster.ServiceProvider.GetRequiredService<ILogger<GrainDirectoryResilienceTests>>();
+            log.LogInformation("ServiceId: '{ServiceId}', ClusterId: '{ClusterId}'.",
+                testCluster.Options.ServiceId, testCluster.Options.ClusterId);
+            var client = ((InProcessSiloHandle)testCluster.Primary!).SiloHost.Services.GetRequiredService<IGrainFactory>();
+            await EnsureDirectoryStableAsync(testCluster, client, cancellationToken);
+            phase = "running the workload and topology changes";
+            loadTask = RunChaosWorkloadAsync(client, monitor, cts.Token);
+            chaosTask = RunChaosTopologyAsync(testCluster, client, log, monitor, cts.Token);
+
+            var completed = await Task.WhenAny(loadTask, chaosTask, monitor.InvariantFailure).WaitAsync(cancellationToken);
+            if (completed == monitor.InvariantFailure)
+            {
+                throw await monitor.InvariantFailure;
+            }
+
+            await completed;
+            cancellationToken.ThrowIfCancellationRequested();
+            if (completed != chaosTask)
+            {
+                throw new InvalidOperationException("The workload stopped before the topology scenario completed.");
+            }
+
+            cts.Cancel();
+            await loadTask;
+            phase = "establishing final progress and directory integrity";
+            monitor.RecordPhase(phase);
+            using var finalProbe = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            finalProbe.CancelAfter(DirectoryMigrationTimeout);
+            await EnsureDirectoryStableAsync(testCluster, client, finalProbe.Token);
+            await CreatePingBatch(client, -100, 100, finalProbe.Token);
+            await CheckIntegrityAsync(testCluster, client, finalProbe.Token);
+            log.LogInformation("Chaos completed: {SuccessfulBatches} successful batches, {ExpectedDisruptions} expected disruptions.",
+                monitor.SuccessfulBatches, monitor.ExpectedDisruptions);
+        }
+        catch (Exception exception)
+        {
+            failures.Add(monitor.InvariantFailure.IsCompletedSuccessfully
+                ? await monitor.InvariantFailure
+                : exception is DirectoryChaosFailure || exception is OperationCanceledException && cancellationToken.IsCancellationRequested
+                    ? exception
+                    : monitor.RuntimeFailure(phase, exception));
         }
         finally
         {
-            cts.Cancel();
-            using var joinCancellation = new CancellationTokenSource(TimeSpan.FromMinutes(1));
-            try
+            await CaptureCleanupFailureAsync("canceling scenario workers", _ => cts.CancelAsync());
+            await CaptureCleanupFailureAsync("joining scenario workers", async token =>
             {
-                await Task.WhenAll(loadTask, chaosTask).WaitAsync(joinCancellation.Token);
-            }
-            catch (OperationCanceledException) when (
-                cts.IsCancellationRequested
-                && !joinCancellation.IsCancellationRequested)
-            {
-            }
+                var workers = Task.WhenAll(loadTask, chaosTask);
+                try
+                {
+                    await workers.WaitAsync(token);
+                }
+                catch (Exception exception) when (!token.IsCancellationRequested
+                    && DirectoryChaosMonitor.IsExpectedShutdown(workers.Exception ?? exception))
+                {
+                }
+            });
+            await CaptureCleanupFailureAsync("stopping the cluster", token => testCluster.StopAllSilosAsync(token));
+            await CaptureCleanupFailureAsync("disposing the cluster", token => testCluster.DisposeAsync().AsTask().WaitAsync(token));
+        }
 
+        if (failures.Count == 1)
+        {
+            ExceptionDispatchInfo.Capture(failures[0]).Throw();
+        }
+
+        if (failures.Count > 1)
+        {
+            throw new AggregateException("ElasticChaos encountered scenario and/or cleanup failures.", failures);
+        }
+
+        async Task CaptureCleanupFailureAsync(string cleanupPhase, Func<CancellationToken, Task> cleanup)
+        {
+            using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(1));
             try
             {
-                using var stopCancellation = new CancellationTokenSource(TimeSpan.FromMinutes(1));
-                await testCluster.StopAllSilosAsync(stopCancellation.Token);
+                await cleanup(timeout.Token).WaitAsync(timeout.Token);
             }
-            finally
+            catch (Exception exception)
             {
-                using var disposeCancellation = new CancellationTokenSource(TimeSpan.FromMinutes(1));
-                await testCluster.DisposeAsync().AsTask().WaitAsync(disposeCancellation.Token);
+                if (!failures.Contains(exception))
+                {
+                    failures.Add(exception is DirectoryChaosFailure ? exception : monitor.RuntimeFailure(cleanupPhase, exception));
+                }
             }
         }
     }
+
+    private static async Task RunChaosWorkloadAsync(
+        IGrainFactory client,
+        DirectoryChaosMonitor monitor,
+        CancellationToken cancellationToken)
+    {
+        const int BatchSize = 100;
+        for (var idBase = 0L; !cancellationToken.IsCancellationRequested; idBase += BatchSize)
+        {
+            var batch = CreatePingBatch(client, idBase, BatchSize, cancellationToken);
+            try
+            {
+                await batch;
+                monitor.RecordSuccessfulBatch();
+            }
+            catch (Exception exception) when (cancellationToken.IsCancellationRequested
+                && DirectoryChaosMonitor.IsExpectedShutdown(batch.Exception ?? exception))
+            {
+                break;
+            }
+            catch (Exception exception) when (DirectoryChaosMonitor.IsExpectedDisruption(batch.Exception ?? exception))
+            {
+                monitor.RecordExpectedDisruption(batch.Exception ?? exception);
+            }
+            catch (Exception exception)
+            {
+                throw monitor.RuntimeFailure($"workload batch starting at grain {idBase}", batch.Exception ?? exception);
+            }
+        }
+    }
+
+    private static async Task RunChaosTopologyAsync(
+        TestCluster cluster,
+        IGrainFactory client,
+        ILogger log,
+        DirectoryChaosMonitor monitor,
+        CancellationToken cancellationToken)
+    {
+        const int Seed = 10969;
+        const int UpperLimit = 10;
+        const int LowerLimit = 1;
+        var random = new Random(Seed);
+        var target = UpperLimit;
+        var duration = Stopwatch.StartNew();
+        using var pacing = new PeriodicTimer(TimeSpan.FromSeconds(10));
+        log.LogInformation("Chaos topology seed: {Seed}.", Seed);
+        while (duration.Elapsed < TimeSpan.FromMinutes(5) && await pacing.WaitForNextTickAsync(cancellationToken))
+        {
+            var phase = "selecting the next topology change";
+            try
+            {
+                var count = cluster.Silos.Count;
+                if (count == UpperLimit)
+                {
+                    target = LowerLimit;
+                }
+                else if (count == LowerLimit)
+                {
+                    target = UpperLimit;
+                }
+
+                if (count < target)
+                {
+                    phase = $"starting silo with {count} existing silos";
+                    monitor.RecordPhase(phase);
+                    var started = Assert.Single(await cluster.StartAdditionalSilosAsync(
+                        1, startAdditionalSiloOnNewPort: false, cancellationToken));
+                    monitor.TrackSilo(started.SiloAddress);
+                    log.LogInformation("Started '{Silo}'.", started.SiloAddress);
+                }
+                else
+                {
+                    var victim = cluster.SecondarySilos[random.Next(cluster.SecondarySilos.Count)];
+                    phase = $"{(count % 2 == 0 ? "stopping" : "killing")} silo {victim.SiloAddress}";
+                    monitor.RecordPhase(phase);
+                    if (count % 2 == 0)
+                    {
+                        await cluster.StopSiloAsync(victim, cancellationToken);
+                    }
+                    else
+                    {
+                        await cluster.KillSiloAsync(victim, cancellationToken);
+                    }
+                }
+
+                phase = $"converging and checking integrity after {phase}";
+                monitor.RecordPhase(phase);
+                await EnsureDirectoryStableAsync(cluster, client, cancellationToken);
+                using var probe = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                probe.CancelAfter(DirectoryMigrationTimeout);
+                await CheckIntegrityAsync(cluster, client, probe.Token);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                throw monitor.InvariantFailure.IsCompletedSuccessfully
+                    ? await monitor.InvariantFailure
+                    : monitor.RuntimeFailure(phase, exception);
+            }
+        }
+    }
+
+    private static async Task EnsureDirectoryStableAsync(
+        TestCluster cluster,
+        IGrainFactory grainFactory,
+        CancellationToken cancellationToken)
+    {
+        var silos = cluster.Silos.Cast<InProcessSiloHandle>().ToArray();
+        var expected = silos.Select(silo => silo.SiloAddress).ToHashSet();
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(DirectoryMigrationTimeout);
+        var tasks = silos.Select(async silo =>
+        {
+            var membership = silo.ServiceProvider.GetRequiredService<DirectoryMembershipService>();
+            var view = await WaitForDirectoryViewAsync(
+                membership,
+                candidate => candidate.Members.Length == expected.Count && candidate.Members.All(expected.Contains),
+                $"directory membership on {silo.SiloAddress} with active silos [{string.Join(", ", expected)}]",
+                timeout.Token);
+            var waits = Enumerable.Range(0, view.PartitionCount).Select(index =>
+                ((IInternalGrainFactory)grainFactory).GetSystemTarget<IGrainDirectoryTestHooks>(
+                    GrainDirectoryPartition.CreateGrainId(silo.SiloAddress, index).GrainId)
+                    .WaitForMembershipVersionAsync(view.Version, timeout.Token).AsTask()).ToArray();
+            await Task.WhenAll(waits).WaitAsync(timeout.Token);
+        }).ToArray();
+        try
+        {
+            await Task.WhenAll(tasks).WaitAsync(timeout.Token);
+        }
+        catch (OperationCanceledException exception) when (!cancellationToken.IsCancellationRequested && timeout.IsCancellationRequested)
+        {
+            throw new TimeoutException(
+                $"Directory failed to converge for [{string.Join(", ", expected)}] within {DirectoryMigrationTimeout}. "
+                + string.Join("; ", silos.Select(silo =>
+                    $"{silo.SiloAddress}: view {silo.ServiceProvider.GetRequiredService<DirectoryMembershipService>().CurrentView.Version}")),
+                exception);
+        }
+    }
+
+    private static Task CreatePingBatch(IGrainFactory client, long idBase, int count, CancellationToken cancellationToken) =>
+        Task.WhenAll(Enumerable.Range(0, count)
+            .Select(i => client.GetGrain<IMyDirectoryTestGrain>(idBase + i).Ping(cancellationToken).AsTask()));
 
     [Fact]
     public async Task JoiningSilo_DoesNotLeaveStaleEntriesOnPreviousOwner()
@@ -408,20 +516,15 @@ public sealed class GrainDirectoryResilienceTests
         int callsPerIteration,
         CancellationToken cancellationToken)
     {
-        var tasks = Enumerable.Range(0, callsPerIteration).Select(i => client.GetGrain<IMyDirectoryTestGrain>(idBase + i).Ping().AsTask()).ToList();
-        var workTask = Task.WhenAll(tasks);
+        var workTask = CreatePingBatch(client, idBase, callsPerIteration, cancellationToken);
 
         try
         {
             await workTask.WaitAsync(cancellationToken);
         }
-        catch (SiloUnavailableException sue)
+        catch (Exception exception) when (DirectoryChaosMonitor.IsExpectedDisruption(workTask.Exception ?? exception))
         {
-            log.LogInformation(sue, "Swallowed transient exception.");
-        }
-        catch (OrleansMessageRejectionException omre)
-        {
-            log.LogInformation(omre, "Swallowed rejection.");
+            log.LogInformation(exception, "Expected transient directory-workload disruption.");
         }
     }
 
