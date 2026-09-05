@@ -17,7 +17,7 @@ public class SqlServerReminderDbContext : ReminderDbContext<SqlServerReminderDbC
 
         modelBuilder.Entity<ReminderRecord<byte[]>>(c =>
         {
-            c.HasKey(p => new {p.ServiceIdHash, p.GrainIdHash, p.ReminderNameHash}).IsClustered(false).HasName("PK_Reminders");
+            c.HasKey(p => new { p.ServiceIdHash, p.GrainIdHash, p.ReminderNameHash }).IsClustered(false).HasName("PK_Reminders");
             c.Property(p => p.ServiceIdHash).HasColumnType("binary(32)");
             c.Property(p => p.GrainIdHash).HasColumnType("binary(32)");
             c.Property(p => p.ReminderNameHash).HasColumnType("binary(32)");
@@ -26,8 +26,8 @@ public class SqlServerReminderDbContext : ReminderDbContext<SqlServerReminderDbC
             c.Property(p => p.Name).HasColumnType("nvarchar(max)").UseCollation(IdentifierCollation);
             c.Property(p => p.ETag).IsRequired().IsRowVersion();
 
-            c.HasIndex(p => new {p.ServiceIdHash, p.GrainHash}).IsClustered(false).HasDatabaseName("IDX_Reminders_ServiceIdHash_GrainHash");
-            c.HasIndex(p => new {p.ServiceIdHash, p.GrainIdHash}).IsClustered(false).HasDatabaseName("IDX_Reminders_ServiceIdHash_GrainIdHash");
+            c.HasIndex(p => new { p.ServiceIdHash, p.GrainHash }).IsClustered(false).HasDatabaseName("IDX_Reminders_ServiceIdHash_GrainHash");
+            c.HasIndex(p => new { p.ServiceIdHash, p.GrainIdHash }).IsClustered(false).HasDatabaseName("IDX_Reminders_ServiceIdHash_GrainIdHash");
         });
     }
 }

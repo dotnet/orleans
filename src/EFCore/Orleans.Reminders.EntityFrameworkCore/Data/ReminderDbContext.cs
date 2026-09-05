@@ -15,7 +15,7 @@ public class ReminderDbContext<TDbContext, TETag> : DbContext where TDbContext :
     {
         modelBuilder.Entity<ReminderRecord<TETag>>(c =>
         {
-            c.HasKey(p => new {p.ServiceIdHash, p.GrainIdHash, p.ReminderNameHash});
+            c.HasKey(p => new { p.ServiceIdHash, p.GrainIdHash, p.ReminderNameHash });
             c.Property(p => p.ServiceIdHash).HasMaxLength(32).IsRequired().UsePropertyAccessMode(PropertyAccessMode.Property);
             c.Property(p => p.GrainIdHash).HasMaxLength(32).IsRequired().UsePropertyAccessMode(PropertyAccessMode.Property);
             c.Property(p => p.ReminderNameHash).HasMaxLength(32).IsRequired().UsePropertyAccessMode(PropertyAccessMode.Property);
@@ -28,8 +28,8 @@ public class ReminderDbContext<TDbContext, TETag> : DbContext where TDbContext :
                 .IsRequired();
             c.Property(p => p.GrainHash).IsRequired();
             c.Property(p => p.ETag).IsRequired().IsConcurrencyToken();
-            c.HasIndex(p => new {p.ServiceIdHash, p.GrainHash});
-            c.HasIndex(p => new {p.ServiceIdHash, p.GrainIdHash});
+            c.HasIndex(p => new { p.ServiceIdHash, p.GrainHash });
+            c.HasIndex(p => new { p.ServiceIdHash, p.GrainIdHash });
         });
     }
 }
