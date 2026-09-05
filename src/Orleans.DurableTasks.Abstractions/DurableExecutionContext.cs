@@ -10,13 +10,28 @@ public abstract class DurableExecutionContext
     private static readonly AsyncLocal<DurableExecutionContext?> AmbientContext = new();
     private readonly object _lock = new();
     private readonly CancellationTokenSource _cancellationSource = new();
+    private readonly CancellationTokenSource? _executionCancellationSource;
     private List<CancellationRegistration>? _registrations;
     private CancellationOperation? _cancellationOperation;
     private bool _cancellationRequested;
     private long _nextChildId;
     private long _nextOperationId;
 
-    protected DurableExecutionContext(TaskId taskId)
+    /// <summary>Initializes an execution with durable cancellation.</summary>
+    protected DurableExecutionContext(TaskId taskId) : this(taskId, CancellationToken.None)
+    {
+    }
+
+    /// <summary>Initializes an execution with durable cancellation and a host execution-abort token.</summary>
+    /// <param name="taskId">The stable identifier of this execution.</param>
+    /// <param name="executionAbortToken">The host-owned token for aborting this execution attempt.</param>
+    /// <remarks>
+    /// Delegate and delay operations observe both durable cancellation and host execution abort.
+    /// <see cref="CancellationToken"/> and durable cancellation callbacks continue to observe the
+    /// durable request. The host owns the abort source for this execution's lifetime, drains
+    /// the aborted attempt, discards its response, and replays it in a new context.
+    /// </remarks>
+    protected DurableExecutionContext(TaskId taskId, CancellationToken executionAbortToken)
     {
         if (taskId.IsDefault)
         {
@@ -24,6 +39,12 @@ public abstract class DurableExecutionContext
         }
 
         TaskId = taskId;
+        if (executionAbortToken.CanBeCanceled)
+        {
+            _executionCancellationSource = CancellationTokenSource.CreateLinkedTokenSource(
+                _cancellationSource.Token,
+                executionAbortToken);
+        }
     }
 
     /// <summary>Gets the current durable execution context.</summary>
@@ -66,6 +87,8 @@ public abstract class DurableExecutionContext
     /// </para>
     /// </remarks>
     public CancellationToken CancellationToken => _cancellationSource.Token;
+
+    internal CancellationToken ExecutionCancellationToken => _executionCancellationSource?.Token ?? CancellationToken;
 
     /// <summary>Schedules or reattaches to a child definition under an exact identifier.</summary>
     protected internal abstract ValueTask<IScheduledTaskHandle> ScheduleChildTaskAsync(
