@@ -189,6 +189,33 @@ public sealed class FaultyReminderServiceLifecycleTests
     }
 
     [Fact]
+    public async Task TopologyReconciliationDoesNotRequestRefresh()
+    {
+        var fixture = new ReminderServiceLifecycleFixture();
+        await fixture.InitializeAsync();
+        try
+        {
+            using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(
+                TestContext.Current.CancellationToken);
+            cancellation.CancelAfter(TimeSpan.FromMinutes(2));
+            await fixture.Harness.WaitForStartupReadinessAsync(cancellation.Token);
+            var table = Assert.IsType<IdealizedReminderTable>(fixture.Harness.ReminderTable);
+            var rangeReads = table.Operations.Count(operation =>
+                operation.Kind == ReminderTableOperationKind.ReadRange);
+
+            await fixture.Harness.WaitForTopologyReconciliationAsync(cancellation.Token);
+
+            Assert.Equal(
+                rangeReads,
+                table.Operations.Count(operation => operation.Kind == ReminderTableOperationKind.ReadRange));
+        }
+        finally
+        {
+            await fixture.DisposeAsync();
+        }
+    }
+
+    [Fact]
     public Task DuplicateOwnerImplementationIsRejected()
         => RunFaultAsync(
             harness => new LifecycleRunner(new DuplicateOwnerHarness(harness), "DuplicateOwner"),
