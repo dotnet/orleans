@@ -45,7 +45,6 @@
 
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
-    <PackageReference Include="Microsoft.AspNetCore.Connections.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.Configuration" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Binder" />
     <PackageReference Include="Microsoft.Extensions.DependencyModel" />
@@ -75,6 +74,7 @@
     <InternalsVisibleTo Include="Orleans.Clustering.ZooKeeper.Tests" />
     <InternalsVisibleTo Include="Orleans.CodeGeneration" />
     <InternalsVisibleTo Include="Orleans.CodeGeneration.Build" />
+    <InternalsVisibleTo Include="Orleans.Connections.Security.Tests" />
     <InternalsVisibleTo Include="Orleans.Core.Tests" />
     <InternalsVisibleTo Include="Orleans.Cosmos.Tests" />
     <InternalsVisibleTo Include="Orleans.DefaultCluster.Tests" />
@@ -82,6 +82,7 @@
     <InternalsVisibleTo Include="Orleans.DurableJobs.Tests" />
     <InternalsVisibleTo Include="Orleans.Persistence.Firestore.Tests" />
     <InternalsVisibleTo Include="Orleans.GrainDirectory.Tests" />
+    <InternalsVisibleTo Include="Orleans.Journaling" />
     <InternalsVisibleTo Include="Orleans.Placement.Tests" />
     <InternalsVisibleTo Include="Orleans.Redis.Tests" />
     <InternalsVisibleTo Include="Orleans.Reminders" />

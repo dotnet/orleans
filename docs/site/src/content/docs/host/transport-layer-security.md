@@ -10,9 +10,9 @@ ms.topic: how-to
 Orleans can protect client-to-silo and silo-to-silo connections with Transport Layer Security (TLS). TLS encrypts traffic and authenticates the endpoint acting as the TLS server. Mutual TLS (mTLS) additionally requires and authenticates the endpoint acting as the TLS client.
 
 > [!IMPORTANT]
-> <xref:Orleans.Connections.Security.TlsOptions.RemoteCertificateMode> defaults to `RequireCertificate`. On a silo's inbound connections, this default requires the connecting silo or Orleans client to present a certificate. To configure server-authenticated TLS without client certificates, explicitly set it to `NoCertificate` on every silo.
+> <xref:Orleans.Connections.Transport.Security.TlsOptions.RemoteCertificateMode> defaults to `RequireCertificate`. On a silo's inbound connections, this default requires the connecting silo or Orleans client to present a certificate. To configure server-authenticated TLS without client certificates, explicitly set it to `NoCertificate` on every silo.
 
-Install [Microsoft.Orleans.Connections.Security](https://www.nuget.org/packages/Microsoft.Orleans.Connections.Security) in every silo and client process.
+The TLS APIs are included in the Orleans server and client packages.
 
 ## Choose an authentication model
 
@@ -23,8 +23,8 @@ Install [Microsoft.Orleans.Connections.Security](https://www.nuget.org/packages/
 
 The two similarly named options apply at different stages:
 
-- <xref:Orleans.Connections.Security.TlsOptions.RemoteCertificateMode> controls whether the remote endpoint must present a certificate. In server middleware, `RequireCertificate` requires a certificate from an inbound Orleans client or silo, `AllowCertificate` requests one but permits none, and `NoCertificate` doesn't request one. Silo configuration uses this same value for outbound middleware; the TLS server still presents a certificate and platform validation authenticates it when no custom callback is installed.
-- <xref:Orleans.Connections.Security.TlsOptions.ClientCertificateMode> controls selection of the local client certificate in client middleware. On a silo, it applies when the silo initiates a silo-to-silo connection. On an Orleans client, it applies when the client initiates a gateway connection. It doesn't control inbound silo behavior.
+- <xref:Orleans.Connections.Transport.Security.TlsOptions.RemoteCertificateMode> controls whether the remote endpoint must present a certificate. In server middleware, `RequireCertificate` requires a certificate from an inbound Orleans client or silo, `AllowCertificate` requests one but permits none, and `NoCertificate` doesn't request one. Silo configuration uses this same value for outbound middleware; the TLS server still presents a certificate and platform validation authenticates it when no custom callback is installed.
+- <xref:Orleans.Connections.Transport.Security.TlsOptions.ClientCertificateMode> controls selection of the local client certificate in client middleware. On a silo, it applies when the silo initiates a silo-to-silo connection. On an Orleans client, it applies when the client initiates a gateway connection. It doesn't control inbound silo behavior.
 
 `ClientCertificateMode` defaults to `AllowCertificate`: a configured local certificate is sent when it's valid for client authentication, but a missing or unsuitable local certificate is tolerated. Setting it to `RequireCertificate` makes the outbound requirement explicit and fails configuration or connection setup when an appropriate local certificate isn't available.
 
@@ -64,7 +64,7 @@ Configure an Orleans client without a local certificate:
 
 :::code language="csharp" source="./snippets/transport-layer-security/csharp/ClientExample/Program.cs" id="ServerAuthenticatedTls":::
 
-<xref:Orleans.Connections.Security.TlsClientAuthenticationOptions.TargetHost> must match a DNS Subject Alternative Name (SAN) on the server certificate. Use the stable service name clients use to reach the silos, not an arbitrary certificate subject.
+<xref:Orleans.Connections.Transport.Security.TlsClientAuthenticationOptions.TargetHost> must match a DNS Subject Alternative Name (SAN) on the server certificate. Use the stable service name clients use to reach the silos, not an arbitrary certificate subject.
 
 ## Configure mutual TLS
 
@@ -74,10 +74,10 @@ For mTLS, silos require a certificate from every inbound Orleans client or silo 
 
 :::code language="csharp" source="./snippets/transport-layer-security/csharp/ClientExample/Program.cs" id="MutualTls":::
 
-The default platform validation applies when <xref:Orleans.Connections.Security.TlsOptions.RemoteCertificateValidation> isn't set. If you provide that callback, keep normal chain and name checks and add only the deployment-specific policy you require. A callback which returns `true` unconditionally defeats peer authentication.
+The default platform validation applies when <xref:Orleans.Connections.Transport.Security.TlsOptions.RemoteCertificateValidation> isn't set. If you provide that callback, keep normal chain and name checks and add only the deployment-specific policy you require. A callback which returns `true` unconditionally defeats peer authentication.
 
 > [!WARNING]
-> <xref:Orleans.Connections.Security.TlsOptions.AllowAnyRemoteCertificate> is suitable only for isolated local development. It accepts any remote certificate and therefore doesn't protect against impersonation or an active man-in-the-middle.
+> <xref:Orleans.Connections.Transport.Security.TlsOptions.AllowAnyRemoteCertificate> is suitable only for isolated local development. It accepts any remote certificate and therefore doesn't protect against impersonation or an active man-in-the-middle.
 
 ## Establish certificate trust
 
@@ -91,9 +91,9 @@ Keep trust stores narrow. Don't place unrelated public or corporate roots in a w
 
 ## Protocols and revocation
 
-<xref:Orleans.Connections.Security.TlsOptions.SslProtocols> defaults to TLS 1.2 and TLS 1.3. Retain those defaults unless an interoperability or policy requirement calls for a narrower set. Orleans doesn't enable TLS 1.0 or TLS 1.1 by default.
+<xref:Orleans.Connections.Transport.Security.TlsOptions.SslProtocols> defaults to TLS 1.2 and TLS 1.3. Retain those defaults unless an interoperability or policy requirement calls for a narrower set. Orleans doesn't enable TLS 1.0 or TLS 1.1 by default.
 
-Set <xref:Orleans.Connections.Security.TlsOptions.CheckCertificateRevocation> to check remote certificates on inbound silo connections. For outbound connections, set <xref:Orleans.Connections.Security.TlsClientAuthenticationOptions.CertificateRevocationCheckMode> in <xref:Orleans.Connections.Security.TlsOptions.OnAuthenticateAsClient>. Before enabling revocation checks, verify that every workload can reach the certificate revocation list (CRL) or Online Certificate Status Protocol (OCSP) service and decide how outages should affect availability.
+Set <xref:Orleans.Connections.Transport.Security.TlsOptions.CheckCertificateRevocation> to check remote certificates on inbound silo connections. For outbound connections, set <xref:Orleans.Connections.Transport.Security.TlsClientAuthenticationOptions.CertificateRevocationCheckMode> in <xref:Orleans.Connections.Transport.Security.TlsOptions.OnAuthenticateAsClient>. Before enabling revocation checks, verify that every workload can reach the certificate revocation list (CRL) or Online Certificate Status Protocol (OCSP) service and decide how outages should affect availability.
 
 ## Rotate certificates
 
@@ -102,7 +102,7 @@ Plan rotation before deployment:
 1. Issue the replacement certificate with the same required names and EKUs.
 2. Distribute the new issuing chain to trust stores before any endpoint presents the new certificate.
 3. Make both old and new chains valid during an overlap window.
-4. Restart processes with the replacement certificate, or use <xref:Orleans.Connections.Security.TlsOptions.LocalServerCertificateSelector> and <xref:Orleans.Connections.Security.TlsOptions.LocalClientCertificateSelector> to select certificates dynamically.
+4. Restart processes with the replacement certificate, or use <xref:Orleans.Connections.Transport.Security.TlsOptions.LocalServerCertificateSelector> and <xref:Orleans.Connections.Transport.Security.TlsOptions.LocalClientCertificateSelector> to select certificates dynamically.
 5. Confirm new connections use the replacement, then remove the old certificate and obsolete trust roots.
 
 Certificate selectors are called during authentication, but certificate loading, caching, disposal, and refresh are application responsibilities. Test rotation under normal reconnect and silo restart behavior. Alert on certificate expiration well before the overlap window closes.
@@ -123,8 +123,9 @@ Certificate selectors are called during authentication, but certificate loading,
 
 - [Orleans security](../security/index.md)
 - [Network hardening](../security/networking.md)
-- <xref:Orleans.Connections.Security.TlsOptions>
-- <xref:Orleans.Hosting.OrleansConnectionSecurityHostingExtensions.UseTls*>
+- <xref:Orleans.Connections.Transport.Security.TlsOptions>
+- <xref:Orleans.Hosting.ClientTlsHostingExtensions.UseTls*>
+- <xref:Orleans.Hosting.SiloTlsHostingExtensions.UseTls*>
 - [Client configuration](configuration-guide/client-configuration.md)
 - [Server configuration](configuration-guide/server-configuration.md)
 - [.NET TLS/SSL best practices](https://learn.microsoft.com/dotnet/core/extensions/sslstream-best-practices)

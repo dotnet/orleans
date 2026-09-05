@@ -32,5 +32,16 @@ namespace Orleans.Configuration
         /// The default value for <see cref="OpenConnectionTimeout"/>.
         /// </summary>
         public static readonly TimeSpan DEFAULT_OPENCONNECTION_TIMEOUT = TimeSpan.FromSeconds(5);
+
+        /// <summary>
+        /// Gets or sets the timeout for gracefully closing a connection.
+        /// If the timeout is exceeded, the connection will be forcefully closed.
+        /// </summary>
+        public TimeSpan CloseConnectionTimeout { get; set; } = DEFAULT_CLOSECONNECTION_TIMEOUT;
+
+        /// <summary>
+        /// The default value for <see cref="CloseConnectionTimeout"/>.
+        /// </summary>
+        public static readonly TimeSpan DEFAULT_CLOSECONNECTION_TIMEOUT = TimeSpan.FromSeconds(30);
     }
 }

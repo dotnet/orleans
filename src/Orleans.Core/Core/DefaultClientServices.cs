@@ -1,4 +1,7 @@
-using Microsoft.AspNetCore.Connections;
+#nullable enable
+
+using System;
+using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -7,18 +10,21 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Configuration.Internal;
 using Orleans.Configuration.Validators;
+using Orleans.Connections;
+using Orleans.Connections.Transport;
+using Orleans.Connections.Transport.Sockets;
 using Orleans.GrainReferences;
-using Orleans.Hosting;
 using Orleans.Messaging;
 using Orleans.Metadata;
-using Orleans.Networking.Shared;
 using Orleans.Placement.Repartitioning;
 using Orleans.Providers;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Versions;
 using Orleans.Serialization;
 using Orleans.Serialization.Cloning;
+using Orleans.Serialization.Internal;
 using Orleans.Serialization.Serializers;
+using Orleans.Serialization.Session;
 using Orleans.Statistics;
 
 namespace Orleans
@@ -49,9 +55,6 @@ namespace Orleans
             services.AddOptions();
             services.AddMetrics();
             services.TryAddSingleton<TimeProvider>(TimeProvider.System);
-
-            // Catch-all keyed TimeProvider: consumers resolve their area's clock via [FromKeyedServices(TimeProviderNames.X)];
-            // unless an area has been explicitly overridden, this fallback supplies the unkeyed default provider.
             services.TryAddKeyedSingleton<TimeProvider>(KeyedService.AnyKey, static (sp, _) => sp.GetRequiredService<TimeProvider>());
             services.TryAddSingleton<OrleansInstruments>();
             services.TryAddSingleton<ClientInstruments>();
@@ -120,20 +123,14 @@ namespace Orleans
             services.AddTransient<IConfigurationValidator, ClientClusteringValidator>();
             services.AddTransient<IConfigurationValidator, SerializerConfigurationValidator>();
 
-            // TODO: abstract or move into some options.
-            services.AddSingleton<SocketSchedulers>();
-            services.AddSingleton<SharedMemoryPool>();
-
             // Networking
+            services.AddSingleton<MessageHandlerShared>();
             services.TryAddSingleton<IMessageStatisticsSink, NoOpMessageStatisticsSink>();
+            services.TryAddSingleton<NetworkingInstruments>();
             services.TryAddSingleton<ConnectionCommon>();
             services.TryAddSingleton<ConnectionManager>();
             services.TryAddSingleton<ConnectionPreambleHelper>();
             services.AddSingleton<ILifecycleParticipant<IClusterClientLifecycle>, ConnectionManagerLifecycleAdapter<IClusterClientLifecycle>>();
-
-            services.AddKeyedSingleton<IConnectionFactory>(
-                ClientOutboundConnectionFactory.ServicesKey,
-                (sp, key) => ActivatorUtilities.CreateInstance<SocketConnectionFactory>(sp));
 
             services.AddSerializer();
             services.AddSingleton<ITypeNameFilter, AllowOrleansTypes>();
@@ -143,13 +140,17 @@ namespace Orleans
             services.AddSingleton<IPostConfigureOptions<OrleansJsonSerializerOptions>, ConfigureOrleansJsonSerializerOptions>();
             services.AddSingleton<OrleansJsonSerializer>();
 
-            services.TryAddTransient(sp => ActivatorUtilities.CreateInstance<MessageSerializer>(
-                sp,
-                sp.GetRequiredService<IOptions<ClientMessagingOptions>>().Value));
+            services.TryAddSingleton<MessageSerializerFactory>(sp =>
+            {
+                var sessionPool = sp.GetRequiredService<SerializerSessionPool>();
+                var options = sp.GetRequiredService<IOptions<ClientMessagingOptions>>();
+                return () => new MessageSerializer(sessionPool, options.Value);
+            });
             services.TryAddSingleton<ConnectionFactory, ClientOutboundConnectionFactory>();
-            services.TryAddSingleton<ClientMessageCenter>(sp => sp.GetRequiredService<OutsideRuntimeClient>().MessageCenter!);
+            services.AddSingleton<ClientMessageCenter>(sp => sp.GetRequiredService<OutsideRuntimeClient>().MessageCenter!);
             services.TryAddFromExisting<IMessageCenter, ClientMessageCenter>();
             services.AddSingleton<GatewayManager>();
+            services.AddSingleton<ConnectionTrace>();
             services.AddSingleton<MessagingTrace>();
 
             // Type metadata
@@ -171,6 +172,7 @@ namespace Orleans
             services.AddSingleton<IGrainCallCancellationManager, ExternalClientGrainCallCancellationManager>();
             services.AddSingleton<ILocalActivationStatusChecker, ClientLocalActivationStatusChecker>();
 
+            services.AddSingleton<MessageTransportConnector, TcpMessageTransportConnector>();
             ApplyConfiguration(builder);
         }
 
@@ -210,7 +212,7 @@ namespace Orleans
 
             static IProviderBuilder<IClientBuilder> GetRequiredProvider(Dictionary<(string Kind, string Name), Type> knownProviderTypes, string kind, string name)
             {
-                if (ProviderRegistrationResolver.Default.TryGetRegisteredProvider(knownProviderTypes, "Client", kind, name, out var type))
+                if (knownProviderTypes.TryGetValue((kind, name), out var type))
                 {
                     var instance = Activator.CreateInstance(type);
                     return instance as IProviderBuilder<IClientBuilder>
@@ -231,7 +233,21 @@ namespace Orleans
             }
 
             static Dictionary<(string Kind, string Name), Type> GetRegisteredProviders()
-                => ProviderRegistrationResolver.Default.GetRegisteredProviders("Client");
+            {
+                var result = new Dictionary<(string, string), Type>();
+                foreach (var asm in ReferencedAssemblyProvider.GetRelevantAssemblies())
+                {
+                    foreach (var attr in asm.GetCustomAttributes<RegisterProviderAttribute>())
+                    {
+                        if (string.Equals(attr.Target, "Client"))
+                        {
+                            result[(attr.Kind, attr.Name)] = attr.Type;
+                        }
+                    }
+                }
+
+                return result;
+            }
 
             static void ApplySubsection(IClientBuilder builder, IConfigurationSection cfg, Dictionary<(string Kind, string Name), Type> knownProviderTypes, string sectionName)
             {
@@ -276,7 +292,7 @@ namespace Orleans
         }
 
         /// <summary>
-        /// A marker type used to determine
+        /// A marker type used to determine whether the default services have been added.
         /// </summary>
         private class ServicesAdded { }
     }
