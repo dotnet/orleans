@@ -1352,6 +1352,56 @@ public class DurableTaskTests
         Assert.Null(DurableExecutionContext.Current);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task NestedPostCompletionCallbackBreaksCancellationCycle(bool faulted)
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var completed = host.CreateContext(TaskId.CreateRoot("completed-cancellation"));
+        var active = host.CreateContext(TaskId.CreateRoot("active-cancellation"));
+        var completedCancellation = DurableTaskRuntimeHelper.RequestCancellationAsync(completed, CancellationToken.None);
+        await completedCancellation;
+        var expected = new InvalidOperationException("nested post-completion failure");
+        var nestedCalls = 0;
+        await active.RegisterCancellationCallbackAsync(async _ =>
+        {
+            await using var registration = await completed.RegisterCancellationCallbackAsync(async token =>
+            {
+                Assert.Same(completed, DurableExecutionContext.Current);
+                Assert.True(token.IsCancellationRequested);
+                nestedCalls++;
+                var cycleClosingRequest = DurableTaskRuntimeHelper.RequestCancellationAsync(active, CancellationToken.None);
+                Assert.True(cycleClosingRequest.IsCompletedSuccessfully);
+                await cycleClosingRequest;
+                if (faulted)
+                {
+                    throw expected;
+                }
+            }, CancellationToken.None);
+        }, Xunit.TestContext.Current.CancellationToken);
+
+        var cancellation = DurableTaskRuntimeHelper.RequestCancellationAsync(active, Xunit.TestContext.Current.CancellationToken);
+        if (faulted)
+        {
+            var failure = await Assert.ThrowsAsync<AggregateException>(
+                () => cancellation.WaitAsync(TimeSpan.FromSeconds(10), Xunit.TestContext.Current.CancellationToken));
+            Assert.Same(expected, Assert.Single(failure.InnerExceptions));
+        }
+        else
+        {
+            await cancellation.WaitAsync(TimeSpan.FromSeconds(10), Xunit.TestContext.Current.CancellationToken);
+        }
+
+        Assert.Equal(1, nestedCalls);
+        Assert.True(active.IsCancellationRequested);
+        Assert.True(completedCancellation.IsCompletedSuccessfully);
+        Assert.Same(
+            completedCancellation,
+            DurableTaskRuntimeHelper.RequestCancellationAsync(completed, CancellationToken.None));
+        Assert.Null(DurableExecutionContext.Current);
+    }
+
     [Fact]
     public async Task RegistrationRacingCancellationCompletionLandsOnExactlyOneSide()
     {

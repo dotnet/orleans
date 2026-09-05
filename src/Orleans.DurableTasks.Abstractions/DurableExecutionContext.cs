@@ -171,6 +171,8 @@ public abstract class DurableExecutionContext
             callbackOperation = new(this);
         }
 
+        // Record nested callback causality before the callback can request its caller's cancellation.
+        _ = CancellationOperation.TryAddDependency(CancellationOperation.Current, callbackOperation!);
         _ = InvokePostCompletionCallbackAsync(callbackOperation!, registration);
         return new(registration);
     }
