@@ -59,6 +59,7 @@ than its own, it refreshes its view and retries the request if necessary. This e
 internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDirectory, IGrainDirectoryClient, ILifecycleParticipant<ISiloLifecycle>, DistributedGrainDirectory.ITestHooks
 {
     private readonly DirectoryMembershipService _membershipService;
+    private readonly IFatalErrorHandler _fatalErrorHandler;
     private readonly ILogger<DistributedGrainDirectory> _logger;
     private readonly IServiceProvider _serviceProvider;
     private readonly ImmutableArray<GrainDirectoryPartition> _partitions;
@@ -70,6 +71,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
 
     internal CancellationToken OnStoppedToken => _stoppedCts.Token;
     internal DirectoryInstruments DirectoryInstruments => _directoryInstruments;
+    internal DirectoryMembershipSnapshot DirectoryMembershipSnapshot => _membershipService.CurrentView;
     internal ClusterMembershipSnapshot ClusterMembershipSnapshot => _membershipService.CurrentView.ClusterMembershipSnapshot;
     internal ClusterMembershipSnapshot LatestClusterMembershipSnapshot => _membershipService.ClusterMembershipService.CurrentSnapshot;
 
@@ -89,6 +91,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
 
     public DistributedGrainDirectory(
         DirectoryMembershipService membershipService,
+        IFatalErrorHandler fatalErrorHandler,
         ILogger<DistributedGrainDirectory> logger,
         IServiceProvider serviceProvider,
         IInternalGrainFactory grainFactory,
@@ -101,6 +104,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         _localActivations = shared.ActivationDirectory;
         _serviceProvider = serviceProvider;
         _membershipService = membershipService;
+        _fatalErrorHandler = fatalErrorHandler;
         _logger = logger;
         _directoryInstruments = directoryInstruments;
         _clusterMemberCancellationTokens = new(_stoppedCts.Token);
@@ -570,6 +574,8 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
                     previous = current;
                     previousRanges = currentRanges;
                 }
+
+                break;
             }
             catch (Exception exception)
             {
@@ -584,7 +590,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         _clusterMemberCancellationTokens.Dispose();
     }
 
-    private async Task ObserveMembershipUpdateTask(Task task)
+    internal async Task ObserveMembershipUpdateTask(Task task)
     {
         try
         {
@@ -593,6 +599,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         catch (Exception exception) when (!_stoppedCts.IsCancellationRequested)
         {
             LogErrorProcessingMembershipUpdates(exception);
+            _fatalErrorHandler.OnFatalException(this, nameof(ObserveMembershipUpdateTask), exception);
         }
     }
 
