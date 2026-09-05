@@ -1,7 +1,7 @@
 ---
 title: Orleans metrics catalog
 description: Complete reference for metrics emitted by the Microsoft.Orleans meter.
-ms.date: 08/18/2026
+ms.date: 09/04/2026
 ms.topic: reference
 ---
 
@@ -66,6 +66,29 @@ Request latency covers the interval until the caller's callback completes, inclu
 | `orleans-networking-sockets-opened` | C | Sockets, implicit | `Direction` | Network connections opened, split by connection direction. |
 
 `Destination` and `silo` contain silo addresses and incarnations. They are useful during incident diagnosis and can create new time series during restarts.
+
+## Runtime dissemination
+
+| Instrument | Type | Unit | Attributes | Description |
+|---|---|---|---|---|
+| `orleans-dissemination-anti-entropy-digests` | C | `digests` | `direction` | Digest entries sent in successful outbound exchanges or received in inbound exchanges. |
+| `orleans-dissemination-anti-entropy-exchanges` | C | `operations` | `direction`, `truncated` | Successful anti-entropy requests and responses. `truncated=true` indicates that response budgets left candidates for a later exchange. |
+| `orleans-dissemination-anti-entropy-failures` | C | `operations` | `reason` | Outbound anti-entropy peer operations which ended in `timeout` or `error`. |
+| `orleans-dissemination-anti-entropy-values` | C | `values` | `direction` | Repair values returned by successful anti-entropy exchanges. |
+| `orleans-dissemination-broadcast-received` | C | `messages` | `namespace`, `kind` | Broadcast batches received, counted once for each namespace represented in the batch. |
+| `orleans-dissemination-broadcast-scheduled` | C | `schedules` | `reason` | Per-peer pump schedules split into `immediate`, `coalesce`, `retry`, and `priority`. |
+| `orleans-dissemination-broadcast-send-failures` | C | `attempts` | `reason` | Broadcast send attempts which ended in `timeout` or `error`. |
+| `orleans-dissemination-broadcast-sent` | C | `messages` | `namespace`, `kind` | Successfully completed broadcast sends, counted once for each namespace represented in the batch. |
+| `orleans-dissemination-bytes-sent` | C | `bytes` | `namespace`, `kind` | Serialized dissemination payload bytes in successful broadcasts. |
+| `orleans-dissemination-payload-dropped` | C | `values` | `namespace`, `reason` | Values rejected by a payload guard. |
+| `orleans-dissemination-pump-failures` | C | `failures` | `status` | Unexpected peer-pump failures split into `recovered` and `permanent`. |
+| `orleans-dissemination-publications` | C | `operations` | `namespace`, `result`, `reason` | Publication attempts classified as `accepted` or `rejected`. Rejection reasons identify disabled namespaces, unavailable membership or values, invalid versions or repairs, and over-budget repairs. |
+| `orleans-dissemination-queue-admission-rejected` | C | `keys` | `namespace`, `reason` | New distinct keys rejected after a namespace reached its per-peer pending-key limit. |
+| `orleans-dissemination-values-applied` | C | `values` | `namespace`, `result` | Received values classified by the namespace apply result. |
+| `orleans-dissemination-values-received` | C | `values` | `namespace`, `kind` | Values included in received broadcast batches before individual application. |
+| `orleans-dissemination-values-sent` | C | `values` | `namespace`, `kind` | Values included in successfully completed broadcast sends. |
+
+All dissemination attributes have bounded runtime-defined values. Keys and peer addresses are available through opt-in diagnostic events instead of metric attributes. See [Monitor runtime dissemination](runtime-dissemination.md).
 
 ## Scheduling, activations, and grains
 

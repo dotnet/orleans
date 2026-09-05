@@ -1,7 +1,7 @@
 ---
 title: Orleans runtime architecture
 description: An advanced guide to the protocols, invariants, and extension points inside the Orleans runtime.
-ms.date: 08/02/2026
+ms.date: 09/04/2026
 ms.topic: overview
 ---
 
@@ -38,6 +38,7 @@ Use this runtime map and the following topic list to choose the required depth. 
 - [Runtime architecture](runtime-architecture.md) follows a call through client, messaging, placement, directory, activation, and scheduling components.
 - [Activation lifecycle and migration](activation-lifecycle.md) explains creation, activation, collection, deactivation, and state transfer.
 - [Cluster membership](cluster-management.md) describes the failure detector, membership table, ordered views, and death-vote protocol.
+- [Runtime state dissemination](runtime-dissemination.md) explains deterministic broadcast, acknowledged peer state, bounded repair, mixed-version behavior, and integration boundaries.
 - [Grain directory](grain-directory.md) distinguishes the default `LocalGrainDirectory` DHT from the experimental distributed directory.
 - [Scheduling and turn execution](scheduler.md) explains `WorkItemGroup`, continuations, interleaving, and single-threaded execution.
 - [Messaging and delivery semantics](messaging-delivery-guarantees.md) traces requests and explains why a timeout has an unknown outcome.

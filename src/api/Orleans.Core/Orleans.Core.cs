@@ -445,6 +445,8 @@ namespace Orleans.Configuration
 
         public bool EnableConnectionLivenessCheck { get { throw null; } set { } }
 
+        public DisseminationNamespaceOptions Dissemination { get { throw null; } set { } }
+
         public bool EnableIndirectProbes { get { throw null; } set { } }
 
         public bool EvictWhenMaxJoinAttemptTimeExceeded { get { throw null; } set { } }
@@ -506,6 +508,57 @@ namespace Orleans.Configuration
         public System.TimeSpan OpenConnectionTimeout { get { throw null; } set { } }
 
         public Runtime.Messaging.NetworkProtocolVersion ProtocolVersion { get { throw null; } set { } }
+    }
+
+    public sealed partial class DisseminationOptions
+    {
+        public bool Enabled { get { throw null; } set { } }
+
+        public int MaxBatchBytes { get { throw null; } set { } }
+
+        public int MaxBatchItems { get { throw null; } set { } }
+
+        public int MaxConcurrentSends { get { throw null; } set { } }
+
+        public DisseminationOverlayOptions Overlay { get { throw null; } set { } }
+    }
+
+    public sealed partial class DisseminationOverlayOptions
+    {
+        public System.TimeSpan AntiEntropyInterval { get { throw null; } set { } }
+
+        public int AntiEntropyPeerCount { get { throw null; } set { } }
+
+        public System.Func<int, int>? FanOutFactor { get { throw null; } set { } }
+
+        public int MaxFanOutFactor { get { throw null; } set { } }
+
+        public int MinFanOutFactor { get { throw null; } set { } }
+
+        public int TargetHopCount { get { throw null; } set { } }
+    }
+
+    public enum DisseminationPriority
+    {
+        Normal = 0,
+        High = 1,
+    }
+
+    public sealed partial class DisseminationNamespaceOptions
+    {
+        public bool Enabled { get { throw null; } set { } }
+
+        public System.TimeSpan ExpectedUpdateCadence { get { throw null; } set { } }
+
+        public System.TimeSpan MaxCoalescingDelay { get { throw null; } set { } }
+
+        public int MaxPayloadBytes { get { throw null; } set { } }
+
+        public int MaxPendingItemCount { get { throw null; } set { } }
+
+        public DisseminationPriority Priority { get { throw null; } set { } }
+
+        public System.TimeSpan StaleItemTtl { get { throw null; } set { } }
     }
 
     public partial class GatewayOptions

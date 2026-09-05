@@ -94,6 +94,23 @@ namespace Orleans.Configuration
         public bool UseLivenessGossip { get; set; } = true;
 
         /// <summary>
+        /// Gets or sets dissemination options for membership updates.
+        /// </summary>
+        /// <remarks>
+        /// Membership dissemination includes Joining, Active, ShuttingDown, and Stopping silos and is a
+        /// best-effort accelerator. Direct membership gossip remains the authoritative delivery path, including
+        /// during shutdown and mixed-version operation.
+        /// </remarks>
+        public DisseminationNamespaceOptions Dissemination { get; set; } = new()
+        {
+            ExpectedUpdateCadence = TimeSpan.FromSeconds(10),
+
+            // Membership changes must propagate as quickly as possible, ahead of and without waiting to coalesce
+            // with other gossip.
+            Priority = DisseminationPriority.High,
+        };
+
+        /// <summary>
         /// Gets or sets the number of silos each silo probes for liveness.
         /// </summary>
         /// <remarks>

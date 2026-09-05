@@ -1,17 +1,22 @@
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Metadata;
+using Orleans.Runtime.Dissemination;
 
 namespace Orleans.Runtime
 {
     internal sealed class ClusterManifestSystemTarget : SystemTarget, IClusterManifestSystemTarget, ISiloManifestSystemTarget, ILifecycleParticipant<ISiloLifecycle>
     {
         private readonly GrainManifest _siloManifest;
+        private readonly ManifestHash _siloManifestHash;
         private readonly IClusterMembershipService _clusterMembershipService;
         private readonly IClusterManifestProvider _clusterManifestProvider;
         private readonly ClusterManifestUpdate? _noUpdate = default;
         private MembershipVersion _cachedMembershipVersion;
         private ClusterManifestUpdate? _cachedUpdate;
+        private MajorMinorVersion _cachedHashSummaryVersion;
+        private ClusterManifestHashSummary? _cachedHashSummary;
 
         public ClusterManifestSystemTarget(
             IClusterMembershipService clusterMembershipService,
@@ -20,6 +25,7 @@ namespace Orleans.Runtime
             : base(Constants.ManifestProviderType, shared)
         {
             _siloManifest = clusterManifestProvider.LocalGrainManifest;
+            _siloManifestHash = ManifestHashCalculator.ComputeHash(_siloManifest);
             _clusterMembershipService = clusterMembershipService;
             _clusterManifestProvider = clusterManifestProvider;
             shared.ActivationDirectory.RecordNewTarget(this);
@@ -29,6 +35,41 @@ namespace Orleans.Runtime
         {
             cancellationToken.ThrowIfCancellationRequested();
             return new(_clusterManifestProvider.Current);
+        }
+
+        public ValueTask<ClusterManifestHashSummary> GetClusterManifestHashSummary(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var manifest = _clusterManifestProvider.Current;
+
+            // Reuse the summary while the version is unchanged. Individual content hashes are cached by
+            // immutable manifest identity across versions and across silos with identical manifests.
+            if (_cachedHashSummary is null || manifest.Version != _cachedHashSummaryVersion)
+            {
+                var hashes = new Dictionary<SiloAddress, ManifestHash>();
+                foreach (var siloManifest in manifest.Silos)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    hashes[siloManifest.Key] = ManifestHashCalculator.ComputeHash(siloManifest.Value);
+                }
+
+                _cachedHashSummary = new ClusterManifestHashSummary(manifest.Version, hashes);
+                _cachedHashSummaryVersion = manifest.Version;
+            }
+
+            return new(_cachedHashSummary);
+        }
+
+        public ValueTask<ManifestHash> GetSiloManifestHash(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return new(_siloManifestHash);
+        }
+
+        public ValueTask<GrainManifest?> GetSiloManifestByHash(ManifestHash hash, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return new(hash == _siloManifestHash ? _siloManifest : null);
         }
 
         public ValueTask<ClusterManifestUpdate?> GetClusterManifestUpdate(
