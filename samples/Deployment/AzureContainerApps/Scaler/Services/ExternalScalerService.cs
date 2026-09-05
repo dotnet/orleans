@@ -129,14 +129,15 @@ namespace Scaler.Services
         {
             var statistics = await _managementGrain.GetDetailedGrainStatistics();
             var activeGrainsInCluster = statistics.Select(_ => new GrainInfo(_.GrainType, _.GrainId.Key.ToString(), _.SiloAddress.ToGatewayUri().AbsoluteUri));
-            var activeGrainsOfSpecifiedType = activeGrainsInCluster.Where(_ => _.Type.ToLower().Contains(grainType));
+            var activeGrainsOfSpecifiedType = activeGrainsInCluster.Where(_ => _.Type.Contains(grainType, StringComparison.OrdinalIgnoreCase));
             var detailedHosts = await _managementGrain.GetDetailedHosts();
             var silos = detailedHosts
                             .Where(x => x.Status == SiloStatus.Active)
                             .Select(_ => new SiloInfo(_.SiloName, _.SiloAddress.ToGatewayUri().AbsoluteUri));
-            var activeSiloCount = silos.Where(_ => _.SiloName.ToLower().Contains(siloNameFilter.ToLower())).Count();
-            _logger.LogInformation($"Found {activeGrainsOfSpecifiedType.Count()} instances of {grainType} in cluster, with {activeSiloCount} '{siloNameFilter}' silos in the cluster hosting {grainType} grains.");
-            return new GrainSaturationSummary(activeGrainsOfSpecifiedType.Count(), activeSiloCount);
+            var activeGrainCount = activeGrainsOfSpecifiedType.Count();
+            var activeSiloCount = silos.Count(_ => _.SiloName.Contains(siloNameFilter, StringComparison.OrdinalIgnoreCase));
+            _logger.LogInformation($"Found {activeGrainCount} instances of {grainType} in cluster, with {activeSiloCount} '{siloNameFilter}' silos in the cluster hosting {grainType} grains.");
+            return new GrainSaturationSummary(activeGrainCount, activeSiloCount);
         }
     }
 

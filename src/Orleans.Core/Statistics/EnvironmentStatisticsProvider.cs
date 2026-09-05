@@ -80,7 +80,7 @@ internal sealed class EnvironmentStatisticsProvider : IEnvironmentStatisticsProv
 
         protected override void OnEventSourceCreated(EventSource source)
         {
-            if (source.Name.Equals("System.Runtime"))
+            if (source.Name.Equals("System.Runtime", StringComparison.Ordinal))
             {
                 Dictionary<string, string?>? refreshInterval = new() { ["EventCounterIntervalSec"] = "1" };
                 EnableEvents(source, EventLevel.Informational, (EventKeywords)(-1), refreshInterval);
@@ -89,7 +89,7 @@ internal sealed class EnvironmentStatisticsProvider : IEnvironmentStatisticsProv
 
         protected override void OnEventWritten(EventWrittenEventArgs eventData)
         {
-            if ("EventCounters".Equals(eventData.EventName) && eventData.Payload is { } payload)
+            if ("EventCounters".Equals(eventData.EventName, StringComparison.Ordinal) && eventData.Payload is { } payload)
             {
                 for (var i = 0; i < payload.Count; i++)
                 {

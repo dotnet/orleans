@@ -102,7 +102,7 @@ namespace UnitTests.General
 
                             // Test 1: Verify RequestContext propagation through filters
                             // Each filter adds a digit to build up "1234"
-                            if (string.Equals(context.InterfaceMethod.Name, nameof(IGrainCallFilterTestGrain.GetRequestContext)))
+                            if (string.Equals(context.InterfaceMethod.Name, nameof(IGrainCallFilterTestGrain.GetRequestContext), StringComparison.Ordinal))
                             {
                                 if (RequestContext.Get(GrainCallFilterTestConstants.Key) != null) throw new InvalidOperationException();
                                 RequestContext.Set(GrainCallFilterTestConstants.Key, "1");
@@ -110,7 +110,7 @@ namespace UnitTests.General
 
                             // Test 2: Verify behavior when filter doesn't call context.Invoke()
                             // This should result in an InvalidOperationException for the caller
-                            if (string.Equals(context.InterfaceMethod.Name, nameof(IGrainCallFilterTestGrain.SystemWideCallFilterMarker)))
+                            if (string.Equals(context.InterfaceMethod.Name, nameof(IGrainCallFilterTestGrain.SystemWideCallFilterMarker), StringComparison.Ordinal))
                             {
                                 // explicitly do not continue calling Invoke
                                 return Task.CompletedTask;
@@ -118,7 +118,7 @@ namespace UnitTests.General
 
                             // Test 3: Demonstrate request manipulation - negate the value
                             // This shows filters can modify method arguments before execution
-                            if (string.Equals(context.InterfaceMethod.Name, nameof(IMyGrainExtension.SetExtensionValue)))
+                            if (string.Equals(context.InterfaceMethod.Name, nameof(IMyGrainExtension.SetExtensionValue), StringComparison.Ordinal))
                             {
                                 context.Request.SetArgument(0, (int)context.Request.GetArgument(0)! * -1);
                             }
@@ -137,7 +137,7 @@ namespace UnitTests.General
                                 ctx.Request.SetArgument(0, orig + orig);
                             }
 
-                            if (string.Equals(ctx.InterfaceMethod?.Name, nameof(IMethodInterceptionGrain.SystemWideCallFilterMarker)))
+                            if (string.Equals(ctx.InterfaceMethod?.Name, nameof(IMethodInterceptionGrain.SystemWideCallFilterMarker), StringComparison.Ordinal))
                             {
                                 // explicitly do not continue calling Invoke
                                 return;
@@ -168,13 +168,13 @@ namespace UnitTests.General
                             Assert.False(context.TargetId.IsDefault);
                             Assert.False(context.InterfaceType.IsDefault);
 
-                            if (string.Equals(context.InterfaceMethod.Name, nameof(IGrainCallFilterTestGrainObserver.GetRequestContext)))
+                            if (string.Equals(context.InterfaceMethod.Name, nameof(IGrainCallFilterTestGrainObserver.GetRequestContext), StringComparison.Ordinal))
                             {
                                 if (RequestContext.Get(GrainCallFilterTestConstants.Key) != null) throw new InvalidOperationException();
                                 RequestContext.Set(GrainCallFilterTestConstants.Key, "1");
                             }
 
-                            if (string.Equals(context.InterfaceMethod.Name, nameof(IGrainCallFilterTestGrainObserver.SystemWideCallFilterMarker)))
+                            if (string.Equals(context.InterfaceMethod.Name, nameof(IGrainCallFilterTestGrainObserver.SystemWideCallFilterMarker), StringComparison.Ordinal))
                             {
                                 // explicitly do not continue calling Invoke
                                 return Task.CompletedTask;
@@ -227,7 +227,7 @@ namespace UnitTests.General
                             catch (ArgumentOutOfRangeException) when (attemptsRemaining > 1 && ctx.Grain is IOutgoingMethodInterceptionGrain)
                             {
                                 // Retry by decrementing the problematic value
-                                if (string.Equals(ctx.InterfaceMethod?.Name, nameof(IOutgoingMethodInterceptionGrain.ThrowIfGreaterThanZero)) && ctx.Request.GetArgument(0) is int value)
+                                if (string.Equals(ctx.InterfaceMethod?.Name, nameof(IOutgoingMethodInterceptionGrain.ThrowIfGreaterThanZero), StringComparison.Ordinal) && ctx.Request.GetArgument(0) is int value)
                                 {
                                     ctx.Request.SetArgument(0, value - 1);
                                 }
@@ -252,7 +252,7 @@ namespace UnitTests.General
             {
                 Assert.NotNull(grainFactory);
                 // Continue building the RequestContext value: "1" -> "12"
-                if (string.Equals(context.ImplementationMethod?.Name, nameof(IGrainCallFilterTestGrain.GetRequestContext)))
+                if (string.Equals(context.ImplementationMethod?.Name, nameof(IGrainCallFilterTestGrain.GetRequestContext), StringComparison.Ordinal))
                 {
                     if (RequestContext.Get(GrainCallFilterTestConstants.Key) is string value)
                     {

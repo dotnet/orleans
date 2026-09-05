@@ -163,7 +163,7 @@ namespace NonSilo.Tests.Membership
                 var existingEntry = this.entries.Find(e => e.Item1.SiloAddress.Equals(entry.SiloAddress));
                 if (existingEntry.Item1 is null) return Task.FromResult(false);
 
-                if (!etag.Equals(existingEntry.Item2))
+                if (!etag.Equals(existingEntry.Item2, StringComparison.Ordinal))
                 {
                     throw new InvalidOperationException($"Mismatching row etag. Required: {existingEntry.Item2}, Provided: {etag}");
                 }

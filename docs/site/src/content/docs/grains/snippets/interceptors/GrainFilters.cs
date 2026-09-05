@@ -15,7 +15,8 @@ public sealed class MyFilteredGrain
         // Change the result of the call from 7 to 38.
         if (string.Equals(
             context.InterfaceMethod.Name,
-            nameof(IMyFilteredGrain.GetFavoriteNumber)))
+            nameof(IMyFilteredGrain.GetFavoriteNumber),
+            StringComparison.Ordinal))
         {
             context.Result = 38;
         }

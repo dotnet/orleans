@@ -173,8 +173,8 @@ namespace Orleans.Runtime.ReminderService
             // group by grain hashcode so each query goes to different partition
             var tasks = new List<Task>();
             var groupedByHash = entries
-                .Where(tuple => tuple.Entity.ServiceId!.Equals(_serviceId))
-                .Where(tuple => tuple.Entity.DeploymentId!.Equals(_clusterId))  // delete only entries that belong to our DeploymentId.
+                .Where(tuple => tuple.Entity.ServiceId!.Equals(_serviceId, StringComparison.Ordinal))
+                .Where(tuple => tuple.Entity.DeploymentId!.Equals(_clusterId, StringComparison.Ordinal))  // delete only entries that belong to our DeploymentId.
                 .GroupBy(x => x.Entity.GrainRefConsistentHash!).ToDictionary(g => g.Key, g => g.ToList());
 
             foreach (var entriesPerPartition in groupedByHash.Values)

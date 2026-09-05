@@ -71,7 +71,7 @@ namespace Orleans.Metadata
             }
 
             // Trim "Grain" suffix
-            index = name.LastIndexOf(GrainSuffix);
+            index = name.LastIndexOf(GrainSuffix, StringComparison.Ordinal);
             if (index > 0 && name.Length - index == GrainSuffix.Length)
             {
                 name = name[..index];

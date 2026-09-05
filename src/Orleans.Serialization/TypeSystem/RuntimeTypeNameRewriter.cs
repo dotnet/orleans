@@ -174,7 +174,7 @@ internal static class RuntimeTypeNameRewriter
                 // Remove the assembly qualification
                 return (replacement.Type, assemblyName);
             }
-            else if (!string.Equals(replacement.Assembly, type.Assembly) || !ReferenceEquals(replacement.Type, type.Type))
+            else if (!string.Equals(replacement.Assembly, type.Assembly, StringComparison.Ordinal) || !ReferenceEquals(replacement.Type, type.Type))
             {
                 // Update the assembly or the type.
                 return (new AssemblyQualifiedTypeSpec(replacement.Type, replacement.Assembly), assemblyName);

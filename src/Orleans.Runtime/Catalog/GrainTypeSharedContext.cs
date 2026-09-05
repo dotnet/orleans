@@ -99,7 +99,7 @@ public sealed class GrainTypeSharedContext
         if (siloManifest.Grains.TryGetValue(grainType, out var properties)
             && properties.Properties.TryGetValue(WellKnownGrainTypeProperties.IdleDeactivationPeriod, out var idleTimeoutString))
         {
-            if (string.Equals(idleTimeoutString, WellKnownGrainTypeProperties.IndefiniteIdleDeactivationPeriodValue))
+            if (string.Equals(idleTimeoutString, WellKnownGrainTypeProperties.IndefiniteIdleDeactivationPeriodValue, StringComparison.Ordinal))
             {
                 return Timeout.InfiniteTimeSpan;
             }

@@ -45,7 +45,7 @@ static async Task ProcessLoopAsync(ClientContext context)
             continue;
         }
 
-        if (input.StartsWith("/exit") &&
+        if (input.StartsWith("/exit", StringComparison.Ordinal) &&
             AnsiConsole.Confirm("Do you really want to exit?"))
         {
             break;

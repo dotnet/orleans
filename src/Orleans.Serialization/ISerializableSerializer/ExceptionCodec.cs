@@ -266,7 +266,7 @@ namespace Orleans.Serialization
 
                 foreach (var prefix in _options.SupportedNamespacePrefixes)
                 {
-                    if (ns.StartsWith(prefix))
+                    if (ns.StartsWith(prefix, StringComparison.Ordinal))
                     {
                         return true;
                     }

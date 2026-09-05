@@ -21,7 +21,8 @@ await Host.CreateDefaultBuilder(args)
         silo.Services.AddSerializer(
             serializer => serializer.AddJsonSerializer(
                 isSupported: type => type?.Namespace?.StartsWith(
-                        nameof(BroadcastChannel)) ?? false,
+                        nameof(BroadcastChannel),
+                        StringComparison.Ordinal) ?? false,
                 jsonSerializerOptions: new(JsonSerializerDefaults.Web)));
         silo.Services.AddHostedService<StockWorker>();
         silo.UseLocalhostClustering();

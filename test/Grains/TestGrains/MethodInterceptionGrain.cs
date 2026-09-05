@@ -305,12 +305,12 @@ namespace UnitTests.Grains
                 {
                     var interfaceMethod = ctx.InterfaceMethod ?? throw new ArgumentException("InterfaceMethod is null!");
                     var implementationMethod = ctx.ImplementationMethod ?? throw new ArgumentException("ImplementationMethod is null!");
-                    if (!string.Equals(implementationMethod.Name, interfaceMethod.Name))
+                    if (!string.Equals(implementationMethod.Name, interfaceMethod.Name, StringComparison.Ordinal))
                     {
                         throw new ArgumentException("InterfaceMethod.Name != ImplementationMethod.Name");
                     }
 
-                    if (string.Equals(implementationMethod.Name, nameof(GrainSpecificCallFilterMarker)))
+                    if (string.Equals(implementationMethod.Name, nameof(GrainSpecificCallFilterMarker), StringComparison.Ordinal))
                     {
                         // explicitly do not continue calling Invoke
                         return;
@@ -322,7 +322,7 @@ namespace UnitTests.Grains
                 }
                 catch (ArgumentOutOfRangeException) when (attemptsRemaining > 1)
                 {
-                    if (string.Equals(ctx.ImplementationMethod?.Name, nameof(ThrowIfGreaterThanZero)) && ctx.Request.GetArgument(0) is int value)
+                    if (string.Equals(ctx.ImplementationMethod?.Name, nameof(ThrowIfGreaterThanZero), StringComparison.Ordinal) && ctx.Request.GetArgument(0) is int value)
                     {
                         ctx.Request.SetArgument(0, value - 1);
                     }
@@ -365,12 +365,12 @@ namespace UnitTests.Grains
                 {
                     var interfaceMethod = ctx.InterfaceMethod ?? throw new ArgumentException("InterfaceMethod is null!");
                     var implementationMethod = ctx.ImplementationMethod ?? throw new ArgumentException("ImplementationMethod is null!");
-                    if (!string.Equals(implementationMethod.Name, interfaceMethod.Name))
+                    if (!string.Equals(implementationMethod.Name, interfaceMethod.Name, StringComparison.Ordinal))
                     {
                         throw new ArgumentException("InterfaceMethod.Name != ImplementationMethod.Name");
                     }
 
-                    if (string.Equals(implementationMethod.Name, nameof(GrainSpecificCallFilterMarker)))
+                    if (string.Equals(implementationMethod.Name, nameof(GrainSpecificCallFilterMarker), StringComparison.Ordinal))
                     {
                         // explicitly do not continue calling Invoke
                         return;
@@ -382,7 +382,7 @@ namespace UnitTests.Grains
                 }
                 catch (ArgumentOutOfRangeException) when (attemptsRemaining > 1)
                 {
-                    if (string.Equals(ctx.ImplementationMethod?.Name, nameof(ThrowIfGreaterThanZero)) && ctx.Request.GetArgument(0) is int value)
+                    if (string.Equals(ctx.ImplementationMethod?.Name, nameof(ThrowIfGreaterThanZero), StringComparison.Ordinal) && ctx.Request.GetArgument(0) is int value)
                     {
                         ctx.Request.SetArgument(0, value - 1);
                     }

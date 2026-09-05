@@ -26,7 +26,7 @@ internal readonly struct CompoundTypeAliasComponent : IEquatable<CompoundTypeAli
     public bool Equals(CompoundTypeAliasComponent other) => (Value, other.Value) switch
     {
         (null, null) => true,
-        (string stringValue, string otherStringValue) => string.Equals(stringValue, otherStringValue),
+        (string stringValue, string otherStringValue) => string.Equals(stringValue, otherStringValue, StringComparison.Ordinal),
         (ITypeSymbol typeValue, ITypeSymbol otherTypeValue) => SymbolEqualityComparer.Default.Equals(typeValue, otherTypeValue),
         _ => false,
     };

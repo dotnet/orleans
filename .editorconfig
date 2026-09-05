@@ -307,13 +307,13 @@ dotnet_diagnostic.CA1304.severity = suggestion
 dotnet_diagnostic.CA1305.severity = suggestion
 
 # CA1309: Use ordinal string comparison
-dotnet_diagnostic.CA1309.severity = suggestion
+dotnet_diagnostic.CA1309.severity = warning
 
 # CA1310: Specify StringComparison for correctness
-dotnet_diagnostic.CA1310.severity = suggestion
+dotnet_diagnostic.CA1310.severity = warning
 
 # CA1311: Specify a culture or use an invariant version
-dotnet_diagnostic.CA1311.severity = suggestion
+dotnet_diagnostic.CA1311.severity = warning
 
 # CA1507: Use nameof to express symbol names
 dotnet_diagnostic.CA1507.severity = suggestion
@@ -682,7 +682,7 @@ dotnet_diagnostic.CA2000.severity = warning
 dotnet_diagnostic.CA2000.severity = warning
 
 # CA1062: Validate arguments of public methods
-[src/Azure/{Orleans.GrainDirectory.AzureStorage,Orleans.Reminders.AzureStorage,Orleans.Clustering.Cosmos,Orleans.Reminders.Cosmos,Shared}/**.cs]
+[src/Azure/{Orleans.GrainDirectory.AzureStorage,Orleans.Persistence.AzureStorage,Orleans.Reminders.AzureStorage,Orleans.Clustering.Cosmos,Orleans.Reminders.Cosmos,Shared}/**.cs]
 dotnet_diagnostic.CA1062.severity = warning
 
 # Production source enforces the correctness baseline. Tests, samples, documentation,
@@ -703,6 +703,17 @@ dotnet_diagnostic.IDE0043.severity = warning
 
 # Dashboard text handling explicitly distinguishes deterministic identifiers from localized display text.
 [src/Dashboard/Orleans.Dashboard/**/*.cs]
+dotnet_diagnostic.CA1305.severity = warning
+dotnet_diagnostic.CA1307.severity = warning
+
+# Provider-specific globalization enforcement is centralized here.
+[src/{AWS/Orleans.Clustering.DynamoDB,Azure/Orleans.Clustering.AzureStorage}/**.cs]
+dotnet_diagnostic.CA1305.severity = warning
+dotnet_diagnostic.CA1307.severity = warning
+
+# Azure Table sources are linked into multiple provider projects, so they share one enforcement policy.
+[src/Azure/Shared/{Storage/{AzureStorageOperationOptions.cs,AzureStoragePolicyOptions.cs,AzureTableDataManager.cs,AzureTableUtils.cs},Utilities/ErrorCode.cs}]
+dotnet_diagnostic.CA1062.severity = warning
 dotnet_diagnostic.CA1305.severity = warning
 dotnet_diagnostic.CA1307.severity = warning
 

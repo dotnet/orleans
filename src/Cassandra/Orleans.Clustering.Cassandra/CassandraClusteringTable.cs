@@ -57,7 +57,7 @@ internal sealed class CassandraClusteringTable : IMembershipTable
 
     async Task IMembershipTable.DeleteMembershipTableEntries(string clusterId)
     {
-        if (string.Compare(clusterId, _clusterOptions.ClusterId, StringComparison.InvariantCultureIgnoreCase) != 0)
+        if (string.Compare(clusterId, _clusterOptions.ClusterId, StringComparison.OrdinalIgnoreCase) != 0)
         {
             throw new ArgumentException(
                 $"Cluster id {clusterId} does not match CassandraClusteringTable value of '{_clusterOptions.ClusterId}'.",

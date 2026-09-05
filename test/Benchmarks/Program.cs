@@ -357,7 +357,7 @@ internal class Program
         }
 
         var slicedArgs = args.Skip(1).ToArray();
-        if (args.Length > 0 && args[0].Equals("all", StringComparison.InvariantCultureIgnoreCase))
+        if (args.Length > 0 && args[0].Equals("all", StringComparison.OrdinalIgnoreCase))
         {
             Console.WriteLine("Running full benchmarks suite");
             _benchmarks.Select(pair => pair.Value).ToList().ForEach(action => action(slicedArgs));

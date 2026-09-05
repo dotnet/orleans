@@ -20,7 +20,6 @@
     <Compile Include="..\Shared\Storage\AzureTableDataManager.cs" Link="Storage\AzureTableDataManager.cs" />
     <Compile Include="..\Shared\Storage\AzureTableUtils.cs" Link="Storage\AzureTableUtils.cs" />
     <Compile Include="..\Shared\Utilities\ErrorCode.cs" Link="Utilities\ErrorCode.cs" />
-    <GlobalAnalyzerConfigFiles Include="$(MSBuildThisFileDirectory)Orleans.Persistence.AzureStorage.globalconfig" />
   </ItemGroup>
 
   <ItemGroup>

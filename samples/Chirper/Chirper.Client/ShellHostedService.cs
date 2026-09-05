@@ -37,7 +37,7 @@ public sealed partial class ShellHostedService : BackgroundService
                 _applicationLifetime.StopApplication();
                 return;
             }
-            else if (command.StartsWith("/user "))
+            else if (command.StartsWith("/user ", StringComparison.Ordinal))
             {
                 if (SetUsernameRegex().Match(command) is { Success: true } match)
                 {
@@ -52,7 +52,7 @@ public sealed partial class ShellHostedService : BackgroundService
                     AnsiConsole.MarkupLine("[bold red]Invalid username[/][red].[/] Try again or type [bold fuchsia]/help[/] for a list of commands.");
                 }
             }
-            else if (command.StartsWith("/follow "))
+            else if (command.StartsWith("/follow ", StringComparison.Ordinal))
             {
                 if (EnsureActiveAccount(_account))
                 {
@@ -136,7 +136,7 @@ public sealed partial class ShellHostedService : BackgroundService
                     AnsiConsole.MarkupLine("[bold grey][[[/][bold lime]✓[/][bold grey]]][/] [bold olive]No longer observing[/] [navy]{0}[/]", _account.GetPrimaryKeyString());
                 }
             }
-            else if (command.StartsWith("/unfollow "))
+            else if (command.StartsWith("/unfollow ", StringComparison.Ordinal))
             {
                 if (EnsureActiveAccount(_account))
                 {
@@ -151,7 +151,7 @@ public sealed partial class ShellHostedService : BackgroundService
                     }
                 }
             }
-            else if (command.StartsWith("/chirp "))
+            else if (command.StartsWith("/chirp ", StringComparison.Ordinal))
             {
                 if (EnsureActiveAccount(_account))
                 {

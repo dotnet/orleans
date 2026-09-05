@@ -331,7 +331,7 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
         {
             foreach (var idx in _options.StateFieldsToIndex)
             {
-                var path = idx.StartsWith("/") ? idx[1..] : idx;
+                var path = idx.StartsWith("/", StringComparison.Ordinal) ? idx[1..] : idx;
                 stateContainer.IndexingPolicy.IncludedPaths.Add(new IncludedPath { Path = $"/\"State\"/\"{path}\"/?" });
             }
         }

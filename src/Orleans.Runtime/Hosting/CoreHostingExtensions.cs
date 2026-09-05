@@ -69,7 +69,7 @@ namespace Orleans.Hosting
             builder.ConfigureServices(services =>
             {
                 // If the caller did not override service id or cluster id, configure default values as a fallback.
-                if (string.Equals(serviceId, ClusterOptions.DevelopmentServiceId) && string.Equals(clusterId, ClusterOptions.DevelopmentClusterId))
+                if (string.Equals(serviceId, ClusterOptions.DevelopmentServiceId, StringComparison.Ordinal) && string.Equals(clusterId, ClusterOptions.DevelopmentClusterId, StringComparison.Ordinal))
                 {
                     services.PostConfigure<ClusterOptions>(options =>
                     {

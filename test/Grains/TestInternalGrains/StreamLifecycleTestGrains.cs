@@ -56,7 +56,7 @@ namespace UnitTests.Grains
                 return false;
             }
 
-            return A.Equals(item.A) && B.Equals(item.B);
+            return A.Equals(item.A, StringComparison.Ordinal) && B.Equals(item.B);
         }
 
         public override int GetHashCode() => HashCode.Combine(A, B);

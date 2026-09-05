@@ -169,7 +169,7 @@ namespace Orleans.Runtime.ReminderService
             finally
             {
                 string serviceIdStr = this.clusterOptions.ServiceId;
-                if (!tableEntry.ServiceId!.Equals(serviceIdStr))
+                if (!tableEntry.ServiceId!.Equals(serviceIdStr, StringComparison.Ordinal))
                 {
                     LogWarningAzureTable_ReadWrongReminder(tableEntry, serviceIdStr);
                     throw new OrleansException($"Read a reminder entry for wrong Service id. Read {tableEntry}, but my service id is {serviceIdStr}. Going to discard it.");

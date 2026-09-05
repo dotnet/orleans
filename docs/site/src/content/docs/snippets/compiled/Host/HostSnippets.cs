@@ -91,7 +91,7 @@ namespace Documentation.Hosting.SerializationConfiguration
 siloBuilder.Services.AddSerializer(serializerBuilder =>
 {
     serializerBuilder.AddJsonSerializer(
-        isSupported: type => type.Namespace?.StartsWith("MyApp") == true);
+        isSupported: type => type.Namespace?.StartsWith("MyApp", StringComparison.Ordinal) == true);
     serializerBuilder.Configure(options =>
         options.AddAllowedType(typeof(TriggerRule)));
 });

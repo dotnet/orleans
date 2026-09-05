@@ -2786,25 +2786,10 @@ namespace Orleans.Serialization.UnitTests
         {
             public bool Equals(string? left, string? right)
             {
-                if (left == null && right == null)
-                {
-                    return true;
-                }
-                else if (left == null || right == null)
-                {
-                    return false;
-                }
-                else if (left.ToUpper() == right.ToUpper())
-                {
-                    return true;
-                }
-                else
-                {
-                    return false;
-                }
+                return StringComparer.OrdinalIgnoreCase.Equals(left, right);
             }
 
-            public int GetHashCode(string s) => s.ToUpper().GetHashCode();
+            public int GetHashCode(string s) => StringComparer.OrdinalIgnoreCase.GetHashCode(s);
         }
     }
 

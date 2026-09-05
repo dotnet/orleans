@@ -70,18 +70,16 @@ public class RoomGrain : Grain, IRoomGrain
 
     Task<PlayerInfo?> IRoomGrain.FindPlayer(string name)
     {
-        name = name.ToLower();
         return Task.FromResult(
             _players.FirstOrDefault(
-                x => x?.Name?.ToLower()?.Contains(name) ?? false));
+                x => x?.Name?.Contains(name, StringComparison.OrdinalIgnoreCase) ?? false));
     }
 
     Task<MonsterInfo?> IRoomGrain.FindMonster(string name)
     {
-        name = name.ToLower();
         return Task.FromResult(
             _monsters.FirstOrDefault(
-                x => x?.Name?.ToLower()?.Contains(name) ?? false));
+                x => x?.Name?.Contains(name, StringComparison.OrdinalIgnoreCase) ?? false));
     }
 
     Task<string> IRoomGrain.Description(PlayerInfo whoisAsking)

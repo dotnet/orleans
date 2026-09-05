@@ -1543,7 +1543,7 @@ namespace Orleans.Runtime.ReminderService
             public readonly GrainId GrainId = grainId;
             public readonly string ReminderName = reminderName;
 
-            public readonly bool Equals(ReminderIdentity other) => GrainId.Equals(other.GrainId) && ReminderName.Equals(other.ReminderName);
+            public readonly bool Equals(ReminderIdentity other) => GrainId.Equals(other.GrainId) && ReminderName.Equals(other.ReminderName, StringComparison.Ordinal);
 
             public override readonly bool Equals(object? other) => other is ReminderIdentity id && Equals(id);
 

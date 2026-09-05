@@ -38,25 +38,25 @@ public class CustomStreamFilter : IStreamFilter
 
     private static bool ShouldDeliverImpl(StreamId streamId, object item, string filterData)
     {
-        if (filterData.Equals("throw"))
+        if (filterData.Equals("throw", StringComparison.Ordinal))
             throw new Exception("throw");
 
         if (string.IsNullOrWhiteSpace(filterData))
             return true;
 
-        if (filterData.Equals("even"))
+        if (filterData.Equals("even", StringComparison.Ordinal))
         {
             var value = (int)item;
             return value % 2 == 0;
         }
 
-        if (filterData.Equals("only3"))
+        if (filterData.Equals("only3", StringComparison.Ordinal))
         {
             var value = (int)item;
             return value == 3;
         }
 
-        if (filterData.Equals("only7"))
+        if (filterData.Equals("only7", StringComparison.Ordinal))
         {
             var value = (int)item;
             return value == 7;

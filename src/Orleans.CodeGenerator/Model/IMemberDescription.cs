@@ -35,7 +35,7 @@ internal sealed class MemberDescriptionTypeComparer : IEqualityComparer<IMemberD
             return false;
         }
 
-        return string.Equals(x.TypeName, y.TypeName) && string.Equals(x.AssemblyName, y.AssemblyName);
+        return string.Equals(x.TypeName, y.TypeName, StringComparison.Ordinal) && string.Equals(x.AssemblyName, y.AssemblyName, StringComparison.Ordinal);
     }
 
     public int GetHashCode(IMemberDescription obj)

@@ -231,7 +231,7 @@ namespace Orleans.BroadcastChannel
 
         public static implicit operator ChannelId(InternalChannelId internalStreamId) => internalStreamId.ChannelId;
 
-        public bool Equals(InternalChannelId other) => ChannelId.Equals(other) && ProviderName.Equals(other.ProviderName);
+        public bool Equals(InternalChannelId other) => ChannelId.Equals(other) && ProviderName.Equals(other.ProviderName, StringComparison.Ordinal);
 
         public override bool Equals(object? obj) => obj is InternalChannelId other ? this.Equals(other) : false;
 

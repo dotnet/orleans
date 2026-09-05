@@ -19,7 +19,7 @@ namespace Tester.AzureUtils
     {
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
-        public static string DeploymentId = "aqdatamanagertests".ToLower();
+        public static string DeploymentId = "aqdatamanagertests";
         private string queueName = null!;
 
         public AzureQueueDataManagerTests()
@@ -49,7 +49,7 @@ namespace Tester.AzureUtils
         [Fact, TestCategory("Functional")]
         public async Task AQ_Standalone_1()
         {
-            queueName = "Test-1-".ToLower() + Guid.NewGuid();
+            queueName = "test-1-" + Guid.NewGuid();
             AzureQueueDataManager manager = await GetTableManager(queueName);
             Assert.Equal(0, await manager.GetApproximateMessageCount());
 
@@ -86,7 +86,7 @@ namespace Tester.AzureUtils
         [Fact, TestCategory("Functional")]
         public async Task AQ_Standalone_2()
         {
-            queueName = "Test-2-".ToLower() + Guid.NewGuid();
+            queueName = "test-2-" + Guid.NewGuid();
             AzureQueueDataManager manager = await GetTableManager(queueName);
 
             IEnumerable<QueueMessage> msgs = await manager.GetQueueMessages();
@@ -119,7 +119,7 @@ namespace Tester.AzureUtils
         [Fact, TestCategory("Functional")]
         public async Task AQ_Standalone_3_Init_MultipleThreads()
         {
-            queueName = "Test-4-".ToLower() + Guid.NewGuid();
+            queueName = "test-4-" + Guid.NewGuid();
 
             const int NumThreads = 100;
             Task<bool>[] promises = new Task<bool>[NumThreads];
@@ -142,7 +142,7 @@ namespace Tester.AzureUtils
         {
             var visibilityTimeout = TimeSpan.FromSeconds(2);
 
-            queueName = "Test-5-".ToLower() + Guid.NewGuid();
+            queueName = "test-5-" + Guid.NewGuid();
             var manager = await GetTableManager(queueName, visibilityTimeout);
 
             var inMessage = "Hello, World";

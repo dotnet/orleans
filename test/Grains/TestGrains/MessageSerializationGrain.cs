@@ -66,7 +66,7 @@ namespace UnitTests.Grains
                 RequestContext.Set(IPlacementDirector.PlacementHintKey, silos.First());
                 otherGrain = this.GrainFactory.GetGrain<IMessageSerializationGrain>(++id);
                 var otherIdentity = await otherGrain.GetSiloIdentity();
-                if (!string.Equals(otherIdentity, currentSiloIdentity))
+                if (!string.Equals(otherIdentity, currentSiloIdentity, StringComparison.Ordinal))
                 {
                     break;
                 }
