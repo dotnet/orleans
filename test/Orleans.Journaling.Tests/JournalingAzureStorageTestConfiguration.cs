@@ -1,5 +1,5 @@
 using TestExtensions;
-using Xunit;
+using Tester;
 
 namespace Orleans.Journaling.Tests;
 
@@ -7,14 +7,7 @@ internal static class JournalingAzureStorageTestConfiguration
 {
     public static void CheckPreconditionsOrThrow()
     {
-        if (TestDefaultConfiguration.UseAadAuthentication)
-        {
-            Assert.SkipWhen(string.IsNullOrEmpty(TestDefaultConfiguration.DataBlobUri.ToString()), "DataBlobUri is not set. Skipping test.");
-        }
-        else
-        {
-            Assert.SkipWhen(string.IsNullOrEmpty(TestDefaultConfiguration.DataConnectionString), "DataConnectionString is not set. Skipping test.");
-        }
+        TestUtils.CheckForAzureStorage();
     }
 
     public static AzureBlobJournalStorageOptions ConfigureTestDefaults(this AzureBlobJournalStorageOptions options)
@@ -25,7 +18,7 @@ internal static class JournalingAzureStorageTestConfiguration
         }
         else
         {
-            options.ConfigureBlobServiceClient(TestDefaultConfiguration.DataConnectionString!); // The Azure Storage test setup supplies the connection string.
+            options.ConfigureBlobServiceClient(TestDefaultConfiguration.AzureStorageConnectionString);
         }
 
         return options;
@@ -39,7 +32,7 @@ internal static class JournalingAzureStorageTestConfiguration
         }
         else
         {
-            options.ConfigureTableServiceClient(TestDefaultConfiguration.DataConnectionString!);
+            options.ConfigureTableServiceClient(TestDefaultConfiguration.AzureStorageConnectionString);
         }
 
         return options;

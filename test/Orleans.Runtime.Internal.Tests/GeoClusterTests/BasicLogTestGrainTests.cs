@@ -57,7 +57,7 @@ namespace Tests.GeoClusterTests
                 {
                     return TestDefaultConfiguration.UseAadAuthentication
                         ? new(TestDefaultConfiguration.TableEndpoint, TestDefaultConfiguration.TokenCredential)
-                        : new(TestDefaultConfiguration.DataConnectionString);
+                        : new(TestDefaultConfiguration.AzureStorageConnectionString);
                 }
             }
         }
@@ -109,7 +109,7 @@ namespace Tests.GeoClusterTests
 
         private async Task ThreeCheckers(string grainClass, int phases)
         {
-            // Global 
+            // Global
             async Task checker1()
             {
                 int x = GetRandom();

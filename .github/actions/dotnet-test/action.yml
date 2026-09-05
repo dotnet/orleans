@@ -15,6 +15,10 @@ inputs:
   framework:
     description: Target framework.
     required: true
+  max-parallel-test-modules:
+    description: Maximum number of test modules to execute concurrently.
+    required: false
+    default: '1'
   result-id:
     description: Unique test result identifier.
     required: true
@@ -39,7 +43,7 @@ runs:
   - name: Test
     if: inputs.coverage != 'true' || (github.event_name != 'pull_request' && (github.event_name != 'push' || github.ref != format('refs/heads/{0}', github.event.repository.default_branch)))
     shell: pwsh
-    run: dotnet test --solution Orleans.slnx --framework "${{ inputs.framework }}" --filter-query "${{ inputs.filter-query }}" --minimum-expected-tests 1 --hangdump --hangdump-timeout 10m --crashdump --crashdump-type Full --hangdump-type Full --report-trx --report-trx-filename "test_results_${{ inputs.result-id }}_{asm}_{tfm}_{arch}.trx" --max-parallel-test-modules 1
+    run: dotnet test --solution Orleans.slnx --framework "${{ inputs.framework }}" --filter-query "${{ inputs.filter-query }}" --minimum-expected-tests 1 --hangdump --hangdump-timeout 10m --crashdump --crashdump-type Full --hangdump-type Full --report-trx --report-trx-filename "test_results_${{ inputs.result-id }}_{asm}_{tfm}_{arch}.trx" --max-parallel-test-modules "${{ inputs.max-parallel-test-modules }}"
   - name: Test with coverage
     if: inputs.coverage == 'true' && (github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)))
     shell: pwsh
@@ -67,7 +71,7 @@ runs:
         '--report-trx-filename'
         'test_results_${{ inputs.result-id }}_{asm}_{tfm}_{arch}.trx'
         '--max-parallel-test-modules'
-        '1'
+        '${{ inputs.max-parallel-test-modules }}'
       )
       ./.github/scripts/invoke-coverage.ps1 -Settings ./.github/coverage.config.xml -Output "TestResults/${{ inputs.coverage-id }}.cobertura.xml" -RetryLogFile "logs/${{ inputs.coverage-id }}.retry.log" -Command $command
   - name: Validate coverage report

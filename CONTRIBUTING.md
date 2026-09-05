@@ -53,6 +53,8 @@ dotnet test --solution Orleans.slnx --framework net10.0 --filter-trait "Category
 dotnet test --project test/Orleans.Core.Tests/Orleans.Core.Tests.csproj --framework net10.0 --filter-class "*MyTestClass*" --filter-method "*MyTestMethod*" --minimum-expected-tests 1
 ```
 
+Azure Storage provider tests start a pinned Azurite Testcontainer when neither an Azure Storage connection string nor AAD configuration is supplied. Keep a Docker-compatible runtime running in Linux-container mode; Testcontainers allocates ports and cleans up the container, so no manual Azurite setup is required. To run against an existing emulator or Azure Storage account, set the corresponding `OrleansDataConnectionString` or AAD settings before starting the test process.
+
 ### Work on an application with local source
 
 For an application which needs to exercise an unreleased change, reference the relevant project under `src` instead of the published NuGet package. For example, reference `src/Orleans.Core/Orleans.Core.csproj` from the application project and build the application together with the Orleans solution. This lets the debugger step into the local Orleans source.

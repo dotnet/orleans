@@ -324,37 +324,16 @@ jobs:
         framework: ["net8.0", "net10.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
-    - name: Start Azurite
-      run: |
-        set -euo pipefail
-
-        bash .github/scripts/docker-pull-with-retry.sh "$AZURITE_IMAGE"
-
-        docker run -d --pull=never --name azurite \
-          -p 10000:10000 \
-          -p 10001:10001 \
-          -p 10002:10002 \
-          "$AZURITE_IMAGE" \
-          azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 --skipApiVersionCheck
-    - name: Wait for Azurite
-      run: |
-        echo "Waiting for Azurite to be ready..."
-        timeout 60 bash -c 'until nc -z localhost 10000 && nc -z localhost 10001 && nc -z localhost 10002; do sleep 1; done'
-        echo "Azurite is ready"
+    - name: Verify Linux Docker
+      run: test "$(docker info --format '{{.OSType}}')" = "linux"
+    # Each test module starts an isolated Azurite Testcontainer on dynamic ports.
     - name: Test
       uses: ./.github/actions/run-tests
       with:
         artifact-name: test_output_${{ github.job }}_${{ matrix.framework }}
         framework: ${{ matrix.framework }}
+        max-parallel-test-modules: 2
         provider: AzureStorage
-      env:
-# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
-# [SuppressMessage("Microsoft.Security", "CSCAN0090:ConfigFile", Justification="Not a secret")]
-# [SuppressMessage("Microsoft.Security", "CSCAN0220:DefaultPasswordContexts", Justification="Not a secret")]
-        ORLEANSDATACONNECTIONSTRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
-    - name: Clean up Azurite
-      if: always()
-      run: docker rm -f azurite || true
   test-azure-eventhubs:
     name: Azure Event Hubs provider tests
     runs-on: ubuntu-latest
