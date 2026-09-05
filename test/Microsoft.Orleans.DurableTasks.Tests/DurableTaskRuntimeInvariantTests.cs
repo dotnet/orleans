@@ -1678,22 +1678,40 @@ public sealed class DurableTaskRuntimeInvariantTests
     {
         var (runtime, storage, manager, transport) = CreateRuntime();
         var rootId = TaskId.Parse("root");
-        var childId = TaskId.Parse("root/remote-child");
+        var childId = TaskId.Parse("root/local-child");
+        var grandchildId = TaskId.Parse("root/local-child/remote-grandchild");
+        var unrelatedId = TaskId.Parse("unrelated");
         var target = GrainId.Create("target", "one");
         var root = storage.GetOrCreate(rootId);
         var child = storage.GetOrCreate(childId);
-        storage.SetRemoteRequest(childId, child, target, "fingerprint");
+        var grandchild = storage.GetOrCreate(grandchildId);
+        storage.SetRemoteRequest(grandchildId, grandchild, target, "fingerprint");
+        var unrelated = storage.GetOrCreate(unrelatedId);
         var rootHandle = runtime.GetScheduledTaskHandle(rootId);
+        transport.BeforeSendCancellation = (_, _, taskId) =>
+        {
+            Assert.Equal(grandchildId, taskId);
+            Assert.Null(root.Result);
+        };
+        manager.BeforeWrite = () =>
+        {
+            Assert.NotNull(child.CancellationRequestedAt);
+            Assert.NotNull(grandchild.CancellationRequestedAt);
+            Assert.Single(transport.Cancellations);
+        };
 
         await rootHandle.CancelAsync(TestContext.Current.CancellationToken);
 
         Assert.NotNull(root.CancellationRequestedAt);
         Assert.Equal(DurableTaskStatus.Canceled, root.Result!.Status);
         Assert.NotNull(child.CancellationRequestedAt);
+        Assert.NotNull(grandchild.CancellationRequestedAt);
+        Assert.Null(unrelated.CancellationRequestedAt);
+        Assert.Null(unrelated.Result);
         var cancellation = Assert.Single(transport.Cancellations);
-        Assert.Equal(childId, cancellation.TaskId);
+        Assert.Equal(grandchildId, cancellation.TaskId);
         Assert.Equal(target, cancellation.Target);
-        Assert.Equal(1, manager.WriteCount);
+        Assert.Equal(2, manager.WriteCount);
     }
 
     [Fact]
