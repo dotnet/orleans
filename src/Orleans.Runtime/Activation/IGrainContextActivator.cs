@@ -58,13 +58,20 @@ namespace Orleans.Runtime
         /// <returns>The grain context.</returns>
         public IGrainContext CreateInstance(GrainAddress address)
         {
+            var preparedContext = CreatePreparedContext(address);
+            using var startup = preparedContext.Start();
+            return preparedContext.Context;
+        }
+
+        internal PreparedGrainContext CreatePreparedContext(GrainAddress address)
+        {
             var grainId = address.GrainId;
             if (!_activators.TryGetValue(grainId.Type, out var activator))
             {
                 activator = this.CreateActivator(grainId.Type);
             }
 
-            return activator.Activator.CreateContext(address, activator.ConfigureActions);
+            return PreparedGrainContext.Create(activator.Activator, address, activator.ConfigureActions);
         }
 
         private (IGrainContextActivator, IConfigureGrainContext[]) CreateActivator(GrainType grainType)
@@ -132,6 +139,79 @@ namespace Orleans.Runtime
         /// <param name="configureActions">The actions which must be used to configure the context before grain construction begins.</param>
         /// <returns>The newly created grain context.</returns>
         public IGrainContext CreateContext(GrainAddress address, IConfigureGrainContext[] configureActions);
+    }
+
+    internal interface IPreparedGrainContextActivator : IGrainContextActivator
+    {
+        PreparedGrainContext CreatePreparedContext(
+            GrainAddress address,
+            IConfigureGrainContext[] configureActions);
+    }
+
+    internal readonly struct PreparedGrainContext(IGrainContext context, IGrainContextStartup? startup)
+    {
+        private readonly IGrainContext? _context = context;
+        private readonly IGrainContextStartup? _startup = startup;
+
+        public IGrainContext Context
+            => _context ?? throw new InvalidOperationException("The grain context activation is not initialized.");
+
+        public bool HasStartup => _startup is not null;
+
+        public static PreparedGrainContext Create(
+            IGrainContextActivator activator,
+            GrainAddress address,
+            IConfigureGrainContext[] configureActions) =>
+            activator is IPreparedGrainContextActivator preparedActivator
+                ? preparedActivator.CreatePreparedContext(address, configureActions)
+                : new(activator.CreateContext(address, configureActions), startup: null);
+
+        public IDisposable Start()
+        {
+            if (_startup is not { } startup)
+            {
+                return NoopDisposable.Instance;
+            }
+
+            try
+            {
+                return startup.Start();
+            }
+            catch (Exception startupException)
+            {
+                try
+                {
+                    startup.Abort();
+                }
+                catch (Exception abortException)
+                {
+                    throw new AggregateException(
+                        "Grain context startup failed and aborting the startup also failed.",
+                        startupException,
+                        abortException);
+                }
+
+                throw;
+            }
+        }
+
+        public void Abort() => _startup?.Abort();
+
+        private sealed class NoopDisposable : IDisposable
+        {
+            public static NoopDisposable Instance { get; } = new();
+
+            public void Dispose()
+            {
+            }
+        }
+    }
+
+    internal interface IGrainContextStartup
+    {
+        IDisposable Start();
+
+        void Abort();
     }
 
     /// <summary>
