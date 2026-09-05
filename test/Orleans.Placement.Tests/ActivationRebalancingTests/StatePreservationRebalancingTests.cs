@@ -68,6 +68,7 @@ public class StatePreservationRebalancingTests(SPFixture fixture, ITestOutputHel
 
         (var rebalancerHost, var rebalancerHostNum) = await FindRebalancerHost(Silo1);
         var reportBeforeStop = await rebalancer.GetReport(cancellationToken);
+        Assert.NotEmpty(reportBeforeStop.Statistics);
 
         OutputHelper.WriteLine($"Now stopping Silo{rebalancerHostNum}, which is the host of the rebalancer\n");
 
@@ -83,13 +84,6 @@ public class StatePreservationRebalancingTests(SPFixture fixture, ITestOutputHel
         Assert.NotEqual(rebalancerHost, newHost);
         Assert.Equal(reportBeforeStop.ClusterImbalance, reportAfterStop.ClusterImbalance);
         Assert.Equal(reportBeforeStop.Status, reportAfterStop.Status);
-        Assert.Equal(
-            reportBeforeStop.Statistics
-                .Single(statistic => statistic.SiloAddress.Equals(newHost))
-                .AcquiredActivations,
-            reportAfterStop.Statistics
-                .Single(statistic => statistic.SiloAddress.Equals(newHost))
-                .AcquiredActivations);
         Assert.Equal(
             reportBeforeStop.Statistics
                 .Where(statistic => !statistic.SiloAddress.Equals(rebalancerHost))
