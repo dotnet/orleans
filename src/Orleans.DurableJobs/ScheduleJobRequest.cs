@@ -25,6 +25,11 @@ public readonly struct ScheduleJobRequest
     public required DateTimeOffset DueTime { get; init; }
 
     /// <summary>
+    /// Gets the priority used to order jobs which have the same due time.
+    /// </summary>
+    public DurableJobPriority Priority { get; init; }
+
+    /// <summary>
     /// Gets optional metadata associated with the job.
     /// </summary>
     public IReadOnlyDictionary<string, string>? Metadata { get; init; }

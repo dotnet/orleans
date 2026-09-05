@@ -175,12 +175,21 @@ public class JournaledJobShardManagerTests
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         const int JobCount = 32;
+        const int PendingOperationCapacity = 4;
         var storageProvider = new CountingJournalStorageProvider(delayAppends: true);
         using var services = CreateServices(storageProvider);
         var membership = new TestClusterMembershipService();
         var silo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5016), 0);
         membership.SetSiloStatus(silo, SiloStatus.Active);
-        var manager = CreateManager(services, membership, silo);
+        var manager = CreateManager(
+            services,
+            membership,
+            silo,
+            new DurableJobsOptions
+            {
+                MaxPendingOperationsPerShard = PendingOperationCapacity,
+                MaxShardBatchOperationCount = 2,
+            });
         var start = DateTimeOffset.UtcNow.AddMinutes(-1);
         var end = start.AddHours(1);
         var shard = await manager.CreateShardAsync(
@@ -231,6 +240,132 @@ public class JournaledJobShardManagerTests
             scheduledJobs.Select(job => job!.Id).ToHashSet(StringComparer.Ordinal));
 
         await reopenedManager.UnregisterShardAsync(reopenedShard, cancellationToken);
+    }
+
+    [Fact]
+    public async Task ConcurrentSchedules_WhenShardCapacityIsReached_RejectOverflowBeforeIngress()
+    {
+        const int JobCount = 32;
+        const int MaxJobsPerShard = 4;
+        const int PendingOperationCapacity = 2;
+        var storageProvider = new CountingJournalStorageProvider(delayAppends: true);
+        using var services = CreateServices(storageProvider);
+        var membership = new TestClusterMembershipService();
+        var silo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 50165), 0);
+        membership.SetSiloStatus(silo, SiloStatus.Active);
+        var manager = CreateManager(
+            services,
+            membership,
+            silo,
+            new DurableJobsOptions
+            {
+                MaxJobsPerShard = MaxJobsPerShard,
+                MaxPendingOperationsPerShard = PendingOperationCapacity,
+                MaxShardBatchOperationCount = 1,
+            });
+        var start = DateTimeOffset.UtcNow.AddMinutes(-1);
+        var shard = await manager.CreateShardAsync(start, start.AddHours(1), new Dictionary<string, string>(), CancellationToken.None);
+
+        var schedules = Enumerable.Range(0, JobCount)
+            .Select(index => shard.TryScheduleJobAsync(new()
+            {
+                Target = GrainId.Create("type", $"capacity-{index}"),
+                JobName = $"capacity-{index}",
+                DueTime = start.AddSeconds(1),
+                Metadata = null,
+            }, CancellationToken.None))
+            .ToArray();
+
+        await storageProvider.AppendStarted.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.Equal(
+            JobCount - MaxJobsPerShard,
+            schedules.Count(static task => task.IsCompletedSuccessfully && task.Result is null));
+
+        storageProvider.AllowAppends();
+        var results = await Task.WhenAll(schedules).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.Equal(MaxJobsPerShard, results.Count(static job => job is not null));
+        Assert.Equal(JobCount - MaxJobsPerShard, results.Count(static job => job is null));
+        Assert.Equal(MaxJobsPerShard, await shard.GetJobCountAsync());
+
+        await manager.UnregisterShardAsync(shard, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task ConcurrentSchedules_StorageBatchNeverExceedsConfiguredOperationCount()
+    {
+        const int JobCount = 32;
+        const int MaxBatchOperationCount = 4;
+        var storageProvider = new CountingJournalStorageProvider(delayAppends: true);
+        using var services = CreateServices(storageProvider);
+        var membership = new TestClusterMembershipService();
+        var silo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5018), 0);
+        membership.SetSiloStatus(silo, SiloStatus.Active);
+        var manager = CreateManager(
+            services,
+            membership,
+            silo,
+            new DurableJobsOptions { MaxShardBatchOperationCount = MaxBatchOperationCount });
+        var start = DateTimeOffset.UtcNow.AddMinutes(-1);
+        var shard = await manager.CreateShardAsync(start, start.AddHours(1), new Dictionary<string, string>(), CancellationToken.None);
+        var observedBatchSizes = new ConcurrentBag<long>();
+        using var listener = CreateStorageBatchSizeListener(observedBatchSizes);
+
+        var tasks = Enumerable.Range(0, JobCount)
+            .Select(index => shard.TryScheduleJobAsync(new()
+            {
+                Target = GrainId.Create("type", $"bounded-{index}"),
+                JobName = $"bounded-{index}",
+                DueTime = start.AddSeconds(1),
+                Metadata = null,
+            }, CancellationToken.None))
+            .ToArray();
+
+        await storageProvider.AppendStarted.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        storageProvider.AllowAppends();
+        Assert.All(await Task.WhenAll(tasks).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken), Assert.NotNull);
+        Assert.NotEmpty(observedBatchSizes);
+        Assert.All(observedBatchSizes, size => Assert.InRange(size, 1, MaxBatchOperationCount));
+
+        await manager.UnregisterShardAsync(shard, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task ConcurrentSchedules_StorageBatchHonorsConfiguredSizeBudget()
+    {
+        const int JobCount = 8;
+        var storageProvider = new CountingJournalStorageProvider(delayAppends: true);
+        using var services = CreateServices(storageProvider);
+        var membership = new TestClusterMembershipService();
+        var silo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5019), 0);
+        membership.SetSiloStatus(silo, SiloStatus.Active);
+        var manager = CreateManager(
+            services,
+            membership,
+            silo,
+            new DurableJobsOptions { MaxShardBatchSizeBytes = 1_024 });
+        var start = DateTimeOffset.UtcNow.AddMinutes(-1);
+        var shard = await manager.CreateShardAsync(start, start.AddHours(1), new Dictionary<string, string>(), CancellationToken.None);
+        var observedBatchSizes = new ConcurrentBag<long>();
+        using var listener = CreateStorageBatchSizeListener(observedBatchSizes);
+        var metadataValue = new string('x', 1_024);
+
+        var tasks = Enumerable.Range(0, JobCount)
+            .Select(index => shard.TryScheduleJobAsync(new()
+            {
+                Target = GrainId.Create("type", $"large-{index}"),
+                JobName = $"large-{index}",
+                DueTime = start.AddSeconds(1),
+                Metadata = new Dictionary<string, string> { ["payload"] = metadataValue },
+            }, CancellationToken.None))
+            .ToArray();
+
+        await storageProvider.AppendStarted.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        storageProvider.AllowAppends();
+        Assert.All(await Task.WhenAll(tasks).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken), Assert.NotNull);
+        Assert.NotEmpty(observedBatchSizes);
+        Assert.All(observedBatchSizes, size => Assert.Equal(1, size));
+
+        await manager.UnregisterShardAsync(shard, CancellationToken.None);
     }
 
     [Fact]
@@ -330,6 +465,50 @@ public class JournaledJobShardManagerTests
         Assert.Equal(DurableJobMutationResult.JobNotFound, await startAttemptTask);
 
         await manager.UnregisterShardAsync(shard, cancellationToken);
+    }
+
+    [Fact]
+    public async Task DisposeAsync_WithActiveAndQueuedMutations_CompletesEveryCaller()
+    {
+        const int JobCount = 32;
+        var storageProvider = new CountingJournalStorageProvider(delayAppends: true);
+        using var services = CreateServices(storageProvider);
+        var membership = new TestClusterMembershipService();
+        var silo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5022), 0);
+        membership.SetSiloStatus(silo, SiloStatus.Active);
+        var manager = CreateManager(
+            services,
+            membership,
+            silo,
+            new DurableJobsOptions
+            {
+                MaxPendingOperationsPerShard = 2,
+                MaxShardBatchOperationCount = 1,
+            });
+        var start = DateTimeOffset.UtcNow.AddMinutes(-1);
+        var shard = await manager.CreateShardAsync(
+            start,
+            start.AddHours(1),
+            new Dictionary<string, string> { ["Purpose"] = "DisposePendingMutations" },
+            CancellationToken.None);
+
+        var schedules = Enumerable.Range(0, JobCount)
+            .Select(index => shard.TryScheduleJobAsync(new()
+            {
+                Target = GrainId.Create("type", $"dispose-{index}"),
+                JobName = $"dispose-{index}",
+                DueTime = start.AddSeconds(1),
+                Metadata = null,
+            }, CancellationToken.None))
+            .ToArray();
+
+        await storageProvider.AppendStarted.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        await shard.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        foreach (var schedule in schedules)
+        {
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => schedule);
+        }
     }
 
     [Fact]
@@ -567,6 +746,78 @@ public class JournaledJobShardManagerTests
         }
     }
 
+    [Fact]
+    public async Task AssignJobShardsAsync_BoundsCatalogWorkAndResumes()
+    {
+        const int shardCount = 300;
+        var storageProvider = new CountingJournalStorageProvider(delayAppends: false);
+        using var services = CreateServices(storageProvider);
+        var membership = new TestClusterMembershipService();
+        var silo1 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5080), 0);
+        var silo2 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5081), 0);
+        membership.SetSiloStatus(silo1, SiloStatus.Active);
+        membership.SetSiloStatus(silo2, SiloStatus.Active);
+        var manager1 = CreateManager(services, membership, silo1);
+        var manager2 = CreateManager(services, membership, silo2);
+        var start = DateTimeOffset.UtcNow.AddSeconds(-5);
+        for (var i = 0; i < shardCount; i++)
+        {
+            var shard = await manager1.CreateShardAsync(
+                start,
+                start.AddHours(1),
+                new Dictionary<string, string> { ["Index"] = i.ToString() },
+                CancellationToken.None);
+            await ScheduleJobAsync(shard, $"catalog-job-{i}", TestContext.Current.CancellationToken);
+            await manager1.UnregisterShardAsync(shard, CancellationToken.None);
+        }
+
+        var firstPage = await manager2.AssignJobShardsAsync(DateTimeOffset.UtcNow.AddHours(1), int.MaxValue, CancellationToken.None);
+        var secondPage = await manager2.AssignJobShardsAsync(DateTimeOffset.UtcNow.AddHours(1), int.MaxValue, CancellationToken.None);
+
+        Assert.Equal(256, firstPage.Count);
+        Assert.Equal(shardCount, secondPage.Count);
+        Assert.Equal(
+            shardCount - firstPage.Count,
+            secondPage.Select(static shard => shard.Id).Except(firstPage.Select(static shard => shard.Id), StringComparer.Ordinal).Count());
+        Assert.Equal(2, storageProvider.PageReadCount);
+
+        foreach (var shard in secondPage)
+        {
+            await DrainAndUnregisterAsync(manager2, shard, TestContext.Current.CancellationToken);
+        }
+    }
+
+    [Fact]
+    public async Task CreateShardAsync_CoalescesWithConcurrentCatalogDiscovery()
+    {
+        var storageProvider = new CountingJournalStorageProvider(
+            delayAppends: false,
+            delayFirstMetadataRead: true);
+        using var services = CreateServices(storageProvider);
+        var membership = new TestClusterMembershipService();
+        var silo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5082), 0);
+        membership.SetSiloStatus(silo, SiloStatus.Active);
+        var manager = CreateManager(services, membership, silo);
+        var start = DateTimeOffset.UtcNow.AddSeconds(-5);
+
+        var createTask = manager.CreateShardAsync(
+            start,
+            start.AddHours(1),
+            new Dictionary<string, string>(),
+            CancellationToken.None);
+        await storageProvider.FirstMetadataReadStarted;
+
+        var assigned = await manager.AssignJobShardsAsync(
+            DateTimeOffset.UtcNow.AddHours(1),
+            int.MaxValue,
+            CancellationToken.None);
+        storageProvider.AllowFirstMetadataRead();
+        var created = await createTask;
+
+        Assert.Same(created, Assert.Single(assigned));
+        await manager.UnregisterShardAsync(created, CancellationToken.None);
+    }
+
     private static ServiceProvider CreateServices(IJournalStorageProvider storageProvider)
     {
         var builder = new TestSiloBuilder();
@@ -595,18 +846,28 @@ public class JournaledJobShardManagerTests
         return listener;
     }
 
-    private sealed class CountingJournalStorageProvider : IJournalStorageProvider, IJournalStorageCatalog
+    private sealed class CountingJournalStorageProvider : IJournalStorageProvider, IJournalStorageCatalog, IPagedJournalStorageCatalog
     {
         private readonly VolatileJournalStorageProvider _inner = new();
         private readonly object _appendGate = new();
         private bool _delayAppends;
         private TaskCompletionSource _appendStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private TaskCompletionSource _allowAppends = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly bool _delayFirstMetadataRead;
+        private readonly TaskCompletionSource _firstMetadataReadStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _allowFirstMetadataRead = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private int _appendCount;
+        private int _metadataReadCount;
+        private int _pageReadCount;
 
-        public CountingJournalStorageProvider(bool delayAppends)
+        public CountingJournalStorageProvider(bool delayAppends, bool delayFirstMetadataRead = false)
         {
             _delayAppends = delayAppends;
+            _delayFirstMetadataRead = delayFirstMetadataRead;
+            if (!delayFirstMetadataRead)
+            {
+                _allowFirstMetadataRead.SetResult();
+            }
         }
 
         public Task AppendStarted
@@ -621,6 +882,10 @@ public class JournaledJobShardManagerTests
         }
 
         public int AppendCount => Volatile.Read(ref _appendCount);
+
+        public int PageReadCount => Volatile.Read(ref _pageReadCount);
+
+        public Task FirstMetadataReadStarted => _firstMetadataReadStarted.Task;
 
         public void BlockAppends()
         {
@@ -641,10 +906,22 @@ public class JournaledJobShardManagerTests
             }
         }
 
+        public void AllowFirstMetadataRead() => _allowFirstMetadataRead.TrySetResult();
+
         public IJournalStorage CreateStorage(JournalId journalId) => new CountingJournalStorage(this, _inner.CreateStorage(journalId));
 
         public IAsyncEnumerable<JournalId> ListAsync(JournalId prefix = default, CancellationToken cancellationToken = default)
             => _inner.ListAsync(prefix, cancellationToken);
+
+        public ValueTask<JournalStorageCatalogPage> ReadPageAsync(
+            JournalId prefix,
+            int pageSize,
+            string? continuationToken = null,
+            CancellationToken cancellationToken = default)
+        {
+            Interlocked.Increment(ref _pageReadCount);
+            return _inner.ReadPageAsync(prefix, pageSize, continuationToken, cancellationToken);
+        }
 
         private async ValueTask OnAppendAsync(CancellationToken cancellationToken)
         {
@@ -662,6 +939,19 @@ public class JournaledJobShardManagerTests
             }
         }
 
+        private async ValueTask<IJournalMetadata?> GetMetadataAsync(
+            IJournalStorage storage,
+            CancellationToken cancellationToken)
+        {
+            if (_delayFirstMetadataRead && Interlocked.Increment(ref _metadataReadCount) == 1)
+            {
+                _firstMetadataReadStarted.TrySetResult();
+                await _allowFirstMetadataRead.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            return await storage.GetMetadataAsync(cancellationToken).ConfigureAwait(false);
+        }
+
         private sealed class CountingJournalStorage(CountingJournalStorageProvider owner, IJournalStorage inner) : IJournalStorage
         {
             public bool IsCompactionRequested => inner.IsCompactionRequested;
@@ -670,7 +960,7 @@ public class JournaledJobShardManagerTests
                 => inner.CreateIfNotExistsAsync(metadata, cancellationToken);
 
             public ValueTask<IJournalMetadata?> GetMetadataAsync(CancellationToken cancellationToken = default)
-                => inner.GetMetadataAsync(cancellationToken);
+                => owner.GetMetadataAsync(inner, cancellationToken);
 
             public ValueTask<IJournalMetadata?> UpdateMetadataAsync(
                 IReadOnlyDictionary<string, string>? set = null,

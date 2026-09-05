@@ -1,0 +1,129 @@
+#nullable enable
+using Orleans.Runtime;
+
+namespace Orleans.AdvancedReminders;
+
+/// <summary>
+/// Reconciles reminders for a grain identity on each activation.
+/// An unchanged declaration preserves the current occurrence, while a missing or changed declaration is registered.
+/// </summary>
+[AttributeUsage(AttributeTargets.Class, AllowMultiple = true, Inherited = false)]
+public sealed class RegisterReminderAttribute : Attribute
+{
+    /// <summary>
+    /// Initializes a new interval-based reminder attribute. The due time is applied when the declaration is first
+    /// registered or later changed; reactivating a grain with the same declaration does not restart the due time.
+    /// </summary>
+    public RegisterReminderAttribute(
+        string name,
+        double dueSeconds,
+        double periodSeconds,
+        DurableJobPriority priority = DurableJobPriority.Normal,
+        Runtime.MissedReminderAction action = Runtime.MissedReminderAction.Skip)
+    {
+        ValidateName(name);
+        ValidatePriorityAndAction(priority, action);
+        ValidateNonNegativeFinite(dueSeconds, nameof(dueSeconds));
+        ValidatePositiveFinite(periodSeconds, nameof(periodSeconds));
+
+        Name = name;
+        Due = TimeSpan.FromSeconds(dueSeconds);
+        Period = TimeSpan.FromSeconds(periodSeconds);
+        Priority = priority;
+        Action = action;
+    }
+
+    /// <summary>
+    /// Initializes a new cron-based reminder attribute.
+    /// </summary>
+    public RegisterReminderAttribute(
+        string name,
+        string cron,
+        DurableJobPriority priority = DurableJobPriority.Normal,
+        Runtime.MissedReminderAction action = Runtime.MissedReminderAction.Skip)
+    {
+        ValidateName(name);
+        ValidatePriorityAndAction(priority, action);
+        ValidateCron(cron);
+
+        Name = name;
+        Cron = cron;
+        Priority = priority;
+        Action = action;
+    }
+
+    /// <summary>
+    /// Gets the reminder name.
+    /// </summary>
+    public string Name { get; }
+
+    /// <summary>
+    /// Gets the interval due time.
+    /// </summary>
+    public TimeSpan? Due { get; }
+
+    /// <summary>
+    /// Gets the interval period.
+    /// </summary>
+    public TimeSpan? Period { get; }
+
+    /// <summary>
+    /// Gets the cron expression.
+    /// </summary>
+    public string? Cron { get; }
+
+    /// <summary>
+    /// Gets the reminder priority.
+    /// </summary>
+    public DurableJobPriority Priority { get; }
+
+    /// <summary>
+    /// Gets the missed reminder action.
+    /// </summary>
+    public Runtime.MissedReminderAction Action { get; }
+
+    private static void ValidateName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new ArgumentException("Reminder name must be non-empty.", nameof(name));
+        }
+    }
+
+    private static void ValidateCron(string cron)
+    {
+        if (string.IsNullOrWhiteSpace(cron))
+        {
+            throw new ArgumentException("Cron expression must be non-empty.", nameof(cron));
+        }
+    }
+
+    private static void ValidatePriorityAndAction(DurableJobPriority priority, Runtime.MissedReminderAction action)
+    {
+        if (!Enum.IsDefined(priority))
+        {
+            throw new ArgumentOutOfRangeException(nameof(priority), priority, "Invalid reminder priority.");
+        }
+
+        if (!Enum.IsDefined(action))
+        {
+            throw new ArgumentOutOfRangeException(nameof(action), action, "Invalid missed reminder action.");
+        }
+    }
+
+    private static void ValidateNonNegativeFinite(double value, string argumentName)
+    {
+        if (double.IsNaN(value) || double.IsInfinity(value) || value < 0 || value > TimeSpan.MaxValue.TotalSeconds)
+        {
+            throw new ArgumentOutOfRangeException(argumentName);
+        }
+    }
+
+    private static void ValidatePositiveFinite(double value, string argumentName)
+    {
+        if (double.IsNaN(value) || double.IsInfinity(value) || value <= 0 || value > TimeSpan.MaxValue.TotalSeconds)
+        {
+            throw new ArgumentOutOfRangeException(argumentName);
+        }
+    }
+}

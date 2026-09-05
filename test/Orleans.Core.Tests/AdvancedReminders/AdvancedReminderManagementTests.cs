@@ -1,0 +1,1215 @@
+#nullable enable
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Time.Testing;
+using NSubstitute;
+using Orleans;
+using Orleans.AdvancedReminders;
+using Orleans.AdvancedReminders.Cron.Internal;
+using Orleans.AdvancedReminders.Runtime;
+using Orleans.AdvancedReminders.Runtime.ReminderService;
+using Orleans.DurableJobs;
+using Orleans.Runtime;
+using Xunit;
+using AdvancedReminderException = Orleans.AdvancedReminders.Runtime.ReminderException;
+using ReminderEntry = Orleans.AdvancedReminders.ReminderEntry;
+using ReminderTableData = Orleans.AdvancedReminders.ReminderTableData;
+
+namespace UnitTests.AdvancedReminders;
+
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Reminders")]
+[TestCategory("Reminders")]
+public class ReminderIteratorTests
+{
+    [Fact]
+    public async Task EnumerateAllAsync_ReadsAllPages()
+    {
+        var managementGrain = Substitute.For<IReminderManagementGrain>();
+        managementGrain.ListAllAsync(2, null).Returns(Task.FromResult(new ReminderManagementPage
+        {
+            Reminders = [CreateReminder("r1"), CreateReminder("r2")],
+            ContinuationToken = "next",
+        }));
+        managementGrain.ListAllAsync(2, "next").Returns(Task.FromResult(new ReminderManagementPage
+        {
+            Reminders = [CreateReminder("r3")],
+            ContinuationToken = null,
+        }));
+
+        var iterator = new ReminderIterator(managementGrain);
+        var names = new List<string>();
+        await foreach (var reminder in iterator.EnumerateAllAsync(pageSize: 2, cancellationToken: TestContext.Current.CancellationToken))
+        {
+            names.Add(reminder.ReminderName);
+        }
+
+        Assert.Equal(["r1", "r2", "r3"], names);
+    }
+
+    [Fact]
+    public async Task EnumerateFilteredAsync_ReadsAllPages()
+    {
+        var filter = new ReminderQueryFilter
+        {
+            Status = ReminderQueryStatus.Overdue | ReminderQueryStatus.Missed,
+            OverdueBy = TimeSpan.FromMinutes(2),
+            MissedBy = TimeSpan.FromMinutes(1),
+            Priority = DurableJobPriority.High,
+        };
+
+        var managementGrain = Substitute.For<IReminderManagementGrain>();
+        managementGrain.ListFilteredAsync(filter, 2, null).Returns(Task.FromResult(new ReminderManagementPage
+        {
+            Reminders = [CreateReminder("r1")],
+            ContinuationToken = "next",
+        }));
+        managementGrain.ListFilteredAsync(filter, 2, "next").Returns(Task.FromResult(new ReminderManagementPage
+        {
+            Reminders = [CreateReminder("r2")],
+            ContinuationToken = null,
+        }));
+
+        var iterator = new ReminderIterator(managementGrain);
+        var names = new List<string>();
+        await foreach (var reminder in iterator.EnumerateFilteredAsync(filter, pageSize: 2, cancellationToken: TestContext.Current.CancellationToken))
+        {
+            names.Add(reminder.ReminderName);
+        }
+
+        Assert.Equal(["r1", "r2"], names);
+    }
+
+    [Fact]
+    public async Task EnumerateOverdueAsync_ReadsAllPages()
+    {
+        var managementGrain = Substitute.For<IReminderManagementGrain>();
+        managementGrain.ListOverdueAsync(TimeSpan.FromMinutes(3), 2, null).Returns(Task.FromResult(new ReminderManagementPage
+        {
+            Reminders = [CreateReminder("r1")],
+            ContinuationToken = "next",
+        }));
+        managementGrain.ListOverdueAsync(TimeSpan.FromMinutes(3), 2, "next").Returns(Task.FromResult(new ReminderManagementPage
+        {
+            Reminders = [CreateReminder("r2")],
+            ContinuationToken = null,
+        }));
+
+        var iterator = new ReminderIterator(managementGrain);
+        var names = new List<string>();
+        await foreach (var reminder in iterator.EnumerateOverdueAsync(
+            TimeSpan.FromMinutes(3),
+            pageSize: 2,
+            cancellationToken: TestContext.Current.CancellationToken))
+        {
+            names.Add(reminder.ReminderName);
+        }
+
+        Assert.Equal(["r1", "r2"], names);
+    }
+
+    [Fact]
+    public async Task EnumerateDueInRangeAsync_ReadsAllPages()
+    {
+        var from = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var to = new DateTime(2026, 1, 2, 0, 0, 0, DateTimeKind.Utc);
+        var managementGrain = Substitute.For<IReminderManagementGrain>();
+        managementGrain.ListDueInRangeAsync(from, to, 2, null).Returns(Task.FromResult(new ReminderManagementPage
+        {
+            Reminders = [CreateReminder("r1")],
+            ContinuationToken = "next",
+        }));
+        managementGrain.ListDueInRangeAsync(from, to, 2, "next").Returns(Task.FromResult(new ReminderManagementPage
+        {
+            Reminders = [CreateReminder("r2")],
+            ContinuationToken = null,
+        }));
+
+        var iterator = new ReminderIterator(managementGrain);
+        var names = new List<string>();
+        await foreach (var reminder in iterator.EnumerateDueInRangeAsync(
+            from,
+            to,
+            pageSize: 2,
+            cancellationToken: TestContext.Current.CancellationToken))
+        {
+            names.Add(reminder.ReminderName);
+        }
+
+        Assert.Equal(["r1", "r2"], names);
+    }
+
+    [Fact]
+    public void Ctor_NullManagementGrain_Throws()
+    {
+        Assert.Throws<ArgumentNullException>(() => _ = new ReminderIterator(null!));
+    }
+
+    private static ReminderEntry CreateReminder(string reminderName)
+        => new()
+        {
+            GrainId = GrainId.Create("test", reminderName),
+            ReminderName = reminderName,
+            StartAt = new DateTime(2026, 1, 1, 10, 0, 0, DateTimeKind.Utc),
+            Period = TimeSpan.FromMinutes(1),
+        };
+}
+
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Reminders")]
+[TestCategory("Reminders")]
+public class ReminderManagementGrainExtensionsTests
+{
+    [Fact]
+    public void GetReminderManagementGrain_UsesWellKnownSingletonKey()
+    {
+        var grainFactory = Substitute.For<IGrainFactory>();
+        var expected = Substitute.For<IReminderManagementGrain>();
+        grainFactory.GetGrain<IReminderManagementGrain>(ReminderManagementGrainExtensions.GrainKey).Returns(expected);
+
+        var result = grainFactory.GetReminderManagementGrain();
+
+        Assert.Same(expected, result);
+        grainFactory.Received(1).GetGrain<IReminderManagementGrain>(ReminderManagementGrainExtensions.GrainKey);
+    }
+
+    [Fact]
+    public async Task EnumerateAllAsync_ReadsAllPages()
+    {
+        var managementGrain = Substitute.For<IReminderManagementGrain>();
+        managementGrain.ListAllAsync(2, null).Returns(Task.FromResult(new ReminderManagementPage
+        {
+            Reminders = [CreateReminder("r1"), CreateReminder("r2")],
+            ContinuationToken = "next",
+        }));
+        managementGrain.ListAllAsync(2, "next").Returns(Task.FromResult(new ReminderManagementPage
+        {
+            Reminders = [CreateReminder("r3")],
+            ContinuationToken = null,
+        }));
+
+        var names = new List<string>();
+        await foreach (var reminder in managementGrain.EnumerateAllAsync(
+            pageSize: 2,
+            cancellationToken: TestContext.Current.CancellationToken))
+        {
+            names.Add(reminder.ReminderName);
+        }
+
+        Assert.Equal(["r1", "r2", "r3"], names);
+        await managementGrain.Received(1).ListAllAsync(2, null);
+        await managementGrain.Received(1).ListAllAsync(2, "next");
+    }
+
+    [Fact]
+    public void CreateIterator_ReturnsIteratorFacade()
+    {
+        var managementGrain = Substitute.For<IReminderManagementGrain>();
+
+        var iterator = managementGrain.CreateIterator();
+
+        Assert.NotNull(iterator);
+        Assert.IsType<ReminderIterator>(iterator);
+    }
+
+    [Fact]
+    public async Task EnumerateOverdueAsync_Extension_ReadsAllPages()
+    {
+        var managementGrain = Substitute.For<IReminderManagementGrain>();
+        managementGrain.ListOverdueAsync(TimeSpan.FromMinutes(2), 2, null).Returns(Task.FromResult(new ReminderManagementPage
+        {
+            Reminders = [CreateReminder("r1")],
+            ContinuationToken = "next",
+        }));
+        managementGrain.ListOverdueAsync(TimeSpan.FromMinutes(2), 2, "next").Returns(Task.FromResult(new ReminderManagementPage
+        {
+            Reminders = [CreateReminder("r2")],
+            ContinuationToken = null,
+        }));
+
+        var names = new List<string>();
+        await foreach (var reminder in managementGrain.EnumerateOverdueAsync(
+            TimeSpan.FromMinutes(2),
+            pageSize: 2,
+            cancellationToken: TestContext.Current.CancellationToken))
+        {
+            names.Add(reminder.ReminderName);
+        }
+
+        Assert.Equal(["r1", "r2"], names);
+    }
+
+    [Fact]
+    public async Task EnumerateDueInRangeAsync_Extension_ReadsAllPages()
+    {
+        var from = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var to = new DateTime(2026, 1, 2, 0, 0, 0, DateTimeKind.Utc);
+        var managementGrain = Substitute.For<IReminderManagementGrain>();
+        managementGrain.ListDueInRangeAsync(from, to, 2, null).Returns(Task.FromResult(new ReminderManagementPage
+        {
+            Reminders = [CreateReminder("r1")],
+            ContinuationToken = "next",
+        }));
+        managementGrain.ListDueInRangeAsync(from, to, 2, "next").Returns(Task.FromResult(new ReminderManagementPage
+        {
+            Reminders = [CreateReminder("r2")],
+            ContinuationToken = null,
+        }));
+
+        var names = new List<string>();
+        await foreach (var reminder in managementGrain.EnumerateDueInRangeAsync(
+            from,
+            to,
+            pageSize: 2,
+            cancellationToken: TestContext.Current.CancellationToken))
+        {
+            names.Add(reminder.ReminderName);
+        }
+
+        Assert.Equal(["r1", "r2"], names);
+    }
+
+    private static ReminderEntry CreateReminder(string reminderName)
+        => new()
+        {
+            GrainId = GrainId.Create("test", reminderName),
+            ReminderName = reminderName,
+            StartAt = new DateTime(2026, 1, 1, 10, 0, 0, DateTimeKind.Utc),
+            Period = TimeSpan.FromMinutes(1),
+        };
+}
+
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Reminders")]
+[TestCategory("Reminders")]
+public class ReminderManagementGrainTests
+{
+    [Fact]
+    public async Task ListAllAsync_ReturnsStableBucketOrderedPagesWithContinuationToken()
+    {
+        var due = new DateTime(2026, 1, 1, 10, 0, 0, DateTimeKind.Utc);
+        var grainIdsByBucket = new Dictionary<int, GrainId>();
+        for (var i = 0; i < 10_000 && grainIdsByBucket.Count < 4; i++)
+        {
+            var grainId = GrainId.Create("test", $"bucketed-{i}");
+            grainIdsByBucket.TryAdd((int)(grainId.GetUniformHashCode() >> 24), grainId);
+        }
+
+        Assert.Equal(4, grainIdsByBucket.Count);
+        var entries = grainIdsByBucket
+            .OrderBy(static pair => pair.Key)
+            .Select((pair, index) => new ReminderEntry
+            {
+                GrainId = pair.Value,
+                ReminderName = $"r{index}",
+                StartAt = due,
+                NextDueUtc = due.AddMinutes(-index),
+                Period = TimeSpan.FromMinutes(1),
+            })
+            .ToArray();
+        var table = new InMemoryManagementReminderTable(entries);
+
+        var grain = new ReminderManagementGrain(table);
+
+        var first = await grain.ListAllAsync(pageSize: 2);
+        Assert.Equal(2, first.Reminders.Count);
+        Assert.False(string.IsNullOrWhiteSpace(first.ContinuationToken));
+
+        var second = await grain.ListAllAsync(pageSize: 2, continuationToken: first.ContinuationToken);
+        Assert.Equal(2, second.Reminders.Count);
+        Assert.Null(second.ContinuationToken);
+        Assert.Equal(
+            entries.Select(static reminder => reminder.ReminderName),
+            first.Reminders.Concat(second.Reminders).Select(static reminder => reminder.ReminderName));
+    }
+
+    [Fact]
+    public async Task ListAllAsync_ContinuationDoesNotRepeatReminderWhenDueTimeAdvances()
+    {
+        var grainId = GrainId.Create("test", "mutable-due");
+        var table = new InMemoryManagementReminderTable(
+            new ReminderEntry
+            {
+                GrainId = grainId,
+                ReminderName = "a",
+                StartAt = DateTime.UtcNow,
+                NextDueUtc = DateTime.UtcNow,
+                Period = TimeSpan.FromMinutes(1),
+                ETag = "a-1",
+            },
+            new ReminderEntry
+            {
+                GrainId = grainId,
+                ReminderName = "b",
+                StartAt = DateTime.UtcNow.AddMinutes(1),
+                NextDueUtc = DateTime.UtcNow.AddMinutes(1),
+                Period = TimeSpan.FromMinutes(1),
+                ETag = "b-1",
+            });
+        var grain = new ReminderManagementGrain(table);
+
+        var first = await grain.ListAllAsync(pageSize: 1);
+        Assert.Equal("a", Assert.Single(first.Reminders).ReminderName);
+        var advanced = await table.ReadRow(grainId, "a");
+        Assert.NotNull(advanced);
+        advanced.NextDueUtc = DateTime.UtcNow.AddDays(1);
+        await table.UpsertRow(advanced);
+
+        var second = await grain.ListAllAsync(pageSize: 1, first.ContinuationToken);
+
+        Assert.Equal("b", Assert.Single(second.Reminders).ReminderName);
+        Assert.Null(second.ContinuationToken);
+    }
+
+    [Fact]
+    public async Task ListAllAsync_ContinuationPreservesEmbeddedNewlines()
+    {
+        var grainId = GrainId.Create("test", "grain\nkey");
+        var table = new InMemoryManagementReminderTable(
+            new ReminderEntry
+            {
+                GrainId = grainId,
+                ReminderName = "reminder\none",
+                StartAt = DateTime.UtcNow,
+                Period = TimeSpan.FromMinutes(1),
+            },
+            new ReminderEntry
+            {
+                GrainId = grainId,
+                ReminderName = "reminder\ntwo",
+                StartAt = DateTime.UtcNow,
+                Period = TimeSpan.FromMinutes(1),
+            });
+        var grain = new ReminderManagementGrain(table);
+
+        var first = await grain.ListAllAsync(pageSize: 1);
+        var second = await grain.ListAllAsync(pageSize: 1, first.ContinuationToken);
+
+        Assert.Equal("reminder\none", Assert.Single(first.Reminders).ReminderName);
+        Assert.Equal("reminder\ntwo", Assert.Single(second.Reminders).ReminderName);
+        Assert.Null(second.ContinuationToken);
+    }
+
+    [Fact]
+    public async Task ListFilteredAsync_AppliesPriorityScheduleAndStatus()
+    {
+        var now = DateTime.UtcNow;
+        var table = new InMemoryManagementReminderTable(
+            new ReminderEntry
+            {
+                GrainId = GrainId.Create("test", "match"),
+                ReminderName = "match",
+                StartAt = now.AddMinutes(-20),
+                Period = TimeSpan.Zero,
+                CronExpression = "*/5 * * * * *",
+                NextDueUtc = now.AddMinutes(-10),
+                LastFireUtc = now.AddMinutes(-20),
+                Priority = DurableJobPriority.High,
+                Action = MissedReminderAction.FireImmediately,
+            },
+            new ReminderEntry
+            {
+                GrainId = GrainId.Create("test", "wrong-priority"),
+                ReminderName = "wrong-priority",
+                StartAt = now.AddMinutes(-20),
+                Period = TimeSpan.Zero,
+                CronExpression = "*/5 * * * * *",
+                NextDueUtc = now.AddMinutes(-10),
+                LastFireUtc = null,
+                Priority = DurableJobPriority.Normal,
+                Action = MissedReminderAction.FireImmediately,
+            },
+            new ReminderEntry
+            {
+                GrainId = GrainId.Create("test", "upcoming"),
+                ReminderName = "upcoming",
+                StartAt = now.AddMinutes(2),
+                Period = TimeSpan.FromMinutes(1),
+                NextDueUtc = now.AddMinutes(2),
+                Priority = DurableJobPriority.High,
+                Action = MissedReminderAction.FireImmediately,
+            },
+            new ReminderEntry
+            {
+                GrainId = GrainId.Create("other", "wrong-type"),
+                ReminderName = "wrong-type",
+                StartAt = now.AddMinutes(-20),
+                Period = TimeSpan.Zero,
+                CronExpression = "*/5 * * * * *",
+                NextDueUtc = now.AddMinutes(-10),
+                LastFireUtc = now.AddMinutes(-20),
+                Priority = DurableJobPriority.High,
+                Action = MissedReminderAction.FireImmediately,
+            });
+
+        var grain = new ReminderManagementGrain(table);
+        var filter = new ReminderQueryFilter
+        {
+            Status = ReminderQueryStatus.Overdue | ReminderQueryStatus.Missed,
+            OverdueBy = TimeSpan.FromMinutes(2),
+            MissedBy = TimeSpan.FromMinutes(1),
+            Priority = DurableJobPriority.High,
+            Action = MissedReminderAction.FireImmediately,
+            ScheduleKind = ReminderScheduleKind.Cron,
+            GrainType = GrainType.Create("test"),
+        };
+
+        var page = await grain.ListFilteredAsync(filter, pageSize: 10);
+
+        Assert.Single(page.Reminders);
+        Assert.Equal("match", page.Reminders[0].ReminderName);
+    }
+
+    [Fact]
+    public async Task ListFilteredAsync_StatusFilters_DistinguishDueUpcomingOverdueAndMissed()
+    {
+        var now = DateTime.UtcNow;
+        var table = new InMemoryManagementReminderTable(
+            new ReminderEntry
+            {
+                GrainId = GrainId.Create("test", "due"),
+                ReminderName = "due",
+                StartAt = now.AddMinutes(-1),
+                NextDueUtc = now.AddSeconds(-10),
+                Period = TimeSpan.FromMinutes(1),
+                LastFireUtc = now,
+            },
+            new ReminderEntry
+            {
+                GrainId = GrainId.Create("test", "upcoming"),
+                ReminderName = "upcoming",
+                StartAt = now.AddMinutes(10),
+                NextDueUtc = now.AddMinutes(10),
+                Period = TimeSpan.FromMinutes(1),
+            },
+            new ReminderEntry
+            {
+                GrainId = GrainId.Create("test", "overdue"),
+                ReminderName = "overdue",
+                StartAt = now.AddMinutes(-10),
+                NextDueUtc = now.AddMinutes(-6),
+                Period = TimeSpan.FromMinutes(1),
+                LastFireUtc = now.AddMinutes(-1),
+            },
+            new ReminderEntry
+            {
+                GrainId = GrainId.Create("test", "missed"),
+                ReminderName = "missed",
+                StartAt = now.AddMinutes(-10),
+                NextDueUtc = now.AddMinutes(-6),
+                Period = TimeSpan.FromMinutes(1),
+                LastFireUtc = null,
+            });
+        var grain = new ReminderManagementGrain(table);
+
+        var due = await grain.ListFilteredAsync(new ReminderQueryFilter { Status = ReminderQueryStatus.Due }, pageSize: 10);
+        var upcoming = await grain.ListFilteredAsync(new ReminderQueryFilter { Status = ReminderQueryStatus.Upcoming }, pageSize: 10);
+        var overdue = await grain.ListFilteredAsync(new ReminderQueryFilter { Status = ReminderQueryStatus.Overdue, OverdueBy = TimeSpan.FromMinutes(5) }, pageSize: 10);
+        var missed = await grain.ListFilteredAsync(new ReminderQueryFilter { Status = ReminderQueryStatus.Missed, MissedBy = TimeSpan.FromMinutes(5) }, pageSize: 10);
+
+        Assert.Equal(["due", "missed", "overdue"], due.Reminders.Select(x => x.ReminderName).Order().ToArray());
+        Assert.Equal(["upcoming"], upcoming.Reminders.Select(x => x.ReminderName).ToArray());
+        Assert.Equal(["missed", "overdue"], overdue.Reminders.Select(x => x.ReminderName).Order().ToArray());
+        Assert.Equal(["missed"], missed.Reminders.Select(x => x.ReminderName).ToArray());
+    }
+
+    [Fact]
+    public async Task ListFilteredAsync_MissedStatus_ExcludesReminderAlreadyFiredAfterDueTime()
+    {
+        var now = DateTime.UtcNow;
+        var table = new InMemoryManagementReminderTable(
+            new ReminderEntry
+            {
+                GrainId = GrainId.Create("test", "missed"),
+                ReminderName = "missed",
+                StartAt = now.AddMinutes(-10),
+                NextDueUtc = now.AddMinutes(-6),
+                Period = TimeSpan.FromMinutes(1),
+                LastFireUtc = null,
+            },
+            new ReminderEntry
+            {
+                GrainId = GrainId.Create("test", "already-fired"),
+                ReminderName = "already-fired",
+                StartAt = now.AddMinutes(-10),
+                NextDueUtc = now.AddMinutes(-6),
+                Period = TimeSpan.FromMinutes(1),
+                LastFireUtc = now.AddMinutes(-5),
+            });
+        var grain = new ReminderManagementGrain(table);
+
+        var missed = await grain.ListFilteredAsync(
+            new ReminderQueryFilter
+            {
+                Status = ReminderQueryStatus.Missed,
+                MissedBy = TimeSpan.FromMinutes(5),
+            },
+            pageSize: 10);
+
+        Assert.Equal(["missed"], missed.Reminders.Select(x => x.ReminderName).ToArray());
+    }
+
+    [Fact]
+    public async Task ListOverdueAsync_UsesThreshold()
+    {
+        var now = DateTime.UtcNow;
+        var table = new InMemoryManagementReminderTable(
+            new ReminderEntry
+            {
+                GrainId = GrainId.Create("test", "old"),
+                ReminderName = "old",
+                StartAt = now.AddMinutes(-10),
+                NextDueUtc = now.AddMinutes(-8),
+                Period = TimeSpan.FromMinutes(1),
+            },
+            new ReminderEntry
+            {
+                GrainId = GrainId.Create("test", "recent"),
+                ReminderName = "recent",
+                StartAt = now.AddMinutes(-1),
+                NextDueUtc = now.AddMinutes(-1),
+                Period = TimeSpan.FromMinutes(1),
+            });
+        var grain = new ReminderManagementGrain(table);
+
+        var page = await grain.ListOverdueAsync(TimeSpan.FromMinutes(5), pageSize: 10);
+
+        Assert.Equal(["old"], page.Reminders.Select(x => x.ReminderName).ToArray());
+    }
+
+    [Fact]
+    public async Task ListDueInRangeAsync_UsesInclusiveBounds()
+    {
+        var lower = new DateTime(2026, 1, 1, 10, 0, 0, DateTimeKind.Utc);
+        var upper = new DateTime(2026, 1, 1, 11, 0, 0, DateTimeKind.Utc);
+        var table = new InMemoryManagementReminderTable(
+            new ReminderEntry
+            {
+                GrainId = GrainId.Create("test", "lower"),
+                ReminderName = "lower",
+                StartAt = lower,
+                NextDueUtc = lower,
+                Period = TimeSpan.FromMinutes(1),
+            },
+            new ReminderEntry
+            {
+                GrainId = GrainId.Create("test", "middle"),
+                ReminderName = "middle",
+                StartAt = lower.AddMinutes(30),
+                NextDueUtc = lower.AddMinutes(30),
+                Period = TimeSpan.FromMinutes(1),
+            },
+            new ReminderEntry
+            {
+                GrainId = GrainId.Create("test", "upper"),
+                ReminderName = "upper",
+                StartAt = upper,
+                NextDueUtc = upper,
+                Period = TimeSpan.FromMinutes(1),
+            },
+            new ReminderEntry
+            {
+                GrainId = GrainId.Create("test", "outside"),
+                ReminderName = "outside",
+                StartAt = upper.AddSeconds(1),
+                NextDueUtc = upper.AddSeconds(1),
+                Period = TimeSpan.FromMinutes(1),
+            });
+        var grain = new ReminderManagementGrain(table);
+
+        var page = await grain.ListDueInRangeAsync(lower, upper, pageSize: 10);
+
+        Assert.Equal(["lower", "middle", "upper"], page.Reminders.Select(x => x.ReminderName).Order().ToArray());
+    }
+
+    [Fact]
+    public async Task MutationApis_UpdateBackingStore()
+    {
+        var originalDue = DateTime.UtcNow.AddMinutes(-15);
+        var grainId = GrainId.Create("test", "mutations");
+        var entry = new ReminderEntry
+        {
+            GrainId = grainId,
+            ReminderName = "r",
+            StartAt = originalDue,
+            NextDueUtc = originalDue,
+            Period = TimeSpan.FromMinutes(1),
+            Priority = DurableJobPriority.Normal,
+            Action = MissedReminderAction.Skip,
+            ETag = "etag-1",
+        };
+        var table = new InMemoryManagementReminderTable(entry);
+        var grain = new ReminderManagementGrain(table);
+
+        await grain.SetPriorityAsync(grainId, "r", DurableJobPriority.High);
+        await grain.SetActionAsync(grainId, "r", MissedReminderAction.Notify);
+        await grain.RepairAsync(grainId, "r");
+
+        var repaired = await table.ReadRow(grainId, "r");
+        Assert.NotNull(repaired);
+        Assert.Equal(DurableJobPriority.High, repaired.Priority);
+        Assert.Equal(MissedReminderAction.Notify, repaired.Action);
+        Assert.True(repaired.NextDueUtc > DateTime.UtcNow);
+
+        await grain.DeleteAsync(grainId, "r");
+        Assert.Null(await table.ReadRow(grainId, "r"));
+    }
+
+    [Fact]
+    public async Task RepairAsync_OverdueOneShot_PreservesOutstandingOccurrence()
+    {
+        var due = DateTime.UtcNow.AddMinutes(-15);
+        var grainId = GrainId.Create("test", "repair-one-shot");
+        var entry = new ReminderEntry
+        {
+            GrainId = grainId,
+            ReminderName = "one-shot",
+            StartAt = due,
+            NextDueUtc = due,
+            Period = TimeSpan.Zero,
+            ETag = "etag-1",
+        };
+        var table = new InMemoryManagementReminderTable(entry);
+        var grain = new ReminderManagementGrain(table);
+
+        await grain.RepairAsync(grainId, entry.ReminderName);
+
+        var repaired = await table.ReadRow(grainId, entry.ReminderName);
+        Assert.NotNull(repaired);
+        Assert.Equal(due, repaired.NextDueUtc);
+    }
+
+    [Fact]
+    public async Task MutationApis_WithReminderService_RescheduleReminderChain()
+    {
+        var due = DateTime.UtcNow.AddMinutes(2);
+        var grainId = GrainId.Create("test", "mutation-reschedule");
+        var entry = new ReminderEntry
+        {
+            GrainId = grainId,
+            ReminderName = "r",
+            StartAt = due,
+            NextDueUtc = due,
+            Period = TimeSpan.FromMinutes(5),
+            Priority = DurableJobPriority.Normal,
+            Action = MissedReminderAction.Skip,
+            ETag = "etag-1",
+        };
+
+        var reminderTable = Substitute.For<Orleans.AdvancedReminders.IReminderTable>();
+        reminderTable.ReadRow(grainId, "r").Returns(
+            Task.FromResult<ReminderEntry?>(CloneEntry(entry)),
+            Task.FromResult<ReminderEntry?>(CloneEntry(entry)),
+            Task.FromResult<ReminderEntry?>(CloneEntry(entry)));
+        reminderTable.UpsertRow(Arg.Any<ReminderEntry>()).Returns("etag-2", "etag-3", "etag-4");
+
+        var grainFactory = Substitute.For<IGrainFactory>();
+        var dispatcher = new TestManagementDispatcherGrain(GrainId.Create("sys", "dispatcher"));
+        grainFactory.GetGrain<IAdvancedReminderDispatcherGrain>(grainId.ToString(), null).Returns(dispatcher);
+
+        var jobManager = Substitute.For<ILocalDurableJobManager>();
+        jobManager.ScheduleJobAsync(Arg.Any<ScheduleJobRequest>(), Arg.Any<CancellationToken>())
+            .Returns(call => Task.FromResult(new DurableJob
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                Name = call.Arg<ScheduleJobRequest>().JobName,
+                DueTime = call.Arg<ScheduleJobRequest>().DueTime,
+                TargetGrainId = call.Arg<ScheduleJobRequest>().Target,
+                ShardId = "test-shard",
+            }));
+        var service = new AdvancedReminderService(
+            reminderTable,
+            jobManager,
+            new TestJobShardManager(),
+            grainFactory,
+            Options.Create(new Orleans.AdvancedReminders.ReminderOptions()),
+            NullLogger<AdvancedReminderService>.Instance,
+            TimeProvider.System,
+            Substitute.For<IClusterManifestProvider>(),
+            Substitute.For<IClusterMembershipService>());
+        dispatcher.Service = service;
+        var grain = new ReminderManagementGrain(
+            reminderTable,
+            new ServiceCollection()
+                .AddSingleton(service)
+                .BuildServiceProvider());
+
+        await grain.SetPriorityAsync(grainId, "r", DurableJobPriority.High);
+        await grain.SetActionAsync(grainId, "r", MissedReminderAction.Notify);
+        await grain.RepairAsync(grainId, "r");
+
+        await jobManager.Received(3).ScheduleJobAsync(
+            Arg.Is<ScheduleJobRequest>(request =>
+                request.JobName == "advanced-reminder:r"
+                && request.Target == dispatcher.GetGrainId()
+                && request.Metadata != null
+                && request.Metadata["grain-id"] == grainId.ToString()
+                && request.Metadata["reminder-name"] == "r"),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ListFilteredAsync_WithNonPositivePageSize_Throws()
+    {
+        var grain = new ReminderManagementGrain(new InMemoryManagementReminderTable());
+
+        var exception = await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () => grain.ListFilteredAsync(new ReminderQueryFilter(), pageSize: 0));
+
+        Assert.Equal("pageSize", exception.ParamName);
+    }
+
+    [Fact]
+    public async Task ListFilteredAsync_WithExcessivePageSize_Throws()
+    {
+        var grain = new ReminderManagementGrain(new InMemoryManagementReminderTable());
+
+        var exception = await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () => grain.ListFilteredAsync(new ReminderQueryFilter(), pageSize: int.MaxValue));
+
+        Assert.Equal("pageSize", exception.ParamName);
+    }
+
+    [Theory]
+    [MemberData(nameof(InvalidFilters))]
+    public async Task ListFilteredAsync_WithInvalidFilter_Throws(ReminderQueryFilter filter)
+    {
+        var grain = new ReminderManagementGrain(new InMemoryManagementReminderTable());
+
+        var exception = await Assert.ThrowsAnyAsync<ArgumentException>(
+            () => grain.ListFilteredAsync(filter, pageSize: 10));
+
+        Assert.Equal("filter", exception.ParamName);
+    }
+
+    public static TheoryData<ReminderQueryFilter> InvalidFilters =>
+    [
+        new ReminderQueryFilter { DueFromUtcInclusive = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Local) },
+        new ReminderQueryFilter { DueToUtcInclusive = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+        new ReminderQueryFilter
+        {
+            DueFromUtcInclusive = new DateTime(2026, 1, 2, 0, 0, 0, DateTimeKind.Utc),
+            DueToUtcInclusive = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+        },
+        new ReminderQueryFilter { Priority = (DurableJobPriority)sbyte.MaxValue },
+        new ReminderQueryFilter { Action = (MissedReminderAction)255 },
+        new ReminderQueryFilter { ScheduleKind = (ReminderScheduleKind)255 },
+        new ReminderQueryFilter { Status = (ReminderQueryStatus)128 },
+        new ReminderQueryFilter { OverdueBy = TimeSpan.FromTicks(-1) },
+        new ReminderQueryFilter { MissedBy = TimeSpan.FromTicks(-1) },
+    ];
+
+    [Fact]
+    public async Task LargeTimeRanges_DoNotOverflow()
+    {
+        var grain = new ReminderManagementGrain(new InMemoryManagementReminderTable());
+
+        var page = await grain.ListFilteredAsync(
+            new ReminderQueryFilter
+            {
+                Status = ReminderQueryStatus.Overdue | ReminderQueryStatus.Missed,
+                OverdueBy = TimeSpan.MaxValue,
+                MissedBy = TimeSpan.MaxValue,
+            });
+        Assert.Empty(page.Reminders);
+    }
+
+    [Fact]
+    public async Task ListFilteredAsync_WithMalformedContinuationToken_Throws()
+    {
+        var grain = new ReminderManagementGrain(
+            new InMemoryManagementReminderTable(
+                new ReminderEntry
+                {
+                    GrainId = GrainId.Create("test", "invalid-token"),
+                    ReminderName = "r1",
+                    StartAt = new DateTime(2026, 1, 1, 10, 0, 0, DateTimeKind.Utc),
+                    NextDueUtc = new DateTime(2026, 1, 1, 10, 0, 0, DateTimeKind.Utc),
+                    Period = TimeSpan.FromMinutes(1),
+                }));
+
+        var exception = await Assert.ThrowsAsync<ArgumentException>(
+            () => grain.ListFilteredAsync(new ReminderQueryFilter(), pageSize: 1, continuationToken: "definitely-not-base64"));
+
+        Assert.Equal("continuationToken", exception.ParamName);
+    }
+
+    [Fact]
+    public async Task MutationApis_WhenReminderIsMissing_ThrowReminderException()
+    {
+        var grainId = GrainId.Create("test", "missing-mutation");
+        var grain = new ReminderManagementGrain(new InMemoryManagementReminderTable());
+
+        await Assert.ThrowsAsync<AdvancedReminderException>(() => grain.SetPriorityAsync(grainId, "missing", DurableJobPriority.High));
+        await Assert.ThrowsAsync<AdvancedReminderException>(() => grain.SetActionAsync(grainId, "missing", MissedReminderAction.Notify));
+        await Assert.ThrowsAsync<AdvancedReminderException>(() => grain.RepairAsync(grainId, "missing"));
+        await Assert.ThrowsAsync<AdvancedReminderException>(() => grain.DeleteAsync(grainId, "missing"));
+    }
+
+    [Fact]
+    public async Task RepairAsync_ForCronReminder_RecomputesNextOccurrenceUsingStoredTimeZone()
+    {
+        var grainId = GrainId.Create("test", "cron-repair");
+        var timeZone = AdvancedReminderTimeZoneTestHelper.GetCentralEuropeanTimeZone();
+        var normalizedTimeZoneId = ReminderCronSchedule.NormalizeTimeZoneIdForStorage(timeZone) ?? timeZone.Id;
+        var builder = ReminderCronBuilder.DailyAt(9, 0).InTimeZone(timeZone);
+        var beforeRepair = DateTime.UtcNow;
+        var entry = new ReminderEntry
+        {
+            GrainId = grainId,
+            ReminderName = "cron",
+            StartAt = beforeRepair.AddDays(-2),
+            NextDueUtc = beforeRepair.AddDays(-1),
+            Period = TimeSpan.Zero,
+            CronExpression = builder.ToExpressionString(),
+            CronTimeZoneId = normalizedTimeZoneId,
+            LastFireUtc = beforeRepair.AddDays(-2),
+            ETag = "etag-1",
+        };
+        var table = new InMemoryManagementReminderTable(entry);
+        var grain = new ReminderManagementGrain(table);
+
+        await grain.RepairAsync(grainId, "cron");
+
+        var afterRepair = DateTime.UtcNow;
+        var repaired = await table.ReadRow(grainId, "cron");
+        Assert.NotNull(repaired);
+        var expectedLowerBound = builder.GetNextOccurrence(beforeRepair);
+        var expectedUpperBound = builder.GetNextOccurrence(afterRepair);
+
+        Assert.NotNull(repaired.NextDueUtc);
+        Assert.NotNull(expectedLowerBound);
+        Assert.NotNull(expectedUpperBound);
+        Assert.InRange(repaired.NextDueUtc!.Value, expectedLowerBound!.Value, expectedUpperBound!.Value);
+        Assert.Equal(builder.ToExpressionString(), repaired.CronExpression);
+        Assert.Equal(normalizedTimeZoneId, repaired.CronTimeZoneId);
+    }
+
+    private static ReminderEntry CloneEntry(ReminderEntry entry)
+        => new()
+        {
+            GrainId = entry.GrainId,
+            ReminderName = entry.ReminderName,
+            StartAt = entry.StartAt,
+            Period = entry.Period,
+            ETag = entry.ETag,
+            CronExpression = entry.CronExpression,
+            CronTimeZoneId = entry.CronTimeZoneId,
+            NextDueUtc = entry.NextDueUtc,
+            LastFireUtc = entry.LastFireUtc,
+            Priority = entry.Priority,
+            Action = entry.Action,
+            ScheduleId = entry.ScheduleId,
+            JobId = entry.JobId,
+            JobShardId = entry.JobShardId,
+        };
+
+    private sealed class InMemoryManagementReminderTable(params ReminderEntry[] reminders) : Orleans.AdvancedReminders.IReminderTable
+    {
+        private readonly Dictionary<(GrainId GrainId, string ReminderName), ReminderEntry> _entries =
+            reminders.ToDictionary(
+                reminder => (reminder.GrainId, reminder.ReminderName),
+                reminder => CloneEntry(reminder));
+
+        public Task<ReminderTableData> ReadRows(GrainId grainId)
+            => Task.FromResult(new ReminderTableData(_entries.Values.Where(entry => entry.GrainId.Equals(grainId)).Select(CloneEntry).ToList()));
+
+        public Task<ReminderTableData> ReadRows(uint begin, uint end)
+        {
+            var range = RangeFactory.CreateRange(begin, end);
+            return Task.FromResult(new ReminderTableData(
+                _entries.Values.Where(entry => range.InRange(entry.GrainId)).Select(CloneEntry).ToList()));
+        }
+
+        public async Task<ReminderTableData> ReadRows(uint begin, uint end, int maxRows, string? continuationToken)
+        {
+            var all = await ReadRows(begin, end);
+            var offset = continuationToken is null ? 0 : int.Parse(continuationToken, CultureInfo.InvariantCulture);
+            var rows = all.Reminders.Skip(offset).Take(maxRows + 1).ToList();
+            var hasMore = rows.Count > maxRows;
+            if (hasMore)
+            {
+                rows.RemoveAt(maxRows);
+            }
+
+            return new ReminderTableData(rows, hasMore ? (offset + rows.Count).ToString(CultureInfo.InvariantCulture) : null);
+        }
+
+        public Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName)
+        {
+            _entries.TryGetValue((grainId, reminderName), out var entry);
+            return Task.FromResult(entry is null ? null : CloneEntry(entry));
+        }
+
+        public Task<string> UpsertRow(ReminderEntry entry)
+        {
+            var copy = CloneEntry(entry);
+            copy.ETag = string.IsNullOrWhiteSpace(copy.ETag)
+                ? Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture)
+                : copy.ETag + "-next";
+            _entries[(copy.GrainId, copy.ReminderName)] = copy;
+            return Task.FromResult(copy.ETag);
+        }
+
+        public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag)
+            => Task.FromResult(_entries.Remove((grainId, reminderName)));
+
+        public Task TestOnlyClearTable()
+        {
+            _entries.Clear();
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class TestManagementDispatcherGrain : IAdvancedReminderDispatcherGrain, IGrainBase
+    {
+        public TestManagementDispatcherGrain(GrainId grainId)
+        {
+            var context = Substitute.For<IGrainContext>();
+            context.GrainId.Returns(grainId);
+            GrainContext = context;
+        }
+
+        public IGrainContext GrainContext { get; }
+
+        public AdvancedReminderService? Service { get; set; }
+
+        public Task<Orleans.AdvancedReminders.IGrainReminder> RegisterOrUpdateAsync(ReminderEntry entry)
+            => Service!.RegisterOrUpdateCoreAsync(entry, CancellationToken.None);
+
+        public Task<Orleans.AdvancedReminders.IGrainReminder> ReconcileAttributeAsync(ReminderEntry entry, string declarationId)
+            => Service!.ReconcileAttributeCoreAsync(entry, declarationId, CancellationToken.None);
+
+        public Task<string> UpsertAndScheduleAsync(ReminderEntry entry, CancellationToken cancellationToken)
+            => Service!.UpsertAndScheduleCoreAsync(entry, cancellationToken);
+
+        public Task UnregisterAsync(Orleans.AdvancedReminders.ReminderData reminder)
+            => Service!.UnregisterCoreAsync(reminder, CancellationToken.None);
+
+        public Task ProcessDueReminderAsync(GrainId grainId, string reminderName, string? expectedScheduleId, CancellationToken cancellationToken)
+            => Service!.ProcessDueReminderCoreAsync(grainId, reminderName, expectedScheduleId, cancellationToken);
+
+        public Task EnsureScheduledAsync(GrainId grainId, string reminderName, string? expectedScheduleId, bool force, CancellationToken cancellationToken)
+            => Service!.EnsureScheduledCoreAsync(grainId, reminderName, expectedScheduleId, force, cancellationToken);
+
+        public Task ExecuteJobAsync(IJobRunContext context, CancellationToken cancellationToken) => Task.CompletedTask;
+    }
+
+    private sealed class TestJobShardManager() : JobShardManager(SiloAddress.Zero)
+    {
+        public override Task<List<IJobShard>> AssignJobShardsAsync(DateTimeOffset maxDueTime, int maxNewClaims, CancellationToken cancellationToken)
+            => Task.FromResult(new List<IJobShard>());
+
+        public override Task<IJobShard> CreateShardAsync(DateTimeOffset minDueTime, DateTimeOffset maxDueTime, IDictionary<string, string> metadata, CancellationToken cancellationToken)
+            => throw new NotSupportedException();
+
+        public override Task UnregisterShardAsync(IJobShard shard, CancellationToken cancellationToken)
+            => Task.CompletedTask;
+    }
+}
+
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Reminders")]
+[TestCategory("Reminders")]
+[TestCategory("Stress")]
+public class ReminderStressTests
+{
+    [Fact]
+    public async Task ListAllAsync_Skewed200KBucket_SmallPublicPageUsesBoundedProviderPages()
+    {
+        const int totalReminders = 200_000;
+        const int pageSize = 1;
+
+        var now = DateTime.UtcNow;
+        var reminders = CreateSyntheticReminders(totalReminders, now);
+        var table = new SingleSegmentReminderTable(reminders);
+        var grain = new ReminderManagementGrain(table);
+
+        var page = await grain.ListAllAsync(pageSize);
+
+        Assert.Single(page.Reminders);
+        Assert.NotNull(page.ContinuationToken);
+        Assert.Equal(0, table.CompleteRangeReadCallCount);
+        Assert.Equal(256, table.MaxRequestedRows);
+        Assert.InRange(table.MaxReturnedRows, 0, 256);
+        Assert.True(table.PagedRangeReadCallCount >= (int)Math.Ceiling(totalReminders / 256d));
+    }
+
+    [Fact]
+    public async Task Iterator_HighLoad_StreamsOneMillionReminders()
+    {
+        const int totalReminders = 1_000_000;
+        const int pageSize = 4_096;
+
+        var management = new SyntheticPagedReminderManagementGrain(totalReminders);
+        var iterator = new ReminderIterator(management);
+
+        long observed = 0;
+        await foreach (var _ in iterator.EnumerateAllAsync(pageSize, TestContext.Current.CancellationToken))
+        {
+            observed++;
+        }
+
+        Assert.Equal(totalReminders, observed);
+        Assert.True(management.ListAllCallCount > 1);
+    }
+
+    private static List<ReminderEntry> CreateSyntheticReminders(int count, DateTime nowUtc)
+    {
+        var result = new List<ReminderEntry>(count);
+        var sharedGrainId = GrainId.Create("stress", "scan");
+
+        for (var i = 0; i < count; i++)
+        {
+            var due = nowUtc.AddSeconds((i % 120) - 60);
+            result.Add(new ReminderEntry
+            {
+                GrainId = sharedGrainId,
+                ReminderName = $"r-{i.ToString(CultureInfo.InvariantCulture)}",
+                StartAt = due,
+                NextDueUtc = due,
+                LastFireUtc = due.AddSeconds(-1),
+                Period = TimeSpan.FromMinutes(1),
+                CronExpression = i % 2 == 0 ? "*/5 * * * * *" : null!,
+                Priority = i % 3 == 0 ? DurableJobPriority.High : DurableJobPriority.Normal,
+                Action = (i % 3) switch
+                {
+                    0 => MissedReminderAction.FireImmediately,
+                    1 => MissedReminderAction.Skip,
+                    _ => MissedReminderAction.Notify,
+                },
+            });
+        }
+
+        return result;
+    }
+
+    private sealed class SingleSegmentReminderTable(List<ReminderEntry> reminders) : Orleans.AdvancedReminders.IReminderTable
+    {
+        public int CompleteRangeReadCallCount { get; private set; }
+
+        public int PagedRangeReadCallCount { get; private set; }
+
+        public int MaxRequestedRows { get; private set; }
+
+        public int MaxReturnedRows { get; private set; }
+
+        public Task<ReminderTableData> ReadRows(GrainId grainId) => throw new NotSupportedException();
+
+        public Task<ReminderTableData> ReadRows(uint begin, uint end)
+        {
+            CompleteRangeReadCallCount++;
+            throw new InvalidOperationException("Management paging must use the bounded provider overload.");
+        }
+
+        public Task<ReminderTableData> ReadRows(uint begin, uint end, int maxRows, string? continuationToken)
+        {
+            PagedRangeReadCallCount++;
+            MaxRequestedRows = Math.Max(MaxRequestedRows, maxRows);
+            var range = RangeFactory.CreateRange(begin, end);
+            if (reminders.Count == 0 || !range.InRange(reminders[0].GrainId))
+            {
+                return Task.FromResult(new ReminderTableData());
+            }
+
+            var offset = continuationToken is null ? 0 : int.Parse(continuationToken, CultureInfo.InvariantCulture);
+            var rows = reminders.Skip(offset).Take(maxRows).ToList();
+            MaxReturnedRows = Math.Max(MaxReturnedRows, rows.Count);
+            var nextOffset = offset + rows.Count;
+
+            return Task.FromResult(new ReminderTableData(
+                rows,
+                nextOffset < reminders.Count ? nextOffset.ToString(CultureInfo.InvariantCulture) : null));
+        }
+
+        public Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName) => throw new NotSupportedException();
+
+        public Task<string> UpsertRow(ReminderEntry entry) => throw new NotSupportedException();
+
+        public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag) => throw new NotSupportedException();
+
+        public Task TestOnlyClearTable() => throw new NotSupportedException();
+    }
+
+    private sealed class SyntheticPagedReminderManagementGrain(int totalReminders) : IReminderManagementGrain
+    {
+        private const string TokenPrefix = "offset:";
+        private readonly GrainId _sharedGrainId = GrainId.Create("stress", "iterator");
+
+        public int ListAllCallCount { get; private set; }
+
+        public Task<ReminderManagementPage> ListAllAsync(int pageSize = 256, string? continuationToken = null)
+        {
+            ListAllCallCount++;
+            var offset = ParseOffset(continuationToken);
+            if (offset >= totalReminders)
+            {
+                return Task.FromResult(new ReminderManagementPage { Reminders = [], ContinuationToken = null });
+            }
+
+            var take = Math.Min(pageSize, totalReminders - offset);
+            var reminders = new List<ReminderEntry>(take);
+            for (var i = 0; i < take; i++)
+            {
+                reminders.Add(new ReminderEntry
+                {
+                    GrainId = _sharedGrainId,
+                    ReminderName = $"bulk-{offset + i:0000000}",
+                    StartAt = DateTime.UnixEpoch,
+                    NextDueUtc = DateTime.UnixEpoch,
+                    Period = TimeSpan.FromMinutes(1),
+                    Priority = DurableJobPriority.Normal,
+                    Action = MissedReminderAction.Skip,
+                });
+            }
+
+            var nextOffset = offset + take;
+            return Task.FromResult(new ReminderManagementPage
+            {
+                Reminders = reminders,
+                ContinuationToken = nextOffset < totalReminders ? TokenPrefix + nextOffset.ToString(CultureInfo.InvariantCulture) : null,
+            });
+        }
+
+        public Task<ReminderManagementPage> ListOverdueAsync(TimeSpan overdueBy, int pageSize = 256, string? continuationToken = null) => throw new NotSupportedException();
+        public Task<ReminderManagementPage> ListDueInRangeAsync(DateTime fromUtcInclusive, DateTime toUtcInclusive, int pageSize = 256, string? continuationToken = null) => throw new NotSupportedException();
+        public Task<ReminderManagementPage> ListFilteredAsync(ReminderQueryFilter filter, int pageSize = 256, string? continuationToken = null) => throw new NotSupportedException();
+        public Task<IEnumerable<ReminderEntry>> ListForGrainAsync(GrainId grainId) => throw new NotSupportedException();
+        public Task SetPriorityAsync(GrainId grainId, string name, DurableJobPriority priority) => throw new NotSupportedException();
+        public Task SetActionAsync(GrainId grainId, string name, MissedReminderAction action) => throw new NotSupportedException();
+        public Task RepairAsync(GrainId grainId, string name) => throw new NotSupportedException();
+        public Task DeleteAsync(GrainId grainId, string name) => throw new NotSupportedException();
+
+        private static int ParseOffset(string? continuationToken)
+        {
+            if (string.IsNullOrWhiteSpace(continuationToken))
+            {
+                return 0;
+            }
+
+            if (!continuationToken.StartsWith(TokenPrefix, StringComparison.Ordinal))
+            {
+                throw new ArgumentException("Invalid continuation token format.", nameof(continuationToken));
+            }
+
+            var payload = continuationToken.AsSpan(TokenPrefix.Length);
+            if (!int.TryParse(payload, NumberStyles.None, CultureInfo.InvariantCulture, out var offset) || offset < 0)
+            {
+                throw new ArgumentException("Invalid continuation token payload.", nameof(continuationToken));
+            }
+
+            return offset;
+        }
+    }
+}

@@ -332,7 +332,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
             WriteLog($"{remainingSilos} silos do not have a consistent cluster view, waiting until stabilization.");
             await Task.Delay(TimeSpan.FromMilliseconds(100), cancellationToken);
 
-            if (totalWait.Elapsed < TimeSpan.FromSeconds(60))
+            if (totalWait.Elapsed >= TimeSpan.FromSeconds(60))
             {
                 WriteLog($"Warning! {remainingSilos} silos do not have a consistent cluster view after {totalWait.ElapsedMilliseconds}ms, continuing without stabilization.");
                 break;

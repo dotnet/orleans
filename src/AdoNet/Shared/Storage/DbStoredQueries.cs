@@ -103,6 +103,46 @@ namespace Orleans.Tests.SqlUtils
 
 #if REMINDERS_ADONET || TESTER_SQLUTILS || ORLEANS_REMINDERS_PROVIDER
 
+#if ADVANCED_REMINDERS_ADONET
+        /// <summary>
+        /// A query template to read advanced reminder entries.
+        /// </summary>
+        internal string AdvancedRemindersReadReminderRowsKey => queries[nameof(AdvancedRemindersReadReminderRowsKey)];
+
+        /// <summary>
+        /// A query template to read advanced reminder entries with ranges.
+        /// </summary>
+        internal string AdvancedRemindersReadRangeRows1Key => queries[nameof(AdvancedRemindersReadRangeRows1Key)];
+
+        /// <summary>
+        /// A query template to read advanced reminder entries with ranges.
+        /// </summary>
+        internal string AdvancedRemindersReadRangeRows2Key => queries[nameof(AdvancedRemindersReadRangeRows2Key)];
+
+        internal string AdvancedRemindersReadRangeRows1PagedKey => queries[nameof(AdvancedRemindersReadRangeRows1PagedKey)];
+
+        internal string AdvancedRemindersReadRangeRows2PagedKey => queries[nameof(AdvancedRemindersReadRangeRows2PagedKey)];
+
+        /// <summary>
+        /// A query template to read an advanced reminder entry.
+        /// </summary>
+        internal string AdvancedRemindersReadReminderRowKey => queries[nameof(AdvancedRemindersReadReminderRowKey)];
+
+        /// <summary>
+        /// A query template to upsert an advanced reminder row.
+        /// </summary>
+        internal string AdvancedRemindersUpsertReminderRowKey => queries[nameof(AdvancedRemindersUpsertReminderRowKey)];
+
+        /// <summary>
+        /// A query template to delete an advanced reminder row.
+        /// </summary>
+        internal string AdvancedRemindersDeleteReminderRowKey => queries[nameof(AdvancedRemindersDeleteReminderRowKey)];
+
+        /// <summary>
+        /// A query template to delete all advanced reminder rows.
+        /// </summary>
+        internal string AdvancedRemindersDeleteReminderRowsKey => queries[nameof(AdvancedRemindersDeleteReminderRowsKey)];
+#else
         /// <summary>
         /// A query template to read reminder entries.
         /// </summary>
@@ -137,6 +177,7 @@ namespace Orleans.Tests.SqlUtils
         /// A query template to delete all reminder rows.
         /// </summary>
         internal string DeleteReminderRowsKey => queries[nameof(DeleteReminderRowsKey)];
+#endif
 
 #endif
 
@@ -264,7 +305,7 @@ namespace Orleans.Tests.SqlUtils
 
             internal static int GetVersion(IDataRecord record)
             {
-                return Convert.ToInt32(record.GetValue<object>(nameof(Version)));
+                return record.GetInt32(nameof(Version));
             }
 
             internal static Uri GetGatewayUri(IDataRecord record)
@@ -323,6 +364,36 @@ namespace Orleans.Tests.SqlUtils
             internal int GatewayPort
             {
                 set { Add(nameof(GatewayPort), value); }
+            }
+
+            internal int PageSize
+            {
+                set { Add(nameof(PageSize), value); }
+            }
+
+            internal int Offset
+            {
+                set { Add(nameof(Offset), value); }
+            }
+
+            internal int HasCursor
+            {
+                set { Add(nameof(HasCursor), value); }
+            }
+
+            internal uint CursorHash
+            {
+                set { AddGrainHash(nameof(CursorHash), value); }
+            }
+
+            internal string CursorGrainId
+            {
+                set { Add(nameof(CursorGrainId), value); }
+            }
+
+            internal string CursorReminderName
+            {
+                set { Add(nameof(CursorReminderName), value); }
             }
 
             internal IPAddress GatewayAddress
@@ -455,6 +526,51 @@ namespace Orleans.Tests.SqlUtils
             internal string ReminderName
             {
                 set { Add(nameof(ReminderName), value); }
+            }
+
+            internal string CronExpression
+            {
+                set { Add(nameof(CronExpression), value, dbType: DbType.String); }
+            }
+
+            internal string CronTimeZoneId
+            {
+                set { Add(nameof(CronTimeZoneId), value, dbType: DbType.String); }
+            }
+
+            internal DateTime? NextDueUtc
+            {
+                set { Add(nameof(NextDueUtc), value); }
+            }
+
+            internal DateTime? LastFireUtc
+            {
+                set { Add(nameof(LastFireUtc), value); }
+            }
+
+            internal int Priority
+            {
+                set { Add(nameof(Priority), value); }
+            }
+
+            internal int Action
+            {
+                set { Add(nameof(Action), value); }
+            }
+
+            internal string ScheduleId
+            {
+                set { Add(nameof(ScheduleId), value, dbType: DbType.String); }
+            }
+
+            internal string JobId
+            {
+                set { Add(nameof(JobId), value, dbType: DbType.String); }
+            }
+
+            internal string JobShardId
+            {
+                set { Add(nameof(JobShardId), value, dbType: DbType.String); }
             }
 
             internal TimeSpan Period

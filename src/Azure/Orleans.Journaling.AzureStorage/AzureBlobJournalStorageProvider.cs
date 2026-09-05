@@ -10,7 +10,7 @@ using Orleans.Runtime;
 
 namespace Orleans.Journaling;
 
-internal sealed class AzureBlobJournalStorageProvider : ILifecycleParticipant<ISiloLifecycle>, IJournalStorageProvider, IJournalStorageCatalog
+internal sealed class AzureBlobJournalStorageProvider : ILifecycleParticipant<ISiloLifecycle>, IJournalStorageProvider, IJournalStorageCatalog, IPagedJournalStorageCatalog
 {
     private readonly IBlobContainerFactory _containerFactory;
     private readonly AzureBlobJournalStorageOptions _options;
@@ -59,6 +59,7 @@ internal sealed class AzureBlobJournalStorageProvider : ILifecycleParticipant<IS
         JournalId prefix = default,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        ValidateCatalogLayout();
         var container = GetDefaultContainerClient();
         var blobPrefix = prefix.IsDefault ? null : prefix.Value;
         var journalIds = new List<JournalId>();
@@ -89,6 +90,58 @@ internal sealed class AzureBlobJournalStorageProvider : ILifecycleParticipant<IS
         {
             cancellationToken.ThrowIfCancellationRequested();
             yield return journalId;
+        }
+    }
+
+    async ValueTask<JournalStorageCatalogPage> IPagedJournalStorageCatalog.ReadPageAsync(
+        JournalId prefix,
+        int pageSize,
+        string? continuationToken,
+        CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(pageSize);
+        ValidateCatalogLayout();
+        var container = GetDefaultContainerClient();
+        var blobPrefix = prefix.IsDefault ? null : prefix.Value;
+        await foreach (var page in container.GetBlobsAsync(
+            traits: BlobTraits.None,
+            states: BlobStates.None,
+            prefix: blobPrefix,
+            cancellationToken: cancellationToken).AsPages(continuationToken, pageSize))
+        {
+            var journalIds = new List<JournalId>(page.Values.Count);
+            foreach (var item in page.Values)
+            {
+                if (item.Properties.BlobType is { } blobType && blobType != BlobType.Append
+                    || !item.Name.EndsWith("/wal", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var storageIdValue = item.Name[..^"/wal".Length];
+                if (TryParseJournalId(storageIdValue, out var journalId) && prefix.IsPrefixOf(journalId))
+                {
+                    journalIds.Add(journalId);
+                }
+            }
+
+            return new JournalStorageCatalogPage
+            {
+                JournalIds = journalIds,
+                ContinuationToken = page.ContinuationToken,
+            };
+        }
+
+        return new JournalStorageCatalogPage { JournalIds = [] };
+    }
+
+    private void ValidateCatalogLayout()
+    {
+        if (_containerFactory is not DefaultBlobContainerFactory
+            || !ReferenceEquals(_options.GetWalBlobName, AzureBlobJournalStorageOptions.DefaultGetWalBlobName))
+        {
+            throw new NotSupportedException(
+                "Azure Blob journal catalog discovery requires the default container factory and WAL blob naming layout.");
         }
     }
 

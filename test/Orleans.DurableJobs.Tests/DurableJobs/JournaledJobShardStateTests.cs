@@ -46,7 +46,7 @@ public class JournaledJobShardStateTests
         var start = DateTimeOffset.UtcNow;
         var source = new JournaledJobShardState(shardId, start, start.AddHours(1));
         var removed = CreateJob(shardId, "removed", "removed", start.AddMinutes(1));
-        var live = CreateJob(shardId, "live", "live", start.AddMinutes(2));
+        var live = CreateJob(shardId, "live", "live", start.AddMinutes(2), priority: DurableJobPriority.Low);
 
         source.Apply(DurableJobShardJournalRecord.ForSchedule(removed));
         source.Apply(DurableJobShardJournalRecord.ForSchedule(live));
@@ -63,6 +63,7 @@ public class JournaledJobShardStateTests
         var entry = Assert.Single(target.CaptureSnapshot().Jobs);
         Assert.Equal(live.Id, entry.Job.Id);
         Assert.Equal(start.AddMinutes(3), entry.Job.DueTime);
+        Assert.Equal(DurableJobPriority.Low, entry.Job.Priority);
         Assert.Equal(2, entry.DequeueCount);
         Assert.DoesNotContain(target.CaptureSnapshot().Jobs, item => item.Job.Id == removed.Id);
     }
@@ -134,6 +135,26 @@ public class JournaledJobShardStateTests
     }
 
     [Fact]
+    public void TryScheduleJob_WhenShardReachedConfiguredCapacity_ReturnsNullWithoutWriting()
+    {
+        var shardId = new JobShardId("shard-capacity");
+        var start = DateTimeOffset.UtcNow;
+        var state = new JournaledJobShardState(shardId, start, start.AddHours(1), maxJobCount: 2);
+        state.Apply(DurableJobShardJournalRecord.ForSchedule(CreateJob(shardId, "first", "first", start.AddMinutes(1))));
+        state.Apply(DurableJobShardJournalRecord.ForSchedule(CreateJob(shardId, "second", "second", start.AddMinutes(1))));
+
+        var result = state.TryScheduleJob(new ScheduleJobRequest
+        {
+            Target = GrainId.Create("type", "third"),
+            JobName = "third",
+            DueTime = start.AddMinutes(1),
+        });
+
+        Assert.Null(result);
+        Assert.Equal(2, state.Count);
+    }
+
+    [Fact]
     public async Task ConsumeDurableJobsAsync_YieldsDueJobsInDueTimeOrderAndIncrementsDequeueCount()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -163,6 +184,60 @@ public class JournaledJobShardStateTests
     }
 
     [Fact]
+    public async Task Snapshot_RoundTripsThirtyThousandBackloggedJobsWithoutLossOrDuplicates()
+    {
+        const int bucketCount = 6;
+        const int jobsPerBucket = 5_000;
+        const int jobCount = bucketCount * jobsPerBucket;
+        var shardId = new JobShardId("shard-scale");
+        var now = DateTimeOffset.UtcNow;
+        var source = new JournaledJobShardState(shardId, now.AddMinutes(-10), now.AddMinutes(1));
+
+        for (var bucketIndex = bucketCount - 1; bucketIndex >= 0; bucketIndex--)
+        {
+            var dueTime = now.AddMinutes(bucketIndex - bucketCount);
+            for (var jobIndex = 0; jobIndex < jobsPerBucket; jobIndex++)
+            {
+                var priority = (DurableJobPriority)((jobIndex % 3) - 1);
+                var id = $"bucket-{bucketIndex:D2}-job-{jobIndex:D4}";
+                var job = CreateJob(shardId, id, id, dueTime, priority);
+                source.Apply(DurableJobShardJournalRecord.ForSchedule(job));
+            }
+        }
+
+        var snapshot = source.CaptureSnapshot();
+        Assert.Equal(jobCount, snapshot.Jobs.Count);
+
+        var restored = new JournaledJobShardState(shardId, source.StartTime, source.EndTime);
+        restored.Apply(DurableJobShardJournalRecord.ForSnapshot(snapshot));
+        restored.MarkAsComplete();
+
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        DateTimeOffset? previousDueTime = null;
+        var previousPriority = DurableJobPriority.High;
+        await foreach (var context in restored.ConsumeDurableJobsAsync())
+        {
+            Assert.True(seen.Add(context.Job.Id), $"Job '{context.Job.Id}' was restored more than once.");
+
+            if (previousDueTime == context.Job.DueTime)
+            {
+                Assert.True(context.Job.Priority <= previousPriority);
+            }
+            else
+            {
+                Assert.True(previousDueTime is null || context.Job.DueTime > previousDueTime);
+            }
+
+            previousDueTime = context.Job.DueTime;
+            previousPriority = context.Job.Priority;
+            restored.Apply(DurableJobShardJournalRecord.ForRemove(context.Job.Id));
+        }
+
+        Assert.Equal(jobCount, seen.Count);
+        Assert.Equal(0, restored.Count);
+    }
+
+    [Fact]
     public void JobShardId_MapsToJournalStorageIdentityWithoutExposingRawIds()
     {
         var shardId = new JobShardId("silo/with/slashes:job");
@@ -189,12 +264,18 @@ public class JournaledJobShardStateTests
         Assert.Contains("uninitialized Kind", exception.Message, StringComparison.Ordinal);
     }
 
-    private static DurableJob CreateJob(JobShardId shardId, string id, string name, DateTimeOffset dueTime) => new()
-    {
-        Id = id,
-        Name = name,
-        DueTime = dueTime,
-        TargetGrainId = GrainId.Create("type", id),
-        ShardId = shardId.Value
-    };
+    private static DurableJob CreateJob(
+        JobShardId shardId,
+        string id,
+        string name,
+        DateTimeOffset dueTime,
+        DurableJobPriority priority = DurableJobPriority.Normal) => new()
+        {
+            Id = id,
+            Name = name,
+            DueTime = dueTime,
+            TargetGrainId = GrainId.Create("type", id),
+            ShardId = shardId.Value,
+            Priority = priority
+        };
 }

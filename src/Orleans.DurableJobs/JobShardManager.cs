@@ -19,6 +19,8 @@ public abstract class JobShardManager
     /// </summary>
     protected SiloAddress SiloAddress { get; }
 
+    internal virtual bool HasMoreCatalogWork => false;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="JobShardManager"/> class.
     /// </summary>
@@ -62,4 +64,6 @@ public abstract class JobShardManager
     internal virtual ValueTask<SiloAddress?> GetShardOwnerAsync(string shardId, CancellationToken cancellationToken) => new((SiloAddress?)null);
 
     internal virtual ValueTask<bool> IsShardOwnedByLocalSiloAsync(string shardId, CancellationToken cancellationToken) => new(true);
+
+    internal virtual ValueTask<HashSet<string>?> GetJobIdsAsync(string shardId, CancellationToken cancellationToken) => new((HashSet<string>?)null);
 }
