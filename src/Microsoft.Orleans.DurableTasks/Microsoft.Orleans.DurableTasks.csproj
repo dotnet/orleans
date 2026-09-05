@@ -2,6 +2,7 @@
 
   <PropertyGroup>
     <IsPackable>false</IsPackable>
+    <EnablePackageValidation>false</EnablePackageValidation>
     <GenAPITargetDirectory>$(SourceRoot)src\api\Microsoft.Orleans.DurableTasks\</GenAPITargetDirectory>
     <GenAPITargetPath>$(GenAPITargetDirectory)$(AssemblyName).cs</GenAPITargetPath>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
