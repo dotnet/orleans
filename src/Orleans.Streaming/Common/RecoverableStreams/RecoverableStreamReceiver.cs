@@ -23,6 +23,9 @@ public sealed class RecoverableStreamReceiver<TQueueMessage> : IQueueAdapterRece
     private readonly CancellationTokenSource _lifecycleCancellation = new();
     private Task? _initializeTask;
     private CancellationToken _initializeTaskOwnerToken;
+    private TQueueMessage[]? _pendingMessages;
+    private int _pendingStart;
+    private DateTime _pendingDequeueTime;
     private int _running;
     private int _shutdown;
 
@@ -156,22 +159,62 @@ public sealed class RecoverableStreamReceiver<TQueueMessage> : IQueueAdapterRece
             return [];
         }
 
-        var messages = await _source.Read(maxCount, cancellationToken);
-        if (messages.Count == 0)
+        var readCount = Math.Min(maxCount, _cache.GetMaxAddCount());
+        if (readCount <= 0)
         {
             return [];
         }
 
+        if (_pendingMessages is null)
+        {
+            using var readCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken, _lifecycleCancellation.Token);
+            var messages = await _source.Read(readCount, readCancellation.Token);
+            if (Volatile.Read(ref _shutdown) != 0 || messages.Count == 0)
+            {
+                return [];
+            }
+
+            _pendingMessages = new TQueueMessage[messages.Count];
+            for (var i = 0; i < messages.Count; i++)
+            {
+                _pendingMessages[i] = messages[i];
+            }
+
+            _pendingDequeueTime = DateTime.UtcNow;
+        }
+
+        var pending = _pendingMessages;
+        var remaining = new ArraySegment<TQueueMessage>(pending, _pendingStart, pending.Length - _pendingStart);
+        var attempted = remaining.Slice(0, Math.Min(readCount, remaining.Count));
         IReadOnlyList<StreamPosition> positions;
         try
         {
-            positions = _cache.Add(messages, DateTime.UtcNow);
-            _source.MessagesAdded(messages);
+            positions = _cache.Add(attempted, _pendingDequeueTime);
+            if (positions.Count > 0)
+            {
+                _source.MessagesAdded(attempted.Slice(0, positions.Count));
+            }
         }
         catch
         {
-            _source.MessagesAddFailed(messages);
+            try
+            {
+                _source.MessagesAddFailed(remaining);
+            }
+            finally
+            {
+                ClearPendingMessages();
+            }
+
             throw;
+        }
+
+        Array.Clear(pending, _pendingStart, positions.Count);
+        _pendingStart += positions.Count;
+        if (_pendingStart == pending.Length)
+        {
+            ClearPendingMessages();
         }
 
         var result = new List<IBatchContainer>(positions.Count);
@@ -204,6 +247,7 @@ public sealed class RecoverableStreamReceiver<TQueueMessage> : IQueueAdapterRece
 
         Volatile.Write(ref _running, 0);
         _lifecycleCancellation.Cancel();
+        ClearPendingMessages();
         using var cancellation = timeout == Timeout.InfiniteTimeSpan
             ? null
             : new CancellationTokenSource(timeout);
@@ -316,6 +360,17 @@ public sealed class RecoverableStreamReceiver<TQueueMessage> : IQueueAdapterRece
         {
             _checkpointer.Update(offset, utcNow, CancellationToken.None);
         }
+    }
+
+    private void ClearPendingMessages()
+    {
+        if (_pendingMessages is { } pending)
+        {
+            Array.Clear(pending, _pendingStart, pending.Length - _pendingStart);
+        }
+
+        _pendingMessages = null;
+        _pendingStart = 0;
     }
 
     private sealed class StreamActivityNotificationBatch(StreamPosition position) : IBatchContainer
