@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -67,6 +68,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// <param name="directoryOptions">The Azure Table Storage grain directory options.</param>
         /// <param name="clusterOptions">The cluster options.</param>
         /// <param name="loggerFactory">The logger factory.</param>
+        [SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "The Orleans dependency injection container supplies the cluster options instance.")]
         public AzureTableGrainDirectory(
             AzureTableGrainDirectoryOptions directoryOptions,
             IOptions<ClusterOptions> clusterOptions,
@@ -100,6 +102,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// </summary>
         /// <param name="address">The grain address to register.</param>
         /// <returns>The grain address registered in the directory.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="address"/> is <see langword="null"/>.</exception>
         public Task<GrainAddress?> Register(GrainAddress address) => Register(address, null);
 
         /// <summary>
@@ -108,8 +111,11 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// <param name="address">The grain address to register.</param>
         /// <param name="previousAddress">The previous registration to replace, or <see langword="null"/> to require an empty entry.</param>
         /// <returns>The grain address registered in the directory.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="address"/> is <see langword="null"/>.</exception>
         public async Task<GrainAddress?> Register(GrainAddress address, GrainAddress? previousAddress)
         {
+            ArgumentNullException.ThrowIfNull(address);
+
             (bool isSuccess, string? eTag) result;
             if (previousAddress is not null)
             {
@@ -145,8 +151,11 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// </summary>
         /// <param name="address">The grain address to remove.</param>
         /// <returns>A task representing the operation.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="address"/> is <see langword="null"/>.</exception>
         public async Task Unregister(GrainAddress address)
         {
+            ArgumentNullException.ThrowIfNull(address);
+
             var result = await this.tableDataManager.ReadSingleTableEntryAsync(this.clusterId, GrainDirectoryEntity.GrainIdToRowKey(address.GrainId));
 
             // No entry found
@@ -166,8 +175,11 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// </summary>
         /// <param name="addresses">The grain addresses to remove.</param>
         /// <returns>A task representing the operation.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="addresses"/> is <see langword="null"/>.</exception>
         public async Task UnregisterMany(List<GrainAddress> addresses)
         {
+            ArgumentNullException.ThrowIfNull(addresses);
+
             if (addresses.Count <= this.tableDataManager.StoragePolicyOptions.MaxBulkUpdateRows)
             {
                 await UnregisterManyBlock(addresses);
