@@ -21,19 +21,28 @@ public interface IRecoverableStreamSource<TQueueMessage>
     /// <summary>
     /// Reads an ordered batch of immutable source records.
     /// </summary>
+    /// <param name="maxCount">The maximum number of records to return.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
     Task<IReadOnlyList<TQueueMessage>> Read(int maxCount, CancellationToken cancellationToken);
 
     /// <summary>
     /// Notifies the source that records were successfully admitted to the cache.
     /// </summary>
     /// <param name="messages">The admitted records.</param>
-    /// <remarks>Sources should advance volatile read offsets only in this callback.</remarks>
+    /// <remarks>
+    /// Each callback covers an ordered prefix of the remaining records from one read.
+    /// Sources advance volatile read offsets through that prefix. The list is valid for the duration of the callback.
+    /// </remarks>
     void MessagesAdded(IReadOnlyList<TQueueMessage> messages) { }
 
     /// <summary>
     /// Notifies the source that records could not be admitted to the cache.
     /// </summary>
     /// <param name="messages">The records which were not admitted.</param>
+    /// <remarks>
+    /// The list contains the remaining records from the read and is valid for the duration of the callback.
+    /// The next read resumes after the last successfully admitted prefix.
+    /// </remarks>
     void MessagesAddFailed(IReadOnlyList<TQueueMessage> messages) { }
 
     /// <summary>

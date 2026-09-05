@@ -26,6 +26,11 @@ public class AdoNetStreamOptionsValidator(AdoNetStreamOptions options, string na
             throw new OrleansConfigurationException($"Invalid {nameof(AdoNetStreamOptions)} values for ADO.NET Streaming Provider '{name}': {nameof(options.MaxMessagesPerRead)} must be greater than zero.");
         }
 
+        if (options.MaxCacheSizeBytes <= 0)
+        {
+            throw new OrleansConfigurationException($"Invalid {nameof(AdoNetStreamOptions)} values for ADO.NET Streaming Provider '{name}': {nameof(options.MaxCacheSizeBytes)} must be greater than zero.");
+        }
+
         if (options.CheckpointPersistInterval <= TimeSpan.Zero)
         {
             throw new OrleansConfigurationException($"Invalid {nameof(AdoNetStreamOptions)} values for ADO.NET Streaming Provider '{name}': {nameof(options.CheckpointPersistInterval)} must be greater than zero.");
