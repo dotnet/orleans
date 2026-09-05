@@ -17,16 +17,18 @@ namespace Orleans.Runtime
         private readonly ILogger<ClusterMembershipService> log;
         private readonly IFatalErrorHandler fatalErrorHandler;
         private ClusterMembershipSnapshot snapshot;
+        private MembershipTableSnapshot tableSnapshot;
 
         public ClusterMembershipService(
             IMembershipManager membershipManager,
             ILogger<ClusterMembershipService> log,
             IFatalErrorHandler fatalErrorHandler)
         {
-            this.snapshot = membershipManager.CurrentSnapshot.CreateClusterMembershipSnapshot();
+            this.tableSnapshot = membershipManager.CurrentSnapshot;
+            this.snapshot = this.tableSnapshot.CreateClusterMembershipSnapshot();
             this.updates = new AsyncEnumerable<ClusterMembershipSnapshot>(
                 initialValue: this.snapshot,
-                updateValidator: (previous, proposed) => proposed.Version > previous.Version,
+                updateValidator: (previous, proposed) => proposed.IsSuccessorTo(previous),
                 onPublished: update => Interlocked.Exchange(ref this.snapshot, update));
             this.membershipManager = membershipManager;
             this.log = log;
@@ -38,13 +40,19 @@ namespace Orleans.Runtime
             get
             {
                 var tableSnapshot = this.membershipManager.CurrentSnapshot;
-                if (this.snapshot.Version == tableSnapshot.Version)
+                if (ReferenceEquals(Volatile.Read(ref this.tableSnapshot), tableSnapshot))
                 {
-                    return this.snapshot;
+                    return Volatile.Read(ref this.snapshot);
                 }
 
-                this.updates.TryPublish(tableSnapshot.CreateClusterMembershipSnapshot());
-                return this.snapshot;
+                var currentSnapshot = Volatile.Read(ref this.snapshot);
+                if (currentSnapshot.Version > tableSnapshot.Version)
+                {
+                    return currentSnapshot;
+                }
+
+                this.TryPublish(tableSnapshot);
+                return Volatile.Read(ref this.snapshot);
             }
         }
 
@@ -84,7 +92,7 @@ namespace Orleans.Runtime
                 LogDebugStartingToProcessMembershipUpdates(log);
                 await foreach (var tableSnapshot in this.membershipManager.MembershipUpdates.WithCancellation(ct))
                 {
-                    this.updates.TryPublish(tableSnapshot.CreateClusterMembershipSnapshot());
+                    this.TryPublish(tableSnapshot);
                 }
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -100,6 +108,18 @@ namespace Orleans.Runtime
             {
                 LogDebugStoppingMembershipUpdateProcessor(log);
             }
+        }
+
+        internal bool TryPublish(ClusterMembershipSnapshot proposed)
+            => this.updates.TryPublish(
+                static (previous, proposed) => proposed.MergeMetadata(previous),
+                proposed);
+
+        private bool TryPublish(MembershipTableSnapshot proposed)
+        {
+            var result = this.TryPublish(proposed.CreateClusterMembershipSnapshot());
+            Volatile.Write(ref this.tableSnapshot, proposed);
+            return result;
         }
 
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Linq;
@@ -36,6 +37,7 @@ namespace Orleans.Runtime.Host
                 writer.WritePropertyName("ProxyPort"); writer.WriteValue(me.ProxyPort);
                 writer.WritePropertyName("StartTime"); writer.WriteValue(me.StartTime);
                 writer.WritePropertyName("SuspectTimes"); serializer.Serialize(writer, me.SuspectTimes);
+                writer.WritePropertyName("Metadata"); serializer.Serialize(writer, me.Metadata);
                 writer.WriteEndObject();
             }
 
@@ -51,7 +53,8 @@ namespace Orleans.Runtime.Host
                     Status = jo["Status"]!.ToObject<SiloStatus>(serializer),
                     ProxyPort = jo["ProxyPort"]!.Value<int>(),
                     StartTime = jo["StartTime"]!.Value<DateTime>(),
-                    SuspectTimes = jo["SuspectTimes"]!.ToObject<List<Tuple<SiloAddress, DateTime>>>(serializer)
+                    SuspectTimes = jo["SuspectTimes"]!.ToObject<List<Tuple<SiloAddress, DateTime>>>(serializer),
+                    Metadata = jo["Metadata"]?.ToObject<Dictionary<string, string>>(serializer)?.ToImmutableDictionary()
                 };
             }
         }

@@ -50,4 +50,8 @@ internal class SiloEntity : BaseClusterEntity
     [JsonPropertyName(nameof(IAmAliveTime))]
     public DateTimeOffset IAmAliveTime { get; set; }
 
+    [JsonProperty(nameof(Metadata))]
+    [JsonPropertyName(nameof(Metadata))]
+    public Dictionary<string, string>? Metadata { get; set; }
+
 }

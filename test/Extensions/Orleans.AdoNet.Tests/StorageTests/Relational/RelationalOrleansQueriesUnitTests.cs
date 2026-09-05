@@ -218,8 +218,8 @@ public sealed class RelationalOrleansQueriesUnitTests
             .ExpectRead(
                 Sql("MembershipReadAllKey"),
                 CreateTable(
-                    [("StartTime", typeof(DateTime)), ("Version", typeof(long))],
-                    [DBNull.Value, 17L]));
+                    [("StartTime", typeof(DateTime)), ("MetadataJson", typeof(string)), ("Version", typeof(long))],
+                    [DBNull.Value, DBNull.Value, 17L]));
         var queries = await ClusteringQueries.CreateInstance(storage);
 
         var result = await queries.MembershipReadAllAsync("cluster-a");
@@ -253,9 +253,10 @@ public sealed class RelationalOrleansQueriesUnitTests
                         ("ProxyPort", typeof(int)),
                         ("IAmAliveTime", typeof(DateTime)),
                         ("SuspectTimes", typeof(string)),
+                        ("MetadataJson", typeof(string)),
                         ("Version", typeof(long)),
                     ],
-                    [startTime, 11_111, 9, "127.0.0.1", "silo-a", "host-a", (int)SiloStatus.Active, 30_000, aliveTime, DBNull.Value, 42L]));
+                    [startTime, 11_111, 9, "127.0.0.1", "silo-a", "host-a", (int)SiloStatus.Active, 30_000, aliveTime, DBNull.Value, """{"region":"west"}""", 42L]));
         var queries = await ClusteringQueries.CreateInstance(storage);
 
         var result = await queries.MembershipReadAllAsync("cluster-b");
@@ -269,9 +270,41 @@ public sealed class RelationalOrleansQueriesUnitTests
         Assert.Equal(startTime, member.StartTime);
         Assert.Equal(aliveTime, member.IAmAliveTime);
         Assert.Null(member.SuspectTimes);
+        Assert.NotNull(member.Metadata);
+        Assert.Equal("west", member.Metadata["region"]);
         Assert.Equal(42, result.Version.Version);
         Assert.Equal("42", result.Version.VersionEtag);
         AssertOperationCall(storage, Sql("MembershipReadAllKey"));
+        storage.VerifyComplete();
+    }
+
+    [Fact]
+    public async Task ReadAllMembershipRows_LegacySchemaReturnsUnavailableMetadata()
+    {
+        var startTime = new DateTime(2026, 8, 27, 10, 0, 0, DateTimeKind.Utc);
+        var storage = ExpectQueryLoad(new ScriptedRelationalStorage(), MembershipQueryKeys)
+            .ExpectRead(
+                Sql("MembershipReadAllKey"),
+                CreateTable(
+                    [
+                        ("StartTime", typeof(DateTime)),
+                        ("Port", typeof(int)),
+                        ("Generation", typeof(int)),
+                        ("Address", typeof(string)),
+                        ("SiloName", typeof(string)),
+                        ("HostName", typeof(string)),
+                        ("Status", typeof(int)),
+                        ("ProxyPort", typeof(int)),
+                        ("IAmAliveTime", typeof(DateTime)),
+                        ("SuspectTimes", typeof(string)),
+                        ("Version", typeof(long)),
+                    ],
+                    [startTime, 11_111, 9, "127.0.0.1", "silo-a", "host-a", (int)SiloStatus.Active, 30_000, startTime, DBNull.Value, 42L]));
+        var queries = await ClusteringQueries.CreateInstance(storage);
+
+        var result = await queries.MembershipReadAllAsync("legacy-cluster");
+
+        Assert.Null(Assert.Single(result.Members).Item1.Metadata);
         storage.VerifyComplete();
     }
 
@@ -930,6 +963,7 @@ public sealed class RelationalOrleansQueriesUnitTests
                         ("ProxyPort", typeof(int)),
                         ("IAmAliveTime", typeof(DateTime)),
                         ("SuspectTimes", typeof(string)),
+                        ("MetadataJson", typeof(string)),
                         ("Version", typeof(long)),
                     ],
                     [
@@ -943,6 +977,7 @@ public sealed class RelationalOrleansQueriesUnitTests
                         30_004,
                         aliveTime,
                         "10.4.5.7:11223@15,2026-08-27 17:33:00.000 GMT",
+                        """{"region":"east"}""",
                         106L,
                     ]));
         var queries = await ClusteringQueries.CreateInstance(storage);
@@ -963,6 +998,8 @@ public sealed class RelationalOrleansQueriesUnitTests
         var suspect = Assert.Single(member.SuspectTimes);
         Assert.Equal(SiloAddress.New(IPAddress.Parse("10.4.5.7"), 11_223, 15), suspect.Item1);
         Assert.Equal(suspectTime, suspect.Item2);
+        Assert.NotNull(member.Metadata);
+        Assert.Equal("east", member.Metadata["region"]);
         Assert.Equal(106, result.Version.Version);
         Assert.Equal("106", result.Version.VersionEtag);
         AssertParameters(

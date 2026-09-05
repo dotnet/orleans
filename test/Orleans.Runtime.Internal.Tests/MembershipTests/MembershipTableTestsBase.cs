@@ -1,4 +1,6 @@
 using System.Net;
+using System.Collections.Immutable;
+using System.Text.Json;
 using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.TestingHost.Utils;
@@ -153,6 +155,39 @@ namespace UnitTests.MembershipTests
                 Assert.Equal(1, data.Version.Version);
 
             Assert.Single(data.Members);
+        }
+
+        protected async Task MembershipTable_MetadataRoundTrips()
+        {
+            var membershipEntry = CreateMembershipEntryForTest();
+            membershipEntry.Metadata = ImmutableDictionary<string, string>.Empty
+                .Add("region", "west")
+                .Add("role", "frontend");
+
+            var data = await membershipTable.ReadAll();
+            Assert.Empty(data.Members);
+
+            Assert.True(await membershipTable.InsertRow(membershipEntry, data.Version.Next()));
+
+            var storedEntry = Assert.Single((await membershipTable.ReadRow(membershipEntry.SiloAddress)).Members).Item1;
+            Assert.NotNull(storedEntry.Metadata);
+            Assert.Equal(membershipEntry.Metadata, storedEntry.Metadata);
+        }
+
+        protected async Task MembershipTable_LargeMetadataRoundTrips()
+        {
+            var membershipEntry = CreateMembershipEntryForTest();
+            membershipEntry.Metadata = ImmutableDictionary<string, string>.Empty
+                .Add("large", new string('x', 70 * 1024));
+            Assert.True(JsonSerializer.SerializeToUtf8Bytes(membershipEntry.Metadata).Length > 64 * 1024);
+
+            var data = await membershipTable.ReadAll();
+            Assert.Empty(data.Members);
+
+            Assert.True(await membershipTable.InsertRow(membershipEntry, data.Version.Next()));
+
+            var storedEntry = Assert.Single((await membershipTable.ReadRow(membershipEntry.SiloAddress)).Members).Item1;
+            Assert.Equal(membershipEntry.Metadata, storedEntry.Metadata);
         }
 
         protected async Task MembershipTable_ReadRow_Insert_Read(bool extendedProtocol = true)

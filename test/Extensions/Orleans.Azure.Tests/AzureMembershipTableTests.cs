@@ -1,3 +1,8 @@
+using System.Collections.Immutable;
+using System.Net;
+using System.Text.Json;
+using Azure;
+using Azure.Data.Tables;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.AzureUtils;
@@ -104,6 +109,12 @@ namespace Tester.AzureUtils
         }
 
         [Fact, TestCategory("Functional")]
+        public async Task MembershipTable_Azure_MetadataRoundTrips()
+        {
+            await MembershipTable_MetadataRoundTrips();
+        }
+
+        [Fact, TestCategory("Functional")]
         public async Task MembershipTable_Azure_ReadRow_Insert_Read()
         {
             await MembershipTable_ReadRow_Insert_Read();
@@ -142,5 +153,125 @@ namespace Tester.AzureUtils
         {
             await MembershipTable_UpdateIAmAlive();
         }
+
+        [Fact, TestCategory("Functional")]
+        public async Task MembershipMetadata_HeartbeatRepairsMissingInlineMetadata()
+        {
+            var options = new AzureStorageClusteringOptions();
+            options.ConfigureTestDefaults();
+            var membership = new AzureBasedMembershipTable(loggerFactory, Options.Create(options), _clusterOptions);
+            await membership.InitializeMembershipTable(false);
+
+            var entry = CreateMetadataEntry();
+            var initial = await membership.ReadAll();
+            Assert.True(await membership.InsertRow(entry, initial.Version.Next()));
+
+            var table = options.TableServiceClient!.GetTableClient(options.TableName);
+            var rowKey = SiloInstanceTableEntry.ConstructRowKey(entry.SiloAddress);
+            var legacyEntity = (await table.GetEntityAsync<TableEntity>(
+                clusterId,
+                rowKey,
+                cancellationToken: TestContext.Current.CancellationToken)).Value;
+            legacyEntity.Remove(nameof(SiloInstanceTableEntry.Metadata));
+            await table.UpdateEntityAsync(
+                legacyEntity,
+                ETag.All,
+                TableUpdateMode.Replace,
+                TestContext.Current.CancellationToken);
+
+            entry.IAmAliveTime = entry.IAmAliveTime.AddMinutes(1);
+            await membership.UpdateIAmAlive(entry);
+
+            var repairedEntity = (await table.GetEntityAsync<TableEntity>(
+                clusterId,
+                rowKey,
+                cancellationToken: TestContext.Current.CancellationToken)).Value;
+            var serializedMetadata = Assert.IsType<string>(repairedEntity[nameof(SiloInstanceTableEntry.Metadata)]);
+            var repairedMetadata = JsonSerializer.Deserialize<Dictionary<string, string>>(serializedMetadata);
+            Assert.Equal(entry.Metadata, repairedMetadata);
+            var storedIAmAliveTime = LogFormatter.ParseDate(
+                Assert.IsType<string>(repairedEntity[nameof(SiloInstanceTableEntry.IAmAliveTime)]));
+            var difference = (entry.IAmAliveTime - storedIAmAliveTime).Duration();
+            Assert.True(difference < TimeSpan.FromMilliseconds(1), difference.ToString());
+        }
+
+        private static MembershipEntry CreateMetadataEntry() => new()
+        {
+            SiloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 12345), 123456),
+            HostName = "host",
+            SiloName = "silo",
+            Status = SiloStatus.Joining,
+            StartTime = DateTime.UtcNow,
+            IAmAliveTime = DateTime.UtcNow,
+            Metadata = ImmutableDictionary<string, string>.Empty.Add("region", "west")
+        };
     }
+
+    [TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("AzureStorage")]
+    [TestArea("Membership")]
+    public class AzureMembershipMetadataContractTests
+    {
+        [Fact]
+        public void ConvertPartial_IncludesSerializedMetadata()
+        {
+            var metadata = ImmutableDictionary<string, string>.Empty.Add("region", "west");
+            var entry = new MembershipEntry
+            {
+                SiloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 12345), 123456),
+                IAmAliveTime = DateTime.UtcNow,
+                Metadata = metadata
+            };
+
+            var result = AzureBasedMembershipTable.ConvertPartial(entry, "cluster");
+
+            Assert.Equal(metadata, JsonSerializer.Deserialize<Dictionary<string, string>>(result.Metadata!));
+        }
+
+        [Fact]
+        public void ConvertPartial_IncludesAvailableEmptyMetadata()
+        {
+            var entry = new MembershipEntry
+            {
+                SiloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 12345), 123456),
+                IAmAliveTime = DateTime.UtcNow,
+                Metadata = ImmutableDictionary<string, string>.Empty
+            };
+
+            var result = AzureBasedMembershipTable.ConvertPartial(entry, "cluster");
+
+            Assert.NotNull(result.Metadata);
+            Assert.Empty(JsonSerializer.Deserialize<Dictionary<string, string>>(result.Metadata)!);
+        }
+
+        [Fact]
+        public void ConvertPartial_OmitsMetadataWhenStoredMetadataIsAvailable()
+        {
+            var entry = new MembershipEntry
+            {
+                SiloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 12345), 123456),
+                IAmAliveTime = DateTime.UtcNow,
+                Metadata = ImmutableDictionary<string, string>.Empty.Add("region", "replacement")
+            };
+
+            var result = AzureBasedMembershipTable.ConvertPartial(entry, "cluster", includeMetadata: false);
+
+            Assert.Null(result.Metadata);
+        }
+
+        [Fact]
+        public void MetadataRepairCountdown_ChecksOnConfiguredInterval()
+        {
+            var countdown = AzureBasedMembershipTable.MetadataRepairCheckInterval;
+
+            for (var heartbeat = 1; heartbeat < AzureBasedMembershipTable.MetadataRepairCheckInterval; heartbeat++)
+            {
+                Assert.False(AzureBasedMembershipTable.ShouldCheckMetadata(ref countdown));
+            }
+
+            Assert.True(AzureBasedMembershipTable.ShouldCheckMetadata(ref countdown));
+        }
+    }
+
 }

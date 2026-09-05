@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Data;
 using System.Linq;
 using System.Net;
 using System.Reflection;
+using System.Text.Json;
 using Orleans.Runtime;
 
 #if CLUSTERING_ADONET
@@ -32,9 +34,29 @@ namespace Orleans.Tests.SqlUtils
     internal class DbStoredQueries
     {
         private readonly Dictionary<string, string> queries;
+#if CLUSTERING_ADONET || TESTER_SQLUTILS
+        private static readonly string[] MembershipMetadataQueryKeys =
+        [
+            "InsertMembershipV2Key",
+            "UpdateMembershipV2Key",
+            "MembershipReadRowV2Key",
+            "MembershipReadAllV2Key"
+        ];
+        private readonly bool supportsMembershipMetadata;
+#endif
 
         internal DbStoredQueries(Dictionary<string, string> queries)
         {
+#if CLUSTERING_ADONET || TESTER_SQLUTILS
+            var membershipMetadataQueryCount = MembershipMetadataQueryKeys.Count(queries.ContainsKey);
+            if (membershipMetadataQueryCount != 0 && membershipMetadataQueryCount != MembershipMetadataQueryKeys.Length)
+            {
+                throw new ArgumentException(
+                    $"Membership metadata queries must be provided as a complete bundle. Missing are: {string.Join(",", MembershipMetadataQueryKeys.Except(queries.Keys))}");
+            }
+
+            supportsMembershipMetadata = membershipMetadataQueryCount == MembershipMetadataQueryKeys.Length;
+#endif
             var fields = typeof(DbStoredQueries).GetProperties(BindingFlags.Instance | BindingFlags.NonPublic)
                 .Select(p => p.Name);
             var missingQueryKeys = fields.Except(queries.Keys).ToArray();
@@ -62,12 +84,12 @@ namespace Orleans.Tests.SqlUtils
         /// <summary>
         /// A query template to retrieve a single row of membership data.
         /// </summary>        
-        internal string MembershipReadRowKey => queries[nameof(MembershipReadRowKey)];
+        internal string MembershipReadRowKey => queries[supportsMembershipMetadata ? "MembershipReadRowV2Key" : nameof(MembershipReadRowKey)];
 
         /// <summary>
         /// A query template to retrieve all membership data.
         /// </summary>        
-        internal string MembershipReadAllKey => queries[nameof(MembershipReadAllKey)];
+        internal string MembershipReadAllKey => queries[supportsMembershipMetadata ? "MembershipReadAllV2Key" : nameof(MembershipReadAllKey)];
 
         /// <summary>
         /// A query template to insert a membership version row.
@@ -82,12 +104,15 @@ namespace Orleans.Tests.SqlUtils
         /// <summary>
         /// A query template to insert a membership row.
         /// </summary>
-        internal string InsertMembershipKey => queries[nameof(InsertMembershipKey)];
+        internal string InsertMembershipKey => queries[supportsMembershipMetadata ? "InsertMembershipV2Key" : nameof(InsertMembershipKey)];
 
         /// <summary>
         /// A query template to update a membership row.
         /// </summary>
-        internal string UpdateMembershipKey => queries[nameof(UpdateMembershipKey)];
+        internal string UpdateMembershipKey => queries[supportsMembershipMetadata ? "UpdateMembershipV2Key" : nameof(UpdateMembershipKey)];
+
+        internal bool SupportsMembershipMetadata()
+            => supportsMembershipMetadata;
 
         /// <summary>
         /// A query template to delete membership entries.
@@ -226,6 +251,12 @@ namespace Orleans.Tests.SqlUtils
                         IAmAliveTime = record.GetDateTimeValue(nameof(Columns.IAmAliveTime))
                     };
 
+                    var metadataJson = TryGetMetadataJson(record);
+                    if (!string.IsNullOrEmpty(metadataJson))
+                    {
+                        entry.Metadata = JsonSerializer.Deserialize<Dictionary<string, string>>(metadataJson)?.ToImmutableDictionary();
+                    }
+
                     string? suspectingSilos = record.GetValueOrDefault<string>(nameof(Columns.SuspectTimes));
                     if (!string.IsNullOrWhiteSpace(suspectingSilos))
                     {
@@ -237,9 +268,23 @@ namespace Orleans.Tests.SqlUtils
                                 LogFormatter.ParseDate(split[1]));
                         }));
                     }
+
                 }
 
                 return Tuple.Create(entry, GetVersion(record));
+            }
+
+            private static string? TryGetMetadataJson(IDataRecord record)
+            {
+                for (var index = 0; index < record.FieldCount; index++)
+                {
+                    if (string.Equals(record.GetName(index), nameof(Columns.MetadataJson), StringComparison.OrdinalIgnoreCase))
+                    {
+                        return record.IsDBNull(index) ? null : Convert.ToString(record.GetValue(index));
+                    }
+                }
+
+                return null;
             }
 
             /// <summary>
@@ -492,6 +537,11 @@ namespace Orleans.Tests.SqlUtils
                         : string.Join("|", value.Select(
                             s => $"{s.Item1.ToParsableString()},{LogFormatter.PrintDate(s.Item2)}")));
                 }
+            }
+
+            internal string? MetadataJson
+            {
+                set { Add(nameof(MetadataJson), value); }
             }
 
             internal string QueueId

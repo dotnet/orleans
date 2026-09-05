@@ -9,6 +9,7 @@ using Orleans.Configuration;
 using Orleans.Core.Diagnostics;
 using Orleans.Runtime;
 using Orleans.Runtime.MembershipService;
+using Orleans.Runtime.MembershipService.SiloMetadata;
 using Orleans.TestingHost.Diagnostics;
 using TestExtensions;
 using Xunit;
@@ -84,6 +85,48 @@ namespace NonSilo.Tests.Membership
                 gracefulShutdown: false,
                 cancellationToken: TestContext.Current.CancellationToken);
         }
+
+        [Fact]
+        public async Task UpdateIAmAlive_IncludesLocalMetadata()
+        {
+            var expected = ImmutableDictionary<string, string>.Empty.Add("region", "west");
+            var membershipTable = Substitute.For<IMembershipTable>();
+            using var manager = CreateManager(membershipTable, new SiloMetadata(expected));
+
+            await manager.UpdateIAmAlive();
+
+            await membershipTable.Received(1).UpdateIAmAlive(Arg.Is<MembershipEntry>(entry =>
+                entry.SiloAddress.Equals(this.localSilo)
+                && entry.Metadata != null
+                && entry.Metadata.SequenceEqual(expected)));
+        }
+
+        [Fact]
+        public async Task UpdateIAmAlive_IncludesAvailableEmptyLocalMetadata()
+        {
+            var membershipTable = Substitute.For<IMembershipTable>();
+            using var manager = CreateManager(membershipTable, SiloMetadata.Empty);
+
+            await manager.UpdateIAmAlive();
+
+            await membershipTable.Received(1).UpdateIAmAlive(Arg.Is<MembershipEntry>(entry =>
+                entry.SiloAddress.Equals(this.localSilo)
+                && entry.Metadata != null
+                && entry.Metadata.Count == 0));
+        }
+
+        private MembershipTableManager CreateManager(IMembershipTable membershipTable, SiloMetadata metadata) =>
+            new(
+                localSiloDetails: this.localSiloDetails,
+                clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
+                membershipTable: membershipTable,
+                fatalErrorHandler: this.fatalErrorHandler,
+                gossiper: this.membershipGossiper,
+                log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
+                timerFactory: new AsyncTimerFactory(this.loggerFactory),
+                this.lifecycle,
+                timeProvider: TimeProvider.System,
+                siloMetadata: Options.Create(metadata));
 
         private async Task BasicScenarioTest(
             InMemoryMembershipTable membershipTable,

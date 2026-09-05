@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Linq;
+using SiloMetadataModel = Orleans.Runtime.MembershipService.SiloMetadata.SiloMetadata;
 
 namespace Orleans.Runtime.MembershipService
 {
@@ -11,13 +12,17 @@ namespace Orleans.Runtime.MembershipService
             foreach (var member in membership.Entries)
             {
                 var entry = member.Value;
-                memberBuilder[entry.SiloAddress] = new ClusterMember(
-                    entry.SiloAddress,
-                    entry.Status,
-                    entry.SiloName,
-                    entry.Status == SiloStatus.Dead
-                        && entry.SuspectTimes is { Count: > 0 } suspectTimes
-                        && suspectTimes.All(suspect => !suspect.Item1.Equals(entry.SiloAddress)));
+                var wasDeclaredDead = entry.Status == SiloStatus.Dead
+                    && entry.SuspectTimes is { Count: > 0 } suspectTimes
+                    && suspectTimes.All(suspect => !suspect.Item1.Equals(entry.SiloAddress));
+                memberBuilder[entry.SiloAddress] = entry.Metadata is { } metadata
+                    ? new ClusterMember(
+                        entry.SiloAddress,
+                        entry.Status,
+                        entry.SiloName,
+                        metadata.Count == 0 ? SiloMetadataModel.Empty : new SiloMetadataModel(metadata),
+                        wasDeclaredDead)
+                    : new ClusterMember(entry.SiloAddress, entry.Status, entry.SiloName, wasDeclaredDead);
             }
 
             return new ClusterMembershipSnapshot(memberBuilder.ToImmutable(), membership.Version);

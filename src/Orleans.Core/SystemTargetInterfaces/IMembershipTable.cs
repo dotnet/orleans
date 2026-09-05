@@ -93,7 +93,8 @@ namespace Orleans
 
         /// <summary>
         /// Updates the IAmAlive part (column) of the MembershipEntry for this silo.
-        /// This operation should only update the IAmAlive column and not change other columns.
+        /// The operation can also restore this silo's immutable metadata when <see cref="MembershipEntry.Metadata"/>
+        /// is available and the stored metadata is missing. It should not change other columns.
         /// This operation is a "dirty write" or "in place update" and is performed without etag validation. 
         /// With regards to eTags update:
         /// This operation may automatically update the eTag associated with the given silo row, but it does not have to. It can also leave the etag not changed ("dirty write").
@@ -387,6 +388,32 @@ namespace Orleans
         [Id(10)]
         public DateTime IAmAliveTime { get; set; }
 
+        [Id(11)]
+        private ImmutableDictionary<string, string>? MetadataStorage { get; set; }
+
+        /// <summary>
+        /// Gets or sets the silo metadata, if it is available from the membership table.
+        /// </summary>
+        /// <remarks>
+        /// A <see langword="null"/> value indicates that metadata is unavailable. An empty dictionary indicates
+        /// that metadata is available and the silo has not supplied any metadata values.
+        /// Metadata is fixed for the lifetime of a silo instance. Membership snapshots can enrich an unavailable
+        /// value when metadata becomes available, and retain the first available value thereafter. During a
+        /// mixed-version rolling upgrade, an older replace-style provider write can temporarily remove inline
+        /// metadata. An active metadata-aware silo restores its own metadata on its next heartbeat.
+        /// Storage limits are determined by the configured membership provider.
+        /// </remarks>
+        public IReadOnlyDictionary<string, string>? Metadata
+        {
+            get => MetadataStorage;
+            set => MetadataStorage = value switch
+            {
+                null => null,
+                ImmutableDictionary<string, string> immutable => immutable,
+                _ => value.ToImmutableDictionary(StringComparer.Ordinal)
+            };
+        }
+
         internal DateTime EffectiveIAmAliveTime
         {
             get
@@ -490,7 +517,8 @@ namespace Orleans
                 UpdateZone = UpdateZone,
                 FaultZone = FaultZone,
                 StartTime = StartTime,
-                IAmAliveTime = IAmAliveTime
+                IAmAliveTime = IAmAliveTime,
+                Metadata = Metadata
             };
 
             return copy;
@@ -563,7 +591,7 @@ namespace Orleans
             var suspecters = SuspectTimes == null ? null : Utils.EnumerableToString(SuspectTimes.Select(tuple => tuple.Item1));
             var suspectTimes = SuspectTimes == null ? null : Utils.EnumerableToString(SuspectTimes.Select(tuple => LogFormatter.PrintDate(tuple.Item2)));
 
-            return @$"[SiloAddress={SiloAddress} SiloName={SiloName} Status={Status} HostName={HostName} ProxyPort={ProxyPort} RoleName={RoleName} UpdateZone={UpdateZone} FaultZone={FaultZone} StartTime={LogFormatter.PrintDate(StartTime)} IAmAliveTime={LogFormatter.PrintDate(IAmAliveTime)}{(suspecters == null ? null : " Suspecters=")}{suspecters}{(suspectTimes == null ? null : " SuspectTimes=")}{suspectTimes}]";
+            return @$"[SiloAddress={SiloAddress} SiloName={SiloName} Status={Status} HostName={HostName} ProxyPort={ProxyPort} RoleName={RoleName} UpdateZone={UpdateZone} FaultZone={FaultZone} StartTime={LogFormatter.PrintDate(StartTime)} IAmAliveTime={LogFormatter.PrintDate(IAmAliveTime)} MetadataAvailable={Metadata is not null} MetadataCount={Metadata?.Count ?? 0}{(suspecters == null ? null : " Suspecters=")}{suspecters}{(suspectTimes == null ? null : " SuspectTimes=")}{suspectTimes}]";
         }
     }
 }

@@ -22,12 +22,28 @@ CREATE TABLE OrleansMembershipTable
 	Status INT NOT NULL,
 	ProxyPort INT NULL,
 	SuspectTimes VARCHAR(8000) NULL,
+	MetadataJson NVARCHAR(MAX) NULL,
 	StartTime DATETIME2(3) NOT NULL,
 	IAmAliveTime DATETIME2(3) NOT NULL,
 
 	CONSTRAINT PK_MembershipTable_DeploymentId PRIMARY KEY(DeploymentId, Address, Port, Generation),
 	CONSTRAINT FK_MembershipTable_MembershipVersionTable_DeploymentId FOREIGN KEY (DeploymentId) REFERENCES OrleansMembershipVersionTable (DeploymentId)
 );
+
+IF COL_LENGTH(N'OrleansMembershipTable', N'MetadataJson') IS NULL
+BEGIN
+	ALTER TABLE OrleansMembershipTable ADD MetadataJson NVARCHAR(MAX) NULL;
+END;
+ELSE IF EXISTS (
+	SELECT 1
+	FROM sys.columns
+	WHERE object_id = OBJECT_ID(N'OrleansMembershipTable')
+	  AND name = N'MetadataJson'
+	  AND (max_length <> -1 OR is_nullable = 0)
+)
+BEGIN
+	ALTER TABLE OrleansMembershipTable ALTER COLUMN MetadataJson NVARCHAR(MAX) NULL;
+END;
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 SELECT
@@ -44,9 +60,9 @@ SELECT
 		AND Port = @Port AND @Port IS NOT NULL
 		AND Generation = @Generation AND @Generation IS NOT NULL;
 	'
-WHERE NOT EXISTS 
-( 
-    SELECT 1 
+WHERE NOT EXISTS
+(
+    SELECT 1
     FROM OrleansQuery oqt
     WHERE oqt.[QueryKey] = 'UpdateIAmAlivetimeKey'
 );
@@ -128,6 +144,74 @@ SELECT
 		DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL
 		AND Version = @Version AND @Version IS NOT NULL
 		AND @@ROWCOUNT > 0;
+
+	SET @ROWCOUNT = @@ROWCOUNT;
+
+	IF @ROWCOUNT = 0
+		ROLLBACK TRANSACTION
+	ELSE
+		COMMIT TRANSACTION
+	SELECT @ROWCOUNT;
+	'
+WHERE NOT EXISTS
+(
+    SELECT 1
+    FROM OrleansQuery oqt
+    WHERE oqt.[QueryKey] = 'InsertMembershipKey'
+);
+
+INSERT INTO OrleansQuery(QueryKey, QueryText)
+SELECT
+	'InsertMembershipV2Key',
+	'SET XACT_ABORT, NOCOUNT ON;
+	DECLARE @ROWCOUNT AS INT;
+	BEGIN TRANSACTION;
+	INSERT INTO OrleansMembershipTable
+	(
+		DeploymentId,
+		Address,
+		Port,
+		Generation,
+		SiloName,
+		HostName,
+		Status,
+		ProxyPort,
+		MetadataJson,
+		StartTime,
+		IAmAliveTime
+	)
+	SELECT
+		@DeploymentId,
+		@Address,
+		@Port,
+		@Generation,
+		@SiloName,
+		@HostName,
+		@Status,
+		@ProxyPort,
+		@MetadataJson,
+		@StartTime,
+		@IAmAliveTime
+	WHERE NOT EXISTS
+	(
+		SELECT 1
+		FROM
+			OrleansMembershipTable WITH(HOLDLOCK, XLOCK, ROWLOCK)
+		WHERE
+			DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL
+			AND Address = @Address AND @Address IS NOT NULL
+			AND Port = @Port AND @Port IS NOT NULL
+			AND Generation = @Generation AND @Generation IS NOT NULL
+	);
+
+	UPDATE OrleansMembershipVersionTable
+	SET
+		Timestamp = GETUTCDATE(),
+		Version = Version + 1
+	WHERE
+		DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL
+		AND Version = @Version AND @Version IS NOT NULL
+		AND @@ROWCOUNT > 0;
 	
 	SET @ROWCOUNT = @@ROWCOUNT;
 	
@@ -137,16 +221,52 @@ SELECT
 		COMMIT TRANSACTION
 	SELECT @ROWCOUNT;
 	'
-WHERE NOT EXISTS 
-( 
-    SELECT 1 
+WHERE NOT EXISTS
+(
+    SELECT 1
     FROM OrleansQuery oqt
-    WHERE oqt.[QueryKey] = 'InsertMembershipKey'
+    WHERE oqt.[QueryKey] = 'InsertMembershipV2Key'
 );
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 SELECT
 	'UpdateMembershipKey',
+	'SET XACT_ABORT, NOCOUNT ON;
+	BEGIN TRANSACTION;
+
+	UPDATE OrleansMembershipVersionTable
+	SET
+		Timestamp = GETUTCDATE(),
+		Version = Version + 1
+	WHERE
+		DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL
+		AND Version = @Version AND @Version IS NOT NULL;
+
+	UPDATE OrleansMembershipTable
+	SET
+		Status = @Status,
+		SuspectTimes = @SuspectTimes,
+		IAmAliveTime = @IAmAliveTime
+	WHERE
+		DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL
+		AND Address = @Address AND @Address IS NOT NULL
+		AND Port = @Port AND @Port IS NOT NULL
+		AND Generation = @Generation AND @Generation IS NOT NULL
+		AND @@ROWCOUNT > 0;
+
+	SELECT @@ROWCOUNT;
+	COMMIT TRANSACTION;
+	'
+WHERE NOT EXISTS 
+( 
+    SELECT 1 
+    FROM OrleansQuery oqt
+    WHERE oqt.[QueryKey] = 'UpdateMembershipKey'
+);
+
+INSERT INTO OrleansQuery(QueryKey, QueryText)
+SELECT
+	'UpdateMembershipV2Key',
 	'SET XACT_ABORT, NOCOUNT ON;
 	BEGIN TRANSACTION;
 	
@@ -162,6 +282,7 @@ SELECT
 	SET
 		Status = @Status,
 		SuspectTimes = @SuspectTimes,
+		MetadataJson = @MetadataJson,
 		IAmAliveTime = @IAmAliveTime
 	WHERE
 		DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL
@@ -173,11 +294,11 @@ SELECT
 	SELECT @@ROWCOUNT;
 	COMMIT TRANSACTION;
 	'
-WHERE NOT EXISTS 
-( 
-    SELECT 1 
+WHERE NOT EXISTS
+(
+    SELECT 1
     FROM OrleansQuery oqt
-    WHERE oqt.[QueryKey] = 'UpdateMembershipKey'
+    WHERE oqt.[QueryKey] = 'UpdateMembershipV2Key'
 );
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
@@ -236,6 +357,39 @@ WHERE NOT EXISTS
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 SELECT
+	'MembershipReadRowV2Key',
+	'SELECT
+		v.DeploymentId,
+		m.Address,
+		m.Port,
+		m.Generation,
+		m.SiloName,
+		m.HostName,
+		m.Status,
+		m.ProxyPort,
+		m.SuspectTimes,
+		m.MetadataJson,
+		m.StartTime,
+		m.IAmAliveTime,
+		v.Version
+	FROM
+		OrleansMembershipVersionTable v
+		LEFT OUTER JOIN OrleansMembershipTable m ON v.DeploymentId = m.DeploymentId
+		AND Address = @Address AND @Address IS NOT NULL
+		AND Port = @Port AND @Port IS NOT NULL
+		AND Generation = @Generation AND @Generation IS NOT NULL
+	WHERE
+		v.DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL;
+	'
+WHERE NOT EXISTS
+(
+    SELECT 1
+    FROM OrleansQuery oqt
+    WHERE oqt.[QueryKey] = 'MembershipReadRowV2Key'
+);
+
+INSERT INTO OrleansQuery(QueryKey, QueryText)
+SELECT
 	'MembershipReadAllKey',
 	'SELECT
 		v.DeploymentId,
@@ -261,6 +415,36 @@ WHERE NOT EXISTS
     SELECT 1 
     FROM OrleansQuery oqt
     WHERE oqt.[QueryKey] = 'MembershipReadAllKey'
+);
+
+INSERT INTO OrleansQuery(QueryKey, QueryText)
+SELECT
+	'MembershipReadAllV2Key',
+	'SELECT
+		v.DeploymentId,
+		m.Address,
+		m.Port,
+		m.Generation,
+		m.SiloName,
+		m.HostName,
+		m.Status,
+		m.ProxyPort,
+		m.SuspectTimes,
+		m.MetadataJson,
+		m.StartTime,
+		m.IAmAliveTime,
+		v.Version
+	FROM
+		OrleansMembershipVersionTable v LEFT OUTER JOIN OrleansMembershipTable m
+		ON v.DeploymentId = m.DeploymentId
+	WHERE
+		v.DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL;
+	'
+WHERE NOT EXISTS
+(
+    SELECT 1
+    FROM OrleansQuery oqt
+    WHERE oqt.[QueryKey] = 'MembershipReadAllV2Key'
 );
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)

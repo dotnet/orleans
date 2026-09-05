@@ -90,16 +90,17 @@ namespace Orleans.Runtime
                 throw new ArgumentException($"Argument must have a previous version to the current instance. Expected <= {this.Version}, encountered {previous.Version}", nameof(previous));
             }
 
-            if (this.Version == previous.Version)
+            var current = this.Version == previous.Version ? this.MergeMetadata(previous) : this;
+            if (ReferenceEquals(current, previous))
             {
-                return new ClusterMembershipUpdate(this, ImmutableArray<ClusterMember>.Empty);
+                return new ClusterMembershipUpdate(previous, ImmutableArray<ClusterMember>.Empty);
             }
 
             var changes = ImmutableHashSet.CreateBuilder<ClusterMember>();
-            foreach (var entry in this.Members)
+            foreach (var entry in current.Members)
             {
                 // Include any entry which is new or has changed state.
-                if (!previous.Members.TryGetValue(entry.Key, out var previousEntry) || previousEntry.Status != entry.Value.Status)
+                if (!previous.Members.TryGetValue(entry.Key, out var previousEntry) || !entry.Value.Equals(previousEntry))
                 {
                     changes.Add(entry.Value);
                 }
@@ -108,13 +109,62 @@ namespace Orleans.Runtime
             // Handle entries which were removed entirely.
             foreach (var entry in previous.Members)
             {
-                if (!this.Members.TryGetValue(entry.Key, out _))
+                if (!current.Members.TryGetValue(entry.Key, out _))
                 {
-                    changes.Add(new ClusterMember(entry.Key, SiloStatus.Dead, entry.Value.Name, wasDeclaredDead: true));
+                    changes.Add(entry.Value.Metadata is { } metadata
+                        ? new ClusterMember(entry.Key, SiloStatus.Dead, entry.Value.Name, metadata, wasDeclaredDead: true)
+                        : new ClusterMember(entry.Key, SiloStatus.Dead, entry.Value.Name, wasDeclaredDead: true));
                 }
             }
 
-            return new ClusterMembershipUpdate(this, changes.ToImmutableArray());
+            return new ClusterMembershipUpdate(current, changes.ToImmutableArray());
+        }
+
+        internal bool IsSuccessorTo(ClusterMembershipSnapshot previous)
+        {
+            if (this.Version > previous.Version)
+            {
+                return true;
+            }
+
+            return this.Version == previous.Version && this.CreateUpdate(previous).HasChanges;
+        }
+
+        internal ClusterMembershipSnapshot MergeMetadata(ClusterMembershipSnapshot previous)
+        {
+            if (this.Version != previous.Version)
+            {
+                return this;
+            }
+
+            if (this.Members.Count != previous.Members.Count)
+            {
+                return previous;
+            }
+
+            var members = this.Members.ToBuilder();
+            var enriched = false;
+            foreach (var (address, previousMember) in previous.Members)
+            {
+                if (!this.Members.TryGetValue(address, out var proposedMember)
+                    || proposedMember.Status != previousMember.Status
+                    || proposedMember.WasDeclaredDead != previousMember.WasDeclaredDead
+                    || !string.Equals(proposedMember.Name, previousMember.Name, StringComparison.Ordinal))
+                {
+                    return previous;
+                }
+
+                if (previousMember.Metadata is null)
+                {
+                    enriched |= proposedMember.Metadata is not null;
+                }
+                else if (!ClusterMember.MetadataEquals(previousMember.Metadata, proposedMember.Metadata))
+                {
+                    members[address] = previousMember;
+                }
+            }
+
+            return enriched ? new ClusterMembershipSnapshot(members.ToImmutable(), this.Version) : previous;
         }
 
         /// <inheritdoc/>

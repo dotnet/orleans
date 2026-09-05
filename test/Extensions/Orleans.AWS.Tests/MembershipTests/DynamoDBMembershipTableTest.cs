@@ -73,6 +73,12 @@ namespace AWSUtils.Tests.MembershipTests
         }
 
         [Fact, TestCategory("Functional")]
+        public async Task MembershipTable_DynamoDB_MetadataRoundTrips()
+        {
+            await MembershipTable_MetadataRoundTrips();
+        }
+
+        [Fact, TestCategory("Functional")]
         public async Task MembershipTable_DynamoDB_ReadRow_Insert_Read()
         {
             await MembershipTable_ReadRow_Insert_Read();

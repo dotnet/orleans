@@ -31,6 +31,7 @@ namespace Orleans.AzureUtils
 
         public string? StartTime { get; set; }          // Time this silo was started. For diagnostics.
         public string? IAmAliveTime { get; set; }           // Time this silo updated it was alive. For diagnostics.
+        public string? Metadata { get; set; }           // Optional silo metadata, serialized as JSON.
         public string? MembershipVersion { get; set; }
 
         public string PartitionKey { get; set; } = null!;
@@ -132,6 +133,7 @@ namespace Orleans.AzureUtils
                 if (!string.IsNullOrEmpty(SuspectingTimes)) sb.Append(" SuspectingTimes=").Append(SuspectingTimes);
                 sb.Append(" StartTime=").Append(StartTime);
                 sb.Append(" IAmAliveTime=").Append(IAmAliveTime);
+                sb.Append(" MetadataAvailable=").Append(Metadata is not null);
                 sb.Append("]");
             }
             return sb.ToString();

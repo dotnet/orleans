@@ -1,4 +1,5 @@
 using System.Net;
+using System.Collections.Immutable;
 using Cassandra;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Clustering.Cassandra;
@@ -107,6 +108,23 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
         Assert.Equal(1, data.Version.Version);
 
         Assert.Single(data.Members);
+    }
+
+    [Fact]
+    public async Task MembershipTable_MetadataRoundTrips()
+    {
+        var (membershipTable, _) = await CreateNewMembershipTableAsync(TestContext.Current.CancellationToken);
+        var membershipEntry = CreateMembershipEntryForTest();
+        membershipEntry.Metadata = ImmutableDictionary<string, string>.Empty
+            .Add("region", "west")
+            .Add("role", "frontend");
+        var data = await membershipTable.ReadAll();
+
+        Assert.True(await membershipTable.InsertRow(membershipEntry, data.Version.Next()));
+
+        var storedEntry = Assert.Single((await membershipTable.ReadRow(membershipEntry.SiloAddress)).Members).Item1;
+        Assert.NotNull(storedEntry.Metadata);
+        Assert.Equal(membershipEntry.Metadata, storedEntry.Metadata);
     }
 
     [Fact]

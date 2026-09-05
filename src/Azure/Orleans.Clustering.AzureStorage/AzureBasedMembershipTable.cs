@@ -1,8 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Globalization;
+using System.Linq;
 using System.Net;
 using System.Text;
+using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Azure;
 using Microsoft.Extensions.Logging;
@@ -22,6 +26,9 @@ namespace Orleans.Runtime.MembershipService
         private OrleansSiloInstanceManager tableManager = null!;
         private readonly AzureStorageClusteringOptions options;
         private readonly string clusterId;
+        private int metadataRepairCheckCountdown;
+
+        internal const int MetadataRepairCheckInterval = 10;
 
         public AzureBasedMembershipTable(
             ILoggerFactory loggerFactory,
@@ -68,8 +75,7 @@ namespace Orleans.Runtime.MembershipService
         {
             try
             {
-                var entries = await tableManager.FindSiloEntryAndTableVersionRow(key);
-                MembershipTableData data = Convert(entries);
+                MembershipTableData data = Convert(await tableManager.FindSiloEntryAndTableVersionRow(key));
                 LogDebugReadMyEntry(key, data);
                 return data;
             }
@@ -84,8 +90,7 @@ namespace Orleans.Runtime.MembershipService
         {
             try
             {
-                var entries = await tableManager.FindAllSiloEntries();
-                MembershipTableData data = Convert(entries);
+                MembershipTableData data = Convert(await tableManager.FindAllSiloEntries());
                 LogTraceReadAllTable(data);
 
                 return data;
@@ -150,8 +155,22 @@ namespace Orleans.Runtime.MembershipService
             try
             {
                 LogDebugMergeEntry(entry);
-                var siloEntry = ConvertPartial(entry, tableManager.DeploymentId);
+                var includeMetadata = false;
+                var checkedMetadata = false;
+                if (ShouldCheckMetadata())
+                {
+                    var rowKey = SiloInstanceTableEntry.ConstructRowKey(entry.SiloAddress);
+                    var existing = await tableManager.ReadSingleTableEntryAsync(tableManager.DeploymentId, rowKey);
+                    includeMetadata = existing.Entity?.Metadata is null;
+                    checkedMetadata = true;
+                }
+
+                var siloEntry = ConvertPartial(entry, tableManager.DeploymentId, includeMetadata);
                 await tableManager.MergeTableEntryAsync(siloEntry);
+                if (checkedMetadata)
+                {
+                    MetadataChecked();
+                }
             }
             catch (Exception exc)
             {
@@ -161,6 +180,12 @@ namespace Orleans.Runtime.MembershipService
                 throw;
             }
         }
+
+        private bool ShouldCheckMetadata() => ShouldCheckMetadata(ref metadataRepairCheckCountdown);
+
+        internal static bool ShouldCheckMetadata(ref int countdown) => Interlocked.Decrement(ref countdown) <= 0;
+
+        private void MetadataChecked() => Volatile.Write(ref metadataRepairCheckCountdown, MetadataRepairCheckInterval);
 
         private MembershipTableData Convert(List<(SiloInstanceTableEntry Entity, string ETag)> entries)
         {
@@ -187,7 +212,6 @@ namespace Orleans.Runtime.MembershipService
                     {
                         try
                         {
-
                             MembershipEntry membershipEntry = Parse(tableEntry);
                             memEntries.Add(new Tuple<MembershipEntry, string>(membershipEntry, tuple.ETag));
                         }
@@ -253,6 +277,11 @@ namespace Orleans.Runtime.MembershipService
             parse.IAmAliveTime = !string.IsNullOrEmpty(tableEntry.IAmAliveTime) ?
                 LogFormatter.ParseDate(tableEntry.IAmAliveTime) : default;
 
+            if (!string.IsNullOrEmpty(tableEntry.Metadata))
+            {
+                parse.Metadata = JsonSerializer.Deserialize<Dictionary<string, string>>(tableEntry.Metadata)?.ToImmutableDictionary();
+            }
+
             var suspectingSilos = new List<SiloAddress>();
             var suspectingTimes = new List<DateTime>();
 
@@ -304,7 +333,8 @@ namespace Orleans.Runtime.MembershipService
                 UpdateZone = memEntry.UpdateZone.ToString(CultureInfo.InvariantCulture),
                 FaultZone = memEntry.FaultZone.ToString(CultureInfo.InvariantCulture),
                 StartTime = LogFormatter.PrintDate(memEntry.StartTime),
-                IAmAliveTime = LogFormatter.PrintDate(memEntry.IAmAliveTime)
+                IAmAliveTime = LogFormatter.PrintDate(memEntry.IAmAliveTime),
+                Metadata = memEntry.Metadata is not null ? JsonSerializer.Serialize(memEntry.Metadata) : null
             };
 
             if (memEntry.SuspectTimes != null)
@@ -338,12 +368,16 @@ namespace Orleans.Runtime.MembershipService
             return tableEntry;
         }
 
-        private static SiloInstanceTableEntry ConvertPartial(MembershipEntry memEntry, string deploymentId)
+        internal static SiloInstanceTableEntry ConvertPartial(
+            MembershipEntry memEntry,
+            string deploymentId,
+            bool includeMetadata = true)
         {
             return new SiloInstanceTableEntry
             {
                 DeploymentId = deploymentId,
                 IAmAliveTime = LogFormatter.PrintDate(memEntry.IAmAliveTime),
+                Metadata = includeMetadata && memEntry.Metadata is not null ? JsonSerializer.Serialize(memEntry.Metadata) : null,
                 PartitionKey = deploymentId,
                 RowKey = SiloInstanceTableEntry.ConstructRowKey(memEntry.SiloAddress)
             };

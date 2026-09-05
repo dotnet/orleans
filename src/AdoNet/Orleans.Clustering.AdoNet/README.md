@@ -123,6 +123,12 @@ namespace ExampleGrains;
 - [PostgreSQL Scripts](https://github.com/dotnet/orleans/tree/main/src/AdoNet/Orleans.Clustering.AdoNet/PostgreSQL-Clustering.sql)
 - [Oracle Scripts](https://github.com/dotnet/orleans/tree/main/src/AdoNet/Orleans.Clustering.AdoNet/Oracle-Clustering.sql)
 
+### Membership metadata upgrades
+
+Apply the provider's clustering metadata migration before deploying binaries which publish silo metadata. The migration keeps the legacy membership queries and database routines for older binaries and adds a complete versioned query bundle for metadata-aware binaries. Query selection occurs when the provider initializes, so restart a new binary which initialized before the migration.
+
+Membership metadata is fixed for a silo instance. Cluster snapshots can enrich unavailable metadata when it becomes available and retain the first available value. The supplied ADO.NET schemas use large text or LOB columns for metadata; database request, row, and operational limits continue to apply.
+
 ## Documentation
 For more comprehensive documentation, please refer to:
 - [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)
