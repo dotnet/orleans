@@ -547,9 +547,9 @@ public class AdoNetRecoverableStreamTests
 
     [Theory]
     [InlineData(0, 4, null, null, true)]
-    [InlineData(2, 4, 1, 2, true)]
+    [InlineData(2, 4, 1L, 2L, true)]
     [InlineData(3, 4, null, null, false)]
-    [InlineData(3, 5, 4, 4, false)]
+    [InlineData(3, 5, 4L, 4L, false)]
     public async Task Read_EmptyBatchReconcilesDeletedHistoryAndConcurrentArrivals(
         long checkpoint, long nextMessageId, long? earliest, long? tail, bool gap)
     {

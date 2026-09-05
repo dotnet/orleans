@@ -429,7 +429,6 @@ namespace Orleans.Providers
         [System.Diagnostics.CodeAnalysis.MemberNotNull(new[] { "CacheMonitorFactory", "BlockPoolMonitorFactory", "ReceiverMonitorFactory" })]
         public void Init() { }
 
-        [System.Diagnostics.DebuggerStepThrough]
         public System.Threading.Tasks.Task QueueMessageBatchAsync<T>(Runtime.StreamId streamId, System.Collections.Generic.IEnumerable<T> events, Orleans.Streams.StreamSequenceToken? token, System.Collections.Generic.Dictionary<string, object>? requestContext) { throw null; }
     }
 
@@ -948,9 +947,13 @@ namespace Orleans.Providers.Streams.Common
     {
         public RecoverableStreamQueueCache(int defaultMaxAddCount, IObjectPool<FixedSizeBuffer> bufferPool, IRecoverableStreamDataAdapter<TQueueMessage> dataAdapter, IEvictionStrategy evictionStrategy, Microsoft.Extensions.Logging.ILogger logger, Orleans.Streams.IQueueFlowController? flowController = null, ICacheMonitor? cacheMonitor = null, System.TimeSpan? cacheMonitorWriteInterval = null, System.TimeSpan? metadataMinTimeInCache = null, int? maxCacheSize = null) { }
 
+        public RecoverableStreamQueueCache(int defaultMaxAddCount, IObjectPool<FixedSizeBuffer> bufferPool, IRecoverableStreamDataAdapter<TQueueMessage> dataAdapter, IEvictionStrategy evictionStrategy, Microsoft.Extensions.Logging.ILogger logger, long maxCacheSizeBytes, Orleans.Streams.IQueueFlowController? flowController = null, ICacheMonitor? cacheMonitor = null, System.TimeSpan? cacheMonitorWriteInterval = null, System.TimeSpan? metadataMinTimeInCache = null, int? maxCacheSize = null) { }
+
         public int ItemCount { get { throw null; } }
 
         public string? LastPurgedOffset { get { throw null; } }
+
+        public long SizeInBytes { get { throw null; } }
 
         public System.Collections.Generic.IReadOnlyList<Orleans.Streams.StreamPosition> Add(System.Collections.Generic.IReadOnlyList<TQueueMessage> messages, System.DateTime dequeueTimeUtc) { throw null; }
 
@@ -959,6 +962,8 @@ namespace Orleans.Providers.Streams.Common
         public void Dispose() { }
 
         public Orleans.Streams.IQueueCacheCursor GetCacheCursor(Runtime.StreamId streamId, Orleans.Streams.StreamSequenceToken? token) { throw null; }
+
+        public Orleans.Streams.IQueueCacheCursor GetCacheCursorAtPosition(Runtime.StreamId streamId, Orleans.Streams.StreamSubscriptionStartPosition startPosition) { throw null; }
 
         public int GetMaxAddCount() { throw null; }
 
@@ -981,9 +986,10 @@ namespace Orleans.Providers.Streams.Common
 
         public Orleans.Streams.IQueueCacheCursor GetCacheCursor(Runtime.StreamId streamId, Orleans.Streams.StreamSequenceToken? token) { throw null; }
 
+        public Orleans.Streams.IQueueCacheCursor GetCacheCursorAtPosition(Runtime.StreamId streamId, Orleans.Streams.StreamSubscriptionStartPosition startPosition) { throw null; }
+
         public int GetMaxAddCount() { throw null; }
 
-        [System.Diagnostics.DebuggerStepThrough]
         public System.Threading.Tasks.Task<System.Collections.Generic.IList<Orleans.Streams.IBatchContainer>> GetQueueMessagesAsync(int maxCount, System.Threading.CancellationToken cancellationToken) { throw null; }
 
         [System.Obsolete("Use the overload which accepts a CancellationToken.")]
@@ -991,7 +997,6 @@ namespace Orleans.Providers.Streams.Common
 
         public System.Threading.Tasks.Task Initialize(System.Threading.CancellationToken cancellationToken) { throw null; }
 
-        [System.Diagnostics.DebuggerStepThrough]
         public System.Threading.Tasks.Task Initialize(System.TimeSpan timeout) { throw null; }
 
         public bool IsUnderPressure() { throw null; }
@@ -1001,7 +1006,6 @@ namespace Orleans.Providers.Streams.Common
         [System.Obsolete("Use the overload which accepts a CancellationToken.")]
         public System.Threading.Tasks.Task MessagesDeliveredAsync(System.Collections.Generic.IList<Orleans.Streams.IBatchContainer> messages) { throw null; }
 
-        [System.Diagnostics.DebuggerStepThrough]
         public System.Threading.Tasks.Task Shutdown(System.TimeSpan timeout) { throw null; }
 
         public bool TryPurgeFromCache(out System.Collections.Generic.IList<Orleans.Streams.IBatchContainer> purgedItems) { throw null; }
@@ -1377,6 +1381,16 @@ namespace Orleans.Streaming.Diagnostics
             public MessageDelivered(string streamProvider, Runtime.StreamId streamId, System.Guid subscriptionId, Runtime.SiloAddress? siloAddress, Runtime.IAddressable consumer, Streams.IBatchContainer batch) : base(default!, default) { }
         }
 
+        public sealed partial class MessageDeliveryFailed : StreamingEvent
+        {
+            public readonly Runtime.IAddressable Consumer;
+            public readonly System.Exception Exception;
+            public readonly Streams.StreamSequenceToken SequenceToken;
+            public readonly Runtime.StreamId StreamId;
+            public readonly System.Guid SubscriptionId;
+            public MessageDeliveryFailed(string streamProvider, Runtime.StreamId streamId, System.Guid subscriptionId, Runtime.SiloAddress? siloAddress, Runtime.IAddressable consumer, Streams.StreamSequenceToken sequenceToken, System.Exception exception) : base(default!, default) { }
+        }
+
         public sealed partial class ProducerRegistered : StreamingEvent
         {
             public readonly Runtime.GrainId ProducerGrainId;
@@ -1507,6 +1521,23 @@ namespace Orleans.Streaming.Diagnostics
             public readonly Runtime.StreamId StreamId;
             public readonly System.Guid SubscriptionId;
             public SubscriptionUnregistered(string streamProvider, Runtime.StreamId streamId, System.Guid subscriptionId, Runtime.SiloAddress? siloAddress) : base(default!, default) { }
+        }
+
+        public sealed partial class SubscriptionUnregistration : StreamingEvent
+        {
+            public readonly Runtime.IAddressable Consumer;
+            public readonly System.Exception? Exception;
+            public readonly SubscriptionUnregistrationStage Stage;
+            public readonly Runtime.StreamId StreamId;
+            public readonly System.Guid SubscriptionId;
+            public SubscriptionUnregistration(string streamProvider, Runtime.StreamId streamId, System.Guid subscriptionId, Runtime.SiloAddress? siloAddress, Runtime.IAddressable consumer, SubscriptionUnregistrationStage stage, System.Exception? exception) : base(default!, default) { }
+        }
+
+        public enum SubscriptionUnregistrationStage
+        {
+            Requested = 0,
+            Completed = 1,
+            Failed = 2
         }
     }
 }
@@ -1658,17 +1689,13 @@ namespace Orleans.Streams
 
         public bool CheckpointExists { get { throw null; } }
 
-        [System.Diagnostics.DebuggerStepThrough]
         public static System.Threading.Tasks.Task<IStreamQueueCheckpointer<string>> Create(string providerName, string partition, string serviceId, IClusterClient clusterClient, Configuration.GrainStreamQueueCheckpointerOptions options, System.Threading.CancellationToken cancellationToken) { throw null; }
 
-        [System.Diagnostics.DebuggerStepThrough]
         [System.Obsolete("Use the overload which accepts a CancellationToken.")]
         public static System.Threading.Tasks.Task<IStreamQueueCheckpointer<string>> Create(string providerName, string partition, string serviceId, IClusterClient clusterClient, Configuration.GrainStreamQueueCheckpointerOptions options) { throw null; }
 
-        [System.Diagnostics.DebuggerStepThrough]
         public static System.Threading.Tasks.Task<IStreamQueueCheckpointer<string>> Create(string providerName, string partition, string serviceId, IClusterClient clusterClient, System.Threading.CancellationToken cancellationToken) { throw null; }
 
-        [System.Diagnostics.DebuggerStepThrough]
         [System.Obsolete("Use the overload which accepts a CancellationToken.")]
         public static System.Threading.Tasks.Task<IStreamQueueCheckpointer<string>> Create(string providerName, string partition, string serviceId, IClusterClient clusterClient) { throw null; }
 
@@ -1995,12 +2022,10 @@ namespace Orleans.Streams
 
         public override System.Collections.Generic.IEnumerable<QueueId> GetMyQueues() { throw null; }
 
-        [System.Diagnostics.DebuggerStepThrough]
         public override System.Threading.Tasks.Task Initialize(IStreamQueueMapper queueMapper) { throw null; }
 
         protected override void OnClusterMembershipChange(System.Collections.Generic.HashSet<Runtime.SiloAddress> activeSilos) { }
 
-        [System.Diagnostics.DebuggerStepThrough]
         public override System.Threading.Tasks.Task Shutdown() { throw null; }
     }
 
@@ -2131,7 +2156,6 @@ namespace Orleans.Streams
         protected System.Threading.Tasks.Task NotifyListeners() { throw null; }
 
         protected abstract void OnClusterMembershipChange(System.Collections.Generic.HashSet<Runtime.SiloAddress> activeSilos);
-        [System.Diagnostics.DebuggerStepThrough]
         public virtual System.Threading.Tasks.Task Shutdown() { throw null; }
 
         public bool SubscribeToQueueDistributionChangeEvents(IStreamQueueBalanceListener observer) { throw null; }
@@ -2344,7 +2368,6 @@ namespace Orleans.Streams
 
         public System.Threading.Tasks.ValueTask<string> Load(System.Threading.CancellationToken cancellationToken) { throw null; }
 
-        [System.Diagnostics.DebuggerStepThrough]
         public System.Threading.Tasks.ValueTask<string> Update(string offset, string expectedCheckpoint, System.Threading.CancellationToken cancellationToken) { throw null; }
     }
 
@@ -2449,13 +2472,11 @@ namespace Orleans.Streams
 
         public bool CheckpointExists { get { throw null; } }
 
-        [System.Diagnostics.DebuggerStepThrough]
         public System.Threading.Tasks.Task FlushAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
 
         [System.Obsolete("Use the overload which accepts a CancellationToken.")]
         public System.Threading.Tasks.Task<string> Load() { throw null; }
 
-        [System.Diagnostics.DebuggerStepThrough]
         public System.Threading.Tasks.Task<string> Load(System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public void Update(string offset, System.DateTime utcNow, System.Threading.CancellationToken cancellationToken) { }
