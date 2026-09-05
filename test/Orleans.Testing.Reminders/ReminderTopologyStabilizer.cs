@@ -23,7 +23,6 @@ public static class ReminderTopologyStabilizer
             observer,
             readySilos,
             useInitialLoadForSingleSilo: false,
-            requestRefresh: true,
             cancellationToken);
 
     /// <summary>
@@ -39,7 +38,6 @@ public static class ReminderTopologyStabilizer
             observer,
             readySilos,
             useInitialLoadForSingleSilo: false,
-            requestRefresh: false,
             cancellationToken);
 
     /// <summary>
@@ -56,7 +54,6 @@ public static class ReminderTopologyStabilizer
             observer,
             readySilos,
             useInitialLoadForSingleSilo: true,
-            requestRefresh: true,
             cancellationToken);
 
     private static async Task<IReadOnlyList<InProcessSiloHandle>> WaitForStableTopologyAsync(
@@ -64,7 +61,6 @@ public static class ReminderTopologyStabilizer
         ReminderDiagnosticObserver observer,
         IEnumerable<InProcessSiloHandle> readySilos,
         bool useInitialLoadForSingleSilo,
-        bool requestRefresh,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(cluster);
@@ -134,14 +130,10 @@ public static class ReminderTopologyStabilizer
                     && requiredReadySilos.Length == 1
                     && expectedActiveSilos.Length == 1
                     && requiredReadySilos[0].SiloAddress.Equals(expectedActiveSilos[0].SiloAddress);
-                if (!initialLoadIsRefreshBoundary && requestRefresh)
+                if (!initialLoadIsRefreshBoundary)
                 {
-                    phase = "stable topology refresh start";
-                    var refreshesStarted = reminderServices.Select(service => service.TestOnlyStartRefresh()).ToArray();
-                    await Task.WhenAll(refreshesStarted).WaitAsync(cancellationToken);
-                }
-                else if (!initialLoadIsRefreshBoundary)
-                {
+                    // Membership listener delivery enqueues ring changes before it reports the version as processed.
+                    // This FIFO turn ensures those changes have published their reconciliation generations.
                     phase = "reminder scheduler topology boundary";
                     var schedulerTurns = reminderServices.Select(service => service.TestOnlyWaitForSchedulerTurn()).ToArray();
                     await Task.WhenAll(schedulerTurns).WaitAsync(cancellationToken);

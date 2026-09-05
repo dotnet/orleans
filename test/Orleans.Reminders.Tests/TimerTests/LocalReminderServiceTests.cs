@@ -650,6 +650,93 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
     [TestSuite("BVT")]
     [TestProvider("None")]
     [Fact, TestCategory("BVT")]
+    public async Task StableTopologyBarrier_DoesNotStartAnExtraRefresh()
+    {
+        var silo = Assert.Single(fixture.HostedCluster.Silos);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cancellation.CancelAfter(TestConstants.InitTimeout);
+        await ReminderTopologyStabilizer.WaitForStartupTopologyAsync(
+            fixture.HostedCluster,
+            fixture.DiagnosticObserver,
+            [silo],
+            cancellation.Token);
+
+        var reminderTable = silo.ServiceProvider.GetRequiredService<NullReturningReminderTable>();
+        var rangeReadCount = reminderTable.RangeReadCount;
+
+        await ReminderTopologyStabilizer.WaitForStableTopologyAsync(
+            fixture.HostedCluster,
+            fixture.DiagnosticObserver,
+            [silo],
+            cancellation.Token);
+
+        Assert.Equal(rangeReadCount, reminderTable.RangeReadCount);
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
+    public async Task StableTopologyBarrier_WaitsForMembershipRangeReconciliation()
+    {
+        var initialSilo = Assert.Single(fixture.HostedCluster.Silos);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cancellation.CancelAfter(TestConstants.InitTimeout);
+        await ReminderTopologyStabilizer.WaitForStartupTopologyAsync(
+            fixture.HostedCluster,
+            fixture.DiagnosticObserver,
+            [initialSilo],
+            cancellation.Token);
+
+        var reminderTable = initialSilo.ServiceProvider.GetRequiredService<NullReturningReminderTable>();
+        var reminderService = initialSilo.ServiceProvider.GetRequiredService<LocalReminderService>();
+        var rangeRead = reminderTable.BlockNextRangeRead(cancellation.Token);
+        var schedulerBlocked = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var releaseScheduler = new ManualResetEventSlim();
+        var blockingTask = new Task(() =>
+        {
+            schedulerBlocked.TrySetResult();
+            releaseScheduler.Wait(cancellation.Token);
+        });
+        reminderService.Scheduler.QueueTask(blockingTask);
+        await schedulerBlocked.Task.WaitAsync(cancellation.Token);
+        InProcessSiloHandle? joinedSilo = null;
+        try
+        {
+            joinedSilo = Assert.Single(await fixture.HostedCluster.StartSilosAsync(1, cancellation.Token));
+            await reminderService.TestOnlyWaitForSiloStatusListeners(cancellation.Token);
+
+            var barrier = ReminderTopologyStabilizer.WaitForStableTopologyAsync(
+                fixture.HostedCluster,
+                fixture.DiagnosticObserver,
+                [joinedSilo],
+                cancellation.Token);
+            Assert.False(barrier.IsCompleted);
+
+            releaseScheduler.Set();
+            await blockingTask.WaitAsync(cancellation.Token);
+            await rangeRead.WaitUntilBlockedAsync(cancellation.Token);
+            Assert.False(barrier.IsCompleted);
+
+            rangeRead.Release();
+            await barrier;
+        }
+        finally
+        {
+            releaseScheduler.Set();
+            rangeRead.Release();
+            await blockingTask.WaitAsync(cancellation.Token);
+            if (joinedSilo is not null)
+            {
+                using var siloCleanup = new CancellationTokenSource(TestConstants.InitTimeout);
+                await fixture.HostedCluster.StopSiloAsync(joinedSilo, siloCleanup.Token);
+                await fixture.HostedCluster.WaitForLivenessToStabilizeAsync();
+            }
+        }
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
     public async Task ReconciledTopologyBarrier_WaitsForQueuedRangeChange()
     {
         var silo = Assert.Single(fixture.HostedCluster.Silos);
@@ -712,13 +799,16 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
 
     public sealed class Fixture : BaseInProcessTestClusterFixture
     {
+        private ReminderTestClock? _clock;
+
         public ReminderLifecycleHarness ReminderHarness { get; } = new();
         public ReminderDiagnosticObserver DiagnosticObserver { get; private set; } = null!;
 
         protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
         {
             builder.Options.InitialSilosCount = 1;
-            DiagnosticObserver = ReminderDiagnosticObserver.Create(builder);
+            _clock = builder.AddReminderTestClock();
+            DiagnosticObserver = _clock.DiagnosticObserver;
             builder.ConfigureSilo((_, siloBuilder) =>
             {
                 siloBuilder.AddReminders();
@@ -741,7 +831,7 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
             finally
             {
                 ReminderHarness.Dispose();
-                DiagnosticObserver.Dispose();
+                _clock?.Dispose();
             }
         }
     }

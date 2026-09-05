@@ -77,13 +77,15 @@ namespace Orleans.Runtime
         {
             if (oldStatus != GrainServiceStatus.Started && newStatus == GrainServiceStatus.Started)
             {
-                ring.SubscribeToRangeChangeEvents(this);
+                SubscribeToRangeChangeEvents();
             }
             if (oldStatus != GrainServiceStatus.Stopped && newStatus == GrainServiceStatus.Stopped)
             {
                 ring.UnSubscribeFromRangeChangeEvents(this);
             }
         }
+
+        private protected void SubscribeToRangeChangeEvents() => ring.SubscribeToRangeChangeEvents(this);
 
         /// <summary>Invoked when service is being started</summary>
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>

@@ -584,6 +584,9 @@ namespace Orleans.Runtime.ReminderService
         {
             CheckRuntimeContext();
 
+            // Observe the ring before loading so readiness covers the current range, including changes during the read.
+            SubscribeToRangeChangeEvents();
+            await this.QueueAction(static _ => { }, state: 0);
             await DoInitialReadAndUpdateReminders();
             this.runTask = RunAsync();
         }
@@ -597,7 +600,15 @@ namespace Orleans.Runtime.ReminderService
                 if (StoppedCancellationTokenSource.IsCancellationRequested) return;
 
                 initialReadCallCount++;
-                await this.ReadAndUpdateReminders();
+                while (true)
+                {
+                    var rangeSerialNumber = RangeSerialNumber;
+                    await this.ReadAndUpdateReminders();
+                    if (rangeSerialNumber == RangeSerialNumber)
+                    {
+                        break;
+                    }
+                }
 
                 Status = GrainServiceStatus.Started;
                 startedTask.TrySetResult(true);
