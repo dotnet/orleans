@@ -1002,9 +1002,95 @@ namespace NonSilo.Tests.Membership
             await this.lifecycle.OnStop(cancellationToken);
         }
 
+        [Fact]
+        public async Task MembershipTableManager_RequireFreshStartsNewReadWhileRefreshInFlight()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var membershipTable = new InMemoryMembershipTable();
+            var manager = CreateMembershipTableManager(membershipTable);
+            var firstReadStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var releaseFirstRead = new ManualResetEventSlim();
+            var readCount = 0;
+            membershipTable.OnReadAll = () =>
+            {
+                if (Interlocked.Increment(ref readCount) == 1)
+                {
+                    firstReadStarted.TrySetResult();
+                    if (!releaseFirstRead.Wait(TimeSpan.FromSeconds(30)))
+                    {
+                        throw new TimeoutException("Timed out waiting to release the first membership-table read");
+                    }
+                }
+            };
+
+            var inFlightRefresh = Task.Run(
+                () => manager.Refresh(cancellationToken: cancellationToken),
+                cancellationToken);
+            await firstReadStarted.Task.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
+            var causalRefresh = ((IMembershipManager)manager).Refresh(
+                targetVersion: null,
+                cancellationToken: CancellationToken.None,
+                requireFresh: true);
+
+            try
+            {
+                await causalRefresh.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
+                Assert.Equal(2, readCount);
+            }
+            finally
+            {
+                releaseFirstRead.Set();
+                await inFlightRefresh;
+            }
+
+            Assert.Equal(2, readCount);
+        }
+
+        [Fact]
+        public async Task MembershipTableManager_PreCancelledFreshRefreshDoesNotRead()
+        {
+            var membershipTable = new InMemoryMembershipTable();
+            var manager = CreateMembershipTableManager(membershipTable);
+            var readCount = 0;
+            membershipTable.OnReadAll = () => Interlocked.Increment(ref readCount);
+            var cancellation = new CancellationToken(canceled: true);
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+                manager.Refresh(
+                    targetVersion: null,
+                    cancellationToken: cancellation,
+                    requireFresh: true));
+
+            Assert.Equal(0, readCount);
+        }
+
+        [Fact]
+        public async Task MembershipTableManager_ShutdownFreshRefreshDoesNotRead()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var membershipTable = new InMemoryMembershipTable();
+            var lifecycle = new SiloLifecycleSubject(this.loggerFactory.CreateLogger<SiloLifecycleSubject>());
+            using var manager = CreateMembershipTableManager(membershipTable, lifecycle);
+            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(lifecycle);
+            await lifecycle.OnStart(cancellationToken);
+            await lifecycle.OnStop(cancellationToken);
+            var readCount = 0;
+            membershipTable.OnReadAll = () => Interlocked.Increment(ref readCount);
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+                manager.Refresh(
+                    targetVersion: null,
+                    cancellationToken: CancellationToken.None,
+                    requireFresh: true));
+
+            Assert.Equal(0, readCount);
+        }
+
         private static SiloAddress Silo(string value) => SiloAddress.FromParsableString(value);
 
-        private MembershipTableManager CreateMembershipTableManager(IMembershipTable membershipTable)
+        private MembershipTableManager CreateMembershipTableManager(
+            IMembershipTable membershipTable,
+            SiloLifecycleSubject? lifecycle = null)
         {
             return new MembershipTableManager(
                 localSiloDetails: this.localSiloDetails,
@@ -1014,7 +1100,7 @@ namespace NonSilo.Tests.Membership
                 gossiper: this.membershipGossiper,
                 log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
                 timerFactory: new AsyncTimerFactory(this.loggerFactory),
-                siloLifecycle: this.lifecycle,
+                siloLifecycle: lifecycle ?? this.lifecycle,
                 timeProvider: TimeProvider.System);
         }
 

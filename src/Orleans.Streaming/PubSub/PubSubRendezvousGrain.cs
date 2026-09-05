@@ -10,6 +10,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.Core;
 using Orleans.Providers;
 using Orleans.Runtime;
+using Orleans.Runtime.MembershipService;
 using Orleans.Serialization.Serializers;
 using Orleans.Storage;
 using Orleans.Streaming;
@@ -86,14 +87,23 @@ namespace Orleans.Streams
         private readonly PubSubGrainStateStorageFactory _storageFactory;
         private readonly StateStorageBridge<PubSubGrainState> _storage;
         private readonly StreamInstruments _streamInstruments;
+        private readonly IClusterMembershipService _clusterMembershipService;
+        private readonly UnknownSiloStatusCache _unknownSiloStatusCache;
 
         private PubSubGrainState State => _storage.State!; // OnActivateAsync reads state before grain calls are dispatched.
 
-        public PubSubRendezvousGrain(PubSubGrainStateStorageFactory storageFactory, ILogger<PubSubRendezvousGrain> logger, StreamInstruments streamInstruments)
+        public PubSubRendezvousGrain(
+            PubSubGrainStateStorageFactory storageFactory,
+            ILogger<PubSubRendezvousGrain> logger,
+            StreamInstruments streamInstruments,
+            IClusterMembershipService clusterMembershipService,
+            UnknownSiloStatusCache unknownSiloStatusCache)
         {
             _storageFactory = storageFactory;
             _logger = logger;
             _streamInstruments = streamInstruments;
+            _clusterMembershipService = clusterMembershipService;
+            _unknownSiloStatusCache = unknownSiloStatusCache;
             _storage = _storageFactory.GetStorage(this);
         }
 
@@ -109,29 +119,73 @@ namespace Orleans.Streams
             return Task.CompletedTask;
         }
 
-        public async Task<ISet<PubSubSubscriptionState>> RegisterProducer(QualifiedStreamId streamId, GrainId streamProducer, CancellationToken cancellationToken)
+        public async Task<ISet<PubSubSubscriptionState>> RegisterProducer(
+            QualifiedStreamId streamId,
+            GrainId streamProducer,
+            MembershipVersion membershipVersion = default,
+            CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             TagList? tags = null;
-
-            if (_streamInstruments.PubSubProducersAdded.Enabled)
-            {
-                tags = StreamInstrumentsTagUtils.InitializeTags(streamId, streamProducer);
-                _streamInstruments.PubSubProducersAdded.Add(1, tags.Value);
-            }
+            var registrationRejected = false;
 
             try
             {
-                var publisherState = new PubSubPublisherState(streamId, streamProducer);
-                State.Producers.Add(publisherState);
-                LogPubSubCounts("RegisterProducer {0}", streamProducer);
-                await ((IStorage)_storage).WriteStateAsync(cancellationToken);
-                StreamingEvents.EmitProducerRegistered(streamId.ProviderName, streamId.StreamId, streamProducer, GrainContext.Address.SiloAddress);
-                if (_streamInstruments.PubSubProducersTotal.Enabled)
+                if (_streamInstruments.PubSubProducersAdded.Enabled)
                 {
-                    tags ??= StreamInstrumentsTagUtils.InitializeTags(streamId, streamProducer);
-                    _streamInstruments.PubSubProducersTotal.Add(1, tags.Value);
+                    tags = StreamInstrumentsTagUtils.InitializeTags(streamId, streamProducer);
+                    _streamInstruments.PubSubProducersAdded.Add(1, tags.Value);
                 }
+
+                var (shouldRegister, stateChanged, validatedMembershipVersion, removedProducers) =
+                    await RemoveDefunctSystemTargetProducers(
+                        streamProducer,
+                        membershipVersion,
+                        cancellationToken);
+                var publisherState = new PubSubPublisherState(streamId, streamProducer)
+                {
+                    MembershipVersion = validatedMembershipVersion
+                };
+                if (!shouldRegister)
+                {
+                    LogWarningProducerRegistrationIgnored(publisherState, streamId);
+                    if (stateChanged)
+                    {
+                        await ((IStorage)_storage).WriteStateAsync(cancellationToken);
+                    }
+
+                    RecordRemovedProducers(removedProducers);
+                    registrationRejected = true;
+                }
+                else
+                {
+                    if (State.Producers.TryGetValue(publisherState, out var existingPublisher))
+                    {
+                        if (validatedMembershipVersion > existingPublisher.MembershipVersion)
+                        {
+                            existingPublisher.MembershipVersion = validatedMembershipVersion;
+                        }
+                    }
+                    else
+                    {
+                        State.Producers.Add(publisherState);
+                    }
+
+                    LogPubSubCounts("RegisterProducer {0}", streamProducer);
+                    await ((IStorage)_storage).WriteStateAsync(cancellationToken);
+                    RecordRemovedProducers(removedProducers);
+                    StreamingEvents.EmitProducerRegistered(streamId.ProviderName, streamId.StreamId, streamProducer, GrainContext.Address.SiloAddress);
+                    if (_streamInstruments.PubSubProducersTotal.Enabled)
+                    {
+                        tags ??= StreamInstrumentsTagUtils.InitializeTags(streamId, streamProducer);
+                        _streamInstruments.PubSubProducersTotal.Add(1, tags.Value);
+                    }
+                }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                DeactivateOnIdle();
+                throw;
             }
             catch (Exception exc)
             {
@@ -141,8 +195,212 @@ namespace Orleans.Streams
                 DeactivateOnIdle();
                 throw;
             }
+
+            if (registrationRejected)
+            {
+                throw new OrleansException(
+                    $"Cannot register stream producer {streamProducer}. Registration requires a known, non-terminating producer silo.");
+            }
+
             // The LINQ query is non-null, so ToSet cannot return null.
             return State.Consumers.Where(c => !c.IsFaulted).ToSet()!;
+        }
+
+        private async Task<(
+            bool ShouldRegister,
+            bool StateChanged,
+            MembershipVersion ValidatedMembershipVersion,
+            List<PubSubPublisherState>? RemovedProducers)> RemoveDefunctSystemTargetProducers(
+            GrainId streamProducer,
+            MembershipVersion membershipVersion,
+            CancellationToken cancellationToken)
+        {
+            if (!SystemTargetGrainId.TryParse(streamProducer, out var registeringSystemTarget))
+            {
+                return (true, false, membershipVersion, null);
+            }
+
+            var membershipSnapshot = _clusterMembershipService.CurrentSnapshot;
+            List<(PubSubPublisherState Producer, SiloAddress SiloAddress)>? systemTargetProducers = null;
+            var siloMembershipVersions = new Dictionary<SiloAddress, MembershipVersion>();
+            foreach (var producer in State.Producers)
+            {
+                if (SystemTargetGrainId.TryParse(producer.Producer, out var systemTarget))
+                {
+                    var siloAddress = systemTarget.GetSiloAddress();
+                    systemTargetProducers ??= [];
+                    systemTargetProducers.Add((producer, siloAddress));
+                    AddSiloMembershipVersion(siloMembershipVersions, siloAddress, producer.MembershipVersion);
+                }
+            }
+
+            var registeringSiloAddress = registeringSystemTarget.GetSiloAddress();
+            AddSiloMembershipVersion(siloMembershipVersions, registeringSiloAddress, membershipVersion);
+
+            var validation = await GetSiloStatuses(
+                membershipSnapshot,
+                siloMembershipVersions,
+                _unknownSiloStatusCache.ValidateSiloStatuses,
+                cancellationToken);
+            var statuses = validation.Statuses;
+
+            List<PubSubPublisherState>? removedProducers = null;
+            var stateChanged = false;
+            if (systemTargetProducers is not null)
+            {
+                foreach (var (producer, siloAddress) in systemTargetProducers)
+                {
+                    var status = statuses[siloAddress];
+                    var validatedVersion = GetValidatedMembershipVersion(
+                        producer.MembershipVersion,
+                        siloAddress,
+                        status,
+                        validation.Snapshot);
+                    if (validatedVersion > producer.MembershipVersion)
+                    {
+                        producer.MembershipVersion = validatedVersion;
+                        stateChanged = true;
+                    }
+
+                    if (status.IsTerminating())
+                    {
+                        removedProducers ??= [];
+                        removedProducers.Add(producer);
+                    }
+                }
+            }
+
+            if (removedProducers is not null)
+            {
+                foreach (var producer in removedProducers)
+                {
+                    RemoveProducer(producer);
+                }
+
+                stateChanged = true;
+            }
+
+            membershipVersion = GetValidatedMembershipVersion(
+                membershipVersion,
+                registeringSiloAddress,
+                statuses[registeringSiloAddress],
+                validation.Snapshot);
+
+            var shouldRegister = ShouldRegisterSystemTarget(
+                registeringSiloAddress,
+                systemTargetProducers?.Select(producer => producer.SiloAddress),
+                statuses);
+            return (shouldRegister, stateChanged, membershipVersion, removedProducers);
+        }
+
+        internal static void AddSiloMembershipVersion(
+            Dictionary<SiloAddress, MembershipVersion> siloMembershipVersions,
+            SiloAddress siloAddress,
+            MembershipVersion membershipVersion)
+        {
+            if (!siloMembershipVersions.TryGetValue(siloAddress, out var existingVersion))
+            {
+                siloMembershipVersions.Add(siloAddress, membershipVersion);
+            }
+            else if (!HasMembershipVersion(existingVersion) || !HasMembershipVersion(membershipVersion))
+            {
+                siloMembershipVersions[siloAddress] = PubSubPublisherState.UnknownMembershipVersion;
+            }
+            else if (membershipVersion > existingVersion)
+            {
+                siloMembershipVersions[siloAddress] = membershipVersion;
+            }
+        }
+
+        internal static bool HasMembershipVersion(MembershipVersion membershipVersion) =>
+            membershipVersion != PubSubPublisherState.UnknownMembershipVersion;
+
+        internal static MembershipVersion GetValidatedMembershipVersion(
+            MembershipVersion membershipVersion,
+            SiloAddress siloAddress,
+            SiloStatus status,
+            ClusterMembershipSnapshot membershipSnapshot)
+        {
+            if (HasMembershipVersion(membershipVersion)
+                || !HasMembershipVersion(membershipSnapshot.Version)
+                || !IsValidSystemTargetRegistrationStatus(status)
+                || membershipSnapshot.GetSiloStatus(siloAddress) != status)
+            {
+                return membershipVersion;
+            }
+
+            return membershipSnapshot.Version;
+        }
+
+        internal static async ValueTask<UnknownSiloStatusCache.SiloStatusValidationResult> GetSiloStatuses(
+            ClusterMembershipSnapshot membershipSnapshot,
+            IReadOnlyDictionary<SiloAddress, MembershipVersion> siloMembershipVersions,
+            Func<
+                ClusterMembershipSnapshot,
+                IReadOnlySet<SiloAddress>,
+                CancellationToken,
+                bool,
+                ValueTask<UnknownSiloStatusCache.SiloStatusValidationResult>> validateUnknownSilos,
+            CancellationToken cancellationToken)
+        {
+            var statuses = new Dictionary<SiloAddress, SiloStatus>();
+            HashSet<SiloAddress>? silosRequiringFreshValidation = null;
+            foreach (var (siloAddress, version) in siloMembershipVersions)
+            {
+                if (!HasMembershipVersion(version) || version > membershipSnapshot.Version)
+                {
+                    silosRequiringFreshValidation ??= [];
+                    silosRequiringFreshValidation.Add(siloAddress);
+                }
+            }
+
+            if (silosRequiringFreshValidation is not null)
+            {
+                var validation = await validateUnknownSilos(
+                    membershipSnapshot,
+                    silosRequiringFreshValidation,
+                    cancellationToken,
+                    true);
+                membershipSnapshot = validation.Snapshot;
+                foreach (var (siloAddress, status) in validation.Statuses)
+                {
+                    statuses.Add(siloAddress, status);
+                }
+            }
+
+            foreach (var (siloAddress, version) in siloMembershipVersions)
+            {
+                if (!statuses.ContainsKey(siloAddress)
+                    && HasMembershipVersion(version)
+                    && version <= membershipSnapshot.Version)
+                {
+                    statuses.Add(siloAddress, membershipSnapshot.GetSiloStatus(siloAddress, version));
+                }
+            }
+
+            return new(statuses, membershipSnapshot);
+        }
+
+        internal static bool IsValidSystemTargetRegistrationStatus(SiloStatus status) =>
+            status != SiloStatus.None && !status.IsTerminating();
+
+        internal static bool ShouldRegisterSystemTarget(
+            SiloAddress? registeringSiloAddress,
+            IEnumerable<SiloAddress>? existingProducerSilos,
+            IReadOnlyDictionary<SiloAddress, SiloStatus> statuses)
+        {
+            if (registeringSiloAddress is null)
+            {
+                return true;
+            }
+
+            if (existingProducerSilos is not null
+                && existingProducerSilos.Any(siloAddress => statuses[siloAddress] == SiloStatus.None))
+            {
+                return false;
+            }
+
+            return IsValidSystemTargetRegistrationStatus(statuses[registeringSiloAddress]);
         }
 
         public async Task UnregisterProducer(QualifiedStreamId streamId, GrainId streamProducer, CancellationToken cancellationToken)
@@ -295,9 +553,9 @@ namespace Orleans.Streams
             State.Producers.Remove(producer);
         }
 
-        private void RecordRemovedProducers(IEnumerable<PubSubPublisherState> producers)
+        private void RecordRemovedProducers(IEnumerable<PubSubPublisherState>? producers)
         {
-            if (!_streamInstruments.PubSubProducersTotal.Enabled)
+            if (producers is null || !_streamInstruments.PubSubProducersTotal.Enabled)
             {
                 return;
             }
@@ -610,6 +868,12 @@ namespace Orleans.Streams
             Message = "Producer {Producer} on stream {StreamId} is no longer active - permanently removing producer."
         )]
         private partial void LogWarningProducerIsDead(PubSubPublisherState producer, QualifiedStreamId streamId);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Rejecting producer {Producer} on stream {StreamId}. Registration requires a known, non-terminating producer silo."
+        )]
+        private partial void LogWarningProducerRegistrationIgnored(PubSubPublisherState producer, QualifiedStreamId streamId);
 
         [LoggerMessage(
             Level = LogLevel.Error,
