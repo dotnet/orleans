@@ -27,7 +27,7 @@ public class VoteGrain : Grain, IVoteGrain
         var stopwatch = Stopwatch.StartNew();
         _logger.LogInformation("Saving vote");
 
-        var key = option.ToLower();
+        var key = option.ToLowerInvariant();
         if (!_state.State.ContainsKey(key))
         {
             _logger.LogInformation("Created a vote option and recorded a vote");
@@ -48,7 +48,7 @@ public class VoteGrain : Grain, IVoteGrain
         var stopwatch = Stopwatch.StartNew();
         _logger.LogInformation("Deleting vote option");
 
-        var key = option.ToLower();
+        var key = option.ToLowerInvariant();
         if (!_state.State.ContainsKey(key))
         {
             _logger.LogWarning("Didn't find the requested vote option");
@@ -57,7 +57,7 @@ public class VoteGrain : Grain, IVoteGrain
         else
         {
             _logger.LogInformation("Removed a vote option");
-            _state.State.Remove(key.ToLower());
+            _state.State.Remove(key);
         }
 
         await _state.WriteStateAsync();

@@ -201,7 +201,7 @@ public class PlayerGrain : Grain, IPlayerGrain
             builder.Append($"{words[i]} ");
         }
 
-        return builder.ToString().Trim().ToLower();
+        return builder.ToString().Trim().ToLowerInvariant();
     }
 
     async Task<string?> IPlayerGrain.Play(string command)
@@ -209,7 +209,7 @@ public class PlayerGrain : Grain, IPlayerGrain
         command = RemoveStopWords(command);
 
         string[] words = command.Split(' ');
-        string verb = words[0].ToLower();
+        string verb = words[0].ToLowerInvariant();
 
         if (_killed && verb is not "end")
         {
