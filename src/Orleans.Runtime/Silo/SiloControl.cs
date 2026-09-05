@@ -12,6 +12,7 @@ using Orleans.Metadata;
 using Orleans.Placement;
 using Orleans.Providers;
 using Orleans.Runtime.GrainDirectory;
+using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Versions;
 using Orleans.Runtime.Versions.Compatibility;
@@ -442,5 +443,25 @@ namespace Orleans.Runtime
             Message = "Could not find a controllable service for type {ProviderTypeFullName} and name {ProviderName}."
         )]
         private partial void LogErrorProviderNotFound(string providerTypeFullName, string providerName);
+
+        public Task DropDisconnectedClients(bool excludeRecent, CancellationToken cancellationToken)
+        {
+            var gateway = this.services.GetRequiredService<MessageCenter>().Gateway;
+            if (gateway is null)
+            {
+                // No gateway deployed on this silo.
+                return Task.CompletedTask;
+            }
+
+            gateway.DropDisconnectedClients(excludeRecent);
+            return Task.CompletedTask;
+        }
+
+        public Task CompleteGatewayRequest(GrainId clientId, GrainId sourceId, CorrelationId correlationId, CancellationToken cancellationToken)
+        {
+            this.services.GetRequiredService<MessageCenter>().Gateway?.CompleteTrackedClientRequest(clientId, sourceId, correlationId);
+            return Task.CompletedTask;
+        }
+
     }
 }

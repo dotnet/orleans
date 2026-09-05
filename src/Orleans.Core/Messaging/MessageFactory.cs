@@ -39,6 +39,7 @@ namespace Orleans.Runtime
                 BodyObject = body,
                 RequestContextData = RequestContextExtensions.Export(_deepCopier),
             };
+            message.ClearGatewayRequestOwner();
 
             return message;
         }
@@ -66,6 +67,7 @@ namespace Orleans.Runtime
                 TimeToLive = request.TimeToLive,
                 RequestContextData = RequestContextExtensions.Export(_deepCopier),
             };
+            response.ApplyGatewayRequestOwner(request);
 
             return response;
         }

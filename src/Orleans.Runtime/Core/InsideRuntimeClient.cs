@@ -25,7 +25,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// Internal class for system grains to get access to runtime object
     /// </summary>
-    internal sealed partial class InsideRuntimeClient : IRuntimeClient, ILifecycleParticipant<ISiloLifecycle>
+    internal sealed partial class InsideRuntimeClient : IRuntimeClient, ILifecycleParticipant<ISiloLifecycle>, IDisposable
     {
         private readonly ILogger logger;
         private readonly ILogger invokeExceptionLogger;
@@ -36,7 +36,11 @@ namespace Orleans.Runtime
         private readonly SharedCallbackData sharedCallbackData;
         private readonly SharedCallbackData systemSharedCallbackData;
         private readonly PeriodicTimer callbackTimer;
-        private int _isStopping;
+        private int _isDisposed;
+        private int _requestAdmissionState;
+
+        private const int RequestAdmissionClosed = 1 << 31;
+        private const int ActiveRequestAdmissionMask = ~RequestAdmissionClosed;
 
         private GrainLocator grainLocator = null!;
         private MessageCenter messageCenter = null!;
@@ -176,9 +180,15 @@ namespace Orleans.Runtime
                 sharedData = this.sharedCallbackData;
             }
 
+            var responseTimeout = request.GetDefaultResponseTimeout() ?? sharedData.ResponseTimeout;
+            if (targetGrainId.IsClient())
+            {
+                message.SetGatewayRequestTimeout(responseTimeout);
+            }
+
             if (this.messagingOptions.DropExpiredMessages && message.IsExpirableMessage())
             {
-                message.TimeToLive = request.GetDefaultResponseTimeout() ?? sharedData.ResponseTimeout;
+                message.TimeToLive = responseTimeout;
             }
 
             var oneWay = (options & InvokeMethodOptions.OneWay) != 0;
@@ -189,7 +199,7 @@ namespace Orleans.Runtime
 
                 // Register a callback for the request.
                 callbackData = new CallbackData(sharedData, context, message, _applicationRequestInstruments);
-                if (Volatile.Read(ref _isStopping) != 0)
+                if (IsRequestAdmissionClosed)
                 {
                     callbackData.OnHostShutdown();
                     return;
@@ -201,22 +211,27 @@ namespace Orleans.Runtime
             else
             {
                 context?.Complete();
-                if (Volatile.Read(ref _isStopping) != 0)
+                if (IsRequestAdmissionClosed)
                 {
                     return;
                 }
             }
 
-            // Completing callbacks during shutdown can resume application code which issues follow-up
-            // calls. Reject those calls so that they cannot outlive the shutdown callback sweep.
-            if (Volatile.Read(ref _isStopping) != 0)
+            if (!TryEnterRequestAdmission())
             {
                 callbackData?.OnHostShutdown();
                 return;
             }
 
-            this.messagingTrace.OnSendRequest(message);
-            this.MessageCenter.AddressAndSendMessage(message);
+            try
+            {
+                this.messagingTrace.OnSendRequest(message);
+                this.MessageCenter.AddressAndSendMessage(message);
+            }
+            finally
+            {
+                Interlocked.Decrement(ref _requestAdmissionState);
+            }
         }
 
         public void SendResponse(Message request, Response response)
@@ -472,7 +487,7 @@ namespace Orleans.Runtime
             {
                 // IMPORTANT: we do not schedule the response callback via the scheduler, since the only thing it does
                 // is to resolve/break the resolver. The continuations/waits that are based on this resolution will be scheduled as work items.
-                callbackData.DoCallback(message);
+                callbackData.OnResponse(message);
             }
             else
             {
@@ -549,8 +564,7 @@ namespace Orleans.Runtime
 
         private async Task OnRuntimeInitializeStop(CancellationToken tc)
         {
-            Volatile.Write(ref _isStopping, 1);
-            this.callbackTimer.Dispose();
+            StopRequestAdmission();
             // Once the silo is shutting down it can no longer receive responses, so any requests which
             // are still outstanding will never complete. Fault them now so that in-flight grain calls
             // observe a terminal result instead of hanging forever, which would otherwise deadlock grain
@@ -618,6 +632,8 @@ namespace Orleans.Runtime
         public int GetRunningRequestsCount(GrainInterfaceType grainInterfaceType)
             => this.callbacks.Count(c => c.Value.Message.InterfaceType == grainInterfaceType);
 
+        internal Task CallbackTimerTask => callbackTimerTask ?? Task.CompletedTask;
+
         private async Task MonitorCallbackExpiry()
         {
             while (await callbackTimer.WaitForNextTickAsync())
@@ -641,6 +657,50 @@ namespace Orleans.Runtime
                 catch (Exception ex)
                 {
                     LogWarningWhileProcessingCallbackExpiry(this.logger, ex);
+                }
+            }
+        }
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _isDisposed, 1) != 0)
+            {
+                return;
+            }
+
+            StopRequestAdmission();
+            BreakOutstandingMessages();
+        }
+
+        private void StopRequestAdmission()
+        {
+            var previousState = Interlocked.Or(ref _requestAdmissionState, RequestAdmissionClosed);
+            this.callbackTimer.Dispose();
+            if ((previousState & ActiveRequestAdmissionMask) != 0)
+            {
+                var spinner = new SpinWait();
+                while ((Volatile.Read(ref _requestAdmissionState) & ActiveRequestAdmissionMask) != 0)
+                {
+                    spinner.SpinOnce();
+                }
+            }
+        }
+
+        private bool IsRequestAdmissionClosed => Volatile.Read(ref _requestAdmissionState) < 0;
+
+        private bool TryEnterRequestAdmission()
+        {
+            while (true)
+            {
+                var state = Volatile.Read(ref _requestAdmissionState);
+                if (state < 0)
+                {
+                    return false;
+                }
+
+                if (Interlocked.CompareExchange(ref _requestAdmissionState, state + 1, state) == state)
+                {
+                    return true;
                 }
             }
         }
