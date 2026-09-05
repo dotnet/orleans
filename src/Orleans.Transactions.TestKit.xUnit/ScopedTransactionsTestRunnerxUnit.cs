@@ -14,7 +14,7 @@ namespace Orleans.Transactions.TestKit.xUnit
         /// <param name="transactionFrame">The client used to create transaction scopes.</param>
         /// <param name="output">The xUnit test output helper.</param>
         protected ScopedTransactionsTestRunnerxUnit(IGrainFactory grainFactory, ITransactionClient transactionFrame, ITestOutputHelper output)
-        : base(grainFactory, transactionFrame, output.WriteLine) { }
+        : base(grainFactory, transactionFrame, TestOutputHelperExtensions.GetWriteLine(output, nameof(output))) { }
 
         /// <inheritdoc cref="ScopedTransactionsTestRunner.CreateTransactionScopeAndSetValue(string)"/>
         [Theory]

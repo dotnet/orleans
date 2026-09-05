@@ -46,6 +46,10 @@ public class NewtonsoftJsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeF
         IEnumerable<ICopierSelector> copyableTypeSelectors,
         IOptions<NewtonsoftJsonCodecOptions> options)
     {
+        ArgumentNullException.ThrowIfNull(serializableTypeSelectors);
+        ArgumentNullException.ThrowIfNull(copyableTypeSelectors);
+        ArgumentNullException.ThrowIfNull(options);
+
         _options = options.Value;
         _serializableTypeSelectors = serializableTypeSelectors.Where(t => string.Equals(t.CodecName, WellKnownAlias, StringComparison.Ordinal)).ToArray();
         _copyableTypeSelectors = copyableTypeSelectors.Where(t => string.Equals(t.CopierName, WellKnownAlias, StringComparison.Ordinal)).ToArray();

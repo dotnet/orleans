@@ -1,3 +1,4 @@
+using System;
 using Google.Protobuf;
 using Orleans.Serialization.Cloning;
 
@@ -12,6 +13,13 @@ public sealed class ByteStringCopier : IDeepCopier<ByteString>
     /// <inheritdoc/>
     public ByteString DeepCopy(ByteString input, CopyContext context)
     {
+        ArgumentNullException.ThrowIfNull(context);
+
+        if (input is null)
+        {
+            return null!;
+        }
+
         if (context.TryGetCopy<ByteString>(input, out var result))
         {
             return result!;

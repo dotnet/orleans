@@ -114,6 +114,8 @@ namespace Orleans.BroadcastChannel
         /// <param name="key">The key.</param>
         public static ChannelId Create(string ns, string key)
         {
+            ArgumentNullException.ThrowIfNull(key);
+
             if (ns is null)
                 return new ChannelId(Encoding.UTF8.GetBytes(key), 0);
 
@@ -153,6 +155,8 @@ namespace Orleans.BroadcastChannel
         /// <inheritdoc/>
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
+            ArgumentNullException.ThrowIfNull(info);
+
             info.AddValue("fk", fullKey);
             info.AddValue("ki", this.keyIndex);
             info.AddValue("fh", this.hash);

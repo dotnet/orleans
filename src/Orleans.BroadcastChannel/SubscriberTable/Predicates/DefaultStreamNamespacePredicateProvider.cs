@@ -12,6 +12,8 @@ namespace Orleans.BroadcastChannel
         /// <inheritdoc/>
         public bool TryGetPredicate(string predicatePattern, [NotNullWhen(true)] out IChannelNamespacePredicate? predicate)
         {
+            ArgumentNullException.ThrowIfNull(predicatePattern);
+
             switch (predicatePattern)
             {
                 case "*":
@@ -56,6 +58,8 @@ namespace Orleans.BroadcastChannel
         /// <inheritdoc/>
         public bool TryGetPredicate(string predicatePattern, [NotNullWhen(true)] out IChannelNamespacePredicate? predicate)
         {
+            ArgumentNullException.ThrowIfNull(predicatePattern);
+
             if (!predicatePattern.StartsWith(Prefix, StringComparison.Ordinal))
             {
                 predicate = null;

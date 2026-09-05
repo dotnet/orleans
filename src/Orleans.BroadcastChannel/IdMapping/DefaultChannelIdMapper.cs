@@ -18,6 +18,8 @@ namespace Orleans.BroadcastChannel
         /// <inheritdoc />
         public IdSpan GetGrainKeyId(GrainBindings grainBindings, ChannelId streamId)
         {
+            ArgumentNullException.ThrowIfNull(grainBindings);
+
             string? keyType = null;
             bool includeNamespaceInGrainId = false;
 

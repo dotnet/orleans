@@ -35,6 +35,10 @@ public static class SerializationHostingExtensions
         Func<Type, bool> isSerializable,
         Func<Type, bool> isCopyable)
     {
+        ArgumentNullException.ThrowIfNull(serializerBuilder);
+        ArgumentNullException.ThrowIfNull(isSerializable);
+        ArgumentNullException.ThrowIfNull(isCopyable);
+
         var services = serializerBuilder.Services;
 
         if (isSerializable != null)

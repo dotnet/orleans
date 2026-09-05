@@ -1,3 +1,4 @@
+using System;
 using Google.Protobuf.Collections;
 using Orleans.Serialization.Cloning;
 
@@ -24,6 +25,13 @@ public sealed class RepeatedFieldCopier<T> : IDeepCopier<RepeatedField<T>>, IBas
     /// <inheritdoc/>
     public RepeatedField<T> DeepCopy(RepeatedField<T> input, CopyContext context)
     {
+        ArgumentNullException.ThrowIfNull(context);
+
+        if (input is null)
+        {
+            return null!;
+        }
+
         if (context.TryGetCopy<RepeatedField<T>>(input, out var result))
         {
             return result!;
@@ -47,6 +55,10 @@ public sealed class RepeatedFieldCopier<T> : IDeepCopier<RepeatedField<T>>, IBas
     /// <inheritdoc/>
     public void DeepCopy(RepeatedField<T> input, RepeatedField<T> output, CopyContext context)
     {
+        ArgumentNullException.ThrowIfNull(input);
+        ArgumentNullException.ThrowIfNull(output);
+        ArgumentNullException.ThrowIfNull(context);
+
         foreach (var item in input)
         {
             output.Add(_copier.DeepCopy(item, context));

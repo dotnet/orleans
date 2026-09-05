@@ -44,6 +44,10 @@ public class JsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilter
         IEnumerable<ICopierSelector> copyableTypeSelectors,
         IOptions<JsonCodecOptions> options)
     {
+        ArgumentNullException.ThrowIfNull(serializableTypeSelectors);
+        ArgumentNullException.ThrowIfNull(copyableTypeSelectors);
+        ArgumentNullException.ThrowIfNull(options);
+
         _serializableTypeSelectors = serializableTypeSelectors.Where(t => string.Equals(t.CodecName, WellKnownAlias, StringComparison.Ordinal)).ToArray();
         _copyableTypeSelectors = copyableTypeSelectors.Where(t => string.Equals(t.CopierName, WellKnownAlias, StringComparison.Ordinal)).ToArray();
         _options = options.Value;

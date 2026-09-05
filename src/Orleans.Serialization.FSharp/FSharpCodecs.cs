@@ -62,6 +62,7 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc/>
+        [SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "ReferenceCodec handles null serialized options before the value is accessed.")]
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [AllowNull] Type expectedType, [AllowNull] FSharpOption<T> value) where TBufferWriter : IBufferWriter<byte>
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
@@ -134,6 +135,8 @@ namespace Orleans.Serialization
         [return: NotNullIfNotNull(nameof(input))]
         public FSharpOption<T>? DeepCopy([AllowNull] FSharpOption<T> input, CopyContext context)
         {
+            ArgumentNullException.ThrowIfNull(context);
+
             if (input is null || FSharpOption<T>.get_IsNone(input))
             {
                 return input;
@@ -351,6 +354,8 @@ namespace Orleans.Serialization
         /// <inheritdoc/>
         public FSharpChoice<T1, T2> DeepCopy(FSharpChoice<T1, T2> input, CopyContext context)
         {
+            ArgumentNullException.ThrowIfNull(context);
+
             if (context.TryGetCopy(input, out FSharpChoice<T1, T2>? result))
             {
                 return result!;
@@ -490,6 +495,8 @@ namespace Orleans.Serialization
         /// <inheritdoc/>
         public FSharpChoice<T1, T2, T3> DeepCopy(FSharpChoice<T1, T2, T3> input, CopyContext context)
         {
+            ArgumentNullException.ThrowIfNull(context);
+
             if (context.TryGetCopy(input, out FSharpChoice<T1, T2, T3>? result))
             {
                 return result!;
@@ -643,6 +650,8 @@ namespace Orleans.Serialization
         /// <inheritdoc/>
         public FSharpChoice<T1, T2, T3, T4> DeepCopy(FSharpChoice<T1, T2, T3, T4> input, CopyContext context)
         {
+            ArgumentNullException.ThrowIfNull(context);
+
             if (context.TryGetCopy(input, out FSharpChoice<T1, T2, T3, T4>? result))
             {
                 return result!;
@@ -810,6 +819,8 @@ namespace Orleans.Serialization
         /// <inheritdoc/>
         public FSharpChoice<T1, T2, T3, T4, T5> DeepCopy(FSharpChoice<T1, T2, T3, T4, T5> input, CopyContext context)
         {
+            ArgumentNullException.ThrowIfNull(context);
+
             if (context.TryGetCopy(input, out FSharpChoice<T1, T2, T3, T4, T5>? result))
             {
                 return result!;
@@ -991,6 +1002,8 @@ namespace Orleans.Serialization
         /// <inheritdoc/>
         public FSharpChoice<T1, T2, T3, T4, T5, T6> DeepCopy(FSharpChoice<T1, T2, T3, T4, T5, T6> input, CopyContext context)
         {
+            ArgumentNullException.ThrowIfNull(context);
+
             if (context.TryGetCopy(input, out FSharpChoice<T1, T2, T3, T4, T5, T6>? result))
             {
                 return result!;
@@ -1033,6 +1046,7 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc/>
+        [SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "GeneralizedReferenceTypeSurrogateCodec handles null references before converting a value to its surrogate.")]
         public override void ConvertToSurrogate(FSharpRef<T> value, ref FSharpRefSurrogate<T> surrogate)
         {
             surrogate.Value = value.Value;
@@ -1071,6 +1085,8 @@ namespace Orleans.Serialization
         /// <inheritdoc/>
         public FSharpRef<T> DeepCopy(FSharpRef<T> input, CopyContext context)
         {
+            ArgumentNullException.ThrowIfNull(context);
+
             if (context.TryGetCopy<FSharpRef<T>>(input, out var result))
             {
                 return result!;
@@ -1152,6 +1168,13 @@ namespace Orleans.Serialization
         /// <inheritdoc/>
         public FSharpList<T> DeepCopy(FSharpList<T> input, CopyContext context)
         {
+            ArgumentNullException.ThrowIfNull(context);
+
+            if (input is null)
+            {
+                return null!;
+            }
+
             if (context.TryGetCopy<FSharpList<T>>(input, out var result))
             {
                 return result!;
@@ -1234,6 +1257,13 @@ namespace Orleans.Serialization
         /// <inheritdoc/>
         public FSharpSet<T> DeepCopy(FSharpSet<T> input, CopyContext context)
         {
+            ArgumentNullException.ThrowIfNull(context);
+
+            if (input is null)
+            {
+                return null!;
+            }
+
             if (context.TryGetCopy<FSharpSet<T>>(input, out var result))
             {
                 return result!;
@@ -1328,6 +1358,13 @@ namespace Orleans.Serialization
         /// <inheritdoc/>
         public FSharpMap<TKey, TValue> DeepCopy(FSharpMap<TKey, TValue> input, CopyContext context)
         {
+            ArgumentNullException.ThrowIfNull(context);
+
+            if (input is null)
+            {
+                return null!;
+            }
+
             if (context.TryGetCopy<FSharpMap<TKey, TValue>>(input, out var result))
             {
                 return result!;

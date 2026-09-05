@@ -39,6 +39,8 @@ namespace Orleans
         /// <param name="channelIdMapper">The name of the stream identity mapper.</param>
         public ImplicitChannelSubscriptionAttribute(string streamNamespace, string? channelIdMapper = null)
         {
+            ArgumentNullException.ThrowIfNull(streamNamespace);
+
             Predicate = new ExactMatchChannelNamespacePredicate(streamNamespace.Trim());
             ChannelIdMapper = channelIdMapper;
         }

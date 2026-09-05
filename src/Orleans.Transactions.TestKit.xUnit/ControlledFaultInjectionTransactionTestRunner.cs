@@ -12,7 +12,7 @@ namespace Orleans.Transactions.TestKit.xUnit
         /// <param name="grainFactory">The grain factory used to access test grains.</param>
         /// <param name="output">The xUnit test output helper.</param>
         public ControlledFaultInjectionTransactionTestRunnerxUnit(IGrainFactory grainFactory, ITestOutputHelper output)
-         : base(grainFactory, output.WriteLine)
+         : base(grainFactory, TestOutputHelperExtensions.GetWriteLine(output, nameof(output)))
         { }
 
         /// <inheritdoc cref="ControlledFaultInjectionTransactionTestRunner.SingleGrainReadTransaction"/>

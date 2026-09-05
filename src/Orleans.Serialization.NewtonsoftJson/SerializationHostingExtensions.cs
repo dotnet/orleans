@@ -63,6 +63,8 @@ public static class SerializationHostingExtensions
         Func<Type, bool>? isCopyable,
         Action<OptionsBuilder<NewtonsoftJsonCodecOptions>>? configureOptions)
     {
+        ArgumentNullException.ThrowIfNull(serializerBuilder);
+
         var services = serializerBuilder.Services;
         if (configureOptions != null)
         {
