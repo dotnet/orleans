@@ -80,6 +80,10 @@ sequenceDiagram
 <a name="recovery-process"></a>
 Requests and responses carry view information. A range cannot serve a request under an incompatible ownership view. If an orderly transfer is impossible, the new owner recovers registrations by querying active silos rather than assuming the failed owner's state.
 
+The runtime's cluster-service topology maps a membership snapshot to partition owners. Membership refreshes complete once the requested version is available in the local projection, propagate underlying refresh failures, and cancel pending waits when the projection stops. Each directory partition installs versioned transition gates synchronously when it observes an ownership change. The partition's scheduler serializes local state access, while the gates keep affected requests waiting across asynchronous transfer and recovery steps. Successive transitions wait for overlapping work from earlier views before reading or installing state.
+
+An inbound transition opens its gate after installing state and establishing the directory's fencing conditions. Recovery after an ungraceful failure can also install a timed safety lease which continues to defer new registrations until expiration. An outbound transition drains earlier work and retains a snapshot for a contiguous handoff. An unexpected transition failure keeps the range blocked and reaches the silo's fatal-error handler, allowing cluster membership and the surviving owners to drive recovery. Shutdown cancels outstanding range waits.
+
 API: <xref:Orleans.Hosting.CoreHostingExtensions.AddDistributedGrainDirectory*?displayProperty=nameWithType> and <xref:Orleans.Configuration.GrainDirectoryOptions>. Implementation: [hosting registration](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Hosting/CoreHostingExtensions.cs) and [`DistributedGrainDirectory`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/GrainDirectory/DistributedGrainDirectory.cs).
 
 ## Tradeoffs

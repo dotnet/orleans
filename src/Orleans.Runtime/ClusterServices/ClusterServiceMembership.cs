@@ -52,16 +52,26 @@ internal sealed partial class ClusterServiceMembership : IAsyncDisposable
         MembershipVersion minimumVersion,
         CancellationToken cancellationToken)
     {
-        _clusterMembershipService.Refresh(minimumVersion, cancellationToken).Ignore();
+        if (minimumVersion != default && CurrentView.ViewId.MembershipVersion >= minimumVersion)
+        {
+            return CurrentView;
+        }
+
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _shutdownCts.Token);
+        await _clusterMembershipService.Refresh(minimumVersion, linkedCts.Token);
         if (CurrentView.ViewId.MembershipVersion < minimumVersion)
         {
-            await foreach (var view in _viewUpdates.WithCancellation(cancellationToken))
+            await foreach (var view in _viewUpdates.WithCancellation(linkedCts.Token))
             {
                 if (view.ViewId.MembershipVersion >= minimumVersion)
                 {
-                    break;
+                    return view;
                 }
             }
+
+            throw new OperationCanceledException(
+                "Cluster service membership updates completed before the requested view was published.",
+                linkedCts.Token);
         }
 
         return CurrentView;
@@ -95,6 +105,7 @@ internal sealed partial class ClusterServiceMembership : IAsyncDisposable
         }
         finally
         {
+            _shutdownCts.Cancel();
             _viewUpdates.Dispose();
         }
     }
