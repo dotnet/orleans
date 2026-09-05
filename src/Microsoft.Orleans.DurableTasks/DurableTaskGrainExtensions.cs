@@ -23,6 +23,7 @@ public static class DurableTaskGrainExtensions
     public static ScheduledTask<TResult> GetDurableTask<TResult>(this IAddressable target, string rootId)
     {
         ArgumentNullException.ThrowIfNull(target);
+        ArgumentException.ThrowIfNullOrWhiteSpace(rootId);
         return new AttachedScheduledTask<TResult>(
             TaskId.CreateRoot(rootId),
             target.AsReference<IDurableTaskGrainExtension>());
