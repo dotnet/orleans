@@ -171,7 +171,7 @@ public sealed class ReminderServiceLifecycleHarness
         try
         {
             var silo = AssertSingle(await _cluster.StartSilosAsync(1, cancellationToken));
-            await StabilizeTopologyAsync([silo], cancellationToken);
+            await WaitForReconciledTopologyAsync([silo], cancellationToken);
             return silo.SiloAddress;
         }
         catch (Exception joinFailure)
@@ -225,12 +225,12 @@ public sealed class ReminderServiceLifecycleHarness
 
     /// <inheritdoc />
     public Task WaitForTopologyReconciliationAsync(CancellationToken cancellationToken)
-        => StabilizeTopologyAsync(_cluster.GetActiveSilos(), cancellationToken);
+        => WaitForReconciledTopologyAsync(_cluster.GetActiveSilos(), cancellationToken);
 
-    private async Task StabilizeTopologyAsync(
+    private async Task WaitForReconciledTopologyAsync(
         IEnumerable<InProcessSiloHandle> readySilos,
         CancellationToken cancellationToken)
-        => await ReminderTopologyStabilizer.WaitForStableTopologyAsync(
+        => await ReminderTopologyStabilizer.WaitForReconciledTopologyAsync(
             _cluster,
             _observer,
             readySilos,
