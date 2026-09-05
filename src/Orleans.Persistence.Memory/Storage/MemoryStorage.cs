@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -45,6 +46,7 @@ namespace Orleans.Storage
         /// <param name="grainFactory">The grain factory.</param>
         /// <param name="defaultGrainStorageSerializer">The default grain storage serializer.</param>
         /// <param name="activatorProvider">The provider used to create grain state instances.</param>
+        [SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "Microsoft.Extensions.DependencyInjection supplies the resolved options instance.")]
         public MemoryGrainStorage(
             string name,
             MemoryGrainStorageOptions options,
@@ -74,7 +76,11 @@ namespace Orleans.Storage
 
         /// <inheritdoc/>
         public virtual Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
-            => ReadStateCoreAsync(grainType, grainId, grainState, CancellationToken.None);
+        {
+            ArgumentNullException.ThrowIfNull(grainType);
+            ArgumentNullException.ThrowIfNull(grainState);
+            return ReadStateCoreAsync(grainType, grainId, grainState, CancellationToken.None);
+        }
 
         /// <inheritdoc/>
         public virtual async Task ReadStateAsync<T>(
@@ -84,6 +90,8 @@ namespace Orleans.Storage
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            ArgumentNullException.ThrowIfNull(grainType);
+            ArgumentNullException.ThrowIfNull(grainState);
             if (_overridesLegacyReadState)
             {
                 await ReadStateAsync(grainType, grainId, grainState).WaitAsync(cancellationToken);
@@ -121,7 +129,11 @@ namespace Orleans.Storage
 
         /// <inheritdoc/>
         public virtual Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
-            => WriteStateCoreAsync(grainType, grainId, grainState, CancellationToken.None);
+        {
+            ArgumentNullException.ThrowIfNull(grainType);
+            ArgumentNullException.ThrowIfNull(grainState);
+            return WriteStateCoreAsync(grainType, grainId, grainState, CancellationToken.None);
+        }
 
         /// <inheritdoc/>
         public virtual async Task WriteStateAsync<T>(
@@ -131,6 +143,8 @@ namespace Orleans.Storage
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            ArgumentNullException.ThrowIfNull(grainType);
+            ArgumentNullException.ThrowIfNull(grainState);
             if (_overridesLegacyWriteState)
             {
                 await WriteStateAsync(grainType, grainId, grainState).WaitAsync(cancellationToken);
@@ -167,7 +181,11 @@ namespace Orleans.Storage
 
         /// <inheritdoc/>
         public virtual Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
-            => ClearStateCoreAsync(grainType, grainId, grainState, CancellationToken.None);
+        {
+            ArgumentNullException.ThrowIfNull(grainType);
+            ArgumentNullException.ThrowIfNull(grainState);
+            return ClearStateCoreAsync(grainType, grainId, grainState, CancellationToken.None);
+        }
 
         /// <inheritdoc/>
         public virtual async Task ClearStateAsync<T>(
@@ -177,6 +195,8 @@ namespace Orleans.Storage
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            ArgumentNullException.ThrowIfNull(grainType);
+            ArgumentNullException.ThrowIfNull(grainState);
             if (_overridesLegacyClearState)
             {
                 await ClearStateAsync(grainType, grainId, grainState).WaitAsync(cancellationToken);
