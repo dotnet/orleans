@@ -13,7 +13,7 @@ namespace Orleans.Runtime.MembershipService;
 /// </summary>
 internal sealed partial class UnknownSiloStatusCache
 {
-    private const int CacheCapacity = 1_024;
+    internal const int CacheCapacity = 1_024;
     private readonly ConcurrentLruCache<SiloAddress, SiloStatusCacheEntry> _siloStatuses = new(CacheCapacity);
     private readonly object _refreshLock = new();
     private readonly IMembershipManager _membershipManager;
@@ -78,15 +78,16 @@ internal sealed partial class UnknownSiloStatusCache
 
         try
         {
-            var refresh = GetRefreshOperation(unknownSilos, cancellationToken);
+            var refresh = GetRefreshOperation(
+                requireFresh ? [.. siloAddresses] : unknownSilos,
+                cancellationToken);
             var refreshedTableSnapshot = await refresh.Completion.Task.WaitAsync(cancellationToken);
             result.Clear();
             foreach (var siloAddress in siloAddresses)
             {
-                if (_siloStatuses.TryGet(siloAddress, out var cachedStatus)
-                    && cachedStatus.Version >= refreshedTableSnapshot.Version)
+                if (refresh.TryGetStatus(siloAddress, out var refreshedStatus))
                 {
-                    result.Add(siloAddress, cachedStatus.Status);
+                    result.Add(siloAddress, refreshedStatus.Status);
                     continue;
                 }
 
@@ -185,11 +186,14 @@ internal sealed partial class UnknownSiloStatusCache
                         status = SiloStatus.Dead;
                     }
 
-                    UpdateCachedStatus(siloAddress, status, snapshot.Version);
+                    var observedStatus = operation.Observe(
+                        siloAddress,
+                        new SiloStatusCacheEntry(status, snapshot.Version));
+                    UpdateCachedStatus(siloAddress, observedStatus.Status, observedStatus.Version);
                 }
-            }
 
-            operation.Completion.TrySetResult(snapshot);
+                operation.Completion.TrySetResult(snapshot);
+            }
         }
         catch (OperationCanceledException exception)
         {
@@ -225,17 +229,27 @@ internal sealed partial class UnknownSiloStatusCache
     {
         lock (_refreshLock)
         {
+            var replacement = new SiloStatusCacheEntry(status, version);
             if (_siloStatuses.TryGet(siloAddress, out var existing)
                 && (existing.Version > version
                     || (existing.Version == version
                         && existing.Status != SiloStatus.Dead
                         && status == SiloStatus.Dead)))
             {
-                return existing;
+                replacement = existing;
+            }
+            else
+            {
+                _siloStatuses.AddOrUpdate(siloAddress, replacement);
             }
 
-            var replacement = new SiloStatusCacheEntry(status, version);
-            _siloStatuses.AddOrUpdate(siloAddress, replacement);
+            _activeRefresh?.Observe(siloAddress, replacement);
+            if (!ReferenceEquals(_latestRefresh, _activeRefresh))
+            {
+                _latestRefresh?.Observe(siloAddress, replacement);
+            }
+
+            _pendingRefresh?.Observe(siloAddress, replacement);
             return replacement;
         }
     }
@@ -251,6 +265,7 @@ internal sealed partial class UnknownSiloStatusCache
     private sealed class RefreshOperation
     {
         private readonly HashSet<SiloAddress> _siloAddresses;
+        private readonly Dictionary<SiloAddress, SiloStatusCacheEntry> _observedStatuses = [];
 
         public RefreshOperation(long generation, IReadOnlyList<SiloAddress> siloAddresses)
         {
@@ -270,6 +285,37 @@ internal sealed partial class UnknownSiloStatusCache
             foreach (var siloAddress in siloAddresses)
             {
                 _siloAddresses.Add(siloAddress);
+            }
+        }
+
+        public SiloStatusCacheEntry Observe(SiloAddress siloAddress, SiloStatusCacheEntry status)
+        {
+            lock (_observedStatuses)
+            {
+                if (!_siloAddresses.Contains(siloAddress))
+                {
+                    return status;
+                }
+
+                if (_observedStatuses.TryGetValue(siloAddress, out var existing)
+                    && (existing.Version > status.Version
+                        || (existing.Version == status.Version
+                            && existing.Status != SiloStatus.Dead
+                            && status.Status == SiloStatus.Dead)))
+                {
+                    return existing;
+                }
+
+                _observedStatuses[siloAddress] = status;
+                return status;
+            }
+        }
+
+        public bool TryGetStatus(SiloAddress siloAddress, out SiloStatusCacheEntry status)
+        {
+            lock (_observedStatuses)
+            {
+                return _observedStatuses.TryGetValue(siloAddress, out status);
             }
         }
     }
