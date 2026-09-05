@@ -199,6 +199,7 @@ public sealed class SqsStreamProviderBuilder : IProviderBuilder<ISiloBuilder>, I
     private static void ValidateConnectionString(string connectionString)
     {
         var properties = SqsConnectionString.Parse(connectionString);
+        SqsConnectionString.ValidateCredentials(properties);
         if (!properties.TryGetValue("Service", out var service))
         {
             throw new OrleansConfigurationException(
