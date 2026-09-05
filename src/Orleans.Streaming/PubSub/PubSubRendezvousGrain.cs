@@ -131,14 +131,14 @@ namespace Orleans.Streams
 
             try
             {
-                var publisherState = new PubSubPublisherState(streamId, streamProducer)
-                {
-                    MembershipVersion = membershipVersion
-                };
-                var (shouldRegister, stateChanged) = await RemoveDefunctSystemTargetProducers(
+                var (shouldRegister, stateChanged, validatedMembershipVersion) = await RemoveDefunctSystemTargetProducers(
                     streamProducer,
                     membershipVersion,
                     cancellationToken);
+                var publisherState = new PubSubPublisherState(streamId, streamProducer)
+                {
+                    MembershipVersion = validatedMembershipVersion
+                };
                 if (!shouldRegister)
                 {
                     LogWarningProducerRegistrationIgnored(publisherState, streamId);
@@ -158,9 +158,9 @@ namespace Orleans.Streams
 
                     if (State.Producers.TryGetValue(publisherState, out var existingPublisher))
                     {
-                        if (membershipVersion > existingPublisher.MembershipVersion)
+                        if (validatedMembershipVersion > existingPublisher.MembershipVersion)
                         {
-                            existingPublisher.MembershipVersion = membershipVersion;
+                            existingPublisher.MembershipVersion = validatedMembershipVersion;
                         }
                     }
                     else
@@ -202,7 +202,10 @@ namespace Orleans.Streams
             return State.Consumers.Where(c => !c.IsFaulted).ToSet()!;
         }
 
-        private async Task<(bool ShouldRegister, bool StateChanged)> RemoveDefunctSystemTargetProducers(
+        private async Task<(
+            bool ShouldRegister,
+            bool StateChanged,
+            MembershipVersion ValidatedMembershipVersion)> RemoveDefunctSystemTargetProducers(
             GrainId streamProducer,
             MembershipVersion membershipVersion,
             CancellationToken cancellationToken)
@@ -230,21 +233,35 @@ namespace Orleans.Streams
 
             if (systemTargetProducers is null && registeringSiloAddress is null)
             {
-                return (true, false);
+                return (true, false, membershipVersion);
             }
 
-            var statuses = await GetSiloStatuses(
+            var validation = await GetSiloStatuses(
                 membershipSnapshot,
                 siloMembershipVersions,
                 _unknownSiloStatusCache.ValidateSiloStatuses,
                 cancellationToken);
+            var statuses = validation.Statuses;
 
             List<PubSubPublisherState>? removedProducers = null;
+            var stateChanged = false;
             if (systemTargetProducers is not null)
             {
                 foreach (var (producer, siloAddress) in systemTargetProducers)
                 {
-                    if (statuses[siloAddress].IsTerminating())
+                    var status = statuses[siloAddress];
+                    var validatedVersion = GetValidatedMembershipVersion(
+                        producer.MembershipVersion,
+                        siloAddress,
+                        status,
+                        validation.Snapshot);
+                    if (validatedVersion > producer.MembershipVersion)
+                    {
+                        producer.MembershipVersion = validatedVersion;
+                        stateChanged = true;
+                    }
+
+                    if (status.IsTerminating())
                     {
                         removedProducers ??= [];
                         removedProducers.Add(producer);
@@ -260,22 +277,39 @@ namespace Orleans.Streams
                 }
 
                 RecordRemovedProducers(removedProducers);
+                stateChanged = true;
+            }
+
+            if (registeringSiloAddress is not null)
+            {
+                membershipVersion = GetValidatedMembershipVersion(
+                    membershipVersion,
+                    registeringSiloAddress,
+                    statuses[registeringSiloAddress],
+                    validation.Snapshot);
             }
 
             var shouldRegister = ShouldRegisterSystemTarget(
                 registeringSiloAddress,
                 systemTargetProducers?.Select(producer => producer.SiloAddress),
                 statuses);
-            return (shouldRegister, removedProducers is not null);
+            return (shouldRegister, stateChanged, membershipVersion);
         }
 
-        private static void AddSiloMembershipVersion(
+        internal static void AddSiloMembershipVersion(
             Dictionary<SiloAddress, MembershipVersion> siloMembershipVersions,
             SiloAddress siloAddress,
             MembershipVersion membershipVersion)
         {
-            if (!siloMembershipVersions.TryGetValue(siloAddress, out var existingVersion)
-                || membershipVersion > existingVersion)
+            if (!siloMembershipVersions.TryGetValue(siloAddress, out var existingVersion))
+            {
+                siloMembershipVersions.Add(siloAddress, membershipVersion);
+            }
+            else if (!HasMembershipVersion(existingVersion) || !HasMembershipVersion(membershipVersion))
+            {
+                siloMembershipVersions[siloAddress] = PubSubPublisherState.UnknownMembershipVersion;
+            }
+            else if (membershipVersion > existingVersion)
             {
                 siloMembershipVersions[siloAddress] = membershipVersion;
             }
@@ -284,7 +318,24 @@ namespace Orleans.Streams
         internal static bool HasMembershipVersion(MembershipVersion membershipVersion) =>
             membershipVersion != PubSubPublisherState.UnknownMembershipVersion;
 
-        internal static async ValueTask<Dictionary<SiloAddress, SiloStatus>> GetSiloStatuses(
+        internal static MembershipVersion GetValidatedMembershipVersion(
+            MembershipVersion membershipVersion,
+            SiloAddress siloAddress,
+            SiloStatus status,
+            ClusterMembershipSnapshot membershipSnapshot)
+        {
+            if (HasMembershipVersion(membershipVersion)
+                || !HasMembershipVersion(membershipSnapshot.Version)
+                || !IsValidSystemTargetRegistrationStatus(status)
+                || membershipSnapshot.GetSiloStatus(siloAddress) != status)
+            {
+                return membershipVersion;
+            }
+
+            return membershipSnapshot.Version;
+        }
+
+        internal static async ValueTask<UnknownSiloStatusCache.SiloStatusValidationResult> GetSiloStatuses(
             ClusterMembershipSnapshot membershipSnapshot,
             IReadOnlyDictionary<SiloAddress, MembershipVersion> siloMembershipVersions,
             Func<
@@ -297,14 +348,12 @@ namespace Orleans.Streams
         {
             var statuses = new Dictionary<SiloAddress, SiloStatus>();
             HashSet<SiloAddress>? silosRequiringFreshValidation = null;
-            var requireFresh = false;
             foreach (var (siloAddress, version) in siloMembershipVersions)
             {
                 if (!HasMembershipVersion(version) || version > membershipSnapshot.Version)
                 {
                     silosRequiringFreshValidation ??= [];
                     silosRequiringFreshValidation.Add(siloAddress);
-                    requireFresh |= HasMembershipVersion(version);
                 }
             }
 
@@ -314,7 +363,7 @@ namespace Orleans.Streams
                     membershipSnapshot,
                     silosRequiringFreshValidation,
                     cancellationToken,
-                    requireFresh);
+                    true);
                 membershipSnapshot = validation.Snapshot;
                 foreach (var (siloAddress, status) in validation.Statuses)
                 {
@@ -324,13 +373,15 @@ namespace Orleans.Streams
 
             foreach (var (siloAddress, version) in siloMembershipVersions)
             {
-                if (HasMembershipVersion(version) && version <= membershipSnapshot.Version)
+                if (!statuses.ContainsKey(siloAddress)
+                    && HasMembershipVersion(version)
+                    && version <= membershipSnapshot.Version)
                 {
-                    statuses[siloAddress] = membershipSnapshot.GetSiloStatus(siloAddress, version);
+                    statuses.Add(siloAddress, membershipSnapshot.GetSiloStatus(siloAddress, version));
                 }
             }
 
-            return statuses;
+            return new(statuses, membershipSnapshot);
         }
 
         internal static bool IsValidSystemTargetRegistrationStatus(SiloStatus status) =>
