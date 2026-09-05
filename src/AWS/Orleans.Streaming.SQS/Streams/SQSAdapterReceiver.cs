@@ -23,6 +23,7 @@ namespace OrleansAWSUtils.Streams
         private readonly ILogger logger;
         private readonly ISQSDataAdapter dataAdapter;
         private readonly List<PendingDelivery> pending = [];
+        private readonly object pendingLock = new();
 
         public QueueId Id { get; private set; }
 
@@ -58,17 +59,66 @@ namespace OrleansAWSUtils.Streams
 
         public async Task Shutdown(TimeSpan timeout)
         {
+            using var timeoutCancellation = new CancellationTokenSource(timeout);
+            SQSStorage? queueRef;
+
+            lock (pendingLock)
+            {
+                queueRef = queue;
+                queue = null;
+            }
+
             try
             {
                 // await the last storage operation, so after we shutdown and stop this receiver we don't get async operation completions from pending storage operations.
-                if (outstandingTask != null)
-                    await outstandingTask;
+                var pendingTask = outstandingTask;
+                if (pendingTask != null)
+                {
+                    try
+                    {
+                        await pendingTask.WaitAsync(timeoutCancellation.Token);
+                    }
+                    catch (OperationCanceledException exception) when (timeoutCancellation.IsCancellationRequested)
+                    {
+                        pendingTask.Ignore();
+                        LogWarningPendingOperationException(logger, exception, Id);
+                    }
+                    catch (Exception exception)
+                    {
+                        LogWarningPendingOperationException(logger, exception, Id);
+                    }
+                }
+
+                SQSMessage[] pendingMessages;
+                lock (pendingLock)
+                {
+                    pendingMessages = pending.Select(static item => item.Message).ToArray();
+                }
+
+                if (queueRef is not null && pendingMessages.Length > 0)
+                {
+                    var releaseTask = queueRef.ReleaseMessages(pendingMessages);
+                    try
+                    {
+                        await releaseTask.WaitAsync(timeoutCancellation.Token);
+                    }
+                    catch (OperationCanceledException exception) when (timeoutCancellation.IsCancellationRequested)
+                    {
+                        releaseTask.Ignore();
+                        LogWarningReleaseMessageException(logger, exception, Id, pendingMessages.Length);
+                    }
+                    catch (Exception exc)
+                    {
+                        LogWarningReleaseMessageException(logger, exc, Id, pendingMessages.Length);
+                    }
+                }
             }
             finally
             {
-                // remember that we shut down so we never try to read from the queue again.
-                queue = null;
-                pending.Clear();
+                lock (pendingLock)
+                {
+                    pending.Clear();
+                }
             }
         }
 
@@ -84,26 +134,52 @@ namespace OrleansAWSUtils.Streams
 
                 var task = queueRef.GetMessages(count);
                 outstandingTask = task;
-                IEnumerable<SQSMessage> messages = await task;
-                if (!messages.Any())
+                var messages = (await task).ToArray();
+                if (messages.Length == 0)
                     return Array.Empty<IBatchContainer>();
 
                 var messageBatch = new List<IBatchContainer>();
                 var pendingDeliveries = new List<PendingDelivery>();
                 foreach (var message in messages)
                 {
-                    if (!string.IsNullOrEmpty(message.MessageId))
-                    {
-                        pending.RemoveAll(item => string.Equals(item.Message.MessageId, message.MessageId, StringComparison.Ordinal));
-                    }
-
                     var sequenceId = Interlocked.Increment(ref lastReadMessage);
                     var batch = dataAdapter.FromQueueMessage(message, sequenceId);
                     messageBatch.Add(batch);
                     pendingDeliveries.Add(new PendingDelivery(batch, message));
                 }
 
-                pending.AddRange(pendingDeliveries);
+                lock (pendingLock)
+                {
+                    if (!ReferenceEquals(queue, queueRef))
+                    {
+                        pendingDeliveries.Clear();
+                    }
+
+                    foreach (var delivery in pendingDeliveries)
+                    {
+                        if (!string.IsNullOrEmpty(delivery.Message.MessageId))
+                        {
+                            pending.RemoveAll(item => string.Equals(item.Message.MessageId, delivery.Message.MessageId, StringComparison.Ordinal));
+                        }
+                    }
+
+                    pending.AddRange(pendingDeliveries);
+                }
+
+                if (pendingDeliveries.Count == 0)
+                {
+                    try
+                    {
+                        await queueRef.ReleaseMessages(messages);
+                    }
+                    catch (Exception exception)
+                    {
+                        LogWarningReleaseMessageException(logger, exception, Id, messages.Length);
+                    }
+
+                    return Array.Empty<IBatchContainer>();
+                }
+
                 return messageBatch;
             }
             finally
@@ -119,20 +195,22 @@ namespace OrleansAWSUtils.Streams
                 var queueRef = queue; // store direct ref, in case we are somehow asked to shutdown while we are receiving.
                 if (messages.Count == 0 || queueRef == null) return;
 
-                var cloudQueueMessages = new List<SQSMessage>();
-                foreach (var message in messages)
+                var pendingDeliveries = new HashSet<PendingDelivery>(ReferenceEqualityComparer.Instance);
+                lock (pendingLock)
                 {
-                    var index = pending.FindIndex(item => ReferenceEquals(item.Batch, message));
-                    if (index >= 0)
+                    foreach (var message in messages)
                     {
-                        cloudQueueMessages.Add(pending[index].Message);
-                        pending.RemoveAt(index);
+                        var delivery = pending.Find(item => ReferenceEquals(item.Batch, message));
+                        if (delivery is not null)
+                        {
+                            pendingDeliveries.Add(delivery);
+                        }
                     }
                 }
 
-                if (cloudQueueMessages.Count == 0) return;
+                if (pendingDeliveries.Count == 0) return;
 
-                outstandingTask = queueRef.DeleteMessages(cloudQueueMessages);
+                outstandingTask = ConfirmMessagesDeliveredAsync(queueRef, pendingDeliveries);
                 try
                 {
                     await outstandingTask;
@@ -148,11 +226,33 @@ namespace OrleansAWSUtils.Streams
             }
         }
 
+        private async Task ConfirmMessagesDeliveredAsync(SQSStorage queueRef, HashSet<PendingDelivery> deliveries)
+        {
+            await queueRef.DeleteMessages(deliveries.Select(static item => item.Message));
+
+            lock (pendingLock)
+            {
+                pending.RemoveAll(deliveries.Contains);
+            }
+        }
+
         [LoggerMessage(
             Level = LogLevel.Warning,
             Message = "Exception upon DeleteMessage on queue {Id}. Ignoring."
         )]
         private static partial void LogWarningDeleteMessageException(ILogger logger, Exception exception, QueueId id);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Exception while awaiting a pending operation for queue {Id}. Continuing shutdown cleanup."
+        )]
+        private static partial void LogWarningPendingOperationException(ILogger logger, Exception exception, QueueId id);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "An error occurred while releasing up to {MessageCount} pending messages for queue {Id}."
+        )]
+        private static partial void LogWarningReleaseMessageException(ILogger logger, Exception exception, QueueId id, int messageCount);
 
         private sealed record PendingDelivery(IBatchContainer Batch, SQSMessage Message);
     }

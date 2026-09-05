@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Globalization;
 using AWSUtils.Tests.StorageTests;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -31,6 +32,7 @@ namespace AWSUtils.Tests.Streaming
         private const int NumBatches = 20;
         private const int NumMessagesPerBatch = 20;
         private readonly string clusterId;
+        private bool usesFifoQueue;
         public static readonly string SQS_STREAM_PROVIDER_NAME = "SQSAdapterTests";
         private readonly TimeSpan QueuePollRate = TimeSpan.FromSeconds(1);
 
@@ -56,7 +58,8 @@ namespace AWSUtils.Tests.Streaming
                     SQS_STREAM_PROVIDER_NAME,
                     this.clusterId,
                     AWSTestConstants.SqsConnectionString,
-                    NullLoggerFactory.Instance);
+                    NullLoggerFactory.Instance,
+                    usesFifoQueue);
             }
         }
 
@@ -72,6 +75,72 @@ namespace AWSUtils.Tests.Streaming
             var adapterFactory = new SQSAdapterFactory(SQS_STREAM_PROVIDER_NAME, options, new HashRingStreamQueueMapperOptions(), new SimpleQueueCacheOptions(), Options.Create(clusterOptions), dataAdapter, NullLoggerFactory.Instance);
             adapterFactory.Init();
             await SendAndReceiveFromQueueAdapter(adapterFactory, TestContext.Current.CancellationToken);
+        }
+
+        [Fact]
+        public async Task ShutdownReleasesFifoMessages()
+        {
+            usesFifoQueue = true;
+            var options = new SqsOptions
+            {
+                ConnectionString = AWSTestConstants.SqsConnectionString,
+                FifoQueue = true,
+                VisibilityTimeoutSeconds = 60,
+            };
+            var clusterOptions = new ClusterOptions { ServiceId = this.clusterId };
+            var queueMapperOptions = new HashRingStreamQueueMapperOptions { TotalQueueCount = 1 };
+            var dataAdapter = new SQSDataAdapter(fixture.Serializer);
+            var adapterFactory = new SQSAdapterFactory(
+                SQS_STREAM_PROVIDER_NAME,
+                options,
+                queueMapperOptions,
+                new SimpleQueueCacheOptions(),
+                Options.Create(clusterOptions),
+                dataAdapter,
+                NullLoggerFactory.Instance);
+            adapterFactory.Init();
+
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var adapter = await adapterFactory.CreateAdapter();
+            var queueId = Assert.Single(adapterFactory.GetStreamQueueMapper().GetAllQueues());
+            var receiver = adapter.CreateReceiver(queueId);
+            await receiver.Initialize(TimeSpan.FromSeconds(10), cancellationToken);
+
+            var streamId = StreamId.Create("handoff", Guid.NewGuid());
+            await adapter.QueueMessageBatchAsync(streamId, [42], null, null);
+            var received = await WaitForMessage(receiver, "initial receiver", cancellationToken);
+            Assert.Equal(42, Assert.Single(received.GetEvents<int>()).Item1);
+
+            await receiver.Shutdown(TimeSpan.FromSeconds(10), cancellationToken);
+
+            var replacement = adapter.CreateReceiver(queueId);
+            await replacement.Initialize(TimeSpan.FromSeconds(10), cancellationToken);
+            var redelivered = await WaitForMessage(replacement, "replacement receiver after handoff", cancellationToken);
+            Assert.Equal(42, Assert.Single(redelivered.GetEvents<int>()).Item1);
+
+            await replacement.MessagesDeliveredAsync([redelivered], cancellationToken);
+            await replacement.Shutdown(TimeSpan.FromSeconds(10), cancellationToken);
+        }
+
+        private async Task<IBatchContainer> WaitForMessage(
+            IQueueAdapterReceiver receiver,
+            string phase,
+            CancellationToken cancellationToken)
+        {
+            var timeout = TimeSpan.FromSeconds(30);
+            var stopwatch = Stopwatch.StartNew();
+            while (stopwatch.Elapsed < timeout)
+            {
+                var messages = await receiver.GetQueueMessagesAsync(1, cancellationToken);
+                if (messages.Count > 0)
+                {
+                    return Assert.Single(messages);
+                }
+
+                await Task.Delay(QueuePollRate, cancellationToken);
+            }
+
+            throw new TimeoutException($"Timed out after {timeout} waiting for one SQS message during {phase}; observed 0.");
         }
 
         private async Task SendAndReceiveFromQueueAdapter(

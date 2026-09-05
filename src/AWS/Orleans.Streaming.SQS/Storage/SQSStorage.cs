@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Text;
@@ -328,7 +329,7 @@ namespace OrleansAWSUtils.Storage
 
                 foreach (var message in messagesToDelete)
                 {
-                    ValidateMessageForDeletion(message);
+                    ValidateMessageReceipt(message);
                 }
 
                 foreach (var batch in messagesToDelete.Chunk(MAX_NUMBER_OF_MESSAGE_TO_PEEK))
@@ -362,7 +363,69 @@ namespace OrleansAWSUtils.Storage
             }
         }
 
-        private static void ValidateMessageForDeletion(SQSMessage message)
+        public async Task ReleaseMessages(IEnumerable<SQSMessage> messages)
+        {
+            try
+            {
+                ArgumentNullException.ThrowIfNull(messages);
+                if (string.IsNullOrWhiteSpace(queueUrl))
+                {
+                    throw new InvalidOperationException("Queue not initialized");
+                }
+
+                var messagesToRelease = messages.ToArray();
+                if (messagesToRelease.Length == 0)
+                {
+                    return;
+                }
+
+                foreach (var message in messagesToRelease)
+                {
+                    ValidateMessageReceipt(message);
+                }
+
+                var failedEntryCount = 0;
+                foreach (var batch in messagesToRelease.Chunk(MAX_NUMBER_OF_MESSAGE_TO_PEEK))
+                {
+                    var releaseRequest = new ChangeMessageVisibilityBatchRequest
+                    {
+                        QueueUrl = queueUrl,
+                        Entries = batch
+                            .Select((m, i) => new ChangeMessageVisibilityBatchRequestEntry
+                            {
+                                Id = i.ToString(CultureInfo.InvariantCulture),
+                                ReceiptHandle = m.ReceiptHandle,
+                                VisibilityTimeout = 0,
+                            })
+                            .ToList()
+                    };
+
+                    var result = await sqsClient.ChangeMessageVisibilityBatchAsync(releaseRequest);
+                    var failedEntries = result.Failed ?? [];
+                    failedEntryCount += failedEntries.Count;
+                    foreach (var failed in failedEntries)
+                    {
+                        Logger.LogWarning(
+                            "Failed to release SQS batch entry {EntryId} from queue {QueueName}. Error code: {ErrorCode}. Error message: {ErrorMessage}",
+                            failed.Id,
+                            QueueName,
+                            failed.Code,
+                            failed.Message);
+                    }
+                }
+
+                if (failedEntryCount > 0)
+                {
+                    throw new InvalidOperationException($"Amazon SQS failed to release {failedEntryCount} message(s) from queue {QueueName}.");
+                }
+            }
+            catch (Exception exc)
+            {
+                ReportErrorAndRethrow(exc, "ReleaseMessages");
+            }
+        }
+
+        private static void ValidateMessageReceipt(SQSMessage message)
         {
             if (message == null)
                 throw new ArgumentNullException(nameof(message));
