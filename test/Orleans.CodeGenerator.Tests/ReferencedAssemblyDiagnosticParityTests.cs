@@ -312,10 +312,10 @@ public class ReferencedAssemblyDiagnosticParityTests
         => GetRegistrationMethodName(collectionName) is { } methodName
             ? string.Equals(expression.Name.Identifier.ValueText, methodName, StringComparison.Ordinal)
             : expression is
-                {
-                    Name.Identifier.ValueText: "Add",
-                    Expression: MemberAccessExpressionSyntax collectionExpression,
-                }
+            {
+                Name.Identifier.ValueText: "Add",
+                Expression: MemberAccessExpressionSyntax collectionExpression,
+            }
                 && string.Equals(collectionExpression.Name.Identifier.ValueText, collectionName, StringComparison.Ordinal);
 
     private static string? GetRegistrationMethodName(string collectionName) => collectionName switch
