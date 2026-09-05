@@ -16,7 +16,6 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Microsoft.Orleans.DurableTasks.Tests" />
-    <InternalsVisibleTo Include="Orleans.Journaling.Tests" />
   </ItemGroup>
 
   <ItemGroup>
