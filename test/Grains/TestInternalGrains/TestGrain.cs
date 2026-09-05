@@ -209,6 +209,7 @@ namespace UnitTests.Grains
 
     internal class OneWayGrain : Grain, IOneWayGrain, ISimpleGrainObserver
     {
+        private const int MaxTopologyCandidateCount = 1_000;
         private readonly string _id = Guid.NewGuid().ToString();
         private int count;
         private TaskCompletionSource<int> countChanged = CreateCountChangedSource();
@@ -258,30 +259,66 @@ namespace UnitTests.Grains
             return completedSynchronously;
         }
 
-        public async Task<IOneWayGrain> GetOtherGrain()
+        public async Task<IOneWayGrain> GetOtherGrain(SiloAddress targetSilo, SiloAddress directorySilo)
         {
-            return this.other ?? (this.other = await GetGrainOnOtherSilo());
-
-            async Task<IOneWayGrain> GetGrainOnOtherSilo()
+            if (this.other is not null)
             {
-                var silos = ServiceProvider.GetRequiredService<IClusterMembershipService>().CurrentSnapshot.Members.Where(kv => kv.Value.Status == SiloStatus.Active).Select(kv => kv.Key).ToHashSet();
-                var thisSilo = await this.GetSiloAddress();
-                silos.Remove(thisSilo);
-                while (true)
+                return this.other;
+            }
+
+            var thisSilo = this.LocalSiloDetails.SiloAddress;
+            var activeSilos = ServiceProvider.GetRequiredService<IClusterMembershipService>().CurrentSnapshot.Members
+                .Where(member => member.Value.Status == SiloStatus.Active)
+                .Select(member => member.Key)
+                .ToHashSet();
+            if (targetSilo.Equals(thisSilo)
+                || directorySilo.Equals(thisSilo)
+                || targetSilo.Equals(directorySilo)
+                || !activeSilos.Contains(targetSilo)
+                || !activeSilos.Contains(directorySilo))
+            {
+                throw new InvalidOperationException(
+                    $"The one-way test topology requires three distinct active silos. "
+                    + $"Caller: {thisSilo}, target: {targetSilo}, directory: {directorySilo}, "
+                    + $"active silos: {string.Join(", ", activeSilos.Order())}.");
+            }
+
+            for (var candidateIndex = 0; candidateIndex < MaxTopologyCandidateCount; candidateIndex++)
+            {
+                var candidate = this.GrainFactory.GetGrain<IOneWayGrain>(CreateTopologyCandidateKey(candidateIndex));
+                var grainId = ((GrainReference)candidate).GrainId;
+                if (!directorySilo.Equals(this.LocalGrainDirectory.GetPrimaryForGrain(grainId)))
                 {
-                    RequestContext.Set(IPlacementDirector.PlacementHintKey, silos.First());
-                    var candidate = this.GrainFactory.GetGrain<IOneWayGrain>(Guid.NewGuid());
-                    var directorySilo = await candidate.GetPrimaryForGrain();
-                    var candidateSilo = await candidate.GetSiloAddress();
-                    if (!directorySilo.Equals(candidateSilo)
-                        && !directorySilo.Equals(thisSilo)
-                        && !candidateSilo.Equals(thisSilo))
+                    continue;
+                }
+
+                RequestContext.Set(IPlacementDirector.PlacementHintKey, targetSilo);
+                try
+                {
+                    var actualTargetSilo = await candidate.GetSiloAddress();
+                    if (!targetSilo.Equals(actualTargetSilo))
                     {
-                        return candidate;
+                        throw new InvalidOperationException(
+                            $"The one-way target grain was placed on {actualTargetSilo} instead of {targetSilo}. "
+                            + $"Caller: {thisSilo}, directory: {directorySilo}, grain: {grainId}.");
                     }
+
+                    return this.other = candidate;
+                }
+                finally
+                {
+                    RequestContext.Remove(IPlacementDirector.PlacementHintKey);
                 }
             }
+
+            throw new InvalidOperationException(
+                $"Could not select a one-way target grain owned by directory silo {directorySilo} "
+                + $"after checking {MaxTopologyCandidateCount} deterministic grain ids. "
+                + $"Caller: {thisSilo}, target: {targetSilo}.");
         }
+
+        private static Guid CreateTopologyCandidateKey(int candidateIndex) =>
+            new(candidateIndex, 0x1133, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
         public Task<string> GetActivationId()
         {
