@@ -41,8 +41,8 @@ namespace Orleans.Runtime
         {
             var manifest = _clusterManifestProvider.Current;
 
-            // Recompute the per-silo hashes only when the manifest version changes, so the SHA-256 over every
-            // silo manifest is not repeated on each summary request.
+            // Reuse the summary while the version is unchanged. Individual content hashes are cached by
+            // immutable manifest identity across versions and across silos with identical manifests.
             if (_cachedHashSummary is null || manifest.Version != _cachedHashSummaryVersion)
             {
                 var hashes = new Dictionary<SiloAddress, ManifestHash>();

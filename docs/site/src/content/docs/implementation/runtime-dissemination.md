@@ -35,6 +35,8 @@ flowchart LR
 
 Queue entries contain `(namespace, key)` identities. A pump materializes a repair immediately before transmission, so coalesced notifications carry the latest repairable version without retaining serialized payloads for every peer.
 
+Applied state wakes each forwarding child, including same-version membership liveness advances. Duplicate deliveries wake children whose versions are still missing and whose queues contain no equivalent work. This lets a first tree delivery forward state already learned through a direct path while suppressing repeated forwarding cycles between silos with different topology views.
+
 ## Version and application invariants
 
 A `DisseminationValue` names one key and a `[FromVersion, ToVersion]` transition:
@@ -53,7 +55,7 @@ Deployment-load versions are sample timestamps. Each repair is a full latest val
 
 ## Deterministic topology
 
-Every silo derives routing from the same ordered membership projection. Members are ordered by status, start time, and silo address. Joining, Active, ShuttingDown, and Stopping entries participate.
+Every silo derives routing from the same ordered membership projection. Members are ordered by status and silo address. Silo addresses order by generation, port, and IP address, providing stable ordering across membership storage providers with different timestamp precision. Joining, Active, ShuttingDown, and Stopping entries participate.
 
 For fanout `f` and zero-based member index `i`, a forwarding node selects children starting at `f * (i + 1)` and continuing for at most `f` members. An originator sends to the first `f` members, excluding itself, plus its normal forwarding children. Stable ordering makes parent and child selection deterministic for a given membership version and fanout.
 
@@ -99,7 +101,7 @@ Unexpected iteration failures retain work and retry. A failure in the recovery p
 
 ## Bounded anti-entropy
 
-An anti-entropy round rotates through at most `AntiEntropyPeerCount` eligible peers. The broadest participating membership scope provides the global peer budget; each request includes only namespaces for which that peer is eligible.
+An anti-entropy round rotates through at most `AntiEntropyPeerCount` eligible peers. Rotation progress persists across membership versions so frequent table updates still allow every eligible peer to participate. The broadest participating membership scope provides the global peer budget; each request includes only namespaces for which that peer is eligible.
 
 Digests identify the versions already held by the requester. Recently advanced streams suppress redundant probes until `ExpectedUpdateCadence` elapses. Responses obey item, batch-byte, payload-byte, and hop-lifetime bounds. Persistent per-requester cursors rotate truncated responses so hot early keys cannot starve later candidates. Cursor state for non-members is least-recently-used and bounded to 64 entries.
 
@@ -116,6 +118,8 @@ Deployment-load publication uses dissemination for confirmed peers and the direc
 Manifest summaries identify each silo manifest using SHA-256 over a versioned canonical frame. The frame distinguishes structural boundaries, null and empty values, default and empty identifiers, and sorted entries. Integer fields are big-endian, identifiers contribute raw bytes, and strings contribute UTF-16 code units in big-endian order.
 
 The cluster-manifest provider rotates through a bounded set of Active peers. Fetched content is accepted only after recomputing the expected hash. Valid partial peer results are published immediately while direct fetches continue independently. Hung, stale, invalid, or unsupported peers leave the direct per-silo manifest RPC responsible for completing the manifest.
+
+Content hashes are memoized by immutable manifest identity using weak references. Each cluster-manifest publication replaces the read-through cache with its live manifests and the local manifest. Fetches share the cache captured for their update, so verified content is reused before publication and late completions remain isolated from newer publications. Once peer repair supplies a silo's manifest, its redundant direct fetch completes independently of the remaining required fetches.
 
 ## Concurrency and lifetime
 

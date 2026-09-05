@@ -1,6 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using Orleans.Metadata;
 
@@ -9,8 +10,12 @@ namespace Orleans.Runtime.Dissemination;
 internal static class ManifestHashCalculator
 {
     private const int EncodingVersion = 1;
+    private static readonly ConditionalWeakTable<GrainManifest, StrongBox<ManifestHash>> Hashes = new();
 
-    public static ManifestHash ComputeHash(GrainManifest manifest)
+    public static ManifestHash ComputeHash(GrainManifest manifest) =>
+        Hashes.GetValue(manifest, static value => new(ComputeHashCore(value))).Value;
+
+    private static ManifestHash ComputeHashCore(GrainManifest manifest)
     {
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         AppendToken(hash, FrameToken.ManifestStart);

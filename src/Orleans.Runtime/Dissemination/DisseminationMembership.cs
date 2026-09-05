@@ -32,7 +32,7 @@ internal sealed class DisseminationMembership(
                     return current;
                 }
 
-                current = ComputeMembership(membershipSnapshot, localSiloDetails.SiloAddress, options.Value.Overlay);
+                current = ComputeMembership(membershipSnapshot, localSiloDetails.SiloAddress, options.Value.Overlay, current);
                 Volatile.Write(ref _currentSnapshots, current);
                 return current;
             }
@@ -66,12 +66,14 @@ internal sealed class DisseminationMembership(
     private static DisseminationMembershipSnapshots ComputeMembership(
         MembershipTableSnapshot snapshot,
         SiloAddress localSilo,
-        DisseminationOverlayOptions overlayOptions)
+        DisseminationOverlayOptions overlayOptions,
+        DisseminationMembershipSnapshots? previous)
     {
         var members = snapshot.Entries.Values
             .Where(static entry => IsDisseminationMember(entry.Status))
             .OrderBy(static entry => GetStatusRank(entry.Status))
-            .ThenBy(static entry => entry.StartTime)
+            // Storage providers can round StartTime differently from the originating silo's local snapshot.
+            // SiloAddress includes the generation and provides a stable oldest-first order everywhere.
             .ThenBy(static entry => entry.SiloAddress)
             .ToArray();
         var allMembers = ImmutableArray.CreateBuilder<SiloAddress>(members.Length);
@@ -90,12 +92,14 @@ internal sealed class DisseminationMembership(
                 snapshot.Version,
                 localSilo,
                 activeMembers.ToImmutable(),
-                overlayOptions),
+                overlayOptions,
+                previous?.ActiveMembers),
             new DisseminationMembershipSnapshot(
                 snapshot.Version,
                 localSilo,
                 allMembers.MoveToImmutable(),
-                overlayOptions));
+                overlayOptions,
+                previous?.AllMembers));
     }
 
     private static bool IsDisseminationMember(SiloStatus status) =>

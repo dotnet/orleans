@@ -43,6 +43,8 @@ public sealed class DisseminationOverlayOptions
     /// </summary>
     /// <remarks>
     /// The argument is the current member count for the selected dissemination topology.
+    /// The selector must return the same fanout on every silo for a given member count so that forwarding
+    /// routes agree across the cluster.
     /// When this value is <see langword="null"/>, <see cref="TargetHopCount"/>, <see cref="MinFanOutFactor"/>,
     /// and <see cref="MaxFanOutFactor"/> are used to derive a fanout factor.
     /// </remarks>

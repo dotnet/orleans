@@ -24,7 +24,7 @@ internal sealed partial class DisseminationBroadcastQueue
     private readonly object _lock = new();
     private readonly Dictionary<SiloAddress, PeerQueuePump> _peers = [];
     private readonly SemaphoreSlim _sendGate;
-    private readonly int _maxConcurrentSends;
+    private int _sendGateUsers;
     private bool _sendGateShutdown;
     private bool _stopped;
 
@@ -45,14 +45,14 @@ internal sealed partial class DisseminationBroadcastQueue
         _namespaces = _disseminationNamespaces.ToFrozenDictionary(static ns => ns.Name);
         _logger = logger;
         _responseObserver = responseObserver;
-        _maxConcurrentSends = Math.Max(1, options.CurrentValue.MaxConcurrentSends);
-        _sendGate = new(_maxConcurrentSends);
+        _sendGate = new(Math.Max(1, options.CurrentValue.MaxConcurrentSends));
     }
 
     public bool Notify(
         SiloAddress peer,
         IDisseminationNamespace disseminationNamespace,
-        DisseminationKey key)
+        DisseminationKey key,
+        bool force = true)
     {
         PeerQueuePump pump;
         lock (_lock)
@@ -66,7 +66,8 @@ internal sealed partial class DisseminationBroadcastQueue
         }
 
         // Notification diagnostics run outside the queue lock and can reenter the queue.
-        return pump.Notify(disseminationNamespace, key);
+        var version = disseminationNamespace.GetVersion(key);
+        return pump.Notify(disseminationNamespace, key, version, force);
     }
 
     public void ObservePeerVersion(
@@ -129,7 +130,7 @@ internal sealed partial class DisseminationBroadcastQueue
             lock (_lock)
             {
                 _sendGateShutdown = true;
-                if (_sendGate.CurrentCount == _maxConcurrentSends)
+                if (_sendGateUsers == 0)
                 {
                     _sendGate.Dispose();
                 }
@@ -137,13 +138,42 @@ internal sealed partial class DisseminationBroadcastQueue
         }
     }
 
-    private void ReleaseSendGate()
+    private async ValueTask AcquireSendGate(CancellationToken cancellationToken)
+    {
+        // Count waiters as well as holders so pruning and shutdown can safely overlap.
+        lock (_lock)
+        {
+            ObjectDisposedException.ThrowIf(_sendGateShutdown, this);
+            _sendGateUsers++;
+        }
+
+        var acquired = false;
+        try
+        {
+            await _sendGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            acquired = true;
+        }
+        finally
+        {
+            if (!acquired)
+            {
+                ReleaseSendGate(acquired: false);
+            }
+        }
+    }
+
+    private void ReleaseSendGate(bool acquired = true)
     {
         lock (_lock)
         {
-            _sendGate.Release();
+            if (acquired)
+            {
+                _sendGate.Release();
+            }
+
+            _sendGateUsers--;
             // An RPC can outlive its pump when the runtime waits for remote cancellation acknowledgment.
-            if (_sendGateShutdown && _sendGate.CurrentCount == _maxConcurrentSends)
+            if (_sendGateShutdown && _sendGateUsers == 0)
             {
                 _sendGate.Dispose();
             }
@@ -301,7 +331,7 @@ internal sealed partial class DisseminationBroadcastQueue
 
         private int DirtyCount { get; set; }
 
-        public bool Notify(IDisseminationNamespace disseminationNamespace, DisseminationKey key)
+        public bool Notify(IDisseminationNamespace disseminationNamespace, DisseminationKey key, long version, bool force)
         {
             ScheduledFlush? scheduled = null;
             var admissionRejected = false;
@@ -318,8 +348,29 @@ internal sealed partial class DisseminationBroadcastQueue
                 }
 
                 var namespaceState = GetOrCreateNamespaceStateUnsafe(disseminationNamespace);
-                if (!namespaceState.TryGetKey(key, out var keyState)
-                    && namespaceState.Keys.Count >= disseminationNamespace.Options.MaxPendingItemCount)
+                namespaceState.TryGetKey(key, out var keyState);
+                if (!force)
+                {
+                    // Duplicate deliveries can repair a new child, but cannot perpetuate a cycle between
+                    // skewed trees. Applied same-version state (membership liveness) forces a notification.
+                    if (keyState is { Dirty: true } or { InFlight: true } && keyState.NotificationVersion >= version)
+                    {
+                        return true;
+                    }
+
+                    var knownVersion = keyState?.KnownVersion;
+                    if (knownVersion is null && namespaceState.KnownVersions.TryGetValue(key, out var recordedVersion))
+                    {
+                        knownVersion = recordedVersion;
+                    }
+
+                    if (knownVersion >= version)
+                    {
+                        return true;
+                    }
+                }
+
+                if (keyState is null && namespaceState.Keys.Count >= disseminationNamespace.Options.MaxPendingItemCount)
                 {
                     admissionRejected = true;
                 }
@@ -327,6 +378,7 @@ internal sealed partial class DisseminationBroadcastQueue
                 {
                     keyState ??= namespaceState.AddKey(key);
                     // A notification is only a wake-up. The namespace will choose the latest repair when this key is drained.
+                    keyState.NotificationVersion = version;
                     keyState.NotificationGeneration++;
                     _notificationEpoch++;
                     var wasRetrying = _retryAttempt > 0;
@@ -971,7 +1023,7 @@ internal sealed partial class DisseminationBroadcastQueue
                 lifetimeCancellation.Token);
             try
             {
-                await _owner._sendGate.WaitAsync(sendCancellation.Token);
+                await _owner.AcquireSendGate(sendCancellation.Token);
                 var batch = new DisseminationBroadcastBatch
                 {
                     Sender = _owner._localSilo,
@@ -1478,6 +1530,8 @@ internal sealed partial class DisseminationBroadcastQueue
             public long? KnownVersion { get; set; }
 
             public long NotificationGeneration { get; set; }
+
+            public long NotificationVersion { get; set; }
 
             public bool Dirty { get; set; }
 

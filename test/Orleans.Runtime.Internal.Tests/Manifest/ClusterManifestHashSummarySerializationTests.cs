@@ -1,8 +1,10 @@
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Metadata;
 using Orleans.Runtime;
+using Orleans.Runtime.Dissemination;
 using Orleans.Serialization;
 using Xunit;
 
@@ -11,6 +13,20 @@ namespace UnitTests.Manifest;
 [TestCategory("BVT"), TestCategory("Serialization")]
 public sealed class ClusterManifestHashSummarySerializationTests
 {
+    [Fact]
+    public void ManifestHashCalculatorReusesHashForImmutableManifest()
+    {
+        var manifest = new GrainManifest(
+            ImmutableDictionary<GrainType, GrainProperties>.Empty,
+            ImmutableDictionary<GrainInterfaceType, GrainInterfaceProperties>.Empty);
+
+        var first = ManifestHashCalculator.ComputeHash(manifest);
+        var second = ManifestHashCalculator.ComputeHash(manifest);
+
+        Assert.Same(first.Value, second.Value);
+        Assert.Equal("AC3C68A3F09A51744D328E7EE3D099A85C190B600BD88BFE132DD63B74CCA2BB", first.Value);
+    }
+
     // ClusterManifestHashSummary is sent over the wire by GetClusterManifestHashSummary(). Its
     // SiloManifestHashes collection must use a type that has a serialization codec; a FrozenDictionary
     // has none, which previously caused the RPC to throw CodecNotFoundException (silently swallowed by

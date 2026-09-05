@@ -232,6 +232,103 @@ public class DisseminationMembershipSnapshotTests
         Assert.Equal(first.AllMembers.ForwardingTreeTargets, second.AllMembers.ForwardingTreeTargets);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ScopeProjectionOrderingDoesNotDependOnStartTimePrecision(bool activeMembers)
+    {
+        var members = CreateSilos(6).Select(static silo => SiloAddress.New(silo.Endpoint, 42)).ToArray();
+        var entries = members.Select((member, index) =>
+        {
+            var entry = CreateScopeMembershipEntry(member, activeMembers ? SiloStatus.Active : SiloStatus.Joining, 0);
+            // A joining silo can publish its own entry before reading back the storage-rounded timestamp.
+            entry.StartTime = DateTime.UnixEpoch.AddTicks(index == 0 ? 1 : 0);
+            return entry;
+        }).ToArray();
+        var persistedEntries = entries.Select(entry =>
+        {
+            var persisted = entry.Copy();
+            persisted.StartTime = LogFormatter.ParseDate(LogFormatter.PrintDate(entry.StartTime));
+            return persisted;
+        }).ToArray();
+
+        foreach (var local in members)
+        {
+            var original = CreateProjections(entries, local);
+            var persisted = CreateProjections(persistedEntries, local);
+
+            Assert.Equal(activeMembers ? members : [], original.ActiveMembers.Members);
+            Assert.Equal(activeMembers ? members : [], persisted.ActiveMembers.Members);
+            Assert.Equal(members, original.AllMembers.Members);
+            Assert.Equal(members, persisted.AllMembers.Members);
+            Assert.Equal(original.ActiveMembers.OriginatorTreeTargets, persisted.ActiveMembers.OriginatorTreeTargets);
+            Assert.Equal(original.ActiveMembers.ForwardingTreeTargets, persisted.ActiveMembers.ForwardingTreeTargets);
+            Assert.Equal(original.AllMembers.OriginatorTreeTargets, persisted.AllMembers.OriginatorTreeTargets);
+            Assert.Equal(original.AllMembers.ForwardingTreeTargets, persisted.AllMembers.ForwardingTreeTargets);
+        }
+
+        static DisseminationMembershipSnapshots CreateProjections(MembershipEntry[] entries, SiloAddress local) =>
+            new DisseminationMembership(
+                new CountingMembershipManager(new(
+                    new MembershipVersion(42),
+                    entries.ToImmutableDictionary(static entry => entry.SiloAddress))),
+                new ScopeLocalSiloDetails(local),
+                Microsoft.Extensions.Options.Options.Create(new DisseminationOptions
+                {
+                    Overlay = CreateOverlayOptions(2),
+                })).CurrentSnapshots;
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void MembershipVersionChangesPreserveAntiEntropyPeerRotation(bool activeScope)
+    {
+        var members = CreateSilos(5);
+        var local = members[0];
+        var peers = members[1..];
+        var manager = new MutableMembershipManager(
+            CreateSourceSnapshot(1, local, peers),
+            TestContext.Current.CancellationToken);
+        var membership = new DisseminationMembership(
+            manager,
+            new ScopeLocalSiloDetails(local),
+            Microsoft.Extensions.Options.Options.Create(new DisseminationOptions()));
+        var scope = activeScope ? DisseminationMembershipScope.ActiveMembers : DisseminationMembershipScope.AllMembers;
+
+        for (var round = 0; round < peers.Length * 2; round++)
+        {
+            manager.SetSnapshot(CreateSourceSnapshot(round + 1, local, peers));
+            var snapshot = membership.GetSnapshot(scope);
+
+            Assert.Equal(new MembershipVersion(round + 1), snapshot.MembershipVersion);
+            Assert.Equal(new[] { peers[round % peers.Length] }, snapshot.SelectAntiEntropyPeers(1));
+        }
+    }
+
+    [Fact]
+    public void AntiEntropyPeerRotationWrapsWhenMembershipShrinks()
+    {
+        var members = CreateSilos(5);
+        var local = members[0];
+        var peers = members[1..];
+        var manager = new MutableMembershipManager(
+            CreateSourceSnapshot(1, local, peers),
+            TestContext.Current.CancellationToken);
+        var membership = new DisseminationMembership(
+            manager,
+            new ScopeLocalSiloDetails(local),
+            Microsoft.Extensions.Options.Options.Create(new DisseminationOptions()));
+        var previous = membership.CurrentSnapshot;
+        Assert.Equal(peers[..3], previous.SelectAntiEntropyPeers(3));
+
+        manager.SetSnapshot(CreateSourceSnapshot(2, local, peers[..2]));
+        var current = membership.CurrentSnapshot;
+
+        Assert.Equal(new[] { peers[1], peers[0] }, current.SelectAntiEntropyPeers(2));
+        Assert.Equal(new[] { peers[1] }, current.SelectAntiEntropyPeers(1));
+    }
+
     [Fact]
     public void ScopeProjectionAntiEntropySelectionIsDeterministic()
     {

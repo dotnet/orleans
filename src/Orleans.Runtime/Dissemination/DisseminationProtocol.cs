@@ -129,7 +129,7 @@ internal sealed partial class DisseminationProtocol
             };
         }
 
-        var receivedKeys = new Dictionary<IDisseminationNamespace, HashSet<DisseminationKey>>();
+        var receivedKeys = new Dictionary<IDisseminationNamespace, Dictionary<DisseminationKey, bool>>();
         var unsupportedNamespaces = new List<DisseminationNamespace>();
         foreach (var (namespaceName, values) in batch.Values)
         {
@@ -141,24 +141,28 @@ internal sealed partial class DisseminationProtocol
 
             DisseminationInstruments.OnBroadcastReceived(disseminationNamespace.Name, "tree", values.Count);
             ConfirmPeerNamespaces(batch.Sender, [namespaceName]);
-            var namespaceKeys = new HashSet<DisseminationKey>();
+            var namespaceKeys = new Dictionary<DisseminationKey, bool>();
             receivedKeys.Add(disseminationNamespace, namespaceKeys);
             foreach (var item in values)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                namespaceKeys.Add(item.Value.Key);
+                namespaceKeys.TryAdd(item.Value.Key, false);
                 // The sender necessarily owns this version; use that fact only if an outbound ledger already exists.
                 _broadcastQueue.ObservePeerVersion(
                     batch.Sender,
                     namespaceName,
                     item.Value.Key,
                     item.Value.ToVersion);
-                await ApplyReceivedValue(
+                var result = await ApplyReceivedValue(
                     disseminationNamespace,
                     item,
                     batch.Sender,
                     options,
                     cancellationToken);
+                if (result is DisseminationApplyResult.Applied)
+                {
+                    namespaceKeys[item.Value.Key] = true;
+                }
             }
         }
 
@@ -166,12 +170,12 @@ internal sealed partial class DisseminationProtocol
         var membershipSnapshots = _membership.CurrentSnapshots;
         PrunePeerNamespaceConfirmations(membershipSnapshots.AllMembers);
         await _broadcastQueue.Prune(membershipSnapshots, cancellationToken);
-        // Re-materialize downstream repairs from local state. Duplicate deliveries still wake children,
-        // while their peer ledgers suppress redundant sends.
+        // Changed state always wakes children, including same-version liveness updates. Duplicate deliveries
+        // wake only children which still need this version and have no equivalent queued work.
         foreach (var (disseminationNamespace, keys) in receivedKeys)
         {
             var membership = membershipSnapshots.GetSnapshot(disseminationNamespace.MembershipScope);
-            foreach (var key in keys)
+            foreach (var (key, applied) in keys)
             {
                 if (disseminationNamespace.GetVersion(key) <= 0)
                 {
@@ -182,7 +186,7 @@ internal sealed partial class DisseminationProtocol
                 {
                     if (!Equals(peer, batch.Sender))
                     {
-                        _broadcastQueue.Notify(peer, disseminationNamespace, key);
+                        _broadcastQueue.Notify(peer, disseminationNamespace, key, force: applied);
                     }
                 }
             }
@@ -193,7 +197,7 @@ internal sealed partial class DisseminationProtocol
         foreach (var (disseminationNamespace, keys) in receivedKeys)
         {
             var namespaceAcknowledgments = new List<DigestEntry>(keys.Count);
-            foreach (var key in keys)
+            foreach (var key in keys.Keys)
             {
                 namespaceAcknowledgments.Add(new DigestEntry(key, disseminationNamespace.GetVersion(key)));
             }

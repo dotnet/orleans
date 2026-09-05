@@ -94,12 +94,15 @@ public class ClusterManifestProviderTests
             (remoteSilo, SiloStatus.Active)));
         var grainFactory = CreateGrainFactory(remoteSilo, remoteManifest);
         var provider = CreateClusterManifestProvider(localSilo, membership, grainFactory);
+        var observed = ObserveManifestAsync(provider, new MajorMinorVersion(1, 1));
         var lifecycle = await StartAsync(provider);
 
         try
         {
-            await Until(() => provider.Current.Version == new MajorMinorVersion(1, 1)
-                && provider.Current.Silos.ContainsKey(remoteSilo));
+            var initial = await observed.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            Assert.Equal(new MajorMinorVersion(1, 1), initial.Version);
+            Assert.Contains(remoteSilo, initial.Silos.Keys);
+            Assert.Equal(2, GetCachedManifests(provider).Count);
 
             membership.Update(CreateMembershipSnapshot(
                 2,
@@ -111,6 +114,7 @@ public class ClusterManifestProviderTests
             Assert.Equal(new MajorMinorVersion(2, 0), current.Version);
             Assert.Contains(localSilo, current.Silos.Keys);
             Assert.DoesNotContain(remoteSilo, current.Silos.Keys);
+            Assert.Same(provider.LocalGrainManifest, Assert.Single(GetCachedManifests(provider)).Value);
         }
         finally
         {
@@ -629,6 +633,191 @@ public class ClusterManifestProviderTests
             await Task.CompletedTask;
         }
     }
+
+    [Fact]
+    public async Task UpdateManifest_ReusesVerifiedManifestBeforePublication()
+    {
+        var localSilo = CreateSiloAddress(11111, 1);
+        var peers = new[] { CreateSiloAddress(11112, 1), CreateSiloAddress(11113, 1), CreateSiloAddress(11114, 1) };
+        var snapshot = CreateActiveMembershipSnapshot(1, localSilo, peers);
+        using var membership = new TestClusterMembershipService(snapshot);
+        var grainFactory = Substitute.For<IInternalGrainFactory>();
+        var remoteManifest = CreateGrainManifest();
+        var remoteHash = ManifestHashCalculator.ComputeHash(remoteManifest);
+        var firstTarget = new CanonicalManifestCacheTarget(remoteHash, remoteManifest);
+        var secondTarget = new CanonicalManifestCacheTarget(remoteHash, remoteManifest);
+        grainFactory.GetSystemTarget<IClusterManifestSystemTarget>(Constants.ManifestProviderType, peers[0])
+            .Returns(firstTarget);
+        grainFactory.GetSystemTarget<IClusterManifestSystemTarget>(Constants.ManifestProviderType, peers[1])
+            .Returns(secondTarget);
+        var pendingHash = new TaskCompletionSource<ManifestHash>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var slowTarget = Substitute.For<IClusterManifestSystemTarget>();
+        slowTarget.GetClusterManifestHashSummary().Returns(ValueTask.FromException<ClusterManifestHashSummary>(new NotSupportedException()));
+        slowTarget.GetSiloManifestHash().Returns(new ValueTask<ManifestHash>(pendingHash.Task));
+        grainFactory.GetSystemTarget<IClusterManifestSystemTarget>(Constants.ManifestProviderType, peers[2])
+            .Returns(slowTarget);
+        await using var provider = CreateClusterManifestProvider(localSilo, membership, grainFactory);
+        var localHash = ManifestHashCalculator.ComputeHash(provider.LocalGrainManifest);
+        Assert.Same(provider.LocalGrainManifest, Assert.Single(GetCachedManifests(provider)).Value);
+        Assert.NotEqual(localHash, remoteHash);
+        var initialManifest = provider.Current;
+        var cache = GetCachedManifests(provider);
+        var initialize = typeof(ClusterManifestProvider).GetMethod("Initialize", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        await (Task)initialize.Invoke(provider, [CancellationToken.None])!;
+        var updateManifest = typeof(ClusterManifestProvider).GetMethod("UpdateManifest", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var update = (Task<bool>)updateManifest.Invoke(provider, [snapshot])!;
+
+        Assert.False(update.IsCompleted);
+        Assert.Same(initialManifest, provider.Current);
+        Assert.Same(cache, GetCachedManifests(provider));
+        Assert.Same(remoteManifest, cache[remoteHash]);
+        Assert.Equal(1, firstTarget.HashRequests);
+        Assert.Equal(1, secondTarget.HashRequests);
+        Assert.Equal(1, firstTarget.ManifestByHashRequests + secondTarget.ManifestByHashRequests);
+        Assert.Equal(0, firstTarget.LegacyManifestRequests + secondTarget.LegacyManifestRequests);
+
+        pendingHash.SetResult(localHash);
+        Assert.True(await update.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+        Assert.NotSame(cache, GetCachedManifests(provider));
+        Assert.Equal(new MajorMinorVersion(1, 1), provider.Current.Version);
+        Assert.Equal(remoteManifest, provider.Current.Silos[peers[0]]);
+        Assert.Equal(remoteManifest, provider.Current.Silos[peers[1]]);
+    }
+
+    [Fact]
+    public async Task UpdateManifest_StaleFetchCannotPopulateCurrentCache()
+    {
+        var localSilo = CreateSiloAddress(11111, 1);
+        var remoteSilo = CreateSiloAddress(11112, 1);
+        var snapshot = CreateActiveMembershipSnapshot(1, localSilo, [remoteSilo]);
+        using var membership = new TestClusterMembershipService(snapshot);
+        var grainFactory = Substitute.For<IInternalGrainFactory>();
+        var remoteManifest = CreateGrainManifest();
+        var remoteTarget = Substitute.For<IClusterManifestSystemTarget>();
+        var pendingManifest = new TaskCompletionSource<GrainManifest?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var fetchStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var hash = ManifestHashCalculator.ComputeHash(remoteManifest);
+        remoteTarget.GetSiloManifestHash().Returns(new ValueTask<ManifestHash>(hash));
+        remoteTarget.GetSiloManifestByHash(hash).Returns(_ =>
+        {
+            fetchStarted.TrySetResult();
+            return new ValueTask<GrainManifest?>(pendingManifest.Task);
+        });
+        grainFactory.GetSystemTarget<IClusterManifestSystemTarget>(Constants.ManifestProviderType, remoteSilo)
+            .Returns(remoteTarget);
+        await using var provider = CreateClusterManifestProvider(localSilo, membership, grainFactory);
+        Assert.Equal(new MajorMinorVersion(1, 0), provider.Current.Version);
+        var initialize = typeof(ClusterManifestProvider).GetMethod("Initialize", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        await (Task)initialize.Invoke(provider, [CancellationToken.None])!;
+        var updateManifest = typeof(ClusterManifestProvider).GetMethod("UpdateManifest", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var update = (Task<bool>)updateManifest.Invoke(provider, [snapshot])!;
+        await fetchStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        var fetchCache = GetCachedManifests(provider);
+
+        membership.Update(CreateMembershipSnapshot(2, (localSilo, SiloStatus.Active)));
+        Assert.Equal(new MajorMinorVersion(2, 0), provider.Current.Version);
+        pendingManifest.SetResult(remoteManifest);
+
+        Assert.False(await update.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+        Assert.DoesNotContain(remoteSilo, provider.Current.Silos.Keys);
+        Assert.Same(remoteManifest, fetchCache[hash]);
+        Assert.NotSame(fetchCache, GetCachedManifests(provider));
+        Assert.Same(provider.LocalGrainManifest, Assert.Single(GetCachedManifests(provider)).Value);
+    }
+
+    [Fact]
+    public async Task PeerRepair_CanceledPeerProbe_UsesLegacyManifest()
+    {
+        var localSilo = CreateSiloAddress(11111, 1);
+        var peers = new[] { CreateSiloAddress(11112, 1), CreateSiloAddress(11113, 1) };
+        var remoteManifest = CreateGrainManifest();
+        var targets = peers.ToDictionary(
+            peer => peer,
+            peer => new TestClusterManifestSystemTarget(
+                getHashSummary: () => Task.FromCanceled<ClusterManifestHashSummary>(new CancellationToken(canceled: true)),
+                getUpdate: _ => Task.FromResult<ClusterManifestUpdate?>(null),
+                getLegacyManifest: () => Task.FromResult(remoteManifest)));
+        using var membership = new TestClusterMembershipService(CreateActiveMembershipSnapshot(1, localSilo, peers));
+        await using var provider = CreateClusterManifestProvider(localSilo, membership, CreateGrainFactory(targets));
+        var observed = ObserveManifestAsync(provider, new MajorMinorVersion(1, 1));
+        var lifecycle = await StartAsync(provider);
+        try
+        {
+            var current = await observed.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            Assert.All(peers, peer => Assert.Equal(remoteManifest, current.Silos[peer]));
+        }
+        finally
+        {
+            await lifecycle.OnStop(TestContext.Current.CancellationToken);
+        }
+    }
+
+    [Fact]
+    public async Task DirectFetch_CanceledHashRequest_UsesLegacyManifest()
+    {
+        var localSilo = CreateSiloAddress(11111, 1);
+        var remoteSilo = CreateSiloAddress(11112, 1);
+        var remoteManifest = CreateGrainManifest();
+        using var membership = new TestClusterMembershipService(CreateActiveMembershipSnapshot(1, localSilo, [remoteSilo]));
+        var grainFactory = CreateGrainFactory(remoteSilo, remoteManifest);
+        var remoteTarget = Substitute.For<IClusterManifestSystemTarget>();
+        remoteTarget.GetSiloManifestHash().Returns(new ValueTask<ManifestHash>(
+            Task.FromCanceled<ManifestHash>(new CancellationToken(canceled: true))));
+        grainFactory.GetSystemTarget<IClusterManifestSystemTarget>(Constants.ManifestProviderType, remoteSilo)
+            .Returns(remoteTarget);
+        await using var provider = CreateClusterManifestProvider(localSilo, membership, grainFactory);
+        var observed = ObserveManifestAsync(provider, new MajorMinorVersion(1, 1));
+        var lifecycle = await StartAsync(provider);
+        try
+        {
+            var current = await observed.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            Assert.Equal(remoteManifest, current.Silos[remoteSilo]);
+        }
+        finally
+        {
+            await lifecycle.OnStop(TestContext.Current.CancellationToken);
+        }
+    }
+
+    [Fact]
+    public async Task PeerRepair_PartialResult_CompletesRemainingSilosWithoutWaitingForRepairedSiloFetch()
+    {
+        var localSilo = CreateSiloAddress(11111, 1);
+        var peers = new[] { CreateSiloAddress(11112, 1), CreateSiloAddress(11113, 1) };
+        var remoteManifest = CreateGrainManifest();
+        var summary = new ClusterManifestHashSummary(
+            new MajorMinorVersion(1, 1),
+            new Dictionary<SiloAddress, ManifestHash> { [peers[0]] = ManifestHashCalculator.ComputeHash(remoteManifest) });
+        var peerUpdate = new ClusterManifestUpdate(
+            new MajorMinorVersion(1, 1),
+            ImmutableDictionary<SiloAddress, GrainManifest>.Empty.Add(peers[0], remoteManifest),
+            includesAllActiveServers: false);
+        var pendingDirectFetch = new TaskCompletionSource<GrainManifest>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var targets = peers.ToDictionary(
+            peer => peer,
+            peer => new TestClusterManifestSystemTarget(
+                getHashSummary: () => Task.FromResult(summary),
+                getUpdate: _ => Task.FromResult<ClusterManifestUpdate?>(peerUpdate),
+                getLegacyManifest: () => peer == peers[0] ? pendingDirectFetch.Task : Task.FromResult(remoteManifest)));
+        using var membership = new TestClusterMembershipService(CreateActiveMembershipSnapshot(1, localSilo, peers));
+        await using var provider = CreateClusterManifestProvider(localSilo, membership, CreateGrainFactory(targets));
+        var observed = ObserveManifestAsync(provider, new MajorMinorVersion(1, 2));
+        var lifecycle = await StartAsync(provider);
+        try
+        {
+            var current = await observed.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            Assert.All(peers, peer => Assert.Equal(remoteManifest, current.Silos[peer]));
+            Assert.False(pendingDirectFetch.Task.IsCompleted);
+        }
+        finally
+        {
+            await lifecycle.OnStop(TestContext.Current.CancellationToken);
+        }
+    }
+
+    private static IReadOnlyDictionary<ManifestHash, GrainManifest> GetCachedManifests(ClusterManifestProvider provider) =>
+        (IReadOnlyDictionary<ManifestHash, GrainManifest>)typeof(ClusterManifestProvider)
+            .GetField("_manifestCache", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(provider)!;
 
     [Fact]
     public async Task PeerRepair_HungPeersAndHealthyLaterPeer_UsesAtMostThreeConcurrentProbesAndFakeOneSecondTimeout()

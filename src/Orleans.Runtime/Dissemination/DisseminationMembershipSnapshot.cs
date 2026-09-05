@@ -9,17 +9,20 @@ internal sealed class DisseminationMembershipSnapshot
 {
     private readonly FrozenSet<SiloAddress> _set;
     private readonly SiloAddress[] _antiEntropyPeers;
-    private readonly object _antiEntropyPeersLock = new();
-    private int _antiEntropyCursor;
+    private readonly AntiEntropyPeerSelection _antiEntropySelection;
 
     public DisseminationMembershipSnapshot(
         MembershipVersion membershipVersion,
         SiloAddress localSilo,
         ImmutableArray<SiloAddress> members,
-        DisseminationOverlayOptions overlayOptions)
+        DisseminationOverlayOptions overlayOptions,
+        DisseminationMembershipSnapshot? previous = null)
     {
         MembershipVersion = membershipVersion;
         Members = members.IsDefault ? [] : members;
+        // Membership versions also advance without changing the eligible peers. Preserve progress so that
+        // frequent updates cannot keep repair rounds confined to the first few members.
+        _antiEntropySelection = previous?._antiEntropySelection ?? new();
         var fanout = Members.Length <= 1 ? 1 : overlayOptions.GetFanOutFactor(Members.Length);
         var memberSet = new HashSet<SiloAddress>(Members.Length);
         var localIndex = -1;
@@ -81,14 +84,14 @@ internal sealed class DisseminationMembershipSnapshot
         }
 
         var peers = new SiloAddress[count];
-        lock (_antiEntropyPeersLock)
+        lock (_antiEntropySelection)
         {
             for (var i = 0; i < count; i++)
             {
-                peers[i] = candidates[(_antiEntropyCursor + i) % candidates.Length];
+                peers[i] = candidates[(_antiEntropySelection.Cursor + i) % candidates.Length];
             }
 
-            _antiEntropyCursor = (_antiEntropyCursor + count) % candidates.Length;
+            _antiEntropySelection.Cursor = (_antiEntropySelection.Cursor + count) % candidates.Length;
         }
 
         return ImmutableCollectionsMarshal.AsImmutableArray(peers);
@@ -132,5 +135,10 @@ internal sealed class DisseminationMembershipSnapshot
         }
 
         return result.ToImmutable();
+    }
+
+    private sealed class AntiEntropyPeerSelection
+    {
+        public int Cursor;
     }
 }

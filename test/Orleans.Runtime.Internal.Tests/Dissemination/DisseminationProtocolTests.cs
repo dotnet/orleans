@@ -7741,6 +7741,102 @@ public class DisseminationProtocolTests
         }
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task MembershipDuplicatesStopForwardingWhileNewLivenessStillPropagates(bool duplicateDuringSend)
+    {
+        var sender = CreateSilo(39021);
+        var local = CreateSilo(39022);
+        var child = CreateSilo(39023);
+        SiloAddress[] members = [sender, local, child];
+        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = services.GetRequiredService<Serializer>();
+        var manager = new FakeMembershipManager(CreateSnapshot(1));
+        var ns = CreateMembershipNamespace(manager, serializer);
+        var transport = new FakeTransport(local, sender, child);
+        var sendStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseSend = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var sends = 0;
+        transport.SendBroadcastHandler = async (peer, batch, cancellationToken) =>
+        {
+            lock (transport.BroadcastBatches)
+            {
+                transport.BroadcastBatches.Add((peer, batch));
+            }
+
+            if (Interlocked.Increment(ref sends) == 1)
+            {
+                sendStarted.TrySetResult();
+                if (duplicateDuringSend)
+                {
+                    await releaseSend.Task.WaitAsync(cancellationToken);
+                }
+            }
+        };
+        var protocol = CreateProtocol(
+            transport,
+            [ns],
+            options => options.Overlay.FanOutFactor = static _ => 1,
+            new FakeTimeProvider());
+
+        try
+        {
+            var original = CreateBatch(1);
+            await protocol.ReceiveBroadcast(original, TestContext.Current.CancellationToken);
+            var firstFlush = protocol.FlushPendingBroadcast(TestContext.Current.CancellationToken);
+            await sendStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            if (duplicateDuringSend)
+            {
+                await protocol.ReceiveBroadcast(original, TestContext.Current.CancellationToken);
+            }
+
+            releaseSend.TrySetResult();
+            await firstFlush;
+            var acknowledgment = await protocol.ReceiveBroadcast(original, TestContext.Current.CancellationToken);
+            await protocol.FlushPendingBroadcast(TestContext.Current.CancellationToken);
+
+            Assert.Equal(1, Assert.Single(acknowledgment.Acknowledgments[ns.Name]).Version);
+            Assert.Equal(child, Assert.Single(transport.BroadcastBatches).Peer);
+
+            var updated = CreateBatch(2);
+            await protocol.ReceiveBroadcast(updated, TestContext.Current.CancellationToken);
+            await protocol.FlushPendingBroadcast(TestContext.Current.CancellationToken);
+            await protocol.ReceiveBroadcast(updated, TestContext.Current.CancellationToken);
+            await protocol.FlushPendingBroadcast(TestContext.Current.CancellationToken);
+
+            Assert.Equal(2, Volatile.Read(ref sends));
+            var forwarded = Assert.Single(GetBroadcastValues(transport.BroadcastBatches[1].Batch));
+            var update = serializer.Deserialize<MembershipTableSnapshotUpdate>(forwarded.Value.Payload);
+            Assert.NotNull(update.Snapshot);
+            Assert.Equal(DateTime.UnixEpoch.AddSeconds(2), update.Snapshot.Entries[sender].IAmAliveTime);
+            Assert.Equal(1, forwarded.Value.ToVersion);
+        }
+        finally
+        {
+            releaseSend.TrySetResult();
+            await protocol.StopAsync(TestContext.Current.CancellationToken);
+        }
+
+        MembershipTableSnapshot CreateSnapshot(int aliveSeconds) =>
+            CreateMembershipSnapshot(1, members.Select(member => CreateMembershipEntry(
+                member, SiloStatus.Active, DateTime.UnixEpoch, DateTime.UnixEpoch.AddSeconds(aliveSeconds))).ToArray());
+
+        DisseminationBroadcastBatch CreateBatch(int aliveSeconds) => new()
+        {
+            Sender = sender,
+            Values = CreateValueGroups(ns.Name, new DisseminationBroadcastValue
+            {
+                Value = new DisseminationValue(
+                    DisseminationKey.Default,
+                    0,
+                    1,
+                    serializer.SerializeToArray(new MembershipTableSnapshotUpdate { Snapshot = CreateSnapshot(aliveSeconds) })),
+                TimeToLive = ns.Options.StaleItemTtl,
+            }),
+        };
+    }
+
     [Fact]
     public async Task PeerQueueAdmitsNewKeyAfterOversizedRepair()
     {
@@ -7794,10 +7890,13 @@ public class DisseminationProtocolTests
         try
         {
             Assert.True(await PublishValue(protocol, ns, ns.CreateValue("first", 1), TestContext.Current.CancellationToken));
+            var flush = protocol.FlushPendingBroadcast(TestContext.Current.CancellationToken);
             await sendStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
             Assert.False(await PublishValue(protocol, ns, ns.CreateValue("second", 1), TestContext.Current.CancellationToken));
             Assert.True(await PublishValue(protocol, ns, ns.CreateValue("first", 2), TestContext.Current.CancellationToken));
+            releaseSend.TrySetResult();
+            await flush;
         }
         finally
         {
@@ -7862,11 +7961,11 @@ public class DisseminationProtocolTests
         var response = new TaskCompletionSource<DisseminationBroadcastResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
         var sendStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var sendCount = 0;
-        transport.SendBroadcastResponseHandler = (_, _, _) =>
+        transport.SendBroadcastResponseHandler = (_, batch, _) =>
         {
-            Interlocked.Increment(ref sendCount);
+            var attempt = Interlocked.Increment(ref sendCount);
             sendStarted.TrySetResult();
-            return response.Task;
+            return attempt == 1 ? response.Task : Task.FromResult(FakeTransport.CreateAcknowledgment(batch));
         };
         var queue = CreateBroadcastQueue(transport, [ns], options => options.MaxConcurrentSends = 1, clock);
 
@@ -7893,6 +7992,11 @@ public class DisseminationProtocolTests
 
             Assert.Equal(1, Volatile.Read(ref sendCount));
             Assert.False(response.Task.IsCompleted);
+
+            response.TrySetResult(new DisseminationBroadcastResponse());
+            await queue.FlushPendingBroadcast(TestContext.Current.CancellationToken)
+                .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            Assert.Equal(2, Volatile.Read(ref sendCount));
         }
         finally
         {

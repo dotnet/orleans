@@ -214,6 +214,12 @@ namespace Orleans.Runtime
             SiloRuntimeStatistics myStats,
             CancellationToken cancellationToken = default)
         {
+            // Nonpositive refresh intervals select the initial direct publication path.
+            if (_statisticsRefreshTime <= TimeSpan.Zero)
+            {
+                return false;
+            }
+
             var timeProvider = _serviceProvider.GetService<TimeProvider>() ?? TimeProvider.System;
             using var timeoutCancellation = new CancellationTokenSource(_statisticsRefreshTime, timeProvider);
             using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(
@@ -244,9 +250,8 @@ namespace Orleans.Runtime
                 LogDebugRuntimeStatisticsDisseminationTimedOut(_logger, _statisticsRefreshTime);
                 return false;
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
-                cancellationToken.ThrowIfCancellationRequested();
                 throw;
             }
             catch (Exception exception)
