@@ -24,6 +24,13 @@ a new generation before the stale job terminates.
 The receiver uses the same schedule-before-commit ordering and returns `Accepted` only
 after the inbox envelope and its durable drain-job ownership are stable.
 
+Durable Messaging stores its journal entries using the `orleans-binary` journal
+format. `AddDurableMessaging` changes the default JSON journal format to
+`orleans-binary` and preserves an explicit `orleans-binary` configuration. A different
+configured `JournaledStateManagerOptions.JournalFormatKey` produces an
+`InvalidOperationException` when the options are evaluated, identifying both the
+configured format and the required format.
+
 Transport is at-least-once and unordered. The receiver deduplicates by
 `(SenderId, MessageId)`, providing effectively-once handler effects while the configured
 deduplication record is retained. Applications which require ordering must include and
