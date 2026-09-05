@@ -57,6 +57,17 @@ namespace Tester.AzureUtils
         }
 
         [Fact]
+        public async Task UnregisterMany_NullAddressElement_ThrowsBeforeStorageAccess()
+        {
+            var directory = CreateGrainDirectory();
+            var addresses = new List<GrainAddress> { CreateGrainAddress(), null! };
+
+            var exception = await Assert.ThrowsAsync<ArgumentException>(() => directory.UnregisterMany(addresses));
+
+            Assert.Equal("addresses", exception.ParamName);
+        }
+
+        [Fact]
         public void Participate_ValidLifecycle_RegistersRuntimeInitialization()
         {
             var directory = CreateGrainDirectory();

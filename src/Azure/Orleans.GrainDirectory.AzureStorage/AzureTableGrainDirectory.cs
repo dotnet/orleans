@@ -176,9 +176,18 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// <param name="addresses">The grain addresses to remove.</param>
         /// <returns>A task representing the operation.</returns>
         /// <exception cref="ArgumentNullException"><paramref name="addresses"/> is <see langword="null"/>.</exception>
+        /// <exception cref="ArgumentException"><paramref name="addresses"/> contains a <see langword="null"/> element.</exception>
         public async Task UnregisterMany(List<GrainAddress> addresses)
         {
             ArgumentNullException.ThrowIfNull(addresses);
+
+            foreach (var address in addresses)
+            {
+                if (address is null)
+                {
+                    throw new ArgumentException("The collection cannot contain null elements.", nameof(addresses));
+                }
+            }
 
             if (addresses.Count <= this.tableDataManager.StoragePolicyOptions.MaxBulkUpdateRows)
             {
