@@ -136,9 +136,7 @@ internal sealed class S3JournalStorageProvider : ILifecycleParticipant<ISiloLife
             client.Dispose();
         }
 
-        return cancellationToken.IsCancellationRequested
-            ? Task.FromCanceled(cancellationToken)
-            : Task.CompletedTask;
+        return Task.CompletedTask;
     }
 
     private IAmazonS3 GetClient()

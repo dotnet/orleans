@@ -86,7 +86,7 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
         }
 
         [Fact]
-        public async Task CloseAsync_WhenCancellationRequested_DisposesProviderOwnedClient()
+        public async Task CloseAsync_WhenCancellationRequested_CompletesAfterDisposingProviderOwnedClient()
         {
             var client = CreateTrackingClient();
             var options = CreateOptions();
@@ -96,8 +96,7 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
             using var cancellation = new CancellationTokenSource();
             cancellation.Cancel();
 
-            await Assert.ThrowsAnyAsync<OperationCanceledException>(
-                () => provider.CloseAsync(cancellation.Token));
+            await provider.CloseAsync(cancellation.Token);
 
             client.Received(1).Dispose();
         }
