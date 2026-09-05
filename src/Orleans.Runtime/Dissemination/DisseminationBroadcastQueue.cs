@@ -866,7 +866,7 @@ internal sealed partial class DisseminationBroadcastQueue
                         continue;
                     }
 
-                    if (!work.Namespace.Options.Enabled)
+                    if (!currentOptions.Enabled || !work.Namespace.Options.Enabled)
                     {
                         pending.Dequeue();
                         CompleteUnsupported(work);

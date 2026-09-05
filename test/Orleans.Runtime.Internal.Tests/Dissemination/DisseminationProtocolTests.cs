@@ -7871,6 +7871,34 @@ public class DisseminationProtocolTests
     }
 
     [Fact]
+    public async Task DisablingDisseminationStopsPreviouslyQueuedBroadcasts()
+    {
+        var local = CreateSilo(39025);
+        var peer = CreateSilo(39026);
+        var transport = new FakeTransport(local, peer);
+        var ns = new FakeNamespace(local);
+        DisseminationOptions? options = null;
+        var protocol = CreateProtocol(
+            transport, ns, value => options = value, timeProvider: new FakeTimeProvider());
+
+        try
+        {
+            Assert.True(await PublishValue(
+                protocol, ns, ns.CreateValue("value", 1), TestContext.Current.CancellationToken));
+            Assert.NotNull(options);
+            options.Enabled = false;
+
+            await protocol.FlushPendingBroadcast(TestContext.Current.CancellationToken);
+
+            Assert.Empty(transport.BroadcastBatches);
+        }
+        finally
+        {
+            await protocol.StopAsync(TestContext.Current.CancellationToken);
+        }
+    }
+
+    [Fact]
     public async Task PublishReturnsFalseWhenPeerQueueRejectsNewKey()
     {
         var local = CreateSilo(39005);
