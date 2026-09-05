@@ -97,6 +97,7 @@ internal sealed class DeploymentLoadStatisticsDisseminationNamespace(
         DisseminationValue value,
         CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (value.Key.Value is not SiloAddress siloAddress)
         {
             return ValueTask.FromResult(DisseminationApplyResult.Rejected);
@@ -108,6 +109,7 @@ internal sealed class DeploymentLoadStatisticsDisseminationNamespace(
             return ValueTask.FromResult(DisseminationApplyResult.Rejected);
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         return ValueTask.FromResult(
             deploymentLoadPublisher.ApplyDisseminatedRuntimeStatistics(siloAddress, statistics));
     }

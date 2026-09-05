@@ -161,6 +161,27 @@ public class DeploymentLoadPublisherTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => publication);
     }
 
+    [Fact]
+    public async Task ApplyLoadStatistics_PreCanceledToken_PreservesLocalState()
+    {
+        using var rig = CreateTestRig(TimeSpan.FromSeconds(5));
+        using var cancellation = new CancellationTokenSource();
+        var statistics = new SiloRuntimeStatistics(
+            10, 10,
+            rig.ServiceProvider.GetRequiredService<IEnvironmentStatisticsProvider>(),
+            rig.ServiceProvider.GetRequiredService<IOptions<LoadSheddingOptions>>(),
+            DateTime.UnixEpoch.AddDays(1));
+        var payload = rig.ServiceProvider.GetRequiredService<Serializer>().SerializeToArray(statistics);
+        var value = new DisseminationValue(rig.LocalSilo, 0, statistics.DateTime.Ticks, payload);
+        var disseminationNamespace = rig.ServiceProvider.GetRequiredService<DeploymentLoadStatisticsDisseminationNamespace>();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            async () => await disseminationNamespace.ApplyValueAsync(value, cancellation.Token));
+
+        Assert.Empty(rig.Publisher.PeriodicStatistics);
+    }
+
     private static TestRig CreateTestRig(TimeSpan refreshTime, ITimerRegistry timerRegistry = null)
     {
         var localSilo = SiloAddress.FromParsableString("127.0.0.1:100@100");
