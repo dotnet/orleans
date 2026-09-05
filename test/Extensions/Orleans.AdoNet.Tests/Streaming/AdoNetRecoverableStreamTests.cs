@@ -211,6 +211,7 @@ public class AdoNetRecoverableStreamTests
     [InlineData(StreamQueryKind.Read)]
     [InlineData(StreamQueryKind.Advance)]
     [InlineData(StreamQueryKind.Cleanup)]
+    [InlineData(StreamQueryKind.Bounds)]
     public async Task StreamingQueries_PropagateCancellationToken(StreamQueryKind queryKind)
     {
         var storage = new CapturingRelationalStorage();
@@ -230,6 +231,10 @@ public class AdoNetRecoverableStreamTests
             case StreamQueryKind.Cleanup:
                 _ = await queries.CleanupStreamMessagesAsync(
                     "service", "provider", "queue", 1, 2, 3, 4, cancellation.Token);
+                break;
+            case StreamQueryKind.Bounds:
+                _ = await queries.GetStreamPartitionBoundsAsync(
+                    "service", "provider", "queue", cancellation.Token);
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(queryKind));
@@ -277,7 +282,7 @@ public class AdoNetRecoverableStreamTests
                     (nameof(AdoNetStreamMessage.ServiceId), "service"),
                     (nameof(AdoNetStreamMessage.ProviderId), "provider"),
                     (nameof(AdoNetStreamMessage.QueueId), "queue"),
-                    (nameof(AdoNetStreamMessage.MessageId), 10L),
+                    (nameof(AdoNetStreamMessage.MessageId), 1L),
                     (nameof(AdoNetStreamMessage.StreamIdBytes), new byte[] { 1 }),
                     (nameof(AdoNetStreamMessage.StreamNamespaceLength), 0),
                     (nameof(AdoNetStreamMessage.CreatedOn), DateTime.UtcNow),
@@ -327,7 +332,7 @@ public class AdoNetRecoverableStreamTests
                     (nameof(AdoNetStreamMessage.ServiceId), "service"),
                     (nameof(AdoNetStreamMessage.ProviderId), "provider"),
                     (nameof(AdoNetStreamMessage.QueueId), "queue"),
-                    (nameof(AdoNetStreamMessage.MessageId), 10L),
+                    (nameof(AdoNetStreamMessage.MessageId), 1L),
                     (nameof(AdoNetStreamMessage.StreamIdBytes), new byte[] { 1 }),
                     (nameof(AdoNetStreamMessage.StreamNamespaceLength), 0),
                     (nameof(AdoNetStreamMessage.CreatedOn), DateTime.UtcNow),
@@ -337,14 +342,14 @@ public class AdoNetRecoverableStreamTests
             [
                 Record(
                     (nameof(AdoNetStreamCleanupResult.Ran), true),
-                    (nameof(AdoNetStreamCleanupResult.DeletedCount), 10),
-                    (nameof(AdoNetStreamCleanupResult.DeletedThroughMessageId), 10L),
-                    (nameof(AdoNetStreamCleanupResult.HardDeletedCount), 10),
+                    (nameof(AdoNetStreamCleanupResult.DeletedCount), 1),
+                    (nameof(AdoNetStreamCleanupResult.DeletedThroughMessageId), 1L),
+                    (nameof(AdoNetStreamCleanupResult.HardDeletedCount), 1),
                     (nameof(AdoNetStreamCleanupResult.HardDeletedFromMessageId), 1L),
-                    (nameof(AdoNetStreamCleanupResult.HardDeletedThroughMessageId), 10L),
+                    (nameof(AdoNetStreamCleanupResult.HardDeletedThroughMessageId), 1L),
                     (nameof(AdoNetStreamCleanupResult.Checkpoint), 0L),
-                    (nameof(AdoNetStreamCleanupResult.EarliestMessageId), 11L),
-                    (nameof(AdoNetStreamCleanupResult.TailMessageId), 11L)),
+                    (nameof(AdoNetStreamCleanupResult.EarliestMessageId), 2L),
+                    (nameof(AdoNetStreamCleanupResult.TailMessageId), 2L)),
             ],
         };
         var source = new AdoNetRecoverableStream(
@@ -363,6 +368,210 @@ public class AdoNetRecoverableStreamTests
 
         Assert.Contains("cache admission failed", failure.Message);
         Assert.Equal(readsAfterFailure, storage.ReadCallCount);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task MessagesAdded_PartialAdmissionPreservesHardDeletedSuffix(bool admitWholeBatch)
+    {
+        var storage = new CapturingRelationalStorage
+        {
+            ReadRecords = [MessageRecord(1), MessageRecord(2), MessageRecord(3)],
+            CleanupRecords =
+            [
+                Record(
+                    (nameof(AdoNetStreamCleanupResult.Ran), true),
+                    (nameof(AdoNetStreamCleanupResult.DeletedCount), 3),
+                    (nameof(AdoNetStreamCleanupResult.DeletedThroughMessageId), 3L),
+                    (nameof(AdoNetStreamCleanupResult.HardDeletedCount), 3),
+                    (nameof(AdoNetStreamCleanupResult.HardDeletedFromMessageId), 1L),
+                    (nameof(AdoNetStreamCleanupResult.HardDeletedThroughMessageId), 3L),
+                    (nameof(AdoNetStreamCleanupResult.Checkpoint), 0L),
+                    (nameof(AdoNetStreamCleanupResult.EarliestMessageId), null),
+                    (nameof(AdoNetStreamCleanupResult.TailMessageId), null)),
+            ],
+        };
+        var source = CreateSource(storage);
+        var messages = await source.Read(3, TestContext.Current.CancellationToken);
+        storage.CleanupRecords = null;
+        source.MessagesAdded([messages[0]]);
+        source.MessagesAdded([messages[1]]);
+        if (admitWholeBatch)
+        {
+            source.MessagesAdded([messages[2]]);
+            source.MessagesAddFailed([]);
+            storage.ReadRecords = [MessageRecord(4)];
+            Assert.Equal(4, Assert.Single(await source.Read(1, TestContext.Current.CancellationToken)).MessageId);
+        }
+        else
+        {
+            source.MessagesAddFailed([messages[2]]);
+            var failure = await Assert.ThrowsAsync<DataNotAvailableException>(
+                () => source.Read(1, TestContext.Current.CancellationToken));
+            Assert.Contains("through message 3", failure.Message);
+            Assert.Contains("cache admission failed", failure.Message);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Read_MissingFirstOrInteriorMessagePermanentlyFaultsSource(bool interiorGap)
+    {
+        var storage = new CapturingRelationalStorage
+        {
+            ReadRecords = interiorGap ? [MessageRecord(1), MessageRecord(3)] : [MessageRecord(2)],
+        };
+        var source = CreateSource(storage);
+
+        var failure = await Assert.ThrowsAsync<DataNotAvailableException>(
+            () => source.Read(10, TestContext.Current.CancellationToken));
+        var calls = storage.ReadCallCount;
+        var repeated = await Assert.ThrowsAsync<DataNotAvailableException>(
+            () => source.Read(10, TestContext.Current.CancellationToken));
+
+        Assert.Contains(interiorGap ? "expected message 2" : "expected message 1", failure.Message);
+        Assert.Same(failure, repeated);
+        Assert.Equal(calls, storage.ReadCallCount);
+        Assert.DoesNotContain(nameof(DbStoredQueries.CleanupStreamMessagesKey), storage.Parameters.Keys);
+    }
+
+    [Theory]
+    [InlineData(1, false)]
+    [InlineData(3, false)]
+    [InlineData(3, true)]
+    public async Task Read_CommittedCleanupWithLostResponsePermanentlyFaultsSource(int deletedCount, bool appendAfterCleanup)
+    {
+        var storage = new CapturingRelationalStorage { ReadRecords = [MessageRecord(1), MessageRecord(2), MessageRecord(3)] };
+        var lostResponse = new IOException("Cleanup committed before the connection failed.");
+        storage.OnCleanup = () =>
+        {
+            storage.OnCleanup = null;
+            storage.ReadRecords = deletedCount == 1
+                ? [MessageRecord(2), MessageRecord(3)]
+                : appendAfterCleanup ? [MessageRecord(4)] : [];
+            storage.PartitionRecord = PartitionRecord(
+                checkpoint: 0,
+                nextMessageId: appendAfterCleanup ? 5 : 4,
+                earliest: deletedCount == 1 ? 2 : appendAfterCleanup ? 4 : null,
+                tail: appendAfterCleanup ? 4 : deletedCount == 1 ? 3 : null);
+            throw lostResponse;
+        };
+        var source = CreateSource(storage);
+
+        Assert.Same(lostResponse, await Assert.ThrowsAsync<IOException>(
+            () => source.Read(3, TestContext.Current.CancellationToken)));
+        var failure = await Assert.ThrowsAsync<DataNotAvailableException>(
+            () => source.Read(3, TestContext.Current.CancellationToken));
+        var calls = storage.ReadCallCount;
+        Assert.Same(failure, await Assert.ThrowsAsync<DataNotAvailableException>(
+            () => source.Read(3, TestContext.Current.CancellationToken)));
+
+        Assert.Contains("after admitted message 0", failure.Message);
+        Assert.Equal(calls, storage.ReadCallCount);
+        Assert.Contains(nameof(DbStoredQueries.GetStreamPartitionBoundsKey), storage.Parameters.Keys);
+        Assert.DoesNotContain(nameof(DbStoredQueries.AcquireStreamPartitionKey), storage.Parameters.Keys);
+    }
+
+    [Fact]
+    public async Task Read_FailedCleanupWithIntactHistoryRetriesFromAdmittedOffset()
+    {
+        var storage = new CapturingRelationalStorage
+        {
+            ReadRecords = [MessageRecord(1), MessageRecord(2)],
+            PartitionRecord = PartitionRecord(0, 3, 1, 2),
+        };
+        storage.OnCleanup = () =>
+        {
+            storage.OnCleanup = null;
+            throw new IOException("Cleanup rolled back.");
+        };
+        var source = CreateSource(storage);
+
+        await Assert.ThrowsAsync<IOException>(() => source.Read(2, TestContext.Current.CancellationToken));
+        var messages = await source.Read(2, TestContext.Current.CancellationToken);
+        Assert.Equal([1L, 2L], messages.Select(message => message.MessageId));
+        source.MessagesAdded(messages);
+        storage.ReadRecords = [MessageRecord(3)];
+        Assert.Equal(3, Assert.Single(await source.Read(1, TestContext.Current.CancellationToken)).MessageId);
+        Assert.DoesNotContain(nameof(DbStoredQueries.AcquireStreamPartitionKey), storage.Parameters.Keys);
+    }
+
+    [Fact]
+    public async Task Read_InitialRetentionBaselineResumesBeforeEarliestRetainedMessage()
+    {
+        var storage = new CapturingRelationalStorage
+        {
+            PartitionRecord = PartitionRecord(9, 12, 10, 11),
+            ReadRecords = [MessageRecord(10), MessageRecord(11)],
+        };
+        var source = CreateSource(storage);
+        var loaded = await source.Load(TestContext.Current.CancellationToken);
+        await source.Initialize(new(loaded.Checkpoint, startFromNow: false), TestContext.Current.CancellationToken);
+
+        Assert.Equal("9", loaded.Checkpoint);
+        var messages = await source.Read(2, TestContext.Current.CancellationToken);
+        Assert.Equal([10L, 11L], messages.Select(message => message.MessageId));
+    }
+
+    [Fact]
+    public async Task Load_RetentionGapPermanentlyFaultsWithoutReacquiring()
+    {
+        var storage = new CapturingRelationalStorage { PartitionRecord = PartitionRecord(0, 4, null, null) };
+        var source = CreateSource(storage);
+        var failure = await Assert.ThrowsAsync<DataNotAvailableException>(
+            () => source.Load(TestContext.Current.CancellationToken).AsTask());
+        var calls = storage.ReadCallCount;
+
+        Assert.Same(failure, await Assert.ThrowsAsync<DataNotAvailableException>(
+            () => source.Load(TestContext.Current.CancellationToken).AsTask()));
+        Assert.Same(failure, await Assert.ThrowsAsync<DataNotAvailableException>(
+            () => source.Read(1, TestContext.Current.CancellationToken)));
+        Assert.Equal(calls, storage.ReadCallCount);
+    }
+
+    [Fact]
+    public async Task Read_CheckpointedHistoryHolesPreserveUnreadContinuity()
+    {
+        var storage = new CapturingRelationalStorage
+        {
+            PartitionRecord = PartitionRecord(3, 5, 1, 4),
+            ReadRecords = [MessageRecord(4)],
+        };
+        var source = CreateSource(storage);
+        await source.Load(TestContext.Current.CancellationToken);
+
+        Assert.Equal(4, Assert.Single(await source.Read(1, TestContext.Current.CancellationToken)).MessageId);
+    }
+
+    [Theory]
+    [InlineData(0, 4, null, null, true)]
+    [InlineData(2, 4, 1, 2, true)]
+    [InlineData(3, 4, null, null, false)]
+    [InlineData(3, 5, 4, 4, false)]
+    public async Task Read_EmptyBatchReconcilesDeletedHistoryAndConcurrentArrivals(
+        long checkpoint, long nextMessageId, long? earliest, long? tail, bool gap)
+    {
+        var storage = new CapturingRelationalStorage();
+        var source = CreateSource(storage);
+        await source.Load(TestContext.Current.CancellationToken);
+        await source.Initialize(new(checkpoint.ToString(System.Globalization.CultureInfo.InvariantCulture), false), TestContext.Current.CancellationToken);
+        storage.PartitionRecord = PartitionRecord(checkpoint, nextMessageId, earliest, tail);
+
+        if (gap)
+        {
+            var failure = await Assert.ThrowsAsync<DataNotAvailableException>(
+                () => source.Read(1, TestContext.Current.CancellationToken));
+            Assert.Same(failure, await Assert.ThrowsAsync<DataNotAvailableException>(
+                () => source.Read(1, TestContext.Current.CancellationToken)));
+        }
+        else
+        {
+            Assert.Empty(await source.Read(1, TestContext.Current.CancellationToken));
+            storage.ReadRecords = [MessageRecord(checkpoint + 1)];
+            Assert.Equal(checkpoint + 1, Assert.Single(await source.Read(1, TestContext.Current.CancellationToken)).MessageId);
+        }
     }
 
     [Theory]
@@ -401,6 +610,31 @@ public class AdoNetRecoverableStreamTests
 
     private static IDataRecord Record(params (string Name, object? Value)[] values)
         => new DictionaryDataRecord(values.ToDictionary(value => value.Name, value => value.Value));
+
+    private static AdoNetRecoverableStream CreateSource(IRelationalStorage storage)
+        => new("service", "provider", "queue", new AdoNetStreamOptions { MaxMessagesPerRead = 10 }, CreateQueries(storage), NullLogger.Instance);
+
+    private static IDataRecord MessageRecord(long messageId)
+        => Record(
+            (nameof(AdoNetStreamMessage.ServiceId), "service"),
+            (nameof(AdoNetStreamMessage.ProviderId), "provider"),
+            (nameof(AdoNetStreamMessage.QueueId), "queue"),
+            (nameof(AdoNetStreamMessage.MessageId), messageId),
+            (nameof(AdoNetStreamMessage.StreamIdBytes), new byte[] { 1 }),
+            (nameof(AdoNetStreamMessage.StreamNamespaceLength), 0),
+            (nameof(AdoNetStreamMessage.CreatedOn), DateTime.UtcNow),
+            (nameof(AdoNetStreamMessage.Payload), new byte[] { 2 }));
+
+    private static IDataRecord PartitionRecord(long checkpoint, long nextMessageId, long? earliest, long? tail)
+        => Record(
+            (nameof(AdoNetStreamPartitionState.ServiceId), "service"),
+            (nameof(AdoNetStreamPartitionState.ProviderId), "provider"),
+            (nameof(AdoNetStreamPartitionState.QueueId), "queue"),
+            (nameof(AdoNetStreamPartitionState.OwnerEpoch), 1L),
+            (nameof(AdoNetStreamPartitionState.NextMessageId), nextMessageId),
+            (nameof(AdoNetStreamPartitionState.Checkpoint), checkpoint),
+            (nameof(AdoNetStreamPartitionState.EarliestMessageId), earliest),
+            (nameof(AdoNetStreamPartitionState.TailMessageId), tail));
 
     private sealed class BlockingAdoNetQueueAdapterFactory(
         RelationalOrleansQueries queries,
@@ -545,9 +779,13 @@ public class AdoNetRecoverableStreamTests
 
         public Dictionary<string, Dictionary<string, object?>> Parameters { get; } = [];
 
-        public IReadOnlyList<IDataRecord> ReadRecords { get; init; } = [];
+        public IReadOnlyList<IDataRecord> ReadRecords { get; set; } = [];
 
-        public IReadOnlyList<IDataRecord>? CleanupRecords { get; init; }
+        public IDataRecord PartitionRecord { get; set; } = AdoNetRecoverableStreamTests.PartitionRecord(0, 1, null, null);
+
+        public Action? OnCleanup { get; set; }
+
+        public IReadOnlyList<IDataRecord>? CleanupRecords { get; set; }
 
         public int ReadCallCount { get; private set; }
 
@@ -569,8 +807,14 @@ public class AdoNetRecoverableStreamTests
             Parameters[query] = command.Parameters.Cast<SqlParameter>()
                 .ToDictionary(parameter => parameter.ParameterName, parameter =>
                     parameter.Value is DBNull ? null : parameter.Value);
+            if (query == nameof(DbStoredQueries.CleanupStreamMessagesKey))
+            {
+                OnCleanup?.Invoke();
+            }
+
             var records = query switch
             {
+                nameof(DbStoredQueries.AcquireStreamPartitionKey) or nameof(DbStoredQueries.GetStreamPartitionBoundsKey) => [PartitionRecord],
                 nameof(DbStoredQueries.ReadStreamMessagesKey) => ReadRecords,
                 nameof(DbStoredQueries.AdvanceStreamCheckpointKey) =>
                 [
@@ -644,5 +888,6 @@ public class AdoNetRecoverableStreamTests
         Read,
         Advance,
         Cleanup,
+        Bounds,
     }
 }
