@@ -6,6 +6,7 @@ using Orleans.Serialization.WireProtocol;
 using System;
 using System.Buffers;
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 using System.Security;
@@ -16,6 +17,11 @@ namespace Orleans.Serialization
     /// Serializer for types which implement the <see cref="ISerializable"/> pattern.
     /// </summary>
     [Alias("ISerializable")]
+#if NET5_0_OR_GREATER
+    [RequiresUnreferencedCode(
+        "ISerializable support reflects over serialization constructors and callback methods. "
+        + "Preserve public and non-public constructors and methods on serialized types.")]
+#endif
     public class DotNetSerializableCodec : IGeneralizedCodec
     {
         /// <summary>

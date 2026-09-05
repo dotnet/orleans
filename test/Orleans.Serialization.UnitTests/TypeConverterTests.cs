@@ -458,7 +458,7 @@ namespace Orleans.Serialization.UnitTests
         [Fact]
         public void TypeConverter_AllowsMetadataRegisteredTypes()
         {
-            var converter = CreateConverter(configureOptions: options => options.Activators.Add(typeof(TypeConverterTestsMetadataAllowedTypeActivator)));
+            var converter = CreateConverter(configureOptions: options => options.AddActivator(typeof(TypeConverterTestsMetadataAllowedTypeActivator)));
 
             AssertRoundTrips(converter, typeof(TypeConverterTestsMetadataAllowedType));
         }

@@ -198,7 +198,7 @@ namespace Orleans.GrainReferences
             TypeConverter typeConverter)
         {
             _typeConverter = typeConverter;
-            var proxyTypes = config.Value.InterfaceProxies;
+            var proxyTypes = config.Value.InterfaceProxyTypes;
             _mapping = new Dictionary<GrainInterfaceType, Type>();
             foreach (var proxyType in proxyTypes)
             {

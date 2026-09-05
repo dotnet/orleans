@@ -133,8 +133,8 @@ namespace OrleansCodeGen.TestProject
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
-            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_DemoDataWithCtorParams));
-            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_DemoDataWithCtorParams));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_DemoDataWithCtorParams));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_DemoDataWithCtorParams));
         }
     }
 }

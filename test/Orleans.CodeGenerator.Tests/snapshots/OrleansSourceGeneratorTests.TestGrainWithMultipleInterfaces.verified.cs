@@ -293,15 +293,15 @@ namespace OrleansCodeGen.TestProject
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
-            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IGrainA_GrainReference_11405B98));
-            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IGrainB_GrainReference_6B5D7809));
-            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IGrainA_GrainReference_11405B98));
-            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IGrainB_GrainReference_6B5D7809));
-            config.InterfaceProxies.Add(typeof(OrleansCodeGen.TestProject.Proxy_IGrainA));
-            config.InterfaceProxies.Add(typeof(OrleansCodeGen.TestProject.Proxy_IGrainB));
-            config.Interfaces.Add(typeof(global::TestProject.IGrainA));
-            config.Interfaces.Add(typeof(global::TestProject.IGrainB));
-            config.InterfaceImplementations.Add(typeof(global::TestProject.RealGrain));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IGrainA_GrainReference_11405B98));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IGrainB_GrainReference_6B5D7809));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IGrainA_GrainReference_11405B98));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IGrainB_GrainReference_6B5D7809));
+            config.AddInterfaceProxy(typeof(OrleansCodeGen.TestProject.Proxy_IGrainA));
+            config.AddInterfaceProxy(typeof(OrleansCodeGen.TestProject.Proxy_IGrainB));
+            config.AddInterface(typeof(global::TestProject.IGrainA));
+            config.AddInterface(typeof(global::TestProject.IGrainB));
+            config.AddInterfaceImplementation(typeof(global::TestProject.RealGrain));
             var n1 = config.CompoundTypeAliases.Add("inv");
             var n2 = n1.Add(typeof(global::Orleans.Runtime.GrainReference));
             var n3 = n2.Add(typeof(global::TestProject.IGrainA));

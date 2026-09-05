@@ -42,7 +42,7 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
             generatedInvokableActivatorMetadataNames);
         var serializableRegistrations = GetOrderedSerializableRegistrations(model, generatedInvokables);
 
-        var addSerializerMethod = configParam.Member("Serializers").Member("Add");
+        var addSerializerMethod = configParam.Member("AddSerializer");
         foreach (var registration in serializableRegistrations)
         {
             AddRegistration(body, addSerializerMethod, registration.SerializerTypeSyntax);
@@ -53,7 +53,7 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
             AddRegistration(body, addSerializerMethod, GetOpenTypeSyntax(type.Type));
         }
 
-        var addCopierMethod = configParam.Member("Copiers").Member("Add");
+        var addCopierMethod = configParam.Member("AddCopier");
         foreach (var registration in serializableRegistrations)
         {
             if (registration.CopierTypeSyntax is not null)
@@ -67,31 +67,30 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
             AddRegistration(body, addCopierMethod, GetOpenTypeSyntax(type.Type));
         }
 
-        var addConverterMethod = configParam.Member("Converters").Member("Add");
+        var addConverterMethod = configParam.Member("AddConverter");
         foreach (var type in model.RegisteredCodecs.Where(static codec => codec.Kind == RegisteredCodecKind.Converter))
         {
             AddRegistration(body, addConverterMethod, GetOpenTypeSyntax(type.Type));
         }
 
-        var addProxyMethod = configParam.Member("InterfaceProxies").Member("Add");
+        var addProxyMethod = configParam.Member("AddInterfaceProxy");
         foreach (var type in orderedProxyInterfaces)
         {
             AddRegistration(body, addProxyMethod, GetGeneratedProxyTypeSyntax(type));
         }
 
-        var addInvokableInterfaceMethod = configParam.Member("Interfaces").Member("Add");
+        var addInterfaceMethod = configParam.Member("AddInterface");
         foreach (var type in orderedProxyInterfaces.Select(static proxy => proxy.InterfaceType).Distinct())
         {
-            AddRegistration(body, addInvokableInterfaceMethod, GetOpenTypeSyntax(type));
+            AddRegistration(body, addInterfaceMethod, GetOpenTypeSyntax(type));
         }
 
-        var addInvokableInterfaceImplementationMethod = configParam.Member("InterfaceImplementations").Member("Add");
         foreach (var type in GetOrderedInterfaceImplementations(model.InterfaceImplementations))
         {
-            AddRegistration(body, addInvokableInterfaceImplementationMethod, GetOpenTypeSyntax(type.ImplementationType));
+            AddRegistration(body, configParam.Member("AddInterfaceImplementation"), GetOpenTypeSyntax(type.ImplementationType));
         }
 
-        var addActivatorMethod = configParam.Member("Activators").Member("Add");
+        var addActivatorMethod = configParam.Member("AddActivator");
         foreach (var registration in serializableRegistrations)
         {
             if (registration.ActivatorTypeSyntax is not null)

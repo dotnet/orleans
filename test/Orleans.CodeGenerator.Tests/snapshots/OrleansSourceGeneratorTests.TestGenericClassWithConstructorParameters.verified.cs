@@ -252,11 +252,11 @@ namespace OrleansCodeGen.TestProject
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
-            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_GenericWithCtor<>));
-            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_UsesGenericWithCtor));
-            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_GenericWithCtor<>));
-            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_UsesGenericWithCtor));
-            config.Activators.Add(typeof(OrleansCodeGen.TestProject.Activator_UsesGenericWithCtor));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_GenericWithCtor<>));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_UsesGenericWithCtor));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_GenericWithCtor<>));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_UsesGenericWithCtor));
+            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_UsesGenericWithCtor));
         }
     }
 }

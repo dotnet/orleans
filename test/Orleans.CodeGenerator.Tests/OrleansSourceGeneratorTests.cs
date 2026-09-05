@@ -2379,7 +2379,10 @@ public class DemoClass
         {
             foreach (var invocation in metadataClass.DescendantNodes().OfType<InvocationExpressionSyntax>())
             {
-                if (invocation.Expression is not MemberAccessExpressionSyntax { Name.Identifier.ValueText: "Add", Expression: MemberAccessExpressionSyntax { Name.Identifier.ValueText: "Serializers" } }
+                if (invocation.Expression is not MemberAccessExpressionSyntax
+                    {
+                        Name.Identifier.ValueText: "AddSerializer"
+                    }
                     || invocation.ArgumentList.Arguments.FirstOrDefault()?.Expression is not TypeOfExpressionSyntax typeOfExpression)
                 {
                     continue;
@@ -2525,8 +2528,7 @@ public class DemoClass
             .Where(static invocation =>
                 invocation.Expression is MemberAccessExpressionSyntax
                 {
-                    Name.Identifier.ValueText: "Add",
-                    Expression: MemberAccessExpressionSyntax { Name.Identifier.ValueText: "Activators" }
+                    Name.Identifier.ValueText: "AddActivator"
                 })
             .Select(static invocation => invocation.ArgumentList.Arguments.FirstOrDefault()?.Expression)
             .OfType<TypeOfExpressionSyntax>()

@@ -53,7 +53,14 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         /// <param name="caller">The caller.</param>
         /// <param name="codecProvider">The codec provider.</param>
         /// <returns>The unwrapped service.</returns>
-        public static TService GetService<TService>(object caller, ICodecProvider codecProvider)
+        public static TService GetService<
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TService>(
+#else
+            TService>(
+#endif
+            object caller,
+            ICodecProvider codecProvider)
         {
             var state = ResolutionState.Value!;
 
@@ -223,7 +230,24 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         /// <param name="parameterTypes">The parameter types.</param>
         /// <returns>The corresponding <see cref="MethodInfo"/>.</returns>
         [MethodImpl(MethodImplOptions.NoInlining)]
-        public static MethodInfo? GetMethodInfoOrDefault(Type? interfaceType, string methodName, Type[]? methodTypeParameters, Type[]? parameterTypes)
+        public static MethodInfo? GetMethodInfoOrDefault(
+            Type? interfaceType,
+            string methodName,
+            Type[]? methodTypeParameters,
+            Type[]? parameterTypes)
+            => GetMethodInfoOrDefaultCore(interfaceType, methodName, methodTypeParameters, parameterTypes);
+
+#if NET5_0_OR_GREATER
+        [UnconditionalSuppressMessage(
+            "Trimming",
+            "IL2070",
+            Justification = "Generated manifests register grain interfaces through TypeManifestOptions.AddInterface, which preserves public and non-public methods and inherited interfaces. Recursive Type.GetInterfaces() traversal cannot propagate that annotation.")]
+#endif
+        private static MethodInfo? GetMethodInfoOrDefaultCore(
+            Type? interfaceType,
+            string methodName,
+            Type[]? methodTypeParameters,
+            Type[]? parameterTypes)
         {
             if (interfaceType is null)
             {
@@ -279,7 +303,7 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
 
             foreach (var implemented in interfaceType.GetInterfaces())
             {
-                if (GetMethodInfoOrDefault(implemented, methodName, methodTypeParameters, parameterTypes) is { } method)
+                if (GetMethodInfoOrDefaultCore(implemented, methodName, methodTypeParameters, parameterTypes) is { } method)
                 {
                     return method;
                 }

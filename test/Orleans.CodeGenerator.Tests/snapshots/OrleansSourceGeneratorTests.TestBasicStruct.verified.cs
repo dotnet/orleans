@@ -69,8 +69,8 @@ namespace OrleansCodeGen.TestProject
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
-            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_DemoData));
-            config.Copiers.Add(typeof(global::Orleans.Serialization.Cloning.ShallowCopier<global::TestProject.DemoData>));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_DemoData));
+            config.AddCopier(typeof(global::Orleans.Serialization.Cloning.ShallowCopier<global::TestProject.DemoData>));
         }
     }
 }

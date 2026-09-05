@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.Serialization;
@@ -12,8 +13,12 @@ namespace Orleans.Serialization
     /// </summary>
     internal sealed class SerializationConstructorFactory
     {
+#if NET5_0_OR_GREATER
+        private const DynamicallyAccessedMemberTypes SerializationConstructors =
+            DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors;
+#endif
+
         private static readonly Type[] SerializationConstructorParameterTypes = { typeof(SerializationInfo), typeof(StreamingContext) };
-        private readonly Func<Type, object> _createConstructorDelegate = t => GetSerializationConstructorInvoker(t, typeof(object), typeof(Action<object, SerializationInfo, StreamingContext>));
         private readonly ConcurrentDictionary<Type, object> _constructors = new();
 
         /// <summary>
@@ -22,28 +27,79 @@ namespace Orleans.Serialization
         /// <param name="type">The type.</param>
         /// <returns><see langword="true" /> if the provided type has a serialization constructor; otherwise, <see langword="false" />.</returns>
         [SecurityCritical]
-        public static bool HasSerializationConstructor(Type type) => GetSerializationConstructor(type) != null;
+        public static bool HasSerializationConstructor(
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(SerializationConstructors)]
+#endif
+            Type type)
+            => GetSerializationConstructor(type) != null;
 
         [SecurityCritical]
-        public Action<object, SerializationInfo, StreamingContext> GetSerializationConstructorDelegate(Type type)
-            => (Action<object, SerializationInfo, StreamingContext>)_constructors.GetOrAdd(type, _createConstructorDelegate);
+        public Action<object, SerializationInfo, StreamingContext> GetSerializationConstructorDelegate(
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(SerializationConstructors)]
+#endif
+            Type type)
+        {
+            if (_constructors.TryGetValue(type, out var existing))
+            {
+                return (Action<object, SerializationInfo, StreamingContext>)existing;
+            }
+
+            var created = GetSerializationConstructorInvoker(
+                type,
+                typeof(object),
+                typeof(Action<object, SerializationInfo, StreamingContext>));
+            return (Action<object, SerializationInfo, StreamingContext>)_constructors.GetOrAdd(type, created);
+        }
 
         [SecurityCritical]
-        public TConstructor GetSerializationConstructorDelegate<TOwner, TConstructor>() where TConstructor : Delegate
+        public TConstructor GetSerializationConstructorDelegate<
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(SerializationConstructors)] TOwner,
+#else
+            TOwner,
+#endif
+            TConstructor>()
+            where TConstructor : Delegate
             => (TConstructor)GetSerializationConstructorDelegate(typeof(TOwner), typeof(TConstructor));
 
-        private object GetSerializationConstructorDelegate(Type owner, Type delegateType)
-            => _constructors.GetOrAdd(owner, (t, d) => GetSerializationConstructorInvoker(t, t, d), delegateType);
+        private object GetSerializationConstructorDelegate(
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(SerializationConstructors)]
+#endif
+            Type owner,
+            Type delegateType)
+        {
+            if (_constructors.TryGetValue(owner, out var existing))
+            {
+                return existing;
+            }
+
+            var created = GetSerializationConstructorInvoker(owner, owner, delegateType);
+            return _constructors.GetOrAdd(owner, created);
+        }
 
         [SecurityCritical]
-        private static ConstructorInfo? GetSerializationConstructor(Type type) => type.GetConstructor(
+        private static ConstructorInfo? GetSerializationConstructor(
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(SerializationConstructors)]
+#endif
+            Type type)
+            => type.GetConstructor(
                 BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance,
                 null,
                 SerializationConstructorParameterTypes,
                 null);
 
         [SecurityCritical]
-        private static Delegate GetSerializationConstructorInvoker(Type type, Type owner, Type delegateType)
+        private static Delegate GetSerializationConstructorInvoker(
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(SerializationConstructors)]
+#endif
+            Type type,
+            Type owner,
+            Type delegateType)
         {
             var constructor = GetSerializationConstructor(type) ?? (typeof(Exception).IsAssignableFrom(type) ? GetSerializationConstructor(typeof(Exception)) : null);
             if (constructor is null)

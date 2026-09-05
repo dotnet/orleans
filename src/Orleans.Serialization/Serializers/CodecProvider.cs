@@ -95,15 +95,21 @@ namespace Orleans.Serialization.Serializers
         private void ConsumeMetadata(IOptions<TypeManifestOptions> codecConfiguration)
         {
             var metadata = codecConfiguration.Value;
-            AddFromMetadata(_baseCodecs, metadata.Serializers, typeof(IBaseCodec<>));
-            AddFromMetadata(_valueSerializers, metadata.Serializers, typeof(IValueSerializer<>));
-            AddFromMetadata(_fieldCodecs, metadata.Serializers, typeof(IFieldCodec<>));
-            AddFromMetadata(_fieldCodecs, metadata.FieldCodecs, typeof(IFieldCodec<>));
-            AddFromMetadata(_activators, metadata.Activators, typeof(IActivator<>));
-            AddFromMetadata(_copiers, metadata.Copiers, typeof(IDeepCopier<>));
-            AddFromMetadata(_converters, metadata.Converters, typeof(IConverter<,>));
-            AddFromMetadata(_baseCopiers, metadata.Copiers, typeof(IBaseCopier<>));
+            AddFromMetadata(_baseCodecs, metadata.SerializerTypes, typeof(IBaseCodec<>));
+            AddFromMetadata(_valueSerializers, metadata.SerializerTypes, typeof(IValueSerializer<>));
+            AddFromMetadata(_fieldCodecs, metadata.SerializerTypes, typeof(IFieldCodec<>));
+            AddFromMetadata(_fieldCodecs, metadata.FieldCodecTypes, typeof(IFieldCodec<>));
+            AddFromMetadata(_activators, metadata.ActivatorTypes, typeof(IActivator<>));
+            AddFromMetadata(_copiers, metadata.CopierTypes, typeof(IDeepCopier<>));
+            AddFromMetadata(_converters, metadata.ConverterTypes, typeof(IConverter<,>));
+            AddFromMetadata(_baseCopiers, metadata.CopierTypes, typeof(IBaseCopier<>));
 
+#if NET5_0_OR_GREATER
+            [UnconditionalSuppressMessage(
+                "Trimming",
+                "IL2075",
+                Justification = "Generated manifests and trim-safe manual configuration register implementation types through TypeManifestOptions.AddSerializer, AddFieldCodec, AddCopier, AddConverter, and AddActivator, which preserve implemented interfaces. The HashSet<Type> boundary cannot retain those annotations.")]
+#endif
             static void AddFromMetadata(Dictionary<Type, Type> resultCollection, HashSet<Type> metadataCollection, Type genericType)
             {
                 Debug.Assert(genericType.GetGenericArguments().Length >= 1);
@@ -479,6 +485,22 @@ namespace Orleans.Serialization.Serializers
             }
         }
 
+#if NET5_0_OR_GREATER
+        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(DefaultReferenceTypeActivator<>))]
+        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(DefaultValueTypeActivator<>))]
+        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(ConcreteTypeSerializer<,>))]
+        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(ValueSerializer<,>))]
+        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(ArrayCodec<>))]
+        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(MultiDimensionalArrayCodec<>))]
+        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(SurrogateCodec<,,>))]
+        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(ValueTypeSurrogateCodec<,,>))]
+        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(ArrayCopier<>))]
+        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(MultiDimensionalArrayCopier<>))]
+        [UnconditionalSuppressMessage(
+            "Trimming",
+            "IL2067",
+            Justification = "Generated manifests and trim-safe manual configuration use the annotated TypeManifestOptions registration methods, which preserve public constructors. Built-in dynamically closed implementations are rooted by DynamicDependency attributes. Other implementation types are resolved from dependency injection before this activation path. The TypeManifestOptions and dictionary boundaries cannot retain the annotations.")]
+#endif
         private object GetServiceOrCreateInstance(Type type, object[]? constructorArguments = null)
         {
             var result = OrleansGeneratedCodeHelper.TryGetService(type);

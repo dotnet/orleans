@@ -38,7 +38,7 @@ namespace Orleans.Configuration
         /// <inheritdoc />
         public void Configure(GrainTypeOptions options)
         {
-            foreach (var type in _typeManifestOptions.Interfaces)
+            foreach (var type in _typeManifestOptions.InterfaceTypes)
             {
                 if (typeof(IAddressable).IsAssignableFrom(type))
                 {
@@ -46,7 +46,7 @@ namespace Orleans.Configuration
                 }
             }
 
-            foreach (var type in _typeManifestOptions.InterfaceImplementations)
+            foreach (var type in _typeManifestOptions.InterfaceImplementationTypes)
             {
                 if (IsImplementationType(type))
                 {

@@ -118,9 +118,9 @@ namespace OrleansCodeGen.TestProject
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
-            config.Serializers.Add(typeof(OrleansCodeGen.Codec_DemoData));
-            config.Copiers.Add(typeof(OrleansCodeGen.Copier_DemoData));
-            config.Activators.Add(typeof(OrleansCodeGen.Activator_DemoData));
+            config.AddSerializer(typeof(OrleansCodeGen.Codec_DemoData));
+            config.AddCopier(typeof(OrleansCodeGen.Copier_DemoData));
+            config.AddActivator(typeof(OrleansCodeGen.Activator_DemoData));
         }
     }
 }

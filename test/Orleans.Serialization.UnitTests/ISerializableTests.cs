@@ -440,5 +440,179 @@ namespace Orleans.Serialization.UnitTests
 
             void IDeserializationCallback.OnDeserialization(object? sender) => History.Add("deserialization");
         }
+
+        [Fact]
+        public void ISerializableClassWithPrivateCallbacksAndConstructor_InvokesMembersInExactOrder()
+        {
+            PrivateCallbacksISerializableClass.ResetHistory();
+            var input = new PrivateCallbacksISerializableClass("class order payload", 37);
+
+            var result = Assert.IsType<PrivateCallbacksISerializableClass>(SerializationLoop(input));
+
+            Assert.Equal(
+                new[]
+                {
+                    "on_serializing",
+                    "get_object_data",
+                    "on_serialized",
+                    "on_deserializing",
+                    "serialization_ctor",
+                    "on_deserialized",
+                    "on_deserialization"
+                },
+                PrivateCallbacksISerializableClass.History);
+        }
+
+        [Fact]
+        public void ISerializableClassWithPrivateCallbacksAndConstructor_RestoresState()
+        {
+            PrivateCallbacksISerializableClass.ResetHistory();
+            var input = new PrivateCallbacksISerializableClass("class state payload", 73);
+
+            var result = Assert.IsType<PrivateCallbacksISerializableClass>(SerializationLoop(input));
+
+            Assert.Equal("class state payload", result.Payload, StringComparer.Ordinal);
+            Assert.Equal(73, result.Revision);
+            Assert.Equal("class:class state payload:73", result.ConstructorRestoredState, StringComparer.Ordinal);
+        }
+
+        [Fact]
+        public void ISerializableStructWithPrivateCallbacksAndConstructor_InvokesMembersInExactOrder()
+        {
+            PrivateCallbacksISerializableStruct.ResetHistory();
+            var input = new PrivateCallbacksISerializableStruct("struct order payload", 41);
+
+            var result = Assert.IsType<PrivateCallbacksISerializableStruct>(SerializationLoop(input));
+
+            Assert.Equal(
+                new[]
+                {
+                    "on_serializing",
+                    "get_object_data",
+                    "on_serialized",
+                    "on_deserializing",
+                    "serialization_ctor",
+                    "on_deserialized",
+                    "on_deserialization"
+                },
+                PrivateCallbacksISerializableStruct.History);
+        }
+
+        [Fact]
+        public void ISerializableStructWithPrivateCallbacksAndConstructor_RestoresState()
+        {
+            PrivateCallbacksISerializableStruct.ResetHistory();
+            var input = new PrivateCallbacksISerializableStruct("struct state payload", 89);
+
+            var result = Assert.IsType<PrivateCallbacksISerializableStruct>(SerializationLoop(input));
+
+            Assert.Equal("struct state payload", result.Payload, StringComparer.Ordinal);
+            Assert.Equal(89, result.Revision);
+            Assert.Equal("struct:struct state payload:89", result.ConstructorRestoredState, StringComparer.Ordinal);
+        }
+
+        [Serializable]
+        private class PrivateCallbacksISerializableClass : ISerializable, IDeserializationCallback
+        {
+            private static readonly List<string> CallbackHistory = new List<string>();
+
+            public PrivateCallbacksISerializableClass(string payload, int revision)
+            {
+                Payload = payload;
+                Revision = revision;
+                ConstructorRestoredState = "not restored";
+            }
+
+            protected PrivateCallbacksISerializableClass(SerializationInfo info, StreamingContext context)
+            {
+                CallbackHistory.Add("serialization_ctor");
+                Payload = info.GetString(nameof(Payload))!;
+                Revision = info.GetInt32(nameof(Revision));
+                ConstructorRestoredState = $"class:{Payload}:{Revision}";
+            }
+
+            public static IReadOnlyList<string> History => CallbackHistory;
+
+            public string Payload { get; private set; }
+
+            public int Revision { get; private set; }
+
+            public string ConstructorRestoredState { get; private set; }
+
+            public static void ResetHistory() => CallbackHistory.Clear();
+
+            void ISerializable.GetObjectData(SerializationInfo info, StreamingContext context)
+            {
+                CallbackHistory.Add("get_object_data");
+                info.AddValue(nameof(Payload), Payload);
+                info.AddValue(nameof(Revision), Revision);
+            }
+
+            [OnSerializing]
+            private void OnSerializing(StreamingContext context) => CallbackHistory.Add("on_serializing");
+
+            [OnSerialized]
+            private void OnSerialized(StreamingContext context) => CallbackHistory.Add("on_serialized");
+
+            [OnDeserializing]
+            private void OnDeserializing(StreamingContext context) => CallbackHistory.Add("on_deserializing");
+
+            [OnDeserialized]
+            private void OnDeserialized(StreamingContext context) => CallbackHistory.Add("on_deserialized");
+
+            void IDeserializationCallback.OnDeserialization(object? sender) => CallbackHistory.Add("on_deserialization");
+        }
+
+        [Serializable]
+        private struct PrivateCallbacksISerializableStruct : ISerializable, IDeserializationCallback
+        {
+            private static readonly List<string> CallbackHistory = new List<string>();
+
+            public PrivateCallbacksISerializableStruct(string payload, int revision)
+            {
+                Payload = payload;
+                Revision = revision;
+                ConstructorRestoredState = "not restored";
+            }
+
+            private PrivateCallbacksISerializableStruct(SerializationInfo info, StreamingContext context)
+            {
+                CallbackHistory.Add("serialization_ctor");
+                Payload = info.GetString(nameof(Payload))!;
+                Revision = info.GetInt32(nameof(Revision));
+                ConstructorRestoredState = $"struct:{Payload}:{Revision}";
+            }
+
+            public static IReadOnlyList<string> History => CallbackHistory;
+
+            public string Payload { get; private set; }
+
+            public int Revision { get; private set; }
+
+            public string ConstructorRestoredState { get; private set; }
+
+            public static void ResetHistory() => CallbackHistory.Clear();
+
+            void ISerializable.GetObjectData(SerializationInfo info, StreamingContext context)
+            {
+                CallbackHistory.Add("get_object_data");
+                info.AddValue(nameof(Payload), Payload);
+                info.AddValue(nameof(Revision), Revision);
+            }
+
+            [OnSerializing]
+            private void OnSerializing(StreamingContext context) => CallbackHistory.Add("on_serializing");
+
+            [OnSerialized]
+            private void OnSerialized(StreamingContext context) => CallbackHistory.Add("on_serialized");
+
+            [OnDeserializing]
+            private void OnDeserializing(StreamingContext context) => CallbackHistory.Add("on_deserializing");
+
+            [OnDeserialized]
+            private void OnDeserialized(StreamingContext context) => CallbackHistory.Add("on_deserialized");
+
+            void IDeserializationCallback.OnDeserialization(object? sender) => CallbackHistory.Add("on_deserialization");
+        }
     }
 }

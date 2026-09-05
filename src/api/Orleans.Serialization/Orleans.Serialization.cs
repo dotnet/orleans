@@ -40,6 +40,7 @@ namespace Orleans.Serialization
     }
 
     [Alias("ISerializable")]
+    [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("ISerializable support reflects over serialization constructors and callback methods. Preserve public and non-public constructors and methods on serialized types.")]
     public partial class DotNetSerializableCodec : Serializers.IGeneralizedCodec, Codecs.IFieldCodec
     {
         public static readonly System.Type CodecType;
@@ -3383,9 +3384,25 @@ namespace Orleans.Serialization.Configuration
 
         public System.Collections.Generic.Dictionary<uint, System.Type> WellKnownTypeIds { get { throw null; } }
 
+        public void AddActivator(System.Type type) { }
+
         public void AddAllowedAssembly(System.Reflection.Assembly assembly) { }
 
         public void AddAllowedType(System.Type type) { }
+
+        public void AddConverter(System.Type type) { }
+
+        public void AddCopier(System.Type type) { }
+
+        public void AddFieldCodec(System.Type type) { }
+
+        public void AddInterface(System.Type type) { }
+
+        public void AddInterfaceImplementation(System.Type type) { }
+
+        public void AddInterfaceProxy(System.Type type) { }
+
+        public void AddSerializer(System.Type type) { }
     }
 
     [System.AttributeUsage(System.AttributeTargets.Assembly, AllowMultiple = true)]
@@ -3451,7 +3468,7 @@ namespace Orleans.Serialization.Internal
 
         public static void AddFromAssemblyLoadContext(System.Collections.Generic.HashSet<System.Reflection.Assembly> parts, System.Runtime.Loader.AssemblyLoadContext context) { }
 
-        [System.Diagnostics.CodeAnalysis.RequiresAssemblyFilesAttribute("Dependency-context discovery reads assembly files. Use GetRelevantAssemblies for single-file-compatible discovery.")]
+        [System.Diagnostics.CodeAnalysis.RequiresAssemblyFiles("Dependency-context discovery reads assembly files. Use GetRelevantAssemblies for single-file-compatible discovery.")]
         public static void AddFromDependencyContext(System.Collections.Generic.HashSet<System.Reflection.Assembly> parts, System.Reflection.Assembly? assembly = null) { }
 
         public static System.Collections.Generic.IEnumerable<System.Reflection.Assembly> GetRelevantAssemblies() { throw null; }

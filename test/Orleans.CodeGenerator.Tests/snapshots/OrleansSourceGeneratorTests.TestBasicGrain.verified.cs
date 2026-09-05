@@ -249,14 +249,14 @@ namespace OrleansCodeGen.TestProject
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
-            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IBasicGrain_GrainReference_6B0E24A1));
-            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_BasicGrain));
-            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IBasicGrain_GrainReference_6B0E24A1));
-            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_BasicGrain));
-            config.InterfaceProxies.Add(typeof(OrleansCodeGen.TestProject.Proxy_IBasicGrain));
-            config.Interfaces.Add(typeof(global::TestProject.IBasicGrain));
-            config.InterfaceImplementations.Add(typeof(global::TestProject.BasicGrain));
-            config.Activators.Add(typeof(OrleansCodeGen.TestProject.Activator_BasicGrain));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IBasicGrain_GrainReference_6B0E24A1));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_BasicGrain));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IBasicGrain_GrainReference_6B0E24A1));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_BasicGrain));
+            config.AddInterfaceProxy(typeof(OrleansCodeGen.TestProject.Proxy_IBasicGrain));
+            config.AddInterface(typeof(global::TestProject.IBasicGrain));
+            config.AddInterfaceImplementation(typeof(global::TestProject.BasicGrain));
+            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_BasicGrain));
             var n1 = config.CompoundTypeAliases.Add("inv");
             var n2 = n1.Add(typeof(global::Orleans.Runtime.GrainReference));
             var n3 = n2.Add(typeof(global::TestProject.IBasicGrain));

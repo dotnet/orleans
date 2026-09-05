@@ -352,12 +352,12 @@ namespace OrleansCodeGen.TestProject
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
-            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_SimpleRecord));
-            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_RecordWithExtraProperty));
-            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_RecordStructWithParameterId));
-            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_SimpleRecord));
-            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_RecordWithExtraProperty));
-            config.Copiers.Add(typeof(global::Orleans.Serialization.Cloning.ShallowCopier<global::TestProject.RecordStructWithParameterId>));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_SimpleRecord));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_RecordWithExtraProperty));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_RecordStructWithParameterId));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_SimpleRecord));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_RecordWithExtraProperty));
+            config.AddCopier(typeof(global::Orleans.Serialization.Cloning.ShallowCopier<global::TestProject.RecordStructWithParameterId>));
         }
     }
 }

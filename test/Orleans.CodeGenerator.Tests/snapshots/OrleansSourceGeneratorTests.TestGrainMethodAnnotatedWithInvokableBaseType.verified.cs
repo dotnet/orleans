@@ -254,14 +254,14 @@ namespace OrleansCodeGen.TestProject
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
-            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IHelloGrain_GrainReference_5336307F));
-            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_HelloGrain));
-            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IHelloGrain_GrainReference_5336307F));
-            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_HelloGrain));
-            config.InterfaceProxies.Add(typeof(OrleansCodeGen.TestProject.Proxy_IHelloGrain));
-            config.Interfaces.Add(typeof(global::TestProject.IHelloGrain));
-            config.InterfaceImplementations.Add(typeof(global::TestProject.HelloGrain));
-            config.Activators.Add(typeof(OrleansCodeGen.TestProject.Activator_HelloGrain));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IHelloGrain_GrainReference_5336307F));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_HelloGrain));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IHelloGrain_GrainReference_5336307F));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_HelloGrain));
+            config.AddInterfaceProxy(typeof(OrleansCodeGen.TestProject.Proxy_IHelloGrain));
+            config.AddInterface(typeof(global::TestProject.IHelloGrain));
+            config.AddInterfaceImplementation(typeof(global::TestProject.HelloGrain));
+            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_HelloGrain));
             var n1 = config.CompoundTypeAliases.Add("inv");
             var n2 = n1.Add(typeof(global::Orleans.Runtime.GrainReference));
             var n3 = n2.Add(typeof(global::TestProject.IHelloGrain));

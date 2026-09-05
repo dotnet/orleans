@@ -150,14 +150,14 @@ public class TypeConverter
 
     private void ConsumeMetadata(TypeManifestOptions metadata)
     {
-        AddFromMetadata(metadata.Serializers, typeof(IBaseCodec<>));
-        AddFromMetadata(metadata.Serializers, typeof(IValueSerializer<>));
-        AddFromMetadata(metadata.Serializers, typeof(IFieldCodec<>));
-        AddFromMetadata(metadata.FieldCodecs, typeof(IFieldCodec<>));
-        AddFromMetadata(metadata.Activators, typeof(IActivator<>));
-        AddFromMetadata(metadata.Copiers, typeof(IDeepCopier<>));
-        AddFromMetadata(metadata.Converters, typeof(IConverter<,>));
-        foreach (var type in metadata.InterfaceProxies)
+        AddFromMetadata(metadata.SerializerTypes, typeof(IBaseCodec<>));
+        AddFromMetadata(metadata.SerializerTypes, typeof(IValueSerializer<>));
+        AddFromMetadata(metadata.SerializerTypes, typeof(IFieldCodec<>));
+        AddFromMetadata(metadata.FieldCodecTypes, typeof(IFieldCodec<>));
+        AddFromMetadata(metadata.ActivatorTypes, typeof(IActivator<>));
+        AddFromMetadata(metadata.CopierTypes, typeof(IDeepCopier<>));
+        AddFromMetadata(metadata.ConverterTypes, typeof(IConverter<,>));
+        foreach (var type in metadata.InterfaceProxyTypes)
         {
             AddAllowedType(type switch
             {
@@ -166,6 +166,12 @@ public class TypeConverter
             });
         }
 
+#if NET5_0_OR_GREATER
+        [UnconditionalSuppressMessage(
+            "Trimming",
+            "IL2075",
+            Justification = "Generated manifests and trim-safe manual configuration use the annotated TypeManifestOptions implementation registration methods, which preserve implemented interfaces. The HashSet<Type> boundary cannot retain those annotations.")]
+#endif
         void AddFromMetadata(HashSet<Type> metadataCollection, Type genericType)
         {
             Debug.Assert(genericType.GetGenericArguments().Length >= 1);
@@ -213,6 +219,12 @@ public class TypeConverter
             AddAllowedType(genericArgument);
         }
 
+#if NET5_0_OR_GREATER
+        [UnconditionalSuppressMessage(
+            "Trimming",
+            "IL2070",
+            Justification = "Generated manifests register proxy metadata through TypeManifestOptions.AddInterfaceProxy, which preserves implemented interfaces. The intermediate Type values cannot retain that annotation.")]
+#endif
         void AddAllowedType(Type type)
         {
             FormatAndAddAllowedType(type);

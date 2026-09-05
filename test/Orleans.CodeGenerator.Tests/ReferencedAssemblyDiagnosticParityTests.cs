@@ -298,9 +298,7 @@ public class ReferencedAssemblyDiagnosticParityTests
     private static bool IsMetadataRegistration(InvocationExpressionSyntax invocation, string collectionName, string registeredTypeName)
     {
         if (invocation.Expression is not MemberAccessExpressionSyntax addExpression
-            || !string.Equals(addExpression.Name.Identifier.ValueText, "Add", StringComparison.Ordinal)
-            || addExpression.Expression is not MemberAccessExpressionSyntax collectionExpression
-            || !string.Equals(collectionExpression.Name.Identifier.ValueText, collectionName, StringComparison.Ordinal)
+            || !IsRegistrationMethod(addExpression, collectionName)
             || invocation.ArgumentList.Arguments.FirstOrDefault()?.Expression is not TypeOfExpressionSyntax typeOfExpression)
         {
             return false;
@@ -309,6 +307,29 @@ public class ReferencedAssemblyDiagnosticParityTests
         var typeName = typeOfExpression.Type.ToString().Split('.').Last();
         return string.Equals(GetGeneratedClassIdentifier(typeName), registeredTypeName, StringComparison.Ordinal);
     }
+
+    private static bool IsRegistrationMethod(MemberAccessExpressionSyntax expression, string collectionName)
+        => GetRegistrationMethodName(collectionName) is { } methodName
+            ? string.Equals(expression.Name.Identifier.ValueText, methodName, StringComparison.Ordinal)
+            : expression is
+            {
+                Name.Identifier.ValueText: "Add",
+                Expression: MemberAccessExpressionSyntax collectionExpression,
+            }
+                && string.Equals(collectionExpression.Name.Identifier.ValueText, collectionName, StringComparison.Ordinal);
+
+    private static string? GetRegistrationMethodName(string collectionName) => collectionName switch
+    {
+        "Activators" => "AddActivator",
+        "Converters" => "AddConverter",
+        "Copiers" => "AddCopier",
+        "FieldCodecs" => "AddFieldCodec",
+        "InterfaceImplementations" => "AddInterfaceImplementation",
+        "InterfaceProxies" => "AddInterfaceProxy",
+        "Interfaces" => "AddInterface",
+        "Serializers" => "AddSerializer",
+        _ => null,
+    };
 
     private static IEnumerable<CompilationUnitSyntax> GetGeneratedCompilationUnits(GeneratorRunResult result)
     {
