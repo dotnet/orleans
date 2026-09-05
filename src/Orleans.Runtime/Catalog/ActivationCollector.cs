@@ -28,7 +28,6 @@ namespace Orleans.Runtime
         private long _nextTicketTicks;
         private static readonly List<ICollectibleGrainContext> nothing = [];
         private static readonly IReadOnlyList<CollectionClaim> NoClaims = Array.Empty<CollectionClaim>();
-        private static readonly IEnumerable<KeyValuePair<CollectionRegistration, byte>> NoRegistrations = Array.Empty<KeyValuePair<CollectionRegistration, byte>>();
         private readonly ILogger logger;
         private int collectionNumber;
 
@@ -278,7 +277,12 @@ namespace Orleans.Runtime
             foreach (var kv in buckets)
             {
                 var bucket = kv.Value;
-                foreach (var entry in bucket.Registrations)
+                if (bucket.Registrations is not { } registrations)
+                {
+                    continue;
+                }
+
+                foreach (var entry in registrations)
                 {
                     var registration = entry.Key;
                     if (!registration.IsScheduledIn(bucket))
@@ -403,7 +407,12 @@ namespace Orleans.Runtime
             Array.Sort(bucketSnapshot, static (left, right) => left.Key.CompareTo(right.Key));
             foreach (var bucket in bucketSnapshot)
             {
-                foreach (var entry in bucket.Value.Registrations)
+                if (bucket.Value.Registrations is not { } registrations)
+                {
+                    continue;
+                }
+
+                foreach (var entry in registrations)
                 {
                     var registration = entry.Key;
                     if (candidates.Count >= count)
@@ -1059,8 +1068,7 @@ namespace Orleans.Runtime
 
             public DateTime Ticket => _ticket;
 
-            public IEnumerable<KeyValuePair<CollectionRegistration, byte>> Registrations
-                => Volatile.Read(ref _items) ?? NoRegistrations;
+            public ConcurrentDictionary<CollectionRegistration, byte>? Registrations => Volatile.Read(ref _items);
 
             public bool TryAdd(CollectionRegistration registration)
             {
