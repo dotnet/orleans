@@ -31,6 +31,7 @@ namespace Orleans.Streaming.Kinesis
         private readonly ILogger<KinesisAdapterFactory> _logger;
         private readonly Func<string[], HashRingBasedPartitionedStreamQueueMapper> _queueMapperFactory;
         private readonly IAmazonKinesis _client;
+        private readonly Func<IAmazonKinesis> _clientFactory;
         private readonly TimeProvider _timeProvider;
         private readonly SemaphoreSlim _initializationSemaphore = new(1);
 
@@ -44,7 +45,8 @@ namespace Orleans.Streaming.Kinesis
             Serializer<KinesisBatchContainer.Body> serializer,
             IStreamQueueCheckpointerFactory? checkpointerFactory,
             ILoggerFactory loggerFactory,
-            TimeProvider? timeProvider = null
+            TimeProvider? timeProvider = null,
+            Func<IAmazonKinesis>? clientFactory = null
         )
         {
             _options = options ?? throw new ArgumentNullException(nameof(options));
@@ -56,6 +58,7 @@ namespace Orleans.Streaming.Kinesis
             _cacheOptions = cacheOptions;
             _logger = loggerFactory.CreateLogger<KinesisAdapterFactory>();
             _timeProvider = timeProvider ?? TimeProvider.System;
+            _clientFactory = clientFactory ?? (() => CreateClient(_options));
 
             _queueMapperFactory = partitions => new HashRingBasedPartitionedStreamQueueMapper(partitions, Name);
             _client = CreateClient();
@@ -183,7 +186,8 @@ namespace Orleans.Streaming.Kinesis
                 topologyMonitor,
                 _options.GetRecordsInterval,
                 _timeProvider,
-                receiver => receivers.Remove(queueId, receiver)
+                receiver => receivers.Remove(queueId, receiver),
+                maxCacheSizeBytes: _options.MaxCacheSizeBytes
                 );
         }
 
@@ -192,7 +196,7 @@ namespace Orleans.Streaming.Kinesis
                 ?? throw new InvalidOperationException(
                     $"The Kinesis stream provider '{Name}' must complete {nameof(CreateAdapter)} before accessing initialized adapter state.");
 
-        internal IAmazonKinesis CreateClient() => CreateClient(_options);
+        internal IAmazonKinesis CreateClient() => _clientFactory();
 
         internal static IAmazonKinesis CreateClient(KinesisStreamOptions options)
         {

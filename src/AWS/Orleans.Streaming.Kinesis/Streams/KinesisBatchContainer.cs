@@ -76,13 +76,22 @@ namespace Orleans.Streaming.Kinesis
         private Body GetPayload() => _payload ??= this.Serializer.Deserialize(_rawRecord)!;
 
         /// <summary>
-        /// Gets events of a specific type from the batch.
+        /// Gets events of a specific type with their original event indices within the record.
         /// </summary>
         /// <typeparam name="T"></typeparam>
-        /// <returns></returns>
+        /// <returns>The matching events and their sequence tokens.</returns>
         public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()
         {
-            return GetPayload().Events.OfType<T>().Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, new KinesisSequenceToken(Token.ShardSequence, Token.SequenceNumber, i)));
+            var events = GetPayload().Events;
+            for (var i = 0; i < events.Count; i++)
+            {
+                if (events[i] is T item)
+                {
+                    yield return Tuple.Create<T, StreamSequenceToken>(
+                        item,
+                        new KinesisSequenceToken(Token.ShardSequence, Token.SequenceNumber, i));
+                }
+            }
         }
 
         /// <summary>
