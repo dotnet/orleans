@@ -116,9 +116,10 @@ internal sealed class DeploymentLoadStatisticsDisseminationNamespace(
 
     private void PruneCache(IReadOnlyCollection<SiloAddress> activeSilos)
     {
+        var activeSiloSet = activeSilos.ToHashSet();
         lock (_cacheLock)
         {
-            foreach (var key in _cachedValues.Keys.Where(key => !activeSilos.Contains(key)).ToArray())
+            foreach (var key in _cachedValues.Keys.Where(key => !activeSiloSet.Contains(key)).ToArray())
             {
                 _cachedValues.Remove(key);
             }

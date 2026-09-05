@@ -15,6 +15,12 @@ using Xunit;
 
 namespace UnitTests.Dissemination;
 
+[CollectionDefinition(Name, DisableParallelization = true)]
+public sealed class DisseminationDiagnosticCollection
+{
+    public const string Name = "Dissemination diagnostics";
+}
+
 /// <summary>
 /// Exercises dissemination across a real in-process cluster so that membership updates flow through the
 /// full serialization pipeline (the in-memory transport is a byte pipe, not object pass-through). This
@@ -22,6 +28,7 @@ namespace UnitTests.Dissemination;
 /// cannot catch.
 /// </summary>
 [TestCategory("Functional"), TestCategory("Dissemination")]
+[Collection(DisseminationDiagnosticCollection.Name)]
 public sealed class DisseminationClusterTests
 {
     [Fact]
