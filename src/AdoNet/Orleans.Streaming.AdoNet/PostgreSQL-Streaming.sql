@@ -433,13 +433,8 @@ BEGIN
 
     WITH Candidate AS
     (
-        SELECT M.MessageId
-        FROM OrleansStreamMessage AS M
-        WHERE M.ServiceId = _ServiceId
-            AND M.ProviderId = _ProviderId
-            AND M.QueueId = _QueueId
-            AND
-            (
+        SELECT M.MessageId,
+            CASE WHEN
                 (
                     _Checkpoint IS NOT NULL
                     AND M.MessageId <= _Checkpoint
@@ -450,19 +445,29 @@ BEGIN
                     _MaximumRetentionPeriodSeconds IS NOT NULL
                     AND M.CreatedOn < _Now - make_interval(secs => _MaximumRetentionPeriodSeconds)
                 )
-            )
+                THEN TRUE ELSE FALSE END AS Eligible
+        FROM OrleansStreamMessage AS M
+        WHERE M.ServiceId = _ServiceId
+            AND M.ProviderId = _ProviderId
+            AND M.QueueId = _QueueId
         ORDER BY M.MessageId
         FOR UPDATE
         LIMIT _CleanupBatchSize
     ),
+    Boundary AS
+    (
+        SELECT MIN(MessageId) FILTER (WHERE NOT Eligible) AS FirstIneligibleMessageId
+        FROM Candidate
+    ),
     Deleted AS
     (
         DELETE FROM OrleansStreamMessage AS M
-        USING Candidate AS C
+        USING Candidate AS C, Boundary AS B
         WHERE M.ServiceId = _ServiceId
             AND M.ProviderId = _ProviderId
             AND M.QueueId = _QueueId
             AND M.MessageId = C.MessageId
+            AND (B.FirstIneligibleMessageId IS NULL OR C.MessageId < B.FirstIneligibleMessageId)
         RETURNING M.MessageId
     )
     SELECT

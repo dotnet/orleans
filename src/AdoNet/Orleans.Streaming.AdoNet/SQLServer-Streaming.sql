@@ -532,6 +532,8 @@ BEGIN
     DECLARE @StartedTransaction BIT = 0;
     DECLARE @Now DATETIME2(7) = SYSUTCDATETIME();
     DECLARE @Checkpoint BIGINT;
+    DECLARE @FirstIneligibleMessageId BIGINT;
+    DECLARE @Candidate TABLE (MessageId BIGINT NOT NULL PRIMARY KEY, Eligible BIT NOT NULL);
     DECLARE @Deleted TABLE (MessageId BIGINT NOT NULL, HardDeleted BIT NOT NULL);
 
     BEGIN TRY
@@ -582,29 +584,31 @@ BEGIN
             RETURN;
         END;
 
-        ;WITH Candidate AS
-        (
-            SELECT TOP (@CleanupBatchSize)
-                MessageId
-            FROM OrleansStreamMessage WITH (UPDLOCK, READCOMMITTEDLOCK, ROWLOCK)
-            WHERE ServiceId = @ServiceId
-                AND ProviderId = @ProviderId
-                AND QueueId = @QueueId
-                AND
+        INSERT INTO @Candidate (MessageId, Eligible)
+        SELECT TOP (@CleanupBatchSize)
+            MessageId,
+            CASE WHEN
                 (
-                    (
-                        @Checkpoint IS NOT NULL
-                        AND MessageId <= @Checkpoint
-                        AND CheckpointedOn < DATEADD(SECOND, -@RetentionPeriodSeconds, @Now)
-                    )
-                    OR
-                    (
-                        @MaximumRetentionPeriodSeconds IS NOT NULL
-                        AND CreatedOn < DATEADD(SECOND, -@MaximumRetentionPeriodSeconds, @Now)
-                    )
+                    @Checkpoint IS NOT NULL
+                    AND MessageId <= @Checkpoint
+                    AND CheckpointedOn < DATEADD(SECOND, -@RetentionPeriodSeconds, @Now)
                 )
-            ORDER BY MessageId
-        )
+                OR
+                (
+                    @MaximumRetentionPeriodSeconds IS NOT NULL
+                    AND CreatedOn < DATEADD(SECOND, -@MaximumRetentionPeriodSeconds, @Now)
+                )
+                THEN 1 ELSE 0 END
+        FROM OrleansStreamMessage WITH (UPDLOCK, READCOMMITTEDLOCK, ROWLOCK)
+        WHERE ServiceId = @ServiceId
+            AND ProviderId = @ProviderId
+            AND QueueId = @QueueId
+        ORDER BY MessageId;
+
+        SELECT @FirstIneligibleMessageId = MIN(MessageId)
+        FROM @Candidate
+        WHERE Eligible = 0;
+
         DELETE Message
         OUTPUT
             Deleted.MessageId,
@@ -614,11 +618,12 @@ BEGIN
             END
         INTO @Deleted (MessageId, HardDeleted)
         FROM OrleansStreamMessage AS Message
-        INNER JOIN Candidate
+        INNER JOIN @Candidate AS Candidate
             ON Candidate.MessageId = Message.MessageId
         WHERE Message.ServiceId = @ServiceId
             AND Message.ProviderId = @ProviderId
-            AND Message.QueueId = @QueueId;
+            AND Message.QueueId = @QueueId
+            AND (@FirstIneligibleMessageId IS NULL OR Message.MessageId < @FirstIneligibleMessageId);
 
         SELECT
             CAST(1 AS BIT) AS Ran,

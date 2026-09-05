@@ -412,6 +412,7 @@ BEGIN
     DECLARE _EarliestMessageId BIGINT;
     DECLARE _TailMessageId BIGINT;
     DECLARE _PartitionExists BOOLEAN DEFAULT FALSE;
+    DECLARE _FirstIneligibleMessageId BIGINT;
 
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
@@ -468,17 +469,13 @@ BEGIN
         CREATE TEMPORARY TABLE OrleansStreamCleanupBatch
         (
             MessageId BIGINT NOT NULL,
+            Eligible BOOLEAN NOT NULL,
             PRIMARY KEY (MessageId)
         );
 
-        INSERT INTO OrleansStreamCleanupBatch (MessageId)
-        SELECT MessageId
-        FROM OrleansStreamMessage
-        WHERE ServiceId = _ServiceId
-            AND ProviderId = _ProviderId
-            AND QueueId = _QueueId
-            AND
-            (
+        INSERT INTO OrleansStreamCleanupBatch (MessageId, Eligible)
+        SELECT MessageId,
+            CASE WHEN
                 (
                     _Checkpoint IS NOT NULL
                     AND MessageId <= _Checkpoint
@@ -489,10 +486,22 @@ BEGIN
                     _MaximumRetentionPeriodSeconds IS NOT NULL
                     AND CreatedOn < DATE_SUB(_Now, INTERVAL _MaximumRetentionPeriodSeconds SECOND)
                 )
-            )
+                THEN TRUE ELSE FALSE END
+        FROM OrleansStreamMessage
+        WHERE ServiceId = _ServiceId
+            AND ProviderId = _ProviderId
+            AND QueueId = _QueueId
         ORDER BY MessageId
         LIMIT _CleanupBatchSize
         FOR UPDATE;
+
+        SELECT MIN(MessageId)
+        INTO _FirstIneligibleMessageId
+        FROM OrleansStreamCleanupBatch
+        WHERE Eligible = FALSE;
+
+        DELETE FROM OrleansStreamCleanupBatch
+        WHERE MessageId >= _FirstIneligibleMessageId;
 
         SELECT
             COUNT(*),
