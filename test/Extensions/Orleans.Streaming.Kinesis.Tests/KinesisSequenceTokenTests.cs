@@ -6,6 +6,7 @@ using Orleans.Providers.Streams.Common;
 using Orleans.Streams;
 using Orleans.Streaming.Kinesis;
 using TestExtensions;
+using UnitTests.StreamingTests;
 using Xunit;
 
 namespace Orleans.Streaming.Kinesis.Tests;
@@ -109,6 +110,22 @@ public sealed class KinesisSequenceTokenTests
             () => new SortedSet<StreamSequenceToken> { kinesis, baseToken });
         Assert.Throws<ArgumentOutOfRangeException>(
             () => new SortedSet<StreamSequenceToken> { baseToken, kinesis });
+    }
+
+    [Fact]
+    public void LegacyGenericRecovery_PreservesKinesisIdentityAndAuthoritativeOffset()
+    {
+        var older = new KinesisSequenceToken(HugeShardSequence, sequenceNumber: 999, eventIndex: 2);
+        var newer = new KinesisSequenceToken(SlightlyLargerShardSequence, sequenceNumber: 1, eventIndex: 0);
+        var samePosition = new KinesisSequenceToken(HugeShardSequence, sequenceNumber: 1, eventIndex: 2);
+
+        LegacyTokenRecoveryFixture.AssertProviderIsolation(older);
+        Assert.True(older.CompareTo(newer) < 0);
+        Assert.True(newer.CompareTo(older) > 0);
+        Assert.True(older.Equals(samePosition));
+        Assert.True(samePosition.Equals(older));
+        Assert.Equal(0, older.CompareTo(samePosition));
+        Assert.Equal(older.GetHashCode(), samePosition.GetHashCode());
     }
 
     [Fact]

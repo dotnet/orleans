@@ -1,6 +1,7 @@
 using Orleans.Providers.Streams.Common;
 using Orleans.Streaming.Redis;
 using Orleans.Streams;
+using UnitTests.StreamingTests;
 using Xunit;
 
 namespace Tester.Redis.Streaming;
@@ -10,6 +11,22 @@ namespace Tester.Redis.Streaming;
 [TestArea("Streaming")]
 public sealed class RedisStreamSequenceTokenTests
 {
+    [Fact]
+    public void LegacyGenericRecovery_PreservesRedisEntryIdentity()
+    {
+        var first = new RedisStreamSequenceToken("10-1", 10, 1, 2);
+        var later = new RedisStreamSequenceToken("10-2", 10, 2, 0);
+        var eventToken = first.CreateSequenceTokenForEvent(3);
+
+        LegacyTokenRecoveryFixture.AssertProviderIsolation(first);
+        Assert.True(first.CompareTo(later) < 0);
+        Assert.True(later.CompareTo(first) > 0);
+        Assert.Equal("10-1", eventToken.EntryId);
+        Assert.Equal(1, eventToken.RedisSequenceNumber);
+        Assert.Equal(3, eventToken.EventIndex);
+        Assert.Equal(2, first.EventIndex);
+    }
+
     [Fact]
     public void RedisTokensUseOneSymmetricEqualityAndOrderingContract()
     {

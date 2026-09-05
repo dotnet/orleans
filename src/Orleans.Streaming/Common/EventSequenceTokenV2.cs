@@ -9,9 +9,10 @@ namespace Orleans.Providers.Streams.Common
     /// Stream sequence token that tracks sequence number and event index
     /// </summary>
     /// <remarks>
-    /// The exact <see cref="EventSequenceTokenV2"/> and <see cref="EventSequenceToken"/>
-    /// types compare across versions. Derived tokens compare only with the same concrete
-    /// runtime type unless they override equality, ordering, and hashing together.
+    /// <see cref="EventSequenceTokenV2"/> and <see cref="EventSequenceToken"/> share a numeric
+    /// position contract with subclasses which inherit their complete equality, ordering, and
+    /// hashing implementations. This includes exact base tokens persisted by earlier event-token
+    /// factories. Subclasses which override that contract define their own compatibility.
     /// </remarks>
     [Serializable]
     [GenerateSerializer]
@@ -84,7 +85,7 @@ namespace Orleans.Providers.Streams.Common
         public override bool Equals(StreamSequenceToken? other)
         {
             return other is not null
-                && IsCompatibleLegacyToken(other)
+                && EventSequenceTokenCompatibility.IsCompatibleNumericToken(this, other)
                 && other.SequenceNumber == SequenceNumber
                 && other.EventIndex == EventIndex;
         }
@@ -95,7 +96,7 @@ namespace Orleans.Providers.Streams.Common
             if (other == null)
                 return 1;
 
-            if (!IsCompatibleLegacyToken(other))
+            if (!EventSequenceTokenCompatibility.IsCompatibleNumericToken(this, other))
                 throw new ArgumentOutOfRangeException(nameof(other));
 
             int difference = SequenceNumber.CompareTo(other.SequenceNumber);
@@ -109,20 +110,6 @@ namespace Orleans.Providers.Streams.Common
         public override string ToString()
         {
             return string.Format(CultureInfo.InvariantCulture, "[EventSequenceTokenV2: SeqNum={0}, EventIndex={1}]", SequenceNumber, EventIndex);
-        }
-
-        private bool IsCompatibleLegacyToken(StreamSequenceToken? other)
-        {
-            if (other is null)
-            {
-                return false;
-            }
-
-            var currentType = GetType();
-            var otherType = other.GetType();
-            return currentType == otherType
-                || currentType == typeof(EventSequenceTokenV2)
-                && otherType == typeof(EventSequenceToken);
         }
     }
 }

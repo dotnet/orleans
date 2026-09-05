@@ -33,8 +33,11 @@ namespace Orleans.Streaming.EventHubs
     ///   and ordering of application layer events within an EventHub message.
     /// </summary>
     /// <remarks>
-    /// Event Hub token versions compare with each other using the Event Hubs sequence number
-    /// and event index. They do not compare with generic event sequence tokens.
+    /// Event Hub token versions and subclasses which inherit their complete equality, ordering,
+    /// and hashing contract compare using the Event Hubs sequence number and event index.
+    /// During recovery, Orleans interprets exact <see cref="EventSequenceToken"/> positions from
+    /// the earlier inherited event-token factory in this provider's sequence-number space.
+    /// Delivered event tokens preserve their concrete type and Event Hubs offset.
     /// </remarks>
     [Serializable]
     [GenerateSerializer]
@@ -67,6 +70,18 @@ namespace Orleans.Streaming.EventHubs
         /// </remarks>
         public EventHubSequenceToken() : base()
         {
+        }
+
+        internal override StreamSequenceToken NormalizeLegacyToken(StreamSequenceToken token)
+        {
+            if (token.GetType() == typeof(EventSequenceToken) && HasInheritedEventHubContract(this))
+            {
+                // The former inherited factory persisted the position without the offset.
+                // Empty offsets also identify sequence-only tokens produced by EventHubDataAdapter.
+                return new EventHubSequenceToken(string.Empty, token.SequenceNumber, token.EventIndex);
+            }
+
+            return token;
         }
 
         /// <inheritdoc />
@@ -113,11 +128,13 @@ namespace Orleans.Streaming.EventHubs
                 return false;
             }
 
-            var currentType = GetType();
-            var otherType = other.GetType();
-            return currentType == otherType
-                || (currentType == typeof(EventHubSequenceToken) || currentType == typeof(EventHubSequenceTokenV2))
-                && (otherType == typeof(EventHubSequenceToken) || otherType == typeof(EventHubSequenceTokenV2));
+            return GetType() == other.GetType()
+                || other is EventHubSequenceToken
+                    && HasInheritedEventHubContract(this)
+                    && HasInheritedEventHubContract(other);
         }
+
+        private static bool HasInheritedEventHubContract(StreamSequenceToken token)
+            => EventSequenceTokenCompatibility.HasInheritedContract(token, typeof(EventHubSequenceToken), typeof(EventSequenceToken));
     }
 }

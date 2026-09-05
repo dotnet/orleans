@@ -2547,27 +2547,25 @@ namespace UnitTests.StreamingTests
         }
 
         [Fact]
-        public void EventSequenceTokens_RejectDerivedTokensSymmetrically()
+        public void EventSequenceTokens_InheritedContractsRemainCompatibleWithBaseTokens()
         {
             StreamSequenceToken baseToken = new EventSequenceTokenV2(10, 2);
             StreamSequenceToken derivedToken = new DerivedEventSequenceToken(10, 2);
 
-            Assert.False(baseToken.Equals(derivedToken));
-            Assert.False(derivedToken.Equals(baseToken));
-            Assert.Throws<ArgumentOutOfRangeException>(() => baseToken.CompareTo(derivedToken));
-            Assert.Throws<ArgumentOutOfRangeException>(() => derivedToken.CompareTo(baseToken));
-            Assert.Equal(2, new HashSet<StreamSequenceToken> { baseToken, derivedToken }.Count);
-            Assert.Throws<ArgumentOutOfRangeException>(
-                () => new SortedSet<StreamSequenceToken> { baseToken, derivedToken });
-            Assert.Throws<ArgumentOutOfRangeException>(
-                () => new SortedSet<StreamSequenceToken> { derivedToken, baseToken });
+            Assert.True(baseToken.Equals(derivedToken));
+            Assert.True(derivedToken.Equals(baseToken));
+            Assert.Equal(0, baseToken.CompareTo(derivedToken));
+            Assert.Equal(0, derivedToken.CompareTo(baseToken));
+            Assert.Single(new HashSet<StreamSequenceToken> { baseToken, derivedToken });
+            Assert.Single(new SortedSet<StreamSequenceToken> { baseToken, derivedToken });
+            Assert.Single(new SortedSet<StreamSequenceToken> { derivedToken, baseToken });
 
             StreamSequenceToken v1Base = new EventSequenceToken(10, 2);
             StreamSequenceToken v1Derived = new DerivedEventSequenceTokenV1(10, 2);
-            Assert.False(v1Base.Equals(v1Derived));
-            Assert.False(v1Derived.Equals(v1Base));
-            Assert.Throws<ArgumentOutOfRangeException>(() => v1Base.CompareTo(v1Derived));
-            Assert.Throws<ArgumentOutOfRangeException>(() => v1Derived.CompareTo(v1Base));
+            Assert.True(v1Base.Equals(v1Derived));
+            Assert.True(v1Derived.Equals(v1Base));
+            Assert.Equal(0, v1Base.CompareTo(v1Derived));
+            Assert.Equal(0, v1Derived.CompareTo(v1Base));
 
             StreamSequenceToken v2DerivedPeer = new DerivedEventSequenceToken(10, 2);
             Assert.True(derivedToken.Equals(v2DerivedPeer));
