@@ -15,6 +15,7 @@
   <PropertyGroup>
     <AssemblyName>Orleans.Reminders.TestKit</AssemblyName>
     <RootNamespace>Orleans.Reminders.TestKit</RootNamespace>
+    <WarningsAsErrors>$(WarningsAsErrors);CA1062</WarningsAsErrors>
   </PropertyGroup>
 
   <ItemGroup>

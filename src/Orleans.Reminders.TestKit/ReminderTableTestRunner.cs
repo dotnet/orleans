@@ -1294,8 +1294,12 @@ public abstract class ReminderTableTestRunner
     /// <param name="operation">The operation which produced the observation.</param>
     /// <returns>The report.</returns>
     protected ReminderFailureReport Report(string guarantee, string operation)
-        => ReminderFailureReport.Create(ProviderName, guarantee, operation)
+    {
+        ArgumentNullException.ThrowIfNull(guarantee);
+        ArgumentNullException.ThrowIfNull(operation);
+        return ReminderFailureReport.Create(ProviderName, guarantee, operation)
             .WithDetail("seed", Seed.ToString(CultureInfo.InvariantCulture));
+    }
 
     /// <summary>
     /// Creates a grain identifier which is unique to this runner instance.
@@ -1304,6 +1308,7 @@ public abstract class ReminderTableTestRunner
     /// <returns>The grain identifier.</returns>
     protected GrainId NewGrainId(string label)
     {
+        ArgumentNullException.ThrowIfNull(label);
         var ordinal = Interlocked.Increment(ref _grainCounter);
         return GrainId.Create(
             GrainType.Create("reminder-testkit-grain"),
@@ -1320,13 +1325,17 @@ public abstract class ReminderTableTestRunner
     /// <param name="startAt">The start time, or <see langword="null"/> for <see cref="BaseTime"/>.</param>
     /// <param name="period">The period, or <see langword="null"/> for one minute.</param>
     /// <returns>The entry.</returns>
-    protected ReminderEntry NewEntry(GrainId grainId, string reminderName, DateTime? startAt = null, TimeSpan? period = null) => new()
+    protected ReminderEntry NewEntry(GrainId grainId, string reminderName, DateTime? startAt = null, TimeSpan? period = null)
     {
-        GrainId = grainId,
-        ReminderName = reminderName,
-        StartAt = Normalize(startAt ?? BaseTime),
-        Period = period ?? TimeSpan.FromMinutes(1)
-    };
+        ArgumentNullException.ThrowIfNull(reminderName);
+        return new()
+        {
+            GrainId = grainId,
+            ReminderName = reminderName,
+            StartAt = Normalize(startAt ?? BaseTime),
+            Period = period ?? TimeSpan.FromMinutes(1)
+        };
+    }
 
     /// <summary>
     /// Normalizes a timestamp to whole-second UTC precision supported by every built-in provider.
@@ -1347,7 +1356,11 @@ public abstract class ReminderTableTestRunner
     /// <param name="previousETag">The ETag which a replacement must rotate, or <see langword="null"/> for a new row.</param>
     /// <returns>The new ETag.</returns>
     protected Task<string> UpsertAsync(ReminderEntry entry, string guarantee, string? previousETag = null)
-        => UpsertAsync(entry, guarantee, CancellationToken.None, previousETag);
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        ArgumentNullException.ThrowIfNull(guarantee);
+        return UpsertAsync(entry, guarantee, CancellationToken.None, previousETag);
+    }
 
     /// <summary>
     /// Upserts an entry and asserts that a non-empty ETag was returned.
@@ -1363,6 +1376,10 @@ public abstract class ReminderTableTestRunner
         CancellationToken cancellationToken,
         string? previousETag = null)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        ArgumentNullException.ThrowIfNull(entry);
+        ArgumentNullException.ThrowIfNull(guarantee);
+
         var etag = (await ReminderTableRetryPolicy.MutateUntilAsync(
             () => ReminderTable.UpsertRow(entry),
             etag => !string.IsNullOrEmpty(etag),
@@ -1394,19 +1411,23 @@ public abstract class ReminderTableTestRunner
     /// <param name="reminderName">The reminder name.</param>
     /// <param name="guarantee">The guarantee being verified.</param>
     /// <returns>The reminder entry.</returns>
-    protected async Task<ReminderEntry> ReadRequiredAsync(
+    protected Task<ReminderEntry> ReadRequiredAsync(
         GrainId grainId,
         string reminderName,
         string guarantee,
         ReminderEntry? expected = null,
         string? expectedETag = null)
-        => await ReadRequiredAsync(
+    {
+        ArgumentNullException.ThrowIfNull(reminderName);
+        ArgumentNullException.ThrowIfNull(guarantee);
+        return ReadRequiredAsync(
             grainId,
             reminderName,
             guarantee,
             CancellationToken.None,
             expected,
             expectedETag);
+    }
 
     /// <summary>
     /// Reads a reminder which the guarantee requires to be present.
@@ -1426,6 +1447,10 @@ public abstract class ReminderTableTestRunner
         ReminderEntry? expected = null,
         string? expectedETag = null)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        ArgumentNullException.ThrowIfNull(reminderName);
+        ArgumentNullException.ThrowIfNull(guarantee);
+
         var read = await ReadUntilAsync(
             () => ReminderTable.ReadRow(grainId, reminderName),
             value => value is not null && (expected is null || EntryMatches(expected, expectedETag, value)),
@@ -1485,7 +1510,11 @@ public abstract class ReminderTableTestRunner
     /// <param name="etag">The current ETag.</param>
     /// <returns>A task which represents the asynchronous operation.</returns>
     protected Task RemoveAsync(GrainId grainId, string reminderName, string etag)
-        => RemoveAsync(grainId, reminderName, etag, CancellationToken.None);
+    {
+        ArgumentNullException.ThrowIfNull(reminderName);
+        ArgumentNullException.ThrowIfNull(etag);
+        return RemoveAsync(grainId, reminderName, etag, CancellationToken.None);
+    }
 
     /// <summary>
     /// Removes a reminder during test cleanup.
@@ -1501,6 +1530,10 @@ public abstract class ReminderTableTestRunner
         string etag,
         CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        ArgumentNullException.ThrowIfNull(reminderName);
+        ArgumentNullException.ThrowIfNull(etag);
+
         await ReminderTable.RemoveRow(grainId, reminderName, etag, cancellationToken).WaitAsync(cancellationToken);
     }
 
@@ -1513,6 +1546,9 @@ public abstract class ReminderTableTestRunner
     /// <returns>The non-null result.</returns>
     protected ReminderTableData RequireRows(string guarantee, string operation, ReminderTableData? rows)
     {
+        ArgumentNullException.ThrowIfNull(guarantee);
+        ArgumentNullException.ThrowIfNull(operation);
+
         if (rows is null)
         {
             Report(guarantee, operation)
@@ -1586,6 +1622,12 @@ public abstract class ReminderTableTestRunner
     /// <param name="actual">The observed entry.</param>
     protected void AssertEntry(string guarantee, string operation, ReminderEntry expected, string expectedETag, ReminderEntry actual)
     {
+        ArgumentNullException.ThrowIfNull(guarantee);
+        ArgumentNullException.ThrowIfNull(operation);
+        ArgumentNullException.ThrowIfNull(expected);
+        ArgumentNullException.ThrowIfNull(expectedETag);
+        ArgumentNullException.ThrowIfNull(actual);
+
         if (!actual.GrainId.Equals(expected.GrainId) || !string.Equals(actual.ReminderName, expected.ReminderName, StringComparison.Ordinal))
         {
             Report(guarantee, operation)
@@ -1648,7 +1690,10 @@ public abstract class ReminderTableTestRunner
     /// <param name="entry">The entry.</param>
     /// <returns>The rendered entry.</returns>
     protected static string Describe(ReminderEntry entry)
-        => $"(GrainId={entry.GrainId}, ReminderName='{entry.ReminderName}', StartAt={entry.StartAt:O}, Period={entry.Period}, ETag={FormatETag(entry.ETag)})";
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        return $"(GrainId={entry.GrainId}, ReminderName='{entry.ReminderName}', StartAt={entry.StartAt:O}, Period={entry.Period}, ETag={FormatETag(entry.ETag)})";
+    }
 
     /// <summary>
     /// Renders an ETag for diagnostics.
