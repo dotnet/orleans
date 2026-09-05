@@ -71,7 +71,7 @@ namespace UnitTests.GrainInterfaces
 
         Task<bool> NotifyOtherGrainValueTask(IOneWayGrain otherGrain);
 
-        Task<IOneWayGrain> GetOtherGrain();
+        Task<IOneWayGrain> GetOtherGrain(SiloAddress targetSilo, SiloAddress directorySilo);
 
         Task NotifyOtherGrain();
 

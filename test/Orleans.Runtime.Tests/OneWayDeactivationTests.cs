@@ -55,21 +55,26 @@ namespace UnitTests.General
         public async Task OneWay_Deactivation_CacheInvalidated()
         {
             var directoryCache = ((InProcessSiloHandle)_fixture.HostedCluster.Primary!).SiloHost.Services.GetRequiredService<TestDirectoryCache>();
-            IOneWayGrain grainToCallFrom;
-            while (true)
+            var callerSilo = _fixture.HostedCluster.Primary.SiloAddress;
+            var targetSilo = _fixture.HostedCluster.SecondarySilos[0].SiloAddress;
+            var directorySilo = _fixture.HostedCluster.SecondarySilos[1].SiloAddress;
+            var grainToCallFrom = _fixture.Client.GetGrain<IOneWayGrain>(new Guid("9e773e45-24e0-4e99-b630-6523f5f53b68"));
+
+            RequestContext.Set(IPlacementDirector.PlacementHintKey, callerSilo);
+            try
             {
-                RequestContext.Set(IPlacementDirector.PlacementHintKey, _fixture.HostedCluster.Primary.SiloAddress);
-                grainToCallFrom = _fixture.Client.GetGrain<IOneWayGrain>(Guid.NewGuid());
                 var grainHost = await grainToCallFrom.GetSiloAddress();
-                if (grainHost.Equals(_fixture.HostedCluster.Primary.SiloAddress))
-                {
-                    break;
-                }
+                Assert.Equal(callerSilo, grainHost);
+            }
+            finally
+            {
+                RequestContext.Remove(IPlacementDirector.PlacementHintKey);
             }
 
             // Activate the grain & record its address.
-            RequestContext.Remove(IPlacementDirector.PlacementHintKey);
-            var grainToDeactivate = await grainToCallFrom.GetOtherGrain();
+            var grainToDeactivate = await grainToCallFrom.GetOtherGrain(targetSilo, directorySilo);
+            Assert.Equal(targetSilo, await grainToDeactivate.GetSiloAddress());
+            Assert.Equal(directorySilo, await grainToDeactivate.GetPrimaryForGrain());
             var initialActivationId = await grainToDeactivate.GetActivationId();
             var grainId = grainToDeactivate.GetGrainId();
             var activationAddress = directoryCache.Operations
