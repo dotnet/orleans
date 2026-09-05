@@ -89,6 +89,7 @@ namespace Orleans.Streaming.Kinesis
 
         public System.Threading.Tasks.Task<Streams.IStreamQueueCheckpointer<string>> Create(string partition, System.Threading.CancellationToken cancellationToken) { throw null; }
 
+        [System.Obsolete("Use the overload which accepts a CancellationToken.")]
         public System.Threading.Tasks.Task<Streams.IStreamQueueCheckpointer<string>> Create(string partition) { throw null; }
 
         public static Streams.IStreamQueueCheckpointerFactory CreateFactory(System.IServiceProvider services, string providerName) { throw null; }
