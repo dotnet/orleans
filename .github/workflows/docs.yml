@@ -111,6 +111,9 @@ jobs:
         shell: pwsh
         run: ./samples/Build-Samples.ps1 -Configuration Release -NoIncremental -SkipExternalAssets
 
+      - name: Test durable workflow sample
+        run: dotnet test --project samples/DurableWorkflows/DurableWorkflows.Tests/DurableWorkflows.Tests.csproj --configuration Release --framework net10.0 --no-build --no-restore --minimum-expected-tests 1
+
       - name: Upload build diagnostics
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6

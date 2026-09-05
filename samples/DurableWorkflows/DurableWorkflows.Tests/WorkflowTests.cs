@@ -111,10 +111,14 @@ public sealed class WorkflowTests : IAsyncLifetime
         Assert.Equal(DurableTaskStatus.Pending, await scheduled.GetStatusAsync());
 
         await _cluster.DeactivateAsync(workflow);
-        await Client.GetGrain<ICancellationGrain>(id)
-            .RequestCancellationAsync(new(id, "operator request"));
-        var recovered = await workflow.RunCancellationAsync(id).ScheduleAsync($"cancel-{id}");
-        var result = await recovered.WaitAsync();
+        var cancellation = Client.GetGrain<ICancellationGrain>(id);
+        var signal = new CancellationSignal(id, "operator request");
+        await cancellation.RequestCancellationAsync(signal);
+        await _cluster.DeactivateAsync(cancellation);
+        Assert.Equal(signal, (await cancellation.GetSnapshotAsync()).Signal);
+
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var result = await scheduled.WaitAsync(timeout.Token);
 
         Assert.True(result.Canceled);
         Assert.Equal(id, result.CancellationId);
@@ -216,14 +220,18 @@ public sealed class WorkflowRecoveryTests
 
         await cluster.Client.GetGrain<IApprovalGrain>(id)
             .SubmitDecisionAsync(new(id, Approved: true, "completed after failover"));
-        var recovered = await workflow.RunApprovalAsync(request).ScheduleAsync($"recovery-{id}");
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        var result = await recovered.WaitAsync(timeout.Token);
+        var result = await scheduled.WaitAsync(timeout.Token);
         var after = await workflow.GetRuntimeInfoAsync();
 
         Assert.NotEqual(before.SiloAddress, after.SiloAddress);
         Assert.NotEqual(before.ActivationId, after.ActivationId);
         Assert.Equal(after.SiloAddress, result.SiloAddress);
+        Assert.Equal(after.ActivationId, result.ActivationId);
+        Assert.Equal(id, result.CorrelationId);
+        Assert.Equal(request.Subject, result.Subject);
+        Assert.True(result.Approved);
+        Assert.Equal("completed after failover", result.Reason);
     }
 }
 

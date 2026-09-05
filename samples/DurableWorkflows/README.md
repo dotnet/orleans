@@ -33,7 +33,7 @@ curl "$service/workflows/cancellation/cancel-1/status"
 curl -X POST "$service/workflows/orders/order-1?failShipping=true"
 ```
 
-Approval and cancellation commands return `202 Accepted`. Their `Location` header names the corresponding GET status resource. A status response always includes the stable durable task ID and one of `pending`, `running`, `succeeded`, `canceled`, or `failed`. Successful responses include the workflow result. Canceled and failed responses include only a safe summary, not internal exception details.
+Approval and cancellation commands return `202 Accepted`. Their `Location` header names the corresponding GET status resource. A status response always includes the stable durable task ID and one of `pending`, `running`, `succeeded`, `canceled`, or `failed`. Successful responses include the workflow result. Canceled and failed responses include a safe summary.
 After submitting a command, clients should poll that status resource instead of repeating
 the mutation solely to discover completion.
 
@@ -48,14 +48,14 @@ the mutation solely to discover completion.
 
 Repeating the same command returns the same status resource and task ID. The subject in an approval PUT must match the subject used to start that correlation id; request registration and durable request fingerprinting reject conflicting reuse before recording a decision. Repeating the same decision is idempotent, while a different decision returns `409 Conflict` without changing the original workflow.
 
-For manual process failover, start an approval workflow, stop its active `service` replica in the Aspire dashboard, and then submit the decision. The automated test suite deterministically terminates the owning silo while the workflow is in progress and verifies completion on the other silo.
+For manual process failover, start an approval workflow, stop its active `service` replica in the Aspire dashboard, and then submit the decision. The automated test suite terminates the owning silo while the workflow is in progress and waits on the original scheduled task for completion on the other silo.
 
 ## Guarantees and operational boundaries
 
 - Durable Messaging is at-least-once. Stable `(target grain, task id)` identity and retained request/completion records deduplicate retries only within their configured retention windows. Application effects in this sample are independently idempotent by operation id.
 - Journaling commits durable task state, inbox/outbox changes, and the sample's durable collections together. Production deployments need shared, durable Journaling and Durable Jobs storage; every replica must use the same stores.
-- `DurableTask.Run` does not make arbitrary network, file, database, or non-durable grain effects replay-safe. Use durable RPC or an idempotent transactional outbox for external effects.
-- The cancellation endpoint records an idempotent business cancellation signal in journaled state before the workflow observes it, so recovery cannot lose the request. Separately, canceling a caller's wait is different from the durable-task `CancelAsync` API, which requests monotonic task cancellation.
+- `DurableTask.Run` replays work using its retained durable execution state. Use durable RPC or an idempotent transactional outbox for external network, file, database, or grain effects.
+- The cancellation endpoint commits an idempotent business cancellation signal in journaled state, and the workflow observes that signal across activation recovery. Caller wait cancellation ends that caller's observation. The durable-task `CancelAsync` API requests monotonic task cancellation.
 - Successful and failed results remain pollable for `ResultRetentionPeriod`. Durable grain callers acknowledge completion; external clients poll and cannot provide a durable completion ACK.
 - Monitor durable task diagnostics plus Durable Messaging inbox/outbox dead letters. Treat dead letters and exhausted retries as operator-visible failures.
 
