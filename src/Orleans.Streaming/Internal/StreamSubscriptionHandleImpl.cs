@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
+using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streaming.Diagnostics;
 
@@ -166,8 +167,9 @@ namespace Orleans.Streams
                 // Check if this even already has been delivered
                 if (IsRewindable)
                 {
-                    var currentToken = StreamHandshakeToken.CreateDeliveyToken(batch.SequenceToken);
-                    if (this.expectedToken.Equals(currentToken))
+                    if (this.expectedToken is DeliveryToken deliveryToken
+                        && deliveryToken.Token is { } deliveredToken
+                        && EventSequenceTokenCompatibility.AreEqual(deliveredToken, batch.SequenceToken))
                         return this.expectedToken;
                 }
             }
@@ -224,7 +226,7 @@ namespace Orleans.Streams
                 {
                     if (this.expectedToken is DeliveryToken deliveryToken
                         && deliveryToken.Token is { } deliveredToken
-                        && deliveredToken.Equals(currentToken))
+                        && EventSequenceTokenCompatibility.AreEqual(deliveredToken, currentToken))
                         return this.expectedToken;
                 }
             }

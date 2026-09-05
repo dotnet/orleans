@@ -1,24 +1,30 @@
 using Newtonsoft.Json;
 using Orleans.Providers.Streams.Common;
+using Orleans.Streams;
 using System;
 using System.Globalization;
+using System.Numerics;
 
 namespace Orleans.Streaming.Kinesis
 {
     [Serializable]
     [GenerateSerializer]
-    internal class KinesisSequenceToken : EventSequenceTokenV2
+    internal sealed class KinesisSequenceToken : EventSequenceTokenV2
     {
+        [NonSerialized]
+        private BigInteger? _numericShardSequence;
+
         /// <summary>
         /// Initializes a new instance of the <see cref="KinesisSequenceToken" /> class.
         /// </summary>
         /// <param name="shardSequence">Kinesis offset within the shard (partition) from which this message came.</param>
         /// <param name="sequenceNumber">Receiver-generated sequenceNumber for this message.</param>
         /// <param name="eventIndex">Index into a batch of events, if multiple events were delivered within a single Kinesis record.</param>
+        [JsonConstructor]
         public KinesisSequenceToken(string shardSequence, long sequenceNumber, int eventIndex)
             : base(sequenceNumber, eventIndex)
         {
-            ShardSequence = shardSequence;
+            ShardSequence = shardSequence ?? throw new ArgumentNullException(nameof(shardSequence));
         }
 
         /// <summary>
@@ -38,6 +44,37 @@ namespace Orleans.Streaming.Kinesis
         [JsonProperty]
         public string ShardSequence { get; } = null!;
 
+        /// <inheritdoc />
+        public override bool Equals(object? obj) => obj is StreamSequenceToken token && Equals(token);
+
+        /// <inheritdoc />
+        public override bool Equals(StreamSequenceToken? other)
+        {
+            return other is KinesisSequenceToken token
+                && NumericShardSequence.Equals(token.NumericShardSequence)
+                && EventIndex == token.EventIndex;
+        }
+
+        /// <inheritdoc />
+        public override int CompareTo(StreamSequenceToken? other)
+        {
+            if (other is null)
+            {
+                return 1;
+            }
+
+            if (other is not KinesisSequenceToken token)
+            {
+                throw new ArgumentOutOfRangeException(nameof(other));
+            }
+
+            var difference = NumericShardSequence.CompareTo(token.NumericShardSequence);
+            return difference != 0 ? difference : EventIndex.CompareTo(token.EventIndex);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode() => HashCode.Combine(NumericShardSequence, EventIndex);
+
         /// <summary>Returns a string that represents the current object.</summary>
         /// <returns>A string that represents the current object.</returns>
         /// <filterpriority>2</filterpriority>
@@ -45,5 +82,11 @@ namespace Orleans.Streaming.Kinesis
         {
             return string.Format(CultureInfo.InvariantCulture, "KinesisSequenceToken(ShardSequence: {0}, SequenceNumber: {1}, EventIndex: {2})", ShardSequence, SequenceNumber, EventIndex);
         }
+
+        private BigInteger NumericShardSequence
+            => _numericShardSequence ??= BigInteger.Parse(
+                ShardSequence,
+                NumberStyles.None,
+                CultureInfo.InvariantCulture);
     }
 }
