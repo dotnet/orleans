@@ -1064,6 +1064,64 @@ public sealed class DynamoDBProviderBuilderTests
         validator.ValidateConfiguration();
     }
 
+    [Theory]
+    [InlineData("SiloClustering")]
+    [InlineData("ClientClustering")]
+    [InlineData("Reminders")]
+    public void ProviderBuilder_InvalidLifecycleValue_ThrowsConfigurationException(string target)
+    {
+        const string invalidValue = "fales";
+        var values = new Dictionary<string, string?>
+        {
+            ["Provider:Service"] = "us-east-1",
+            ["Provider:TableName"] = "orleans-table",
+            ["Provider:CreateIfNotExists"] = invalidValue,
+        };
+
+        using var host = target switch
+        {
+            "SiloClustering" => BuildSiloHost(
+                values,
+                (context, silo) => new DynamoDBClusteringProviderBuilder().Configure(
+                    silo,
+                    name: null,
+                    context.Configuration.GetSection("Provider"))),
+            "ClientClustering" => BuildClientHost(
+                values,
+                (context, client) => new DynamoDBClusteringProviderBuilder().Configure(
+                    client,
+                    name: null,
+                    context.Configuration.GetSection("Provider"))),
+            "Reminders" => BuildSiloHost(
+                values,
+                (context, silo) => new DynamoDBRemindersProviderBuilder().Configure(
+                    silo,
+                    name: null,
+                    context.Configuration.GetSection("Provider"))),
+            _ => throw new ArgumentOutOfRangeException(nameof(target), target, null),
+        };
+
+        var exception = Assert.Throws<OrleansConfigurationException>(() =>
+        {
+            if (target == "SiloClustering")
+            {
+                _ = host.Services.GetRequiredService<IOptions<DynamoDBClusteringOptions>>().Value;
+            }
+            else if (target == "ClientClustering")
+            {
+                _ = host.Services.GetRequiredService<IOptions<DynamoDBGatewayOptions>>().Value;
+            }
+            else
+            {
+                _ = host.Services.GetRequiredService<IOptions<DynamoDBReminderStorageOptions>>().Value;
+            }
+        });
+
+        Assert.Contains("Provider", exception.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(DynamoDBClusteringOptions.CreateIfNotExists), exception.Message, StringComparison.Ordinal);
+        Assert.Contains(invalidValue, exception.Message, StringComparison.Ordinal);
+    }
+
     private static IHost BuildSiloHost(
         Dictionary<string, string?> values,
         Action<HostBuilderContext, ISiloBuilder> configure)

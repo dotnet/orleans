@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -85,16 +86,12 @@ internal sealed class KinesisStreamProviderBuilder : IProviderBuilder<ISiloBuild
             options.AccessKey = configurationSection[nameof(options.AccessKey)] ?? options.AccessKey;
             options.SecretKey = configurationSection[nameof(options.SecretKey)] ?? options.SecretKey;
 
-            if (TimeSpan.TryParse(
-                configurationSection[nameof(options.GetRecordsInterval)],
-                out var getRecordsInterval))
+            if (GetTimeSpan(configurationSection, nameof(options.GetRecordsInterval), name) is { } getRecordsInterval)
             {
                 options.GetRecordsInterval = getRecordsInterval;
             }
 
-            if (TimeSpan.TryParse(
-                configurationSection[nameof(options.TopologyCheckInterval)],
-                out var topologyCheckInterval))
+            if (GetTimeSpan(configurationSection, nameof(options.TopologyCheckInterval), name) is { } topologyCheckInterval)
             {
                 options.TopologyCheckInterval = topologyCheckInterval;
             }
@@ -121,9 +118,7 @@ internal sealed class KinesisStreamProviderBuilder : IProviderBuilder<ISiloBuild
                         options.StorageProviderName = storageProviderName;
                     }
 
-                    if (TimeSpan.TryParse(
-                        checkpointSection[nameof(options.PersistInterval)],
-                        out var persistInterval))
+                    if (GetTimeSpan(checkpointSection, nameof(options.PersistInterval), name) is { } persistInterval)
                     {
                         options.PersistInterval = persistInterval;
                     }
@@ -176,48 +171,94 @@ internal sealed class KinesisStreamProviderBuilder : IProviderBuilder<ISiloBuild
         options.Token = checkpointSection[nameof(options.Token)] ?? options.Token;
         options.ProfileName = checkpointSection[nameof(options.ProfileName)] ?? options.ProfileName;
 
-        var createIfNotExistsValue = checkpointSection[nameof(options.CreateIfNotExists)];
-        if (!string.IsNullOrWhiteSpace(createIfNotExistsValue))
+        if (GetBoolean(checkpointSection, nameof(options.CreateIfNotExists), name) is { } createIfNotExists)
         {
-            if (!bool.TryParse(createIfNotExistsValue, out var createIfNotExists))
-            {
-                throw new OrleansConfigurationException(
-                    $"Kinesis stream provider '{name}' has invalid DynamoDB checkpoint " +
-                    $"{nameof(options.CreateIfNotExists)} value '{createIfNotExistsValue}'.");
-            }
-
             options.CreateIfNotExists = createIfNotExists;
         }
 
-        if (bool.TryParse(
-            checkpointSection[nameof(options.UseProvisionedThroughput)],
-            out var useProvisionedThroughput))
+        if (GetBoolean(checkpointSection, nameof(options.UseProvisionedThroughput), name) is { } useProvisionedThroughput)
         {
             options.UseProvisionedThroughput = useProvisionedThroughput;
         }
 
-        if (int.TryParse(checkpointSection[nameof(options.ReadCapacityUnits)], out var readCapacityUnits))
+        if (GetInt32(checkpointSection, nameof(options.ReadCapacityUnits), name) is { } readCapacityUnits)
         {
             options.ReadCapacityUnits = readCapacityUnits;
         }
 
-        if (int.TryParse(checkpointSection[nameof(options.WriteCapacityUnits)], out var writeCapacityUnits))
+        if (GetInt32(checkpointSection, nameof(options.WriteCapacityUnits), name) is { } writeCapacityUnits)
         {
             options.WriteCapacityUnits = writeCapacityUnits;
         }
 
-        if (TimeSpan.TryParse(checkpointSection[nameof(options.PersistInterval)], out var persistInterval))
+        if (GetTimeSpan(checkpointSection, nameof(options.PersistInterval), name) is { } persistInterval)
         {
             options.PersistInterval = persistInterval;
         }
 
-        if (TimeSpan.TryParse(
-            checkpointSection[nameof(options.InitializationTimeout)],
-            out var initializationTimeout))
+        if (GetTimeSpan(checkpointSection, nameof(options.InitializationTimeout), name) is { } initializationTimeout)
         {
             options.InitializationTimeout = initializationTimeout;
         }
     }
+
+    private static int? GetInt32(IConfigurationSection section, string key, string providerName)
+    {
+        var value = section[key];
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        if (!int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var result))
+        {
+            throw CreateInvalidValueException(section, key, value, providerName, "an integer");
+        }
+
+        return result;
+    }
+
+    private static bool? GetBoolean(IConfigurationSection section, string key, string providerName)
+    {
+        var value = section[key];
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        if (!bool.TryParse(value, out var result))
+        {
+            throw CreateInvalidValueException(section, key, value, providerName, "a Boolean");
+        }
+
+        return result;
+    }
+
+    private static TimeSpan? GetTimeSpan(IConfigurationSection section, string key, string providerName)
+    {
+        var value = section[key];
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        if (!TimeSpan.TryParse(value, CultureInfo.InvariantCulture, out var result))
+        {
+            throw CreateInvalidValueException(section, key, value, providerName, "a time span");
+        }
+
+        return result;
+    }
+
+    private static OrleansConfigurationException CreateInvalidValueException(
+        IConfigurationSection section,
+        string key,
+        string value,
+        string providerName,
+        string expectedType)
+        => new(
+            $"Kinesis stream provider '{providerName}' configuration section '{section.Path}' setting '{key}' " +
+            $"must be {expectedType}, but the configured value is '{value}'.");
 
     private static string? GetConnectionString(
         IConfiguration configuration,

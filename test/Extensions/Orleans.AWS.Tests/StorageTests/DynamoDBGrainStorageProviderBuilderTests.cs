@@ -111,23 +111,16 @@ public sealed class DynamoDBGrainStorageProviderBuilderTests
     [InlineData(nameof(DynamoDBStorageOptions.UpdateIfExists), "not-a-boolean")]
     [InlineData(nameof(DynamoDBStorageOptions.DeleteStateOnClear), "not-a-boolean")]
     [InlineData(nameof(DynamoDBStorageOptions.TimeToLive), "not-a-timespan")]
-    public void Configure_InvalidTypedValue_PreservesDefault(string key, string invalidValue)
+    public void Configure_InvalidTypedValue_ThrowsConfigurationException(string key, string invalidValue)
     {
         var (builder, _) = ConfigureBuilder((key, invalidValue));
         using var services = builder.Services.BuildServiceProvider();
-        DynamoDBStorageOptions? options = null;
 
-        var exception = Record.Exception(() => options = GetOptions(services));
+        var exception = Assert.Throws<OrleansConfigurationException>(() => GetOptions(services));
 
-        Assert.Null(exception);
-        Assert.NotNull(options);
-        Assert.Equal(10, options.ReadCapacityUnits);
-        Assert.Equal(5, options.WriteCapacityUnits);
-        Assert.True(options.UseProvisionedThroughput);
-        Assert.True(options.CreateIfNotExists);
-        Assert.True(options.UpdateIfExists);
-        Assert.False(options.DeleteStateOnClear);
-        Assert.Null(options.TimeToLive);
+        Assert.Contains("Storage", exception.Message, StringComparison.Ordinal);
+        Assert.Contains(key, exception.Message, StringComparison.Ordinal);
+        Assert.Contains(invalidValue, exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
