@@ -418,23 +418,80 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
         try
         {
             var refreshStarted = reminderService.TestOnlyStartRefresh();
-            Assert.False(refreshStarted.IsCompleted);
+            var refresh = await refreshStarted.WaitAsync(cancellation.Token);
+            var reconciliationTask = reminderService.TestOnlyWaitForRangeChangeReconciliation(cancellation.Token);
+            Assert.False(refresh.IsCompleted);
+            Assert.False(reconciliationTask.IsCompleted);
 
             releaseScheduler.Set();
             await blockingTask.WaitAsync(cancellation.Token);
             await readGate.WaitUntilBlockedAsync(cancellation.Token);
-            var reconciliationTask = reminderService.TestOnlyWaitForRangeChangeReconciliation(cancellation.Token);
-
-            await refreshStarted.WaitAsync(cancellation.Token);
             Assert.False(reconciliationTask.IsCompleted);
 
             readGate.Release();
-            await reconciliationTask.WaitAsync(cancellation.Token);
+            await Task.WhenAll(refresh, reconciliationTask).WaitAsync(cancellation.Token);
         }
         finally
         {
             releaseScheduler.Set();
             readGate.Release();
+            await blockingTask.WaitAsync(cancellation.Token);
+        }
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
+    public async Task RangeChangeBarrier_PreservesRefreshThenRangeOrder()
+    {
+        var silo = Assert.Single(fixture.HostedCluster.Silos);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cancellation.CancelAfter(TestConstants.InitTimeout);
+        _ = await fixture.ReminderHarness.WaitForServicesReadyAsync(
+            [silo],
+            TestConstants.InitTimeout,
+            cancellation.Token);
+
+        var reminderTable = silo.ServiceProvider.GetRequiredService<NullReturningReminderTable>();
+        var reminderService = silo.ServiceProvider.GetRequiredService<LocalReminderService>();
+        var oldRange = RangeFactory.CreateRange(0, uint.MaxValue / 2);
+        var newRange = RangeFactory.CreateRange(0, uint.MaxValue / 4);
+        var schedulerBlocked = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var releaseScheduler = new ManualResetEventSlim();
+        var blockingTask = new Task(() =>
+        {
+            schedulerBlocked.TrySetResult();
+            releaseScheduler.Wait(cancellation.Token);
+        });
+        reminderService.Scheduler.QueueTask(blockingTask);
+        await schedulerBlocked.Task.WaitAsync(cancellation.Token);
+
+        var refreshRead = reminderTable.BlockNextRangeRead(cancellation.Token);
+        RangeReadGate? rangeChangeRead = null;
+        try
+        {
+            var refresh = reminderService.TestOnlyRefresh();
+            var rangeChange = reminderService.TestOnlyChangeRange(oldRange, newRange, increased: false);
+            var reconciliation = reminderService.TestOnlyWaitForRangeChangeReconciliation(cancellation.Token);
+            Assert.False(reconciliation.IsCompleted);
+
+            releaseScheduler.Set();
+            await blockingTask.WaitAsync(cancellation.Token);
+            await refreshRead.WaitUntilBlockedAsync(cancellation.Token);
+
+            rangeChangeRead = reminderTable.BlockNextRangeRead(cancellation.Token);
+            refreshRead.Release();
+            await rangeChangeRead.WaitUntilBlockedAsync(cancellation.Token);
+            Assert.False(reconciliation.IsCompleted);
+
+            rangeChangeRead.Release();
+            await Task.WhenAll(refresh, rangeChange, reconciliation).WaitAsync(cancellation.Token);
+        }
+        finally
+        {
+            releaseScheduler.Set();
+            refreshRead.Release();
+            rangeChangeRead?.Release();
             await blockingTask.WaitAsync(cancellation.Token);
         }
     }
@@ -671,6 +728,70 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
             cancellation.Token);
 
         Assert.Equal(rangeReadCount, reminderTable.RangeReadCount);
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
+    public async Task StartupTopologyBarrier_DoesNotRefreshStableMultiSiloTopology()
+    {
+        var builder = new InProcessTestClusterBuilder(2);
+        var clock = builder.AddReminderTestClock();
+        builder.ConfigureSilo((_, siloBuilder) =>
+        {
+            siloBuilder.AddReminders();
+            siloBuilder.ConfigureServices(services =>
+            {
+                services.AddSingleton<NullReturningReminderTable>();
+                services.AddSingleton<IReminderTable>(
+                    static provider => provider.GetRequiredService<NullReturningReminderTable>());
+            });
+        });
+
+        var cluster = builder.Build();
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cancellation.CancelAfter(TestConstants.InitTimeout);
+        try
+        {
+            await cluster.DeployAsync(cancellation.Token);
+            await ReminderTopologyStabilizer.WaitForReconciledTopologyAsync(
+                cluster,
+                clock.DiagnosticObserver,
+                cluster.Silos,
+                cancellation.Token);
+            var reminderTables = cluster.Silos
+                .Select(silo => silo.ServiceProvider.GetRequiredService<NullReturningReminderTable>())
+                .ToArray();
+            var rangeReadCounts = reminderTables.Select(table => table.RangeReadCount).ToArray();
+
+            await ReminderTopologyStabilizer.WaitForStartupTopologyAsync(
+                cluster,
+                clock.DiagnosticObserver,
+                cluster.Silos,
+                cancellation.Token);
+
+            Assert.Equal(rangeReadCounts, reminderTables.Select(table => table.RangeReadCount));
+        }
+        finally
+        {
+            try
+            {
+                using var cleanupCancellation = new CancellationTokenSource(TestConstants.InitTimeout);
+                await cluster.StopAllSilosAsync(cleanupCancellation.Token);
+            }
+            finally
+            {
+                try
+                {
+                    using var disposeCancellation = new CancellationTokenSource(TestConstants.InitTimeout);
+                    await cluster.DisposeAsync().AsTask().WaitAsync(disposeCancellation.Token);
+                }
+                finally
+                {
+                    clock.Dispose();
+                }
+            }
+        }
     }
 
     [TestSuite("BVT")]

@@ -124,7 +124,14 @@ namespace Orleans.Runtime
         /// <inheritdoc/>
         void IRingRangeListener.RangeChangeNotification(IRingRange oldRange, IRingRange newRange, bool increased)
         {
-            this.WorkItemGroup.QueueTask(() => OnRangeChange(oldRange, newRange, increased), this).Ignore();
+            if (this is IGrainServiceRangeChangeQueue rangeChangeQueue)
+            {
+                rangeChangeQueue.QueueRangeChange(oldRange, newRange, increased);
+            }
+            else
+            {
+                this.WorkItemGroup.QueueTask(() => OnRangeChange(oldRange, newRange, increased), this).Ignore();
+            }
         }
 
         /// <summary>
@@ -179,5 +186,10 @@ namespace Orleans.Runtime
             /// <summary>Service has been stopped</summary>
             Stopped,
         }
+    }
+
+    internal interface IGrainServiceRangeChangeQueue
+    {
+        void QueueRangeChange(IRingRange oldRange, IRingRange newRange, bool increased);
     }
 }

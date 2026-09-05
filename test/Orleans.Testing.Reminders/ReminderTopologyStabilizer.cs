@@ -18,11 +18,10 @@ public static class ReminderTopologyStabilizer
         ReminderDiagnosticObserver observer,
         IEnumerable<InProcessSiloHandle> readySilos,
         CancellationToken cancellationToken)
-        => await WaitForStableTopologyAsync(
+        => await WaitForTopologyAsync(
             cluster,
             observer,
             readySilos,
-            useInitialLoadForSingleSilo: false,
             cancellationToken);
 
     /// <summary>
@@ -33,34 +32,30 @@ public static class ReminderTopologyStabilizer
         ReminderDiagnosticObserver observer,
         IEnumerable<InProcessSiloHandle> readySilos,
         CancellationToken cancellationToken)
-        => await WaitForStableTopologyAsync(
+        => await WaitForTopologyAsync(
             cluster,
             observer,
             readySilos,
-            useInitialLoadForSingleSilo: false,
             cancellationToken);
 
     /// <summary>
-    /// Waits for the initial reminder topology, using the completed initial load as the refresh boundary for a
-    /// single-silo cluster.
+    /// Waits for the initial reminder topology and its current range reconciliation.
     /// </summary>
     public static async Task<IReadOnlyList<InProcessSiloHandle>> WaitForStartupTopologyAsync(
         InProcessTestCluster cluster,
         ReminderDiagnosticObserver observer,
         IEnumerable<InProcessSiloHandle> readySilos,
         CancellationToken cancellationToken)
-        => await WaitForStableTopologyAsync(
+        => await WaitForTopologyAsync(
             cluster,
             observer,
             readySilos,
-            useInitialLoadForSingleSilo: true,
             cancellationToken);
 
-    private static async Task<IReadOnlyList<InProcessSiloHandle>> WaitForStableTopologyAsync(
+    private static async Task<IReadOnlyList<InProcessSiloHandle>> WaitForTopologyAsync(
         InProcessTestCluster cluster,
         ReminderDiagnosticObserver observer,
         IEnumerable<InProcessSiloHandle> readySilos,
-        bool useInitialLoadForSingleSilo,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(cluster);
@@ -125,19 +120,6 @@ public static class ReminderTopologyStabilizer
                 phase = "silo status listener delivery";
                 await Task.WhenAll(reminderServices.Select(service =>
                     service.TestOnlyWaitForSiloStatusListeners(cancellationToken)));
-
-                var initialLoadIsRefreshBoundary = useInitialLoadForSingleSilo
-                    && requiredReadySilos.Length == 1
-                    && expectedActiveSilos.Length == 1
-                    && requiredReadySilos[0].SiloAddress.Equals(expectedActiveSilos[0].SiloAddress);
-                if (!initialLoadIsRefreshBoundary)
-                {
-                    // Membership listener delivery enqueues ring changes before it reports the version as processed.
-                    // This FIFO turn ensures those changes have published their reconciliation generations.
-                    phase = "reminder scheduler topology boundary";
-                    var schedulerTurns = reminderServices.Select(service => service.TestOnlyWaitForSchedulerTurn()).ToArray();
-                    await Task.WhenAll(schedulerTurns).WaitAsync(cancellationToken);
-                }
 
                 phase = "latest reminder reconciliation";
                 var reconciliations = reminderServices.Select(service =>
