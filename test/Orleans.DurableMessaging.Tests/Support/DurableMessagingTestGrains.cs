@@ -342,6 +342,20 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
 
     private void PublishSnapshot() => _snapshotProbe.Publish(this.GetGrainId(), CreateSnapshot());
 
+    private bool AttemptWriteDuringHandlerSelection()
+    {
+        _inboxJobId.Value = "invalid-handler-selection-write";
+        try
+        {
+            WriteStateAsync().GetAwaiter().GetResult();
+        }
+        catch (InvalidOperationException)
+        {
+        }
+
+        return false;
+    }
+
     private DurableEndpointSnapshot CreateSnapshot() =>
         new(
             _activationId,
@@ -371,9 +385,16 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
 
     private sealed class TypedMessageHandler(DurableMessagingTestGrain owner) : IInboxHandler<DurableTestMessage>
     {
-        bool IInboxHandler.CanHandle(IInboxHandlerContext context) =>
-            context.Envelope.RouteKey.StartsWith("messages/", StringComparison.Ordinal)
-            || context.Envelope.RouteKey == "typed";
+        bool IInboxHandler.CanHandle(IInboxHandlerContext context)
+        {
+            if (context.Envelope.RouteKey == "messages/can-handle-write")
+            {
+                return owner.AttemptWriteDuringHandlerSelection();
+            }
+
+            return context.Envelope.RouteKey.StartsWith("messages/", StringComparison.Ordinal)
+                || context.Envelope.RouteKey == "typed";
+        }
 
         public ValueTask HandleAsync(
             DurableTestMessage? message,
