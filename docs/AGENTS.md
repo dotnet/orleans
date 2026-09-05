@@ -100,6 +100,8 @@ tutorial into a reference or burying architecture detail inside a how-to.
 - Rewrite guidance around affirmative runtime behavior and outcomes. Describe relevant triggers, runtime actions, resulting states, and operator responses when those details help readers understand or operate the feature.
 - Assign each responsibility to the mechanism which performs it. For example, an autoscaler changes cluster capacity, placement selects an activation host, and a rebalancer migrates activations.
 - State what a feature is and does. Remove obvious statements and descriptions framed around what the feature isn't, doesn't do, or doesn't replace.
+- Use direct, conversational technical prose and assume an engaged reader. Name models and mechanisms plainly, keep the article's central idea in focus, and give supporting implementation choices proportionate space. Tie qualifications to concrete assumptions or behavior.
+- Prefer good pedagogy over minimum word count. Keep motivation, worked examples, and useful reinforcement when they help readers build the mental model; trim repetition that adds no explanatory value.
 - Prefer correcting or enhancing useful content over deleting it. Preserve
   authoritative references during rewrites, and remove them only when obsolete,
   redundant, or replaced with a clearer current source.

@@ -7,33 +7,29 @@ ms.topic: concept-article
 
 # View-synchronous cluster services
 
-A view-synchronous cluster service ties partition ownership to an ordered membership view. An owner serves requests under that view; when ownership changes, the affected range passes through a transition which drains preceding work, obtains state, establishes fencing, and admits work under the new ownership.
+Orleans cluster services use the [Virtual Synchrony approach](https://doi.org/10.1145/41457.37515): normal operation runs within a membership view, and a view-change protocol carries work and state into the next view. Before a new owner starts serving, the runtime accounts for preceding work, transfers or recovers state, and establishes fencing. Requests wait at the affected range's gate while that transition is underway.
 
-The runtime implements this discipline through internal types in `Orleans.Runtime.ClusterServices`. The experimental `DistributedGrainDirectory` is the concrete integration described here. This page explains the protocol boundaries and their reasoning for runtime contributors and service implementers. [Cluster membership](cluster-management.md), [scheduling](scheduler.md), and [grain directory architecture](grain-directory.md) provide the surrounding context.
+Orleans uses range-based partitioning for elastic scaling. A hash ring with a configurable number of virtual nodes per silo determines where each key belongs. View synchrony coordinates when a new owner can start serving it.
 
-## Theory and its application here
+The implementation lives in `Orleans.Runtime.ClusterServices`. `DistributedGrainDirectory` uses these helpers to manage grain registrations. This guide follows its ownership-transition protocol: admission, draining, handoff, recovery, and fencing. See [cluster membership](cluster-management.md), [scheduling](scheduler.md), and [grain directory architecture](grain-directory.md) for the surrounding runtime components.
 
-The design separates an inexpensive steady-state path from an explicitly coordinated reconfiguration path. The important connection between them is **state continuity**: work admitted by a predecessor must be accounted for before its successor becomes authoritative.
+## Virtual Synchrony and elastic scaling
+
+State continuity connects normal operation and view changes: the new owner must account for work accepted by the previous owner before taking over.
+
+The same approach works for an unpartitioned service with a single leader owning the entire key space. A leadership change transfers or recovers the service's state before the successor starts serving. Orleans uses range partitioning to spread work across silos as the cluster grows or shrinks. The protocol runs for the ranges whose owners change, while unrelated ranges keep serving requests.
+
+These papers explain the models behind the implementation:
 
 | Source | Relevant idea | Application in Orleans |
 | --- | --- | --- |
-| [Exploiting Virtual Synchrony in Distributed Systems](https://doi.org/10.1145/41457.37515) (SOSP 1987; [publication listing](https://www.cs.cornell.edu/projects/quicksilver/pubs.html)) | The foundational virtual-synchrony model coordinates process-group membership changes with message delivery, providing consistent observations across group views. | Motivates treating a view change as a coordinated boundary for ongoing work. Orleans applies this discipline to partition ownership and state continuity. |
+| [Exploiting Virtual Synchrony in Distributed Systems](https://doi.org/10.1145/41457.37515) (SOSP 1987; [publication listing](https://www.cs.cornell.edu/projects/quicksilver/pubs.html)) | The foundational virtual-synchrony model coordinates process-group membership changes with message delivery, providing consistent observations across group views. | A view change coordinates the completion of old-view work with ownership and state transfer. |
 | [Virtually Synchronous Methodology for Dynamic Service Replication](https://www.microsoft.com/en-us/research/publication/virtually-synchronous-methodology-for-dynamic-service-replication/) (2010) | Integrating normal operation with reconfiguration; establishing boundaries, or wedges, around an old configuration before carrying its state forward. | Versioned range gates prevent a successor from serving partially transferred state. Overlapping transitions wait for preceding work on the same range. |
 | [Vertical Paxos and Primary-Backup Replication](https://www.microsoft.com/en-us/research/publication/vertical-paxos-and-primary-backup-replication/) (2009) | Separating configuration authority from the protocol which preserves state across configurations. | Cluster membership supplies the ordered configuration input. Directory partitions perform the state transfer or recovery needed to activate that configuration locally. |
-| [Dynamo: Amazon's Highly Available Key-value Store](https://www.allthingsdistributed.com/files/amazon-dynamo-sosp2007.pdf) (SOSP 2007; [Dynamo background and HTML version](https://www.allthingsdistributed.com/2007/10/amazons_dynamo.html)) | Consistent hashing and virtual nodes for incremental partition assignment. | Each active silo contributes ring boundaries. Membership changes grow or shrink the affected partitions. |
+| [Dynamo: Amazon's Highly Available Key-value Store](https://www.allthingsdistributed.com/files/amazon-dynamo-sosp2007.pdf) (SOSP 2007; [Dynamo background and HTML version](https://www.allthingsdistributed.com/2007/10/amazons_dynamo.html)) | Consistent hashing and virtual nodes for incremental partition assignment. | Orleans uses a hash ring with configurable virtual nodes per silo. Each virtual node owns a range, which grows or shrinks as membership changes. |
 | [The Chubby Lock Service for Loosely-Coupled Distributed Systems](https://research.google/pubs/the-chubby-lock-service-for-loosely-coupled-distributed-systems/) (OSDI 2006) | Advisory ownership, leases, and sequencers used by recipients to reject stale holders. | Fencing is an explicit responsibility at ownership activation. An integration with external state must establish authority at the component which accepts its writes or effects. |
 
-These connections identify particular mechanisms. Orleans implements membership-ordered, per-range primary ownership with service-specific recovery. The directory reconstructs registrations from surviving activation hosts; the adopted [Dynamo](https://www.allthingsdistributed.com/files/amazon-dynamo-sosp2007.pdf) mechanism is partition assignment. The [Vertical Paxos](https://www.microsoft.com/en-us/research/publication/vertical-paxos-and-primary-backup-replication/) comparison concerns configuration authority and state continuity, while the runtime's actual membership and recovery contracts determine its guarantees.
-
-Start with [Exploiting Virtual Synchrony in Distributed Systems](https://doi.org/10.1145/41457.37515) for the original model, then [the virtual-synchrony methodology paper](https://www.microsoft.com/en-us/research/publication/virtually-synchronous-methodology-for-dynamic-service-replication/) for the transition discipline. Read [Vertical Paxos](https://www.microsoft.com/en-us/research/publication/vertical-paxos-and-primary-backup-replication/) for the separation of authorities and [Dynamo](https://www.allthingsdistributed.com/files/amazon-dynamo-sosp2007.pdf) for the partitioning model. The fencing discussion below connects those ideas to process pauses and external effects.
-
-## Authoritative views and deterministic assignment
-
-The current assignment rule is a deterministic function of fixed service configuration and a complete cluster membership snapshot:
-
-`assignment = F(configuration, membership snapshot)`
-
-`ClusterServiceConfiguration` contains the logical service identifier, protocol version, partitions per silo, and assignment-strategy identifier. It computes a SHA-256 fingerprint over a deterministic encoding of those values. Every participating silo must associate the strategy identifier with the same boundary-generation algorithm.
+## Membership views
 
 `ClusterServiceViewId` combines:
 
@@ -41,21 +37,41 @@ The current assignment rule is a deterministic function of fixed service configu
 - the protocol version; and
 - the configuration fingerprint.
 
-Within the configured service and cluster, one membership version denotes one canonical membership snapshot. Equal or regressive versions are suppressed by the projection. Canonical membership content is therefore a guarantee supplied by the membership layer.
+`ClusterServiceConfiguration` contains the logical service identifier, protocol version, partitions per silo, and assignment-strategy identifier. It computes a SHA-256 fingerprint over a deterministic encoding of those values. The strategy identifier names the boundary-generation algorithm, so it needs to mean the same thing on every silo.
 
-A view is a direct successor only when its protocol and configuration fingerprint match and its membership version is exactly the preceding version plus one. A gap selects the recovery path because intermediate ownership changes may have occurred.
+Within a service and cluster, a membership version identifies one canonical snapshot. The projection ignores repeated and older versions, relying on the membership layer to give each version a consistent meaning.
 
-Silo identity includes its endpoint and generation. A restarted process uses a new identity. A terminating incarnation progresses toward `Dead`; replacement ownership is expressed using a new incarnation rather than reviving the old one.
+A direct successor has the next membership version and the same protocol and configuration fingerprint. Gaps or configuration changes take the recovery path. A silo which skips a view may have missed an owner, so the last owner it saw may be the wrong source for a handoff.
 
-### Ring topology
+Silo identity includes its endpoint and generation. A restart at the same endpoint gets a new generation. Messages and snapshot acknowledgements from the previous process still refer to its old identity.
 
-`ClusterServiceTopology` selects `Active` members, sorts their silo identities, and obtains the configured number of boundaries for each member. Each boundary owns the clockwise interval `(start, nextStart]`, including wraparound through zero. A single remaining boundary owns the full ring.
+### From assignment to a ready owner
 
-Boundaries are sorted by hash, then partition index, then sorted member index. Hash collisions are resolved deterministically; losing partitions have empty ranges. The partition identity used by the directory is the silo identity plus partition index.
+Knowing who owns a range and having the state needed to serve it are separate steps. Consider a directory handoff:
+
+1. In view `v10`, A owns range R. It holds a registration for grain G, whose activation is running on another silo, H.
+2. View `v11` assigns R to B. Once B sees that view, it can compute its new responsibility, but the state transfer may still be in progress. Its range gate holds incoming requests.
+3. After B installs the transferred or recovered state and establishes fencing, it opens the gate. A lookup for G returns the existing activation on H.
+
+An early lookup during step 2 could report G as missing and lead to a second activation. The view-change protocol closes that gap: it coordinates the change in ownership with the work needed to preserve the range's state. Computing the same assignment on every silo is one part of the handoff; making the new owner ready is the other.
+
+### Hash-ring partitioning
+
+Orleans currently computes responsibility as a pure function of service configuration and membership:
+
+`assignment = F(configuration, membership snapshot)`
+
+Given the same inputs, every silo computes the same assignment.
+
+`ClusterServiceTopology` builds the ring from `Active` silos. Each silo contributes the configured number of virtual nodes, each with a position on the ring. A virtual node owns the clockwise interval `(start, nextStart]`, including wraparound through zero. If there is just one virtual node, it owns the full ring.
+
+Ring positions are sorted by hash, then partition index, then sorted member index. Hash collisions are resolved deterministically; losing partitions have empty ranges. The directory creates one `GrainDirectoryPartition` system target per configured virtual node, identified by silo identity and partition index.
 
 Owner lookup uses binary search over the sorted boundaries. Per-member range collections are derived from the same assignment. <xref:Orleans.Configuration.GrainDirectoryOptions.PartitionsPerSilo?displayProperty=nameWithType> controls directory partition granularity and defaults to one.
 
-## Components and responsibility boundaries
+Membership-derived assignment is a design choice. A future implementation could read a mapping and its monotonic revision from a shared consistent register, as outlined in the [register-backed assignment proposal](https://github.com/dotnet/orleans/issues/11156). Draining, state transfer or recovery, and fencing would still govern ownership changes.
+
+## Components
 
 | Component | Responsibility |
 | --- | --- |
@@ -65,6 +81,7 @@ Owner lookup uses binary search over the sorted boundaries. Per-member range col
 | `PartitionTransitionCoordinator` and `PartitionTransition` | Track versioned range gates and enforce legal local transition stages. |
 | `ClusterServiceOperationResult<T>` | Describe execution certainty and whether retry requires deduplication. |
 | `DirectoryMembershipService` and `DirectoryMembershipSnapshot` | Adapt service views into directory routing snapshots and partition references. |
+| `DistributedGrainDirectory` | Route client operations, dispatch membership changes to partitions, coordinate the recovery watermark and activation enumeration, and report fatal transition errors. |
 | `GrainDirectoryPartition` | Execute directory admission, snapshot transfer, recovery, and lease checks on its system-target scheduler. |
 
 ```mermaid
@@ -73,26 +90,27 @@ flowchart TD
     Projection --> Topology[ClusterServiceTopology]
     Topology --> Adapter[DirectoryMembershipService]
     Adapter --> Routing[DirectoryMembershipSnapshot and RPC references]
-    Routing --> Partition[GrainDirectoryPartition]
+    Routing --> Directory[DistributedGrainDirectory]
+    Directory --> Partition[GrainDirectoryPartition]
     Partition --> Gates[PartitionTransitionCoordinator]
     Partition <-->|snapshot and recovery RPCs| Peers[Peer partitions and activation hosts]
 ```
 
-Projection and partition installation are separate asynchronous steps. The latest cluster snapshot, the directory routing snapshot, and an individual partition's observed view can temporarily differ. Request processing synchronizes the required layers before using local state.
+Membership projection and partition updates run asynchronously. A routing snapshot can therefore be ahead of a partition's local view. Request processing waits for the view and range it needs before using local state.
 
-`RefreshViewAsync` returns an already sufficient view immediately. A refresh which requires work awaits the underlying membership refresh and then the local projection. Failures propagate; shutdown or projection termination cancels unsatisfied waits. Completion of an update stream is distinct from satisfying a requested version.
+`RefreshViewAsync` returns immediately when the local view is recent enough. Otherwise it awaits the underlying membership refresh and the local projection. Refresh errors propagate to the caller. If shutdown or stream termination interrupts the wait, the caller receives cancellation.
 
 ## Scheduling, admission, and versioned gates
 
 Each directory partition is a system target. Its scheduler serializes synchronous turns which access the directory map, retained snapshots, and current range. Asynchronous transfer and recovery yield that scheduler so newer views and other requests can be processed.
 
-The crucial admission rule is to **install the affected range gate synchronously before the transition's first asynchronous suspension**. Observing a new owner in a routing snapshot can therefore lead a caller to a partition whose acquisition is still pending; the gate keeps that request waiting.
+The partition **installs the range gate synchronously, before the transition's first `await`**. A caller can already see the new owner in its routing snapshot while that owner is still acquiring the range. The gate keeps the request waiting until the range is ready.
 
 A transition blocks an intersecting request when its target membership version is less than or equal to the version that the request must wait for. Ordinary lookup, registration, and deregistration wait for the maximum of the caller's version and the partition's current version. After the wait, they re-read the view and establish ownership before accessing the map.
 
-Internal transition work deliberately waits using a predecessor version. For example, releasing a range in view `v3` waits for its acquisition in `v2`, while the `v3` release gate remains installed. This permits the predecessor to finish without waiting on its own successor.
+Acquisition, release, and recovery wait for preceding local transitions using the predecessor version. For example, releasing a range in view `v3` waits for its acquisition in `v2`, while the `v3` release gate remains installed. The earlier acquisition can then finish without waiting on the later release. Snapshot reads instead wait on the target version: `GetSnapshotAsync(v3, v2, range)` waits for the `v3` release gate before reading the retained `v2` snapshot.
 
-The directory's final map operations are synchronous within a turn. That property, together with predecessor gates, supplies its draining boundary. A service which awaits external work inside an admitted operation must define how that work is drained or fenced before handoff.
+Once a directory request has passed its gate, its map operation runs synchronously within the turn. Together with the predecessor gates, this gives the directory a clear draining boundary. A service which awaits external work inside an admitted operation needs to drain or fence that work before handoff.
 
 Canceling one caller cancels its wait, while the shared transition continues. Transition completions run continuations asynchronously, keeping waiter code outside the coordinator's collection lock.
 
@@ -100,7 +118,7 @@ Canceling one caller cancels its wait, while the shared transition continues. Tr
 
 Each transition records its range, previous view, target view, direction, stage, completion task, and any failure or fencing information.
 
-| Direction | Successful progression | Completion obligation |
+| Direction | Successful progression | What must be finished |
 | --- | --- | --- |
 | Inbound | `Blocking` -> `StateInstalled` -> `Fenced` -> `Completed` | State installation and the service's fencing conditions are established. |
 | Outbound with handoff | `Blocking` -> `Drained` -> `StateRetained` -> `Completed` | Preceding work is drained and the state needed by transfer partners is retained. |
@@ -124,10 +142,11 @@ sequenceDiagram
     participant Caller as Directory caller
 
     Old->>Old: Observe v+1 and gate outgoing range
-    New->>New: Observe v+1 and gate incoming range
-    New->>Old: GetSnapshotAsync(v+1, v, range)
     Old->>Old: Drain preceding range work
     Old->>Old: Retain snapshot v and remove live entries
+    New->>New: Observe v+1 and gate incoming range
+    New->>Old: GetSnapshotAsync(v+1, v, range)
+    Note over Old: Snapshot read waits for the v+1 release gate
     Old-->>New: Snapshot entries and range lease holds
     Caller->>New: Request requiring v+1
     Note over New: Caller waits at the range gate
@@ -141,11 +160,13 @@ sequenceDiagram
     end
 ```
 
+Either owner can observe the new view first. The membership update starts the release; a snapshot request arriving at a lagging owner prompts a refresh and waits for that release before reading the retained state.
+
 Acknowledgement is initiated by each transfer helper after copying its state. Its asynchronous completion can interleave with acquisition completion and caller processing. When several predecessors contribute state, range activation waits for all transfer results and the required fencing conditions.
 
 An outgoing snapshot tracks the predecessor version and its transfer partners, identified by silo incarnation and partition index. Acknowledgements retire the corresponding partner. The snapshot is released when its partners are finished, are declared dead through membership processing, or abandon transfer in favor of recovery.
 
-A receiver can obtain state from several previous partitions. It waits for older overlapping local transitions before incorporating each transfer. Large ranges are divided into smaller subrange requests to reduce response sizes; registration density also matters when sizing these responses.
+A receiver can obtain state from several previous partitions. It waits for older overlapping local transitions before incorporating each transfer. Large ranges are divided into smaller subrange requests based on ring coverage. Response size still depends on the number of registrations in each subrange.
 
 ### Why overlapping views need predecessor waits
 
@@ -157,30 +178,30 @@ These dependencies are range-specific. Unrelated ranges can make progress while 
 
 ## Recovery after a missed view or failed transfer
 
-A skipped view makes the observed predecessor insufficient to establish the complete ownership history. The acquiring partition performs recovery instead of relying on a single predecessor snapshot. An unavailable predecessor or unsuccessful transfer also leads to recovery.
+When a silo skips a view, the acquiring partition rebuilds the range through recovery. The same path handles an unavailable predecessor or a failed transfer.
 
 `RecoverPartitionRange` asks eligible activation hosts for registrations in the acquired range. Hosts in `Active`, `Joining`, and `ShuttingDown` states can participate, since activation hosting and directory ownership have different lifecycle boundaries. Each host enumerates its actual activation directory and filters entries by range, directory implementation, and registration/lifecycle state.
 
-Recovery reconstructs the registrations reported by surviving hosts. Entries for lost activations are handled according to membership and lease rules; persistent grain state remains the responsibility of its storage provider.
+Recovery rebuilds the acquired directory range from these responses. Membership and lease checks handle entries whose activation hosts have failed.
 
 ### Registration versus recovery
 
 The recovery scan must account for a registration which is concurrently completing against an old owner. `DistributedGrainDirectory` uses a silo-wide `_recoveryMembershipVersion` watermark:
 
-1. A host begins a directory operation using an earlier view and captures its recovery watermark.
-2. A recovery request for a newer view reaches that host. Before enumerating activations, the host advances the watermark.
-3. When the earlier directory operation completes, the caller detects a changed watermark and reissues the operation with sufficiently recent membership.
-4. The registration is consequently accounted for by the recovery scan or by registration against the newer owner before it is exposed as completed to its caller.
+1. An activation host begins a directory operation, captures its current recovery watermark, and resolves an owner using a view at least as recent as that watermark.
+2. A recovery request for a newer view reaches the host and advances the watermark before enumerating registered activations.
+3. When the remote call returns, the host checks the watermark again. If it changed, the host refreshes and retries at or above the new watermark before completing the operation to its caller.
+4. The completed registration is then accounted for by the recovery scan or by registration under the newer view.
 
-The watermark applies across ranges on the activation host. This is a conservative barrier which keeps the registration/recovery race explicit.
+The watermark is silo-wide: recovery of any range raises the minimum view used for directory operations from that activation host.
 
 `RecoverEntry` retains the newer registration membership version when reconciling conflicting records. This is especially relevant during coexistence with `LocalGrainDirectory`, whose recovery participation differs. Equal-version records retain the existing processing-order tie behavior.
 
 ## Fencing and the failure model
 
-The protocol relies on canonical membership views, correct participant behavior, and handling of crashes, pauses, and communication loss. Declaring a silo `Dead` is a membership decision. A paused process can resume afterward; Orleans terminates that incarnation when it learns that it has been declared dead.
+Membership gives every view a consistent meaning, but a declaration of death and a process exit are separate events. A paused silo can resume after the cluster has declared it `Dead`. When it learns of that decision, Orleans terminates the old incarnation.
 
-`ClusterServiceFence` records the fencing mode and token associated with an inbound transition. `MarkFenced` records the integrating service's established fencing condition and advances the local stage. The integrating service supplies the mechanism which makes that assertion true.
+Service code establishes the fence, then calls `MarkFenced` to record it and advance the inbound transition. `ClusterServiceFence` holds the mode and token; the service owns the underlying fencing mechanism.
 
 | Mode | Directory or integration responsibility |
 | --- | --- |
@@ -188,11 +209,13 @@ The protocol relies on canonical membership views, correct participant behavior,
 | `TimedSafetyLease` | The directory installs range lease holds during qualifying failure recovery, carrying their expirations through snapshot transfer. New registrations can receive a retry delay while the holds are active. |
 | `External` | A service establishes an authoritative fence at its storage or effect boundary, such as a recipient-enforced ownership epoch. |
 
-The directory computes a post-detection hold as `max(0, configured range lease duration - configured failure-detection timeout)`, using <xref:Orleans.Configuration.GrainDirectoryOptions.RangeLeaseDuration?displayProperty=nameWithType> and membership configuration. Peer-declared death and missing previous-owner information can require holds; orderly departure follows the graceful path.
+The directory computes a post-detection hold as `max(0, range lease duration - failure-detection budget)`, using <xref:Orleans.Configuration.GrainDirectoryOptions.RangeLeaseDuration?displayProperty=nameWithType>. The detection budget is <xref:Orleans.Configuration.ClusterMembershipOptions.MaxProbeTimeout?displayProperty=nameWithType> multiplied by <xref:Orleans.Configuration.ClusterMembershipOptions.NumMissedProbesLimit?displayProperty=nameWithType>. Peer-declared death and missing previous-owner information can require holds; orderly departure follows the graceful path.
 
-An acquisition can finish recovery and open its transition gate while a range lease still defers new registrations. Lookup, existing-activation refresh, conditional registration, and deregistration follow their own lease checks. Transition completion and lease expiration are separate boundaries.
+An acquisition can finish recovery and open its transition gate while a range lease still defers new registrations. Transition completion and lease expiration are separate boundaries.
 
-Timing-based protection must be understood together with the membership detector, shutdown behavior, and configured timing assumptions. [How to do distributed locking](https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html) explains how long pauses and delayed requests affect lease users. [The Chubby lock service](https://research.google/pubs/the-chubby-lock-service-for-loosely-coupled-distributed-systems/) describes sequencers as a concrete example of fencing at the recipient. For external state, an epoch must be enforced where writes or effects are accepted so that a resumed stale owner cannot commit under superseded authority.
+A registration whose proposed address matches its supplied current registration skips the range hold. A silo hold can still require a retry unless the supplied registration matches the stored entry. Lookup filters dead-silo entries and does not wait for range holds. Deregistration returns false while a silo hold is active for the stored entry.
+
+The safety window depends on the membership detector's timing bounds and the old owner's shutdown behavior. [How to do distributed locking](https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html) explains what happens when process pauses or delayed requests outlast a lease. [The Chubby lock service](https://research.google/pubs/the-chubby-lock-service-for-loosely-coupled-distributed-systems/) describes sequencers that let the recipient reject stale holders. For external state, enforce the ownership epoch where writes or effects are accepted.
 
 ## Execution certainty and retry
 
@@ -204,9 +227,9 @@ Timing-based protection must be understood together with the membership detector
 | `Executed` | Interpret the returned result according to the operation contract. |
 | `OutcomeUnknown` | Resolve or deduplicate the earlier attempt before a correctness-sensitive retry. This is the default disposition, including when a serialized disposition field is absent. |
 
-Reasons such as wrong view, partition readiness, safety delay, or member unavailability explain the next action. A timeout or lost response alone supplies no proof that execution was rejected. See [messaging and delivery semantics](messaging-delivery-guarantees.md) for the surrounding call contract.
+Reasons such as wrong view, partition readiness, safety delay, or member unavailability explain the next action. A timed-out call has an unknown outcome: it may have started or completed before the response was lost. See [messaging and delivery semantics](messaging-delivery-guarantees.md) for the call contract.
 
-The current directory RPCs continue to use `DirectoryResult<T>`, `MembershipVersion`, and the existing snapshot payloads. The new cluster-service result and fencing types remain internal coordination building blocks. Successful directory responses echo the request version; ownership redirects report the partition's current version, and lease responses carry a retry delay.
+The directory records `ClusterServiceFence` locally during acquisition. Its RPCs use `DirectoryResult<T>`, `MembershipVersion`, and the existing snapshot payloads. `ClusterServiceOperationResult<T>` is available to internal service integrations; the directory's RPC path still uses its existing result contract. Successful directory responses echo the request version; ownership redirects report the partition's current version, and lease responses carry a retry delay.
 
 ## Failure handling and observability
 
@@ -227,9 +250,9 @@ For a stalled transition, correlate the latest cluster view, projected directory
 
 Range-lock duration, snapshot-transfer count/duration, and recovery count/duration help distinguish slow handoff from repeated recovery. Retained snapshots and pending transitions also represent memory and shutdown obligations. More partitions improve assignment granularity while increasing references, transition work, and transfer fan-out.
 
-## Responsibilities of another service integration
+## Adapting another runtime service
 
-A new integration should make the following contracts explicit:
+These helpers are internal runtime code. Another service using them needs to define:
 
 - The partition key space, deterministic assignment inputs, and configuration identity.
 - The point where admission is gated and the work which must drain before state is retained.
@@ -251,4 +274,4 @@ The following links pin the implementation revision described by this page:
 - [Real-process version and pause scenarios](https://github.com/dotnet/orleans/blob/19c8de3ebbdf599de84f177887ccfd671ed0cfd8/test/Orleans.GrainDirectory.Tests/Compatibility/GrainDirectoryProcessCompatibilityTests.cs): cross-version handoff, authoritative activation identity, and resumed-owner self-fencing.
 - [Suite guide and mutation guardrails](https://github.com/dotnet/orleans/blob/19c8de3ebbdf599de84f177887ccfd671ed0cfd8/test/Orleans.GrainDirectory.Tests/README.md): commands, evidence boundaries, failure attribution, and the assertions protecting key protocol dependencies.
 
-The local state-machine cases, controlled interleavings, real processes, lease scenarios, and sustained churn provide different kinds of evidence. The [virtual-synchrony model](https://doi.org/10.1145/41457.37515) and [reconfiguration methodology](https://www.microsoft.com/en-us/research/publication/virtually-synchronous-methodology-for-dynamic-service-replication/) explain the reasoning obligations; the executable scenarios above show how the implementation enforces them.
+These suites cover local state-machine rules, controlled RPC interleavings, real-process behavior, and sustained churn. Read them alongside the protocol description when changing admission, handoff, or recovery.
