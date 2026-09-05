@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Orleans.Configuration;
 using Orleans.DurableJobs;
 using Orleans.DurableTasks;
 using Orleans.Hosting;
@@ -158,10 +159,25 @@ internal sealed class DurableTaskRecoveryFixture : IAsyncLifetime
     public DurableTaskRecoveryFixture()
     {
         Probe = new();
+        var clusterId = $"durable-task-recovery-{Guid.NewGuid():N}";
+        var serviceId = $"durable-task-recovery-service-{Guid.NewGuid():N}";
         var builder = new InProcessTestClusterBuilder();
-        builder.ConfigureClient(clientBuilder => clientBuilder.AddDurableTasks());
+        builder.ConfigureClient(clientBuilder =>
+        {
+            clientBuilder.AddDurableTasks();
+            clientBuilder.Configure<ClusterOptions>(options =>
+            {
+                options.ClusterId = clusterId;
+                options.ServiceId = serviceId;
+            });
+        });
         builder.ConfigureSilo((_, siloBuilder) =>
         {
+            siloBuilder.Configure<ClusterOptions>(options =>
+            {
+                options.ClusterId = clusterId;
+                options.ServiceId = serviceId;
+            });
             siloBuilder.AddJournalStorage();
             siloBuilder.UseInMemoryDurableJobs();
             siloBuilder.AddDurableTasks();
