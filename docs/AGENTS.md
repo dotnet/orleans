@@ -24,6 +24,7 @@ These rules apply recursively to documentation, snippets, and samples under
 ## Links
 
 - Retain useful authoritative references when rewriting or condensing a page.
+- Refer to external papers and articles by their titles or recognizable short names, rather than author names. Link every mention, including repeated references after the first citation.
 - Orleans documentation links should be relative so they work under `https://dotnet.github.io/orleans`.
 - External documentation links must be fully qualified. For example, use the locale-neutral canonical form `https://learn.microsoft.com/azure/...`, not `/azure/...` or a hard-coded locale such as `/en-us/`.
 - Don't carry migrated repository `.md` suffixes into published links.
@@ -103,6 +104,7 @@ tutorial into a reference or burying architecture detail inside a how-to.
   authoritative references during rewrites, and remove them only when obsolete,
   redundant, or replaced with a clearer current source.
 - Preserve and expand architecture and implementation detail, and keep it distinct from conceptual and task-oriented how-to guidance.
+- Architecture and implementation-detail pages should cite primary papers and other authoritative technical sources for the underlying protocols. Explain which mechanisms Orleans adopts and the assumptions supplied by each runtime layer, and preserve useful research links from source comments.
 - Treat hub pages as overviews: link to peer detail pages instead of singling out one provider or feature for inline configuration guidance.
 - Preserve stable URLs and anchors when moving content, or provide an explicit redirect or compatibility anchor.
 

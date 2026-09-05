@@ -16,17 +16,20 @@ using Orleans.Runtime.Scheduler;
 namespace Orleans.Runtime.GrainDirectory;
 
 /*
+Detailed protocol contracts, implementation boundaries, and research references:
+docs\site\src\content\docs\implementation\view-synchronous-cluster-services.md
+
 The grain directory in Orleans is a key-value store where the key is a grain identifier and the value is a registration entry which points to an active silo which (potentially)
 hosts the grain.
 
-The directory is partitioned using a consistent hash ring with ranges being assigned to the active silos in the cluster. Grain identifiers are hashed to find the silo which is
-owns the section of the ring corresponding to its hash. Each active silo owns a pre-configured number of ranges, defaulting to 30 ranges per silo. This is similar to the scheme
+The directory is partitioned using a consistent hash ring with ranges being assigned to the active silos in the cluster. Grain identifiers are hashed to find the silo which
+owns the section of the ring corresponding to its hash. Each active silo owns a configurable number of ranges. This is similar to the scheme
 used by Amazon Dynamo (see https://www.allthingsdistributed.com/files/amazon-dynamo-sosp2007.pdf) and Apache Cassandra (see
 https://docs.datastax.com/en/cassandra-oss/3.0/cassandra/architecture/archDataDistributeVnodesUsing.html), where multiple "virtual nodes" (ranges) are created for each node
 (host). The size of a partition is determined by the distance between its hash and the hash of the next partition. Range ownership is determined by cluster membership
 configuration. Cluster membership configurations are called "views" and each view has a monotonically increasing version number. As silos join and leave the cluster, successive
 views are created, resulting in changes to range ownership. This is known as a view change. Directory partitions have two modes of operation: normal operation and view change.
-During normal operation, directory partitions process requests locally without coordination with other hosts. During a view changes, hosts coordinate with each other to transfer
+During normal operation, directory partitions process requests locally without coordination with other hosts. During view changes, hosts coordinate with each other to transfer
 ownership of directory ranges. Once this transfer is complete, normal operation resumes. The two-phase design of the directory follows the Virtual Synchrony methodology (see
 https://www.microsoft.com/en-us/research/publication/virtually-synchronous-methodology-for-dynamic-service-replication/) and has some similarities to Vertical Paxos (see
 https://www.microsoft.com/en-us/research/publication/vertical-paxos-and-primary-backup-replication/). Both proceed in two phases: a normal operation phase where a fixed set of
@@ -40,7 +43,8 @@ owner can delete the snapshot. The previous owner also deletes the snapshot if i
 
 When a host crashes without first handing off its directory partitions, the hosts which subsequently own the partitions previously owned by the crashed silo must perform recovery.
 Recovery involves asking every active silo in the cluster for the grain registrations they own. Registrations for evicted silos do not need to be recovered, since registrations are
-only valid for active silos. The recovery procedure ensures that there is no data loss and that the directory remains consistent (no duplicate grain activations).
+only valid while their hosting silos remain valid. Recovery reconstructs registrations reported by surviving activation hosts, and its registration-version barrier coordinates
+concurrent registration with the scan.
 
 Cluster membership guarantees monotonicity, but it does not guarantee that all silos see all membership views: it is possible for silos to skip intermediate membership view, for
 example if membership changes rapidly. When this happens, snapshot transfers are abandoned and recovery must be performed instead of the normal partition-to-partition hand-over,
@@ -52,7 +56,7 @@ view change and are released when the view change is complete. These locks are a
 be split among multiple silos during a view change. This adds some complexity to the view change procedure since each partition must potentially coordinate with multiple other
 partitions to complete the view change.
 
-All requests to a directory partition include the view number of the caller, and all responses from the directory include the view number of the directory partition. When the
+Requests to a directory partition include the caller's view number. Successful responses echo that version; ownership redirects report the partition's current version. When the
 directory partition sees a view number higher than its own, it refreshes its view and initiates view change. Similarly, when a caller sees a response with a higher view number
 than its own, it refreshes its view and retries the request if necessary. This ensures that all requests are processed by the correct owner of the directory partition.
 */

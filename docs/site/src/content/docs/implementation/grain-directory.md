@@ -84,6 +84,8 @@ The runtime's cluster-service topology maps a membership snapshot to partition o
 
 An inbound transition opens its gate after installing state and establishing the directory's fencing conditions. Recovery after an ungraceful failure can also install a timed safety lease which continues to defer new registrations until expiration. An outbound transition drains earlier work and retains a snapshot for a contiguous handoff. An unexpected transition failure keeps the range blocked and reaches the silo's fatal-error handler, allowing cluster membership and the surviving owners to drive recovery. Shutdown cancels outstanding range waits.
 
+For the internal component contracts, transition state machine, registration/recovery race, fencing assumptions, and annotated research references, see [View-synchronous cluster services](view-synchronous-cluster-services.md).
+
 API: <xref:Orleans.Hosting.CoreHostingExtensions.AddDistributedGrainDirectory*?displayProperty=nameWithType> and <xref:Orleans.Configuration.GrainDirectoryOptions>. Implementation: [hosting registration](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Hosting/CoreHostingExtensions.cs) and [`DistributedGrainDirectory`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/GrainDirectory/DistributedGrainDirectory.cs).
 
 ## Tradeoffs
