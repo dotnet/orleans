@@ -228,6 +228,7 @@ public partial class AzureTableStreamQueueCheckpointer : IStreamQueueCheckpointe
             }
 
             _latestCheckpoint = offset;
+            _entity.Offset = offset;
             if (!_inProgressSave.IsCompleted
                 || (_throttleSavesUntilUtc.HasValue && _throttleSavesUntilUtc.Value > utcNow))
             {
@@ -290,10 +291,11 @@ public partial class AzureTableStreamQueueCheckpointer : IStreamQueueCheckpointe
 
     private async Task Save(string checkpoint, CancellationToken cancellationToken)
     {
-        _entity.Offset = checkpoint;
-        await _dataManager.UpsertTableEntryAsync(_entity, cancellationToken);
+        var entity = CreateWriteEntity(checkpoint);
+        await _dataManager.UpsertTableEntryAsync(entity, cancellationToken);
         lock (_lock)
         {
+            _entity.Offset = checkpoint;
             _persistedCheckpoint = checkpoint;
         }
     }
@@ -309,8 +311,25 @@ public partial class AzureTableStreamQueueCheckpointer : IStreamQueueCheckpointe
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        _entity.Offset = string.Empty;
-        await _dataManager.UpsertTableEntryAsync(_entity, cancellationToken);
+        var entity = CreateWriteEntity(string.Empty);
+        await _dataManager.UpsertTableEntryAsync(entity, cancellationToken);
+        lock (_lock)
+        {
+            _entity.Offset = string.Empty;
+        }
+    }
+
+    private StreamQueueCheckpointEntity CreateWriteEntity(string checkpoint)
+    {
+        lock (_lock)
+        {
+            return new StreamQueueCheckpointEntity
+            {
+                PartitionKey = _entity.PartitionKey,
+                RowKey = _entity.RowKey,
+                Offset = checkpoint,
+            };
+        }
     }
 
     [LoggerMessage(
