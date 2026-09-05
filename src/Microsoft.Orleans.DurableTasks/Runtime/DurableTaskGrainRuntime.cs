@@ -471,13 +471,16 @@ internal sealed partial class DurableTaskGrainRuntime(
 
     public async ValueTask<DurableTaskResponse> ScheduleDelayAsync(
         TaskId taskId,
-        TimeSpan duration,
+        DateTimeOffset dueTime,
         CancellationToken cancellationToken)
     {
         ThrowIfStopping();
         var transport = _messageTransport ?? throw new InvalidOperationException(
             "Durable messaging is not configured. Call AddDurableTasks on the silo builder.");
-        var dueTime = UtcNow + duration;
+        var logicalUtcNow = _logicalTimes.TryGetValue(taskId, out var recordedUtcNow)
+            ? recordedUtcNow
+            : UtcNow;
+        var duration = dueTime - logicalUtcNow;
         var stateExisted = _storage.TryGetTask(taskId, out var state);
         state ??= _storage.GetOrCreateTask(taskId, request: null);
         if (state.Result is { IsCompleted: true } completed)
@@ -487,11 +490,10 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         if (state.DueTime is { } existingDueTime)
         {
-            if (state.DelayDuration is { } existingDuration
-                && existingDuration != duration)
+            if (existingDueTime != dueTime)
             {
                 throw new InvalidOperationException(
-                    $"Durable delay '{taskId}' was already scheduled for duration '{existingDuration}', not '{duration}'.");
+                    $"Durable delay '{taskId}' was already scheduled for '{existingDueTime:O}', not '{dueTime:O}'.");
             }
 
             if (state.DelayDuration is null)
@@ -527,6 +529,12 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         return DurableTaskResponse.Pending;
     }
+
+    internal ValueTask<DurableTaskResponse> ScheduleDelayAsync(
+        TaskId taskId,
+        TimeSpan duration,
+        CancellationToken cancellationToken) =>
+        ScheduleDelayAsync(taskId, UtcNow + duration, cancellationToken);
 
     public bool CanHandle(string jobName) =>
         string.Equals(jobName, DurableTaskMessageTransport.ResumeJobName, StringComparison.Ordinal);
