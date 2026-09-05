@@ -1067,6 +1067,55 @@ public sealed class KinesisAspireIntegrationTests
         }
     }
 
+    [Theory]
+    [InlineData("GetRecordsInterval", "not-a-timespan", false)]
+    [InlineData("TopologyCheckInterval", "not-a-timespan", false)]
+    [InlineData("Checkpoint:UseProvisionedThroughput", "not-a-boolean", true)]
+    [InlineData("Checkpoint:ReadCapacityUnits", "not-an-integer", true)]
+    [InlineData("Checkpoint:WriteCapacityUnits", "not-an-integer", true)]
+    [InlineData("Checkpoint:PersistInterval", "not-a-timespan", true)]
+    [InlineData("Checkpoint:InitializationTimeout", "not-a-timespan", true)]
+    public void InvalidTypedConfiguration_ThrowsConfigurationException(
+        string setting,
+        string invalidValue,
+        bool useDynamoDBCheckpoint)
+    {
+        const string provider = "Orders";
+        var values = new Dictionary<string, string?>
+        {
+            [$"Orleans:Streaming:{provider}:ProviderType"] = "Kinesis",
+            [$"Orleans:Streaming:{provider}:StreamName"] = "orleans-orders",
+            [$"Orleans:Streaming:{provider}:Region"] = "us-west-2",
+            [$"Orleans:Streaming:{provider}:{setting}"] = invalidValue,
+        };
+        if (useDynamoDBCheckpoint)
+        {
+            values[$"Orleans:Streaming:{provider}:Checkpoint:Type"] = "DynamoDB";
+            values[$"Orleans:Streaming:{provider}:Checkpoint:TableName"] = "orleans-orders-checkpoints";
+        }
+
+        var config = BuildConfig(values, providerName: provider);
+        using var host = BuildSiloHost(config);
+
+        var exception = Assert.Throws<OrleansConfigurationException>(() =>
+        {
+            if (useDynamoDBCheckpoint)
+            {
+                _ = host.Services
+                    .GetRequiredService<IOptionsMonitor<DynamoDBStreamQueueCheckpointerOptions>>()
+                    .Get(provider);
+            }
+            else
+            {
+                _ = Resolve(host, provider);
+            }
+        });
+
+        Assert.Contains(provider, exception.Message, StringComparison.Ordinal);
+        Assert.Contains(setting[(setting.LastIndexOf(':') + 1)..], exception.Message, StringComparison.Ordinal);
+        Assert.Contains(invalidValue, exception.Message, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task AspireGeneratedConfiguration_DoesNotExposeSecrets()
     {
@@ -1158,9 +1207,10 @@ public sealed class KinesisAspireIntegrationTests
                 credentialFailureHost.Services
                     .GetRequiredService<IOptionsMonitor<DynamoDBStreamQueueCheckpointerOptions>>()
                     .Get("Orders"));
-            Assert.Equal(
-                $"Kinesis stream provider 'Orders' has invalid DynamoDB checkpoint CreateIfNotExists value '{invalidBoolean}'.",
-                credentialException.Message);
+            Assert.Contains("Orders", credentialException.Message, StringComparison.Ordinal);
+            Assert.Contains("Orleans:Streaming:Orders:Checkpoint", credentialException.Message, StringComparison.Ordinal);
+            Assert.Contains(nameof(DynamoDBStreamQueueCheckpointerOptions.CreateIfNotExists), credentialException.Message, StringComparison.Ordinal);
+            Assert.Contains(invalidBoolean, credentialException.Message, StringComparison.Ordinal);
             var diagnosticOutput = $"{credentialException}{Environment.NewLine}{credentialOptions}";
             Assert.DoesNotContain(sentinels, sentinel =>
                 diagnosticOutput.Contains(sentinel, StringComparison.Ordinal));

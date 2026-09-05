@@ -37,37 +37,37 @@ internal sealed class DynamoDBGrainStorageProviderBuilder : IProviderBuilder<ISi
                     options.TableName = tableName;
                 }
 
-                if (int.TryParse(configurationSection[nameof(options.ReadCapacityUnits)], out var rcu))
+                if (providerConfiguration.GetInt32(nameof(options.ReadCapacityUnits)) is { } rcu)
                 {
                     options.ReadCapacityUnits = rcu;
                 }
 
-                if (int.TryParse(configurationSection[nameof(options.WriteCapacityUnits)], out var wcu))
+                if (providerConfiguration.GetInt32(nameof(options.WriteCapacityUnits)) is { } wcu)
                 {
                     options.WriteCapacityUnits = wcu;
                 }
 
-                if (bool.TryParse(configurationSection[nameof(options.UseProvisionedThroughput)], out var upt))
+                if (providerConfiguration.GetBoolean(nameof(options.UseProvisionedThroughput)) is { } upt)
                 {
                     options.UseProvisionedThroughput = upt;
                 }
 
-                if (bool.TryParse(configurationSection[nameof(options.CreateIfNotExists)], out var cine))
+                if (providerConfiguration.GetBoolean(nameof(options.CreateIfNotExists)) is { } cine)
                 {
                     options.CreateIfNotExists = cine;
                 }
 
-                if (bool.TryParse(configurationSection[nameof(options.UpdateIfExists)], out var uie))
+                if (providerConfiguration.GetBoolean(nameof(options.UpdateIfExists)) is { } uie)
                 {
                     options.UpdateIfExists = uie;
                 }
 
-                if (bool.TryParse(configurationSection[nameof(options.DeleteStateOnClear)], out var dsoc))
+                if (providerConfiguration.GetBoolean(nameof(options.DeleteStateOnClear)) is { } dsoc)
                 {
                     options.DeleteStateOnClear = dsoc;
                 }
 
-                if (TimeSpan.TryParse(configurationSection[nameof(options.TimeToLive)], out var ttl))
+                if (providerConfiguration.GetTimeSpan(nameof(options.TimeToLive)) is { } ttl)
                 {
                     options.TimeToLive = ttl;
                 }
