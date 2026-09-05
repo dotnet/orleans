@@ -609,6 +609,127 @@ public sealed class RecoverableStreamReceiverTests
         Assert.Equal(3, progress.SafeSequenceToken?.SequenceNumber);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Cache_FutureStartAcrossCapacity_PreservesInclusiveTargetDuringPurge(bool createCursorBeforeFirstRead)
+    {
+        var stream = StreamId.Create("namespace", Guid.NewGuid());
+        var otherStream = StreamId.Create("namespace", Guid.NewGuid());
+        using var cache = new RecoverableStreamQueueCache<TestQueueMessage>(
+            3,
+            new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(4 * 1024)),
+            new TestDataAdapter(),
+            new NoOpEvictionStrategy(),
+            NullLogger.Instance,
+            maxCacheSize: 3);
+        var target = new EventSequenceTokenV2(7);
+        var cursor = createCursorBeforeFirstRead ? cache.GetCacheCursor(stream, target) : null;
+        if (cursor is not null)
+        {
+            Assert.False(cursor.MoveNext());
+            Assert.Null(Assert.IsAssignableFrom<IQueueCacheCursorProgress>(cursor).SafeSequenceToken);
+        }
+
+        for (var first = 1; first <= 4; first += 3)
+        {
+            cache.Add(
+                Enumerable.Range(first, 3)
+                    .Select(sequence => new TestQueueMessage(
+                        sequence % 2 == 0 ? otherStream : stream, sequence, $"payload-{sequence}"))
+                    .ToList(),
+                DateTime.UnixEpoch);
+            cursor ??= cache.GetCacheCursor(stream, target);
+            Assert.True(cache.IsUnderPressure());
+            Assert.Equal(0, cache.GetMaxAddCount());
+            Assert.False(cursor.MoveNext());
+            var safeToken = Assert.IsAssignableFrom<IQueueCacheCursorProgress>(cursor).SafeSequenceToken;
+            Assert.NotNull(safeToken);
+            Assert.Equal(first + 2, safeToken.SequenceNumber);
+
+            cache.UpdateDeliveryProgress(safeToken, DateTime.UnixEpoch);
+            Assert.Equal(0, cache.ItemCount);
+            Assert.Equal(3, cache.GetMaxAddCount());
+            Assert.Equal((first + 2).ToString(CultureInfo.InvariantCulture), cache.LastPurgedOffset);
+        }
+
+        using var targetCursor = cursor!;
+        var progress = Assert.IsAssignableFrom<IQueueCacheCursorProgress>(targetCursor);
+        cache.Add(
+        [
+            new TestQueueMessage(stream, 7, "target"),
+            new TestQueueMessage(otherStream, 8, "other"),
+            new TestQueueMessage(stream, 9, "next"),
+        ], DateTime.UnixEpoch);
+        Assert.True(targetCursor.MoveNext());
+        Assert.Equal("target", Assert.IsType<TestBatchContainer>(targetCursor.GetCurrent(out _)).Payload);
+        Assert.True(targetCursor.MoveNext());
+        Assert.Equal("next", Assert.IsType<TestBatchContainer>(targetCursor.GetCurrent(out _)).Payload);
+        Assert.Equal(6, progress.SafeSequenceToken?.SequenceNumber);
+        cache.UpdateDeliveryProgress(progress.SafeSequenceToken, DateTime.UnixEpoch);
+        Assert.Equal(3, cache.ItemCount);
+        Assert.True(cache.IsUnderPressure());
+        Assert.Equal("6", cache.LastPurgedOffset);
+
+        targetCursor.RecordDeliveryFailure();
+        Assert.Equal(6, progress.SafeSequenceToken?.SequenceNumber);
+        Assert.True(targetCursor.MoveNext());
+        Assert.Equal(target, targetCursor.GetCurrent(out _)!.SequenceToken);
+        progress.RecordDeliverySuccess();
+        cache.UpdateDeliveryProgress(progress.SafeSequenceToken, DateTime.UnixEpoch);
+        Assert.Equal("7", cache.LastPurgedOffset);
+        Assert.Equal(2, cache.ItemCount);
+
+        Assert.True(targetCursor.MoveNext());
+        Assert.Equal(9, targetCursor.GetCurrent(out _)!.SequenceToken.SequenceNumber);
+        Assert.Equal(8, progress.SafeSequenceToken?.SequenceNumber);
+        progress.RecordDeliverySuccess();
+        Assert.False(targetCursor.MoveNext());
+        cache.UpdateDeliveryProgress(progress.SafeSequenceToken, DateTime.UnixEpoch);
+        Assert.Equal("9", cache.LastPurgedOffset);
+        Assert.Equal(0, cache.ItemCount);
+        Assert.Equal(3, cache.GetMaxAddCount());
+    }
+
+    [Fact]
+    public void Cache_FutureStartScanWaitsForPendingDeliveryAcknowledgement()
+    {
+        var stream = StreamId.Create("namespace", Guid.NewGuid());
+        using var cache = new RecoverableStreamQueueCache<TestQueueMessage>(
+            3,
+            new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(4 * 1024)),
+            new TestDataAdapter(),
+            new NoOpEvictionStrategy(),
+            NullLogger.Instance,
+            maxCacheSize: 3);
+        cache.Add([new TestQueueMessage(stream, 1, "pending")], DateTime.UnixEpoch);
+        using var cursor = cache.GetCacheCursor(stream, new EventSequenceTokenV2(1));
+        var progress = Assert.IsAssignableFrom<IQueueCacheCursorProgress>(cursor);
+        Assert.True(cursor.MoveNext());
+        cache.Add(
+        [
+            new TestQueueMessage(stream, 2, "before-start-2"),
+            new TestQueueMessage(stream, 3, "before-start-3"),
+        ], DateTime.UnixEpoch);
+
+        cursor.Refresh(new EventSequenceTokenV2(7));
+
+        Assert.False(cursor.MoveNext());
+        Assert.Null(progress.SafeSequenceToken);
+        cache.UpdateDeliveryProgress(progress.SafeSequenceToken, DateTime.UnixEpoch);
+        Assert.Equal(3, cache.ItemCount);
+        Assert.True(cache.IsUnderPressure());
+        progress.RecordDeliverySuccess();
+        Assert.Equal(3, progress.SafeSequenceToken?.SequenceNumber);
+        cache.UpdateDeliveryProgress(progress.SafeSequenceToken, DateTime.UnixEpoch);
+        Assert.Equal(0, cache.ItemCount);
+
+        cache.Add([new TestQueueMessage(stream, 7, "target")], DateTime.UnixEpoch);
+        Assert.True(cursor.MoveNext());
+        Assert.Equal(7, cursor.GetCurrent(out _)!.SequenceToken.SequenceNumber);
+        Assert.Equal(3, progress.SafeSequenceToken?.SequenceNumber);
+    }
+
     [Fact]
     public void Cache_DeliveredThroughScansIntermediatePartitionRecordsWithoutRedelivery()
     {
@@ -873,9 +994,9 @@ public sealed class RecoverableStreamReceiverTests
         return new(source, adapter, cache, checkpointer, startFromNow: false);
     }
 
-    private sealed record TestQueueMessage(StreamId StreamId, long SequenceNumber, string Payload);
+    internal sealed record TestQueueMessage(StreamId StreamId, long SequenceNumber, string Payload);
 
-    private sealed class TestDataAdapter : IRecoverableStreamDataAdapter<TestQueueMessage>
+    internal sealed class TestDataAdapter : IRecoverableStreamDataAdapter<TestQueueMessage>
     {
         public int CompareCallCount { get; private set; }
         public int PositionCallCount { get; private set; }
@@ -988,7 +1109,7 @@ public sealed class RecoverableStreamReceiverTests
         }
     }
 
-    private sealed class TestBatchContainer(
+    internal sealed class TestBatchContainer(
         StreamId streamId,
         StreamSequenceToken sequenceToken,
         string payload) : IBatchContainer
@@ -1143,7 +1264,7 @@ public sealed class RecoverableStreamReceiverTests
         }
     }
 
-    private sealed class NoOpEvictionStrategy : IEvictionStrategy
+    internal sealed class NoOpEvictionStrategy : IEvictionStrategy
     {
         public int PerformPurgeCount { get; private set; }
 
