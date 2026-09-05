@@ -1016,7 +1016,7 @@ namespace Orleans.Streams
                 .Ignore();
         }
 
-        private static bool IsBefore(StreamSequenceToken current, StreamSequenceToken other) => current.CompareTo(other) < 0;
+        private static bool IsBefore(StreamSequenceToken current, StreamSequenceToken other) => EventSequenceTokenCompatibility.Compare(current, other) < 0;
 
         private static void UpdateCursorProgress(
             StreamConsumerData consumerData,
