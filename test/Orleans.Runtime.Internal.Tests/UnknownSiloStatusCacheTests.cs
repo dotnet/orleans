@@ -180,6 +180,50 @@ public class UnknownSiloStatusCacheTests
     }
 
     [Fact]
+    public async Task PendingRefreshRetainsNewerStatusAfterCacheEviction()
+    {
+        var silo = CreateSiloAddress();
+        var membershipManager = new TestMembershipManager(
+            CreateMembershipTableSnapshot(
+                10,
+                CreateMembershipEntry(silo, SiloStatus.Active)))
+        {
+            AutoCompleteRefreshes = false,
+        };
+        var cache = new UnknownSiloStatusCache(membershipManager, NullLogger<UnknownSiloStatusCache>.Instance);
+        var validationTask = cache.ValidateSiloStatuses(
+            CreateSnapshot(9),
+            SiloAddresses(silo),
+            CancellationToken.None,
+            requireFresh: true).AsTask();
+        var refresh = await membershipManager.WaitForRefreshAttempt();
+
+        Assert.Equal(
+            SiloStatus.Dead,
+            (await cache.GetSiloStatuses(
+                CreateSnapshot(11, new ClusterMember(silo, SiloStatus.Dead, "silo")),
+                SiloAddresses(silo),
+                CancellationToken.None))[silo]);
+
+        for (var i = 0; i <= UnknownSiloStatusCache.CacheCapacity; i++)
+        {
+            var otherSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 20_000 + i), 1);
+            Assert.Equal(
+                SiloStatus.Active,
+                (await cache.GetSiloStatuses(
+                    CreateSnapshot(12, new ClusterMember(otherSilo, SiloStatus.Active, "other")),
+                    SiloAddresses(otherSilo),
+                    CancellationToken.None))[otherSilo]);
+        }
+
+        refresh.Completion.TrySetResult();
+
+        var validation = await validationTask;
+        Assert.Equal(SiloStatus.Dead, validation.Statuses[silo]);
+        Assert.Equal(1, membershipManager.SourceRefreshCount);
+    }
+
+    [Fact]
     public async Task ValidationReturnsSnapshotFromQualifyingFreshRead()
     {
         var silo = CreateSiloAddress();

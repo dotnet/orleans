@@ -131,10 +131,17 @@ namespace Orleans.Streams
 
             try
             {
-                var (shouldRegister, stateChanged, validatedMembershipVersion) = await RemoveDefunctSystemTargetProducers(
-                    streamProducer,
-                    membershipVersion,
-                    cancellationToken);
+                if (_streamInstruments.PubSubProducersAdded.Enabled)
+                {
+                    tags = StreamInstrumentsTagUtils.InitializeTags(streamId, streamProducer);
+                    _streamInstruments.PubSubProducersAdded.Add(1, tags.Value);
+                }
+
+                var (shouldRegister, stateChanged, validatedMembershipVersion, removedProducers) =
+                    await RemoveDefunctSystemTargetProducers(
+                        streamProducer,
+                        membershipVersion,
+                        cancellationToken);
                 var publisherState = new PubSubPublisherState(streamId, streamProducer)
                 {
                     MembershipVersion = validatedMembershipVersion
@@ -146,16 +153,12 @@ namespace Orleans.Streams
                     {
                         await ((IStorage)_storage).WriteStateAsync(cancellationToken);
                     }
+
+                    RecordRemovedProducers(removedProducers);
                     registrationRejected = true;
                 }
                 else
                 {
-                    if (_streamInstruments.PubSubProducersAdded.Enabled)
-                    {
-                        tags = StreamInstrumentsTagUtils.InitializeTags(streamId, streamProducer);
-                        _streamInstruments.PubSubProducersAdded.Add(1, tags.Value);
-                    }
-
                     if (State.Producers.TryGetValue(publisherState, out var existingPublisher))
                     {
                         if (validatedMembershipVersion > existingPublisher.MembershipVersion)
@@ -170,6 +173,7 @@ namespace Orleans.Streams
 
                     LogPubSubCounts("RegisterProducer {0}", streamProducer);
                     await ((IStorage)_storage).WriteStateAsync(cancellationToken);
+                    RecordRemovedProducers(removedProducers);
                     StreamingEvents.EmitProducerRegistered(streamId.ProviderName, streamId.StreamId, streamProducer, GrainContext.Address.SiloAddress);
                     if (_streamInstruments.PubSubProducersTotal.Enabled)
                     {
@@ -205,11 +209,17 @@ namespace Orleans.Streams
         private async Task<(
             bool ShouldRegister,
             bool StateChanged,
-            MembershipVersion ValidatedMembershipVersion)> RemoveDefunctSystemTargetProducers(
+            MembershipVersion ValidatedMembershipVersion,
+            List<PubSubPublisherState>? RemovedProducers)> RemoveDefunctSystemTargetProducers(
             GrainId streamProducer,
             MembershipVersion membershipVersion,
             CancellationToken cancellationToken)
         {
+            if (!SystemTargetGrainId.TryParse(streamProducer, out var registeringSystemTarget))
+            {
+                return (true, false, membershipVersion, null);
+            }
+
             var membershipSnapshot = _clusterMembershipService.CurrentSnapshot;
             List<(PubSubPublisherState Producer, SiloAddress SiloAddress)>? systemTargetProducers = null;
             var siloMembershipVersions = new Dictionary<SiloAddress, MembershipVersion>();
@@ -224,17 +234,8 @@ namespace Orleans.Streams
                 }
             }
 
-            SiloAddress? registeringSiloAddress = null;
-            if (SystemTargetGrainId.TryParse(streamProducer, out var registeringSystemTarget))
-            {
-                registeringSiloAddress = registeringSystemTarget.GetSiloAddress();
-                AddSiloMembershipVersion(siloMembershipVersions, registeringSiloAddress, membershipVersion);
-            }
-
-            if (systemTargetProducers is null && registeringSiloAddress is null)
-            {
-                return (true, false, membershipVersion);
-            }
+            var registeringSiloAddress = registeringSystemTarget.GetSiloAddress();
+            AddSiloMembershipVersion(siloMembershipVersions, registeringSiloAddress, membershipVersion);
 
             var validation = await GetSiloStatuses(
                 membershipSnapshot,
@@ -276,24 +277,20 @@ namespace Orleans.Streams
                     RemoveProducer(producer);
                 }
 
-                RecordRemovedProducers(removedProducers);
                 stateChanged = true;
             }
 
-            if (registeringSiloAddress is not null)
-            {
-                membershipVersion = GetValidatedMembershipVersion(
-                    membershipVersion,
-                    registeringSiloAddress,
-                    statuses[registeringSiloAddress],
-                    validation.Snapshot);
-            }
+            membershipVersion = GetValidatedMembershipVersion(
+                membershipVersion,
+                registeringSiloAddress,
+                statuses[registeringSiloAddress],
+                validation.Snapshot);
 
             var shouldRegister = ShouldRegisterSystemTarget(
                 registeringSiloAddress,
                 systemTargetProducers?.Select(producer => producer.SiloAddress),
                 statuses);
-            return (shouldRegister, stateChanged, membershipVersion);
+            return (shouldRegister, stateChanged, membershipVersion, removedProducers);
         }
 
         internal static void AddSiloMembershipVersion(
@@ -556,9 +553,9 @@ namespace Orleans.Streams
             State.Producers.Remove(producer);
         }
 
-        private void RecordRemovedProducers(IEnumerable<PubSubPublisherState> producers)
+        private void RecordRemovedProducers(IEnumerable<PubSubPublisherState>? producers)
         {
-            if (!_streamInstruments.PubSubProducersTotal.Enabled)
+            if (producers is null || !_streamInstruments.PubSubProducersTotal.Enabled)
             {
                 return;
             }
