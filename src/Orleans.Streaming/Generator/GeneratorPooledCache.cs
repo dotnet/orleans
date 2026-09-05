@@ -30,11 +30,27 @@ namespace Orleans.Providers.Streams.Generator
         /// <param name="cacheMonitor">The cache monitor.</param>
         /// <param name="monitorWriteInterval">The monitor write interval. Only triggered for active caches</param>
         public GeneratorPooledCache(IObjectPool<FixedSizeBuffer> bufferPool, ILogger logger, Serialization.Serializer serializer, ICacheMonitor? cacheMonitor, TimeSpan? monitorWriteInterval)
+            : this(
+                bufferPool,
+                logger,
+                serializer,
+                cacheMonitor,
+                monitorWriteInterval,
+                new TimePurgePredicate(TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(10)))
+        {
+        }
+
+        internal GeneratorPooledCache(
+            IObjectPool<FixedSizeBuffer> bufferPool,
+            ILogger logger,
+            Serialization.Serializer serializer,
+            ICacheMonitor? cacheMonitor,
+            TimeSpan? monitorWriteInterval,
+            TimePurgePredicate purgePredicate)
         {
             this.bufferPool = bufferPool;
             this.serializer = serializer;
             cache = new PooledQueueCache(this, logger, cacheMonitor, monitorWriteInterval);
-            TimePurgePredicate purgePredicate = new TimePurgePredicate(TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(10));
             this.evictionStrategy = new ChronologicalEvictionStrategy(logger, purgePredicate, cacheMonitor, monitorWriteInterval) { PurgeObservable = cache };
         }
 
@@ -177,6 +193,11 @@ namespace Orleans.Providers.Streams.Generator
         {
             purgedItems = null!; // Return value is always false, per [MaybeNullWhen(false)] on the interface.
             this.evictionStrategy.PerformPurge(DateTime.UtcNow);
+            if (cache.IsEmpty)
+            {
+                currentBuffer = null;
+            }
+
             return false;
         }
 
