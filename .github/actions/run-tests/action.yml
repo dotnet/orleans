@@ -33,7 +33,7 @@ runs:
       coverage: ${{ runner.os == 'Linux' && inputs.framework == 'net10.0' }}
   - name: Test
     id: test
-    continue-on-error: ${{ inputs.retry == 'true' }}
+    continue-on-error: ${{ env.ORLEANS_TEST_RETRY == 'true' }}
     uses: ./.github/actions/dotnet-test
     with:
       coverage-id: ${{ inputs.artifact-name }}
@@ -42,6 +42,8 @@ runs:
       result-id: ${{ inputs.retry == 'true' && format('{0}-attempt1', inputs.artifact-name) || inputs.artifact-name }}
       coverage: ${{ runner.os == 'Linux' && inputs.framework == 'net10.0' }}
     env:
+      # The nested composite action supplies its own inputs context when continue-on-error is evaluated.
+      ORLEANS_TEST_RETRY: ${{ inputs.retry }}
       BuildExternalAssets: ${{ inputs['build-external-assets'] }}
   - name: Retry tests
     id: retry
