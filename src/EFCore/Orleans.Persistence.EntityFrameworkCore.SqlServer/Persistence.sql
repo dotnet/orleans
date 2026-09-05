@@ -11,13 +11,16 @@ GO
 BEGIN TRANSACTION;
 GO
 
-IF NOT EXISTS(SELECT * FROM [__EFMigrationsHistory] WHERE [MigrationId] = N'20231005033501_InitialPersistenceSchema')
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260811210111_InitialPersistenceSchema'
+)
 BEGIN
     CREATE TABLE [GrainState] (
-        [ServiceId] nvarchar(280) NOT NULL,
-        [GrainType] nvarchar(280) NOT NULL,
-        [StateType] nvarchar(280) NOT NULL,
-        [GrainId] nvarchar(280) NOT NULL,
+        [ServiceId] nvarchar(280) COLLATE Latin1_General_100_BIN2 NOT NULL,
+        [GrainType] nvarchar(280) COLLATE Latin1_General_100_BIN2 NOT NULL,
+        [StateType] nvarchar(280) COLLATE Latin1_General_100_BIN2 NOT NULL,
+        [GrainId] nvarchar(280) COLLATE Latin1_General_100_BIN2 NOT NULL,
         [Data] nvarchar(max) NULL,
         [ETag] rowversion NOT NULL,
         CONSTRAINT [PK_GrainState] PRIMARY KEY NONCLUSTERED ([ServiceId], [GrainType], [StateType], [GrainId])
@@ -25,10 +28,13 @@ BEGIN
 END;
 GO
 
-IF NOT EXISTS(SELECT * FROM [__EFMigrationsHistory] WHERE [MigrationId] = N'20231005033501_InitialPersistenceSchema')
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260811210111_InitialPersistenceSchema'
+)
 BEGIN
     INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
-    VALUES (N'20231005033501_InitialPersistenceSchema', N'7.0.11');
+    VALUES (N'20260811210111_InitialPersistenceSchema', N'8.0.29');
 END;
 GO
 

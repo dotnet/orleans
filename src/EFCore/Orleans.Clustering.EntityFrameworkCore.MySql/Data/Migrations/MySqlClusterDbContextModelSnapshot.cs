@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Orleans.Clustering.EntityFrameworkCore.MySql.Data;
 
@@ -16,18 +17,20 @@ namespace Orleans.Clustering.EntityFrameworkCore.MySql.Data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "7.0.11")
+                .HasAnnotation("ProductVersion", "8.0.29")
                 .HasAnnotation("Relational:MaxIdentifierLength", 64);
 
-            modelBuilder.Entity("Orleans.Clustering.EntityFrameworkCore.Data.ClusterRecord<System.DateTime>", b =>
+            MySqlModelBuilderExtensions.AutoIncrementColumns(modelBuilder);
+
+            modelBuilder.Entity("Orleans.Clustering.EntityFrameworkCore.Data.ClusterRecord<System.Guid>", b =>
                 {
                     b.Property<string>("Id")
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("varchar(255)")
+                        .UseCollation("utf8mb4_bin");
 
-                    b.Property<DateTime>("ETag")
+                    b.Property<Guid>("ETag")
                         .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("char(36)");
 
                     b.Property<DateTimeOffset>("Timestamp")
                         .HasColumnType("datetime(6)");
@@ -35,20 +38,21 @@ namespace Orleans.Clustering.EntityFrameworkCore.MySql.Data.Migrations
                     b.Property<int>("Version")
                         .HasColumnType("int");
 
-                    b.HasKey("Id")
-                        .HasName("PK_Cluster");
+                    b.HasKey("Id");
 
                     b.ToTable("Clusters");
                 });
 
-            modelBuilder.Entity("Orleans.Clustering.EntityFrameworkCore.Data.SiloRecord<System.DateTime>", b =>
+            modelBuilder.Entity("Orleans.Clustering.EntityFrameworkCore.Data.SiloRecord<System.Guid>", b =>
                 {
                     b.Property<string>("ClusterId")
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("varchar(255)")
+                        .UseCollation("utf8mb4_bin");
 
                     b.Property<string>("Address")
                         .HasMaxLength(45)
-                        .HasColumnType("varchar(45)");
+                        .HasColumnType("varchar(45)")
+                        .UseCollation("utf8mb4_bin");
 
                     b.Property<int>("Port")
                         .HasColumnType("int");
@@ -56,10 +60,9 @@ namespace Orleans.Clustering.EntityFrameworkCore.MySql.Data.Migrations
                     b.Property<int>("Generation")
                         .HasColumnType("int");
 
-                    b.Property<DateTime>("ETag")
+                    b.Property<Guid>("ETag")
                         .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("char(36)");
 
                     b.Property<string>("HostName")
                         .IsRequired()
@@ -89,24 +92,20 @@ namespace Orleans.Clustering.EntityFrameworkCore.MySql.Data.Migrations
                     b.Property<string>("SuspectingTimes")
                         .HasColumnType("longtext");
 
-                    b.HasKey("ClusterId", "Address", "Port", "Generation")
-                        .HasName("PK_Silo");
+                    b.HasKey("ClusterId", "Address", "Port", "Generation");
 
-                    b.HasIndex("ClusterId")
-                        .HasDatabaseName("IDX_Silo_ClusterId");
+                    b.HasIndex("ClusterId");
 
-                    b.HasIndex("ClusterId", "Status")
-                        .HasDatabaseName("IDX_Silo_ClusterId_Status");
+                    b.HasIndex("ClusterId", "Status");
 
-                    b.HasIndex("ClusterId", "Status", "IAmAliveTime")
-                        .HasDatabaseName("IDX_Silo_ClusterId_Status_IAmAlive");
+                    b.HasIndex("ClusterId", "Status", "IAmAliveTime");
 
                     b.ToTable("Silos");
                 });
 
-            modelBuilder.Entity("Orleans.Clustering.EntityFrameworkCore.Data.SiloRecord<System.DateTime>", b =>
+            modelBuilder.Entity("Orleans.Clustering.EntityFrameworkCore.Data.SiloRecord<System.Guid>", b =>
                 {
-                    b.HasOne("Orleans.Clustering.EntityFrameworkCore.Data.ClusterRecord<System.DateTime>", "Cluster")
+                    b.HasOne("Orleans.Clustering.EntityFrameworkCore.Data.ClusterRecord<System.Guid>", "Cluster")
                         .WithMany("Silos")
                         .HasForeignKey("ClusterId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -115,7 +114,7 @@ namespace Orleans.Clustering.EntityFrameworkCore.MySql.Data.Migrations
                     b.Navigation("Cluster");
                 });
 
-            modelBuilder.Entity("Orleans.Clustering.EntityFrameworkCore.Data.ClusterRecord<System.DateTime>", b =>
+            modelBuilder.Entity("Orleans.Clustering.EntityFrameworkCore.Data.ClusterRecord<System.Guid>", b =>
                 {
                     b.Navigation("Silos");
                 });

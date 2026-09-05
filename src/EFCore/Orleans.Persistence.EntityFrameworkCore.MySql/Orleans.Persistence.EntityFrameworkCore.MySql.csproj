@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Persistence.EntityFrameworkCore.MySql</PackageId>
+    <Title>Microsoft Orleans Entity Framework Core (MySQL) Persistence Provider</Title>
+    <Description>Microsoft Orleans persistence provider backed by Entity Framework Core for MySQL</Description>
+    <PackageTags>$(PackageTags) Entity Framework Core SQL MySQL</PackageTags>
+    <Nullable>enable</Nullable>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <AssemblyName>Orleans.Persistence.EntityFrameworkCore.MySql</AssemblyName>
+    <RootNamespace>Orleans.Persistence.EntityFrameworkCore.MySql</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Pomelo.EntityFrameworkCore.MySql"/>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\EFCore\Orleans.Persistence.EntityFrameworkCore\Orleans.Persistence.EntityFrameworkCore.csproj"/>
+  </ItemGroup>
+</Project>

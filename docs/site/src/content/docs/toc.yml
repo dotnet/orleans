@@ -252,6 +252,8 @@ items:
             href: host/configuration-guide/configuring-ado-dot-net-providers.md
           - name: ADO.NET database configuration
             href: host/configuration-guide/adonet-configuration.md
+          - name: Entity Framework Core providers
+            href: host/configuration-guide/entity-framework-core-providers.md
           - name: Startup tasks
             href: host/configuration-guide/startup-tasks.md
           - name: Graceful shutdown

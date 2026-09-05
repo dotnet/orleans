@@ -16,22 +16,25 @@ namespace Orleans.GrainDirectory.EntityFrameworkCore.SqlServer.Data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "7.0.11")
+                .HasAnnotation("ProductVersion", "8.0.29")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
-            modelBuilder.Entity("Orleans.GrainDirectory.EntityFrameworkCore.Data.GrainActivationRecord", b =>
+            modelBuilder.Entity("Orleans.GrainDirectory.EntityFrameworkCore.Data.GrainActivationRecord<byte[]>", b =>
                 {
                     b.Property<string>("ClusterId")
-                        .HasColumnType("nvarchar(450)");
+                        .HasColumnType("nvarchar(450)")
+                        .UseCollation("Latin1_General_100_BIN2");
 
                     b.Property<string>("GrainId")
-                        .HasColumnType("nvarchar(450)");
+                        .HasColumnType("nvarchar(450)")
+                        .UseCollation("Latin1_General_100_BIN2");
 
                     b.Property<string>("ActivationId")
                         .IsRequired()
-                        .HasColumnType("nvarchar(450)");
+                        .HasColumnType("nvarchar(450)")
+                        .UseCollation("Latin1_General_100_BIN2");
 
                     b.Property<byte[]>("ETag")
                         .IsConcurrencyToken()
@@ -44,7 +47,8 @@ namespace Orleans.GrainDirectory.EntityFrameworkCore.SqlServer.Data.Migrations
 
                     b.Property<string>("SiloAddress")
                         .IsRequired()
-                        .HasColumnType("nvarchar(450)");
+                        .HasColumnType("nvarchar(450)")
+                        .UseCollation("Latin1_General_100_BIN2");
 
                     b.HasKey("ClusterId", "GrainId")
                         .HasName("PK_Activations");

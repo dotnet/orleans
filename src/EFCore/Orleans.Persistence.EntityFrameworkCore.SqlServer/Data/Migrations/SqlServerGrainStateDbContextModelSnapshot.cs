@@ -16,28 +16,32 @@ namespace Orleans.Persistence.EntityFrameworkCore.SqlServer.Data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "7.0.11")
+                .HasAnnotation("ProductVersion", "8.0.29")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
-            modelBuilder.Entity("Orleans.Persistence.EntityFrameworkCore.Data.GrainStateRecord", b =>
+            modelBuilder.Entity("Orleans.Persistence.EntityFrameworkCore.Data.GrainStateRecord<byte[]>", b =>
                 {
                     b.Property<string>("ServiceId")
                         .HasMaxLength(280)
-                        .HasColumnType("nvarchar(280)");
+                        .HasColumnType("nvarchar(280)")
+                        .UseCollation("Latin1_General_100_BIN2");
 
                     b.Property<string>("GrainType")
                         .HasMaxLength(280)
-                        .HasColumnType("nvarchar(280)");
+                        .HasColumnType("nvarchar(280)")
+                        .UseCollation("Latin1_General_100_BIN2");
 
                     b.Property<string>("StateType")
                         .HasMaxLength(280)
-                        .HasColumnType("nvarchar(280)");
+                        .HasColumnType("nvarchar(280)")
+                        .UseCollation("Latin1_General_100_BIN2");
 
                     b.Property<string>("GrainId")
                         .HasMaxLength(280)
-                        .HasColumnType("nvarchar(280)");
+                        .HasColumnType("nvarchar(280)")
+                        .UseCollation("Latin1_General_100_BIN2");
 
                     b.Property<string>("Data")
                         .HasColumnType("nvarchar(max)");

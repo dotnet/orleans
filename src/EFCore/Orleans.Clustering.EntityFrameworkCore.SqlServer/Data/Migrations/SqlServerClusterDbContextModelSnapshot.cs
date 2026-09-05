@@ -17,15 +17,16 @@ namespace Orleans.Clustering.EntityFrameworkCore.SqlServer.Data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "7.0.11")
+                .HasAnnotation("ProductVersion", "8.0.29")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
-            modelBuilder.Entity("Orleans.Clustering.EntityFrameworkCore.Data.ClusterRecord", b =>
+            modelBuilder.Entity("Orleans.Clustering.EntityFrameworkCore.Data.ClusterRecord<byte[]>", b =>
                 {
                     b.Property<string>("Id")
-                        .HasColumnType("nvarchar(450)");
+                        .HasColumnType("nvarchar(450)")
+                        .UseCollation("Latin1_General_100_BIN2");
 
                     b.Property<byte[]>("ETag")
                         .IsConcurrencyToken()
@@ -47,14 +48,16 @@ namespace Orleans.Clustering.EntityFrameworkCore.SqlServer.Data.Migrations
                     b.ToTable("Clusters");
                 });
 
-            modelBuilder.Entity("Orleans.Clustering.EntityFrameworkCore.Data.SiloRecord", b =>
+            modelBuilder.Entity("Orleans.Clustering.EntityFrameworkCore.Data.SiloRecord<byte[]>", b =>
                 {
                     b.Property<string>("ClusterId")
-                        .HasColumnType("nvarchar(450)");
+                        .HasColumnType("nvarchar(450)")
+                        .UseCollation("Latin1_General_100_BIN2");
 
                     b.Property<string>("Address")
                         .HasMaxLength(45)
-                        .HasColumnType("nvarchar(45)");
+                        .HasColumnType("nvarchar(45)")
+                        .UseCollation("Latin1_General_100_BIN2");
 
                     b.Property<int>("Port")
                         .HasColumnType("int");
@@ -119,9 +122,9 @@ namespace Orleans.Clustering.EntityFrameworkCore.SqlServer.Data.Migrations
                     b.ToTable("Silos");
                 });
 
-            modelBuilder.Entity("Orleans.Clustering.EntityFrameworkCore.Data.SiloRecord", b =>
+            modelBuilder.Entity("Orleans.Clustering.EntityFrameworkCore.Data.SiloRecord<byte[]>", b =>
                 {
-                    b.HasOne("Orleans.Clustering.EntityFrameworkCore.Data.ClusterRecord", "Cluster")
+                    b.HasOne("Orleans.Clustering.EntityFrameworkCore.Data.ClusterRecord<byte[]>", "Cluster")
                         .WithMany("Silos")
                         .HasForeignKey("ClusterId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -130,7 +133,7 @@ namespace Orleans.Clustering.EntityFrameworkCore.SqlServer.Data.Migrations
                     b.Navigation("Cluster");
                 });
 
-            modelBuilder.Entity("Orleans.Clustering.EntityFrameworkCore.Data.ClusterRecord", b =>
+            modelBuilder.Entity("Orleans.Clustering.EntityFrameworkCore.Data.ClusterRecord<byte[]>", b =>
                 {
                     b.Navigation("Silos");
                 });

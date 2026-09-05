@@ -2,6 +2,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
+using Orleans.Runtime.Hosting;
 using Orleans.Hosting;
 using Orleans.GrainDirectory.EntityFrameworkCore;
 using Orleans.GrainDirectory.EntityFrameworkCore.Data;
@@ -54,10 +55,6 @@ public static class EFGrainDirectoryHostingExtension
         this IServiceCollection services,
         string name) where TDbContext : GrainDirectoryDbContext<TDbContext, TETag>
     {
-        services
-            .AddSingletonNamedService<IGrainDirectory>(name, (sp, _) => ActivatorUtilities.CreateInstance<EFCoreGrainDirectory<TDbContext, TETag>>(sp))
-            .AddSingletonNamedService<ILifecycleParticipant<ISiloLifecycle>>(name, (s, n) => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredServiceByName<IGrainDirectory>(n));
-
-        return services;
+        return services.AddGrainDirectory(name, (sp, _) => ActivatorUtilities.CreateInstance<EFCoreGrainDirectory<TDbContext, TETag>>(sp));
     }
 }

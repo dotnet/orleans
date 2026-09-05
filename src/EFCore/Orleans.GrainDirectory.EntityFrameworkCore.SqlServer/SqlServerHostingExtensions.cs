@@ -54,11 +54,7 @@ public static class SqlServerHostingExtensions
         this IServiceCollection services,
         string name)
     {
-        services
-            .AddSingleton<IEFGrainDirectoryETagConverter<byte[]>, SqlServerGrainDirectoryETagConverter>()
-            .AddSingletonNamedService<IGrainDirectory>(name, (sp, _) => ActivatorUtilities.CreateInstance<EFCoreGrainDirectory<SqlServerGrainDirectoryDbContext, byte[]>>(sp))
-            .AddSingletonNamedService<ILifecycleParticipant<ISiloLifecycle>>(name, (s, n) => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredServiceByName<IGrainDirectory>(n));
-
-        return services;
+        services.AddSingleton<IEFGrainDirectoryETagConverter<byte[]>, SqlServerGrainDirectoryETagConverter>();
+        return services.AddEntityFrameworkCoreGrainDirectory<SqlServerGrainDirectoryDbContext, byte[]>(name);
     }
 }
