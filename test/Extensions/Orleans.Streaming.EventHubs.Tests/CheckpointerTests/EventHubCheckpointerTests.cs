@@ -684,6 +684,22 @@ public class EventHubCheckpointerTests
 
     [TestSuite("BVT")]
     [Fact, TestCategory("BVT")]
+    public void AzureTableCheckpointer_CreatesIndependentWriteEntity()
+    {
+        var checkpointer = CreateUninitializedCheckpointer();
+        SetPersistedOffset(checkpointer, "10");
+
+        var writeEntity = InvokeCreateWriteEntity(checkpointer, "20");
+
+        Assert.NotSame(GetField(checkpointer, "_entity"), writeEntity);
+        Assert.Equal(GetEntityPartitionKey(checkpointer), GetEntityProperty(writeEntity, "PartitionKey"));
+        Assert.Equal(GetEntityRowKey(checkpointer), GetEntityProperty(writeEntity, "RowKey"));
+        Assert.Equal("20", GetEntityProperty(writeEntity, "Offset"));
+        Assert.Equal("10", GetEntityOffset(checkpointer));
+    }
+
+    [TestSuite("BVT")]
+    [Fact, TestCategory("BVT")]
     public void EventHubCheckpointEntity_PreservesLegacyAzureTableSchema()
     {
         var checkpointer = CreateUninitializedCheckpointer(
@@ -964,6 +980,20 @@ public class EventHubCheckpointerTests
         var entity = GetField(checkpointer, "_entity");
         entity.GetType().GetProperty("Offset")!.SetValue(entity, offset);
     }
+
+    private static object InvokeCreateWriteEntity(
+        AzureTableStreamQueueCheckpointer checkpointer,
+        string offset)
+    {
+        var method = typeof(AzureTableStreamQueueCheckpointer).GetMethod(
+            "CreateWriteEntity",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        return method.Invoke(checkpointer, [offset])!;
+    }
+
+    private static string GetEntityProperty(object entity, string propertyName)
+        => (string)entity.GetType().GetProperty(propertyName)!.GetValue(entity)!;
 
     private static object GetField(AzureTableStreamQueueCheckpointer checkpointer, string name)
     {
