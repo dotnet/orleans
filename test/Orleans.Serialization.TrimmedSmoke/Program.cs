@@ -112,6 +112,10 @@ internal static class Program
         "Trimming",
         "IL2075",
         Justification = "TypeManifestOptions.AddInterfaceImplementation preserves implemented interfaces before the type flows through the manifest collection.")]
+    [UnconditionalSuppressMessage(
+        "Trimming",
+        "IL2026",
+        Justification = "This method only reads manifest types which were registered through trimming-aware TypeManifestOptions.Add* methods.")]
     private static void ValidateConfigurationAnalyzer(IServiceProvider serviceProvider, CodecProvider codecProvider)
     {
         var analysisOptions = new TypeManifestOptions();
@@ -132,6 +136,10 @@ internal static class Program
             "The generated grain implementation's interface metadata was not preserved.");
     }
 
+    [UnconditionalSuppressMessage(
+        "Trimming",
+        "IL2026",
+        Justification = "This method only reads proxy types which were registered through TypeManifestOptions.AddInterfaceProxy.")]
     private static void ValidateGeneratedProxy(IServiceProvider serviceProvider, CodecProvider codecProvider)
     {
         var options = serviceProvider.GetRequiredService<IOptions<TypeManifestOptions>>().Value;
@@ -263,6 +271,10 @@ internal sealed class TrimSmokeReferenceActivator(
     [UnconditionalSuppressMessage(
         "Trimming",
         "IL2067",
+        Justification = "TypeManifestOptions.AddInterfaceProxy preserves the public constructor used to instantiate generated proxy types.")]
+    [UnconditionalSuppressMessage(
+        "Trimming",
+        "IL2077",
         Justification = "TypeManifestOptions.AddInterfaceProxy preserves the public constructor used to instantiate generated proxy types.")]
     public GrainReference CreateReference(GrainId grainId) =>
         (GrainReference)Activator.CreateInstance(proxyType, shared, grainId.Key)!;

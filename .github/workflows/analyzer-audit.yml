@@ -147,17 +147,6 @@ jobs:
             -p:CustomBeforeMicrosoftCommonTargets="$env:GITHUB_WORKSPACE/.github/scripts/analyzer-audit.targets" `
             -p:TreatWarningsAsErrors=false `
             -p:WarningsAsErrors=
-      - name: Publish and run serialization trimmed smoke
-        shell: pwsh
-        run: |
-          $output = Join-Path $env:RUNNER_TEMP 'orleans-serialization-trimmed-smoke'
-          dotnet publish test/Orleans.Serialization.TrimmedSmoke/Orleans.Serialization.TrimmedSmoke.csproj `
-            --framework net10.0 `
-            --configuration Release `
-            --runtime linux-x64 `
-            --self-contained true `
-            --output $output
-          & (Join-Path $output 'Orleans.Serialization.TrimmedSmoke')
       - name: Prepare compatibility analyzer results
         if: always()
         continue-on-error: true
@@ -182,3 +171,25 @@ jobs:
         with:
           category: compatibility-analyzers-net10-core-runtime
           sarif_file: ${{ env.RESULTS_DIRECTORY }}/compatibility-analyzers.sarif
+
+  serialization-trimmed-smoke:
+    name: Orleans.Serialization trimmed smoke (net10.0)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - name: Setup .NET
+        uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
+        with:
+          global-json-file: global.json
+      - name: Publish and run serialization trimmed smoke
+        shell: pwsh
+        run: |
+          $output = Join-Path $env:RUNNER_TEMP 'orleans-serialization-trimmed-smoke'
+          dotnet publish test/Orleans.Serialization.TrimmedSmoke/Orleans.Serialization.TrimmedSmoke.csproj `
+            --framework net10.0 `
+            --configuration Release `
+            --runtime linux-x64 `
+            --self-contained true `
+            --output $output
+          & (Join-Path $output 'Orleans.Serialization.TrimmedSmoke')

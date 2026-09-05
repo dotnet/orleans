@@ -23,6 +23,15 @@ namespace Orleans.Serialization.Configuration
             | DynamicallyAccessedMemberTypes.Interfaces;
 #endif
 
+        private readonly HashSet<Type> _activators = new();
+        private readonly HashSet<Type> _fieldCodecs = new();
+        private readonly HashSet<Type> _serializers = new();
+        private readonly HashSet<Type> _copiers = new();
+        private readonly HashSet<Type> _converters = new();
+        private readonly HashSet<Type> _interfaces = new();
+        private readonly HashSet<Type> _interfaceProxies = new();
+        private readonly HashSet<Type> _interfaceImplementations = new();
+
         /// <summary>
         /// Gets or sets a value indicating whether <see cref="SerializerConfigurationAnalyzer"/> should be enabled.
         /// </summary>
@@ -35,32 +44,80 @@ namespace Orleans.Serialization.Configuration
         /// <summary>
         /// Gets the set of known activators, which are responsible for creating instances of a given type.
         /// </summary>
-        public HashSet<Type> Activators { get; } = new HashSet<Type>();
+        public HashSet<Type> Activators
+        {
+#if NET5_0_OR_GREATER
+            [RequiresUnreferencedCode(
+                "Direct collection access cannot preserve activator members required by trimming. "
+                + "Use AddActivator(Type) when registering activators.")]
+#endif
+            get => _activators;
+        }
 
         /// <summary>
         /// Gets the set of known field codecs, which are responsible for serializing and deserializing fields of a given type.
         /// </summary>
-        public HashSet<Type> FieldCodecs { get; } = new HashSet<Type>();
+        public HashSet<Type> FieldCodecs
+        {
+#if NET5_0_OR_GREATER
+            [RequiresUnreferencedCode(
+                "Direct collection access cannot preserve field codec members required by trimming. "
+                + "Use AddFieldCodec(Type) when registering field codecs.")]
+#endif
+            get => _fieldCodecs;
+        }
 
         /// <summary>
         /// Gets the set of known serializers, which are responsible for serializing and deserializing a given type.
         /// </summary>
-        public HashSet<Type> Serializers { get; } = new HashSet<Type>();
+        public HashSet<Type> Serializers
+        {
+#if NET5_0_OR_GREATER
+            [RequiresUnreferencedCode(
+                "Direct collection access cannot preserve serializer members required by trimming. "
+                + "Use AddSerializer(Type) when registering serializers.")]
+#endif
+            get => _serializers;
+        }
 
         /// <summary>
         /// Gets the set of copiers, which are responsible for creating deep copies of a given type.
         /// </summary>
-        public HashSet<Type> Copiers { get; } = new HashSet<Type>();
+        public HashSet<Type> Copiers
+        {
+#if NET5_0_OR_GREATER
+            [RequiresUnreferencedCode(
+                "Direct collection access cannot preserve copier members required by trimming. "
+                + "Use AddCopier(Type) when registering copiers.")]
+#endif
+            get => _copiers;
+        }
 
         /// <summary>
         /// Gets the set of converters, which are responsible for converting from one type to another.
         /// </summary>
-        public HashSet<Type> Converters { get; } = new HashSet<Type>();
+        public HashSet<Type> Converters
+        {
+#if NET5_0_OR_GREATER
+            [RequiresUnreferencedCode(
+                "Direct collection access cannot preserve converter members required by trimming. "
+                + "Use AddConverter(Type) when registering converters.")]
+#endif
+            get => _converters;
+        }
 
         /// <summary>
         /// Gets the set of known interfaces, which are interfaces that have corresponding proxies in the <see cref="InterfaceProxies"/> collection.
         /// </summary>
-        public HashSet<Type> Interfaces { get; } = new HashSet<Type>();
+        public HashSet<Type> Interfaces
+        {
+#if NET5_0_OR_GREATER
+            [RequiresUnreferencedCode(
+                "Direct collection access cannot preserve interface members required by trimming. "
+                + "Use AddInterface(Type) when registering interfaces.")]
+#endif
+            get => _interfaces;
+        }
 
         /// <summary>
         /// Gets the set of known interface proxies, which capture method invocations which can be serialized, deserialized, and invoked against an implementation of this interface.
@@ -68,12 +125,28 @@ namespace Orleans.Serialization.Configuration
         /// <remarks>
         /// This allows decoupling the caller and target, so that remote procedure calls can be implemented by capturing an invocation, transmitting it, and later invoking it against a target object.
         /// </remarks>
-        public HashSet<Type> InterfaceProxies { get; } = new HashSet<Type>();
+        public HashSet<Type> InterfaceProxies
+        {
+#if NET5_0_OR_GREATER
+            [RequiresUnreferencedCode(
+                "Direct collection access cannot preserve proxy members required by trimming. "
+                + "Use AddInterfaceProxy(Type) when registering interface proxies.")]
+#endif
+            get => _interfaceProxies;
+        }
 
         /// <summary>
         /// Gets the set of interface implementations, which are implementations of the interfaces present in <see cref="Interfaces"/>.
         /// </summary>
-        public HashSet<Type> InterfaceImplementations { get; } = new HashSet<Type>();
+        public HashSet<Type> InterfaceImplementations
+        {
+#if NET5_0_OR_GREATER
+            [RequiresUnreferencedCode(
+                "Direct collection access cannot preserve implementation members required by trimming. "
+                + "Use AddInterfaceImplementation(Type) when registering interface implementations.")]
+#endif
+            get => _interfaceImplementations;
+        }
 
         /// <summary>
         /// Gets the mapping of well-known type identifiers to their corresponding type.
@@ -152,6 +225,22 @@ namespace Orleans.Serialization.Configuration
         /// </summary>
         internal HashSet<object> TypeManifestProviders { get; } = new();
 
+        internal HashSet<Type> ActivatorTypes => _activators;
+
+        internal HashSet<Type> FieldCodecTypes => _fieldCodecs;
+
+        internal HashSet<Type> SerializerTypes => _serializers;
+
+        internal HashSet<Type> CopierTypes => _copiers;
+
+        internal HashSet<Type> ConverterTypes => _converters;
+
+        internal HashSet<Type> InterfaceTypes => _interfaces;
+
+        internal HashSet<Type> InterfaceProxyTypes => _interfaceProxies;
+
+        internal HashSet<Type> InterfaceImplementationTypes => _interfaceImplementations;
+
         /// <summary>
         /// Adds a serializer implementation type and preserves the members used to inspect and activate it.
         /// </summary>
@@ -160,7 +249,7 @@ namespace Orleans.Serialization.Configuration
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(ImplementationTypeMembers)]
 #endif
-            Type type) => Serializers.Add(type ?? throw new ArgumentNullException(nameof(type)));
+            Type type) => _serializers.Add(type ?? throw new ArgumentNullException(nameof(type)));
 
         /// <summary>
         /// Adds a field codec implementation type and preserves the members used to inspect and activate it.
@@ -170,7 +259,7 @@ namespace Orleans.Serialization.Configuration
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(ImplementationTypeMembers)]
 #endif
-            Type type) => FieldCodecs.Add(type ?? throw new ArgumentNullException(nameof(type)));
+            Type type) => _fieldCodecs.Add(type ?? throw new ArgumentNullException(nameof(type)));
 
         /// <summary>
         /// Adds a copier implementation type and preserves the members used to inspect and activate it.
@@ -180,7 +269,7 @@ namespace Orleans.Serialization.Configuration
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(ImplementationTypeMembers)]
 #endif
-            Type type) => Copiers.Add(type ?? throw new ArgumentNullException(nameof(type)));
+            Type type) => _copiers.Add(type ?? throw new ArgumentNullException(nameof(type)));
 
         /// <summary>
         /// Adds a converter implementation type and preserves the members used to inspect and activate it.
@@ -190,7 +279,7 @@ namespace Orleans.Serialization.Configuration
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(ImplementationTypeMembers)]
 #endif
-            Type type) => Converters.Add(type ?? throw new ArgumentNullException(nameof(type)));
+            Type type) => _converters.Add(type ?? throw new ArgumentNullException(nameof(type)));
 
         /// <summary>
         /// Adds an activator implementation type and preserves the members used to inspect and activate it.
@@ -200,7 +289,7 @@ namespace Orleans.Serialization.Configuration
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(ImplementationTypeMembers)]
 #endif
-            Type type) => Activators.Add(type ?? throw new ArgumentNullException(nameof(type)));
+            Type type) => _activators.Add(type ?? throw new ArgumentNullException(nameof(type)));
 
         /// <summary>
         /// Adds a generated interface type and preserves the methods and inherited interfaces used by generated invokables.
@@ -210,7 +299,7 @@ namespace Orleans.Serialization.Configuration
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(InterfaceTypeMembers)]
 #endif
-            Type type) => Interfaces.Add(type ?? throw new ArgumentNullException(nameof(type)));
+            Type type) => _interfaces.Add(type ?? throw new ArgumentNullException(nameof(type)));
 
         /// <summary>
         /// Adds a generated proxy type and preserves its implemented interfaces.
@@ -221,7 +310,7 @@ namespace Orleans.Serialization.Configuration
             [DynamicallyAccessedMembers(
                 DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.Interfaces)]
 #endif
-            Type type) => InterfaceProxies.Add(type ?? throw new ArgumentNullException(nameof(type)));
+            Type type) => _interfaceProxies.Add(type ?? throw new ArgumentNullException(nameof(type)));
 
         /// <summary>
         /// Adds a generated interface implementation type and preserves its implemented interfaces.
@@ -231,7 +320,7 @@ namespace Orleans.Serialization.Configuration
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.Interfaces)]
 #endif
-            Type type) => InterfaceImplementations.Add(type ?? throw new ArgumentNullException(nameof(type)));
+            Type type) => _interfaceImplementations.Add(type ?? throw new ArgumentNullException(nameof(type)));
 
         /// <summary>
         /// Adds the Orleans-formatted runtime type name for <paramref name="type"/> to

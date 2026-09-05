@@ -150,14 +150,14 @@ public class TypeConverter
 
     private void ConsumeMetadata(TypeManifestOptions metadata)
     {
-        AddFromMetadata(metadata.Serializers, typeof(IBaseCodec<>));
-        AddFromMetadata(metadata.Serializers, typeof(IValueSerializer<>));
-        AddFromMetadata(metadata.Serializers, typeof(IFieldCodec<>));
-        AddFromMetadata(metadata.FieldCodecs, typeof(IFieldCodec<>));
-        AddFromMetadata(metadata.Activators, typeof(IActivator<>));
-        AddFromMetadata(metadata.Copiers, typeof(IDeepCopier<>));
-        AddFromMetadata(metadata.Converters, typeof(IConverter<,>));
-        foreach (var type in metadata.InterfaceProxies)
+        AddFromMetadata(metadata.SerializerTypes, typeof(IBaseCodec<>));
+        AddFromMetadata(metadata.SerializerTypes, typeof(IValueSerializer<>));
+        AddFromMetadata(metadata.SerializerTypes, typeof(IFieldCodec<>));
+        AddFromMetadata(metadata.FieldCodecTypes, typeof(IFieldCodec<>));
+        AddFromMetadata(metadata.ActivatorTypes, typeof(IActivator<>));
+        AddFromMetadata(metadata.CopierTypes, typeof(IDeepCopier<>));
+        AddFromMetadata(metadata.ConverterTypes, typeof(IConverter<,>));
+        foreach (var type in metadata.InterfaceProxyTypes)
         {
             AddAllowedType(type switch
             {

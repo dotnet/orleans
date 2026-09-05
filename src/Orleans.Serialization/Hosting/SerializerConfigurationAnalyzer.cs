@@ -29,7 +29,7 @@ namespace Orleans.Serialization
         public static Dictionary<Type, SerializerConfigurationComplaint> AnalyzeSerializerAvailability(ICodecProvider codecProvider, TypeManifestOptions options)
         {
             var allComplaints = new Dictionary<Type, SerializerConfigurationComplaint>();
-            foreach (var @interface in options.Interfaces)
+            foreach (var @interface in options.InterfaceTypes)
             {
                 foreach (var method in GetInterfaceMethods(@interface))
                 {

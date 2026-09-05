@@ -95,14 +95,14 @@ namespace Orleans.Serialization.Serializers
         private void ConsumeMetadata(IOptions<TypeManifestOptions> codecConfiguration)
         {
             var metadata = codecConfiguration.Value;
-            AddFromMetadata(_baseCodecs, metadata.Serializers, typeof(IBaseCodec<>));
-            AddFromMetadata(_valueSerializers, metadata.Serializers, typeof(IValueSerializer<>));
-            AddFromMetadata(_fieldCodecs, metadata.Serializers, typeof(IFieldCodec<>));
-            AddFromMetadata(_fieldCodecs, metadata.FieldCodecs, typeof(IFieldCodec<>));
-            AddFromMetadata(_activators, metadata.Activators, typeof(IActivator<>));
-            AddFromMetadata(_copiers, metadata.Copiers, typeof(IDeepCopier<>));
-            AddFromMetadata(_converters, metadata.Converters, typeof(IConverter<,>));
-            AddFromMetadata(_baseCopiers, metadata.Copiers, typeof(IBaseCopier<>));
+            AddFromMetadata(_baseCodecs, metadata.SerializerTypes, typeof(IBaseCodec<>));
+            AddFromMetadata(_valueSerializers, metadata.SerializerTypes, typeof(IValueSerializer<>));
+            AddFromMetadata(_fieldCodecs, metadata.SerializerTypes, typeof(IFieldCodec<>));
+            AddFromMetadata(_fieldCodecs, metadata.FieldCodecTypes, typeof(IFieldCodec<>));
+            AddFromMetadata(_activators, metadata.ActivatorTypes, typeof(IActivator<>));
+            AddFromMetadata(_copiers, metadata.CopierTypes, typeof(IDeepCopier<>));
+            AddFromMetadata(_converters, metadata.ConverterTypes, typeof(IConverter<,>));
+            AddFromMetadata(_baseCopiers, metadata.CopierTypes, typeof(IBaseCopier<>));
 
 #if NET5_0_OR_GREATER
             [UnconditionalSuppressMessage(

@@ -1,9 +1,12 @@
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization.Cloning;
+using Orleans.Serialization.Configuration;
 using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Utilities;
 using System;
+using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
 using Xunit;
 
 namespace Orleans.Serialization.UnitTests;
@@ -14,6 +17,30 @@ namespace Orleans.Serialization.UnitTests;
 [Trait("Area", "Serialization")]
 public class TrimFlowTests
 {
+    [Theory]
+    [InlineData(nameof(TypeManifestOptions.Activators), nameof(TypeManifestOptions.AddActivator), DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.Interfaces)]
+    [InlineData(nameof(TypeManifestOptions.FieldCodecs), nameof(TypeManifestOptions.AddFieldCodec), DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.Interfaces)]
+    [InlineData(nameof(TypeManifestOptions.Serializers), nameof(TypeManifestOptions.AddSerializer), DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.Interfaces)]
+    [InlineData(nameof(TypeManifestOptions.Copiers), nameof(TypeManifestOptions.AddCopier), DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.Interfaces)]
+    [InlineData(nameof(TypeManifestOptions.Converters), nameof(TypeManifestOptions.AddConverter), DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.Interfaces)]
+    [InlineData(nameof(TypeManifestOptions.Interfaces), nameof(TypeManifestOptions.AddInterface), DynamicallyAccessedMemberTypes.PublicMethods | DynamicallyAccessedMemberTypes.NonPublicMethods | DynamicallyAccessedMemberTypes.Interfaces)]
+    [InlineData(nameof(TypeManifestOptions.InterfaceProxies), nameof(TypeManifestOptions.AddInterfaceProxy), DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.Interfaces)]
+    [InlineData(nameof(TypeManifestOptions.InterfaceImplementations), nameof(TypeManifestOptions.AddInterfaceImplementation), DynamicallyAccessedMemberTypes.Interfaces)]
+    public void TypeManifestRegistrations_ExposeTrimSafeAlternative(
+        string legacyPropertyName,
+        string registrationMethodName,
+        DynamicallyAccessedMemberTypes expectedMembers)
+    {
+        var property = typeof(TypeManifestOptions).GetProperty(legacyPropertyName)!;
+        var legacyWarning = property.GetMethod!.GetCustomAttribute<RequiresUnreferencedCodeAttribute>();
+        var registrationParameter = typeof(TypeManifestOptions).GetMethod(registrationMethodName)!.GetParameters()[0];
+        var preservedMembers = registrationParameter.GetCustomAttribute<DynamicallyAccessedMembersAttribute>();
+
+        Assert.NotNull(legacyWarning);
+        Assert.Contains(registrationMethodName, legacyWarning.Message, StringComparison.Ordinal);
+        Assert.Equal(expectedMembers, preservedMembers?.MemberTypes);
+    }
+
     [Fact]
     public void ShallowCopyableTypes_InspectsPrivateValueTypeFields()
     {
