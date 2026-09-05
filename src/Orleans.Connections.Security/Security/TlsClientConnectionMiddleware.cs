@@ -222,16 +222,19 @@ namespace Orleans.Connections.Security
             }
         }
 
-        private static X509Certificate2? ValidateCertificate(X509Certificate2? certificate, RemoteCertificateMode mode)
+        internal static X509Certificate2? ValidateCertificate(X509Certificate2? certificate, RemoteCertificateMode mode)
         {
             switch (mode)
             {
                 case RemoteCertificateMode.NoCertificate:
                     return null;
                 case RemoteCertificateMode.AllowCertificate:
-                    //if certificate exists but can not be used for client authentication.
-                    if (certificate != null && CertificateLoader.IsCertificateAllowedForClientAuth(certificate))
+                    if (certificate is { HasPrivateKey: true }
+                        && CertificateLoader.IsCertificateAllowedForClientAuth(certificate))
+                    {
                         return certificate;
+                    }
+
                     return null;
                 case RemoteCertificateMode.RequireCertificate:
                     EnsureCertificateIsAllowedForClientAuth(certificate);
