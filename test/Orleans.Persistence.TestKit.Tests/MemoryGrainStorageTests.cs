@@ -61,7 +61,70 @@ public class MemoryGrainStorageTests : GrainStorageTestRunner, IClassFixture<Mem
         Assert.Contains("found '<null>'", exception.Message);
     }
 
-    private sealed class TestRunner(IGrainStorage storage) : GrainStorageTestRunner(storage);
+    [Fact]
+    public async Task StoreWriteRead_NullState_ThrowsBeforeCallingStorage()
+    {
+        var storage = new TrackingGrainStorage();
+        var runner = new TestRunner(storage);
+
+        var exception = await Assert.ThrowsAsync<ArgumentNullException>(
+            () => runner.StoreWriteReadWithNullState(TestContext.Current.CancellationToken));
+
+        Assert.Equal("grainState", exception.ParamName);
+        Assert.Equal(0, storage.CallCount);
+    }
+
+    [Fact]
+    public async Task StoreWriteClearRead_NullState_ThrowsBeforeCallingStorage()
+    {
+        var storage = new TrackingGrainStorage();
+        var runner = new TestRunner(storage);
+
+        var exception = await Assert.ThrowsAsync<ArgumentNullException>(
+            () => runner.StoreWriteClearReadWithNullState(TestContext.Current.CancellationToken));
+
+        Assert.Equal("grainState", exception.ParamName);
+        Assert.Equal(0, storage.CallCount);
+    }
+
+    [Fact]
+    public async Task StoreWriteRead_CanceledTokenTakesPrecedenceOverNullState()
+    {
+        var storage = new TrackingGrainStorage();
+        var runner = new TestRunner(storage);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        var exception = await Assert.ThrowsAsync<OperationCanceledException>(
+            () => runner.StoreWriteReadWithNullState(cancellation.Token));
+
+        Assert.Equal(cancellation.Token, exception.CancellationToken);
+        Assert.Equal(0, storage.CallCount);
+    }
+
+    [Fact]
+    public async Task StoreWriteClearRead_CanceledTokenTakesPrecedenceOverNullState()
+    {
+        var storage = new TrackingGrainStorage();
+        var runner = new TestRunner(storage);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        var exception = await Assert.ThrowsAsync<OperationCanceledException>(
+            () => runner.StoreWriteClearReadWithNullState(cancellation.Token));
+
+        Assert.Equal(cancellation.Token, exception.CancellationToken);
+        Assert.Equal(0, storage.CallCount);
+    }
+
+    private sealed class TestRunner(IGrainStorage storage) : GrainStorageTestRunner(storage)
+    {
+        public Task StoreWriteReadWithNullState(CancellationToken cancellationToken = default) =>
+            Store_WriteRead<object>("grain-type", default, null!, cancellationToken);
+
+        public Task StoreWriteClearReadWithNullState(CancellationToken cancellationToken = default) =>
+            Store_WriteClearRead<object>("grain-type", default, null!, cancellationToken);
+    }
 
     private sealed class NullStateGrainStorage : IGrainStorage
     {
@@ -78,6 +141,29 @@ public class MemoryGrainStorageTests : GrainStorageTestRunner, IClassFixture<Mem
         }
 
         public Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState) => Task.CompletedTask;
+    }
+
+    private sealed class TrackingGrainStorage : IGrainStorage
+    {
+        public int CallCount { get; private set; }
+
+        public Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        {
+            CallCount++;
+            return Task.CompletedTask;
+        }
+
+        public Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        {
+            CallCount++;
+            return Task.CompletedTask;
+        }
+
+        public Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        {
+            CallCount++;
+            return Task.CompletedTask;
+        }
     }
 
     [Fact]

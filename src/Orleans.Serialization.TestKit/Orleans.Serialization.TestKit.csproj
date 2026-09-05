@@ -7,7 +7,6 @@
     <PackageDescription>Test kit for projects using Orleans.Serialization</PackageDescription>
     <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
     <IsTestProject>false</IsTestProject>
-    <WarningsAsErrors>$(WarningsAsErrors);CA1062</WarningsAsErrors>
   </PropertyGroup>
 
   <ItemGroup>

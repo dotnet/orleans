@@ -85,6 +85,9 @@ namespace Orleans.AzureUtils
         /// <param name="options">Queue connection options.</param>
         public AzureQueueDataManager(ILoggerFactory loggerFactory, string queueName, AzureQueueOptions options)
         {
+            ArgumentNullException.ThrowIfNull(queueName);
+            ArgumentNullException.ThrowIfNull(options);
+
             queueName = SanitizeQueueName(queueName);
             ValidateQueueName(queueName);
 
@@ -298,6 +301,8 @@ namespace Orleans.AzureUtils
         /// <param name="message">A message to be deleted from the queue.</param>
         public async Task DeleteQueueMessage(QueueMessage message)
         {
+            ArgumentNullException.ThrowIfNull(message);
+
             var startTime = DateTime.UtcNow;
             LogTraceDeletingAMessage(QueueName);
             try

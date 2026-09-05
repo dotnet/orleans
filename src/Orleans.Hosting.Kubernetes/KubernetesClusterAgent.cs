@@ -68,6 +68,7 @@ namespace Orleans.Hosting.Kubernetes
         /// <param name="options">The Kubernetes hosting options.</param>
         /// <param name="clusterOptions">The cluster identity options.</param>
         /// <param name="localSiloDetails">The local silo identity.</param>
+        [SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "Microsoft.Extensions.DependencyInjection supplies the registered cluster options instance.")]
         public KubernetesClusterAgent(
             IClusterMembershipService clusterMembershipService,
             ILogger<KubernetesClusterAgent> logger,

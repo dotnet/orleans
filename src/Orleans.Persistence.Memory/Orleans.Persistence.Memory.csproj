@@ -7,7 +7,6 @@
     <AssemblyName>Orleans.Persistence.Memory</AssemblyName>
     <RootNamespace>Orleans.Persistence.Memory</RootNamespace>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
-    <WarningsAsErrors>$(WarningsAsErrors);CA1062</WarningsAsErrors>
   </PropertyGroup>
 
   <ItemGroup>

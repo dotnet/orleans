@@ -14,6 +14,7 @@ public static class AzureTableStorageHostingExtensions
     /// </summary>
     /// <param name="builder">The silo builder.</param>
     /// <returns>The silo builder.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="builder"/> is <see langword="null"/>.</exception>
     public static ISiloBuilder AddAzureTableJournalStorage(this ISiloBuilder builder) => builder.AddAzureTableJournalStorage(configure: null);
 
     /// <summary>
@@ -22,8 +23,11 @@ public static class AzureTableStorageHostingExtensions
     /// <param name="builder">The silo builder.</param>
     /// <param name="configure">The delegate used to configure the journal storage provider.</param>
     /// <returns>The silo builder.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="builder"/> is <see langword="null"/>.</exception>
     public static ISiloBuilder AddAzureTableJournalStorage(this ISiloBuilder builder, Action<AzureTableJournalStorageOptions>? configure)
     {
+        ArgumentNullException.ThrowIfNull(builder);
+
         builder.AddJournalStorage();
 
         var services = builder.Services;

@@ -31,8 +31,10 @@ namespace Orleans.Providers.Streams.AzureQueue
         /// Initializes a new instance of the <see cref="AzureQueueDataAdapterV1"/> class.
         /// </summary>
         /// <param name="serializer"></param>
+        /// <exception cref="ArgumentNullException"><paramref name="serializer"/> is <see langword="null"/>.</exception>
         public AzureQueueDataAdapterV1(Serializer serializer)
         {
+            ArgumentNullException.ThrowIfNull(serializer);
             this.serializer = serializer.GetSerializer<AzureQueueBatchContainer>();
         }
 
@@ -75,8 +77,10 @@ namespace Orleans.Providers.Streams.AzureQueue
         /// Initializes a new instance of the <see cref="AzureQueueDataAdapterV2"/> class.
         /// </summary>
         /// <param name="serializer"></param>
+        /// <exception cref="ArgumentNullException"><paramref name="serializer"/> is <see langword="null"/>.</exception>
         public AzureQueueDataAdapterV2(Serializer serializer)
         {
+            ArgumentNullException.ThrowIfNull(serializer);
             this.serializer = serializer.GetSerializer<AzureQueueBatchContainerV2>();
         }
 
