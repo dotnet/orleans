@@ -15,17 +15,28 @@ namespace ServiceBus.Tests.CheckpointerTests;
 [TestProvider("EventHub")]
 [TestArea("Streaming")]
 [TestCategory("EventHub"), TestCategory("AzureStorage"), TestCategory("Streaming")]
-public sealed class AzureTableStreamQueueCheckpointerAzuriteTests
+public sealed class AzureTableStreamQueueCheckpointerAzuriteTests : IDisposable
 {
-    private static CancellationToken TestCancellation => TestContext.Current.CancellationToken;
+    private readonly CancellationTokenSource _operationCancellation =
+        CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+    private CancellationToken TestCancellation => _operationCancellation.Token;
     private static readonly DateTime UpdateTime = new(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+    public AzureTableStreamQueueCheckpointerAzuriteTests()
+        => _operationCancellation.CancelAfter(TimeSpan.FromMinutes(1));
+
+    public void Dispose()
+    {
+        _operationCancellation.Cancel();
+        _operationCancellation.Dispose();
+    }
 
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task TwoCheckpointers_InitialInsertRace_PreservesMonotonicCheckpoint(bool higherWinsInsert)
     {
-        await using var fixture = new Fixture();
+        await using var fixture = new Fixture(TestCancellation);
         var lowRequests = new TableRequests(fixture.TableName, holdInsert: true);
         var highRequests = new TableRequests(fixture.TableName, holdInsert: true);
         var low = await fixture.CreateCheckpointer(lowRequests);
@@ -73,14 +84,15 @@ public sealed class AzureTableStreamQueueCheckpointerAzuriteTests
         {
             lowRequests.ReleaseInsert.TrySetResult();
             highRequests.ReleaseInsert.TrySetResult();
-            await Task.WhenAll(low.FlushAsync(TestCancellation), high.FlushAsync(TestCancellation));
+            using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            await Task.WhenAll(low.FlushAsync(cleanup.Token), high.FlushAsync(cleanup.Token));
         }
     }
 
     [Fact]
     public async Task TwoCheckpointers_StaleETagReloadsAndRetriesHigherNumericCheckpoint()
     {
-        await using var fixture = new Fixture();
+        await using var fixture = new Fixture(TestCancellation);
         var winner = await fixture.CreateCheckpointer();
         Assert.Equal(string.Empty, await winner.Load(TestCancellation));
         await Persist(winner, "8");
@@ -115,7 +127,7 @@ public sealed class AzureTableStreamQueueCheckpointerAzuriteTests
     [Fact]
     public async Task TwoCheckpointers_StaleETagRetriesPendingHigherCheckpointWithinSameFlush()
     {
-        await using var fixture = new Fixture();
+        await using var fixture = new Fixture(TestCancellation);
         var first = await fixture.CreateCheckpointer();
         await first.Load(TestCancellation);
         await Persist(first, "8");
@@ -142,7 +154,7 @@ public sealed class AzureTableStreamQueueCheckpointerAzuriteTests
     [InlineData(true)]
     public async Task TwoCheckpointers_DeleteRecreateInvalidatesCachedETagAndRecovers(bool recreateBeforeUpdate)
     {
-        await using var fixture = new Fixture();
+        await using var fixture = new Fixture(TestCancellation);
         var oldRequests = new TableRequests(fixture.TableName);
         var old = await fixture.CreateCheckpointer(oldRequests);
         await old.Load(TestCancellation);
@@ -173,7 +185,7 @@ public sealed class AzureTableStreamQueueCheckpointerAzuriteTests
         await fixture.AssertCheckpoint("11");
     }
 
-    private static async Task Persist(IStreamQueueCheckpointer<string> checkpointer, string checkpoint)
+    private async Task Persist(IStreamQueueCheckpointer<string> checkpointer, string checkpoint)
     {
         checkpointer.Update(checkpoint, UpdateTime, TestCancellation);
         await checkpointer.FlushAsync(TestCancellation);
@@ -185,8 +197,9 @@ public sealed class AzureTableStreamQueueCheckpointerAzuriteTests
         private const string Service = "etag-service";
         private const string Partition = "shard-1";
         private readonly TableServiceClient _serviceClient;
+        private readonly CancellationToken _cancellationToken;
 
-        public Fixture()
+        public Fixture(CancellationToken cancellationToken)
         {
             if (TestDefaultConfiguration.UseAadAuthentication
                 ? TestDefaultConfiguration.TableEndpoint is null
@@ -195,6 +208,7 @@ public sealed class AzureTableStreamQueueCheckpointerAzuriteTests
                 throw Xunit.Sdk.SkipException.ForSkip("Azure Table tests require the existing AzureStorage test connection configuration.");
             }
 
+            _cancellationToken = cancellationToken;
             _serviceClient = AzureStorageOperationOptionsExtensions.GetTableServiceClient();
             Table = _serviceClient.GetTableClient(TableName);
         }
@@ -225,24 +239,24 @@ public sealed class AzureTableStreamQueueCheckpointerAzuriteTests
                         PersistInterval = TimeSpan.FromMinutes(1),
                         CheckpointComparer = StreamCheckpointComparers.Numeric,
                     },
-                    Provider, Partition, Service, NullLoggerFactory.Instance, TestCancellation));
+                    Provider, Partition, Service, NullLoggerFactory.Instance, _cancellationToken));
         }
 
         public async Task<StreamQueueCheckpointEntity> ReadEntity()
         {
             var key = StreamQueueCheckpointEntity.Create(string.Empty, Provider, Service, Partition);
             var response = await Table.GetEntityAsync<StreamQueueCheckpointEntity>(
-                key.PartitionKey, key.RowKey, cancellationToken: TestCancellation);
+                key.PartitionKey, key.RowKey, cancellationToken: _cancellationToken);
             return response.Value;
         }
 
         public async Task AssertCheckpoint(string expected)
         {
             var fresh = await CreateCheckpointer();
-            Assert.Equal(expected, await fresh.Load(TestCancellation));
+            Assert.Equal(expected, await fresh.Load(_cancellationToken));
             Assert.True(fresh.CheckpointExists);
             var entities = new List<StreamQueueCheckpointEntity>();
-            await foreach (var entity in Table.QueryAsync<StreamQueueCheckpointEntity>(cancellationToken: TestCancellation))
+            await foreach (var entity in Table.QueryAsync<StreamQueueCheckpointEntity>(cancellationToken: _cancellationToken))
             {
                 entities.Add(entity);
             }

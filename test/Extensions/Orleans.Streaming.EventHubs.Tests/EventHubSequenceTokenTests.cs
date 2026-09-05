@@ -80,7 +80,7 @@ public sealed class EventHubSequenceTokenTests
         }
 
         Assert.Single(new HashSet<StreamSequenceToken>(tokens));
-        Assert.Single(new SortedSet<StreamSequenceToken>(tokens.Reverse()));
+        Assert.Single(new SortedSet<StreamSequenceToken>(Enumerable.Reverse(tokens)));
     }
 
     [Theory]
