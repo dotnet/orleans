@@ -28,7 +28,7 @@ internal sealed partial class ActivationData
 
     [LoggerMessage(
         Level = LogLevel.Warning,
-        Message = "Error while cancelling on-going operation '{Operation}'."
+        Message = "Error while cancelling ongoing operation '{Operation}'."
     )]
     private static partial void LogErrorCancellingOperation(ILogger logger, Exception exception, object operation);
 
