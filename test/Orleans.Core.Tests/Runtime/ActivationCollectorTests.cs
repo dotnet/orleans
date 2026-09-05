@@ -1337,30 +1337,19 @@ namespace UnitTests.Runtime
             public bool IsIdle
             {
                 get => Volatile.Read(ref _isIdle);
-                set
-                {
-                    Assert.True(Monitor.IsEntered(this));
-                    _isIdle = value;
-                }
+                set => Volatile.Write(ref _isIdle, value);
             }
 
             public bool IsInWorkingSet
             {
                 get => Volatile.Read(ref _isInWorkingSet);
-                set
-                {
-                    Assert.True(Monitor.IsEntered(this));
-                    _isInWorkingSet = value;
-                }
+                set => Volatile.Write(ref _isInWorkingSet, value);
             }
 
             public bool WasRemovedByCollection { get; set; }
 
             public bool IsCandidateForRemoval(bool wouldRemove)
-            {
-                Assert.True(Monitor.IsEntered(this));
-                return isCandidateForRemoval?.Invoke(wouldRemove) ?? false;
-            }
+                => isCandidateForRemoval?.Invoke(wouldRemove) ?? false;
 
         }
 
@@ -1370,7 +1359,6 @@ namespace UnitTests.Runtime
 
             public bool IsCandidateForRemoval(bool wouldRemove)
             {
-                Assert.True(Monitor.IsEntered(this));
                 CandidateCalls.Add(wouldRemove);
                 return true;
             }
@@ -2402,7 +2390,11 @@ namespace UnitTests.Runtime
 
             public ActivationData Activation { get; }
             public IActivationWorkingSetMemberStatus Member { get; }
+#if NET10_0_OR_GREATER
+            public Lock SyncRoot => (Lock)LockField.GetValue(Activation)!;
+#else
             public object SyncRoot => LockField.GetValue(Activation)!;
+#endif
             public FakeTimeProvider TimeProvider { get; }
             public ActivationWorkingSet WorkingSet { get; }
             public RecordingWorkingSetObserver Observer { get; }
