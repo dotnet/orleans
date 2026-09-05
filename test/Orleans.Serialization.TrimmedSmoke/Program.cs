@@ -5,6 +5,8 @@ using Orleans.Serialization;
 using Orleans.Serialization.Configuration;
 using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.Serializers;
+using Orleans.CodeGeneration;
+using Orleans.Runtime;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Runtime.Serialization;
@@ -22,15 +24,35 @@ internal static class Program
     private static void Main()
     {
         using var serviceProvider = new ServiceCollection()
-            .AddSerializer()
+            .AddSerializer(builder => builder.Configure(options =>
+            {
+                options.AddSerializer(typeof(CustomGenericCodec<>));
+                options.AddCopier(typeof(CustomGenericCopier<>));
+                options.AddActivator(typeof(CustomGenericActivator<>));
+            }))
             .AddSingleton<IGeneralizedCodec, DotNetSerializableCodec>()
             .BuildServiceProvider();
 
         var codecProvider = serviceProvider.GetRequiredService<CodecProvider>();
         ValidateGeneratedSerializer(serviceProvider);
+        ValidateManualRegistrations(codecProvider);
         ValidateSerializableCallbacks(serviceProvider);
         ValidateGeneratedHelper(codecProvider);
         ValidateConfigurationAnalyzer(serviceProvider, codecProvider);
+        ValidateGeneratedProxy(serviceProvider, codecProvider);
+    }
+
+    private static void ValidateManualRegistrations(CodecProvider codecProvider)
+    {
+        Ensure(
+            codecProvider.GetCodec<CustomTarget<string>>().GetType() == typeof(CustomGenericCodec<string>),
+            "The manually registered generic codec constructor was not preserved.");
+        Ensure(
+            codecProvider.GetDeepCopier<CustomTarget<string>>().GetType() == typeof(CustomGenericCopier<string>),
+            "The manually registered generic copier constructor was not preserved.");
+        Ensure(
+            codecProvider.GetActivator<CustomTarget<string>>().GetType() == typeof(CustomGenericActivator<string>),
+            "The manually registered generic activator constructor was not preserved.");
     }
 
     private static void ValidateGeneratedSerializer(IServiceProvider serviceProvider)
@@ -86,11 +108,17 @@ internal static class Program
         Ensure(method is not null, "Generated method metadata was not preserved.");
     }
 
+    [UnconditionalSuppressMessage(
+        "Trimming",
+        "IL2075",
+        Justification = "TypeManifestOptions.AddInterfaceImplementation preserves implemented interfaces before the type flows through the manifest collection.")]
     private static void ValidateConfigurationAnalyzer(IServiceProvider serviceProvider, CodecProvider codecProvider)
     {
-        var options = serviceProvider.GetRequiredService<IOptions<TypeManifestOptions>>().Value;
-        var complaints = SerializerConfigurationAnalyzer.AnalyzeSerializerAvailability(codecProvider, options);
-        var proxyType = options.InterfaceProxies.Single(type => typeof(ITrimSmokeGrain).IsAssignableFrom(type));
+        var analysisOptions = new TypeManifestOptions();
+        analysisOptions.AddInterface(typeof(ITrimSmokeGrain));
+        var complaints = SerializerConfigurationAnalyzer.AnalyzeSerializerAvailability(codecProvider, analysisOptions);
+        var manifestOptions = serviceProvider.GetRequiredService<IOptions<TypeManifestOptions>>().Value;
+        var proxyType = manifestOptions.InterfaceProxies.Single(type => typeof(ITrimSmokeGrain).IsAssignableFrom(type));
 
         Ensure(
             complaints.Keys.All(type => type != typeof(GeneratedPayload<string>)),
@@ -98,6 +126,36 @@ internal static class Program
         Ensure(
             typeof(ITrimSmokeGrain).IsAssignableFrom(proxyType),
             "The generated proxy's implemented grain interface was not preserved.");
+        var implementationType = manifestOptions.InterfaceImplementations.Single(type => type == typeof(TrimSmokeGrain));
+        Ensure(
+            implementationType.GetInterfaces().Contains(typeof(ITrimSmokeGrain)),
+            "The generated grain implementation's interface metadata was not preserved.");
+    }
+
+    private static void ValidateGeneratedProxy(IServiceProvider serviceProvider, CodecProvider codecProvider)
+    {
+        var options = serviceProvider.GetRequiredService<IOptions<TypeManifestOptions>>().Value;
+        var proxyType = options.InterfaceProxies.Single(type => typeof(ITrimSmokeGrain).IsAssignableFrom(type));
+        var grainType = GrainType.Create("trim-smoke");
+        var interfaceType = GrainInterfaceType.Create("trim-smoke-interface");
+        var shared = new GrainReferenceShared(
+            grainType,
+            interfaceType,
+            interfaceVersion: 0,
+            runtime: null!,
+            InvokeMethodOptions.None,
+            codecProvider,
+            serviceProvider.GetRequiredService<Orleans.Serialization.Cloning.CopyContextPool>(),
+            serviceProvider);
+        var referenceActivator = new Orleans.GrainReferences.GrainReferenceActivator(
+            serviceProvider,
+            [new TrimSmokeReferenceActivatorProvider(proxyType, shared)]);
+
+        var proxy = referenceActivator.CreateReference(
+            GrainId.Create(grainType, IdSpan.Create("key")),
+            interfaceType);
+
+        Ensure(proxy is ITrimSmokeGrain, "The generated grain proxy constructor was not preserved.");
     }
 
     private static void Ensure([DoesNotReturnIf(false)] bool condition, string message)
@@ -112,6 +170,11 @@ internal static class Program
 public interface ITrimSmokeGrain : IGrainWithStringKey
 {
     Task<GeneratedPayload<string>> Echo(GeneratedPayload<string> value);
+}
+
+public sealed class TrimSmokeGrain : Grain, ITrimSmokeGrain
+{
+    public Task<GeneratedPayload<string>> Echo(GeneratedPayload<string> value) => Task.FromResult(value);
 }
 
 [GenerateSerializer]
@@ -135,6 +198,74 @@ internal sealed class PublicConstructorService
     }
 
     public int Value => 42;
+}
+
+internal sealed class CustomTarget<T>;
+
+internal sealed class CustomGenericCodec<T> : Orleans.Serialization.Codecs.IFieldCodec<CustomTarget<T>>
+{
+    public CustomGenericCodec()
+    {
+    }
+
+    public void WriteField<TBufferWriter>(
+        ref Orleans.Serialization.Buffers.Writer<TBufferWriter> writer,
+        uint fieldIdDelta,
+        [AllowNull] Type expectedType,
+        [AllowNull] CustomTarget<T> value)
+        where TBufferWriter : System.Buffers.IBufferWriter<byte> =>
+        throw new NotSupportedException("This codec is used only to verify registration activation.");
+
+    public CustomTarget<T> ReadValue<TInput>(
+        ref Orleans.Serialization.Buffers.Reader<TInput> reader,
+        Orleans.Serialization.WireProtocol.Field field) =>
+        throw new NotSupportedException("This codec is used only to verify registration activation.");
+}
+
+internal sealed class CustomGenericCopier<T> : Orleans.Serialization.Cloning.IDeepCopier<CustomTarget<T>>
+{
+    public CustomGenericCopier()
+    {
+    }
+
+    public CustomTarget<T> DeepCopy(
+        CustomTarget<T> input,
+        Orleans.Serialization.Cloning.CopyContext context) => input;
+}
+
+internal sealed class CustomGenericActivator<T> : Orleans.Serialization.Activators.IActivator<CustomTarget<T>>
+{
+    public CustomGenericActivator()
+    {
+    }
+
+    public CustomTarget<T> Create() => new();
+}
+
+internal sealed class TrimSmokeReferenceActivatorProvider(
+    Type proxyType,
+    GrainReferenceShared shared) : Orleans.GrainReferences.IGrainReferenceActivatorProvider
+{
+    public bool TryGet(
+        GrainType grainType,
+        GrainInterfaceType interfaceType,
+        [NotNullWhen(true)] out Orleans.GrainReferences.IGrainReferenceActivator? activator)
+    {
+        activator = new TrimSmokeReferenceActivator(proxyType, shared);
+        return true;
+    }
+}
+
+internal sealed class TrimSmokeReferenceActivator(
+    Type proxyType,
+    GrainReferenceShared shared) : Orleans.GrainReferences.IGrainReferenceActivator
+{
+    [UnconditionalSuppressMessage(
+        "Trimming",
+        "IL2067",
+        Justification = "TypeManifestOptions.AddInterfaceProxy preserves the public constructor used to instantiate generated proxy types.")]
+    public GrainReference CreateReference(GrainId grainId) =>
+        (GrainReference)Activator.CreateInstance(proxyType, shared, grainId.Key)!;
 }
 
 [Serializable]

@@ -99,7 +99,7 @@ namespace Orleans.Serialization
         [UnconditionalSuppressMessage(
             "Trimming",
             "IL2070",
-            Justification = "Generated manifests register grain interfaces through TypeManifestProviderBase.AddInterfaceType, which preserves public and non-public methods and inherited interfaces. The HashSet<Type> boundary cannot retain that annotation.")]
+            Justification = "Generated manifests and trim-safe manual configuration register grain interfaces through TypeManifestOptions.AddInterface, which preserves public and non-public methods and inherited interfaces. The HashSet<Type> boundary cannot retain that annotation.")]
 #endif
         private static MethodInfo[] GetInterfaceMethods(Type interfaceType)
             => interfaceType.GetMethods(BindingFlags.Instance | BindingFlags.Public);

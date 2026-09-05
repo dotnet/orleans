@@ -262,12 +262,12 @@ namespace OrleansCodeGen.TestProject
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
-            AddImplementationType(config.Serializers, typeof(OrleansCodeGen.TestProject.Codec_GenericData<>));
-            AddImplementationType(config.Serializers, typeof(OrleansCodeGen.TestProject.Codec_ConcreteUsage));
-            AddImplementationType(config.Copiers, typeof(OrleansCodeGen.TestProject.Copier_GenericData<>));
-            AddImplementationType(config.Copiers, typeof(OrleansCodeGen.TestProject.Copier_ConcreteUsage));
-            AddImplementationType(config.Activators, typeof(OrleansCodeGen.TestProject.Activator_GenericData<>));
-            AddImplementationType(config.Activators, typeof(OrleansCodeGen.TestProject.Activator_ConcreteUsage));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_GenericData<>));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_ConcreteUsage));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_GenericData<>));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_ConcreteUsage));
+            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_GenericData<>));
+            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_ConcreteUsage));
         }
     }
 }

@@ -127,8 +127,8 @@ namespace OrleansCodeGen.TestProject
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
-            AddImplementationType(config.Serializers, typeof(OrleansCodeGen.TestProject.Codec_InterfaceCtorParam));
-            AddImplementationType(config.Copiers, typeof(OrleansCodeGen.TestProject.Copier_InterfaceCtorParam));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_InterfaceCtorParam));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_InterfaceCtorParam));
         }
     }
 }

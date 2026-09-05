@@ -3384,9 +3384,25 @@ namespace Orleans.Serialization.Configuration
 
         public System.Collections.Generic.Dictionary<uint, System.Type> WellKnownTypeIds { get { throw null; } }
 
+        public void AddActivator(System.Type type) { }
+
         public void AddAllowedAssembly(System.Reflection.Assembly assembly) { }
 
         public void AddAllowedType(System.Type type) { }
+
+        public void AddConverter(System.Type type) { }
+
+        public void AddCopier(System.Type type) { }
+
+        public void AddFieldCodec(System.Type type) { }
+
+        public void AddInterface(System.Type type) { }
+
+        public void AddInterfaceImplementation(System.Type type) { }
+
+        public void AddInterfaceProxy(System.Type type) { }
+
+        public void AddSerializer(System.Type type) { }
     }
 
     [System.AttributeUsage(System.AttributeTargets.Assembly, AllowMultiple = true)]
@@ -3401,12 +3417,6 @@ namespace Orleans.Serialization.Configuration
     public abstract partial class TypeManifestProviderBase : ITypeManifestProvider, Microsoft.Extensions.Options.IConfigureOptions<TypeManifestOptions>
     {
         public virtual object Key { get { throw null; } }
-
-        protected static void AddImplementationType(System.Collections.Generic.HashSet<System.Type> collection, System.Type type) { }
-
-        protected static void AddInterfaceType(System.Collections.Generic.HashSet<System.Type> collection, System.Type type) { }
-
-        protected static void AddMetadataType(System.Collections.Generic.HashSet<System.Type> collection, System.Type type) { }
 
         protected abstract void ConfigureInner(TypeManifestOptions options);
         void Microsoft.Extensions.Options.IConfigureOptions<TypeManifestOptions>.Configure(TypeManifestOptions options) { }

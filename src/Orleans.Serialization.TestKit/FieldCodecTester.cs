@@ -54,7 +54,7 @@ namespace Orleans.Serialization.TestKit
         internal static IServiceProvider CreateServiceProviderCore(Action<ISerializerBuilder> configure)
         {
             var services = new ServiceCollection();
-            _ = services.AddSerializer(builder => builder.Configure(config => config.FieldCodecs.Add(typeof(TCodec))));
+            _ = services.AddSerializer(builder => builder.Configure(config => config.AddFieldCodec(typeof(TCodec))));
 
             if (!typeof(TCodec).IsAbstract && !typeof(TCodec).IsInterface)
             {

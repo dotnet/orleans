@@ -228,11 +228,11 @@ namespace OrleansCodeGen.TestProject
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
-            AddImplementationType(config.Serializers, typeof(OrleansCodeGen.TestProject.Codec_MyServiceConsumer));
-            AddImplementationType(config.Serializers, typeof(OrleansCodeGen.TestProject.Codec_RootType));
-            AddImplementationType(config.Copiers, typeof(OrleansCodeGen.TestProject.Copier_MyServiceConsumer));
-            AddImplementationType(config.Copiers, typeof(OrleansCodeGen.TestProject.Copier_RootType));
-            AddImplementationType(config.Activators, typeof(OrleansCodeGen.TestProject.Activator_RootType));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_MyServiceConsumer));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_RootType));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_MyServiceConsumer));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_RootType));
+            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_RootType));
         }
     }
 }

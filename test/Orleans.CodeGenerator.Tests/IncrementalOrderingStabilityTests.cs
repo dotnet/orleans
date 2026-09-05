@@ -178,11 +178,11 @@ public class IncrementalOrderingStabilityTests
         Assert.Equal(metadataSource, reorderedMetadataSource);
         Assert.Equal(1, CountOccurrences(metadataSource, "WellKnownTypeAliases.Add(\"A.Alias\""));
         Assert.Equal(1, CountOccurrences(metadataSource, "WellKnownTypeAliases.Add(\"B.Alias\""));
-        Assert.Equal(1, CountOccurrences(metadataSource, "Serializers.Add(typeof(global::LibraryB.SerializerType))"));
-        Assert.Equal(1, CountOccurrences(metadataSource, "Copiers.Add(typeof(global::LibraryB.CopierType))"));
-        Assert.Equal(1, CountOccurrences(metadataSource, "Activators.Add(typeof(global::LibraryB.ActivatorType))"));
-        Assert.Equal(1, CountOccurrences(metadataSource, "Converters.Add(typeof(global::LibraryB.ConverterType))"));
-        Assert.Equal(1, CountOccurrences(metadataSource, "InterfaceImplementations.Add(typeof(global::LibraryB.GeneratedInterfaceImplementation))"));
+        Assert.Equal(1, CountOccurrences(metadataSource, "AddSerializer(typeof(global::LibraryB.SerializerType))"));
+        Assert.Equal(1, CountOccurrences(metadataSource, "AddCopier(typeof(global::LibraryB.CopierType))"));
+        Assert.Equal(1, CountOccurrences(metadataSource, "AddActivator(typeof(global::LibraryB.ActivatorType))"));
+        Assert.Equal(1, CountOccurrences(metadataSource, "AddConverter(typeof(global::LibraryB.ConverterType))"));
+        Assert.Equal(1, CountOccurrences(metadataSource, "AddInterfaceImplementation(typeof(global::LibraryB.GeneratedInterfaceImplementation))"));
     }
 
     private static async Task<CSharpCompilation> CreateCompilation(string assemblyName, params string[] sources)

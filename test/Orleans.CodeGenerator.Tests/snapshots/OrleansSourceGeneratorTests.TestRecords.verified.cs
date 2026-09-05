@@ -303,12 +303,12 @@ namespace OrleansCodeGen.TestProject
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
-            AddImplementationType(config.Serializers, typeof(OrleansCodeGen.TestProject.Codec_DemoDataRecordStruct));
-            AddImplementationType(config.Serializers, typeof(OrleansCodeGen.TestProject.Codec_DemoDataRecordClass));
-            AddImplementationType(config.Serializers, typeof(OrleansCodeGen.TestProject.Codec_DemoDataRecord));
-            AddImplementationType(config.Copiers, typeof(global::Orleans.Serialization.Cloning.ShallowCopier<global::TestProject.DemoDataRecordStruct>));
-            AddImplementationType(config.Copiers, typeof(OrleansCodeGen.TestProject.Copier_DemoDataRecordClass));
-            AddImplementationType(config.Copiers, typeof(OrleansCodeGen.TestProject.Copier_DemoDataRecord));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_DemoDataRecordStruct));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_DemoDataRecordClass));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_DemoDataRecord));
+            config.AddCopier(typeof(global::Orleans.Serialization.Cloning.ShallowCopier<global::TestProject.DemoDataRecordStruct>));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_DemoDataRecordClass));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_DemoDataRecord));
         }
     }
 }

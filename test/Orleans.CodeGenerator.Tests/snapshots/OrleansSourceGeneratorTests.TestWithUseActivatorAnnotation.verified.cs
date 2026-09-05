@@ -15,7 +15,7 @@ namespace OrleansCodeGen.TestProject
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
-            AddImplementationType(config.Activators, typeof(global::TestProject.DemoClassActivator));
+            config.AddActivator(typeof(global::TestProject.DemoClassActivator));
         }
     }
 }

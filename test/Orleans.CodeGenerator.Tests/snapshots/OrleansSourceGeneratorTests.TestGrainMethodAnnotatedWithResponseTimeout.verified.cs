@@ -156,11 +156,11 @@ namespace OrleansCodeGen.TestProject
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
-            AddImplementationType(config.Serializers, typeof(OrleansCodeGen.TestProject.Codec_Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8));
-            AddImplementationType(config.Copiers, typeof(OrleansCodeGen.TestProject.Copier_Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8));
-            AddMetadataType(config.InterfaceProxies, typeof(OrleansCodeGen.TestProject.Proxy_IResponseTimeoutGrain));
-            AddInterfaceType(config.Interfaces, typeof(global::TestProject.IResponseTimeoutGrain));
-            config.InterfaceImplementations.Add(typeof(global::TestProject.ResponseTimeoutGrain));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8));
+            config.AddInterfaceProxy(typeof(OrleansCodeGen.TestProject.Proxy_IResponseTimeoutGrain));
+            config.AddInterface(typeof(global::TestProject.IResponseTimeoutGrain));
+            config.AddInterfaceImplementation(typeof(global::TestProject.ResponseTimeoutGrain));
             var n1 = config.CompoundTypeAliases.Add("inv");
             var n2 = n1.Add(typeof(global::Orleans.Runtime.GrainReference));
             var n3 = n2.Add(typeof(global::TestProject.IResponseTimeoutGrain));

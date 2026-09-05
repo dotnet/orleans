@@ -1,5 +1,8 @@
 using System;
 using System.Collections.Generic;
+#if NET5_0_OR_GREATER
+using System.Diagnostics.CodeAnalysis;
+#endif
 using System.Reflection;
 using Orleans.Serialization.TypeSystem;
 
@@ -10,6 +13,16 @@ namespace Orleans.Serialization.Configuration
     /// </summary>
     public sealed class TypeManifestOptions
     {
+#if NET5_0_OR_GREATER
+        private const DynamicallyAccessedMemberTypes ImplementationTypeMembers =
+            DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.Interfaces;
+
+        private const DynamicallyAccessedMemberTypes InterfaceTypeMembers =
+            DynamicallyAccessedMemberTypes.PublicMethods
+            | DynamicallyAccessedMemberTypes.NonPublicMethods
+            | DynamicallyAccessedMemberTypes.Interfaces;
+#endif
+
         /// <summary>
         /// Gets or sets a value indicating whether <see cref="SerializerConfigurationAnalyzer"/> should be enabled.
         /// </summary>
@@ -138,6 +151,87 @@ namespace Orleans.Serialization.Configuration
         /// Gets the set of type manifest providers which have configured this instance.
         /// </summary>
         internal HashSet<object> TypeManifestProviders { get; } = new();
+
+        /// <summary>
+        /// Adds a serializer implementation type and preserves the members used to inspect and activate it.
+        /// </summary>
+        /// <param name="type">The serializer implementation type.</param>
+        public void AddSerializer(
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(ImplementationTypeMembers)]
+#endif
+            Type type) => Serializers.Add(type ?? throw new ArgumentNullException(nameof(type)));
+
+        /// <summary>
+        /// Adds a field codec implementation type and preserves the members used to inspect and activate it.
+        /// </summary>
+        /// <param name="type">The field codec implementation type.</param>
+        public void AddFieldCodec(
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(ImplementationTypeMembers)]
+#endif
+            Type type) => FieldCodecs.Add(type ?? throw new ArgumentNullException(nameof(type)));
+
+        /// <summary>
+        /// Adds a copier implementation type and preserves the members used to inspect and activate it.
+        /// </summary>
+        /// <param name="type">The copier implementation type.</param>
+        public void AddCopier(
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(ImplementationTypeMembers)]
+#endif
+            Type type) => Copiers.Add(type ?? throw new ArgumentNullException(nameof(type)));
+
+        /// <summary>
+        /// Adds a converter implementation type and preserves the members used to inspect and activate it.
+        /// </summary>
+        /// <param name="type">The converter implementation type.</param>
+        public void AddConverter(
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(ImplementationTypeMembers)]
+#endif
+            Type type) => Converters.Add(type ?? throw new ArgumentNullException(nameof(type)));
+
+        /// <summary>
+        /// Adds an activator implementation type and preserves the members used to inspect and activate it.
+        /// </summary>
+        /// <param name="type">The activator implementation type.</param>
+        public void AddActivator(
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(ImplementationTypeMembers)]
+#endif
+            Type type) => Activators.Add(type ?? throw new ArgumentNullException(nameof(type)));
+
+        /// <summary>
+        /// Adds a generated interface type and preserves the methods and inherited interfaces used by generated invokables.
+        /// </summary>
+        /// <param name="type">The generated interface type.</param>
+        public void AddInterface(
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(InterfaceTypeMembers)]
+#endif
+            Type type) => Interfaces.Add(type ?? throw new ArgumentNullException(nameof(type)));
+
+        /// <summary>
+        /// Adds a generated proxy type and preserves its implemented interfaces.
+        /// </summary>
+        /// <param name="type">The generated proxy type.</param>
+        public void AddInterfaceProxy(
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(
+                DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.Interfaces)]
+#endif
+            Type type) => InterfaceProxies.Add(type ?? throw new ArgumentNullException(nameof(type)));
+
+        /// <summary>
+        /// Adds a generated interface implementation type and preserves its implemented interfaces.
+        /// </summary>
+        /// <param name="type">The generated interface implementation type.</param>
+        public void AddInterfaceImplementation(
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.Interfaces)]
+#endif
+            Type type) => InterfaceImplementations.Add(type ?? throw new ArgumentNullException(nameof(type)));
 
         /// <summary>
         /// Adds the Orleans-formatted runtime type name for <paramref name="type"/> to

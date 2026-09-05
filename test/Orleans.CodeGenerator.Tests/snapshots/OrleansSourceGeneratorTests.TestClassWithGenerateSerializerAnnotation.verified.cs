@@ -143,10 +143,10 @@ namespace OrleansCodeGen.TestProject
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
-            AddImplementationType(config.Serializers, typeof(OrleansCodeGen.TestProject.Codec_MyCustomEnum));
-            AddImplementationType(config.Serializers, typeof(OrleansCodeGen.TestProject.Codec_ClassWithImplicitFieldIds));
-            AddImplementationType(config.Copiers, typeof(OrleansCodeGen.TestProject.Copier_ClassWithImplicitFieldIds));
-            AddImplementationType(config.Activators, typeof(OrleansCodeGen.TestProject.Activator_ClassWithImplicitFieldIds));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_MyCustomEnum));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_ClassWithImplicitFieldIds));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_ClassWithImplicitFieldIds));
+            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_ClassWithImplicitFieldIds));
         }
     }
 }

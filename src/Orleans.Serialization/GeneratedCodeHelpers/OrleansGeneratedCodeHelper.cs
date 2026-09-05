@@ -241,7 +241,7 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         [UnconditionalSuppressMessage(
             "Trimming",
             "IL2070",
-            Justification = "Generated manifests register grain interfaces through TypeManifestProviderBase.AddInterfaceType, which preserves public and non-public methods and inherited interfaces. Recursive Type.GetInterfaces() traversal cannot propagate that annotation.")]
+            Justification = "Generated manifests register grain interfaces through TypeManifestOptions.AddInterface, which preserves public and non-public methods and inherited interfaces. Recursive Type.GetInterfaces() traversal cannot propagate that annotation.")]
 #endif
         private static MethodInfo? GetMethodInfoOrDefaultCore(
             Type? interfaceType,

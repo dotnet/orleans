@@ -236,12 +236,12 @@ namespace OrleansCodeGen.TestProject
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
-            AddImplementationType(config.Serializers, typeof(OrleansCodeGen.TestProject.Codec_MyCompoundTypeAliasBaseClass));
-            AddImplementationType(config.Serializers, typeof(OrleansCodeGen.TestProject.Codec_MyCompoundTypeAliasClass));
-            AddImplementationType(config.Copiers, typeof(OrleansCodeGen.TestProject.Copier_MyCompoundTypeAliasBaseClass));
-            AddImplementationType(config.Copiers, typeof(OrleansCodeGen.TestProject.Copier_MyCompoundTypeAliasClass));
-            AddImplementationType(config.Activators, typeof(OrleansCodeGen.TestProject.Activator_MyCompoundTypeAliasBaseClass));
-            AddImplementationType(config.Activators, typeof(OrleansCodeGen.TestProject.Activator_MyCompoundTypeAliasClass));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_MyCompoundTypeAliasBaseClass));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_MyCompoundTypeAliasClass));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_MyCompoundTypeAliasBaseClass));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_MyCompoundTypeAliasClass));
+            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_MyCompoundTypeAliasBaseClass));
+            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_MyCompoundTypeAliasClass));
             config.WellKnownTypeAliases.Add("_custom_type_alias_", typeof(global::TestProject.MyTypeAliasClass));
             var n1 = config.CompoundTypeAliases.Add("xx_test_xx");
             var n2 = n1.Add(typeof(global::TestProject.MyTypeAliasClass));

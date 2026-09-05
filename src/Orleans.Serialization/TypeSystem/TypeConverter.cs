@@ -170,7 +170,7 @@ public class TypeConverter
         [UnconditionalSuppressMessage(
             "Trimming",
             "IL2075",
-            Justification = "Generated manifests register implementation types through TypeManifestProviderBase.AddImplementationType, which preserves implemented interfaces. The HashSet<Type> boundary cannot retain that annotation.")]
+            Justification = "Generated manifests and trim-safe manual configuration use the annotated TypeManifestOptions implementation registration methods, which preserve implemented interfaces. The HashSet<Type> boundary cannot retain those annotations.")]
 #endif
         void AddFromMetadata(HashSet<Type> metadataCollection, Type genericType)
         {
@@ -223,7 +223,7 @@ public class TypeConverter
         [UnconditionalSuppressMessage(
             "Trimming",
             "IL2070",
-            Justification = "Generated manifests register proxy metadata through TypeManifestProviderBase.AddMetadataType, which preserves implemented interfaces. The intermediate Type values cannot retain that annotation.")]
+            Justification = "Generated manifests register proxy metadata through TypeManifestOptions.AddInterfaceProxy, which preserves implemented interfaces. The intermediate Type values cannot retain that annotation.")]
 #endif
         void AddAllowedType(Type type)
         {

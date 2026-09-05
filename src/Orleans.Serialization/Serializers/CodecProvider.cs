@@ -108,7 +108,7 @@ namespace Orleans.Serialization.Serializers
             [UnconditionalSuppressMessage(
                 "Trimming",
                 "IL2075",
-                Justification = "Generated manifests register implementation types through TypeManifestProviderBase.AddImplementationType, which preserves implemented interfaces. The HashSet<Type> boundary cannot retain that annotation.")]
+                Justification = "Generated manifests and trim-safe manual configuration register implementation types through TypeManifestOptions.AddSerializer, AddFieldCodec, AddCopier, AddConverter, and AddActivator, which preserve implemented interfaces. The HashSet<Type> boundary cannot retain those annotations.")]
 #endif
             static void AddFromMetadata(Dictionary<Type, Type> resultCollection, HashSet<Type> metadataCollection, Type genericType)
             {
@@ -499,7 +499,7 @@ namespace Orleans.Serialization.Serializers
         [UnconditionalSuppressMessage(
             "Trimming",
             "IL2067",
-            Justification = "Generated manifests register implementation types through TypeManifestProviderBase.AddImplementationType, which preserves public constructors. Built-in dynamically closed implementations are rooted by DynamicDependency attributes. Other implementation types are resolved from dependency injection before this activation path. The TypeManifestOptions and dictionary boundaries cannot retain the annotation.")]
+            Justification = "Generated manifests and trim-safe manual configuration use the annotated TypeManifestOptions registration methods, which preserve public constructors. Built-in dynamically closed implementations are rooted by DynamicDependency attributes. Other implementation types are resolved from dependency injection before this activation path. The TypeManifestOptions and dictionary boundaries cannot retain the annotations.")]
 #endif
         private object GetServiceOrCreateInstance(Type type, object[]? constructorArguments = null)
         {

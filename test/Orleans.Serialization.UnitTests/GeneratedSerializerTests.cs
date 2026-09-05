@@ -810,9 +810,9 @@ public class GeneratedSerializerTests : IDisposable
         return new ServiceCollection()
             .AddSerializer(builder => builder.Configure(options =>
             {
-                options.Serializers.Add(typeof(CustomGenericCodec<>));
-                options.Copiers.Add(typeof(CustomGenericCopier<>));
-                options.Activators.Add(typeof(CustomGenericActivator<>));
+                options.AddSerializer(typeof(CustomGenericCodec<>));
+                options.AddCopier(typeof(CustomGenericCopier<>));
+                options.AddActivator(typeof(CustomGenericActivator<>));
             }))
             .BuildServiceProvider();
     }

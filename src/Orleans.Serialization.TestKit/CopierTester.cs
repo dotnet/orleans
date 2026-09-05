@@ -46,7 +46,7 @@ namespace Orleans.Serialization.TestKit
         internal static IServiceProvider CreateServiceProviderCore(Action<ISerializerBuilder> configure)
         {
             var services = new ServiceCollection();
-            _ = services.AddSerializer(builder => builder.Configure(config => config.Copiers.Add(typeof(TCopier))));
+            _ = services.AddSerializer(builder => builder.Configure(config => config.AddCopier(typeof(TCopier))));
 
             if (!typeof(TCopier).IsAbstract && !typeof(TCopier).IsInterface)
             {

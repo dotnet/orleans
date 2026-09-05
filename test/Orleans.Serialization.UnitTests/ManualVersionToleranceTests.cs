@@ -49,10 +49,10 @@ namespace Orleans.Serialization.UnitTests
               {
                   _ = builder.Configure(configuration =>
                     {
-                        _ = configuration.Serializers.Add(typeof(SubTypeSerializer));
-                        _ = configuration.Serializers.Add(typeof(BaseTypeSerializer));
-                        _ = configuration.Serializers.Add(typeof(ObjectWithNewFieldTypeSerializer));
-                        _ = configuration.Serializers.Add(typeof(ObjectWithoutNewFieldTypeSerializer));
+                        configuration.AddSerializer(typeof(SubTypeSerializer));
+                        configuration.AddSerializer(typeof(BaseTypeSerializer));
+                        configuration.AddSerializer(typeof(ObjectWithNewFieldTypeSerializer));
+                        configuration.AddSerializer(typeof(ObjectWithoutNewFieldTypeSerializer));
 
                         // Intentionally remove the generated serializer for these type. It will be added back during tests.
                         configuration.Serializers.RemoveWhere(s => typeof(IFieldCodec<ObjectWithNewField>).IsAssignableFrom(s));

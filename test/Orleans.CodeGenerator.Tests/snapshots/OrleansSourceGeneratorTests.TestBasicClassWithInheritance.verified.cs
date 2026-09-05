@@ -176,10 +176,10 @@ namespace OrleansCodeGen.TestProject
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
-            AddImplementationType(config.Serializers, typeof(OrleansCodeGen.TestProject.Codec_BaseData));
-            AddImplementationType(config.Serializers, typeof(OrleansCodeGen.TestProject.Codec_DerivedData));
-            AddImplementationType(config.Copiers, typeof(OrleansCodeGen.TestProject.Copier_BaseData));
-            AddImplementationType(config.Copiers, typeof(OrleansCodeGen.TestProject.Copier_DerivedData));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_BaseData));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_DerivedData));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_BaseData));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_DerivedData));
         }
     }
 }

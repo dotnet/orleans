@@ -249,14 +249,14 @@ namespace OrleansCodeGen.TestProject
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
-            AddImplementationType(config.Serializers, typeof(OrleansCodeGen.TestProject.Codec_Invokable_IBasicGrain_GrainReference_6B0E24A1));
-            AddImplementationType(config.Serializers, typeof(OrleansCodeGen.TestProject.Codec_BasicGrain));
-            AddImplementationType(config.Copiers, typeof(OrleansCodeGen.TestProject.Copier_Invokable_IBasicGrain_GrainReference_6B0E24A1));
-            AddImplementationType(config.Copiers, typeof(OrleansCodeGen.TestProject.Copier_BasicGrain));
-            AddMetadataType(config.InterfaceProxies, typeof(OrleansCodeGen.TestProject.Proxy_IBasicGrain));
-            AddInterfaceType(config.Interfaces, typeof(global::TestProject.IBasicGrain));
-            config.InterfaceImplementations.Add(typeof(global::TestProject.BasicGrain));
-            AddImplementationType(config.Activators, typeof(OrleansCodeGen.TestProject.Activator_BasicGrain));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IBasicGrain_GrainReference_6B0E24A1));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_BasicGrain));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IBasicGrain_GrainReference_6B0E24A1));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_BasicGrain));
+            config.AddInterfaceProxy(typeof(OrleansCodeGen.TestProject.Proxy_IBasicGrain));
+            config.AddInterface(typeof(global::TestProject.IBasicGrain));
+            config.AddInterfaceImplementation(typeof(global::TestProject.BasicGrain));
+            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_BasicGrain));
             var n1 = config.CompoundTypeAliases.Add("inv");
             var n2 = n1.Add(typeof(global::Orleans.Runtime.GrainReference));
             var n3 = n2.Add(typeof(global::TestProject.IBasicGrain));

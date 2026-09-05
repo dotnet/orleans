@@ -140,9 +140,9 @@ namespace OrleansCodeGen.TestProject
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
-            config.Serializers.Add(typeof(OrleansCodeGen.Codec_ExternalType));
-            config.Copiers.Add(typeof(OrleansCodeGen.Copier_ExternalType));
-            config.Activators.Add(typeof(OrleansCodeGen.Activator_ExternalType));
+            config.AddSerializer(typeof(OrleansCodeGen.Codec_ExternalType));
+            config.AddCopier(typeof(OrleansCodeGen.Copier_ExternalType));
+            config.AddActivator(typeof(OrleansCodeGen.Activator_ExternalType));
         }
     }
 }

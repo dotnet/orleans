@@ -147,6 +147,17 @@ jobs:
             -p:CustomBeforeMicrosoftCommonTargets="$env:GITHUB_WORKSPACE/.github/scripts/analyzer-audit.targets" `
             -p:TreatWarningsAsErrors=false `
             -p:WarningsAsErrors=
+      - name: Publish and run serialization trimmed smoke
+        shell: pwsh
+        run: |
+          $output = Join-Path $env:RUNNER_TEMP 'orleans-serialization-trimmed-smoke'
+          dotnet publish test/Orleans.Serialization.TrimmedSmoke/Orleans.Serialization.TrimmedSmoke.csproj `
+            --framework net10.0 `
+            --configuration Release `
+            --runtime linux-x64 `
+            --self-contained true `
+            --output $output
+          & (Join-Path $output 'Orleans.Serialization.TrimmedSmoke')
       - name: Prepare compatibility analyzer results
         if: always()
         continue-on-error: true

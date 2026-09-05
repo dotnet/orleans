@@ -2379,12 +2379,11 @@ public class DemoClass
         {
             foreach (var invocation in metadataClass.DescendantNodes().OfType<InvocationExpressionSyntax>())
             {
-                if (invocation.Expression is not IdentifierNameSyntax { Identifier.ValueText: "AddImplementationType" }
-                    || invocation.ArgumentList.Arguments.FirstOrDefault()?.Expression is not MemberAccessExpressionSyntax
+                if (invocation.Expression is not MemberAccessExpressionSyntax
                     {
-                        Name.Identifier.ValueText: "Serializers"
+                        Name.Identifier.ValueText: "AddSerializer"
                     }
-                    || invocation.ArgumentList.Arguments.ElementAtOrDefault(1)?.Expression is not TypeOfExpressionSyntax typeOfExpression)
+                    || invocation.ArgumentList.Arguments.FirstOrDefault()?.Expression is not TypeOfExpressionSyntax typeOfExpression)
                 {
                     continue;
                 }
@@ -2527,12 +2526,11 @@ public class DemoClass
                 .DescendantNodes()
                 .OfType<InvocationExpressionSyntax>())
             .Where(static invocation =>
-                invocation.Expression is IdentifierNameSyntax { Identifier.ValueText: "AddImplementationType" }
-                && invocation.ArgumentList.Arguments.FirstOrDefault()?.Expression is MemberAccessExpressionSyntax
+                invocation.Expression is MemberAccessExpressionSyntax
                 {
-                    Name.Identifier.ValueText: "Activators"
+                    Name.Identifier.ValueText: "AddActivator"
                 })
-            .Select(static invocation => invocation.ArgumentList.Arguments.ElementAtOrDefault(1)?.Expression)
+            .Select(static invocation => invocation.ArgumentList.Arguments.FirstOrDefault()?.Expression)
             .OfType<TypeOfExpressionSyntax>()
             .Select(static typeOfExpression => GetGeneratedClassIdentifier(typeOfExpression.Type.ToString().Split('.').Last()))
             .Where(static name => name.StartsWith("Activator_Invokable_", StringComparison.Ordinal))
