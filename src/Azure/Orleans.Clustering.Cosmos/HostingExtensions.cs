@@ -19,6 +19,9 @@ public static class HostingExtensions
         this ISiloBuilder builder,
         Action<CosmosClusteringOptions> configureOptions)
     {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(configureOptions);
+
         builder.Services.UseCosmosClustering(configureOptions);
         return builder;
     }
@@ -33,6 +36,9 @@ public static class HostingExtensions
         this ISiloBuilder builder,
         Action<OptionsBuilder<CosmosClusteringOptions>> configureOptions)
     {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(configureOptions);
+
         builder.Services.UseCosmosClustering(configureOptions);
         return builder;
     }
@@ -44,6 +50,8 @@ public static class HostingExtensions
     /// <returns>The provided <paramref name="builder"/>.</returns>
     public static ISiloBuilder UseCosmosClustering(this ISiloBuilder builder)
     {
+        ArgumentNullException.ThrowIfNull(builder);
+
         builder.Services.AddOptions<CosmosClusteringOptions>();
         builder.Services.AddSingleton<IMembershipTable, CosmosMembershipTable>();
         return builder;
@@ -59,6 +67,9 @@ public static class HostingExtensions
         this IClientBuilder builder,
         Action<CosmosClusteringOptions> configureOptions)
     {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(configureOptions);
+
         builder.Services.UseCosmosGatewayListProvider(configureOptions);
         return builder;
     }
@@ -70,6 +81,8 @@ public static class HostingExtensions
     /// <returns>The provided <paramref name="builder"/>.</returns>
     public static IClientBuilder UseCosmosGatewayListProvider(this IClientBuilder builder)
     {
+        ArgumentNullException.ThrowIfNull(builder);
+
         builder.Services.AddOptions<CosmosClusteringOptions>();
         builder.Services.AddSingleton<IGatewayListProvider, CosmosGatewayListProvider>();
         return builder;
@@ -85,6 +98,9 @@ public static class HostingExtensions
         this IClientBuilder builder,
         Action<OptionsBuilder<CosmosClusteringOptions>> configureOptions)
     {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(configureOptions);
+
         builder.Services.UseCosmosGatewayListProvider(configureOptions);
         return builder;
     }
@@ -100,6 +116,9 @@ public static class HostingExtensions
         this IServiceCollection services,
         Action<CosmosClusteringOptions> configureOptions)
     {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configureOptions);
+
         return services.UseCosmosClustering(ob => ob.Configure(configureOptions));
     }
 
@@ -113,7 +132,10 @@ public static class HostingExtensions
         this IServiceCollection services,
         Action<OptionsBuilder<CosmosClusteringOptions>> configureOptions)
     {
-        configureOptions?.Invoke(services.AddOptions<CosmosClusteringOptions>());
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configureOptions);
+
+        configureOptions(services.AddOptions<CosmosClusteringOptions>());
         return services.AddSingleton<IMembershipTable, CosmosMembershipTable>();
     }
 
@@ -127,6 +149,9 @@ public static class HostingExtensions
         this IServiceCollection services,
         Action<CosmosClusteringOptions> configureOptions)
     {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configureOptions);
+
         return services.UseCosmosGatewayListProvider(ob => ob.Configure(configureOptions));
     }
 
@@ -140,7 +165,10 @@ public static class HostingExtensions
         this IServiceCollection services,
         Action<OptionsBuilder<CosmosClusteringOptions>> configureOptions)
     {
-        configureOptions?.Invoke(services.AddOptions<CosmosClusteringOptions>());
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configureOptions);
+
+        configureOptions(services.AddOptions<CosmosClusteringOptions>());
         services.AddTransient<IConfigurationValidator>(
             sp => new CosmosOptionsValidator<CosmosClusteringOptions>(
                 sp.GetRequiredService<IOptionsMonitor<CosmosClusteringOptions>>().CurrentValue,
