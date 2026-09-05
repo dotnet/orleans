@@ -77,6 +77,7 @@ Memory persistence distributes records across cluster storage grains but isn't d
 | [Microsoft.Orleans.Reminders.Redis](https://www.nuget.org/packages/Microsoft.Orleans.Reminders.Redis) | Redis reminders. |
 | [Microsoft.Orleans.DurableJobs](https://www.nuget.org/packages/Microsoft.Orleans.DurableJobs) | Distributed scheduling for durable one-time jobs. |
 | [Microsoft.Orleans.DurableJobs.AzureStorage](https://www.nuget.org/packages/Microsoft.Orleans.DurableJobs.AzureStorage) | Azure Blob Storage for durable jobs. |
+| `Microsoft.Orleans.DurableTasks` | Pre-release alpha durable grain RPC adapter. Awaiting first NuGet publication. |
 | `Microsoft.Orleans.DurableTasks.Abstractions` | Pre-release alpha programming model abstractions for durable asynchronous operations. Awaiting first NuGet publication. |
 | [Microsoft.Orleans.DurableMessaging](https://www.nuget.org/packages/Microsoft.Orleans.DurableMessaging) | Experimental grain-scoped durable inbox and outbox messaging. |
 
