@@ -396,6 +396,7 @@ namespace Orleans.Streaming.EventHubs
 
         public System.Threading.Tasks.Task<Streams.IStreamQueueCheckpointer<string>> Create(string partition, System.Threading.CancellationToken cancellationToken) { throw null; }
 
+        [System.Obsolete("Use the overload which accepts a CancellationToken.")]
         public System.Threading.Tasks.Task<Streams.IStreamQueueCheckpointer<string>> Create(string partition) { throw null; }
 
         public static Streams.IStreamQueueCheckpointerFactory CreateFactory(System.IServiceProvider services, string providerName) { throw null; }
@@ -766,6 +767,8 @@ namespace Orleans.Streaming.EventHubs.Testing
     {
         public static NoOpCheckpointerFactory Instance;
         public System.Threading.Tasks.Task<Streams.IStreamQueueCheckpointer<string>> Create(string partition, System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        [System.Obsolete("Use the overload which accepts a CancellationToken.")]
         public System.Threading.Tasks.Task<Streams.IStreamQueueCheckpointer<string>> Create(string partition) { throw null; }
     }
 
@@ -818,6 +821,7 @@ namespace Orleans.Streams
 
         public System.Threading.Tasks.Task<IStreamQueueCheckpointer<string>> Create(string partition, System.Threading.CancellationToken cancellationToken) { throw null; }
 
+        [System.Obsolete("Use the overload which accepts a CancellationToken.")]
         public System.Threading.Tasks.Task<IStreamQueueCheckpointer<string>> Create(string partition) { throw null; }
 
         public static IStreamQueueCheckpointerFactory CreateFactory(System.IServiceProvider services, string providerName) { throw null; }
