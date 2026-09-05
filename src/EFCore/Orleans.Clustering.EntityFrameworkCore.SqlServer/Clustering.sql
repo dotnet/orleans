@@ -11,10 +11,13 @@ GO
 BEGIN TRANSACTION;
 GO
 
-IF NOT EXISTS(SELECT * FROM [__EFMigrationsHistory] WHERE [MigrationId] = N'20231005032242_InitialClusteringSchema')
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260811210044_InitialClusteringSchema'
+)
 BEGIN
     CREATE TABLE [Clusters] (
-        [Id] nvarchar(450) NOT NULL,
+        [Id] nvarchar(450) COLLATE Latin1_General_100_BIN2 NOT NULL,
         [Timestamp] datetimeoffset NOT NULL,
         [Version] int NOT NULL,
         [ETag] rowversion NOT NULL,
@@ -23,11 +26,14 @@ BEGIN
 END;
 GO
 
-IF NOT EXISTS(SELECT * FROM [__EFMigrationsHistory] WHERE [MigrationId] = N'20231005032242_InitialClusteringSchema')
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260811210044_InitialClusteringSchema'
+)
 BEGIN
     CREATE TABLE [Silos] (
-        [ClusterId] nvarchar(450) NOT NULL,
-        [Address] nvarchar(45) NOT NULL,
+        [ClusterId] nvarchar(450) COLLATE Latin1_General_100_BIN2 NOT NULL,
+        [Address] nvarchar(45) COLLATE Latin1_General_100_BIN2 NOT NULL,
         [Port] int NOT NULL,
         [Generation] int NOT NULL,
         [Name] nvarchar(150) NOT NULL,
@@ -45,28 +51,40 @@ BEGIN
 END;
 GO
 
-IF NOT EXISTS(SELECT * FROM [__EFMigrationsHistory] WHERE [MigrationId] = N'20231005032242_InitialClusteringSchema')
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260811210044_InitialClusteringSchema'
+)
 BEGIN
     CREATE NONCLUSTERED INDEX [IDX_Silo_ClusterId] ON [Silos] ([ClusterId]);
 END;
 GO
 
-IF NOT EXISTS(SELECT * FROM [__EFMigrationsHistory] WHERE [MigrationId] = N'20231005032242_InitialClusteringSchema')
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260811210044_InitialClusteringSchema'
+)
 BEGIN
     CREATE NONCLUSTERED INDEX [IDX_Silo_ClusterId_Status] ON [Silos] ([ClusterId], [Status]);
 END;
 GO
 
-IF NOT EXISTS(SELECT * FROM [__EFMigrationsHistory] WHERE [MigrationId] = N'20231005032242_InitialClusteringSchema')
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260811210044_InitialClusteringSchema'
+)
 BEGIN
     CREATE NONCLUSTERED INDEX [IDX_Silo_ClusterId_Status_IAmAlive] ON [Silos] ([ClusterId], [Status], [IAmAliveTime]);
 END;
 GO
 
-IF NOT EXISTS(SELECT * FROM [__EFMigrationsHistory] WHERE [MigrationId] = N'20231005032242_InitialClusteringSchema')
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260811210044_InitialClusteringSchema'
+)
 BEGIN
     INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
-    VALUES (N'20231005032242_InitialClusteringSchema', N'7.0.11');
+    VALUES (N'20260811210044_InitialClusteringSchema', N'8.0.29');
 END;
 GO
 

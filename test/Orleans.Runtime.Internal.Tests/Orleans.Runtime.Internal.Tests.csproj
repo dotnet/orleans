@@ -30,5 +30,6 @@
     <InternalsVisibleTo Include="Orleans.Reminders.Firestore.Tests" />
     <InternalsVisibleTo Include="Orleans.Streaming.NATS.Tests" />
     <InternalsVisibleTo Include="Orleans.Streaming.Kinesis.Tests" />
+    <InternalsVisibleTo Include="Orleans.EntityFrameworkCore.Tests" />
   </ItemGroup>
 </Project>

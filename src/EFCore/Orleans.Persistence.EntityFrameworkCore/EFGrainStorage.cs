@@ -47,7 +47,7 @@ internal class EFGrainStorage<TDbContext, TETag> : IGrainStorage, ILifecyclePart
 
         try
         {
-            var ctx = this._dbContextFactory.CreateDbContext();
+            await using var ctx = await this._dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
 
             var record = await ctx.GrainState.AsNoTracking().SingleOrDefaultAsync(r =>
                     r.ServiceId == this._serviceId &&
@@ -60,6 +60,7 @@ internal class EFGrainStorage<TDbContext, TETag> : IGrainStorage, ILifecyclePart
             {
                 grainState.State = ActivatorUtilities.CreateInstance<T>(_serviceProvider);
                 grainState.RecordExists = false;
+                grainState.ETag = null;
                 return;
             }
 
@@ -83,7 +84,7 @@ internal class EFGrainStorage<TDbContext, TETag> : IGrainStorage, ILifecyclePart
 
         var id = grainId.Key.ToString()!;
 
-        var ctx = this._dbContextFactory.CreateDbContext();
+        await using var ctx = await this._dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
 
         var record = new GrainStateRecord<TETag>
         {
@@ -129,8 +130,13 @@ internal class EFGrainStorage<TDbContext, TETag> : IGrainStorage, ILifecyclePart
         }
         catch (DbUpdateConcurrencyException ex)
         {
-            var found = await ctx.GrainState.AsNoTracking().SingleOrDefaultAsync(r => r.StateType == grainType && r.GrainId == id).ConfigureAwait(false);
-            var foundETag = found is not null ? found.ETag?.ToString() : "<null>";
+            var found = await ctx.GrainState.AsNoTracking().SingleOrDefaultAsync(r =>
+                    r.ServiceId == this._serviceId &&
+                    r.GrainType == grainType &&
+                    r.StateType == stateName &&
+                    r.GrainId == id)
+                .ConfigureAwait(false);
+            var foundETag = found is not null ? this._eTagConverter.FromDbETag(found.ETag) : "<null>";
 
             var isEx = new InconsistentStateException(
                 $"Inconsistent state. Operation: Write | State: {stateName} | Grain: {grainType} | GrainId: {id}",
@@ -164,7 +170,7 @@ internal class EFGrainStorage<TDbContext, TETag> : IGrainStorage, ILifecyclePart
             return;
         }
 
-        var ctx = this._dbContextFactory.CreateDbContext();
+        await using var ctx = await this._dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
 
         try
         {
@@ -182,15 +188,22 @@ internal class EFGrainStorage<TDbContext, TETag> : IGrainStorage, ILifecyclePart
                 throw new DbUpdateConcurrencyException();
             }
 
+            ctx.Entry(record).Property(r => r.ETag).OriginalValue =
+                this._eTagConverter.ToDbETag(grainState.ETag);
             ctx.GrainState.Remove(record);
-            await ctx.SaveChangesAsync();
+            await ctx.SaveChangesAsync().ConfigureAwait(false);
         }
         catch (DbUpdateConcurrencyException ex)
         {
             var found = await ctx.GrainState.AsNoTracking()
-                .SingleOrDefaultAsync(r => r.StateType == stateName && r.GrainId == id).ConfigureAwait(false);
+                .SingleOrDefaultAsync(r =>
+                    r.ServiceId == this._serviceId &&
+                    r.GrainType == grainType &&
+                    r.StateType == stateName &&
+                    r.GrainId == id)
+                .ConfigureAwait(false);
 
-            var foundETag = found is not null ? found.ETag?.ToString() : "<null>";
+            var foundETag = found is not null ? this._eTagConverter.FromDbETag(found.ETag) : "<null>";
 
             var isEx = new InconsistentStateException(
                 $"Inconsistent state. Operation: Clear | State: {stateName} | GrainType: {grainType} | GrainId: {id}",
@@ -219,7 +232,7 @@ internal class EFGrainStorage<TDbContext, TETag> : IGrainStorage, ILifecyclePart
 
 internal static class EFStorageFactory
 {
-    public static IGrainStorage Create<TDbContext, TETag>(IServiceProvider services, string name) where TDbContext : GrainStateDbContext<TDbContext, TETag>
+    public static EFGrainStorage<TDbContext, TETag> Create<TDbContext, TETag>(IServiceProvider services, string name) where TDbContext : GrainStateDbContext<TDbContext, TETag>
     {
         return ActivatorUtilities.CreateInstance<EFGrainStorage<TDbContext, TETag>>(services, name);
     }

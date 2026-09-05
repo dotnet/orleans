@@ -8,7 +8,7 @@ public class MySqlClusterDbContextFactory: IDesignTimeDbContextFactory<MySqlClus
     public MySqlClusterDbContext CreateDbContext(string[] args)
     {
         var optionsBuilder = new DbContextOptionsBuilder<MySqlClusterDbContext>();
-        optionsBuilder.UseMySQL("Data Source=db.db", opt =>
+        optionsBuilder.UseMySql("Server=localhost;Database=orleans;User=root;Password=password", new MySqlServerVersion(new Version(8, 0)), opt =>
         {
             opt.MigrationsHistoryTable("__EFMigrationsHistory");
             opt.MigrationsAssembly(typeof(MySqlClusterDbContext).Assembly.FullName);

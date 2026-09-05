@@ -11,14 +11,17 @@ GO
 BEGIN TRANSACTION;
 GO
 
-IF NOT EXISTS(SELECT * FROM [__EFMigrationsHistory] WHERE [MigrationId] = N'20231005034632_InitialRemindersSchema')
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260811210132_InitialRemindersSchema'
+)
 BEGIN
     CREATE TABLE [Reminders] (
-        [ServiceId] nvarchar(450) NOT NULL,
-        [GrainId] nvarchar(450) NOT NULL,
-        [Name] nvarchar(450) NOT NULL,
+        [ServiceId] nvarchar(450) COLLATE Latin1_General_100_BIN2 NOT NULL,
+        [GrainId] nvarchar(450) COLLATE Latin1_General_100_BIN2 NOT NULL,
+        [Name] nvarchar(450) COLLATE Latin1_General_100_BIN2 NOT NULL,
         [StartAt] datetimeoffset NOT NULL,
-        [Period] time NOT NULL,
+        [Period] bigint NOT NULL,
         [GrainHash] bigint NOT NULL,
         [ETag] rowversion NOT NULL,
         CONSTRAINT [PK_Reminders] PRIMARY KEY ([ServiceId], [GrainId], [Name])
@@ -26,22 +29,31 @@ BEGIN
 END;
 GO
 
-IF NOT EXISTS(SELECT * FROM [__EFMigrationsHistory] WHERE [MigrationId] = N'20231005034632_InitialRemindersSchema')
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260811210132_InitialRemindersSchema'
+)
 BEGIN
     CREATE NONCLUSTERED INDEX [IDX_Reminders_ServiceId_GrainHash] ON [Reminders] ([ServiceId], [GrainHash]);
 END;
 GO
 
-IF NOT EXISTS(SELECT * FROM [__EFMigrationsHistory] WHERE [MigrationId] = N'20231005034632_InitialRemindersSchema')
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260811210132_InitialRemindersSchema'
+)
 BEGIN
     CREATE NONCLUSTERED INDEX [IDX_Reminders_ServiceId_GrainId] ON [Reminders] ([ServiceId], [GrainId]);
 END;
 GO
 
-IF NOT EXISTS(SELECT * FROM [__EFMigrationsHistory] WHERE [MigrationId] = N'20231005034632_InitialRemindersSchema')
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260811210132_InitialRemindersSchema'
+)
 BEGIN
     INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
-    VALUES (N'20231005034632_InitialRemindersSchema', N'7.0.11');
+    VALUES (N'20260811210132_InitialRemindersSchema', N'8.0.29');
 END;
 GO
 

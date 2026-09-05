@@ -11,6 +11,8 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Orleans.GrainDirectory.EntityFrameworkCore.SqlServer"/>
+    <InternalsVisibleTo Include="Orleans.GrainDirectory.EntityFrameworkCore.MySql"/>
+    <InternalsVisibleTo Include="Orleans.GrainDirectory.EntityFrameworkCore.PostgreSQL"/>
   </ItemGroup>
 
   <PropertyGroup>
