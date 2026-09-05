@@ -83,9 +83,11 @@ namespace Orleans
 
         public sealed partial class LocalObjectData : IGrainContext, IGrainCallCancellationExtension
         {
+            private const int MaxPendingCancellations = 1_024;
             private static readonly Func<object?, Task> HandleFunc = self => ((LocalObjectData)self!).LocalObjectMessagePumpAsync();
             private readonly InvokableObjectManager _manager;
-            private readonly HashSet<(GrainId SenderGrainId, CorrelationId MessageId)> _pendingCancellations = [];
+            private readonly Dictionary<(GrainId SenderGrainId, CorrelationId MessageId), LinkedListNode<(GrainId, CorrelationId)>> _pendingCancellations = [];
+            private readonly LinkedList<(GrainId SenderGrainId, CorrelationId MessageId)> _pendingCancellationOrder = [];
             private readonly Dictionary<Message, Task?> _runningRequests = [];
             private Task? _messagePumpTask;
 
@@ -168,7 +170,7 @@ namespace Orleans
                     bool wasCancelled;
                     lock (Messages)
                     {
-                        wasCancelled = _pendingCancellations.Remove((message.SendingGrain, message.Id));
+                        wasCancelled = RemovePendingCancellation((message.SendingGrain, message.Id));
                         if (!wasCancelled)
                         {
                             // Track the running request so it can be cancelled.
@@ -198,7 +200,7 @@ namespace Orleans
                 bool wasWaitingCancellation;
                 lock (this.Messages)
                 {
-                    wasWaitingCancellation = _pendingCancellations.Remove((message.SendingGrain, message.Id));
+                    wasWaitingCancellation = RemovePendingCancellation((message.SendingGrain, message.Id));
                     if (wasWaitingCancellation)
                     {
                         start = false;
@@ -363,6 +365,7 @@ namespace Orleans
                 lock (Messages)
                 {
                     _pendingCancellations.Clear();
+                    _pendingCancellationOrder.Clear();
                 }
             }
 
@@ -370,7 +373,7 @@ namespace Orleans
             {
                 lock (Messages)
                 {
-                    return _pendingCancellations.Remove((message.SendingGrain, message.Id));
+                    return RemovePendingCancellation((message.SendingGrain, message.Id));
                 }
             }
 
@@ -521,7 +524,7 @@ namespace Orleans
                         {
                             // Cancellation and invocation are delivered independently. Retain cancellation
                             // until the matching invocation is admitted or has initialized its local token.
-                            _pendingCancellations.Add(key);
+                            RetainPendingCancellation(key);
                         }
                     }
 
@@ -550,10 +553,38 @@ namespace Orleans
                     {
                         lock (Messages)
                         {
-                            _pendingCancellations.Remove(key);
+                            RemovePendingCancellation(key);
                         }
                     }
                 }
+            }
+
+            private void RetainPendingCancellation((GrainId SenderGrainId, CorrelationId MessageId) key)
+            {
+                if (_pendingCancellations.ContainsKey(key))
+                {
+                    return;
+                }
+
+                if (_pendingCancellations.Count >= MaxPendingCancellations)
+                {
+                    var oldest = _pendingCancellationOrder.First!;
+                    _pendingCancellationOrder.RemoveFirst();
+                    _pendingCancellations.Remove(oldest.Value);
+                }
+
+                _pendingCancellations.Add(key, _pendingCancellationOrder.AddLast(key));
+            }
+
+            private bool RemovePendingCancellation((GrainId SenderGrainId, CorrelationId MessageId) key)
+            {
+                if (!_pendingCancellations.Remove(key, out var node))
+                {
+                    return false;
+                }
+
+                _pendingCancellationOrder.Remove(node);
+                return true;
             }
 
             [LoggerMessage(
