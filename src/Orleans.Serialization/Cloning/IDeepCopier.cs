@@ -388,8 +388,10 @@ namespace Orleans.Serialization.Cloning
         /// <param name="codecProvider">The codec provider.</param>
         public CopyContextPool(CodecProvider codecProvider)
         {
-            var sessionPoolPolicy = new PoolPolicy(codecProvider, Return);
-            _pool = new ConcurrentObjectPool<CopyContext, PoolPolicy>(sessionPoolPolicy);
+            var returner = new WeakPoolReturner<CopyContext>();
+            var poolPolicy = new PoolPolicy(codecProvider, returner.Return);
+            _pool = new ConcurrentObjectPool<CopyContext, PoolPolicy>(poolPolicy);
+            returner.SetPool(_pool);
         }
 
         /// <summary>
@@ -400,12 +402,6 @@ namespace Orleans.Serialization.Cloning
 
         /// <inheritdoc/>
         public void Dispose() => _pool.Dispose();
-
-        /// <summary>
-        /// Returns the specified copy context to the pool.
-        /// </summary>
-        /// <param name="context">The context.</param>
-        private void Return(CopyContext context) => _pool.Return(context);
 
         private readonly struct PoolPolicy(CodecProvider codecProvider, Action<CopyContext> onDisposed) : IPooledObjectPolicy<CopyContext>
         {
