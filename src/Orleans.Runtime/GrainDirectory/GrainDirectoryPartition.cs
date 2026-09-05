@@ -424,12 +424,12 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
 
         if (!removedRange.IsEmpty)
         {
-            _viewChangeTasks.Add(ReleaseRangeAsync(previous, current, removedRange));
+            _viewChangeTasks.Add(_owner.ObserveMembershipUpdateTask(ReleaseRangeAsync(previous, current, removedRange)));
         }
 
         if (!addedRange.IsEmpty)
         {
-            _viewChangeTasks.Add(AcquireRangeAsync(previous, current, addedRange));
+            _viewChangeTasks.Add(_owner.ObserveMembershipUpdateTask(AcquireRangeAsync(previous, current, addedRange)));
         }
 
         _viewUpdates.Publish(current);
@@ -698,23 +698,13 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
     {
         _directoryInstruments.RangeLockHeldDuration.Record((long)heldDuration.TotalMilliseconds);
         var canceled = ShutdownToken.IsCancellationRequested;
-        var canComplete = transition.Direction switch
+        if (canceled)
         {
-            PartitionTransitionDirection.Inbound => transition.Stage == PartitionTransitionStage.Fenced,
-            PartitionTransitionDirection.Outbound => transition.Stage is PartitionTransitionStage.Drained or PartitionTransitionStage.StateRetained,
-            _ => false
-        };
-        if (canceled || !canComplete)
+            transition.Abort(ShutdownToken);
+        }
+        else if (failure is not null)
         {
-            if (canceled)
-            {
-                transition.Abort(ShutdownToken);
-            }
-            else
-            {
-                transition.Fail(failure ?? new InvalidOperationException(
-                    $"Range transition '{operationName}' did not reach a safe terminal stage."));
-            }
+            transition.Fail(failure);
         }
         else
         {

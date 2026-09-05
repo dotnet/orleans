@@ -590,7 +590,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         _clusterMemberCancellationTokens.Dispose();
     }
 
-    private async Task ObserveMembershipUpdateTask(Task task)
+    internal async Task ObserveMembershipUpdateTask(Task task)
     {
         try
         {

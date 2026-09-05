@@ -1,7 +1,10 @@
+using System.Buffers;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Runtime.ClusterServices;
 using Orleans.Serialization;
+using Orleans.Serialization.Buffers;
+using Orleans.Serialization.WireProtocol;
 using TestExtensions;
 using Xunit;
 
@@ -14,6 +17,38 @@ namespace UnitTests.ClusterServices;
 public sealed class ClusterServiceOperationResultTests
 {
     private static readonly ClusterServiceViewId View = new(new MembershipVersion(3), 1, "config");
+
+    [Fact]
+    public void DefaultResult_RequiresDeduplicationBeforeRetry()
+    {
+        var result = default(ClusterServiceOperationResult<int>);
+
+        Assert.Equal(ClusterServiceExecutionDisposition.OutcomeUnknown, result.Disposition);
+        Assert.False(result.CanRetryWithoutDeduplication);
+    }
+
+    [Fact]
+    public void GeneratedSerializer_MissingDispositionRequiresDeduplicationBeforeRetry()
+    {
+        using var serviceProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = serviceProvider.GetRequiredService<Serializer>();
+        using var session = serializer.SessionPool.GetSession();
+        var buffer = new ArrayBufferWriter<byte>();
+        var writer = Writer.Create(buffer, session);
+        writer.WriteFieldHeaderExpected(0, WireType.TagDelimited);
+        session.CodecProvider.GetCodec<ClusterServiceViewId>().WriteField(ref writer, 1, typeof(ClusterServiceViewId), View);
+        session.CodecProvider.GetCodec<ClusterServiceRetryReason>().WriteField(
+            ref writer, 2, typeof(ClusterServiceRetryReason), ClusterServiceRetryReason.WrongView);
+        writer.WriteEndObject();
+        writer.Commit();
+
+        var result = serializer.Deserialize<ClusterServiceOperationResult<int>>(buffer.WrittenSpan);
+
+        Assert.Equal(View, result.ViewId);
+        Assert.Equal(ClusterServiceRetryReason.WrongView, result.RetryReason);
+        Assert.Equal(ClusterServiceExecutionDisposition.OutcomeUnknown, result.Disposition);
+        Assert.False(result.CanRetryWithoutDeduplication);
+    }
 
     [Fact]
     public void RejectedBeforeExecution_IsTheOnlyDispositionSafeForAutomaticRetry()
@@ -83,6 +118,7 @@ public sealed class ClusterServiceOperationResultTests
                 ClusterServiceRetryReason.SafetyDelay,
                 TimeSpan.FromMilliseconds(250)),
             ClusterServiceOperationResult<int>.Unknown(View),
+            default,
         };
 
         foreach (var expected in expectedResults)
