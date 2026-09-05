@@ -1,12 +1,15 @@
 using System.Reflection;
+using Amazon.Runtime;
 using Amazon.SQS;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Providers;
 using Orleans.Streaming.SQS.Streams;
 using Orleans.Streams;
+using OrleansAWSUtils.Storage;
 using OrleansAWSUtils.Streams;
 using SqsMessage = Amazon.SQS.Model.Message;
 using Xunit;
@@ -107,6 +110,51 @@ public sealed class SQSStreamProviderBuilderTests
         Assert.Equal(connectionString, options.ConnectionString);
     }
 
+    [Fact]
+    public async Task AspireConnectionResource_CustomEndpointPreservesExplicitCredentials()
+    {
+        const string connectionString =
+            "Service=https://sqs.example.com;AccessKey=access;SecretKey=secret;SessionToken=token";
+        await using var app = await SqsAspireTestApp.CreateAsync(
+            ProviderName,
+            [("ConnectionString", connectionString)]);
+        using var host = await app.BuildClientHostAsync();
+        var options = GetOptions<SqsOptions>(host.Services, ProviderName);
+
+        Assert.Equal(connectionString, options.ConnectionString);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SqsStorage_CustomEndpointUsesExplicitCredentials(bool useSessionToken)
+    {
+        var connectionString = "Service=https://sqs.example.com;AccessKey=access;SecretKey=secret";
+        if (useSessionToken)
+        {
+            connectionString += ";SessionToken=token";
+        }
+
+        var storage = new SQSStorage(
+            NullLoggerFactory.Instance,
+            "queue",
+            new SqsOptions { ConnectionString = connectionString },
+            "service");
+        var client = Assert.IsType<AmazonSQSClient>(
+            typeof(SQSStorage)
+                .GetField("sqsClient", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .GetValue(storage));
+        var credentials = Assert.IsAssignableFrom<AWSCredentials>(
+            typeof(AmazonServiceClient)
+                .GetProperty("ExplicitAWSCredentials", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .GetValue(client));
+        var immutableCredentials = credentials.GetCredentials();
+
+        Assert.Equal("access", immutableCredentials.AccessKey);
+        Assert.Equal("secret", immutableCredentials.SecretKey);
+        Assert.Equal(useSessionToken ? "token" : string.Empty, immutableCredentials.Token);
+    }
+
     [Theory]
     [InlineData("DataAdapterServiceKey")]
     [InlineData("DataAdapterKey")]
@@ -187,6 +235,24 @@ public sealed class SQSStreamProviderBuilderTests
             ["ConnectionString", "AccessKey=access;SecretKey=secret"],
             [],
             "non-empty Service"
+        },
+        {
+            "ConnectionStringMissingSecretKey",
+            ["ConnectionString", "Service=us-east-1;AccessKey=access"],
+            [],
+            "AccessKey and SecretKey together"
+        },
+        {
+            "ConnectionStringMissingAccessKey",
+            ["ConnectionString", "Service=us-east-1;SecretKey=secret"],
+            [],
+            "AccessKey and SecretKey together"
+        },
+        {
+            "ConnectionStringSessionTokenWithoutCredentials",
+            ["ConnectionString", "Service=us-east-1;SessionToken=token"],
+            [],
+            "SessionToken"
         },
         {
             "ConflictingServiceKeyAndConnectionName",
