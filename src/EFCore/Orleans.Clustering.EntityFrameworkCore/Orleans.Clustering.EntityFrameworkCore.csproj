@@ -12,7 +12,8 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Orleans.Clustering.EntityFrameworkCore.SqlServer"/>
     <InternalsVisibleTo Include="Orleans.Clustering.EntityFrameworkCore.MySql"/>
-    <InternalsVisibleTo Include="Tester.EFCore"/>
+    <InternalsVisibleTo Include="Orleans.Clustering.EntityFrameworkCore.PostgreSQL"/>
+    <InternalsVisibleTo Include="Orleans.EntityFrameworkCore.Tests"/>
   </ItemGroup>
 
   <PropertyGroup>

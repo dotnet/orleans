@@ -15,7 +15,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="Tester.EFCore"/>
+    <InternalsVisibleTo Include="Orleans.EntityFrameworkCore.Tests"/>
   </ItemGroup>
 
   <ItemGroup>

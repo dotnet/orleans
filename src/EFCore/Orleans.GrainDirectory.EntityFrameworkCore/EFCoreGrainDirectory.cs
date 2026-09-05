@@ -40,7 +40,7 @@ public class EFCoreGrainDirectory<TDbContext, TETag> : IGrainDirectory, ILifecyc
 
         try
         {
-            var ctx = this._dbContextFactory.CreateDbContext();
+            await using var ctx = await this._dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
 
             if (previousAddress is not null)
             {
@@ -77,10 +77,16 @@ public class EFCoreGrainDirectory<TDbContext, TETag> : IGrainDirectory, ILifecyc
                 await ctx.SaveChangesAsync().ConfigureAwait(false);
             }
         }
-        catch
+        catch (DbUpdateException exception)
         {
-            // Possible race condition?
-            return await Lookup(address.GrainId).ConfigureAwait(false);
+            this._logger.LogDebug(exception, "Possible concurrent registration for grain {GrainId}", address.GrainId);
+            var winner = await Lookup(address.GrainId).ConfigureAwait(false);
+            if (winner is not null)
+            {
+                return winner;
+            }
+
+            throw;
         }
 
         return await Lookup(address.GrainId).ConfigureAwait(false);
@@ -90,7 +96,7 @@ public class EFCoreGrainDirectory<TDbContext, TETag> : IGrainDirectory, ILifecyc
     {
         try
         {
-            var ctx = this._dbContextFactory.CreateDbContext();
+            await using var ctx = await this._dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
 
             var grainIdStr = address.GrainId.ToString();
             var activationIdStr = address.ActivationId.ToParsableString();
@@ -110,6 +116,7 @@ public class EFCoreGrainDirectory<TDbContext, TETag> : IGrainDirectory, ILifecyc
         catch (Exception exc)
         {
             this._logger.LogWarning(exc, "Unable to unregister activation");
+            throw;
         }
     }
 
@@ -117,7 +124,7 @@ public class EFCoreGrainDirectory<TDbContext, TETag> : IGrainDirectory, ILifecyc
     {
         try
         {
-            var ctx = this._dbContextFactory.CreateDbContext();
+            await using var ctx = await this._dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
 
             var grainIdStr = grainId.ToString();
             var record = await ctx.Activations.AsNoTracking()
@@ -131,7 +138,7 @@ public class EFCoreGrainDirectory<TDbContext, TETag> : IGrainDirectory, ILifecyc
         catch (Exception exc)
         {
             this._logger.LogWarning(exc, "Unable to lookup Grain Directory");
-            return default!;
+            throw;
         }
     }
 
@@ -139,7 +146,7 @@ public class EFCoreGrainDirectory<TDbContext, TETag> : IGrainDirectory, ILifecyc
     {
         try
         {
-            var ctx = this._dbContextFactory.CreateDbContext();
+            await using var ctx = await this._dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
 
             var silos = siloAddresses.Select(s => s.ToParsableString()).ToArray();
 
@@ -155,6 +162,7 @@ public class EFCoreGrainDirectory<TDbContext, TETag> : IGrainDirectory, ILifecyc
         catch (Exception exc)
         {
             this._logger.LogWarning(exc, "Unable to unregister silos from the Grain Directory");
+            throw;
         }
     }
 
@@ -162,7 +170,7 @@ public class EFCoreGrainDirectory<TDbContext, TETag> : IGrainDirectory, ILifecyc
     {
         try
         {
-            var ctx = this._dbContextFactory.CreateDbContext();
+            await using var ctx = await this._dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
 
             foreach (var addr in addresses)
             {
@@ -182,6 +190,7 @@ public class EFCoreGrainDirectory<TDbContext, TETag> : IGrainDirectory, ILifecyc
         catch (Exception exc)
         {
             this._logger.LogWarning(exc, "Unable to unregister silos from the Grain Directory");
+            throw;
         }
     }
 

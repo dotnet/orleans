@@ -11,13 +11,16 @@ GO
 BEGIN TRANSACTION;
 GO
 
-IF NOT EXISTS(SELECT * FROM [__EFMigrationsHistory] WHERE [MigrationId] = N'20231005032142_InitialGrainDirectorySchema')
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260811210058_InitialGrainDirectorySchema'
+)
 BEGIN
     CREATE TABLE [Activations] (
-        [ClusterId] nvarchar(450) NOT NULL,
-        [GrainId] nvarchar(450) NOT NULL,
-        [SiloAddress] nvarchar(450) NOT NULL,
-        [ActivationId] nvarchar(450) NOT NULL,
+        [ClusterId] nvarchar(450) COLLATE Latin1_General_100_BIN2 NOT NULL,
+        [GrainId] nvarchar(450) COLLATE Latin1_General_100_BIN2 NOT NULL,
+        [SiloAddress] nvarchar(450) COLLATE Latin1_General_100_BIN2 NOT NULL,
+        [ActivationId] nvarchar(450) COLLATE Latin1_General_100_BIN2 NOT NULL,
         [MembershipVersion] bigint NOT NULL,
         [ETag] rowversion NOT NULL,
         CONSTRAINT [PK_Activations] PRIMARY KEY NONCLUSTERED ([ClusterId], [GrainId])
@@ -25,22 +28,31 @@ BEGIN
 END;
 GO
 
-IF NOT EXISTS(SELECT * FROM [__EFMigrationsHistory] WHERE [MigrationId] = N'20231005032142_InitialGrainDirectorySchema')
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260811210058_InitialGrainDirectorySchema'
+)
 BEGIN
     CREATE NONCLUSTERED INDEX [IDX_Activations_ClusterId_GrainId_ActivationId] ON [Activations] ([ClusterId], [GrainId], [ActivationId]);
 END;
 GO
 
-IF NOT EXISTS(SELECT * FROM [__EFMigrationsHistory] WHERE [MigrationId] = N'20231005032142_InitialGrainDirectorySchema')
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260811210058_InitialGrainDirectorySchema'
+)
 BEGIN
     CREATE NONCLUSTERED INDEX [IDX_Activations_CusterId_SiloAddress] ON [Activations] ([ClusterId], [SiloAddress]);
 END;
 GO
 
-IF NOT EXISTS(SELECT * FROM [__EFMigrationsHistory] WHERE [MigrationId] = N'20231005032142_InitialGrainDirectorySchema')
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260811210058_InitialGrainDirectorySchema'
+)
 BEGIN
     INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
-    VALUES (N'20231005032142_InitialGrainDirectorySchema', N'7.0.11');
+    VALUES (N'20260811210058_InitialGrainDirectorySchema', N'8.0.29');
 END;
 GO
 

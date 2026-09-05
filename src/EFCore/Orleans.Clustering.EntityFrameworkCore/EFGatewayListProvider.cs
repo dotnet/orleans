@@ -49,7 +49,7 @@ internal class EFGatewayListProvider<TDbContext, TEtag> : IGatewayListProvider w
     {
         try
         {
-            var ctx = this._dbContextFactory.CreateDbContext();
+            await using var ctx = await this._dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
 
             var records = await ctx.Silos.Where(r =>
                     r.ClusterId == this._clusterId &&

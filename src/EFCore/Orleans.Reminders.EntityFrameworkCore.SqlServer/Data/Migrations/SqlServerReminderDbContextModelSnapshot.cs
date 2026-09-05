@@ -17,21 +17,24 @@ namespace Orleans.Reminders.EntityFrameworkCore.SqlServer.Data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "7.0.11")
+                .HasAnnotation("ProductVersion", "8.0.29")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
-            modelBuilder.Entity("Orleans.Reminders.EntityFrameworkCore.Data.ReminderRecord", b =>
+            modelBuilder.Entity("Orleans.Reminders.EntityFrameworkCore.Data.ReminderRecord<byte[]>", b =>
                 {
                     b.Property<string>("ServiceId")
-                        .HasColumnType("nvarchar(450)");
+                        .HasColumnType("nvarchar(450)")
+                        .UseCollation("Latin1_General_100_BIN2");
 
                     b.Property<string>("GrainId")
-                        .HasColumnType("nvarchar(450)");
+                        .HasColumnType("nvarchar(450)")
+                        .UseCollation("Latin1_General_100_BIN2");
 
                     b.Property<string>("Name")
-                        .HasColumnType("nvarchar(450)");
+                        .HasColumnType("nvarchar(450)")
+                        .UseCollation("Latin1_General_100_BIN2");
 
                     b.Property<byte[]>("ETag")
                         .IsConcurrencyToken()
@@ -42,8 +45,8 @@ namespace Orleans.Reminders.EntityFrameworkCore.SqlServer.Data.Migrations
                     b.Property<long>("GrainHash")
                         .HasColumnType("bigint");
 
-                    b.Property<TimeSpan>("Period")
-                        .HasColumnType("time");
+                    b.Property<long>("Period")
+                        .HasColumnType("bigint");
 
                     b.Property<DateTimeOffset>("StartAt")
                         .HasColumnType("datetimeoffset");

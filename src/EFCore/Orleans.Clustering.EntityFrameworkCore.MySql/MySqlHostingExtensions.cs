@@ -49,9 +49,9 @@ public static class MySqlHostingExtensions
             .ConfigureServices(services =>
             {
                 services
-                    .AddSingleton<IEFClusterETagConverter<DateTime>, MySqlClusterETagConverter>();
+                    .AddSingleton<IEFClusterETagConverter<Guid>, GuidClusterETagConverter>();
             })
-            .UseEntityFrameworkCoreClustering<MySqlClusterDbContext, DateTime>();
+            .UseEntityFrameworkCoreClustering<MySqlClusterDbContext, Guid>();
     }
 
     /// <summary>
@@ -94,8 +94,8 @@ public static class MySqlHostingExtensions
         return builder
             .ConfigureServices(services =>
             {
-                services.AddSingleton<IEFClusterETagConverter<DateTime>, MySqlClusterETagConverter>();
+                services.AddSingleton<IEFClusterETagConverter<Guid>, GuidClusterETagConverter>();
             })
-            .UseEntityFrameworkCoreClustering<MySqlClusterDbContext, DateTime>();
+            .UseEntityFrameworkCoreClustering<MySqlClusterDbContext, Guid>();
     }
 }

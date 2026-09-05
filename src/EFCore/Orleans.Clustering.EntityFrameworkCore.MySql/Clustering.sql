@@ -1,63 +1,131 @@
 ﻿CREATE TABLE IF NOT EXISTS `__EFMigrationsHistory` (
-    `MigrationId` varchar(150) NOT NULL,
-    `ProductVersion` varchar(32) NOT NULL,
-    PRIMARY KEY (`MigrationId`)
-);
+    `MigrationId` varchar(150) CHARACTER SET utf8mb4 NOT NULL,
+    `ProductVersion` varchar(32) CHARACTER SET utf8mb4 NOT NULL,
+    CONSTRAINT `PK___EFMigrationsHistory` PRIMARY KEY (`MigrationId`)
+) CHARACTER SET=utf8mb4;
 
 START TRANSACTION;
 
-IF NOT EXISTS(SELECT * FROM `__EFMigrationsHistory` WHERE `MigrationId` = '20231007024046_InitialClusteringSchema')
+DROP PROCEDURE IF EXISTS MigrationsScript;
+DELIMITER //
+CREATE PROCEDURE MigrationsScript()
 BEGIN
+    IF NOT EXISTS(SELECT 1 FROM `__EFMigrationsHistory` WHERE `MigrationId` = '20260811210037_InitialClusteringSchema') THEN
+
+    ALTER DATABASE CHARACTER SET utf8mb4;
+
+    END IF;
+END //
+DELIMITER ;
+CALL MigrationsScript();
+DROP PROCEDURE MigrationsScript;
+
+DROP PROCEDURE IF EXISTS MigrationsScript;
+DELIMITER //
+CREATE PROCEDURE MigrationsScript()
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM `__EFMigrationsHistory` WHERE `MigrationId` = '20260811210037_InitialClusteringSchema') THEN
+
     CREATE TABLE `Clusters` (
-        `Id` varchar(255) NOT NULL,
+        `Id` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
         `Timestamp` datetime(6) NOT NULL,
         `Version` int NOT NULL,
-        `ETag` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
-        PRIMARY KEY (`Id`)
-    );
-END;
+        `ETag` char(36) COLLATE ascii_general_ci NOT NULL,
+        CONSTRAINT `PK_Clusters` PRIMARY KEY (`Id`)
+    ) CHARACTER SET=utf8mb4;
 
-IF NOT EXISTS(SELECT * FROM `__EFMigrationsHistory` WHERE `MigrationId` = '20231007024046_InitialClusteringSchema')
+    END IF;
+END //
+DELIMITER ;
+CALL MigrationsScript();
+DROP PROCEDURE MigrationsScript;
+
+DROP PROCEDURE IF EXISTS MigrationsScript;
+DELIMITER //
+CREATE PROCEDURE MigrationsScript()
 BEGIN
+    IF NOT EXISTS(SELECT 1 FROM `__EFMigrationsHistory` WHERE `MigrationId` = '20260811210037_InitialClusteringSchema') THEN
+
     CREATE TABLE `Silos` (
-        `ClusterId` varchar(255) NOT NULL,
-        `Address` varchar(45) NOT NULL,
+        `ClusterId` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+        `Address` varchar(45) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
         `Port` int NOT NULL,
         `Generation` int NOT NULL,
-        `Name` varchar(150) NOT NULL,
-        `HostName` varchar(150) NOT NULL,
+        `Name` varchar(150) CHARACTER SET utf8mb4 NOT NULL,
+        `HostName` varchar(150) CHARACTER SET utf8mb4 NOT NULL,
         `Status` int NOT NULL,
         `ProxyPort` int NULL,
-        `SuspectingTimes` longtext NULL,
-        `SuspectingSilos` longtext NULL,
+        `SuspectingTimes` longtext CHARACTER SET utf8mb4 NULL,
+        `SuspectingSilos` longtext CHARACTER SET utf8mb4 NULL,
         `StartTime` datetime(6) NOT NULL,
         `IAmAliveTime` datetime(6) NOT NULL,
-        `ETag` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
-        PRIMARY KEY (`ClusterId`, `Address`, `Port`, `Generation`),
+        `ETag` char(36) COLLATE ascii_general_ci NOT NULL,
+        CONSTRAINT `PK_Silos` PRIMARY KEY (`ClusterId`, `Address`, `Port`, `Generation`),
         CONSTRAINT `FK_Silos_Clusters_ClusterId` FOREIGN KEY (`ClusterId`) REFERENCES `Clusters` (`Id`) ON DELETE CASCADE
-    );
-END;
+    ) CHARACTER SET=utf8mb4;
 
-IF NOT EXISTS(SELECT * FROM `__EFMigrationsHistory` WHERE `MigrationId` = '20231007024046_InitialClusteringSchema')
-BEGIN
-    CREATE INDEX `IDX_Silo_ClusterId` ON `Silos` (`ClusterId`);
-END;
+    END IF;
+END //
+DELIMITER ;
+CALL MigrationsScript();
+DROP PROCEDURE MigrationsScript;
 
-IF NOT EXISTS(SELECT * FROM `__EFMigrationsHistory` WHERE `MigrationId` = '20231007024046_InitialClusteringSchema')
+DROP PROCEDURE IF EXISTS MigrationsScript;
+DELIMITER //
+CREATE PROCEDURE MigrationsScript()
 BEGIN
-    CREATE INDEX `IDX_Silo_ClusterId_Status` ON `Silos` (`ClusterId`, `Status`);
-END;
+    IF NOT EXISTS(SELECT 1 FROM `__EFMigrationsHistory` WHERE `MigrationId` = '20260811210037_InitialClusteringSchema') THEN
 
-IF NOT EXISTS(SELECT * FROM `__EFMigrationsHistory` WHERE `MigrationId` = '20231007024046_InitialClusteringSchema')
-BEGIN
-    CREATE INDEX `IDX_Silo_ClusterId_Status_IAmAlive` ON `Silos` (`ClusterId`, `Status`, `IAmAliveTime`);
-END;
+    CREATE INDEX `IX_Silos_ClusterId` ON `Silos` (`ClusterId`);
 
-IF NOT EXISTS(SELECT * FROM `__EFMigrationsHistory` WHERE `MigrationId` = '20231007024046_InitialClusteringSchema')
+    END IF;
+END //
+DELIMITER ;
+CALL MigrationsScript();
+DROP PROCEDURE MigrationsScript;
+
+DROP PROCEDURE IF EXISTS MigrationsScript;
+DELIMITER //
+CREATE PROCEDURE MigrationsScript()
 BEGIN
+    IF NOT EXISTS(SELECT 1 FROM `__EFMigrationsHistory` WHERE `MigrationId` = '20260811210037_InitialClusteringSchema') THEN
+
+    CREATE INDEX `IX_Silos_ClusterId_Status` ON `Silos` (`ClusterId`, `Status`);
+
+    END IF;
+END //
+DELIMITER ;
+CALL MigrationsScript();
+DROP PROCEDURE MigrationsScript;
+
+DROP PROCEDURE IF EXISTS MigrationsScript;
+DELIMITER //
+CREATE PROCEDURE MigrationsScript()
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM `__EFMigrationsHistory` WHERE `MigrationId` = '20260811210037_InitialClusteringSchema') THEN
+
+    CREATE INDEX `IX_Silos_ClusterId_Status_IAmAliveTime` ON `Silos` (`ClusterId`, `Status`, `IAmAliveTime`);
+
+    END IF;
+END //
+DELIMITER ;
+CALL MigrationsScript();
+DROP PROCEDURE MigrationsScript;
+
+DROP PROCEDURE IF EXISTS MigrationsScript;
+DELIMITER //
+CREATE PROCEDURE MigrationsScript()
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM `__EFMigrationsHistory` WHERE `MigrationId` = '20260811210037_InitialClusteringSchema') THEN
+
     INSERT INTO `__EFMigrationsHistory` (`MigrationId`, `ProductVersion`)
-    VALUES ('20231007024046_InitialClusteringSchema', '7.0.11');
-END;
+    VALUES ('20260811210037_InitialClusteringSchema', '8.0.29');
+
+    END IF;
+END //
+DELIMITER ;
+CALL MigrationsScript();
+DROP PROCEDURE MigrationsScript;
 
 COMMIT;
 

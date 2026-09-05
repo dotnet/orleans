@@ -10,6 +10,8 @@ namespace Orleans.Clustering.EntityFrameworkCore.SqlServer.Data;
 
 public sealed class SqlServerClusterDbContext : ClusterDbContext<SqlServerClusterDbContext, byte[]>
 {
+    private const string IdentifierCollation = "Latin1_General_100_BIN2";
+
     public SqlServerClusterDbContext(DbContextOptions<SqlServerClusterDbContext> options) : base(options)
     {
     }
@@ -19,6 +21,7 @@ public sealed class SqlServerClusterDbContext : ClusterDbContext<SqlServerCluste
         modelBuilder.Entity<ClusterRecord<byte[]>>(c =>
         {
             c.HasKey(p => p.Id).IsClustered(false).HasName("PK_Cluster");
+            c.Property(p => p.Id).UseCollation(IdentifierCollation);
             c.Property(p => p.Timestamp).IsRequired();
             c.Property(p => p.Version).IsRequired();
             c.Property(p => p.ETag).IsRequired().IsRowVersion();
@@ -42,7 +45,8 @@ public sealed class SqlServerClusterDbContext : ClusterDbContext<SqlServerCluste
         modelBuilder.Entity<SiloRecord<byte[]>>(c =>
         {
             c.HasKey(p => new {p.ClusterId, p.Address, p.Port, p.Generation}).IsClustered(false).HasName("PK_Silo");
-            c.Property(p => p.Address).HasMaxLength(45).IsRequired();
+            c.Property(p => p.ClusterId).UseCollation(IdentifierCollation);
+            c.Property(p => p.Address).HasMaxLength(45).UseCollation(IdentifierCollation).IsRequired();
             c.Property(p => p.Port).IsRequired();
             c.Property(p => p.Generation).IsRequired();
             c.Property(p => p.Name).HasMaxLength(150).IsRequired();
