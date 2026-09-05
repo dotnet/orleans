@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using Microsoft.Extensions.Logging;
 using Orleans.Serialization.Invocation;
@@ -12,21 +13,29 @@ namespace Orleans.Runtime
         private const int StateCompleted = 1;
         private const int StateCancellationRegistrationPending = 2;
         private const int StateCancellationRegistrationPublished = 4;
+        private const long OwnerReference = 1;
+        private const long LeaseReference = 2;
+        private const int ReferenceBits = 16;
+        private const long ReferenceMask = (1L << ReferenceBits) - 1;
+        private const long GenerationIncrement = 1L << ReferenceBits;
 
-        private readonly SharedCallbackData shared;
-        private readonly IResponseCompletionSource context;
-        private readonly ApplicationRequestInstruments _applicationRequestInstruments;
+        private SharedCallbackData shared = null!;
+        private IResponseCompletionSource context = null!;
+        private ApplicationRequestInstruments _applicationRequestInstruments = null!;
         private int _state;
         private StatusResponse? lastKnownStatus;
         private ValueStopwatch stopwatch;
         private CancellationTokenRegistration _cancellationTokenRegistration;
+        private long _cancellationGeneration;
+        private long _referenceState;
 
-        public CallbackData(
-            SharedCallbackData shared,
-            IResponseCompletionSource ctx,
-            Message msg,
-            ApplicationRequestInstruments applicationRequestInstruments)
+        internal CallbackData()
         {
+        }
+
+        internal void Initialize(SharedCallbackData shared, IResponseCompletionSource ctx, Message msg, ApplicationRequestInstruments applicationRequestInstruments)
+        {
+            Debug.Assert(GetReferences(Volatile.Read(ref _referenceState)) == 0, "CallbackData should have no references before initialization");
             this.shared = shared;
             this.context = ctx;
             this.Message = msg;
@@ -34,7 +43,141 @@ namespace Orleans.Runtime
             this.stopwatch = ValueStopwatch.StartNew();
         }
 
-        public Message Message { get; } // might hold metadata used by response pipeline
+        internal void Reset()
+        {
+            Debug.Assert(GetReferences(Volatile.Read(ref _referenceState)) == 0, "CallbackData should have no references before reset");
+            shared = null!;
+            context = null!;
+            _applicationRequestInstruments = null!;
+            _state = StateNone;
+            lastKnownStatus = null;
+            stopwatch = default;
+            _cancellationTokenRegistration.Dispose();
+            _cancellationTokenRegistration = default;
+            Volatile.Write(ref _cancellationGeneration, 0);
+            Message = null!;
+        }
+
+        internal long AcquireOwnerReference(bool acquireLease)
+        {
+            while (true)
+            {
+                var state = Volatile.Read(ref _referenceState);
+                if (GetReferences(state) != 0)
+                {
+                    throw new InvalidOperationException("CallbackData already has an owner.");
+                }
+
+                var generation = unchecked((state & ~ReferenceMask) + GenerationIncrement);
+                var nextState = generation | OwnerReference | (acquireLease ? LeaseReference : 0);
+                if (Interlocked.CompareExchange(ref _referenceState, nextState, state) == state)
+                {
+                    return generation;
+                }
+            }
+        }
+
+        internal bool TryTransferOwnerToLease(long generation)
+        {
+            while (true)
+            {
+                var state = Volatile.Read(ref _referenceState);
+                if (GetGeneration(state) != generation || (state & OwnerReference) == 0)
+                {
+                    return false;
+                }
+
+                if (GetReferences(state) > ReferenceMask - LeaseReference)
+                {
+                    throw new InvalidOperationException("CallbackData has too many active leases.");
+                }
+
+                // Replace the owner reference with one lease.
+                if (Interlocked.CompareExchange(ref _referenceState, state + LeaseReference - OwnerReference, state) == state)
+                {
+                    return true;
+                }
+            }
+        }
+
+        internal void ReleaseOwnerReference(long generation)
+        {
+            while (true)
+            {
+                var state = Volatile.Read(ref _referenceState);
+                if (GetGeneration(state) != generation || (state & OwnerReference) == 0)
+                {
+                    return;
+                }
+
+                var nextState = state - OwnerReference;
+                if (Interlocked.CompareExchange(ref _referenceState, nextState, state) == state)
+                {
+                    ReturnIfUnreferenced(nextState);
+                    return;
+                }
+            }
+        }
+
+        internal bool TryAcquireLease(long generation)
+        {
+            while (true)
+            {
+                var state = Volatile.Read(ref _referenceState);
+                if (GetGeneration(state) != generation || (state & OwnerReference) == 0)
+                {
+                    return false;
+                }
+
+                if (GetReferences(state) > ReferenceMask - LeaseReference)
+                {
+                    throw new InvalidOperationException("CallbackData has too many active leases.");
+                }
+
+                if (Interlocked.CompareExchange(ref _referenceState, state + LeaseReference, state) == state)
+                {
+                    return true;
+                }
+            }
+        }
+
+        internal void ReleaseLease(long generation)
+        {
+            while (true)
+            {
+                var state = Volatile.Read(ref _referenceState);
+                if (GetGeneration(state) != generation)
+                {
+                    throw new InvalidOperationException("Cannot release a stale CallbackData lease.");
+                }
+
+                if (GetReferences(state) < LeaseReference)
+                {
+                    throw new InvalidOperationException("CallbackData lease was released more than once.");
+                }
+
+                var nextState = state - LeaseReference;
+                if (Interlocked.CompareExchange(ref _referenceState, nextState, state) == state)
+                {
+                    ReturnIfUnreferenced(nextState);
+                    return;
+                }
+            }
+        }
+
+        private static long GetGeneration(long state) => state & ~ReferenceMask;
+
+        private static long GetReferences(long state) => state & ReferenceMask;
+
+        private void ReturnIfUnreferenced(long state)
+        {
+            if (GetReferences(state) == 0)
+            {
+                CallbackDataPool.ReturnCore(this);
+            }
+        }
+
+        public Message Message { get; private set; } = null!; // might hold metadata used by response pipeline
 
         public bool IsCompleted => (Volatile.Read(ref _state) & StateCompleted) != 0;
 
@@ -53,10 +196,18 @@ namespace Orleans.Runtime
                 return;
             }
 
+            Volatile.Write(ref _cancellationGeneration, GetGeneration(Volatile.Read(ref _referenceState)));
             var registration = cancellationToken.UnsafeRegister(static (arg, token) =>
             {
-                var callbackData = (CallbackData)arg!;
-                callbackData.OnCancellation(token);
+                var callback = (CallbackData)arg!;
+                var generation = Volatile.Read(ref callback._cancellationGeneration);
+                using var lease = callback.TryAcquireLease(generation)
+                    ? new CallbackDataLease(callback, generation)
+                    : default;
+                if (lease.TryGetValue(out var callbackData))
+                {
+                    callbackData.OnCancellation(token);
+                }
             }, this);
 
             _cancellationTokenRegistration = registration;
@@ -80,10 +231,7 @@ namespace Orleans.Runtime
             }
         }
 
-        public void OnStatusUpdate(StatusResponse status)
-        {
-            this.lastKnownStatus = status;
-        }
+        public void OnStatusUpdate(StatusResponse status) => this.lastKnownStatus = status;
 
         public bool IsExpired(long currentTimestamp)
         {
@@ -130,11 +278,11 @@ namespace Orleans.Runtime
             stopwatch.Stop();
             SignalCancellation();
             shared.Unregister(Message);
+            DisposeCancellationRegistration();
             _applicationRequestInstruments.OnAppRequestsEnd((long)stopwatch.Elapsed.TotalMilliseconds);
             _applicationRequestInstruments.OnAppRequestsCanceled(GetTargetGrainType());
             OrleansCallBackDataEvent.Instance.OnCanceled(Message);
             context.Complete(Response.FromException(new OperationCanceledException(cancellationToken)));
-            DisposeCancellationRegistration();
         }
 
         public void OnTimeout()
@@ -156,13 +304,10 @@ namespace Orleans.Runtime
             _applicationRequestInstruments.OnAppRequestsTimedOut(GetTargetGrainType());
 
             OrleansCallBackDataEvent.Instance.OnTimeout(this.Message);
-
-            var msg = this.Message; // Local working copy
-
+            var msg = this.Message;
             var statusMessage = lastKnownStatus is StatusResponse status ? $"Last known status is {status}. " : string.Empty;
             var timeout = GetResponseTimeout();
             LogTimeout(this.shared.Logger, timeout, msg, statusMessage);
-
             var exception = new TimeoutException($"Response did not arrive on time in {timeout} for message: {msg}. {statusMessage}");
             context.Complete(Response.FromException(exception));
         }
@@ -226,6 +371,8 @@ namespace Orleans.Runtime
         private void DisposeCancellationRegistration()
         {
             // If registration is still pending, its publisher observes completion and disposes it.
+            // Dispose waits for a concurrently executing callback, so its captured generation remains
+            // stable until that callback releases its lease and this instance can return to the pool.
             if ((Volatile.Read(ref _state) & StateCancellationRegistrationPublished) != 0)
             {
                 _cancellationTokenRegistration.Dispose();
@@ -281,5 +428,91 @@ namespace Orleans.Runtime
             Message = "The target silo became unavailable for message: '{Message}'. {StatusMessage}See {TroubleshootingHelpLink} for troubleshooting help. About to break its promise."
         )]
         private static partial void LogTargetSiloFail(ILogger logger, Message message, string statusMessage, string troubleshootingHelpLink);
+    }
+
+    /// <summary>
+    /// Holds the dictionary-owned reference to a pooled <see cref="CallbackData"/> instance.
+    /// Copies share one idempotent owner release. Callers acquire a lease before accessing the
+    /// callback, and the callback returns to the pool after the owner and every lease are released.
+    /// The generation prevents stale handles from accessing or releasing a reused callback.
+    /// </summary>
+    internal readonly struct CallbackDataOwner
+    {
+        private readonly CallbackData? _callback;
+        private readonly long _generation;
+
+        public CallbackDataOwner(CallbackData callback)
+        {
+            _callback = callback;
+            _generation = callback.AcquireOwnerReference(acquireLease: false);
+        }
+
+        internal CallbackDataOwner(CallbackData callback, out CallbackDataLease lease)
+        {
+            _callback = callback;
+            _generation = callback.AcquireOwnerReference(acquireLease: true);
+            lease = new CallbackDataLease(callback, _generation);
+        }
+
+        public CallbackDataLease Acquire()
+        {
+            var callback = _callback ?? throw new InvalidOperationException("CallbackDataOwner is not initialized.");
+            if (callback.TryAcquireLease(_generation))
+            {
+                return new CallbackDataLease(callback, _generation);
+            }
+
+            return default;
+        }
+
+        public CallbackDataLease TransferToLease()
+        {
+            var callback = _callback ?? throw new InvalidOperationException("CallbackDataOwner is not initialized.");
+            if (callback.TryTransferOwnerToLease(_generation))
+            {
+                return new CallbackDataLease(callback, _generation);
+            }
+
+            return default;
+        }
+
+        public void Release()
+        {
+            var callback = _callback ?? throw new InvalidOperationException("CallbackDataOwner is not initialized.");
+            callback.ReleaseOwnerReference(_generation);
+        }
+    }
+
+    /// <summary>
+    /// Holds a scoped reference to a pooled <see cref="CallbackData"/> instance.
+    /// </summary>
+    internal ref struct CallbackDataLease
+    {
+        private CallbackData? _callback;
+        private readonly long _generation;
+
+        internal CallbackDataLease(CallbackData callback, long generation)
+        {
+            _callback = callback;
+            _generation = generation;
+        }
+
+        public readonly CallbackData Value =>
+            _callback ?? throw new InvalidOperationException("CallbackDataLease is not initialized.");
+
+        public readonly bool TryGetValue([NotNullWhen(true)] out CallbackData? callback)
+        {
+            callback = _callback;
+            return callback is not null;
+        }
+
+        public void Dispose()
+        {
+            if (_callback is { } callback)
+            {
+                _callback = null;
+                callback.ReleaseLease(_generation);
+            }
+        }
     }
 }
