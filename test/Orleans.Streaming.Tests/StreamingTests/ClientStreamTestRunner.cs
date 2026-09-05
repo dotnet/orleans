@@ -76,7 +76,18 @@ namespace Tester.StreamingTests
             {
                 using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 cts.CancelAfter(_timeout);
-                await streamingObserver.WaitForSubscriptionUnregisteredAsync(streamId, droppedSubscriptionId, streamProviderName, cts.Token);
+                try
+                {
+                    await streamingObserver.WaitForSubscriptionUnregisteredAsync(streamId, droppedSubscriptionId, streamProviderName, cts.Token);
+                }
+                catch (OperationCanceledException exception) when (!cancellationToken.IsCancellationRequested && cts.IsCancellationRequested)
+                {
+                    var diagnostics = streamingObserver.GetSubscriptionDiagnostics(streamId, droppedSubscriptionId, streamProviderName);
+                    var message = $"Timed out unregistering dropped subscription {droppedSubscriptionId} on {streamProviderName}/{streamId}. "
+                        + $"Dropped clients: {string.Join(", ", droppedClients)}.{Environment.NewLine}{diagnostics}";
+                    output?.WriteLine(message);
+                    throw new TimeoutException(message, exception);
+                }
             }
 
             if (getDeliveryFailureCount is not null)

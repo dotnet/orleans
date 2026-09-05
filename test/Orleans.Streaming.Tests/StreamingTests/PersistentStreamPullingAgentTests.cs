@@ -19,7 +19,7 @@ using Xunit;
 
 namespace UnitTests.StreamingTests
 {
-    public class PersistentStreamPullingAgentTests
+    public partial class PersistentStreamPullingAgentTests
     {
         [TestSuite("BVT")]
         [TestProvider("None")]
