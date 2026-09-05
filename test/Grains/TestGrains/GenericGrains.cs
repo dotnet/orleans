@@ -754,6 +754,11 @@ namespace UnitTests.Grains
             await target.LongWait(tc, delay, callId);
         }
 
+        public async Task CallOtherLongRunningTaskWithStartNotification(ILongRunningTaskGrain<T> target, ILongRunningTaskObserver observer, CancellationToken tc, TimeSpan delay, Guid callId)
+        {
+            await target.LongWaitWithStartNotification(delay, callId, observer, tc);
+        }
+
         public async Task CallOtherLongRunningTaskWithLocalCancellation(ILongRunningTaskGrain<T> target, TimeSpan delay, TimeSpan delayBeforeCancel, Guid callId)
         {
             using var cts = new CancellationTokenSource();

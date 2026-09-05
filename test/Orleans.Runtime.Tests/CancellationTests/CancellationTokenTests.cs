@@ -323,12 +323,34 @@ public abstract class CancellationTokenTests(CancellationTokenTests.FixtureBase 
         var target = grains.Item2;
         using var cts = new CancellationTokenSource();
         var callId = Guid.NewGuid();
-        var grainTask = grain.CallOtherLongRunningTask(target, cts.Token, TimeSpan.FromSeconds(10), callId);
-        cts.CancelAfter(delay);
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => grainTask);
-        if (delay > 0)
+        if (delay == 0)
         {
+            var grainTask = grain.CallOtherLongRunningTask(target, cts.Token, TimeSpan.FromSeconds(10), callId);
+            cts.CancelAfter(delay);
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => grainTask);
+            return;
+        }
+
+        var observer = new LongRunningTaskObserver();
+        var observerReference = fixture.GrainFactory.CreateObjectReference<ILongRunningTaskObserver>(observer);
+        try
+        {
+            var grainTask = grain.CallOtherLongRunningTaskWithStartNotification(
+                target,
+                observerReference,
+                cts.Token,
+                TimeSpan.FromSeconds(10),
+                callId);
+            await observer.WaitForCallToStart(callId);
+
+            cts.CancelAfter(delay);
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => grainTask);
             await WaitForCallCancellation(target, callId);
+        }
+        finally
+        {
+            fixture.GrainFactory.DeleteObjectReference<ILongRunningTaskObserver>(observerReference);
+            GC.KeepAlive(observer);
         }
     }
 
