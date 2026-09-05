@@ -4,12 +4,13 @@
     <AssemblyName>Orleans.Transactions.DynamoDB.Tests</AssemblyName>
     <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <DefineConstants>$(DefineConstants);TRANSACTIONS_DYNAMODB_TESTS</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)test\Transactions\Orleans.Transactions.Tests\Orleans.Transactions.Tests.csproj" />
     <ProjectReference Include="$(SourceRoot)src\AWS\Orleans.Clustering.DynamoDB\Orleans.Clustering.DynamoDB.csproj" />
     <ProjectReference Include="$(SourceRoot)src\AWS\Orleans.Transactions.DynamoDB\Orleans.Transactions.DynamoDB.csproj" />
-    <ProjectReference Include="..\..\Extensions\Orleans.AWS.Tests\Orleans.AWS.Tests.csproj" />
+    <Compile Include="$(SourceRoot)test\Extensions\Orleans.AWS.Tests\StorageTests\AWSTestConstants.cs" Link="AWSTestConstants.cs" />
   </ItemGroup>
 </Project>
