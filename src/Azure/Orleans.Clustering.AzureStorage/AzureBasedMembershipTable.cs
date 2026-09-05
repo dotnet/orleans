@@ -171,7 +171,7 @@ namespace Orleans.Runtime.MembershipService
                 foreach (var tuple in entries)
                 {
                     var tableEntry = tuple.Entity;
-                    if (tableEntry.RowKey.Equals(SiloInstanceTableEntry.TABLE_VERSION_ROW))
+                    if (tableEntry.RowKey.Equals(SiloInstanceTableEntry.TABLE_VERSION_ROW, StringComparison.Ordinal))
                     {
                         var membershipVersion = tableEntry.MembershipVersion
                             ?? throw new InvalidOperationException("The table version row does not contain a membership version.");
@@ -214,19 +214,19 @@ namespace Orleans.Runtime.MembershipService
             var parse = new MembershipEntry
             {
                 HostName = tableEntry.HostName!,
-                Status = (SiloStatus)Enum.Parse(typeof(SiloStatus), tableEntry.Status!)
+                Status = Enum.Parse<SiloStatus>(tableEntry.Status!, ignoreCase: false)
             };
 
             if (!string.IsNullOrEmpty(tableEntry.ProxyPort))
-                parse.ProxyPort = int.Parse(tableEntry.ProxyPort);
+                parse.ProxyPort = int.Parse(tableEntry.ProxyPort, NumberStyles.Integer, CultureInfo.InvariantCulture);
 
             int port = 0;
             if (!string.IsNullOrEmpty(tableEntry.Port))
-                int.TryParse(tableEntry.Port, out port);
+                int.TryParse(tableEntry.Port, NumberStyles.Integer, CultureInfo.InvariantCulture, out port);
 
             int gen = 0;
             if (!string.IsNullOrEmpty(tableEntry.Generation))
-                int.TryParse(tableEntry.Generation, out gen);
+                int.TryParse(tableEntry.Generation, NumberStyles.Integer, CultureInfo.InvariantCulture, out gen);
 
             parse.SiloAddress = SiloAddress.New(IPAddress.Parse(tableEntry.Address!), port, gen);
 
@@ -242,10 +242,10 @@ namespace Orleans.Runtime.MembershipService
                 parse.SiloName = tableEntry.InstanceName;
             }
             if (!string.IsNullOrEmpty(tableEntry.UpdateZone))
-                parse.UpdateZone = int.Parse(tableEntry.UpdateZone);
+                parse.UpdateZone = int.Parse(tableEntry.UpdateZone, NumberStyles.Integer, CultureInfo.InvariantCulture);
 
             if (!string.IsNullOrEmpty(tableEntry.FaultZone))
-                parse.FaultZone = int.Parse(tableEntry.FaultZone);
+                parse.FaultZone = int.Parse(tableEntry.FaultZone, NumberStyles.Integer, CultureInfo.InvariantCulture);
 
             parse.StartTime = !string.IsNullOrEmpty(tableEntry.StartTime) ?
                 LogFormatter.ParseDate(tableEntry.StartTime) : default;
@@ -273,7 +273,11 @@ namespace Orleans.Runtime.MembershipService
             }
 
             if (suspectingSilos.Count != suspectingTimes.Count)
-                throw new OrleansException(string.Format("SuspectingSilos.Length of {0} as read from Azure table is not equal to SuspectingTimes.Length of {1}", suspectingSilos.Count, suspectingTimes.Count));
+                throw new OrleansException(string.Format(
+                    CultureInfo.CurrentCulture,
+                    "SuspectingSilos.Length of {0} as read from Azure table is not equal to SuspectingTimes.Length of {1}",
+                    suspectingSilos.Count,
+                    suspectingTimes.Count));
 
             for (int i = 0; i < suspectingSilos.Count; i++)
                 parse.AddSuspector(suspectingSilos[i], suspectingTimes[i]);

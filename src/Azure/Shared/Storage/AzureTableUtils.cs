@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Net;
 using System.Text.RegularExpressions;
 using Azure;
@@ -214,7 +215,11 @@ namespace Orleans.GrainDirectory.AzureStorage
                 .Replace('?', '_');       // Question mark
 
             if (key.Length >= 1024)
-                throw new ArgumentException(string.Format("Key length {0} is too long to be an Azure table key. Key={1}", key.Length, key));
+                throw new ArgumentException(string.Format(
+                    CultureInfo.CurrentCulture,
+                    "Key length {0} is too long to be an Azure table key. Key={1}",
+                    key.Length,
+                    key));
 
             return key;
         }
