@@ -111,6 +111,16 @@ public class DurableInboxOptions
     public TimeSpan MaxOutboxRetryAge { get; set; } = TimeSpan.FromDays(1);
 
     /// <summary>
+    /// Gets or sets how long inbox and outbox dead letters are retained.
+    /// </summary>
+    public TimeSpan DeadLetterRetentionPeriod { get; set; } = TimeSpan.FromDays(30);
+
+    /// <summary>
+    /// Gets or sets the maximum number of dead letters retained per inbox and per outbox.
+    /// </summary>
+    public int MaxRetainedDeadLetters { get; set; } = 1000;
+
+    /// <summary>
     /// Gets or sets the maximum number of inbox messages processed by one durable job attempt.
     /// </summary>
     public int InboxBatchSize { get; set; } = 32;
@@ -177,6 +187,22 @@ public class DurableInboxOptions
                 nameof(MaxOutboxRetryAge),
                 MaxOutboxRetryAge,
                 "MaxOutboxRetryAge must be less than DeduplicationWindow.");
+        }
+
+        if (DeadLetterRetentionPeriod <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(DeadLetterRetentionPeriod),
+                DeadLetterRetentionPeriod,
+                "DeadLetterRetentionPeriod must be greater than TimeSpan.Zero.");
+        }
+
+        if (MaxRetainedDeadLetters <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(MaxRetainedDeadLetters),
+                MaxRetainedDeadLetters,
+                "MaxRetainedDeadLetters must be greater than zero.");
         }
 
         if (InboxBatchSize <= 0)

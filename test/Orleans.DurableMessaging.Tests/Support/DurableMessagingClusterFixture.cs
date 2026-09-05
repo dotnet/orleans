@@ -126,6 +126,8 @@ public class DurableMessagingClusterFixture : IAsyncLifetime
         options.MaxOutboxRetryAge = TimeSpan.FromMinutes(5);
         options.MaxProcessingAttempts = 1;
         options.MaxDeliveryAttempts = 3;
+        options.MaxRetainedDeadLetters = 2;
+        options.DeadLetterRetentionPeriod = TimeSpan.FromHours(1);
         options.BackpressureRetryDelay = TimeSpan.FromMilliseconds(25);
         options.InboxBatchSize = 8;
         options.OutboxBatchSize = 8;
