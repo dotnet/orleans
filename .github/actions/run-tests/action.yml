@@ -46,6 +46,7 @@ runs:
     env:
       BuildExternalAssets: ${{ inputs['build-external-assets'] }}
   - name: Retry tests
+    id: retry
     if: inputs.retry == 'true' && steps.test.outcome == 'failure'
     uses: ./.github/actions/dotnet-test
     with:
@@ -61,3 +62,4 @@ runs:
     uses: ./.github/actions/archive-test-results
     with:
       name: ${{ inputs.artifact-name }}
+      retention-days: ${{ steps.test.outcome == 'failure' && steps.retry.outcome != 'success' && 14 || 1 }}
