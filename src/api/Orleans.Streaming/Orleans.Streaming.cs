@@ -1202,6 +1202,7 @@ namespace Orleans.Streaming.Diagnostics
             public readonly Runtime.StreamId StreamId;
             public readonly System.Guid SubscriptionId;
             public ItemDelivered(string streamProvider, Runtime.StreamId streamId, System.Guid subscriptionId, Runtime.SiloAddress? siloAddress, Streams.StreamSequenceToken? sequenceToken) : base(default!, default) { }
+
             public ItemDelivered(string streamProvider, Runtime.StreamId streamId, System.Guid subscriptionId, Runtime.SiloAddress? siloAddress, string clusterId, Streams.StreamSequenceToken? sequenceToken) : base(default!, default) { }
         }
 
@@ -1708,6 +1709,12 @@ namespace Orleans.Streams
         System.Threading.Tasks.ValueTask<string> Update(string offset, string expectedCheckpoint, System.Threading.CancellationToken cancellationToken);
     }
 
+    public partial interface IStreamCheckpointStore
+    {
+        System.Threading.Tasks.ValueTask<StreamCheckpointStoreState> Load(System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.ValueTask<StreamCheckpointStoreState> Update(string checkpoint, string expectedVersion, System.Threading.CancellationToken cancellationToken);
+    }
+
     public partial interface IStreamFailureHandler
     {
         bool ShouldFaultSubsriptionOnError { get; }
@@ -2066,6 +2073,17 @@ namespace Orleans.Streams
         public System.Threading.Tasks.ValueTask<string> Update(string offset, string expectedCheckpoint, System.Threading.CancellationToken cancellationToken) { throw null; }
     }
 
+    public readonly partial struct StreamCheckpointStoreState
+    {
+        private readonly object _dummy;
+        private readonly int _dummyPrimitive;
+        public StreamCheckpointStoreState(string checkpoint, string version) { }
+
+        public string Checkpoint { get { throw null; } }
+
+        public string Version { get { throw null; } }
+    }
+
     [GenerateSerializer]
     public sealed partial class StreamEventDeliveryFailureException : Runtime.OrleansException
     {
@@ -2138,6 +2156,32 @@ namespace Orleans.Streams
         ExplicitGrainBasedAndImplicit = 0,
         ExplicitGrainBasedOnly = 1,
         ImplicitOnly = 2
+    }
+
+    public sealed partial class StreamQueueCheckpointer : IStreamQueueCheckpointer<string>
+    {
+        public StreamQueueCheckpointer(IStreamCheckpointStore store, StreamQueueCheckpointerOptions options) { }
+
+        public bool CheckpointExists { get { throw null; } }
+
+        public System.Threading.Tasks.Task FlushAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        [System.Obsolete("Use the overload which accepts a CancellationToken.")]
+        public System.Threading.Tasks.Task<string> Load() { throw null; }
+
+        public System.Threading.Tasks.Task<string> Load(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public void Update(string offset, System.DateTime utcNow, System.Threading.CancellationToken cancellationToken) { }
+
+        [System.Obsolete("Use the overload which accepts a CancellationToken.")]
+        public void Update(string offset, System.DateTime utcNow) { }
+    }
+
+    public sealed partial class StreamQueueCheckpointerOptions
+    {
+        public System.Collections.Generic.IComparer<string>? CheckpointComparer { get { throw null; } set { } }
+
+        public System.TimeSpan PersistInterval { get { throw null; } set { } }
     }
 
     [GenerateSerializer]
