@@ -80,7 +80,9 @@ namespace Orleans.GrainDirectory.AzureStorage
 
             try
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 TableServiceClient tableCreationClient = await GetCloudTableCreationClientAsync();
+                cancellationToken.ThrowIfCancellationRequested();
                 var table = tableCreationClient.GetTableClient(TableName);
                 var response = await table.CreateIfNotExistsAsync(cancellationToken);
                 var alreadyExisted = response.GetRawResponse().Status == (int)HttpStatusCode.Conflict;
@@ -187,7 +189,16 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// </summary>
         /// <param name="data">Data to be inserted or replaced in the table.</param>
         /// <returns>Value promise with new Etag for this data entry after completing this storage operation.</returns>
-        public async Task<string> UpsertTableEntryAsync(T data)
+        public Task<string> UpsertTableEntryAsync(T data)
+            => UpsertTableEntryAsync(data, CancellationToken.None);
+
+        /// <summary>
+        /// Inserts a data entry in the Azure table: creates a new one if does not exist or overwrites an existing version.
+        /// </summary>
+        /// <param name="data">Data to be inserted or replaced in the table.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <returns>Value promise with new Etag for this data entry after completing this storage operation.</returns>
+        public async Task<string> UpsertTableEntryAsync(T data, CancellationToken cancellationToken)
         {
             const string operation = "UpsertTableEntry";
             var startTime = DateTime.UtcNow;
@@ -196,7 +207,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             {
                 try
                 {
-                    var opResult = await Table.UpsertEntityAsync(data);
+                    var opResult = await Table.UpsertEntityAsync(data, cancellationToken: cancellationToken);
                     return opResult.Headers.ETag.GetValueOrDefault().ToString();
                 }
                 catch (Exception exc)

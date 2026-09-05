@@ -74,6 +74,14 @@ Set `GrainStreamQueueCheckpointerOptions.StorageProviderName` to use another reg
 
 Both `UseGrainCheckpointer` and `UseAzureTableCheckpointer` extend `ISiloPersistentStreamConfigurator`, so they can also be used with other persistent stream providers. Event Hubs configures numeric checkpoint ordering by default; other providers can set the corresponding `CheckpointComparer` option for their checkpoint format.
 
+### Recovering from an expired checkpoint
+
+When Event Hubs rejects a persisted partition offset as invalid, the provider clears that partition's checkpoint, closes and recreates its receiver, and resumes on the next pull using the configured no-checkpoint position. `EventHubReceiverOptions.StartFromNow` selects that position. Its default value, `true`, starts at the partition tail and reads newly enqueued events, skipping the retained backlog. Set it to `false` to replay from the earliest retained event, which can duplicate delivery. Choose the policy according to the application's recovery requirements and keep consumers idempotent.
+
+The built-in Azure Table and grain-backed checkpointers support this reset contract. A custom `IStreamQueueCheckpointer<TCheckpoint>` participates in recovery by implementing `Reset(CancellationToken)`; the default implementation surfaces unsupported recovery with `NotSupportedException`.
+
+Existing Orleans subscription cursors rebind to the replacement partition cache, so subscriptions continue without application re-registration. Checkpoint reset, receiver shutdown, and receiver initialization observe the pulling agent's cancellation token.
+
 ## Example - Using Event Hub Streams in a Grain
 
 ```csharp
