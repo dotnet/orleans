@@ -23,6 +23,8 @@
     <None Include="README.md" Pack="true" PackagePath="\" />
     <!-- The host enters covered regions (DurableTaskContext.EnterCoveredRegion, RunInCoveredFlowAsync), which stay internal. -->
     <InternalsVisibleTo Include="Orleans.Durable" />
+    <!-- The durable RPC adapter enters the same covered regions. -->
+    <InternalsVisibleTo Include="Microsoft.Orleans.DurableTasks" />
   </ItemGroup>
 
   <ItemGroup>
