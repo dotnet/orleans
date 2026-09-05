@@ -15,7 +15,7 @@ namespace Orleans
     /// <summary>
     /// Client for communicating with clusters of Orleans silos.
     /// </summary>
-    internal partial class ClusterClient : IInternalClusterClient, IHostedService
+    internal partial class ClusterClient : IInternalClusterClient, IHostedService, IGrainTypeAvailability
     {
         private readonly OutsideRuntimeClient _runtimeClient;
         private readonly ILogger<ClusterClient> _logger;
@@ -57,6 +57,13 @@ namespace Orleans
 
         /// <inheritdoc />
         public IServiceProvider ServiceProvider => _runtimeClient.ServiceProvider;
+
+        ValueTask<GrainType> IGrainTypeAvailability.WaitForGrainTypeAsync(
+            Type grainInterfaceType,
+            string? grainClassNamePrefix,
+            CancellationToken cancellationToken)
+            => ((IGrainTypeAvailability)_runtimeClient.InternalGrainFactory)
+                .WaitForGrainTypeAsync(grainInterfaceType, grainClassNamePrefix, cancellationToken);
 
         /// <inheritdoc />
         public async Task StartAsync(CancellationToken cancellationToken)
