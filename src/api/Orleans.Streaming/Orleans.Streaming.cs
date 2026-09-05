@@ -1202,6 +1202,7 @@ namespace Orleans.Streaming.Diagnostics
             public readonly Runtime.StreamId StreamId;
             public readonly System.Guid SubscriptionId;
             public ItemDelivered(string streamProvider, Runtime.StreamId streamId, System.Guid subscriptionId, Runtime.SiloAddress? siloAddress, Streams.StreamSequenceToken? sequenceToken) : base(default!, default) { }
+
             public ItemDelivered(string streamProvider, Runtime.StreamId streamId, System.Guid subscriptionId, Runtime.SiloAddress? siloAddress, string clusterId, Streams.StreamSequenceToken? sequenceToken) : base(default!, default) { }
         }
 
