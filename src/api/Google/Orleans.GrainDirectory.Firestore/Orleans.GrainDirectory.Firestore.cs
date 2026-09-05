@@ -18,6 +18,8 @@ namespace Orleans.GrainDirectory.Firestore
 
         System.Threading.Tasks.Task<Runtime.GrainAddress?> IGrainDirectory.Register(Runtime.GrainAddress address, Runtime.GrainAddress? previousAddress, System.Threading.CancellationToken cancellationToken) { throw null; }
 
+        System.Threading.Tasks.Task<Runtime.GrainAddress?> IGrainDirectory.Register(Runtime.GrainAddress address, Runtime.GrainAddress? previousAddress) { throw null; }
+
         System.Threading.Tasks.Task<Runtime.GrainAddress?> IGrainDirectory.Register(Runtime.GrainAddress address, System.Threading.CancellationToken cancellationToken) { throw null; }
 
         System.Threading.Tasks.Task IGrainDirectory.Unregister(Runtime.GrainAddress address, System.Threading.CancellationToken cancellationToken) { throw null; }
