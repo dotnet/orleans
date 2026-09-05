@@ -7807,7 +7807,8 @@ public class DisseminationProtocolTests
 
             Assert.Equal(2, Volatile.Read(ref sends));
             var forwarded = Assert.Single(GetBroadcastValues(transport.BroadcastBatches[1].Batch));
-            var update = serializer.Deserialize<MembershipTableSnapshotUpdate>(forwarded.Value.Payload);
+            var update = Assert.IsType<MembershipTableSnapshotUpdate>(
+                serializer.Deserialize<MembershipTableSnapshotUpdate>(forwarded.Value.Payload));
             Assert.NotNull(update.Snapshot);
             Assert.Equal(DateTime.UnixEpoch.AddSeconds(2), update.Snapshot.Entries[sender].IAmAliveTime);
             Assert.Equal(1, forwarded.Value.ToVersion);

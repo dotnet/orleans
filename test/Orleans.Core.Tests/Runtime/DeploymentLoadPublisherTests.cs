@@ -13,6 +13,7 @@ using Orleans.Core.Diagnostics;
 using Orleans.Runtime;
 using Orleans.Runtime.Dissemination;
 using Orleans.Runtime.Scheduler;
+using Orleans.Serialization;
 using Orleans.Statistics;
 using TestExtensions;
 using Xunit;
