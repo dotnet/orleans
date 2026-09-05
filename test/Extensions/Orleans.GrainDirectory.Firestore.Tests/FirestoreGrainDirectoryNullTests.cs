@@ -67,7 +67,7 @@ public class FirestoreGrainDirectoryNullTests
     }
 
     [Fact]
-    public async Task RegisterWithPreviousAddress_NullAddress_ThrowsBeforeUnregistering()
+    public async Task RegisterWithoutCancellation_NullAddress_ThrowsArgumentNullException()
     {
         IGrainDirectory directory = CreateGrainDirectory();
         var previousAddress = new GrainAddress
