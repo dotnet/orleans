@@ -1606,19 +1606,19 @@ namespace UnitTests.Runtime
             switch (operation.Kind)
             {
                 case WorkingSetOperationKind.Activate:
-                {
-                    var exception = Record.Exception(() => harness.WorkingSet.OnActivated(member));
-                    if (expectedDuplicate)
                     {
-                        Assert.IsType<InvalidOperationException>(exception);
-                    }
-                    else if (exception is not null)
-                    {
-                        System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(exception).Throw();
-                    }
+                        var exception = Record.Exception(() => harness.WorkingSet.OnActivated(member));
+                        if (expectedDuplicate)
+                        {
+                            Assert.IsType<InvalidOperationException>(exception);
+                        }
+                        else if (exception is not null)
+                        {
+                            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(exception).Throw();
+                        }
 
-                    return exception is not null;
-                }
+                        return exception is not null;
+                    }
                 case WorkingSetOperationKind.Active:
                     harness.WorkingSet.OnActive(member);
                     break;
