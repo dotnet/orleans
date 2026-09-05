@@ -53,7 +53,9 @@ internal interface ICollectibleGrainContext : IGrainContext
 /// <summary>
 /// Represents opaque activation-collector state whose lifetime is anchored by a grain context.
 /// </summary>
-internal interface IActivationCollectionRegistration;
+internal interface IActivationCollectionRegistration
+{
+}
 
 internal enum ActivationCollectionAction
 {
