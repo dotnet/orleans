@@ -42,4 +42,23 @@ internal static class SqsConnectionString
 
         return result;
     }
+
+    public static void ValidateCredentials(IReadOnlyDictionary<string, string> properties)
+    {
+        var hasAccessKey = properties.ContainsKey("AccessKey");
+        var hasSecretKey = properties.ContainsKey("SecretKey");
+        var hasSessionToken = properties.ContainsKey("SessionToken");
+
+        if (hasSessionToken && (!hasAccessKey || !hasSecretKey))
+        {
+            throw new OrleansConfigurationException(
+                "SQS streaming connection string property 'SessionToken' requires both AccessKey and SecretKey.");
+        }
+
+        if (hasAccessKey != hasSecretKey)
+        {
+            throw new OrleansConfigurationException(
+                "SQS streaming connection strings must configure AccessKey and SecretKey together.");
+        }
+    }
 }
