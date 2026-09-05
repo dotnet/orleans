@@ -114,6 +114,9 @@
   <Folder Name="/src/Extensions/NATS/">
     <Project Path="src\Orleans.Streaming.NATS\Orleans.Streaming.NATS.csproj" />
   </Folder>
+  <Folder Name="/src/Extensions/RabbitMQ/">
+    <Project Path="src/RabbitMQ/Orleans.Streaming.RabbitMQ/Orleans.Streaming.RabbitMQ.csproj" />
+  </Folder>
   <Folder Name="/src/Extensions/Redis/">
     <Project Path="src/Redis/Orleans.Clustering.Redis/Orleans.Clustering.Redis.csproj" />
     <Project Path="src/Redis/Orleans.Journaling.Redis/Orleans.Journaling.Redis.csproj" />
@@ -185,6 +188,7 @@
     <Project Path="test/Extensions/Orleans.GrainDirectory.Firestore.Tests/Orleans.GrainDirectory.Firestore.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.Persistence.Firestore.Tests/Orleans.Persistence.Firestore.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.Reminders.Firestore.Tests/Orleans.Reminders.Firestore.Tests.csproj" />
+    <Project Path="test/Extensions/RabbitMQ.Tests/RabbitMQ.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.AdoNet.Tests/Orleans.AdoNet.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.Azure.Tests/Orleans.Azure.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.DurableJobs.AzureStorage.Tests/Orleans.DurableJobs.AzureStorage.Tests.csproj" />

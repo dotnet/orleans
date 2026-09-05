@@ -20,6 +20,7 @@ A stream provider connects the Orleans streaming API to a transport and defines 
 | Amazon SQS | [`Microsoft.Orleans.Streaming.SQS`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.SQS) | Stable | Yes, within SQS retention | No | AWS account, queue permissions, region/endpoint configuration |
 | ADO.NET | [`Microsoft.Orleans.Streaming.AdoNet`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.AdoNet) | **Alpha** | Yes, in relational tables until expiry/dead-letter eviction | No | Supported database, ADO.NET driver, and Orleans streaming SQL schema |
 | NATS JetStream | [`Microsoft.Orleans.Streaming.NATS`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.NATS) | **Alpha** | Configurable; file storage is the default | No | NATS server with JetStream and sufficient storage; subject/stream administration |
+| RabbitMQ Streams | [`Microsoft.Orleans.Streaming.RabbitMQ`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.RabbitMQ) | **Alpha** | Yes, within RabbitMQ stream retention | No | RabbitMQ with the stream plugin enabled and port 5552 reachable |
 | Redis Streams | [`Microsoft.Orleans.Streaming.Redis`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.Redis) | **Alpha** | Configurable through Redis persistence and stream retention | Yes, while entries remain | Redis deployment, persistence/HA policy, and retention sizing |
 
 Alpha packages have an `alpha.1` version suffix. Treat their APIs and operational behavior as prerelease, validate failure modes under load, and pin versions deliberately.
@@ -73,6 +74,10 @@ Register [ADO.NET](https://learn.microsoft.com/dotnet/framework/data/adonet/ado-
 ## NATS JetStream streaming (alpha)
 
 Register [NATS JetStream](https://docs.nats.io/nats-concepts/jetstream) with `AddNatsStreams`. The provider creates or uses a JetStream stream and deterministic subject partitions. File-backed storage is the default; memory-backed JetStream storage is optional and not durable across server loss. Changes to `NatsOptions.PartitionCount` require corresponding server-side stream updates. The provider isn't rewindable.
+
+## RabbitMQ Streams (alpha)
+
+Register [RabbitMQ Streams](https://www.rabbitmq.com/docs/streams) with `AddRabbitMQStreams`. The provider maps Orleans queues to RabbitMQ streams and stores consumer offsets in RabbitMQ after delivery. Receiver recovery resumes from the stored broker offset, and new subscriptions begin at the provider's current position. New streams default to a 200 MiB maximum length, configurable through `RabbitMQClientOptions.StreamOptions.MaxLengthBytes`. See [Stream with RabbitMQ](rabbitmq-streaming.md) for silo and standalone-client configuration, local setup, and operational guidance.
 
 ## Redis Streams streaming (alpha)
 

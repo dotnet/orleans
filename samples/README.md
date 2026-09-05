@@ -53,6 +53,7 @@ The command checks the gallery manifest and builds every project in `Samples.sln
 | [Shopping Cart](ShoppingCart) | A Blazor shopping cart using Orleans persistence and Azure Storage. | C#, Razor | blazor, persistence, azure-storage | [dotnet/samples](https://github.com/dotnet/samples) |
 | [Stocks](Stocks) | A stock price application using grain timers, HTTP calls, and temporary caching. | C#, Razor | timers, http, caching | [dotnet/samples](https://github.com/dotnet/samples) |
 | [Streaming Custom Data Adapter](Streaming/CustomDataAdapter) | An Event Hubs streaming sample consuming data from a non-Orleans publisher. | C# | streaming, event-hubs, azure | [dotnet/samples](https://github.com/dotnet/samples) |
+| [RabbitMQ Streams](Streaming/RabbitMQ) | An Aspire-hosted Orleans persistent streaming sample backed by RabbitMQ Streams. | C# | streaming, rabbitmq, aspire | [dotnet/orleans](https://github.com/dotnet/orleans) |
 | [Simple Streaming](Streaming/Simple) | A compact producer and consumer example using Orleans Streams. | C# | streaming, getting-started | [dotnet/samples](https://github.com/dotnet/samples) |
 | [Tic Tac Toe](TicTacToe) | A Web-based game demonstrating lobbies and ASP.NET Core integration. | C#, JavaScript | games, aspnet-core, web | [dotnet/samples](https://github.com/dotnet/samples) |
 | [Transport Layer Security](TransportLayerSecurity) | A Hello World cluster configured with mutual TLS for all network communication. | C# | security, tls, networking | [dotnet/samples](https://github.com/dotnet/samples) |

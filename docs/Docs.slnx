@@ -118,6 +118,9 @@
     <Project Path="site/src/content/docs/streaming/snippets/broadcastchannel/BroadcastChannel.GrainInterfaces/BroadcastChannel.GrainInterfaces.csproj" />
     <Project Path="site/src/content/docs/streaming/snippets/broadcastchannel/BroadcastChannel.Silo/BroadcastChannel.Silo.csproj" />
   </Folder>
+  <Folder Name="/site/src/content/docs/streaming/snippets/rabbitmq/">
+    <Project Path="site/src/content/docs/streaming/snippets/rabbitmq/rabbitmq.csproj" />
+  </Folder>
   <Folder Name="/site/src/content/docs/streaming/snippets/subscription-start-positions/">
     <Project Path="site/src/content/docs/streaming/snippets/subscription-start-positions/subscription-start-positions.csproj" />
   </Folder>
