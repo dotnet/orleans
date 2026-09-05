@@ -225,7 +225,7 @@ public sealed class DurableOutboxDeliveryBatchTests
             },
             maxDeliveryAttempts: 1);
 
-        var delivery = fixture.DeliverAsync();
+        var delivery = fixture.DeliverAsync(TestContext.Current.CancellationToken);
         await entered.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         fixture.SimulateRecoveryWithoutMessage();
         release.TrySetResult();
@@ -519,8 +519,8 @@ public sealed class DurableOutboxDeliveryBatchTests
         var fixture = new OutboxFixture(
             _ => ValueTask.FromResult(DeliveryResult.DeadLettered("Receiver rejected the payload.")));
 
-        await fixture.DeliverAsync();
-        await fixture.DeliverAsync();
+        await fixture.DeliverAsync(TestContext.Current.CancellationToken);
+        await fixture.DeliverAsync(TestContext.Current.CancellationToken);
 
         Assert.False(fixture.Messages.ContainsKey(fixture.MessageId));
         Assert.False(fixture.MessageStates.ContainsKey(fixture.MessageId));
@@ -557,7 +557,7 @@ public sealed class DurableOutboxDeliveryBatchTests
                 new OperationCanceledException("Receiver canceled its operation.")),
             maxDeliveryAttempts: 1);
 
-        await fixture.DeliverAsync();
+        await fixture.DeliverAsync(TestContext.Current.CancellationToken);
 
         Assert.False(fixture.Messages.ContainsKey(fixture.MessageId));
         Assert.False(fixture.MessageStates.ContainsKey(fixture.MessageId));

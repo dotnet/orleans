@@ -95,10 +95,10 @@ public sealed class DurableMessagingPumpResultsTests
         var results = new PumpResults(new FakeTimeProvider(), TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1), 1);
         var runningKey = results.CreateKey("job", "running", "run");
         var rejectedKey = results.CreateKey("job", "rejected", "run");
-        Assert.True(results.TryStart(runningKey, out var execution));
+        Assert.True(results.TryStart(runningKey, out var execution, TestContext.Current.CancellationToken));
         Assert.True(results.TryBegin(execution));
 
-        Assert.False(results.TryStart(rejectedKey, out _));
+        Assert.False(results.TryStart(rejectedKey, out _, TestContext.Current.CancellationToken));
         results.Complete(execution);
 
         Assert.True(results.TryTake(runningKey, out var result, out var exception));

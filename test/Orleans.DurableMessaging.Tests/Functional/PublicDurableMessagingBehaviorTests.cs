@@ -117,7 +117,7 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
         using var schedule = fixture.JobManagerProbe.BlockNext("orleans.messaging.inbox-drain");
         using var envelope = CreateEnvelope(receiver, NewMessage(74, "schedule-barrier"));
 
-        var delivery = DeliverAsync(receiver, envelope.Value);
+        var delivery = DeliverAsync(receiver, envelope.Value, TestContext.Current.CancellationToken);
         await schedule.WaitUntilEnteredAsync();
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
@@ -137,7 +137,7 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
         using var schedule = fixture.JobManagerProbe.BlockNext("orleans.messaging.inbox-drain");
         using var envelope = CreateEnvelope(receiver, NewMessage(77, "recovered-during-schedule"));
 
-        var delivery = DeliverAsync(receiver, envelope.Value);
+        var delivery = DeliverAsync(receiver, envelope.Value, TestContext.Current.CancellationToken);
         await schedule.WaitUntilEnteredAsync();
         await fixture.RevertStateAsync(receiver);
         schedule.Continue();
@@ -183,7 +183,8 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
         fixture.Storage.FailAfterWrite(journalId);
         using var envelope = CreateEnvelope(receiver, NewMessage(76, "ambiguous-acceptance"));
 
-        await Assert.ThrowsAsync<IOException>(() => DeliverAsync(receiver, envelope.Value));
+        await Assert.ThrowsAsync<IOException>(
+            () => DeliverAsync(receiver, envelope.Value, TestContext.Current.CancellationToken));
 
         var completed = await fixture.WaitForEffectCountAsync(receiver, 1);
         Assert.Equal("ambiguous-acceptance", Assert.Single(completed.Effects).Value);
@@ -416,7 +417,7 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
             NewMessage(80, "selection-failure"),
             "messages/selection-failure");
 
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value, TestContext.Current.CancellationToken)).Status);
         var state = await fixture.WaitForDeadLetterCountAsync(receiver, 1);
 
         Assert.Empty(state.Effects);
@@ -433,7 +434,7 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
             NewMessage(81, "selection-mutation"),
             "messages/selection-mutation");
 
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value, TestContext.Current.CancellationToken)).Status);
         var state = await fixture.WaitForDeadLetterCountAsync(receiver, 1);
 
         Assert.Empty(state.Effects);
@@ -454,7 +455,7 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
             CommitDuringHandling: true);
         using var envelope = CreateEnvelope(receiver, message);
 
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value, TestContext.Current.CancellationToken)).Status);
         var state = await fixture.WaitForDeadLetterCountAsync(receiver, 1);
 
         Assert.Empty(state.Effects);
@@ -473,7 +474,7 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
             DeleteDuringHandling: true);
         using var envelope = CreateEnvelope(receiver, message);
 
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value, TestContext.Current.CancellationToken)).Status);
         var state = await fixture.WaitForDeadLetterCountAsync(receiver, 1);
 
         Assert.Empty(state.Effects);
@@ -491,7 +492,7 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
             NewMessage(78, "recover-handler"),
             "messages/recover-handler");
 
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value, TestContext.Current.CancellationToken)).Status);
         await handler.WaitUntilEnteredAsync();
         await fixture.RevertStateAsync(receiver);
         handler.Release();
@@ -511,7 +512,7 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
             NewMessage(79, "recover-handler-failure") with { ThrowOnceAfterStaging = true },
             "messages/recover-handler-failure");
 
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value, TestContext.Current.CancellationToken)).Status);
         await handler.WaitUntilEnteredAsync();
         await fixture.RevertStateAsync(receiver);
         handler.Release();
@@ -639,7 +640,7 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
     {
         var receiver = NewGrain();
         using var malformed = CreateEnvelope(receiver, "wrong-body", "typed");
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, malformed.Value)).Status);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, malformed.Value, TestContext.Current.CancellationToken)).Status);
         _ = await fixture.WaitForDeadLetterCountAsync(receiver, 1);
 
         Assert.True(await receiver.RemoveInboxDeadLetterAsync(
@@ -1228,7 +1229,7 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
             NewMessage(74, "wrong-receiver"));
 
         var exception = await Assert.ThrowsAsync<ArgumentException>(
-            () => DeliverAsync(receiver, envelope.Value));
+            () => DeliverAsync(receiver, envelope.Value, TestContext.Current.CancellationToken));
 
         Assert.Contains(declaredReceiver.GetGrainId().ToString(), exception.Message, StringComparison.Ordinal);
         Assert.Contains(receiver.GetGrainId().ToString(), exception.Message, StringComparison.Ordinal);
@@ -1236,7 +1237,7 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
         Assert.Equal(0, state.InboxCount);
         Assert.Empty(state.Effects);
 
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(declaredReceiver, envelope.Value)).Status);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(declaredReceiver, envelope.Value, TestContext.Current.CancellationToken)).Status);
         var delivered = await fixture.WaitForEffectCountAsync(declaredReceiver, 1);
         Assert.Single(delivered.Effects);
     }
