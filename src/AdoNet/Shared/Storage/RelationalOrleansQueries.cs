@@ -569,7 +569,8 @@ namespace Orleans.Tests.SqlUtils
         internal Task<AdoNetStreamPartitionState?> GetStreamPartitionBoundsAsync(
             string serviceId,
             string providerId,
-            string queueId)
+            string queueId,
+            CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(serviceId);
             ArgumentNullException.ThrowIfNull(providerId);
@@ -592,7 +593,8 @@ namespace Orleans.Tests.SqlUtils
                     ProviderId = providerId,
                     QueueId = queueId
                 },
-                result => result.SingleOrDefault());
+                result => result.SingleOrDefault(),
+                cancellationToken);
         }
 
         /// <summary>

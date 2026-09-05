@@ -660,6 +660,198 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
 
     #region Cleanup: retention, hard ceiling diagnostics, batching, and throttling
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RecoverableStream_ContinuityChecksOnlyUnreadHistory(bool checkpointBeforeGap)
+    {
+        var serviceId = RandomServiceId();
+        var providerId = RandomProviderId();
+        var queueId = RandomQueueId();
+        for (var i = 0; i < 3; i++)
+        {
+            await AppendAsync(serviceId, providerId, queueId);
+        }
+
+        var initial = await _queries.AcquireStreamPartitionAsync(serviceId, providerId, queueId, false);
+        if (checkpointBeforeGap)
+        {
+            await _queries.AdvanceStreamCheckpointAsync(serviceId, providerId, queueId, initial.OwnerEpoch, 2);
+        }
+
+        await _storage.ExecuteAsync(
+            """
+            DELETE FROM OrleansStreamMessage
+            WHERE ServiceId = @ServiceId AND ProviderId = @ProviderId AND QueueId = @QueueId AND MessageId = 2
+            """,
+            command =>
+            {
+                AddParameter(command, "ServiceId", serviceId);
+                AddParameter(command, "ProviderId", providerId);
+                AddParameter(command, "QueueId", queueId);
+            },
+            cancellationToken: TestContext.Current.CancellationToken);
+        var source = new AdoNetRecoverableStream(
+            serviceId, providerId, queueId, new AdoNetStreamOptions { StartFromNow = false }, _queries.Inner, NullLogger.Instance);
+        var loaded = await source.Load(TestContext.Current.CancellationToken);
+        Assert.Equal(checkpointBeforeGap ? "2" : "0", loaded.Checkpoint);
+        if (checkpointBeforeGap)
+        {
+            Assert.Equal(3, Assert.Single(await source.Read(3, TestContext.Current.CancellationToken)).MessageId);
+        }
+        else
+        {
+            var failure = await Assert.ThrowsAsync<DataNotAvailableException>(
+                () => source.Read(3, TestContext.Current.CancellationToken));
+            Assert.Contains("expected message 2, received message 3", failure.Message);
+            Assert.Same(failure, await Assert.ThrowsAsync<DataNotAvailableException>(
+                () => source.Read(3, TestContext.Current.CancellationToken)));
+            Assert.Equal(0, (await _queries.GetStreamPartitionBoundsAsync(serviceId, providerId, queueId))!.Checkpoint);
+        }
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task CleanupStreamMessages_StopsAtFirstIneligibleMessage(bool hardRetention, bool eligibleFirstMessage)
+    {
+        var serviceId = RandomServiceId();
+        var providerId = RandomProviderId();
+        var queueId = RandomQueueId();
+        for (var i = 0; i < 3; i++)
+        {
+            await AppendAsync(serviceId, providerId, queueId);
+        }
+
+        await _queries.AcquireStreamPartitionAsync(serviceId, providerId, queueId, startFromNow: !hardRetention);
+        var timestampColumn = hardRetention ? "CreatedOn" : "CheckpointedOn";
+        await _storage.ExecuteAsync(
+            $"""
+            UPDATE OrleansStreamMessage
+            SET {timestampColumn} = CASE
+                WHEN MessageId = @FirstAgedId OR MessageId = @SecondAgedId THEN @AgedOn
+                ELSE @YoungOn END
+            WHERE ServiceId = @ServiceId AND ProviderId = @ProviderId AND QueueId = @QueueId
+            """,
+            command =>
+            {
+                AddParameter(command, "AgedOn", DateTime.UtcNow.AddDays(-2));
+                AddParameter(command, "YoungOn", DateTime.UtcNow.AddDays(1));
+                AddParameter(command, "ServiceId", serviceId);
+                AddParameter(command, "ProviderId", providerId);
+                AddParameter(command, "QueueId", queueId);
+                AddParameter(command, "FirstAgedId", eligibleFirstMessage ? 1L : 2L);
+                AddParameter(command, "SecondAgedId", eligibleFirstMessage ? 3L : 2L);
+            },
+            cancellationToken: TestContext.Current.CancellationToken);
+        await MakeCleanupDueAsync(serviceId, providerId, queueId);
+
+        var cleanup = await _queries.CleanupStreamMessagesAsync(
+            serviceId, providerId, queueId, 60, hardRetention ? 120 : null, 60, 3);
+        Assert.True(cleanup.Ran);
+        Assert.Equal(eligibleFirstMessage ? 1 : 0, cleanup.DeletedCount);
+        Assert.Equal(eligibleFirstMessage ? 1L : (long?)null, cleanup.DeletedThroughMessageId);
+        Assert.Equal(hardRetention && eligibleFirstMessage ? 1 : 0, cleanup.HardDeletedCount);
+        var remaining = await _queries.ReadStreamMessagesAsync(serviceId, providerId, queueId, 0, 10);
+        long[] expectedIds = eligibleFirstMessage ? [2, 3] : [1, 2, 3];
+        Assert.Equal(expectedIds, remaining.Select(message => message.MessageId));
+
+        await MakeCleanupDueAsync(serviceId, providerId, queueId);
+        var repeated = await _queries.CleanupStreamMessagesAsync(
+            serviceId, providerId, queueId, 60, hardRetention ? 120 : null, 60, 3);
+        Assert.Equal(0, repeated.DeletedCount);
+    }
+
+    [Theory]
+    [InlineData(1, false)]
+    [InlineData(3, false)]
+    [InlineData(3, true)]
+    public async Task RecoverableStream_CommittedCleanupWithLostResponsePermanentlyFaults(
+        int cleanupBatchSize, bool appendAfterCleanup)
+    {
+        var serviceId = RandomServiceId();
+        var providerId = RandomProviderId();
+        var queueId = RandomQueueId();
+        for (var i = 0; i < 3; i++)
+        {
+            await AppendAsync(serviceId, providerId, queueId);
+        }
+
+        var storedQueries = new DbStoredQueries((await _storage.ReadAsync(
+            DbStoredQueries.GetQueriesKey,
+            null,
+            (record, _, _) => Task.FromResult(new KeyValuePair<string, string>(
+                (string)record["QueryKey"], (string)record["QueryText"])),
+            cancellationToken: TestContext.Current.CancellationToken)).ToDictionary(pair => pair.Key, pair => pair.Value));
+        var lostResponseStorage = new LostCleanupResponseStorage(_storage, storedQueries.CleanupStreamMessagesKey);
+        var source = new AdoNetRecoverableStream(
+            serviceId,
+            providerId,
+            queueId,
+            new AdoNetStreamOptions
+            {
+                StartFromNow = false,
+                MaxMessagesPerRead = 3,
+                RetentionPeriod = TimeSpan.FromMinutes(1),
+                MaximumRetentionPeriod = TimeSpan.FromMinutes(2),
+                CleanupBatchSize = cleanupBatchSize,
+            },
+            new RelationalOrleansQueries(lostResponseStorage, storedQueries),
+            NullLogger.Instance);
+        var loaded = await source.Load(TestContext.Current.CancellationToken);
+        Assert.Equal("0", loaded.Checkpoint);
+        await AgePartitionMessagesAsync(serviceId, providerId, queueId);
+        await MakeCleanupDueAsync(serviceId, providerId, queueId);
+
+        Assert.Same(lostResponseStorage.Failure, await Assert.ThrowsAsync<IOException>(
+            () => source.Read(3, TestContext.Current.CancellationToken)));
+        var afterCleanup = await _queries.ReadStreamMessagesAsync(serviceId, providerId, queueId, 0, 10);
+        Assert.Equal(Enumerable.Range(cleanupBatchSize + 1, 3 - cleanupBatchSize).Select(id => (long)id),
+            afterCleanup.Select(message => message.MessageId));
+        if (appendAfterCleanup)
+        {
+            Assert.Equal(4, (await AppendAsync(serviceId, providerId, queueId)).MessageId);
+        }
+
+        var failure = await Assert.ThrowsAsync<DataNotAvailableException>(
+            () => source.Read(3, TestContext.Current.CancellationToken));
+        Assert.Contains("after admitted message 0", failure.Message);
+        Assert.Same(failure, await Assert.ThrowsAsync<DataNotAvailableException>(
+            () => source.Read(3, TestContext.Current.CancellationToken)));
+        var bounds = await _queries.GetStreamPartitionBoundsAsync(serviceId, providerId, queueId);
+        Assert.Equal(0, bounds!.Checkpoint);
+        Assert.Equal(long.Parse(loaded.Version, CultureInfo.InvariantCulture), bounds.OwnerEpoch);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(3)]
+    public async Task RecoverableStream_InitialAcquisitionUsesRetainedBaseline(int deletedCount)
+    {
+        var serviceId = RandomServiceId();
+        var providerId = RandomProviderId();
+        var queueId = RandomQueueId();
+        for (var i = 0; i < 3; i++)
+        {
+            await AppendAsync(serviceId, providerId, queueId);
+        }
+
+        await AgePartitionMessagesAsync(serviceId, providerId, queueId);
+        var cleanup = await _queries.CleanupStreamMessagesAsync(serviceId, providerId, queueId, 60, 120, 60, deletedCount);
+        Assert.Equal(deletedCount, cleanup.DeletedCount);
+        var source = new AdoNetRecoverableStream(
+            serviceId, providerId, queueId, new AdoNetStreamOptions { StartFromNow = false }, _queries.Inner, NullLogger.Instance);
+        var loaded = await source.Load(TestContext.Current.CancellationToken);
+        Assert.Equal(deletedCount.ToString(CultureInfo.InvariantCulture), loaded.Checkpoint);
+        await AppendAsync(serviceId, providerId, queueId);
+
+        var messages = await source.Read(10, TestContext.Current.CancellationToken);
+        Assert.Equal(Enumerable.Range(deletedCount + 1, 4 - deletedCount).Select(id => (long)id),
+            messages.Select(message => message.MessageId));
+    }
+
     [Fact]
     public async Task CleanupStreamMessages_RemovesCheckpointedMessagesAfterRetentionElapses()
     {
@@ -1195,7 +1387,7 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
             string serviceId,
             string providerId,
             string queueId)
-            => Inner.GetStreamPartitionBoundsAsync(serviceId, providerId, queueId);
+            => Inner.GetStreamPartitionBoundsAsync(serviceId, providerId, queueId, TestContext.Current.CancellationToken);
 
         public Task<AdoNetStreamCleanupResult> CleanupStreamMessagesAsync(
             string serviceId,
@@ -1214,6 +1406,39 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
                 cleanupIntervalSeconds,
                 cleanupBatchSize,
                 TestContext.Current.CancellationToken);
+    }
+
+    private sealed class LostCleanupResponseStorage(IRelationalStorage inner, string cleanupQuery) : IRelationalStorage
+    {
+        private bool _failed;
+
+        public IOException Failure { get; } = new("Cleanup committed before its response reached the source.");
+        public string InvariantName => inner.InvariantName;
+        public string ConnectionString => inner.ConnectionString;
+
+        public async Task<IEnumerable<TResult>> ReadAsync<TResult>(
+            string query,
+            Action<IDbCommand>? parameterProvider,
+            Func<IDataRecord, int, CancellationToken, Task<TResult>> selector,
+            CommandBehavior commandBehavior = CommandBehavior.Default,
+            CancellationToken cancellationToken = default)
+        {
+            var result = await inner.ReadAsync(query, parameterProvider, selector, commandBehavior, cancellationToken);
+            if (!_failed && query == cleanupQuery)
+            {
+                _failed = true;
+                throw Failure;
+            }
+
+            return result;
+        }
+
+        public Task<int> ExecuteAsync(
+            string query,
+            Action<IDbCommand>? parameterProvider,
+            CommandBehavior commandBehavior = CommandBehavior.Default,
+            CancellationToken cancellationToken = default)
+            => inner.ExecuteAsync(query, parameterProvider, commandBehavior, cancellationToken);
     }
 
     #endregion SQL Server
