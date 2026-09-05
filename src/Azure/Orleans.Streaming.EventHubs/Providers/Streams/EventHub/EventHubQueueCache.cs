@@ -35,7 +35,7 @@ namespace Orleans.Streaming.EventHubs
         private readonly ILogger logger;
         private readonly AggregatedCachePressureMonitor cachePressureMonitor;
         private readonly ICacheMonitor cacheMonitor;
-        private FixedSizeBuffer currentBuffer = null!;
+        private FixedSizeBuffer? currentBuffer;
 
         /// <summary>
         /// EventHub queue cache.
@@ -80,6 +80,10 @@ namespace Orleans.Streaming.EventHubs
         public void SignalPurge()
         {
             this.evictionStrategy.PerformPurge(DateTime.UtcNow);
+            if (this.cache.IsEmpty)
+            {
+                this.currentBuffer = null;
+            }
         }
 
         /// <summary>

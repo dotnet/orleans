@@ -161,13 +161,12 @@ namespace ServiceBus.Tests.EvictionStrategyTests
 
             //perform purge
 
-            //after purge, inUseBuffers should be purged and return to the pool, except for the current buffer
+            //after purge, inUseBuffers should be purged and return to the pool
             var expectedPurgedBuffers = new List<FixedSizeBuffer>();
             this.evictionStrategyList.ForEach(strategy =>
             {
                 var purgedBufferList = strategy.InUseBuffers.ToArray<FixedSizeBuffer>();
-                //last one in purgedBufferList should be current buffer, which shouldn't be purged
-                for (int i = 0; i < purgedBufferList.Count() - 1; i++)
+                for (int i = 0; i < purgedBufferList.Count(); i++)
                     expectedPurgedBuffers.Add(purgedBufferList[i]);
             });
 
@@ -175,8 +174,8 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             this.receiver1.TryPurgeFromCache(out ignore);
             this.receiver2.TryPurgeFromCache(out ignore);
 
-            //Each cache should have all buffers purged, except for current buffer
-            this.evictionStrategyList.ForEach(strategy => Assert.Single(strategy.InUseBuffers));
+            //Each cache should have all buffers purged
+            this.evictionStrategyList.ForEach(strategy => Assert.Empty(strategy.InUseBuffers));
             var oldBuffersInCaches = new List<FixedSizeBuffer>();
             this.evictionStrategyList.ForEach(strategy =>
             {
