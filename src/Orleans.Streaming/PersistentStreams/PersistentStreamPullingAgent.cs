@@ -726,6 +726,11 @@ namespace Orleans.Streams
 
         private IQueueCacheCursor GetCacheMissRecoveryCursor(StreamConsumerData consumerData)
         {
+            if (SupportsRetainedReplay)
+            {
+                return GetRecoveryCursor(consumerData);
+            }
+
             try
             {
                 return queueCache!.GetCacheCursorAtPosition(

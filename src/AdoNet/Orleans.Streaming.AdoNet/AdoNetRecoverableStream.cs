@@ -255,6 +255,7 @@ internal sealed partial class AdoNetRecoverableStream(
         out AdoNetStreamSequenceToken normalized)
     {
         if (token is AdoNetStreamSequenceToken adoNetToken
+            && adoNetToken.SequenceNumber >= 0
             && string.Equals(adoNetToken.ServiceId, serviceId, StringComparison.Ordinal)
             && string.Equals(adoNetToken.ProviderId, providerId, StringComparison.Ordinal)
             && string.Equals(adoNetToken.QueueId, queueId, StringComparison.Ordinal))
@@ -284,7 +285,8 @@ internal sealed partial class AdoNetRecoverableStream(
             return true;
         }
 
-        if (token.GetType() == typeof(EventSequenceTokenV2))
+        if (token.GetType() == typeof(EventSequenceTokenV2)
+            && token.SequenceNumber >= 0)
         {
             normalized = new(
                 serviceId,
