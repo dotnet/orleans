@@ -808,10 +808,24 @@ namespace Orleans.Runtime
                 MaxDegreeOfParallelism = Environment.ProcessorCount * 512
             };
 
-            await Parallel.ForEachAsync(list, options, async (activationData, token) =>
+            var deactivationTask = Parallel.ForEachAsync(list, options, async (activationData, token) =>
             {
                 await activationData.Deactivated.ConfigureAwait(false);
-            }).WaitAsync(cancellationToken);
+            });
+
+            try
+            {
+                await deactivationTask.WaitAsync(cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                _ = deactivationTask.ContinueWith(
+                    static task => _ = task.Exception,
+                    CancellationToken.None,
+                    TaskContinuationOptions.ExecuteSynchronously | TaskContinuationOptions.OnlyOnFaulted,
+                    TaskScheduler.Default);
+                throw;
+            }
 
             ActivationCollectionEvents.EmitCollectionCompleted(collectionSource, ageLimit, deactivationReason, list);
         }
