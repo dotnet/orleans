@@ -80,11 +80,11 @@
     <PackageVersion Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" />
     <PackageVersion Include="Microsoft.SourceLink.AzureRepos.Git" Version="8.0.0" />
     <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="8.0.0" />
-    <PackageVersion Include="Microsoft.Testing.Extensions.CrashDump" Version="2.3.3" />
-    <PackageVersion Include="Microsoft.Testing.Extensions.HangDump" Version="2.3.3" />
-    <PackageVersion Include="Microsoft.Testing.Extensions.TrxReport" Version="2.3.3" />
-    <PackageVersion Include="Microsoft.Testing.Platform" Version="2.3.3" />
-    <PackageVersion Include="Microsoft.Testing.Platform.MSBuild" Version="2.3.3" />
+    <PackageVersion Include="Microsoft.Testing.Extensions.CrashDump" Version="2.4.0" />
+    <PackageVersion Include="Microsoft.Testing.Extensions.HangDump" Version="2.4.0" />
+    <PackageVersion Include="Microsoft.Testing.Extensions.TrxReport" Version="2.4.0" />
+    <PackageVersion Include="Microsoft.Testing.Platform" Version="2.4.0" />
+    <PackageVersion Include="Microsoft.Testing.Platform.MSBuild" Version="2.4.0" />
     <PackageVersion Include="MySql.Data" Version="8.0.31" />
     <PackageVersion Include="NATS.Net" Version="2.7.2" />
     <PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />
