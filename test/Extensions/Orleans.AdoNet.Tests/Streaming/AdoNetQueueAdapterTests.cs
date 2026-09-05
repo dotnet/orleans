@@ -250,7 +250,8 @@ public abstract class AdoNetQueueAdapterTests(string invariant, TestEnvironmentF
         await using var observerConnection = CreateConnection();
         await observerConnection.OpenAsync(cancellationToken);
         await using var observer = observerConnection.CreateCommand();
-        observer.CommandText = GetBlockedAcquisitionQuery(observerConnection);
+        var serverVersion = observerConnection.ServerVersion;
+        observer.CommandText = GetBlockedAcquisitionQuery(serverVersion);
         AddParameter(observer, "LockOwner", lockOwner);
         using var readCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var lockReleased = false;
@@ -325,11 +326,17 @@ public abstract class AdoNetQueueAdapterTests(string invariant, TestEnvironmentF
                         Assert.Fail("Acquisition completed before the held partition lock was released.");
                     }
 
-                    var actual = Convert.ToInt32(await observer.ExecuteScalarAsync(token), CultureInfo.InvariantCulture);
+                    var result = await observer.ExecuteScalarAsync(token);
+                    Assert.NotNull(result);
+                    var actual = Convert.ToInt32(result, CultureInfo.InvariantCulture);
                     if (lastTry)
                     {
+                        var diagnostics = invariant == AdoNetInvariants.InvariantNameMySql && actual != expected
+                            ? await GetMySqlLockDiagnostics(token)
+                            : string.Empty;
                         Assert.True(actual == expected,
-                            $"{invariant} partition {serviceId}/{providerId}/{partitionId}: expected {expected} acquisitions blocked by session {lockOwner}, observed {actual}.");
+                            $"{invariant} server {serverVersion}, partition {serviceId}/{providerId}/{partitionId}: expected {expected} acquisitions blocked by session {lockOwner}, observed {actual}. "
+                            + $"Read status: {read?.Status}; worker threads: {ThreadPool.ThreadCount}; queued work: {ThreadPool.PendingWorkItemCount}.{Environment.NewLine}{diagnostics}");
                     }
 
                     return actual == expected;
@@ -338,6 +345,42 @@ public abstract class AdoNetQueueAdapterTests(string invariant, TestEnvironmentF
                 TimeSpan.FromMilliseconds(50),
                 cancellationToken,
                 predicateExpression: $"{invariant} acquisition lock wait count for session {lockOwner} becomes {expected}");
+
+        async Task<string> GetMySqlLockDiagnostics(CancellationToken token)
+        {
+            var rows = new List<string>();
+            await using var command = observerConnection.CreateCommand();
+            command.CommandTimeout = 5;
+            AddParameter(command, "LockOwner", lockOwner);
+            command.CommandText =
+                """
+                SELECT ID, COMMAND, STATE, TIME, LEFT(INFO, 256)
+                FROM information_schema.PROCESSLIST
+                WHERE DB = DATABASE() AND ID <> CONNECTION_ID()
+                    AND (ID = @LockOwner OR INFO LIKE '%StreamPartition%')
+                LIMIT 10
+                """;
+            await ReadRows();
+            command.CommandText =
+                """
+                SELECT trx_id, trx_state, trx_mysql_thread_id, trx_requested_lock_id, LEFT(trx_query, 256)
+                FROM information_schema.INNODB_TRX
+                WHERE trx_mysql_thread_id = @LockOwner
+                    OR (trx_state = 'LOCK WAIT' AND trx_query LIKE '%StreamPartition%')
+                LIMIT 10
+                """;
+            await ReadRows();
+            return string.Join(Environment.NewLine, rows);
+
+            async Task ReadRows()
+            {
+                await using var reader = await command.ExecuteReaderAsync(token);
+                while (await reader.ReadAsync(token))
+                {
+                    rows.Add(string.Join(" | ", Enumerable.Range(0, reader.FieldCount).Select(reader.GetValue)));
+                }
+            }
+        }
     }
 
     private DbConnection CreateConnection()
@@ -349,14 +392,14 @@ public abstract class AdoNetQueueAdapterTests(string invariant, TestEnvironmentF
             _ => throw new NotSupportedException(invariant),
         };
 
-    private string GetBlockedAcquisitionQuery(DbConnection connection)
+    private string GetBlockedAcquisitionQuery(string serverVersion)
         => invariant switch
         {
             AdoNetInvariants.InvariantNameSqlServer =>
                 "SELECT COUNT(*) FROM sys.dm_exec_requests WHERE blocking_session_id = @LockOwner",
             AdoNetInvariants.InvariantNamePostgreSql =>
                 "SELECT COUNT(*) FROM pg_locks WHERE NOT granted AND @LockOwner = ANY(pg_blocking_pids(pid))",
-            AdoNetInvariants.InvariantNameMySql when connection.ServerVersion.Contains("MariaDB", StringComparison.OrdinalIgnoreCase) =>
+            AdoNetInvariants.InvariantNameMySql when serverVersion.Contains("MariaDB", StringComparison.OrdinalIgnoreCase) =>
                 """
                 SELECT COUNT(*) FROM information_schema.INNODB_LOCK_WAITS AS W
                 INNER JOIN information_schema.INNODB_TRX AS B ON B.trx_id = W.blocking_trx_id
