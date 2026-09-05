@@ -604,6 +604,24 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task CommittedOutbox_ToSameGrain_DeliversLocally()
+    {
+        var grain = NewGrain();
+
+        await grain.SendAsync(
+            grain.GetGrainId(),
+            "messages/loopback",
+            NewMessage(82, "loopback"));
+        var delivered = await fixture.WaitForEffectCountAsync(grain, 1);
+        delivered = await fixture.WaitForOutboxCountAsync(grain, 0);
+
+        Assert.Equal("loopback", Assert.Single(delivered.Effects).Value);
+        Assert.Equal(0, delivered.InboxCount);
+        Assert.Empty(delivered.InboxDeadLetters);
+        Assert.Empty(delivered.OutboxDeadLetters);
+    }
+
+    [Fact]
     public async Task OutboxSchedulingFailure_AbortsCommitAndRetryUsesStableOwnership()
     {
         var sender = NewGrain();
