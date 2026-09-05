@@ -13,6 +13,7 @@ namespace UnitTests.GrainInterfaces
     public interface IBusyActivationGcTestGrain1 : IGrainWithGuidKey
     {
         Task Nop();
+        Task BlockUntilReleased();
         Task Delay(TimeSpan dt);
         Task<string> IdentifyActivation();
     }
