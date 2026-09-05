@@ -21,6 +21,10 @@ internal static class Program
         | DynamicallyAccessedMemberTypes.PublicMethods
         | DynamicallyAccessedMemberTypes.NonPublicMethods,
         typeof(SerializablePayload))]
+    [UnconditionalSuppressMessage(
+        "Trimming",
+        "IL2026",
+        Justification = "This smoke registers DotNetSerializableCodec only for SerializablePayload, whose constructors and callback methods are explicitly rooted above.")]
     private static void Main()
     {
         using var serviceProvider = new ServiceCollection()
