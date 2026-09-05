@@ -1160,6 +1160,8 @@ namespace Orleans
 
         public static string GetPrimaryKeyString(this Runtime.IAddressable grain) { throw null; }
 
+        public static Runtime.UniversalReference GetUniversalReference(this Runtime.IAddressable grain) { throw null; }
+
         public static bool IsPrimaryKeyBasedOnLong(this Runtime.IAddressable grain) { throw null; }
     }
 
@@ -1245,6 +1247,7 @@ namespace Orleans
             where TGrainObserverInterface : IGrainObserver;
         Runtime.IAddressable GetGrain(Runtime.GrainId grainId, Runtime.GrainInterfaceType interfaceType);
         Runtime.IAddressable GetGrain(Runtime.GrainId grainId);
+        Runtime.IAddressable GetGrain(Runtime.UniversalReference reference);
         Runtime.IAddressable GetGrain(System.Type interfaceType, Runtime.IdSpan grainKey, string grainClassNamePrefix);
         Runtime.IAddressable GetGrain(System.Type interfaceType, Runtime.IdSpan grainKey);
         IGrain GetGrain(System.Type grainInterfaceType, System.Guid grainPrimaryKey, string keyExtension);
@@ -1253,6 +1256,8 @@ namespace Orleans
         IGrain GetGrain(System.Type grainInterfaceType, long grainPrimaryKey);
         IGrain GetGrain(System.Type grainInterfaceType, string grainPrimaryKey);
         TGrainInterface GetGrain<TGrainInterface>(Runtime.GrainId grainId)
+            where TGrainInterface : Runtime.IAddressable;
+        TGrainInterface GetGrain<TGrainInterface>(Runtime.UniversalReference reference)
             where TGrainInterface : Runtime.IAddressable;
         TGrainInterface GetGrain<TGrainInterface>(System.Guid primaryKey, string keyExtension, string? grainClassNamePrefix = null)
             where TGrainInterface : IGrainWithGuidCompoundKey;
@@ -1480,6 +1485,24 @@ namespace Orleans.Concurrency
     [System.Obsolete("Message ordering is not guaranteed regardless of whether this attribute is used. This attribute has no effect.")]
     public sealed partial class UnorderedAttribute : System.Attribute
     {
+    }
+}
+
+namespace Orleans.Configuration
+{
+    public sealed partial class MetaclusterOptions
+    {
+        public System.TimeSpan ClusterLocationCacheDuration { get { throw null; } set { } }
+
+        public System.TimeSpan ClusterOwnershipLeaseDuration { get { throw null; } set { } }
+
+        public System.TimeSpan ClusterOwnershipLeaseRenewalWindow { get { throw null; } set { } }
+
+        public System.Collections.Generic.Dictionary<string, System.Uri[]> Clusters { get { throw null; } }
+
+        public bool Enabled { get { throw null; } set { } }
+
+        public System.Collections.Generic.HashSet<string> ExportedSystemTargets { get { throw null; } }
     }
 }
 
@@ -1764,6 +1787,8 @@ namespace Orleans.Metadata
         public const string BroadcastChannelBindingPatternKey = "channel-pattern";
         public const string BroadcastChannelBindingTypeValue = "broadcast-channel";
         public const string ChannelIdMapperKey = "channelid-mapper";
+        public const string ClusterLocator = "cluster-locator";
+        public const string ClusterPlacementStrategy = "cluster-placement-strategy";
         public const string FullTypeName = "full-type-name";
         public const string GrainDirectory = "directory-policy";
         public const string IdleDeactivationPeriod = "idle-duration";
@@ -1790,6 +1815,26 @@ namespace Orleans.Placement
     public sealed partial class ActivationCountBasedPlacementAttribute : PlacementAttribute
     {
         public ActivationCountBasedPlacementAttribute() : base(default!) { }
+    }
+
+    [System.AttributeUsage(System.AttributeTargets.Class, AllowMultiple = false)]
+    public sealed partial class ClusterLocatorAttribute : System.Attribute, Metadata.IGrainPropertiesProviderAttribute
+    {
+        public ClusterLocatorAttribute(string name) { }
+
+        public string Name { get { throw null; } }
+
+        public void Populate(System.IServiceProvider services, System.Type grainClass, Runtime.GrainType grainType, System.Collections.Generic.Dictionary<string, string> properties) { }
+    }
+
+    [System.AttributeUsage(System.AttributeTargets.Class, AllowMultiple = false)]
+    public abstract partial class ClusterPlacementAttribute : System.Attribute, Metadata.IGrainPropertiesProviderAttribute
+    {
+        protected ClusterPlacementAttribute(Runtime.ClusterPlacementStrategy strategy) { }
+
+        public Runtime.ClusterPlacementStrategy Strategy { get { throw null; } }
+
+        public void Populate(System.IServiceProvider services, System.Type grainClass, Runtime.GrainType grainType, System.Collections.Generic.Dictionary<string, string> properties) { }
     }
 
     [System.AttributeUsage(System.AttributeTargets.Class, AllowMultiple = false)]
@@ -1995,6 +2040,132 @@ namespace Orleans.Runtime
     public sealed partial class ClientNotAvailableException : OrleansException
     {
         internal ClientNotAvailableException() { }
+    }
+
+    [GenerateSerializer]
+    [Immutable]
+    public sealed partial record ClusterDirectoryEntry
+    {
+        public ClusterDirectoryEntry(GrainId grainId, string clusterId, long version, long topologyEpoch, long fencingToken, System.DateTimeOffset leaseExpiration) { }
+
+        [Id(1)]
+        public string ClusterId { get { throw null; } }
+
+        [Id(4)]
+        public long FencingToken { get { throw null; } }
+
+        [Id(0)]
+        public GrainId GrainId { get { throw null; } }
+
+        [Id(5)]
+        public System.DateTimeOffset LeaseExpiration { get { throw null; } }
+
+        [Id(3)]
+        public long TopologyEpoch { get { throw null; } }
+
+        [Id(2)]
+        public long Version { get { throw null; } }
+    }
+
+    [GenerateSerializer]
+    [Immutable]
+    [Alias("cluster-identity")]
+    public readonly partial struct ClusterIdentity : System.IEquatable<ClusterIdentity>
+    {
+        private readonly object _dummy;
+        private readonly int _dummyPrimitive;
+        public ClusterIdentity(string serviceId, string clusterId) { }
+
+        [Id(1)]
+        public string ClusterId { get { throw null; } }
+
+        [Id(0)]
+        public string ServiceId { get { throw null; } }
+
+        public readonly bool Equals(ClusterIdentity other) { throw null; }
+
+        public override readonly bool Equals(object? obj) { throw null; }
+
+        public override readonly int GetHashCode() { throw null; }
+
+        public static bool operator ==(ClusterIdentity left, ClusterIdentity right) { throw null; }
+
+        public static bool operator !=(ClusterIdentity left, ClusterIdentity right) { throw null; }
+
+        public override readonly string ToString() { throw null; }
+    }
+
+    [GenerateSerializer]
+    [Immutable]
+    public readonly partial struct ClusterLocation : System.IEquatable<ClusterLocation>
+    {
+        private readonly object _dummy;
+        private readonly int _dummyPrimitive;
+        public ClusterLocation(string ClusterId, long Version, long TopologyEpoch, bool IsExistingOwner) { }
+
+        [Id(0)]
+        public string ClusterId { get { throw null; } init { } }
+
+        [Id(3)]
+        public bool IsExistingOwner { get { throw null; } init { } }
+
+        [Id(2)]
+        public long TopologyEpoch { get { throw null; } init { } }
+
+        [Id(1)]
+        public long Version { get { throw null; } init { } }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public readonly void Deconstruct(out string ClusterId, out long Version, out long TopologyEpoch, out bool IsExistingOwner) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public readonly bool Equals(ClusterLocation other) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public override readonly bool Equals(object obj) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public override readonly int GetHashCode() { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public static bool operator ==(ClusterLocation left, ClusterLocation right) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public static bool operator !=(ClusterLocation left, ClusterLocation right) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public override readonly string ToString() { throw null; }
+    }
+
+    public sealed partial class ClusterLocationContext
+    {
+        public ClusterLocationContext(string serviceId, string localClusterId, Metadata.GrainProperties grainProperties, System.Collections.Generic.IReadOnlyDictionary<string, object>? requestContext = null) { }
+
+        public Metadata.GrainProperties GrainProperties { get { throw null; } }
+
+        public string LocalClusterId { get { throw null; } }
+
+        public System.Collections.Generic.IReadOnlyDictionary<string, object>? RequestContext { get { throw null; } }
+
+        public string ServiceId { get { throw null; } }
+    }
+
+    [GenerateSerializer]
+    [Immutable]
+    public sealed partial record ClusterPlacementResult
+    {
+        public ClusterPlacementResult(System.Collections.Generic.IEnumerable<string> candidateClusters) { }
+
+        [Id(0)]
+        public System.Collections.Immutable.ImmutableArray<string> CandidateClusters { get { throw null; } }
+    }
+
+    [SerializerTransparent]
+    public abstract partial class ClusterPlacementStrategy
+    {
+        public virtual void Initialize(Metadata.GrainProperties properties) { }
+
+        public virtual void PopulateGrainProperties(System.IServiceProvider services, System.Type grainClass, GrainType grainType, System.Collections.Generic.Dictionary<string, string> properties) { }
     }
 
     [GenerateSerializer]
@@ -2256,6 +2427,8 @@ namespace Orleans.Runtime
     {
         protected GrainReference(GrainReferenceShared shared, IdSpan key) { }
 
+        protected GrainReference(GrainReferenceShared shared, UniversalReference universalReference) { }
+
         protected Orleans.Serialization.Serializers.CodecProvider CodecProvider { get { throw null; } }
 
         protected Orleans.Serialization.Cloning.CopyContextPool CopyContextPool { get { throw null; } }
@@ -2267,6 +2440,8 @@ namespace Orleans.Runtime
         public GrainInterfaceType InterfaceType { get { throw null; } }
 
         public ushort InterfaceVersion { get { throw null; } }
+
+        public UniversalReference UniversalReference { get { throw null; } }
 
         public virtual TGrainInterface Cast<TGrainInterface>()
             where TGrainInterface : IAddressable { throw null; }
@@ -2306,11 +2481,17 @@ namespace Orleans.Runtime
 
     public partial class GrainReferenceShared
     {
+        public GrainReferenceShared(GrainType grainType, GrainInterfaceType grainInterfaceType, ushort interfaceVersion, IGrainReferenceRuntime runtime, CodeGeneration.InvokeMethodOptions invokeMethodOptions, Orleans.Serialization.Serializers.CodecProvider codecProvider, Orleans.Serialization.Cloning.CopyContextPool copyContextPool, System.IServiceProvider serviceProvider, string serviceId, string clusterId, UniversalReferenceBinding defaultBinding) { }
+
         public GrainReferenceShared(GrainType grainType, GrainInterfaceType grainInterfaceType, ushort interfaceVersion, IGrainReferenceRuntime runtime, CodeGeneration.InvokeMethodOptions invokeMethodOptions, Orleans.Serialization.Serializers.CodecProvider codecProvider, Orleans.Serialization.Cloning.CopyContextPool copyContextPool, System.IServiceProvider serviceProvider) { }
+
+        public string ClusterId { get { throw null; } }
 
         public Orleans.Serialization.Serializers.CodecProvider CodecProvider { get { throw null; } }
 
         public Orleans.Serialization.Cloning.CopyContextPool CopyContextPool { get { throw null; } }
+
+        public UniversalReferenceBinding DefaultBinding { get { throw null; } }
 
         public GrainType GrainType { get { throw null; } }
 
@@ -2322,7 +2503,11 @@ namespace Orleans.Runtime
 
         public IGrainReferenceRuntime Runtime { get { throw null; } }
 
+        public string ServiceId { get { throw null; } }
+
         public System.IServiceProvider ServiceProvider { get { throw null; } }
+
+        public UniversalReference CreateUniversalReference(GrainId grainId) { throw null; }
     }
 
     public readonly partial struct GrainTimerCreationOptions
@@ -2488,6 +2673,34 @@ namespace Orleans.Runtime
         int MaxBatchSize { get; set; }
 
         System.Collections.Generic.IAsyncEnumerable<T> InvokeImplementation();
+    }
+
+    public partial interface IClusterDirectory
+    {
+        System.Threading.Tasks.ValueTask<ClusterDirectoryEntry> GetOrCreate(GrainId grainId, string proposedClusterId, long topologyEpoch, System.TimeSpan leaseDuration, System.Threading.CancellationToken cancellationToken = default);
+        System.Threading.Tasks.ValueTask<ClusterDirectoryEntry?> Lookup(GrainId grainId, System.Threading.CancellationToken cancellationToken = default);
+        System.Threading.Tasks.ValueTask<ClusterDirectoryEntry?> TryMove(GrainId grainId, long expectedVersion, string destinationClusterId, long topologyEpoch, System.TimeSpan leaseDuration, System.Threading.CancellationToken cancellationToken = default);
+        System.Threading.Tasks.ValueTask<ClusterDirectoryEntry?> TryRenew(GrainId grainId, long expectedVersion, string ownerClusterId, System.TimeSpan leaseDuration, System.Threading.CancellationToken cancellationToken = default);
+    }
+
+    public partial interface IClusterLocator
+    {
+        System.Threading.Tasks.ValueTask<ClusterLocation> Locate(GrainId grainId, ClusterLocationContext context, System.Threading.CancellationToken cancellationToken = default);
+    }
+
+    public partial interface IClusterOwnershipAccessor
+    {
+        ClusterDirectoryEntry? Current { get; }
+    }
+
+    public partial interface IClusterOwnershipValidator
+    {
+        System.Threading.Tasks.ValueTask<ClusterDirectoryEntry> ValidateLocalOwnership(GrainId grainId, string localClusterId, System.Threading.CancellationToken cancellationToken = default);
+    }
+
+    public partial interface IClusterPlacementDirector
+    {
+        System.Threading.Tasks.ValueTask<ClusterPlacementResult> SelectClusters(ClusterPlacementStrategy strategy, GrainId grainId, ClusterLocationContext context, System.Threading.CancellationToken cancellationToken = default);
     }
 
     public partial interface IDehydrationContext
@@ -2659,6 +2872,32 @@ namespace Orleans.Runtime
         void Change(System.TimeSpan dueTime, System.TimeSpan period);
     }
 
+    public partial interface IInterClusterRelay : IGrainWithStringKey, IGrain, IAddressable
+    {
+        System.Threading.Tasks.ValueTask<Orleans.Serialization.Invocation.Response> Forward(ClusterIdentity source, UniversalReference target, Orleans.Serialization.Invocation.IInvokable request, CodeGeneration.InvokeMethodOptions options, System.Threading.CancellationToken cancellationToken);
+    }
+
+    public partial interface IInterClusterRequestAuthorizer
+    {
+        System.Threading.Tasks.ValueTask Authorize(ClusterIdentity source, UniversalReference target, System.Threading.CancellationToken cancellationToken = default);
+    }
+
+    public partial interface IInterClusterRequestReceiver
+    {
+        System.Threading.Tasks.ValueTask<Orleans.Serialization.Invocation.Response> ReceiveRequest(ClusterIdentity source, UniversalReference target, Orleans.Serialization.Invocation.IInvokable request, CodeGeneration.InvokeMethodOptions options, System.Threading.CancellationToken cancellationToken = default);
+    }
+
+    public partial interface IInterClusterTransport
+    {
+        System.Threading.Tasks.ValueTask<Orleans.Serialization.Invocation.Response> SendRequest(ClusterIdentity destination, UniversalReference target, Orleans.Serialization.Invocation.IInvokable request, CodeGeneration.InvokeMethodOptions options, System.Threading.CancellationToken cancellationToken = default);
+    }
+
+    public partial interface IMetaclusterTopologyProvider
+    {
+        System.Threading.Tasks.ValueTask<MetaclusterTopology> GetTopology(System.Threading.CancellationToken cancellationToken = default);
+        System.Collections.Generic.IAsyncEnumerable<MetaclusterTopology> Watch(System.Threading.CancellationToken cancellationToken = default);
+    }
+
     public partial interface IRehydrationContext
     {
         System.Collections.Generic.IEnumerable<string> Keys { get; }
@@ -2823,6 +3062,49 @@ namespace Orleans.Runtime
         public override void Write(System.Text.Json.Utf8JsonWriter writer, MembershipVersion value, System.Text.Json.JsonSerializerOptions options) { }
 
         public override void WriteAsPropertyName(System.Text.Json.Utf8JsonWriter writer, MembershipVersion value, System.Text.Json.JsonSerializerOptions options) { }
+    }
+
+    [GenerateSerializer]
+    [Immutable]
+    public sealed partial class MetaclusterCluster
+    {
+        public MetaclusterCluster(string clusterId, MetaclusterClusterState state, System.Collections.Immutable.ImmutableArray<System.Uri> relayEndpoints, System.Collections.Immutable.ImmutableDictionary<string, string>? metadata = null) { }
+
+        [Id(0)]
+        public string ClusterId { get { throw null; } }
+
+        [Id(3)]
+        public System.Collections.Immutable.ImmutableDictionary<string, string> Metadata { get { throw null; } }
+
+        [Id(2)]
+        public System.Collections.Immutable.ImmutableArray<System.Uri> RelayEndpoints { get { throw null; } }
+
+        [Id(1)]
+        public MetaclusterClusterState State { get { throw null; } }
+    }
+
+    [GenerateSerializer]
+    public enum MetaclusterClusterState : byte
+    {
+        Active = 0,
+        Draining = 1,
+        Removed = 2
+    }
+
+    [GenerateSerializer]
+    [Immutable]
+    public sealed partial class MetaclusterTopology
+    {
+        public MetaclusterTopology(string serviceId, long epoch, System.Collections.Immutable.ImmutableDictionary<string, MetaclusterCluster> clusters) { }
+
+        [Id(2)]
+        public System.Collections.Immutable.ImmutableDictionary<string, MetaclusterCluster> Clusters { get { throw null; } }
+
+        [Id(1)]
+        public long Epoch { get { throw null; } }
+
+        [Id(0)]
+        public string ServiceId { get { throw null; } }
     }
 
     [GenerateSerializer]
@@ -3219,6 +3501,65 @@ namespace Orleans.Runtime
         public override void Write(System.Text.Json.Utf8JsonWriter writer, UniqueKey value, System.Text.Json.JsonSerializerOptions options) { }
 
         public override void WriteAsPropertyName(System.Text.Json.Utf8JsonWriter writer, UniqueKey value, System.Text.Json.JsonSerializerOptions options) { }
+    }
+
+    [GenerateSerializer]
+    [Immutable]
+    [Alias("universal-ref")]
+    public readonly partial struct UniversalReference : System.IEquatable<UniversalReference>, System.ISpanFormattable, System.IFormattable
+    {
+        private readonly object _dummy;
+        private readonly int _dummyPrimitive;
+        [System.Text.Json.Serialization.JsonConstructor]
+        public UniversalReference(GrainId grainId, GrainInterfaceType interfaceType, string serviceId, UniversalReferenceBinding binding, string? clusterId) { }
+
+        [Id(3)]
+        public UniversalReferenceBinding Binding { get { throw null; } }
+
+        [Id(4)]
+        public string? ClusterId { get { throw null; } }
+
+        [Id(0)]
+        public GrainId GrainId { get { throw null; } }
+
+        [Id(1)]
+        public GrainInterfaceType InterfaceType { get { throw null; } }
+
+        public bool IsDefault { get { throw null; } }
+
+        [Id(2)]
+        public string ServiceId { get { throw null; } }
+
+        public static UniversalReference CreateCluster(GrainId grainId, GrainInterfaceType interfaceType, string serviceId, string clusterId) { throw null; }
+
+        public static UniversalReference CreateVirtual(GrainId grainId, GrainInterfaceType interfaceType, string serviceId) { throw null; }
+
+        public readonly bool Equals(UniversalReference other) { throw null; }
+
+        public override readonly bool Equals(object? obj) { throw null; }
+
+        public override readonly int GetHashCode() { throw null; }
+
+        public readonly uint GetUniformHashCode() { throw null; }
+
+        public static bool operator ==(UniversalReference left, UniversalReference right) { throw null; }
+
+        public static bool operator !=(UniversalReference left, UniversalReference right) { throw null; }
+
+        readonly string System.IFormattable.ToString(string? format, System.IFormatProvider? formatProvider) { throw null; }
+
+        readonly bool System.ISpanFormattable.TryFormat(System.Span<char> destination, out int charsWritten, System.ReadOnlySpan<char> format, System.IFormatProvider? provider) { throw null; }
+
+        public override readonly string ToString() { throw null; }
+
+        public readonly UniversalReference WithInterfaceType(GrainInterfaceType interfaceType) { throw null; }
+    }
+
+    [GenerateSerializer]
+    public enum UniversalReferenceBinding : byte
+    {
+        Virtual = 0,
+        Cluster = 1
     }
 
     public static partial class Utils
@@ -3924,6 +4265,74 @@ namespace OrleansCodeGen.Orleans.Runtime
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_ClusterDirectoryEntry : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Runtime.ClusterDirectoryEntry>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public Codec_ClusterDirectoryEntry(global::Orleans.Serialization.Activators.IActivator<global::Orleans.Runtime.ClusterDirectoryEntry> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Runtime.ClusterDirectoryEntry instance) { }
+
+        public global::Orleans.Runtime.ClusterDirectoryEntry ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::Orleans.Runtime.ClusterDirectoryEntry instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Runtime.ClusterDirectoryEntry value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_ClusterIdentity : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Runtime.ClusterIdentity>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Runtime.ClusterIdentity>, global::Orleans.Serialization.Serializers.IValueSerializer
+    {
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, scoped ref global::Orleans.Runtime.ClusterIdentity instance) { }
+
+        public global::Orleans.Runtime.ClusterIdentity ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, scoped ref global::Orleans.Runtime.ClusterIdentity instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Runtime.ClusterIdentity value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_ClusterLocation : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Runtime.ClusterLocation>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Runtime.ClusterLocation>, global::Orleans.Serialization.Serializers.IValueSerializer
+    {
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, scoped ref global::Orleans.Runtime.ClusterLocation instance) { }
+
+        public global::Orleans.Runtime.ClusterLocation ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, scoped ref global::Orleans.Runtime.ClusterLocation instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Runtime.ClusterLocation value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_ClusterPlacementResult : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Runtime.ClusterPlacementResult>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public Codec_ClusterPlacementResult(global::Orleans.Serialization.Activators.IActivator<global::Orleans.Runtime.ClusterPlacementResult> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Runtime.ClusterPlacementResult instance) { }
+
+        public global::Orleans.Runtime.ClusterPlacementResult ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::Orleans.Runtime.ClusterPlacementResult instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Runtime.ClusterPlacementResult value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_EnumerationAbortedException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Runtime.EnumerationAbortedException>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public Codec_EnumerationAbortedException(global::Orleans.Serialization.Serializers.IBaseCodec<System.Exception> _baseTypeSerializer) { }
@@ -4247,6 +4656,24 @@ namespace OrleansCodeGen.Orleans.Runtime
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_Invokable_IInterClusterRelay_GrainReference_431F62BF : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IInterClusterRelay_GrainReference_431F62BF>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public Codec_Invokable_IInterClusterRelay_GrainReference_431F62BF(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_IInterClusterRelay_GrainReference_431F62BF instance) { }
+
+        public Invokable_IInterClusterRelay_GrainReference_431F62BF ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, Invokable_IInterClusterRelay_GrainReference_431F62BF instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IInterClusterRelay_GrainReference_431F62BF value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_LegacyGrainId : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Runtime.LegacyGrainId>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public Codec_LegacyGrainId(global::Orleans.Serialization.Activators.IActivator<global::Orleans.Runtime.LegacyGrainId> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -4293,6 +4720,53 @@ namespace OrleansCodeGen.Orleans.Runtime
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
 
         public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Runtime.MembershipVersion value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_MetaclusterCluster : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Runtime.MetaclusterCluster>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public Codec_MetaclusterCluster(global::Orleans.Serialization.Activators.IActivator<global::Orleans.Runtime.MetaclusterCluster> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Runtime.MetaclusterCluster instance) { }
+
+        public global::Orleans.Runtime.MetaclusterCluster ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::Orleans.Runtime.MetaclusterCluster instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Runtime.MetaclusterCluster value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_MetaclusterClusterState : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Runtime.MetaclusterClusterState>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public global::Orleans.Runtime.MetaclusterClusterState ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Runtime.MetaclusterClusterState value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_MetaclusterTopology : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Runtime.MetaclusterTopology>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public Codec_MetaclusterTopology(global::Orleans.Serialization.Activators.IActivator<global::Orleans.Runtime.MetaclusterTopology> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Runtime.MetaclusterTopology instance) { }
+
+        public global::Orleans.Runtime.MetaclusterTopology ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::Orleans.Runtime.MetaclusterTopology instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Runtime.MetaclusterTopology value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
@@ -4485,6 +4959,35 @@ namespace OrleansCodeGen.Orleans.Runtime
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_UniversalReference : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Runtime.UniversalReference>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Runtime.UniversalReference>, global::Orleans.Serialization.Serializers.IValueSerializer
+    {
+        public Codec_UniversalReference(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, scoped ref global::Orleans.Runtime.UniversalReference instance) { }
+
+        public global::Orleans.Runtime.UniversalReference ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, scoped ref global::Orleans.Runtime.UniversalReference instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Runtime.UniversalReference value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_UniversalReferenceBinding : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Runtime.UniversalReferenceBinding>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public global::Orleans.Runtime.UniversalReferenceBinding ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Runtime.UniversalReferenceBinding value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_WrappedException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Runtime.WrappedException>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IBaseCodec<global::Orleans.Runtime.WrappedException>, global::Orleans.Serialization.Serializers.IBaseCodec
     {
         public Codec_WrappedException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider, global::Orleans.Serialization.Activators.IActivator<global::Orleans.Runtime.WrappedException> _activator) { }
@@ -4596,6 +5099,16 @@ namespace OrleansCodeGen.Orleans.Runtime
     public sealed partial class Copier_Invokable_IAsyncEnumerableGrainExtension_GrainReference_Ext_F1B31751 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IAsyncEnumerableGrainExtension_GrainReference_Ext_F1B31751>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
         public Invokable_IAsyncEnumerableGrainExtension_GrainReference_Ext_F1B31751 DeepCopy(Invokable_IAsyncEnumerableGrainExtension_GrainReference_Ext_F1B31751 original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_Invokable_IInterClusterRelay_GrainReference_431F62BF : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IInterClusterRelay_GrainReference_431F62BF>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public Copier_Invokable_IInterClusterRelay_GrainReference_431F62BF(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public Invokable_IInterClusterRelay_GrainReference_431F62BF DeepCopy(Invokable_IInterClusterRelay_GrainReference_431F62BF original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
@@ -4873,6 +5386,48 @@ namespace OrleansCodeGen.Orleans.Runtime
         public override object GetTarget() { throw null; }
 
         protected override System.Threading.Tasks.ValueTask InvokeInner() { throw null; }
+
+        public override void SetArgument(int index, object value) { }
+
+        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
+
+        public override bool TryCancel() { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IInterClusterRelay), "431F62BF" })]
+    public sealed partial class Invokable_IInterClusterRelay_GrainReference_431F62BF : global::Orleans.Runtime.Request<global::Orleans.Serialization.Invocation.Response>
+    {
+        public global::Orleans.Runtime.ClusterIdentity arg0;
+        public global::Orleans.Runtime.UniversalReference arg1;
+        public global::Orleans.Serialization.Invocation.IInvokable arg2;
+        public global::Orleans.CodeGeneration.InvokeMethodOptions arg3;
+        public System.Threading.CancellationToken arg4;
+        public override bool IsCancellable { get { throw null; } }
+
+        public override void Dispose() { }
+
+        public override string GetActivityName() { throw null; }
+
+        public override object GetArgument(int index) { throw null; }
+
+        public override int GetArgumentCount() { throw null; }
+
+        public override System.Threading.CancellationToken GetCancellationToken() { throw null; }
+
+        public override string GetInterfaceName() { throw null; }
+
+        public override System.Type GetInterfaceType() { throw null; }
+
+        public override System.Reflection.MethodInfo GetMethod() { throw null; }
+
+        public override string GetMethodName() { throw null; }
+
+        public override object GetTarget() { throw null; }
+
+        protected override System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> InvokeInner() { throw null; }
 
         public override void SetArgument(int index, object value) { }
 

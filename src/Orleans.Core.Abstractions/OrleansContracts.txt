@@ -45,4 +45,7 @@ interface [GrainInterfaceType("Orleans.Runtime.ICancellationSourcesExtension")] 
 
 interface [GrainInterfaceType("Orleans.Runtime.IGrainExtension")] Orleans.Runtime.IGrainExtension [Version(0)]
 
+interface [GrainInterfaceType("Orleans.Runtime.IInterClusterRelay")] Orleans.Runtime.IInterClusterRelay [Version(0)]
+  431F62BF: Forward(cluster-identity, universal-ref, Orleans.Serialization.Invocation.IInvokable, Orleans.CodeGeneration.InvokeMethodOptions, System.Threading.CancellationToken) -> ValueTask<Orleans.Serialization.Invocation.Response>
+
 interface [GrainInterfaceType("Orleans.Services.IGrainService")] Orleans.Services.IGrainService [Version(0)]

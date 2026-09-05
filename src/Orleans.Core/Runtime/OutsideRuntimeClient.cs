@@ -10,8 +10,10 @@ using Microsoft.Extensions.Options;
 using Orleans.ClientObservers;
 using Orleans.CodeGeneration;
 using Orleans.Configuration;
+using Orleans.GrainReferences;
 using Orleans.Messaging;
 using Orleans.Runtime;
+using Orleans.Runtime.Placement;
 using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
 using static Orleans.Internal.StandardExtensions;
@@ -49,6 +51,9 @@ namespace Orleans
         private readonly ILoggerFactory loggerFactory;
 
         private readonly SharedCallbackData sharedCallbackData;
+        private readonly UniversalReferenceBindingResolver _universalReferenceBindingResolver;
+        private readonly ClusterReferenceResolver _clusterReferenceResolver;
+        private readonly IInterClusterTransport _interClusterTransport;
         private readonly PeriodicTimer callbackTimer;
         private Task? callbackTimerTask;
 
@@ -78,7 +83,10 @@ namespace Orleans
             IServiceProvider serviceProvider,
             [FromKeyedServices(TimeProviderNames.Messaging)] TimeProvider timeProvider,
             InterfaceToImplementationMappingCache interfaceToImplementationMapping,
-            OrleansInstruments orleansInstruments)
+            OrleansInstruments orleansInstruments,
+            UniversalReferenceBindingResolver universalReferenceBindingResolver,
+            ClusterReferenceResolver clusterReferenceResolver,
+            IInterClusterTransport interClusterTransport)
         {
             TimeProvider = timeProvider;
             _interfaceToImplementationMapping = interfaceToImplementationMapping;
@@ -103,6 +111,9 @@ namespace Orleans
                 this.clientMessagingOptions.CancelRequestOnTimeout,
                 this.clientMessagingOptions.WaitForCancellationAcknowledgement,
                 null);
+            _universalReferenceBindingResolver = universalReferenceBindingResolver;
+            _clusterReferenceResolver = clusterReferenceResolver;
+            _interClusterTransport = interClusterTransport;
         }
 
         internal void ConsumeServices()
@@ -269,6 +280,51 @@ namespace Orleans
             ThrowIfDisposed();
             var cancellationToken = request.GetCancellationToken();
             cancellationToken.ThrowIfCancellationRequested();
+            if (_clusterReferenceResolver.TryResolveLocal(target.UniversalReference, out var localCluster))
+            {
+                SendRequest(target, request, context, options, cancellationToken, localCluster);
+                return;
+            }
+
+            var resolutionCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            resolutionCts.CancelAfter(request.GetDefaultResponseTimeout() ?? this.clientMessagingOptions.ResponseTimeout);
+            ValueTask<ClusterIdentity> resolveTask;
+            try
+            {
+                resolveTask = _clusterReferenceResolver.Resolve(
+                    target.UniversalReference,
+                    this.messageFactory!.ExportRequestContext(),
+                    cancellationToken: resolutionCts.Token);
+            }
+            catch
+            {
+                resolutionCts.Dispose();
+                throw;
+            }
+            if (!resolveTask.IsCompletedSuccessfully)
+            {
+                ResolveAndSendRequest(resolveTask, target, request, context, options, resolutionCts).Ignore();
+                return;
+            }
+
+            resolutionCts.Dispose();
+            SendRequest(target, request, context, options, cancellationToken, resolveTask.Result);
+        }
+
+        private void SendRequest(
+            GrainReference target,
+            IInvokable request,
+            IResponseCompletionSource? context,
+            InvokeMethodOptions options,
+            CancellationToken cancellationToken,
+            ClusterIdentity targetCluster)
+        {
+            if (targetCluster != _universalReferenceBindingResolver.LocalCluster)
+            {
+                SendInterClusterRequest(targetCluster, target, request, context, options, cancellationToken).Ignore();
+                return;
+            }
+
             var message = this.messageFactory!.CreateMessage(request, options);
             OrleansOutsideRuntimeClientEvent.Instance.SendRequest(message);
 
@@ -321,6 +377,83 @@ namespace Orleans
 
             LogSendingMessage(logger, message);
             MessageCenter!.SendMessage(message);
+        }
+
+        private async Task SendInterClusterRequest(
+            ClusterIdentity targetCluster,
+            GrainReference target,
+            IInvokable request,
+            IResponseCompletionSource? context,
+            InvokeMethodOptions options,
+            CancellationToken cancellationToken)
+        {
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeoutCts.CancelAfter(request.GetDefaultResponseTimeout() ?? this.clientMessagingOptions.ResponseTimeout);
+            try
+            {
+                var response = await _interClusterTransport.SendRequest(
+                    targetCluster,
+                    target.UniversalReference,
+                    request,
+                    options,
+                    timeoutCts.Token);
+                if (context is not null)
+                {
+                    context.Complete(response);
+                }
+                else
+                {
+                    response.Dispose();
+                }
+            }
+            catch (Exception exception)
+            {
+                if (exception is OperationCanceledException && !cancellationToken.IsCancellationRequested)
+                {
+                    exception = new TimeoutException(
+                        $"Response did not arrive before the inter-cluster request timeout for grain '{target.GrainId}'.",
+                        exception);
+                }
+
+                if (context is not null)
+                {
+                    context.Complete(Response.FromException(exception));
+                }
+                else
+                {
+                    LogWarningFailedToSendOneWayCall(this.logger, exception, targetCluster.ClusterId);
+                }
+            }
+        }
+
+        private async Task ResolveAndSendRequest(
+            ValueTask<ClusterIdentity> resolveTask,
+            GrainReference target,
+            IInvokable request,
+            IResponseCompletionSource? context,
+            InvokeMethodOptions options,
+            CancellationTokenSource resolutionCts)
+        {
+            try
+            {
+                var targetCluster = await resolveTask;
+                SendRequest(target, request, context, options, request.GetCancellationToken(), targetCluster);
+            }
+            catch (Exception exception)
+            {
+                if (context is not null)
+                {
+                    context.Complete(Response.FromException(exception));
+                }
+                else
+                {
+                    LogWarningFailedToResolveOneWayCall(this.logger, exception, target.GrainId);
+                }
+            }
+            finally
+            {
+                resolutionCts.Dispose();
+            }
         }
 
         public void ReceiveResponse(Message response)
@@ -606,6 +739,24 @@ namespace Orleans
             Message = "Error while processing callback expiry."
         )]
         private static partial void LogErrorWhileProcessingCallbackExpiry(ILogger logger, Exception ex);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Failed to send one-way call to cluster {ClusterId}."
+        )]
+        private static partial void LogWarningFailedToSendOneWayCall(
+            ILogger logger,
+            Exception exception,
+            string clusterId);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Failed to resolve the target cluster for one-way call to {GrainId}."
+        )]
+        private static partial void LogWarningFailedToResolveOneWayCall(
+            ILogger logger,
+            Exception exception,
+            GrainId grainId);
 
         [LoggerMessage(
             Level = LogLevel.Debug,

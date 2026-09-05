@@ -21,7 +21,7 @@ namespace Orleans.Runtime
     public class GrainReferenceShared
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="GrainReferenceShared"/> class.
+        /// Initializes a new instance of the <see cref="GrainReferenceShared"/> class using virtual reference semantics.
         /// </summary>
         /// <param name="grainType">The grain type.</param>
         /// <param name="grainInterfaceType">The grain interface type.</param>
@@ -40,6 +40,33 @@ namespace Orleans.Runtime
             CodecProvider codecProvider,
             CopyContextPool copyContextPool,
             IServiceProvider serviceProvider)
+            : this(
+                grainType,
+                grainInterfaceType,
+                interfaceVersion,
+                runtime,
+                invokeMethodOptions,
+                codecProvider,
+                copyContextPool,
+                serviceProvider,
+                serviceId: "default",
+                clusterId: "default",
+                UniversalReferenceBinding.Virtual)
+        {
+        }
+
+        public GrainReferenceShared(
+            GrainType grainType,
+            GrainInterfaceType grainInterfaceType,
+            ushort interfaceVersion,
+            IGrainReferenceRuntime runtime,
+            InvokeMethodOptions invokeMethodOptions,
+            CodecProvider codecProvider,
+            CopyContextPool copyContextPool,
+            IServiceProvider serviceProvider,
+            string serviceId,
+            string clusterId,
+            UniversalReferenceBinding defaultBinding)
         {
             this.GrainType = grainType;
             this.InterfaceType = grainInterfaceType;
@@ -49,6 +76,9 @@ namespace Orleans.Runtime
             this.CopyContextPool = copyContextPool;
             this.ServiceProvider = serviceProvider;
             this.InterfaceVersion = interfaceVersion;
+            this.ServiceId = serviceId;
+            this.ClusterId = clusterId;
+            this.DefaultBinding = defaultBinding;
         }
 
         /// <summary>
@@ -90,13 +120,38 @@ namespace Orleans.Runtime
         /// Gets the interface version.
         /// </summary>
         public ushort InterfaceVersion { get; }
+
+        /// <summary>
+        /// Gets the Orleans service identity.
+        /// </summary>
+        public string ServiceId { get; }
+
+        /// <summary>
+        /// Gets the local cluster identity.
+        /// </summary>
+        public string ClusterId { get; }
+
+        /// <summary>
+        /// Gets the default binding for references created by this shared context.
+        /// </summary>
+        public UniversalReferenceBinding DefaultBinding { get; }
+
+        /// <summary>
+        /// Creates a universal reference for the provided grain identity.
+        /// </summary>
+        public UniversalReference CreateUniversalReference(GrainId grainId) => DefaultBinding switch
+        {
+            UniversalReferenceBinding.Virtual => UniversalReference.CreateVirtual(grainId, InterfaceType, ServiceId),
+            UniversalReferenceBinding.Cluster => UniversalReference.CreateCluster(grainId, InterfaceType, ServiceId, ClusterId),
+            _ => throw new InvalidOperationException($"Unsupported universal reference binding '{DefaultBinding}'.")
+        };
     }
 
     /// <summary>
     /// Functionality for serializing and deserializing <see cref="GrainReference"/> and derived types.
     /// </summary>
     [RegisterSerializer]
-    internal class GrainReferenceCodec : GeneralizedReferenceTypeSurrogateCodec<IAddressable, GrainReferenceSurrogate>
+    internal class GrainReferenceCodec : GeneralizedReferenceTypeSurrogateCodec<IAddressable, UniversalReference>
     {
         private readonly IGrainFactory _grainFactory;
 
@@ -105,24 +160,22 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="grainFactory">The grain factory.</param>
         /// <param name="surrogateSerializer">The serializer for the surrogate type used by this class.</param>
-        public GrainReferenceCodec(IGrainFactory grainFactory, IValueSerializer<GrainReferenceSurrogate> surrogateSerializer)
+        public GrainReferenceCodec(IGrainFactory grainFactory, IValueSerializer<UniversalReference> surrogateSerializer)
             : base(surrogateSerializer)
         {
             _grainFactory = grainFactory;
         }
 
         /// <inheritdoc/>
-        public override IAddressable ConvertFromSurrogate(ref GrainReferenceSurrogate surrogate)
+        public override IAddressable ConvertFromSurrogate(ref UniversalReference surrogate)
         {
-            return _grainFactory.GetGrain(surrogate.GrainId, surrogate.GrainInterfaceType);
+            return _grainFactory.GetGrain(surrogate);
         }
 
         /// <inheritdoc/>
-        public override void ConvertToSurrogate(IAddressable value, ref GrainReferenceSurrogate surrogate)
+        public override void ConvertToSurrogate(IAddressable value, ref UniversalReference surrogate)
         {
-            var refValue = value.AsReference();
-            surrogate.GrainId = refValue.GrainId;
-            surrogate.GrainInterfaceType = refValue.InterfaceType;
+            surrogate = value.AsReference().UniversalReference;
         }
     }
 
@@ -195,7 +248,7 @@ namespace Orleans.Runtime
     /// A strongly-typed codec for grain reference instances.
     /// </summary>
     /// <typeparam name="T">The grain reference interface type.</typeparam>
-    internal class TypedGrainReferenceCodec<T> : GeneralizedReferenceTypeSurrogateCodec<T, GrainReferenceSurrogate>
+    internal class TypedGrainReferenceCodec<T> : GeneralizedReferenceTypeSurrogateCodec<T, UniversalReference>
         where T : class, IAddressable
     {
         private readonly IGrainFactory _grainFactory;
@@ -205,19 +258,19 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="grainFactory">The grain factory.</param>
         /// <param name="surrogateSerializer">The surrogate serializer.</param>
-        public TypedGrainReferenceCodec(IGrainFactory grainFactory, IValueSerializer<GrainReferenceSurrogate> surrogateSerializer) : base(surrogateSerializer)
+        public TypedGrainReferenceCodec(IGrainFactory grainFactory, IValueSerializer<UniversalReference> surrogateSerializer) : base(surrogateSerializer)
         {
             _grainFactory = grainFactory;
         }
 
         /// <inheritdoc/>
-        public override T ConvertFromSurrogate(ref GrainReferenceSurrogate surrogate)
+        public override T ConvertFromSurrogate(ref UniversalReference surrogate)
         {
-            return (T)_grainFactory.GetGrain(surrogate.GrainId, surrogate.GrainInterfaceType);
+            return (T)_grainFactory.GetGrain(surrogate);
         }
 
         /// <inheritdoc/>
-        public override void ConvertToSurrogate(T value, ref GrainReferenceSurrogate surrogate)
+        public override void ConvertToSurrogate(T value, ref UniversalReference surrogate)
         {
             // Check that the typical case is false before performing the more expensive interface check
             if (value is not GrainReference refValue)
@@ -230,28 +283,8 @@ namespace Orleans.Runtime
                 refValue = (GrainReference)(object)value.AsReference<T>();
             }
 
-            surrogate.GrainId = refValue.GrainId;
-            surrogate.GrainInterfaceType = refValue.InterfaceType;
+            surrogate = refValue.UniversalReference;
         }
-    }
-
-    /// <summary>
-    /// A surrogate used to represent <see cref="GrainReference"/> implementations for serialization.
-    /// </summary>
-    [GenerateSerializer]
-    internal struct GrainReferenceSurrogate
-    {
-        /// <summary>
-        /// Gets or sets the grain id.
-        /// </summary>
-        [Id(0)]
-        public GrainId GrainId;
-
-        /// <summary>
-        /// Gets or sets the grain interface type.
-        /// </summary>
-        [Id(1)]
-        public GrainInterfaceType GrainInterfaceType;
     }
 
     /// <summary>
@@ -273,10 +306,10 @@ namespace Orleans.Runtime
         private readonly GrainReferenceShared _shared;
 
         /// <summary>
-        /// The underlying grain id key.
+        /// The universal reference value.
         /// </summary>
         [NonSerialized]
-        private readonly IdSpan _key;
+        private readonly UniversalReference _universalReference;
 
         /// <summary>
         /// Gets the grain reference functionality which is shared by all grain references of a given type.
@@ -289,9 +322,14 @@ namespace Orleans.Runtime
         internal IGrainReferenceRuntime Runtime => Shared.Runtime;
 
         /// <summary>
+        /// Gets the universal reference value.
+        /// </summary>
+        public UniversalReference UniversalReference => _universalReference;
+
+        /// <summary>
         /// Gets the grain id.
         /// </summary>
-        public GrainId GrainId => GrainId.Create(_shared.GrainType, _key);
+        public GrainId GrainId => _universalReference.GrainId;
 
         /// <summary>
         /// Gets the interface type.
@@ -316,15 +354,44 @@ namespace Orleans.Runtime
         /// The key portion of the grain id.
         /// </param>
         protected GrainReference(GrainReferenceShared shared, IdSpan key)
+            : this(shared, shared.CreateUniversalReference(GrainId.Create(shared.GrainType, key)))
         {
+        }
+
+        /// <summary>Initializes a new instance of the <see cref="GrainReference"/> class.</summary>
+        /// <param name="shared">
+        /// The grain reference functionality which is shared by all grain references of a given type.
+        /// </param>
+        /// <param name="universalReference">
+        /// The universal reference value.
+        /// </param>
+        protected GrainReference(GrainReferenceShared shared, UniversalReference universalReference)
+        {
+            universalReference.Validate();
+            if (!shared.GrainType.Equals(universalReference.GrainId.Type))
+            {
+                throw new ArgumentException("The universal reference grain type does not match the shared reference context.", nameof(universalReference));
+            }
+
+            if (!shared.InterfaceType.Equals(universalReference.InterfaceType))
+            {
+                throw new ArgumentException("The universal reference interface type does not match the shared reference context.", nameof(universalReference));
+            }
+
             _shared = shared;
-            _key = key;
+            _universalReference = universalReference;
         }
 
         /// <summary>
         /// Creates a new <see cref="GrainReference"/> instance for the specified <paramref name="grainId"/>.
         /// </summary>
         internal static GrainReference FromGrainId(GrainReferenceShared shared, GrainId grainId) => new(shared, grainId.Key);
+
+        /// <summary>
+        /// Creates a new <see cref="GrainReference"/> instance for the specified universal reference.
+        /// </summary>
+        internal static GrainReference FromUniversalReference(GrainReferenceShared shared, UniversalReference universalReference)
+            => new(shared, universalReference);
 
         /// <summary>
         /// Creates a new grain reference which implements the specified grain interface.
@@ -349,10 +416,10 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc />
-        public bool Equals(GrainReference? other) => other is not null && this.GrainId.Equals(other.GrainId);
+        public bool Equals(GrainReference? other) => other is not null && UniversalReference.Equals(other.UniversalReference);
 
         /// <inheritdoc />
-        public override int GetHashCode() => this.GrainId.GetHashCode();
+        public override int GetHashCode() => UniversalReference.GetHashCode();
 
         /// <summary>
         /// Get a uniform hash code for this grain reference.
@@ -363,7 +430,7 @@ namespace Orleans.Runtime
         public uint GetUniformHashCode()
         {
             // GrainId already includes the hashed type code for generic arguments.
-            return GrainId.GetUniformHashCode();
+            return UniversalReference.GetUniformHashCode();
         }
 
         /// <summary>
@@ -405,12 +472,12 @@ namespace Orleans.Runtime
         public virtual string InterfaceName => InterfaceType.ToString();
 
         /// <inheritdoc/>
-        public sealed override string ToString() => $"GrainReference:{GrainId}:{InterfaceType}";
+        public sealed override string ToString() => $"GrainReference:{UniversalReference}";
 
         string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString();
 
         bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
-            => destination.TryWrite($"GrainReference:{GrainId}:{InterfaceType}", out charsWritten);
+            => destination.TryWrite($"GrainReference:{UniversalReference}", out charsWritten);
 
         /// <summary>
         /// Gets or creates an invokable request instance.

@@ -340,6 +340,16 @@ namespace Orleans.Serialization
             writer.WriteEndObject();
             writer.WritePropertyName("Interface");
             writer.WriteValue(val.InterfaceType.ToString());
+            writer.WritePropertyName("ServiceId");
+            writer.WriteValue(val.UniversalReference.ServiceId);
+            writer.WritePropertyName("Binding");
+            writer.WriteValue((byte)val.UniversalReference.Binding);
+            if (val.UniversalReference.ClusterId is { } clusterId)
+            {
+                writer.WritePropertyName("ClusterId");
+                writer.WriteValue(clusterId);
+            }
+
             writer.WriteEndObject();
         }
 
@@ -347,11 +357,55 @@ namespace Orleans.Serialization
         public override object ReadJson(JsonReader reader, Type objectType, object? existingValue, JsonSerializer serializer)
         {
             JObject jo = JObject.Load(reader);
-            var id = jo["Id"];
-            GrainId grainId = GrainId.Create(id!["Type"]!.ToObject<string>()!, id["Key"]!.ToObject<string>()!);
-            var encodedInterface = jo["Interface"]!.ToString();
-            var iface = string.IsNullOrWhiteSpace(encodedInterface) ? default : GrainInterfaceType.Create(encodedInterface);
-            return this.referenceActivator.CreateReference(grainId, iface);
+            var id = jo["Id"] ?? throw new JsonSerializationException("The grain identity is missing.");
+            var grainId = GrainId.Create(id["Type"]!.ToObject<string>()!, id["Key"]!.ToObject<string>()!);
+            var encodedInterface = jo["Interface"]?.ToString()
+                ?? throw new JsonSerializationException("The grain interface is missing.");
+            var interfaceType = string.IsNullOrWhiteSpace(encodedInterface) ? default : GrainInterfaceType.Create(encodedInterface);
+            var serviceIdToken = jo["ServiceId"];
+            var bindingToken = jo["Binding"];
+            if (serviceIdToken is null && bindingToken is null)
+            {
+                return this.referenceActivator.CreateReference(grainId, interfaceType);
+            }
+
+            if (serviceIdToken is null || bindingToken is null)
+            {
+                throw new JsonSerializationException("The universal reference service identity and binding must both be present.");
+            }
+
+            var serviceId = serviceIdToken.ToObject<string>()!;
+            var binding = (UniversalReferenceBinding)bindingToken.ToObject<byte>();
+            if (binding is not (UniversalReferenceBinding.Virtual or UniversalReferenceBinding.Cluster))
+            {
+                throw new JsonSerializationException($"Unknown universal reference binding '{binding}'.");
+            }
+
+            var clusterId = jo["ClusterId"]?.ToObject<string>();
+            try
+            {
+                var reference = new UniversalReference(
+                    grainId,
+                    interfaceType,
+                    serviceId,
+                    binding,
+                    clusterId);
+                return this.referenceActivator.CreateReference(reference);
+            }
+            catch (ArgumentException exception) when (
+                binding == UniversalReferenceBinding.Cluster
+                && string.IsNullOrWhiteSpace(clusterId))
+            {
+                throw new JsonSerializationException(
+                    "A cluster-bound universal reference must specify a non-empty ClusterId.",
+                    exception);
+            }
+            catch (ArgumentException exception)
+            {
+                throw new JsonSerializationException(
+                    "Could not deserialize an invalid universal reference.",
+                    exception);
+            }
         }
     }
 }

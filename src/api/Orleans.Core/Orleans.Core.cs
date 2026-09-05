@@ -740,11 +740,14 @@ namespace Orleans.GrainReferences
         public GrainReferenceActivator(System.IServiceProvider serviceProvider, System.Collections.Generic.IEnumerable<IGrainReferenceActivatorProvider> providers) { }
 
         public Runtime.GrainReference CreateReference(Runtime.GrainId grainId, Runtime.GrainInterfaceType interfaceType) { throw null; }
+
+        public Runtime.GrainReference CreateReference(Runtime.UniversalReference reference) { throw null; }
     }
 
     public partial interface IGrainReferenceActivator
     {
         Runtime.GrainReference CreateReference(Runtime.GrainId grainId);
+        Runtime.GrainReference CreateReference(Runtime.UniversalReference reference);
     }
 
     public partial interface IGrainReferenceActivatorProvider
@@ -823,6 +826,44 @@ namespace Orleans.Hosting
 
         public static IClientBuilder AddOutgoingGrainCallFilter<TImplementation>(this IClientBuilder builder)
             where TImplementation : class, IOutgoingGrainCallFilter { throw null; }
+    }
+
+    public static partial class ClusterPlacementExtensions
+    {
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddClusterLocator<TLocator>(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, string name)
+            where TLocator : class, Runtime.IClusterLocator { throw null; }
+
+        public static IClientBuilder AddClusterLocator<TLocator>(this IClientBuilder builder, string name)
+            where TLocator : class, Runtime.IClusterLocator { throw null; }
+
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddClusterPlacement<TStrategy, TDirector>(this Microsoft.Extensions.DependencyInjection.IServiceCollection services)
+            where TStrategy : Runtime.ClusterPlacementStrategy, new()
+            where TDirector : class, Runtime.IClusterPlacementDirector { throw null; }
+
+        public static IClientBuilder AddClusterPlacement<TStrategy, TDirector>(this IClientBuilder builder)
+            where TStrategy : Runtime.ClusterPlacementStrategy, new()
+            where TDirector : class, Runtime.IClusterPlacementDirector { throw null; }
+
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddDirectoryClusterLocator<TDirectory>(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, string name)
+            where TDirectory : class, Runtime.IClusterDirectory { throw null; }
+
+        public static IClientBuilder AddDirectoryClusterLocator<TDirectory>(this IClientBuilder builder, string name)
+            where TDirectory : class, Runtime.IClusterDirectory { throw null; }
+
+        public static IClientBuilder AddInterClusterTransport<TTransport>(this IClientBuilder builder)
+            where TTransport : class, Runtime.IInterClusterTransport { throw null; }
+
+        public static IClientBuilder AddMetaclusterTopologyProvider<TProvider>(this IClientBuilder builder)
+            where TProvider : class, Runtime.IMetaclusterTopologyProvider { throw null; }
+
+        public static IClientBuilder AddRendezvousClusterLocator(this IClientBuilder builder, string name) { throw null; }
+
+        public static IClientBuilder UseClientInterClusterTransport<TClientProvider>(this IClientBuilder builder)
+            where TClientProvider : class, Runtime.IInterClusterClientProvider { throw null; }
+
+        public static IClientBuilder UseMetacluster(this IClientBuilder builder, System.Action<Configuration.MetaclusterOptions> configure) { throw null; }
+
+        public static IClientBuilder UseMetacluster(this IClientBuilder builder) { throw null; }
     }
 
     public static partial class GrainCallFilterServiceCollectionExtensions
@@ -1276,6 +1317,13 @@ namespace Orleans.Runtime
         public const string WaitMigration = "wait migration";
     }
 
+    public sealed partial class ClientInterClusterTransport : IInterClusterTransport
+    {
+        public ClientInterClusterTransport(IInterClusterClientProvider clientProvider, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.ClusterOptions> clusterOptions) { }
+
+        public System.Threading.Tasks.ValueTask<Orleans.Serialization.Invocation.Response> SendRequest(ClusterIdentity destination, UniversalReference target, Orleans.Serialization.Invocation.IInvokable request, CodeGeneration.InvokeMethodOptions options, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+    }
+
     [GenerateSerializer]
     [Immutable]
     public partial class ClusterManifestUpdate
@@ -1389,6 +1437,11 @@ namespace Orleans.Runtime
     public partial interface IHealthCheckable
     {
         bool CheckHealth(System.DateTime lastCheckTime, out string? reason);
+    }
+
+    public partial interface IInterClusterClientProvider
+    {
+        System.Threading.Tasks.ValueTask<IClusterClient> GetClient(ClusterIdentity destination, System.Threading.CancellationToken cancellationToken = default);
     }
 
     public partial interface ILocalSiloDetails
@@ -1726,6 +1779,60 @@ namespace Orleans.Runtime.Messaging
 
 namespace Orleans.Runtime.Placement
 {
+    public sealed partial class ClusterLocatorResolver
+    {
+        public ClusterLocatorResolver(Metadata.GrainPropertiesResolver grainPropertiesResolver, System.IServiceProvider services) { }
+
+        public IClusterLocator? Resolve(GrainType grainType) { throw null; }
+    }
+
+    public sealed partial class ClusterPlacementDirectorResolver
+    {
+        public ClusterPlacementDirectorResolver(System.IServiceProvider services) { }
+
+        public IClusterPlacementDirector Resolve(ClusterPlacementStrategy strategy) { throw null; }
+    }
+
+    public sealed partial class ClusterPlacementStrategyResolver
+    {
+        public ClusterPlacementStrategyResolver(Metadata.GrainPropertiesResolver grainPropertiesResolver, System.IServiceProvider services) { }
+
+        public ClusterPlacementStrategy? Resolve(GrainType grainType) { throw null; }
+    }
+
+    public sealed partial class ClusterReferenceResolver
+    {
+        public ClusterReferenceResolver(Microsoft.Extensions.Options.IOptions<Orleans.Configuration.ClusterOptions> clusterOptions, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.MetaclusterOptions> metaclusterOptions, ClusterLocatorResolver clusterLocatorResolver, Metadata.GrainPropertiesResolver grainPropertiesResolver, IMetaclusterTopologyProvider topologyProvider, System.TimeProvider timeProvider) { }
+
+        public void Invalidate(UniversalReference reference) { }
+
+        public System.Threading.Tasks.ValueTask<ClusterIdentity> Resolve(UniversalReference reference, System.Collections.Generic.IReadOnlyDictionary<string, object>? requestContext = null, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+    }
+
+    public sealed partial class DirectoryClusterLocator : IClusterLocator, IClusterOwnershipValidator
+    {
+        public DirectoryClusterLocator(IClusterDirectory directory, IMetaclusterTopologyProvider topologyProvider, ClusterPlacementStrategyResolver strategyResolver, ClusterPlacementDirectorResolver directorResolver, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.MetaclusterOptions> options) { }
+
+        public System.Threading.Tasks.ValueTask<ClusterLocation> Locate(GrainId grainId, ClusterLocationContext context, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public System.Threading.Tasks.ValueTask<ClusterDirectoryEntry> ValidateLocalOwnership(GrainId grainId, string localClusterId, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+    }
+
+    public sealed partial class InMemoryClusterDirectory : IClusterDirectory
+    {
+        public InMemoryClusterDirectory() { }
+
+        public InMemoryClusterDirectory(System.TimeProvider timeProvider) { }
+
+        public System.Threading.Tasks.ValueTask<ClusterDirectoryEntry> GetOrCreate(GrainId grainId, string proposedClusterId, long topologyEpoch, System.TimeSpan leaseDuration, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public System.Threading.Tasks.ValueTask<ClusterDirectoryEntry?> Lookup(GrainId grainId, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public System.Threading.Tasks.ValueTask<ClusterDirectoryEntry?> TryMove(GrainId grainId, long expectedVersion, string destinationClusterId, long topologyEpoch, System.TimeSpan leaseDuration, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public System.Threading.Tasks.ValueTask<ClusterDirectoryEntry?> TryRenew(GrainId grainId, long expectedVersion, string ownerClusterId, System.TimeSpan leaseDuration, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+    }
+
     public partial interface IPlacementContext
     {
         SiloAddress LocalSilo { get; }
@@ -1757,6 +1864,13 @@ namespace Orleans.Runtime.Placement
         public ushort InterfaceVersion { get { throw null; } }
 
         public System.Collections.Generic.Dictionary<string, object> RequestContextData { get { throw null; } }
+    }
+
+    public sealed partial class RendezvousClusterLocator : IClusterLocator
+    {
+        public RendezvousClusterLocator(IMetaclusterTopologyProvider topologyProvider) { }
+
+        public System.Threading.Tasks.ValueTask<ClusterLocation> Locate(GrainId grainId, ClusterLocationContext context, System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }
 }
 
