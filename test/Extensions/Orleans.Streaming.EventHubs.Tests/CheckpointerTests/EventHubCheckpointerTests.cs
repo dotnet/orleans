@@ -73,6 +73,15 @@ public class EventHubCheckpointerTests
         }
     }
 
+    private sealed class FailingResetCheckpointer : TestCheckpointer
+    {
+        public override Task Reset(CancellationToken cancellationToken)
+        {
+            _ = base.Reset(cancellationToken);
+            throw new InvalidOperationException("Reset failed");
+        }
+    }
+
     private class TestEventHubQueueCache : IEventHubQueueCache
     {
         private readonly IStreamQueueCheckpointer<string>? checkpointer;
@@ -89,19 +98,30 @@ public class EventHubCheckpointerTests
         public object? RefreshedCursor { get; private set; }
         public StreamSequenceToken? RefreshToken { get; private set; }
         public Exception? CursorException { get; set; }
-        public QueueCacheMissException? MoveNextException { get; set; }
+        public Exception? MoveNextException { get; set; }
         public IBatchContainer? NoDataMessage { get; set; }
+        public int GetCursorCount { get; private set; }
+        public IBatchContainer? NextMessage { get; set; }
+        public List<StreamPosition> PositionsToReturn { get; init; } = [];
 
         public int GetMaxAddCount() => 1_000;
 
         public List<StreamPosition> Add(List<EventData> message, DateTime dequeueTimeUtc)
         {
             AddCount++;
-            return [];
+            return PositionsToReturn;
         }
 
         public object GetCursor(StreamId streamId, StreamSequenceToken? sequenceToken)
-            => CursorException is { } exception ? throw exception : Cursor;
+        {
+            if (CursorException is { } exception)
+            {
+                throw exception;
+            }
+
+            GetCursorCount++;
+            return Cursor;
+        }
 
         public void Refresh(object cursor, StreamSequenceToken? sequenceToken)
         {
@@ -114,6 +134,13 @@ public class EventHubCheckpointerTests
             if (MoveNextException is { } exception)
             {
                 throw exception;
+            }
+
+            if (NextMessage is { } next)
+            {
+                NextMessage = null;
+                message = next;
+                return true;
             }
 
             message = NoDataMessage!;
@@ -141,10 +168,11 @@ public class EventHubCheckpointerTests
     private sealed class TestEventHubReceiver : IEventHubReceiver
     {
         public int CloseCount { get; private set; }
+        public IEnumerable<EventData> Messages { get; init; } = [];
 
         public Task<IEnumerable<EventData>> ReceiveAsync(int maxCount, TimeSpan waitTime)
         {
-            return Task.FromResult<IEnumerable<EventData>>([]);
+            return Task.FromResult(Messages);
         }
 
         public Task CloseAsync()
@@ -152,6 +180,16 @@ public class EventHubCheckpointerTests
             CloseCount++;
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class TestBatchContainer : IBatchContainer
+    {
+        public StreamId StreamId { get; } = StreamId.Create("namespace", Guid.NewGuid());
+        public StreamSequenceToken SequenceToken { get; init; } = MakeToken(1);
+
+        public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>() => [];
+
+        public bool ImportRequestContext() => false;
     }
 
     [Fact, TestCategory("BVT")]
@@ -319,6 +357,20 @@ public class EventHubCheckpointerTests
         }
     }
 
+    private sealed class InvalidArgumentEventHubReceiver : IEventHubReceiver
+    {
+        public int CloseCount { get; private set; }
+
+        public Task<IEnumerable<EventData>> ReceiveAsync(int maxCount, TimeSpan waitTime)
+            => throw new ArgumentException("The receiver rejected an unrelated argument.");
+
+        public Task CloseAsync()
+        {
+            CloseCount++;
+            return Task.CompletedTask;
+        }
+    }
+
     private sealed class CancellableEventHubReceiver : IEventHubReceiver
     {
         public TaskCompletionSource<CancellationToken> ReceiveStarted { get; } = new(
@@ -363,6 +415,17 @@ public class EventHubCheckpointerTests
         return new EventHubSequenceToken(offset.ToString(), sequenceNumber, 0);
     }
 
+    private static IQueueCacheCursor AssertCursor(
+        EventHubAdapterReceiver receiver,
+        StreamId streamId,
+        StreamSequenceToken token)
+    {
+        var result = ((IQueueCache)receiver).TryGetCacheCursor(streamId, token);
+        Assert.Equal(QueueCacheCursorResultKind.Success, result.Kind);
+        Assert.NotNull(result.Cursor);
+        return result.Cursor;
+    }
+
     private static void UpdateDeliveryProgress(EventHubAdapterReceiver receiver, StreamSequenceToken token)
     {
         receiver.UpdateDeliveryProgress(token, DateTime.UtcNow);
@@ -378,7 +441,9 @@ public class EventHubCheckpointerTests
         TestEventHubQueueCache? cache = null,
         IEventHubReceiver? eventHubReceiver = null,
         Action<string>? onReceiverCreated = null,
-        Func<string, IEventHubReceiver>? receiverFactory = null)
+        Func<string, IEventHubReceiver>? receiverFactory = null,
+        Func<IEventHubQueueCache>? cacheFactory = null,
+        bool initialize = true)
     {
         var settings = new EventHubPartitionSettings
         {
@@ -394,7 +459,7 @@ public class EventHubCheckpointerTests
 
         var receiver = new EventHubAdapterReceiver(
             settings,
-            cacheFactory: (_, createdCheckpointer, _) => cache ?? new TestEventHubQueueCache(createdCheckpointer),
+            cacheFactory: (_, createdCheckpointer, _) => cacheFactory?.Invoke() ?? cache ?? new TestEventHubQueueCache(createdCheckpointer),
             checkpointerFactory: _ => Task.FromResult<IStreamQueueCheckpointer<string>>(checkpointer),
             loggerFactory: Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance,
             monitor: new Orleans.Streaming.EventHubs.DefaultEventHubReceiverMonitor(
@@ -412,9 +477,21 @@ public class EventHubCheckpointerTests
                 return receiverFactory?.Invoke(offset) ?? eventHubReceiver ?? new TestEventHubReceiver();
             });
 
-        await receiver.Initialize(TimeSpan.FromSeconds(5));
+        if (initialize)
+        {
+            await receiver.Initialize(TimeSpan.FromSeconds(5));
+        }
 
         return receiver;
+    }
+
+    [TestSuite("BVT")]
+    [Fact, TestCategory("BVT")]
+    public async Task GetMaxAddCount_BeforeInitialize_UsesSafeDefault()
+    {
+        var receiver = await CreateReceiver(new TestCheckpointer(), initialize: false);
+
+        Assert.Equal(EventHubAdapterReceiver.MaxMessagesPerRead, receiver.GetMaxAddCount());
     }
 
     [TestSuite("BVT")]
@@ -458,23 +535,217 @@ public class EventHubCheckpointerTests
         {
             LoadedOffset = "123",
         };
-        var cache = new TestEventHubQueueCache();
+        var initialBatch = new TestBatchContainer();
+        var initialCache = new TestEventHubQueueCache
+        {
+            NextMessage = initialBatch,
+        };
+        var recoveredToken = MakeToken(10);
+        var recoveredBatch = new TestBatchContainer
+        {
+            SequenceToken = recoveredToken,
+        };
+        var replacementCache = new TestEventHubQueueCache
+        {
+            NextMessage = recoveredBatch,
+            PositionsToReturn =
+            [
+                new StreamPosition(
+                    StreamId.Create("namespace", Guid.NewGuid()),
+                    recoveredToken),
+            ],
+        };
+        var replacementReceiver = new TestEventHubReceiver
+        {
+            Messages = [new EventData()],
+        };
+        var caches = new Queue<IEventHubQueueCache>([initialCache, replacementCache]);
         var invalidReceiver = new InvalidOffsetEventHubReceiver();
         var offsets = new List<string>();
         var receiver = await CreateReceiver(
             checkpointer,
-            cache,
             onReceiverCreated: offsets.Add,
-            receiverFactory: offset => offset == "123" ? invalidReceiver : new TestEventHubReceiver());
+            receiverFactory: offset => offset == "123" ? invalidReceiver : replacementReceiver,
+            cacheFactory: caches.Dequeue);
+        var streamId = StreamId.Create("namespace", Guid.NewGuid());
+        var abandonedCursor = AssertCursor(receiver, streamId, MakeToken(1));
+        initialCache.MoveNextException = new InvalidOperationException("Cache cursor failed");
+        Assert.Throws<InvalidOperationException>(() => abandonedCursor.MoveNextWithResult());
+        initialCache.MoveNextException = null;
+
+        var cursor = AssertCursor(receiver, streamId, MakeToken(1));
+        var pendingCursor = AssertCursor(receiver, StreamId.Create("namespace", Guid.NewGuid()), MakeToken(1));
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
+        Assert.Same(initialBatch, cursor.GetCurrent(out _));
 
         await Assert.ThrowsAsync<ArgumentException>(
             () => receiver.GetQueueMessagesAsync(10, CancellationToken.None));
         Assert.Equal(1, checkpointer.ResetCount);
         Assert.Equal(1, invalidReceiver.CloseCount);
-        Assert.Equal(1, cache.DisposeCount);
+        Assert.Equal(1, initialCache.DisposeCount);
 
-        Assert.Empty(await receiver.GetQueueMessagesAsync(10, CancellationToken.None));
+        receiver.UpdateDeliveryProgress(MakeToken(123), DateTime.UtcNow);
+        Assert.Equal(0, checkpointer.UpdateCount);
+
+        Assert.Single(await receiver.GetQueueMessagesAsync(10, CancellationToken.None));
         Assert.Equal(["123", EventHubConstants.StartOfStream], offsets);
+
+        var refreshToken = MakeToken(2);
+        cursor.Refresh(refreshToken);
+        Assert.Equal(1, replacementCache.GetCursorCount);
+        Assert.Null(cursor.GetCurrent(out _));
+
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
+        Assert.Same(recoveredBatch, cursor.GetCurrent(out _));
+        receiver.UpdateDeliveryProgress(recoveredToken, DateTime.UtcNow);
+        Assert.Equal(0, checkpointer.UpdateCount);
+
+        pendingCursor.Dispose();
+        receiver.UpdateDeliveryProgress(recoveredToken, DateTime.UtcNow);
+        Assert.Equal("10", checkpointer.LastOffset);
+        Assert.Equal(1, checkpointer.UpdateCount);
+    }
+
+    [TestSuite("BVT")]
+    [Fact, TestCategory("BVT")]
+    public async Task GetQueueMessagesAsync_WhenArgumentFailureIsNotAnInvalidOffset_DoesNotReset()
+    {
+        var checkpointer = new TestCheckpointer
+        {
+            LoadedOffset = "123",
+        };
+        var eventHubReceiver = new InvalidArgumentEventHubReceiver();
+        var offsets = new List<string>();
+        var receiver = await CreateReceiver(
+            checkpointer,
+            eventHubReceiver: eventHubReceiver,
+            onReceiverCreated: offsets.Add);
+
+        var exception = await Assert.ThrowsAsync<ArgumentException>(
+            () => receiver.GetQueueMessagesAsync(10, CancellationToken.None));
+
+        Assert.Equal("The receiver rejected an unrelated argument.", exception.Message);
+        Assert.Equal(0, checkpointer.ResetCount);
+        Assert.Equal(0, eventHubReceiver.CloseCount);
+        Assert.Equal(["123"], offsets);
+    }
+
+    [TestSuite("BVT")]
+    [Fact, TestCategory("BVT")]
+    public async Task GetQueueMessagesAsync_AcceptsResumeTokenResolvedByReplacementCache()
+    {
+        var checkpointer = new TestCheckpointer
+        {
+            LoadedOffset = "123",
+        };
+        var recoveredToken = MakeToken(10);
+        var replacementCache = new TestEventHubQueueCache
+        {
+            NextMessage = new TestBatchContainer
+            {
+                SequenceToken = recoveredToken,
+            },
+            PositionsToReturn =
+            [
+                new StreamPosition(
+                    StreamId.Create("namespace", Guid.NewGuid()),
+                    recoveredToken),
+            ],
+        };
+        var caches = new Queue<IEventHubQueueCache>([new TestEventHubQueueCache(), replacementCache]);
+        var receiver = await CreateReceiver(
+            checkpointer,
+            receiverFactory: offset => offset == "123"
+                ? new InvalidOffsetEventHubReceiver()
+                : new TestEventHubReceiver { Messages = [new EventData()] },
+            cacheFactory: caches.Dequeue);
+
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => receiver.GetQueueMessagesAsync(10, CancellationToken.None));
+        Assert.Single(await receiver.GetQueueMessagesAsync(10, CancellationToken.None));
+
+        var resumeToken = MakeToken(9);
+        using var cursor = AssertCursor(
+            receiver,
+            StreamId.Create("namespace", Guid.NewGuid()),
+            resumeToken);
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
+
+        receiver.UpdateDeliveryProgress(MakeToken(9), DateTime.UtcNow);
+        Assert.Equal(0, checkpointer.UpdateCount);
+
+        receiver.UpdateDeliveryProgress(resumeToken, DateTime.UtcNow);
+        Assert.Equal("9", checkpointer.LastOffset);
+        Assert.Equal(1, checkpointer.UpdateCount);
+    }
+
+    [TestSuite("BVT")]
+    [Fact, TestCategory("BVT")]
+    public async Task CursorRefresh_WhenReplacementCacheMisses_LegacyMoveNextThrows()
+    {
+        var checkpointer = new TestCheckpointer
+        {
+            LoadedOffset = "123",
+        };
+        var replacementCache = new TestEventHubQueueCache
+        {
+            CursorException = new QueueCacheMissException("requested", "low", "high"),
+        };
+        var caches = new Queue<IEventHubQueueCache>([new TestEventHubQueueCache(), replacementCache]);
+        var receiver = await CreateReceiver(
+            checkpointer,
+            receiverFactory: offset => offset == "123"
+                ? new InvalidOffsetEventHubReceiver()
+                : new TestEventHubReceiver(),
+            cacheFactory: caches.Dequeue);
+#pragma warning disable CS0618 // Verify compatibility of the obsolete cursor APIs.
+        var cursor = ((IQueueCache)receiver).GetCacheCursor(
+            StreamId.Create("namespace", Guid.NewGuid()),
+            MakeToken(1));
+#pragma warning restore CS0618
+
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => receiver.GetQueueMessagesAsync(10, CancellationToken.None));
+        cursor.Refresh(MakeToken(2));
+
+#pragma warning disable CS0618 // Verify compatibility of the obsolete cursor APIs.
+        var exception = Assert.Throws<QueueCacheMissException>(() => cursor.MoveNext());
+#pragma warning restore CS0618
+        Assert.Equal("requested", exception.Requested);
+        Assert.Equal("low", exception.Low);
+        Assert.Equal("high", exception.High);
+    }
+
+    [TestSuite("BVT")]
+    [Fact, TestCategory("BVT")]
+    public async Task GetQueueMessagesAsync_WhenCheckpointRecoveryFails_RethrowsReadFailure()
+    {
+        var checkpointer = new FailingResetCheckpointer
+        {
+            LoadedOffset = "123",
+        };
+        var receiver = await CreateReceiver(
+            checkpointer,
+            eventHubReceiver: new InvalidOffsetEventHubReceiver());
+
+        var exception = await Assert.ThrowsAsync<ArgumentException>(
+            () => receiver.GetQueueMessagesAsync(10, TestContext.Current.CancellationToken));
+
+        Assert.Equal("The supplied offset is invalid.", exception.Message);
+        Assert.Equal(1, checkpointer.ResetCount);
+    }
+
+    [TestSuite("BVT")]
+    [Fact, TestCategory("BVT")]
+    public async Task NoOpCheckpointerFactory_CreateHonorsCancellation()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => NoOpCheckpointerFactory.Instance.Create("partition", cancellation.Token));
+
+        Assert.Equal(cancellation.Token, exception.CancellationToken);
     }
 
     [TestSuite("BVT")]
@@ -488,6 +759,7 @@ public class EventHubCheckpointerTests
         };
         var invalidReceiver = new InvalidOffsetEventHubReceiver();
         var receiver = await CreateReceiver(checkpointer, eventHubReceiver: invalidReceiver);
+        checkpointer.CheckpointExists = true;
 
         await Assert.ThrowsAsync<ArgumentException>(
             () => receiver.GetQueueMessagesAsync(10, CancellationToken.None));
