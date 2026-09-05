@@ -141,6 +141,15 @@ internal class Program
         {
             new PingBenchmark(numSilos: 1, startClient: true).PingConcurrent().GetAwaiter().GetResult();
         },
+        ["StablePing_OneSilo"] = _ =>
+        {
+            new PingBenchmark(numSilos: 1, startClient: true)
+                .PingConcurrent(runs: 1, blocksPerWorker: 200, warmupBlocksPerWorker: 50)
+                .GetAwaiter().GetResult();
+        },
+        ["ProcessPing_Server"] = args => ProcessPingBenchmark.RunServerAsync(args).GetAwaiter().GetResult(),
+        ["ProcessPing_Client"] = args => ProcessPingBenchmark.RunClientAsync(args).GetAwaiter().GetResult(),
+        ["ProcessPing_LatencyClient"] = args => ProcessPingBenchmark.RunLatencyClientAsync(args).GetAwaiter().GetResult(),
         ["ConcurrentPing_TwoSilos"] = _ =>
         {
             new PingBenchmark(numSilos: 2, startClient: true).PingConcurrent().GetAwaiter().GetResult();
@@ -172,6 +181,12 @@ internal class Program
         ["ConcurrentPing_SiloToSilo"] = _ =>
         {
             new PingBenchmark(numSilos: 2, startClient: false, grainsOnSecondariesOnly: true).PingConcurrentHostedClient(blocksPerWorker: 10).GetAwaiter().GetResult();
+        },
+        ["StablePing_SiloToSilo"] = _ =>
+        {
+            new PingBenchmark(numSilos: 2, startClient: false, grainsOnSecondariesOnly: true)
+                .PingConcurrentHostedClient(blocksPerWorker: 200, runs: 1, warmupBlocksPerWorker: 50)
+                .GetAwaiter().GetResult();
         },
         ["ConcurrentPing_SiloToSilo_Forever"] = _ =>
         {

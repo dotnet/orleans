@@ -1,55 +1,47 @@
 ---
-title: Connection middleware
-description: Plug custom logic, such as authentication or custom framing, into Orleans silo-to-silo and client-to-silo connections.
-ms.date: 08/11/2026
+title: Message transport middleware
+description: Decorate Orleans message transport connectors and listeners with cross-cutting connection behavior.
+ms.date: 08/21/2026
 ms.topic: how-to
 ---
 
-# Connection middleware
+# Message transport middleware
 
-Orleans silo-to-silo and client-to-gateway connections are built from a chain of middleware, similar to an ASP.NET Core request pipeline. <xref:Orleans.Runtime.Messaging.IConnectionMiddleware> lets you insert custom logic, such as authentication, custom framing, or connection-level diagnostics, into that pipeline without reimplementing connection setup.
+Orleans establishes silo-to-silo and client-to-gateway connections through message transport connectors and listeners. Transport middleware decorates those components before they create or accept a connection.
 
-Orleans itself uses this abstraction for TLS. See [Secure Orleans connections with TLS](transport-layer-security.md) for the built-in TLS middleware.
+<xref:Orleans.Connections.Transport.IMessageTransportConnectorMiddleware> applies to outbound connectors. <xref:Orleans.Connections.Transport.IMessageTransportListenerMiddleware> applies to inbound listeners. Orleans applies every registered middleware instance in dependency-injection registration order.
 
-## The middleware interface
-
-The interface defines `OnConnectionAsync(ConnectionContext, ConnectionDelegate)`. A middleware instance can be invoked concurrently for multiple connections, so store per-connection state in local variables or on the <xref:Microsoft.AspNetCore.Connections.ConnectionContext>, not on the middleware instance. Implementations should call `next(context)` to continue the pipeline after performing their work; not calling `next` terminates the connection.
+Orleans uses transport middleware to apply TLS. See [Secure Orleans connections with TLS](transport-layer-security.md) for the built-in security configuration.
 
 ## Register middleware
 
-Use <xref:Orleans.ConnectionMiddlewareExtensions.UseMiddleware*> on an <xref:Microsoft.AspNetCore.Connections.IConnectionBuilder> to add middleware to a connection pipeline:
+Register connector and listener middleware as singleton services:
 
 :::code language="csharp" source="./snippets/connection-middleware/ConnectionMiddlewareExamples.cs" id="RegisterMiddleware":::
 
-Connection pipelines are configured through <xref:Orleans.Configuration.SiloConnectionOptions> (silo) and <xref:Orleans.Configuration.ClientConnectionOptions> (client). A silo has three distinct pipelines:
+The middleware instances can be invoked for multiple connectors or listeners, so keep per-connection state in the returned decorator or the resulting <xref:Orleans.Connections.Transport.MessageTransport>.
 
-:::code language="csharp" source="./snippets/connection-middleware/ConnectionMiddlewareExamples.cs" id="SiloPipelines":::
+## Decorate outbound connectors
 
-An Orleans client has a single outbound pipeline, configured with <xref:Orleans.Configuration.ClientConnectionOptions>:
+A connector middleware receives the next <xref:Orleans.Connections.Transport.MessageTransportConnector> and returns the connector Orleans should use. The decorator can observe connection attempts, select another transport, or wrap the returned message transport:
 
-:::code language="csharp" source="./snippets/connection-middleware/ConnectionMiddlewareExamples.cs" id="ClientPipeline":::
+:::code language="csharp" source="./snippets/connection-middleware/ConnectionMiddlewareExamples.cs" id="ConnectorDecorator":::
 
-Middleware added first runs first, wrapping every middleware added after it, matching the order `UseMiddleware` is called. Register the middleware type itself (for example `MyClientSideMiddleware`, `MyServerSideMiddleware`) as a singleton service when using the generic `UseMiddleware<T>()` overload.
+Delegate <xref:Orleans.Connections.Transport.MessageTransportConnector.Features>, `IsValid`, and disposal unless the middleware deliberately changes those guarantees.
 
-> [!NOTE]
-> Silo-to-silo and client-to-silo connections perform an Orleans-internal handshake after the connection pipeline runs. Middleware that terminates or replaces the transport (such as TLS) must leave a working `ConnectionContext` in place before calling `next`, because Orleans handshake and message framing execute afterward.
+## Decorate inbound listeners
 
-## Read and write framed data
+A listener middleware receives the next <xref:Orleans.Connections.Transport.MessageTransportListener> and returns the listener Orleans should bind and accept from:
 
-Custom middleware that exchanges its own protocol data before calling `next` (for example, a handshake) can read and write directly from `context.Transport.Input`/`Output` (`PipeReader`/`PipeWriter`), or use <xref:Orleans.Runtime.Messaging.ConnectionFrameHelper> for structured, length-prefixed frames. `ConnectionFrameHelper` is optional; it exists to save middleware authors from re-implementing length-prefixed framing.
+:::code language="csharp" source="./snippets/connection-middleware/ConnectionMiddlewareExamples.cs" id="ListenerDecorator":::
 
-The wire format per frame is `[4-byte little-endian length][1-byte frame type][payload]`, where the length equals `1 + payload.Length`.
-
-:::code language="csharp" source="./snippets/connection-middleware/ConnectionMiddlewareExamples.cs" id="ServerMiddleware":::
-
-`ConnectionFrameHelper` also provides `WriteLengthPrefixedString`/`ReadLengthPrefixedString` helpers for encoding UTF-8 strings inside a frame payload, and a zero-copy `WriteFrameAsync` overload that writes the payload directly into the transport pipe buffer via an `Action<IBufferWriter<byte>>` delegate, avoiding an intermediate `byte[]` allocation.
-
-`ReadFrameAsync` throws `InvalidOperationException` if the connection is closed mid-frame or if the declared frame length exceeds `maxFrameLength` (`ConnectionFrameHelper.DefaultMaxFrameLength`, 1 MB, by default). Pass a smaller `maxFrameLength` if your protocol's frames are bounded more tightly, to fail fast on malformed or hostile input.
+Preserve the listener name so Orleans can select the silo and gateway listeners by role. Return `null` from `AcceptAsync` when the inner listener has stopped, matching the listener contract.
 
 ## See also
 
-- <xref:Orleans.Runtime.Messaging.IConnectionMiddleware>
-- <xref:Orleans.Runtime.Messaging.ConnectionFrameHelper>
+- <xref:Orleans.Connections.Transport.MessageTransport>
+- <xref:Orleans.Connections.Transport.MessageTransportConnector>
+- <xref:Orleans.Connections.Transport.MessageTransportListener>
 - [Secure Orleans connections with TLS](transport-layer-security.md)
 - [Server configuration](configuration-guide/server-configuration.md)
 - [Client configuration](configuration-guide/client-configuration.md)
