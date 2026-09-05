@@ -19,6 +19,7 @@ interface [GrainInterfaceType("Orleans.IReminderService")] Orleans.IReminderServ
   AC622EEB: GetReminder(Orleans.Runtime.GrainId, string, System.Threading.CancellationToken) -> Task<Orleans.Runtime.IGrainReminder?>
   GetReminders: GetReminders(Orleans.Runtime.GrainId) -> Task<System.Collections.Generic.List<Orleans.Runtime.IGrainReminder>>
   419EB51E: GetReminders(Orleans.Runtime.GrainId, System.Threading.CancellationToken) -> Task<System.Collections.Generic.List<Orleans.Runtime.IGrainReminder>>
+  902EB550: ReconcileReminder(Orleans.Runtime.GrainId, string, int) -> Task<bool>
   RegisterOrUpdateReminder: RegisterOrUpdateReminder(Orleans.Runtime.GrainId, string, System.TimeSpan, System.TimeSpan) -> Task<Orleans.Runtime.IGrainReminder>
   1281C86D: RegisterOrUpdateReminder(Orleans.Runtime.GrainId, string, System.TimeSpan, System.TimeSpan, System.Threading.CancellationToken) -> Task<Orleans.Runtime.IGrainReminder>
   Start: Start() -> Task

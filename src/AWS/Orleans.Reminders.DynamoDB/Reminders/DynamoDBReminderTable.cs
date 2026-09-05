@@ -6,6 +6,7 @@ using Orleans.Configuration;
 using Orleans.Runtime;
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Orleans.Reminders.DynamoDB
@@ -30,8 +31,23 @@ namespace Orleans.Reminders.DynamoDB
         private readonly ILogger logger;
         private readonly DynamoDBReminderStorageOptions options;
         private readonly string serviceId;
+        private readonly IClusterMembershipService? membershipService;
+        private readonly ILocalSiloDetails? localSiloDetails;
+        private readonly TimeProvider timeProvider;
+        private readonly DynamoDBReminderMigrationTestHooks? testHooks;
+        private readonly string migrationOwner;
+        private readonly string v2TableName;
+        private readonly string v2DataPartitionPrefix;
+        private readonly string v2MetadataPartitionKey;
 
         private DynamoDBStorage storage = null!;
+        private bool useV2Reads;
+        private bool useV2OnlyWrites;
+        private CancellationTokenSource? heartbeatCancellation;
+        private Task? heartbeatTask;
+        private string? leaseToken;
+        private CancellationTokenSource? leaseRenewalCancellation;
+        private Task? leaseRenewalTask;
 
         /// <summary>Initializes a new instance of the <see cref="DynamoDBReminderTable"/> class.</summary>
         /// <param name="loggerFactory">logger factory to use</param>
@@ -40,16 +56,43 @@ namespace Orleans.Reminders.DynamoDB
         public DynamoDBReminderTable(
             ILoggerFactory loggerFactory,
             IOptions<ClusterOptions> clusterOptions,
-            IOptions<DynamoDBReminderStorageOptions> storageOptions)
+            IOptions<DynamoDBReminderStorageOptions> storageOptions,
+            IClusterMembershipService? membershipService = null,
+            ILocalSiloDetails? localSiloDetails = null,
+            TimeProvider? timeProvider = null)
+            : this(loggerFactory, clusterOptions, storageOptions, membershipService, localSiloDetails, timeProvider, null)
+        {
+        }
+
+        internal DynamoDBReminderTable(
+            ILoggerFactory loggerFactory,
+            IOptions<ClusterOptions> clusterOptions,
+            IOptions<DynamoDBReminderStorageOptions> storageOptions,
+            IClusterMembershipService? membershipService,
+            ILocalSiloDetails? localSiloDetails,
+            TimeProvider? timeProvider,
+            DynamoDBReminderMigrationTestHooks? testHooks)
         {
             this.logger = loggerFactory.CreateLogger<DynamoDBReminderTable>();
             this.serviceId = clusterOptions.Value.ServiceId;
             this.options = storageOptions.Value;
+            this.membershipService = membershipService;
+            this.localSiloDetails = localSiloDetails;
+            this.timeProvider = timeProvider ?? TimeProvider.System;
+            this.testHooks = testHooks;
+            this.migrationOwner = localSiloDetails?.SiloAddress.ToParsableString() ?? Guid.NewGuid().ToString("N");
+            this.v2TableName = options.V2TableName ?? $"{options.TableName}-v2";
+            this.v2DataPartitionPrefix = $"{DataPartitionPrefix}{Encode(serviceId)}#";
+            this.v2MetadataPartitionKey = $"{MetadataPartitionPrefix}{Encode(serviceId)}";
         }
 
         /// <summary>Initialize current instance with specific global configuration and logger</summary>
-        public Task Init()
+        public Task Init() => StartAsync();
+
+        /// <inheritdoc/>
+        public async Task StartAsync(CancellationToken cancellationToken = default)
         {
+            ValidateOptions();
             this.storage = new DynamoDBStorage(
                 this.logger,
                 this.options.Service,
@@ -64,6 +107,25 @@ namespace Orleans.Reminders.DynamoDB
                 this.options.UpdateIfExists);
 
             LogInformationInitializingDynamoDBRemindersTable(logger);
+
+            if (options.TableMode != DynamoDBReminderTableMode.Legacy)
+            {
+                await InitializeV2Table(cancellationToken);
+                if ((await ReadMigrationState())?.Status == MigrationStatus.Retired)
+                {
+                    await StartCompatibilityHeartbeat();
+                    try
+                    {
+                        await InitializeMigration(cancellationToken);
+                        return;
+                    }
+                    catch
+                    {
+                        await StopAsync(cancellationToken);
+                        throw;
+                    }
+                }
+            }
 
             var serviceIdGrainHashGlobalSecondaryIndex = new GlobalSecondaryIndex
             {
@@ -87,7 +149,7 @@ namespace Orleans.Reminders.DynamoDB
                 }
             };
 
-            return this.storage.InitializeTable(this.options.TableName,
+            await this.storage.InitializeTable(this.options.TableName,
                 new List<KeySchemaElement>
                 {
                     new KeySchemaElement { AttributeName = REMINDER_ID_PROPERTY_NAME, KeyType = KeyType.HASH },
@@ -100,7 +162,26 @@ namespace Orleans.Reminders.DynamoDB
                     new AttributeDefinition { AttributeName = SERVICE_ID_PROPERTY_NAME, AttributeType = ScalarAttributeType.S },
                     new AttributeDefinition { AttributeName = GRAIN_REFERENCE_PROPERTY_NAME, AttributeType = ScalarAttributeType.S }
                 },
-                new List<GlobalSecondaryIndex> { serviceIdGrainHashGlobalSecondaryIndex, serviceIdGrainReferenceGlobalSecondaryIndex });
+                new List<GlobalSecondaryIndex> { serviceIdGrainHashGlobalSecondaryIndex, serviceIdGrainReferenceGlobalSecondaryIndex },
+                cancellationToken: cancellationToken);
+
+            if (options.TableMode == DynamoDBReminderTableMode.Legacy)
+            {
+                await ValidateLegacyModeMigrationState();
+                return;
+            }
+
+            await StartCompatibilityHeartbeat();
+
+            try
+            {
+                await InitializeMigration(cancellationToken);
+            }
+            catch
+            {
+                await StopAsync(cancellationToken);
+                throw;
+            }
         }
 
         /// <summary>
@@ -112,6 +193,12 @@ namespace Orleans.Reminders.DynamoDB
         /// <returns> Return the ReminderTableData if the rows were read successfully </returns>
         public async Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName)
         {
+            await RefreshReadMode();
+            if (useV2Reads)
+            {
+                return await ReadV2Row(grainId, reminderName);
+            }
+
             var reminderId = ConstructReminderId(this.serviceId, grainId, reminderName);
 
             var keys = new Dictionary<string, AttributeValue>
@@ -138,6 +225,12 @@ namespace Orleans.Reminders.DynamoDB
         /// <returns> Return the ReminderTableData if the rows were read successfully </returns>
         public async Task<ReminderTableData> ReadRows(GrainId grainId)
         {
+            await RefreshReadMode();
+            if (useV2Reads)
+            {
+                return await ReadV2Rows(grainId);
+            }
+
             var expressionValues = new Dictionary<string, AttributeValue>
                 {
                     { $":{SERVICE_ID_PROPERTY_NAME}", new AttributeValue(this.serviceId) },
@@ -148,6 +241,7 @@ namespace Orleans.Reminders.DynamoDB
             {
                 var expression = $"{SERVICE_ID_PROPERTY_NAME} = :{SERVICE_ID_PROPERTY_NAME} AND {GRAIN_REFERENCE_PROPERTY_NAME} = :{GRAIN_REFERENCE_PROPERTY_NAME}";
                 var records = await this.storage.QueryAllAsync(this.options.TableName, expressionValues, expression, this.Resolve, SERVICE_ID_GRAIN_REFERENCE_INDEX, consistentRead: false).ConfigureAwait(false);
+                records = await ConfirmLegacyDiscoveryCandidates(records);
 
                 return new ReminderTableData(records);
             }
@@ -166,6 +260,12 @@ namespace Orleans.Reminders.DynamoDB
         /// <returns> Return the RemiderTableData if the rows were read successfully </returns>
         public async Task<ReminderTableData> ReadRows(uint begin, uint end)
         {
+            await RefreshReadMode();
+            if (useV2Reads)
+            {
+                return await ReadV2Rows(begin, end);
+            }
+
             Dictionary<string, AttributeValue>? expressionValues = null;
 
             try
@@ -204,6 +304,7 @@ namespace Orleans.Reminders.DynamoDB
 
                 }
 
+                records = await ConfirmLegacyDiscoveryCandidates(records);
                 return new ReminderTableData(records);
             }
             catch (Exception exc)
@@ -217,7 +318,7 @@ namespace Orleans.Reminders.DynamoDB
         {
             return new ReminderEntry
             {
-                ETag = item[ETAG_PROPERTY_NAME].N,
+                ETag = item[ETAG_PROPERTY_NAME].S ?? item[ETAG_PROPERTY_NAME].N,
                 GrainId = GrainId.Parse(item[GRAIN_REFERENCE_PROPERTY_NAME].S),
                 Period = TimeSpan.Parse(item[PERIOD_PROPERTY_NAME].S),
                 ReminderName = item[REMINDER_NAME_PROPERTY_NAME].S,
@@ -234,6 +335,17 @@ namespace Orleans.Reminders.DynamoDB
         /// <returns> Return true if the row was removed </returns>
         public async Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag)
         {
+            await RefreshReadMode();
+            if (useV2OnlyWrites)
+            {
+                return await RemoveV2OnlyRow(grainId, reminderName, eTag);
+            }
+
+            if (options.TableMode != DynamoDBReminderTableMode.Legacy)
+            {
+                return await RemoveDualRow(grainId, reminderName, eTag);
+            }
+
             var reminderId = ConstructReminderId(this.serviceId, grainId, reminderName);
 
             var keys = new Dictionary<string, AttributeValue>
@@ -262,6 +374,17 @@ namespace Orleans.Reminders.DynamoDB
         /// <returns></returns>
         public async Task TestOnlyClearTable()
         {
+            await RefreshReadMode();
+            if (options.TableMode != DynamoDBReminderTableMode.Legacy)
+            {
+                await ClearV2ServiceRows();
+            }
+
+            if (useV2OnlyWrites)
+            {
+                return;
+            }
+
             var expressionValues = new Dictionary<string, AttributeValue>
                 {
                     { $":{SERVICE_ID_PROPERTY_NAME}", new AttributeValue(this.serviceId) }
@@ -305,6 +428,17 @@ namespace Orleans.Reminders.DynamoDB
         /// <returns> Return the entry ETag if entry was upsert successfully </returns>
         public async Task<string?> UpsertRow(ReminderEntry entry)
         {
+            await RefreshReadMode();
+            if (useV2OnlyWrites)
+            {
+                return await UpsertV2OnlyRow(entry);
+            }
+
+            if (options.TableMode != DynamoDBReminderTableMode.Legacy)
+            {
+                return await UpsertDualRow(entry);
+            }
+
             var reminderId = ConstructReminderId(this.serviceId, entry.GrainId, entry.ReminderName);
 
             var fields = new Dictionary<string, AttributeValue>
@@ -336,6 +470,39 @@ namespace Orleans.Reminders.DynamoDB
         }
 
         private static string ConstructReminderId(string serviceId, GrainId grainId, string reminderName) => $"{serviceId}_{grainId}_{reminderName}";
+
+        /// <inheritdoc/>
+        public async Task StopAsync(CancellationToken cancellationToken = default)
+        {
+            var cancellation = heartbeatCancellation;
+            if (cancellation is null)
+            {
+                return;
+            }
+
+            var task = heartbeatTask;
+            try
+            {
+                await cancellation.CancelAsync();
+                if (task is not null)
+                {
+                    await task.WaitAsync(cancellationToken);
+                }
+            }
+            finally
+            {
+                cancellation.Dispose();
+                if (ReferenceEquals(heartbeatCancellation, cancellation))
+                {
+                    heartbeatCancellation = null;
+                }
+
+                if (ReferenceEquals(heartbeatTask, task))
+                {
+                    heartbeatTask = null;
+                }
+            }
+        }
 
         [LoggerMessage(
             EventId = (int)ErrorCode.ReminderServiceBase,
