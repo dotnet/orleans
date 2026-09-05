@@ -15,9 +15,14 @@ namespace Orleans.Serialization.TestKit
         /// <summary>
         /// Initializes a new <see cref="SerializationTester"/> instance.
         /// </summary>
+        /// <exception cref="ArgumentNullException"><paramref name="output"/> is <see langword="null"/>.</exception>
         protected SerializationTester(ITestOutputHelper output)
         {
-            _ = output;
+            if (output is null)
+            {
+                throw new ArgumentNullException(nameof(output));
+            }
+
             RandomSeed = CreateRandomSeed();
             Random = new(RandomSeed);
             ServiceProvider = CreateServiceProvider();
@@ -27,9 +32,14 @@ namespace Orleans.Serialization.TestKit
         /// <summary>
         /// Initializes a new <see cref="SerializationTester"/> instance.
         /// </summary>
+        /// <exception cref="ArgumentNullException"><paramref name="output"/> or <paramref name="fixture"/> is <see langword="null"/>.</exception>
         protected SerializationTester(ITestOutputHelper output, SerializationTesterFixture fixture)
         {
-            _ = output;
+            if (output is null)
+            {
+                throw new ArgumentNullException(nameof(output));
+            }
+
             if (fixture is null)
             {
                 throw new ArgumentNullException(nameof(fixture));

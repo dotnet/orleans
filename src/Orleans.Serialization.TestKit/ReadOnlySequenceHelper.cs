@@ -18,23 +18,34 @@ namespace Orleans.Serialization.TestKit
         /// <param name="sequence">The sequence to divide into batches.</param>
         /// <param name="batchSize">The maximum number of bytes in each batch.</param>
         /// <returns>A sequence of byte arrays containing the source bytes in order.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="sequence"/> is <see langword="null"/>.</exception>
         public static IEnumerable<byte[]> Batch(this IEnumerable<byte> sequence, int batchSize)
         {
-            var batch = new List<byte>(batchSize);
-            foreach (var item in sequence)
+            if (sequence is null)
             {
-                batch.Add(item);
-
-                if (batch.Count >= batchSize)
-                {
-                    yield return batch.ToArray();
-                    batch = new List<byte>(batchSize);
-                }
+                throw new ArgumentNullException(nameof(sequence));
             }
 
-            if (batch.Count > 0)
+            return BatchCore(sequence, batchSize);
+
+            static IEnumerable<byte[]> BatchCore(IEnumerable<byte> sequence, int batchSize)
             {
-                yield return batch.ToArray();
+                var batch = new List<byte>(batchSize);
+                foreach (var item in sequence)
+                {
+                    batch.Add(item);
+
+                    if (batch.Count >= batchSize)
+                    {
+                        yield return batch.ToArray();
+                        batch = new List<byte>(batchSize);
+                    }
+                }
+
+                if (batch.Count > 0)
+                {
+                    yield return batch.ToArray();
+                }
             }
         }
 
@@ -43,22 +54,46 @@ namespace Orleans.Serialization.TestKit
         /// </summary>
         /// <param name="buffers">The buffers to include as sequence segments.</param>
         /// <returns>A read-only sequence containing the provided buffers in order.</returns>
-        public static ReadOnlySequence<byte> ToReadOnlySequence(this IEnumerable<byte[]> buffers) => CreateReadOnlySequence(buffers.ToArray());
+        /// <exception cref="ArgumentNullException"><paramref name="buffers"/> is <see langword="null"/>.</exception>
+        public static ReadOnlySequence<byte> ToReadOnlySequence(this IEnumerable<byte[]> buffers)
+        {
+            if (buffers is null)
+            {
+                throw new ArgumentNullException(nameof(buffers));
+            }
+
+            return CreateReadOnlySequence(buffers.ToArray());
+        }
 
         /// <summary>
         /// Creates a read-only sequence whose segments are backed by the provided memory regions.
         /// </summary>
         /// <param name="buffers">The memory regions to include as sequence segments.</param>
         /// <returns>A read-only sequence containing the provided memory regions in order.</returns>
-        public static ReadOnlySequence<byte> ToReadOnlySequence(this IEnumerable<Memory<byte>> buffers) => ReadOnlyBufferSegment.Create(buffers);
+        /// <exception cref="ArgumentNullException"><paramref name="buffers"/> is <see langword="null"/>.</exception>
+        public static ReadOnlySequence<byte> ToReadOnlySequence(this IEnumerable<Memory<byte>> buffers)
+        {
+            if (buffers is null)
+            {
+                throw new ArgumentNullException(nameof(buffers));
+            }
+
+            return ReadOnlyBufferSegment.Create(buffers);
+        }
 
         /// <summary>
         /// Creates a read-only sequence whose segments are backed by the provided byte arrays.
         /// </summary>
         /// <param name="buffers">The buffers to include as sequence segments.</param>
         /// <returns>A read-only sequence containing the provided buffers in order.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="buffers"/> is <see langword="null"/>.</exception>
         public static ReadOnlySequence<byte> CreateReadOnlySequence(params byte[][] buffers)
         {
+            if (buffers is null)
+            {
+                throw new ArgumentNullException(nameof(buffers));
+            }
+
             if (buffers.Length == 1)
             {
                 return new ReadOnlySequence<byte>(buffers[0]);

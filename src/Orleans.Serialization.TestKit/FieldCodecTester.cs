@@ -32,7 +32,8 @@ namespace Orleans.Serialization.TestKit
         /// <summary>
         /// Initializes a new instance of the <see cref="FieldCodecTester{TValue, TCodec}"/> class.
         /// </summary>
-        protected FieldCodecTester(ITestOutputHelper output) : base(output)
+        /// <exception cref="ArgumentNullException"><paramref name="output"/> is <see langword="null"/>.</exception>
+        protected FieldCodecTester(ITestOutputHelper output) : base(output ?? throw new ArgumentNullException(nameof(output)))
         {
             output.WriteLine($"Random seed: {RandomSeed}");
             _sessionPool = ServiceProvider.GetRequiredService<SerializerSessionPool>();
@@ -41,7 +42,8 @@ namespace Orleans.Serialization.TestKit
         /// <summary>
         /// Initializes a new instance of the <see cref="FieldCodecTester{TValue, TCodec}"/> class.
         /// </summary>
-        protected FieldCodecTester(ITestOutputHelper output, SerializationTesterFixture fixture) : base(output, fixture)
+        /// <exception cref="ArgumentNullException"><paramref name="output"/> or <paramref name="fixture"/> is <see langword="null"/>.</exception>
+        protected FieldCodecTester(ITestOutputHelper output, SerializationTesterFixture fixture) : base(output ?? throw new ArgumentNullException(nameof(output)), fixture)
         {
             output.WriteLine($"Random seed: {RandomSeed}");
             _sessionPool = ServiceProvider.GetRequiredService<SerializerSessionPool>();
