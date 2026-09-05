@@ -200,12 +200,6 @@ internal sealed partial class ActivationData :
         set => SetStatusFlag(WasRemovedByCollectionMask, value);
     }
 
-    private bool WasRemovedByCollection
-    {
-        get => (Volatile.Read(ref _status) & WasRemovedByCollectionMask) != 0;
-        set => SetStatusFlag(WasRemovedByCollectionMask, value);
-    }
-
     // Currently, the only supported multi-activation grain is one using the StatelessWorkerPlacement strategy.
     internal bool IsStatelessWorker => PlacementStrategy is StatelessWorkerPlacement;
 

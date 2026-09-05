@@ -2113,11 +2113,11 @@ namespace UnitTests.Runtime
                 ? ActivationState.Creating
                 : ActivationState.Invalid;
 
-            lock (fixture.Activation)
+            lock (fixture.SyncRoot)
             {
                 fixture.Member.IsInWorkingSet = expectedInWorkingSet;
                 fixture.Member.IsIdle = expectedIdle;
-                fixture.Activation.SetState(otherState);
+                fixture.SetState(otherState);
             }
 
             Assert.Equal(otherState, fixture.Activation.State);
@@ -2125,9 +2125,9 @@ namespace UnitTests.Runtime
             Assert.Equal(expectedIdle, fixture.Member.IsIdle);
             Assert.False(fixture.WasRemovedByCollection);
 
-            lock (fixture.Activation)
+            lock (fixture.SyncRoot)
             {
-                fixture.Activation.SetState(expectedState);
+                fixture.SetState(expectedState);
             }
 
             Assert.Equal(expectedState, fixture.Activation.State);
@@ -2135,7 +2135,7 @@ namespace UnitTests.Runtime
             Assert.Equal(expectedIdle, fixture.Member.IsIdle);
             Assert.False(fixture.WasRemovedByCollection);
 
-            lock (fixture.Activation)
+            lock (fixture.SyncRoot)
             {
                 fixture.Member.IsInWorkingSet = !expectedInWorkingSet;
             }
@@ -2145,7 +2145,7 @@ namespace UnitTests.Runtime
             Assert.Equal(expectedIdle, fixture.Member.IsIdle);
             Assert.False(fixture.WasRemovedByCollection);
 
-            lock (fixture.Activation)
+            lock (fixture.SyncRoot)
             {
                 fixture.Member.IsInWorkingSet = expectedInWorkingSet;
                 fixture.Member.IsIdle = !expectedIdle;
@@ -2156,7 +2156,7 @@ namespace UnitTests.Runtime
             Assert.Equal(!expectedIdle, fixture.Member.IsIdle);
             Assert.False(fixture.WasRemovedByCollection);
 
-            lock (fixture.Activation)
+            lock (fixture.SyncRoot)
             {
                 fixture.Member.IsIdle = expectedIdle;
             }
@@ -2174,7 +2174,7 @@ namespace UnitTests.Runtime
 
             fixture.AdvanceIdleDurationTo(10_000);
             bool isCandidateAtBoundary;
-            lock (fixture.Activation)
+            lock (fixture.SyncRoot)
             {
                 isCandidateAtBoundary = fixture.Member.IsCandidateForRemoval(wouldRemove: true);
             }
@@ -2184,7 +2184,7 @@ namespace UnitTests.Runtime
 
             fixture.AdvanceIdleDurationTo(10_001);
             bool isCandidateOnFirstPass;
-            lock (fixture.Activation)
+            lock (fixture.SyncRoot)
             {
                 isCandidateOnFirstPass = fixture.Member.IsCandidateForRemoval(wouldRemove: false);
             }
@@ -2193,7 +2193,7 @@ namespace UnitTests.Runtime
             Assert.False(fixture.WasRemovedByCollection);
 
             bool isCandidateOnRemovalPass;
-            lock (fixture.Activation)
+            lock (fixture.SyncRoot)
             {
                 isCandidateOnRemovalPass = fixture.Member.IsCandidateForRemoval(wouldRemove: true);
             }
@@ -2201,9 +2201,9 @@ namespace UnitTests.Runtime
             Assert.True(isCandidateOnRemovalPass);
             Assert.False(fixture.WasRemovedByCollection);
 
-            lock (fixture.Activation)
+            lock (fixture.SyncRoot)
             {
-                fixture.Activation.SetState(ActivationState.Valid);
+                fixture.SetState(ActivationState.Valid);
                 fixture.Member.IsIdle = true;
             }
 
@@ -2217,9 +2217,9 @@ namespace UnitTests.Runtime
         public void ActivationData_ClockCollectionThenOnActive_ClearsCollectionMarker()
         {
             using var fixture = new ActivationDataWorkingSetFixture();
-            lock (fixture.Activation)
+            lock (fixture.SyncRoot)
             {
-                fixture.Activation.SetState(ActivationState.Valid);
+                fixture.SetState(ActivationState.Valid);
             }
 
             fixture.WorkingSet.OnActivated(fixture.Member);
@@ -2257,9 +2257,9 @@ namespace UnitTests.Runtime
         public void ActivationData_ExplicitWorkingSetDeactivation_DoesNotSetCollectionMarker()
         {
             using var fixture = new ActivationDataWorkingSetFixture();
-            lock (fixture.Activation)
+            lock (fixture.SyncRoot)
             {
-                fixture.Activation.SetState(ActivationState.Valid);
+                fixture.SetState(ActivationState.Valid);
             }
 
             fixture.WorkingSet.OnActivated(fixture.Member);
@@ -2278,9 +2278,9 @@ namespace UnitTests.Runtime
         public void ActivationData_CompletedRequest_DoesNotReaddDeactivatingActivation()
         {
             using var fixture = new ActivationDataWorkingSetFixture();
-            lock (fixture.Activation)
+            lock (fixture.SyncRoot)
             {
-                fixture.Activation.SetState(ActivationState.Deactivating);
+                fixture.SetState(ActivationState.Deactivating);
                 fixture.Member.IsInWorkingSet = false;
                 fixture.Member.IsIdle = false;
             }
@@ -2315,6 +2315,10 @@ namespace UnitTests.Runtime
                 "_idleDuration",
                 BindingFlags.Instance | BindingFlags.NonPublic)
                 ?? throw new InvalidOperationException("Could not find the activation idle-duration field.");
+            private static readonly FieldInfo LockField = typeof(ActivationData).GetField(
+                "_lock",
+                BindingFlags.Instance | BindingFlags.NonPublic)
+                ?? throw new InvalidOperationException("Could not find the activation synchronization lock.");
             private static readonly FieldInfo ServiceScopeField = typeof(ActivationData).GetField(
                 "_serviceScope",
                 BindingFlags.Instance | BindingFlags.NonPublic)
@@ -2333,6 +2337,11 @@ namespace UnitTests.Runtime
                 BindingFlags.Instance | BindingFlags.NonPublic,
                 [typeof(Message)])
                 ?? throw new InvalidOperationException("Could not find the completed-request method.");
+            private static readonly MethodInfo SetStateMethod = typeof(ActivationData).GetMethod(
+                "SetState",
+                BindingFlags.Instance | BindingFlags.NonPublic,
+                [typeof(ActivationState)])
+                ?? throw new InvalidOperationException("Could not find the activation state transition method.");
 
             private readonly ServiceProvider _serviceProvider;
             private readonly IServiceScope _activationScope;
@@ -2393,6 +2402,7 @@ namespace UnitTests.Runtime
 
             public ActivationData Activation { get; }
             public IActivationWorkingSetMemberStatus Member { get; }
+            public object SyncRoot => LockField.GetValue(Activation)!;
             public FakeTimeProvider TimeProvider { get; }
             public ActivationWorkingSet WorkingSet { get; }
             public RecordingWorkingSetObserver Observer { get; }
@@ -2418,6 +2428,8 @@ namespace UnitTests.Runtime
             public void ScanOnce() => VisitMemberMethod.Invoke(WorkingSet, [Member]);
 
             public void CompleteRequest(Message message) => CompleteRequestMethod.Invoke(Activation, [message]);
+
+            public void SetState(ActivationState state) => SetStateMethod.Invoke(Activation, [state]);
 
             public void Dispose()
             {
