@@ -34,6 +34,7 @@
     <File Path="Directory.Packages.props" />
   </Folder>
   <Folder Name="/src/">
+    <Project Path="src/Microsoft.Orleans.DurableTasks/Microsoft.Orleans.DurableTasks.csproj" />
     <Project Path="src/Orleans.Analyzers/Orleans.Analyzers.csproj" />
     <Project Path="src/Orleans.Analyzers.Contracts/Orleans.Analyzers.Contracts.csproj" />
     <Project Path="src/Orleans.BroadcastChannel/Orleans.BroadcastChannel.csproj" />
@@ -130,6 +131,7 @@
     <Project Path="src/Orleans.Transactions/Orleans.Transactions.csproj" />
   </Folder>
   <Folder Name="/test/">
+    <Project Path="test/Microsoft.Orleans.DurableTasks.Tests/Microsoft.Orleans.DurableTasks.Tests.csproj" />
     <Project Path="test/Orleans.Testing.Reminders/Orleans.Testing.Reminders.csproj" />
     <Project Path="test/Orleans.Analyzers.Tests/Orleans.Analyzers.Tests.csproj" />
     <Project Path="test/Orleans.DefaultCluster.Tests/Orleans.DefaultCluster.Tests.csproj" />
