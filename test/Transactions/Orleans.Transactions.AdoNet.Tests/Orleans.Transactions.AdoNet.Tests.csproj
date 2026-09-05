@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NSubstitute" />
+    <PackageReference Include="Microsoft.Extensions.Logging" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Data.SqlClient" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\AdoNet\Orleans.Transactions.AdoNet\Orleans.Transactions.AdoNet.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
+  </ItemGroup>
+</Project>

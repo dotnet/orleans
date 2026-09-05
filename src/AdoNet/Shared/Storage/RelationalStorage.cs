@@ -3,9 +3,14 @@ using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
 using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+#if TRANSACTIONS_ADONET
+using Orleans.Storage;
+#endif
 
 #if CLUSTERING_ADONET
 namespace Orleans.Clustering.AdoNet.Storage
@@ -17,6 +22,8 @@ namespace Orleans.Reminders.AdoNet.Storage
 namespace Orleans.Streaming.AdoNet.Storage
 #elif GRAINDIRECTORY_ADONET
 namespace Orleans.GrainDirectory.AdoNet.Storage
+#elif TRANSACTIONS_ADONET
+namespace Orleans.Transactions.AdoNet.Storage
 #elif TESTER_SQLUTILS
 namespace Orleans.Tests.SqlUtils
 #else
@@ -29,6 +36,10 @@ namespace Orleans.Tests.SqlUtils
     [DebuggerDisplay("InvariantName = {InvariantName}, ConnectionString = {ConnectionString}")]
     internal class RelationalStorage : IRelationalStorage
     {
+#if TRANSACTIONS_ADONET
+        internal const string RollbackExceptionDataKey = "Orleans.RelationalStorage.RollbackException";
+#endif
+
         /// <summary>
         /// The connection string to use.
         /// </summary>
@@ -205,6 +216,83 @@ namespace Orleans.Tests.SqlUtils
             return (await ExecuteAsync(query, parameterProvider, ExecuteReaderAsync, selector, commandBehavior, cancellationToken).ConfigureAwait(false)).Item1;
         }
 
+#if TRANSACTIONS_ADONET
+        public async Task<(IReadOnlyList<TFirst> First, IReadOnlyList<TSecond> Second)> ReadTransactionAsync<TFirst, TSecond>(
+            string firstQuery,
+            Action<IDbCommand>? firstParameterProvider,
+            Func<IDataRecord, TFirst> firstSelector,
+            string secondQuery,
+            Action<IDbCommand>? secondParameterProvider,
+            Func<IDataRecord, TSecond> secondSelector,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(firstQuery);
+            ArgumentNullException.ThrowIfNull(firstSelector);
+            ArgumentNullException.ThrowIfNull(secondQuery);
+            ArgumentNullException.ThrowIfNull(secondSelector);
+
+            using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
+            using var transaction = connection.BeginTransaction(IsolationLevel.Serializable);
+            try
+            {
+                var first = await ReadInTransactionAsync(
+                    connection,
+                    transaction,
+                    firstQuery,
+                    firstParameterProvider,
+                    firstSelector,
+                    cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
+                var second = await ReadInTransactionAsync(
+                    connection,
+                    transaction,
+                    secondQuery,
+                    secondParameterProvider,
+                    secondSelector,
+                    cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
+
+                await transaction.CommitAsync(cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
+                return (first, second);
+            }
+            catch (Exception exception)
+            {
+                await RollbackPreservingOriginalExceptionAsync(transaction, exception, cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
+                throw;
+            }
+        }
+
+        private async Task<IReadOnlyList<TResult>> ReadInTransactionAsync<TResult>(
+            DbConnection connection,
+            DbTransaction transaction,
+            string query,
+            Action<IDbCommand>? parameterProvider,
+            Func<IDataRecord, TResult> selector,
+            CancellationToken cancellationToken)
+        {
+            using var command = connection.CreateCommand();
+            parameterProvider?.Invoke(command);
+            command.CommandText = query;
+            command.Transaction = transaction;
+            _databaseCommandInterceptor.Intercept(command);
+
+            var operation = _isSynchronousAdoNetImplementation
+                ? Task.Run(
+                    () => ExecuteReaderAsync(
+                        command,
+                        (record, _, _) => Task.FromResult(selector(record)),
+                        CommandBehavior.Default,
+                        cancellationToken),
+                    cancellationToken)
+                : ExecuteReaderAsync(
+                    command,
+                    (record, _, _) => Task.FromResult(selector(record)),
+                    CommandBehavior.Default,
+                    cancellationToken);
+
+            var result = await operation.ConfigureAwait(continueOnCapturedContext: false);
+            return result.Item1.ToList();
+        }
+#endif
+
 
         /// <summary>
         /// Executes a given statement. Especially intended to use with <em>INSERT</em>, <em>UPDATE</em>, <em>DELETE</em> or <em>DDL</em> queries.
@@ -237,6 +325,30 @@ namespace Orleans.Tests.SqlUtils
 
             return (await ExecuteAsync(query, parameterProvider, ExecuteReaderAsync, (unit, id, c) => Task.FromResult(unit), commandBehavior, cancellationToken).ConfigureAwait(false)).Item2;
         }
+
+#if TRANSACTIONS_ADONET
+        /// <summary>
+        /// Executes a given statement. Especially intended to use with <em>INSERT</em>, <em>UPDATE</em>, <em>DELETE</em> or <em>DDL</em> queries with transaction
+        /// </summary>
+        /// <param name="multipleQuery"></param>
+        /// <param name="currentETag">The ETag held by the current activation, used to describe optimistic concurrency conflicts.</param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        /// <exception cref="ArgumentNullException"></exception>
+        public async Task<int> ExecuteTransactionAsync(
+            List<Tuple<string, Action<DbCommand>>> multipleQuery,
+            string? currentETag,
+            CancellationToken cancellationToken = default)
+        {
+            //If the query is something else that is not acceptable (e.g. an empty string), there will an appropriate database exception.
+            if (multipleQuery == null)
+            {
+                throw new ArgumentNullException(nameof(multipleQuery));
+            }
+
+            return await ExecuteTransactionCoreAsync(multipleQuery, currentETag, cancellationToken).ConfigureAwait(false);
+        }
+#endif
 
         /// <summary>
         /// Creates an instance of a database of type <see cref="RelationalStorage"/>.
@@ -354,6 +466,115 @@ namespace Orleans.Tests.SqlUtils
                 throw;
             }
         }
+
+#if TRANSACTIONS_ADONET
+        private async Task<int> ExecuteTransactionCoreAsync(
+            List<Tuple<string, Action<DbCommand>>> multipleQuery,
+            string? currentETag,
+            CancellationToken cancellationToken)
+        {
+            using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
+            using var transaction = connection.BeginTransaction(IsolationLevel.ReadCommitted);
+            try
+            {
+                var affectedRows = 0;
+                for (var operationIndex = 0; operationIndex < multipleQuery.Count; operationIndex++)
+                {
+                    var (query, parameterProvider) = multipleQuery[operationIndex];
+                    using var command = connection.CreateCommand();
+                    parameterProvider?.Invoke(command);
+                    command.CommandText = query;
+                    command.Transaction = transaction;
+
+                    _databaseCommandInterceptor.Intercept(command);
+
+                    var operation = _isSynchronousAdoNetImplementation
+                        ? Task.Run(command.ExecuteNonQuery, cancellationToken)
+                        : command.ExecuteNonQueryAsync(cancellationToken);
+                    var currentAffectedRows = await operation.ConfigureAwait(continueOnCapturedContext: false);
+                    ValidateAffectedRows(operationIndex, currentAffectedRows, currentETag);
+
+                    affectedRows += currentAffectedRows;
+                }
+
+                await transaction.CommitAsync(cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
+                return affectedRows;
+            }
+            catch (DbException exception) when (IsUniqueConstraintViolation(_invariantName, exception))
+            {
+                await RollbackPreservingOriginalExceptionAsync(transaction, exception, cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
+                throw CreateTransactionConflict(
+                    $"Relational transaction insert conflicted with an existing record for provider '{_invariantName}'.",
+                    currentETag,
+                    exception);
+            }
+            catch (Exception exception)
+            {
+                await RollbackPreservingOriginalExceptionAsync(transaction, exception, cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
+                throw;
+            }
+        }
+
+        internal static async Task RollbackPreservingOriginalExceptionAsync(
+            DbTransaction transaction,
+            Exception originalException,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                await transaction.RollbackAsync(cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
+            }
+            catch (Exception rollbackException)
+            {
+                originalException.Data[RollbackExceptionDataKey] = rollbackException;
+            }
+        }
+
+        internal static InconsistentStateException CreateTransactionConflict(
+            string message,
+            string? currentETag,
+            Exception? innerException = null) =>
+            new(
+                message,
+                storedEtag: "Unknown",
+                currentEtag: currentETag ?? "null",
+                storageException: innerException);
+
+        internal static void ValidateAffectedRows(int operationIndex, int affectedRows, string? currentETag)
+        {
+            if (affectedRows != 1)
+            {
+                throw CreateTransactionConflict(
+                    $"Relational transaction operation {operationIndex} expected to affect one row but affected {affectedRows}.",
+                    currentETag);
+            }
+        }
+
+        internal static bool IsUniqueConstraintViolation(string invariantName, DbException exception)
+        {
+            if (invariantName == AdoNetInvariants.InvariantNamePostgreSql)
+            {
+                return exception.SqlState == "23505";
+            }
+
+            var providerErrorNumber = GetProviderErrorNumber(exception);
+            return invariantName switch
+            {
+                AdoNetInvariants.InvariantNameSqlServer => providerErrorNumber is 2601 or 2627,
+                AdoNetInvariants.InvariantNameMySql or AdoNetInvariants.InvariantNameMySqlConnector => providerErrorNumber == 1062,
+                AdoNetInvariants.InvariantNameOracleDatabase => providerErrorNumber == 1,
+                _ => false,
+            };
+        }
+
+        private static int? GetProviderErrorNumber(DbException exception)
+        {
+            var value = exception.GetType()
+                .GetProperty("Number", BindingFlags.Instance | BindingFlags.Public)?
+                .GetValue(exception);
+            return value is null ? null : Convert.ToInt32(value, CultureInfo.InvariantCulture);
+        }
+#endif
 
 
         private static void CommandCancellation(object? state)
