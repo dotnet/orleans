@@ -14,15 +14,9 @@ using OrleansAWSUtils.Storage;
 using TestExtensions;
 using Xunit;
 
-namespace Orleans.Streaming.SQS.Aspire.Tests;
+namespace AWSUtils.Tests.Streaming;
 
-[CollectionDefinition(CollectionName, DisableParallelization = true)]
-public sealed class SqsStreamingResourceTestCollection
-{
-    public const string CollectionName = "SQS Aspire resource tests";
-}
-
-[Collection(SqsStreamingResourceTestCollection.CollectionName)]
+[Collection(SQSStreamProviderBuilderTestCollection.CollectionName)]
 [TestSuite("BVT")]
 [TestProvider("SQS")]
 [TestArea("Streaming")]
