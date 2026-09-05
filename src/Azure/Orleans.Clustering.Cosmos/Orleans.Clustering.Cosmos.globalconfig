@@ -1,3 +1,0 @@
-is_global = true
-
-dotnet_diagnostic.CA1062.severity = warning
