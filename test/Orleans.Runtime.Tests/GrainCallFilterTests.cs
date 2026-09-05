@@ -600,6 +600,7 @@ namespace UnitTests.General
             var context = await grain.GetRequestContext();
             Assert.NotNull(context);
             Assert.Equal("1234", context);
+            GC.KeepAlive(observer);
         }
 
         /// <summary>
@@ -615,6 +616,7 @@ namespace UnitTests.General
             Assert.Equal("Thanks for nothing", result);
 
             await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => grain.ThrowIfGreaterThanZero(2));
+            GC.KeepAlive(observer);
         }
 
         /// <summary>
@@ -628,6 +630,7 @@ namespace UnitTests.General
 
             var result = await grain.SumSet(new HashSet<int> { 1, 2, 3 });
             Assert.Equal(6, result);
+            GC.KeepAlive(observer);
         }
 
         /// <summary>
@@ -643,6 +646,7 @@ namespace UnitTests.General
             // The call filter doesn't continue the Invoke chain, but the error state should be thrown as an
             // InvalidOperationException, not an NullReferenceException.
             await Assert.ThrowsAsync<InvalidOperationException>(() => grain.SystemWideCallFilterMarker());
+            GC.KeepAlive(observer);
         }
 
         /// <summary>
@@ -658,6 +662,7 @@ namespace UnitTests.General
             // The call filter doesn't continue the Invoke chain, but the error state should be thrown as an
             // InvalidOperationException, not an NullReferenceException.
             await Assert.ThrowsAsync<InvalidOperationException>(() => grain.GrainSpecificCallFilterMarker());
+            GC.KeepAlive(observer);
         }
 
         /// <summary>
@@ -679,6 +684,7 @@ namespace UnitTests.General
 
             result = await grain.SayHello();
             Assert.Equal("Hello", result);
+            GC.KeepAlive(observer);
         }
 
         /// <summary>
@@ -695,6 +701,7 @@ namespace UnitTests.General
 
             result = await grain.SayHello();
             Assert.Equal("Hello", result);
+            GC.KeepAlive(observer);
         }
 
         /// <summary>
@@ -718,6 +725,7 @@ namespace UnitTests.General
 
             result = await grain.GetInputAsString(true);
             Assert.Contains(true.ToString(CultureInfo.InvariantCulture), result);
+            GC.KeepAlive(observer);
         }
 
         /// <summary>
@@ -734,6 +742,7 @@ namespace UnitTests.General
             var result = await grain.Throw();
             Assert.NotNull(result);
             Assert.Equal("EXCEPTION! Oi!", result);
+            GC.KeepAlive(observer);
         }
 
         /// <summary>
@@ -748,6 +757,7 @@ namespace UnitTests.General
             var exception = await Assert.ThrowsAsync<MethodInterceptionGrainObserver.MyDomainSpecificException>(() => grain.FilterThrows());
             Assert.NotNull(exception);
             Assert.Equal("Filter THROW!", exception.Message);
+            GC.KeepAlive(observer);
         }
 
         /// <summary>
@@ -763,6 +773,7 @@ namespace UnitTests.General
             // This grain method throws, but the exception should be handled by one of the filters and converted
             // into a specific message.
             await Assert.ThrowsAsync<InvalidCastException>(() => grain.IncorrectResultType());
+            GC.KeepAlive(observer);
         }
     }
 }
