@@ -586,7 +586,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
 
             var previousCheckpointName = _shared.Options.DeleteOldCheckpoints ? walState.Value.Manifest.Checkpoint?.Name : null;
 
-            using var checkpointStream = new ReadOnlySequenceStream(value);
+            using var checkpointStream = new S3ReadOnlySequenceStream(value);
             while (true)
             {
                 var checkpointName = GetCheckpointName(Guid.NewGuid().ToString("N"));
@@ -667,7 +667,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
         WalProviderState expectedProviderState,
         CancellationToken cancellationToken)
     {
-        using var stream = new ReadOnlySequenceStream(value);
+        using var stream = new S3ReadOnlySequenceStream(value);
         var response = await _client.PutObjectAsync(
             new PutObjectRequest
             {
@@ -919,7 +919,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
 
     private async ValueTask<bool> TryCreateCheckpointAsync(
         string checkpointName,
-        ReadOnlySequenceStream checkpointStream,
+        S3ReadOnlySequenceStream checkpointStream,
         CancellationToken cancellationToken)
     {
         for (var attempt = 0; ; attempt++)

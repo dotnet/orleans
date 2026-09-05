@@ -2,7 +2,7 @@ using System.Buffers;
 
 namespace Orleans.Journaling;
 
-internal sealed class ReadOnlySequenceStream(ReadOnlySequence<byte> sequence) : Stream
+internal sealed class S3ReadOnlySequenceStream(ReadOnlySequence<byte> sequence) : Stream
 {
     private readonly ReadOnlySequence<byte> _sequence = sequence;
     private long _position;
@@ -44,7 +44,11 @@ internal sealed class ReadOnlySequenceStream(ReadOnlySequence<byte> sequence) : 
 
     public override void Flush() => ObjectDisposedException.ThrowIf(_disposed, this);
 
-    public override int Read(byte[] buffer, int offset, int count) => Read(buffer.AsSpan(offset, count));
+    public override int Read(byte[] buffer, int offset, int count)
+    {
+        ArgumentNullException.ThrowIfNull(buffer);
+        return Read(buffer.AsSpan(offset, count));
+    }
 
     public override int Read(Span<byte> buffer)
     {
