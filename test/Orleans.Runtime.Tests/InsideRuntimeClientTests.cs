@@ -36,6 +36,7 @@ public class InsideRuntimeClientTests
                 RejectionInfo = "The outbound queue is stopped",
             },
         };
+        rejection.InitializeRefCount();
 
         await silo.StopSiloAsync(stopGracefully: false);
         await silo.DisposeAsync();

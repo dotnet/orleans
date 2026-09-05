@@ -99,16 +99,18 @@ namespace Orleans.Runtime.Messaging
                 var body = input.Slice(bodyOffset, bodyLength);
 
                 // Build message
-                message = new();
+                var result = MessagePool.Get();
+                message = result;
+
                 if (header.IsSingleSegment)
                 {
                     var headersReader = Reader.Create(header.First.Span, _deserializationSession);
-                    Deserialize(ref headersReader, message);
+                    Deserialize(ref headersReader, result);
                 }
                 else
                 {
                     var headersReader = Reader.Create(header, _deserializationSession);
-                    Deserialize(ref headersReader, message);
+                    Deserialize(ref headersReader, result);
                 }
 
                 if (bodyLength != 0)
@@ -120,12 +122,12 @@ namespace Orleans.Runtime.Messaging
                     if (body.IsSingleSegment)
                     {
                         var reader = Reader.Create(body.First.Span, _deserializationSession);
-                        ReadBodyObject(message, ref reader);
+                        ReadBodyObject(result, ref reader);
                     }
                     else
                     {
                         var reader = Reader.Create(body, _deserializationSession);
-                        ReadBodyObject(message, ref reader);
+                        ReadBodyObject(result, ref reader);
                     }
                 }
 

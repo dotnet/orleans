@@ -18,53 +18,53 @@ internal static class DispatcherEvents
     }
 
     internal sealed class ReceivedInvalidActivation(
-        Message message,
+        MessageSnapshot message,
         ActivationState activationState) : DispatcherEvent
     {
-        public readonly Message Message = message;
+        public readonly MessageSnapshot Message = message;
         public readonly ActivationState ActivationState = activationState;
     }
 
     internal sealed class DetectedDeadlock(
-        Message message,
+        MessageSnapshot message,
         ActivationData activation) : DispatcherEvent
     {
-        public readonly Message Message = message;
+        public readonly MessageSnapshot Message = message;
         public readonly ActivationData Activation = activation;
     }
 
     internal sealed class DiscardedRejection(
-        Message message,
+        MessageSnapshot message,
         Message.RejectionTypes rejectionType,
         string? reason,
         Exception? exception) : DispatcherEvent
     {
-        public readonly Message Message = message;
+        public readonly MessageSnapshot Message = message;
         public readonly Message.RejectionTypes RejectionType = rejectionType;
         public readonly string? Reason = reason;
         public readonly Exception? Exception = exception;
     }
 
     internal sealed class Rejected(
-        Message message,
+        MessageSnapshot message,
         Message.RejectionTypes rejectionType,
         string? reason,
         Exception? exception) : DispatcherEvent
     {
-        public readonly Message Message = message;
+        public readonly MessageSnapshot Message = message;
         public readonly Message.RejectionTypes RejectionType = rejectionType;
         public readonly string? Reason = reason;
         public readonly Exception? Exception = exception;
     }
 
     internal sealed class Forwarding(
-        Message message,
+        MessageSnapshot message,
         GrainAddress? oldAddress,
         SiloAddress? forwardingAddress,
         string? failedOperation,
         Exception? exception) : DispatcherEvent
     {
-        public readonly Message Message = message;
+        public readonly MessageSnapshot Message = message;
         public readonly GrainAddress? OldAddress = oldAddress;
         public readonly SiloAddress? ForwardingAddress = forwardingAddress;
         public readonly string? FailedOperation = failedOperation;
@@ -72,13 +72,13 @@ internal static class DispatcherEvents
     }
 
     internal sealed class ForwardingFailed(
-        Message message,
+        MessageSnapshot message,
         GrainAddress? oldAddress,
         SiloAddress? forwardingAddress,
         string? failedOperation,
         Exception? exception) : DispatcherEvent
     {
-        public readonly Message Message = message;
+        public readonly MessageSnapshot Message = message;
         public readonly GrainAddress? OldAddress = oldAddress;
         public readonly SiloAddress? ForwardingAddress = forwardingAddress;
         public readonly string? FailedOperation = failedOperation;
@@ -100,10 +100,10 @@ internal static class DispatcherEvents
     }
 
     internal sealed class SelectTargetFailed(
-        Message message,
+        MessageSnapshot message,
         Exception exception) : DispatcherEvent
     {
-        public readonly Message Message = message;
+        public readonly MessageSnapshot Message = message;
         public readonly Exception Exception = exception;
     }
 
@@ -119,7 +119,7 @@ internal static class DispatcherEvents
         [MethodImpl(MethodImplOptions.NoInlining)]
         static void Emit(Message message, ActivationData activation)
         {
-            Listener.Write(nameof(DetectedDeadlock), new DetectedDeadlock(message, activation));
+            Listener.Write(nameof(DetectedDeadlock), new DetectedDeadlock(message.CaptureSnapshot(), activation));
         }
     }
 
@@ -143,7 +143,7 @@ internal static class DispatcherEvents
             string? reason,
             Exception? exception)
         {
-            Listener.Write(nameof(DiscardedRejection), new DiscardedRejection(message, rejectionType, reason, exception));
+            Listener.Write(nameof(DiscardedRejection), new DiscardedRejection(message.CaptureSnapshot(), rejectionType, reason, exception));
         }
     }
 
@@ -169,7 +169,7 @@ internal static class DispatcherEvents
             string? failedOperation,
             Exception? exception)
         {
-            Listener.Write(nameof(Forwarding), new Forwarding(message, oldAddress, forwardingAddress, failedOperation, exception));
+            Listener.Write(nameof(Forwarding), new Forwarding(message.CaptureSnapshot(), oldAddress, forwardingAddress, failedOperation, exception));
         }
     }
 
@@ -195,7 +195,7 @@ internal static class DispatcherEvents
             string? failedOperation,
             Exception? exception)
         {
-            Listener.Write(nameof(ForwardingFailed), new ForwardingFailed(message, oldAddress, forwardingAddress, failedOperation, exception));
+            Listener.Write(nameof(ForwardingFailed), new ForwardingFailed(message.CaptureSnapshot(), oldAddress, forwardingAddress, failedOperation, exception));
         }
     }
 
@@ -242,7 +242,7 @@ internal static class DispatcherEvents
         [MethodImpl(MethodImplOptions.NoInlining)]
         static void Emit(Message message, ActivationState activationState)
         {
-            Listener.Write(nameof(ReceivedInvalidActivation), new ReceivedInvalidActivation(message, activationState));
+            Listener.Write(nameof(ReceivedInvalidActivation), new ReceivedInvalidActivation(message.CaptureSnapshot(), activationState));
         }
     }
 
@@ -266,7 +266,7 @@ internal static class DispatcherEvents
             string? reason,
             Exception? exception)
         {
-            Listener.Write(nameof(Rejected), new Rejected(message, rejectionType, reason, exception));
+            Listener.Write(nameof(Rejected), new Rejected(message.CaptureSnapshot(), rejectionType, reason, exception));
         }
     }
 
@@ -282,7 +282,7 @@ internal static class DispatcherEvents
         [MethodImpl(MethodImplOptions.NoInlining)]
         static void Emit(Message message, Exception exception)
         {
-            Listener.Write(nameof(SelectTargetFailed), new SelectTargetFailed(message, exception));
+            Listener.Write(nameof(SelectTargetFailed), new SelectTargetFailed(message.CaptureSnapshot(), exception));
         }
     }
 

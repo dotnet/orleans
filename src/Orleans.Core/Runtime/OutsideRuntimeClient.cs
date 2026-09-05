@@ -160,11 +160,9 @@ namespace Orleans
         public async Task StopAsync(CancellationToken cancellationToken)
         {
             Volatile.Write(ref _isStopping, 1);
-            this.callbackTimer.Dispose();
-
-            // Fault callbacks before any cancellation-sensitive waits. Completing them can resume code
-            // which issues follow-up calls, so request admission must already be closed.
             BreakOutstandingMessages();
+
+            this.callbackTimer.Dispose();
 
             if (this.callbackTimerTask is { } task)
             {
@@ -198,13 +196,13 @@ namespace Orleans
             MessageCenter = ActivatorUtilities.CreateInstance<ClientMessageCenter>(this.ServiceProvider);
             MessageCenter.RegisterLocalMessageHandler(this.HandleMessage);
             await ExecuteWithRetries(
-                async () => await MessageCenter!.StartAsync(cancellationToken),
+                async () => await MessageCenter.StartAsync(cancellationToken),
                 retryFilter,
                 cancellationToken);
             CurrentActivationAddress = GrainAddress.NewActivationAddress(MessageCenter.MyAddress, _localClientDetails.ClientId.GrainId);
 
             this.gatewayObserver = new ClientGatewayObserver(gatewayManager);
-            this.InternalGrainFactory.CreateObjectReference<IClientGatewayObserver>(this.gatewayObserver!);
+            this.InternalGrainFactory.CreateObjectReference<IClientGatewayObserver>(this.gatewayObserver);
 
             await ExecuteWithRetries(
                 _manifestProvider!.StartAsync,
@@ -250,6 +248,7 @@ namespace Orleans
                     }
                 default:
                     LogMessageNotSupported(logger, message);
+                    message.ReleaseDropped("UnsupportedMessageDirection");
                     break;
             }
         }
@@ -298,6 +297,7 @@ namespace Orleans
                 if (Volatile.Read(ref _isStopping) != 0)
                 {
                     callbackData.OnHostShutdown();
+                    message.ReleaseDropped("ClientStoppingBeforeCallbackRegistration");
                     return;
                 }
 
@@ -307,6 +307,7 @@ namespace Orleans
                 if (Volatile.Read(ref _isStopping) != 0)
                 {
                     callbackData.OnHostShutdown();
+                    message.ReleaseDropped("ClientStoppingBeforeSend");
                     return;
                 }
             }
@@ -315,6 +316,7 @@ namespace Orleans
                 context?.Complete();
                 if (Volatile.Read(ref _isStopping) != 0)
                 {
+                    message.ReleaseDropped("ClientStoppingBeforeOneWaySend");
                     return;
                 }
             }
@@ -325,57 +327,73 @@ namespace Orleans
 
         public void ReceiveResponse(Message response)
         {
-            OrleansOutsideRuntimeClientEvent.Instance.ReceiveResponse(response);
-
-            LogReceivedMessage(logger, response);
-
-            if (response.Result is Message.ResponseTypes.Status)
+            try
             {
-                var status = (StatusResponse)response.BodyObject!;
-                callbacks.TryGetValue(response.Id, out var callback);
-                var request = callback?.Message;
-                if (request is not null)
+                OrleansOutsideRuntimeClientEvent.Instance.ReceiveResponse(response);
+                LogReceivedMessage(logger, response);
+
+                if (response.Result is Message.ResponseTypes.Status)
                 {
-                    callback!.OnStatusUpdate(status);
-                    if (status.Diagnostics != null && status.Diagnostics.Count > 0)
+                    var status = (StatusResponse)response.BodyObject!;
+                    callbacks.TryGetValue(response.Id, out var callback);
+                    if (callback is not null && callback.TryAcquireMessage(out var requestMessage))
                     {
-                        LogReceivedStatusUpdateForPendingRequest(logger, request, new(status.Diagnostics));
+                        try
+                        {
+                            callback.OnStatusUpdate(status);
+                            if (status.Diagnostics != null && status.Diagnostics.Count > 0)
+                            {
+                                LogReceivedStatusUpdateForPendingRequest(logger, requestMessage, new(status.Diagnostics));
+                            }
+                        }
+                        finally
+                        {
+                            requestMessage.Release();
+                        }
                     }
+                    else
+                    {
+                        if (clientMessagingOptions.CancelUnknownRequestOnStatusUpdate)
+                        {
+                            // Cancel the call since the caller has abandoned it.
+                            // Note that the target and sender arguments are swapped because this is a response to the original request.
+                            _cancellationManager?.SignalCancellation(
+                                response.SendingSilo,
+                                targetGrainId: response.SendingGrain,
+                                sendingGrainId: response.TargetGrain,
+                                messageId: response.Id);
+                        }
+
+                        if (status.Diagnostics != null && status.Diagnostics.Count > 0)
+                        {
+                            LogReceivedStatusUpdateForUnknownRequest(logger, response, new(status.Diagnostics));
+                        }
+                    }
+
+                    return;
+                }
+
+                CallbackData? callbackData;
+                var found = callbacks.TryRemove(response.Id, out callbackData);
+                if (found)
+                {
+                    // We need to import the RequestContext here as well.
+                    // Unfortunately, it is not enough, since CallContext.LogicalGetData will not flow "up" from task completion source into the resolved task.
+                    // RequestContextExtensions.Import(response.RequestContextData);
+                    callbackData!.DoCallback(response);
                 }
                 else
                 {
-                    if (clientMessagingOptions.CancelUnknownRequestOnStatusUpdate)
-                    {
-                        // Cancel the call since the caller has abandoned it.
-                        // Note that the target and sender arguments are swapped because this is a response to the original request.
-                        _cancellationManager?.SignalCancellation(
-                            response.SendingSilo,
-                            targetGrainId: response.SendingGrain,
-                            sendingGrainId: response.TargetGrain,
-                            messageId: response.Id);
-                    }
-
-                    if (status.Diagnostics != null && status.Diagnostics.Count > 0)
-                    {
-                        LogReceivedStatusUpdateForUnknownRequest(logger, response, new(status.Diagnostics));
-                    }
+                    LogDebugNoCallbackForResponseMessage(logger, response);
                 }
-
-                return;
             }
-
-            CallbackData? callbackData;
-            var found = callbacks.TryRemove(response.Id, out callbackData);
-            if (found)
+            catch (Exception exception)
             {
-                // We need to import the RequestContext here as well.
-                // Unfortunately, it is not enough, since CallContext.LogicalGetData will not flow "up" from task completion source into the resolved task.
-                // RequestContextExtensions.Import(response.RequestContextData);
-                callbackData!.DoCallback(response);
+                LogErrorProcessingResponse(logger, exception, response);
             }
-            else
+            finally
             {
-                LogDebugNoCallbackForResponseMessage(logger, response);
+                response.ReleaseDropped("ResponseHandled");
             }
         }
 
@@ -449,17 +467,6 @@ namespace Orleans
             disposed = true;
         }
 
-        public void BreakOutstandingMessagesToSilo(SiloAddress deadSilo)
-        {
-            foreach (var callback in callbacks)
-            {
-                if (deadSilo.Equals(callback.Value.Message.TargetSilo))
-                {
-                    callback.Value.OnTargetSiloFail();
-                }
-            }
-        }
-
         private void BreakOutstandingMessages()
         {
             foreach (var (_, callback) in callbacks)
@@ -475,8 +482,54 @@ namespace Orleans
             }
         }
 
+        public void BreakOutstandingMessagesToSilo(SiloAddress deadSilo)
+        {
+            foreach (var callback in callbacks)
+            {
+                if (!callback.Value.TryAcquireMessage(out var message))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    if (deadSilo.Equals(message.TargetSilo))
+                    {
+                        callback.Value.OnTargetSiloFail();
+                    }
+                }
+                finally
+                {
+                    message.Release();
+                }
+            }
+        }
+
         public int GetRunningRequestsCount(GrainInterfaceType grainInterfaceType)
-            => this.callbacks.Count(c => c.Value.Message.InterfaceType == grainInterfaceType);
+        {
+            var count = 0;
+            foreach (var callback in callbacks.Values)
+            {
+                if (!callback.TryAcquireMessage(out var message))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    if (message.InterfaceType == grainInterfaceType)
+                    {
+                        count++;
+                    }
+                }
+                finally
+                {
+                    message.Release();
+                }
+            }
+
+            return count;
+        }
 
         /// <inheritdoc />
         public void NotifyClusterConnectionLost()
@@ -542,7 +595,7 @@ namespace Orleans
 
         private void ThrowIfDisposed()
         {
-            if (disposed)
+            if (disposing || disposed)
             {
                 ThrowObjectDisposedException();
             }
@@ -588,6 +641,12 @@ namespace Orleans
             Message = "Message not supported: '{Message}'."
         )]
         private static partial void LogMessageNotSupported(ILogger logger, Message message);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Error processing response message '{Message}'."
+        )]
+        private static partial void LogErrorProcessingResponse(ILogger logger, Exception exception, Message message);
 
         [LoggerMessage(
             Level = LogLevel.Warning,

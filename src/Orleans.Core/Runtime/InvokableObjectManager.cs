@@ -68,6 +68,7 @@ namespace Orleans
             if (!ObserverGrainId.TryParse(message.TargetGrain, out var observerId))
             {
                 LogNotAddressedToAnObserver(logger, message);
+                message.ReleaseDropped("NotAddressedToObserver");
                 return;
             }
 
@@ -78,6 +79,7 @@ namespace Orleans
             else
             {
                 LogUnexpectedTargetInRequest(logger, message.TargetGrain, message);
+                message.ReleaseDropped("ObserverNotFound");
             }
         }
 
@@ -150,9 +152,10 @@ namespace Orleans
 
             bool IEquatable<IGrainContext>.Equals(IGrainContext? other) => ReferenceEquals(this, other);
 
-            public void ReceiveMessage(object msg)
+            public void ReceiveMessage(object msg) => ReceiveMessage((Message)msg);
+
+            public void ReceiveMessage(Message message)
             {
-                var message = (Message)msg;
                 var obj = this.LocalObject.Target;
                 if (obj is null)
                 {
@@ -160,6 +163,7 @@ namespace Orleans
                     LogObserverGarbageCollected(_manager.logger, this.ObserverId, message);
                     // Try to remove. If it's not there, we don't care.
                     _manager.TryDeregister(this.ObserverId);
+                    message.ReleaseDropped("ObserverGarbageCollected");
                     return;
                 }
 
@@ -258,7 +262,7 @@ namespace Orleans
                     await ProcessMessageAsync(message);
                 }
 
-                bool TryDequeueMessage([NotNullWhen(true)] out Message? message)
+                bool TryDequeueMessage(out Message message)
                 {
                     lock (Messages)
                     {
@@ -269,7 +273,7 @@ namespace Orleans
                         }
                         else
                         {
-                            _runningRequests.Add(message!, _messagePumpTask);
+                            _runningRequests.Add(message, _messagePumpTask);
                         }
 
                         return result;
@@ -344,19 +348,21 @@ namespace Orleans
                     {
                         this.ReportException(message, exc);
                     }
-                    finally
-                    {
-                        // Clear the running request when done.
-                        lock (Messages)
-                        {
-                            _runningRequests.Remove(message);
-                        }
-                    }
                 }
                 catch (Exception outerException)
                 {
                     // Ignore and keep looping.
                     LogErrorProcessingMessage(_manager.logger, outerException, message);
+                }
+                finally
+                {
+                    lock (Messages)
+                    {
+                        _runningRequests.Remove(message);
+                    }
+
+                    message.MarkTransferred("InvokableObjectManager.ProcessMessageAsync");
+                    message.Release();
                 }
             }
 
@@ -390,8 +396,17 @@ namespace Orleans
                 }
             }
 
-            private void SendCanceledResponse(Message message) =>
-                _manager.runtimeClient.SendResponse(message, Response.FromException(new OperationCanceledException()));
+            private void SendCanceledResponse(Message message)
+            {
+                try
+                {
+                    _manager.runtimeClient.SendResponse(message, Response.FromException(new OperationCanceledException()));
+                }
+                finally
+                {
+                    message.ReleaseDropped("CanceledWhileWaiting");
+                }
+            }
 
             private void SendResponseAsync(Message message, Response resultObject)
             {
@@ -481,6 +496,7 @@ namespace Orleans
                     Message? message = null;
                     var wasWaiting = false;
                     var key = (senderGrainId, messageId);
+                    var acquiredRunningMessage = false;
                     lock (Messages)
                     {
                         // Check the running requests.
@@ -488,7 +504,9 @@ namespace Orleans
                         {
                             if (runningRequest.Id == messageId && runningRequest.SendingGrain == senderGrainId)
                             {
+                                runningRequest.Acquire();
                                 message = runningRequest;
+                                acquiredRunningMessage = true;
                                 break;
                             }
                         }
@@ -509,7 +527,7 @@ namespace Orleans
                                     for (var i = 0; i < initialCount; i++)
                                     {
                                         var current = Messages.Dequeue();
-                                        if (!ReferenceEquals(current, message))
+                                        if (current != message)
                                         {
                                             Messages.Enqueue(current);
                                         }
@@ -528,32 +546,42 @@ namespace Orleans
                         }
                     }
 
-                    var didCancel = false;
-                    if (message is not null)
+                    try
                     {
-                        // The message never began executing, so send a canceled response immediately.
-                        // If the message did begin executing, wait for it to observe the cancellation token and respond itself.
-                        if (wasWaiting)
+                        var didCancel = false;
+                        if (message is { } targetMessage)
                         {
-                            SendCanceledResponse(message);
-                            didCancel = true;
+                            // The message never began executing, so send a canceled response immediately.
+                            // If the message did begin executing, wait for it to observe the cancellation token and respond itself.
+                            if (wasWaiting)
+                            {
+                                SendCanceledResponse(targetMessage);
+                                didCancel = true;
+                            }
+                            else if (targetMessage.BodyObject is IInvokable invokableRequest)
+                            {
+                                didCancel = TryCancelInvokable(invokableRequest) || !invokableRequest.IsCancellable;
+                            }
+                            else
+                            {
+                                // Assume the request is not cancellable.
+                                didCancel = true;
+                            }
                         }
-                        else if (message.BodyObject is IInvokable invokableRequest)
+
+                        if (didCancel)
                         {
-                            didCancel = TryCancelInvokable(invokableRequest) || !invokableRequest.IsCancellable;
-                        }
-                        else
-                        {
-                            // Assume the request is not cancellable.
-                            didCancel = true;
+                            lock (Messages)
+                            {
+                                RemovePendingCancellation(key);
+                            }
                         }
                     }
-
-                    if (didCancel)
+                    finally
                     {
-                        lock (Messages)
+                        if (acquiredRunningMessage)
                         {
-                            RemovePendingCancellation(key);
+                            message!.Value.Release();
                         }
                     }
                 }

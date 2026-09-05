@@ -16,6 +16,7 @@ namespace Orleans.Runtime
         private readonly SharedCallbackData shared;
         private readonly IResponseCompletionSource context;
         private readonly ApplicationRequestInstruments _applicationRequestInstruments;
+        private readonly TimeSpan? _defaultResponseTimeout;
         private int _state;
         private StatusResponse? lastKnownStatus;
         private ValueStopwatch stopwatch;
@@ -29,12 +30,21 @@ namespace Orleans.Runtime
         {
             this.shared = shared;
             this.context = ctx;
+            // CallbackData holds a reference to the request message while awaiting completion.
+            msg.Acquire();
             this.Message = msg;
+            _defaultResponseTimeout = (msg.BodyObject as IInvokable)?.GetDefaultResponseTimeout();
             _applicationRequestInstruments = applicationRequestInstruments;
             this.stopwatch = ValueStopwatch.StartNew();
         }
 
         public Message Message { get; } // might hold metadata used by response pipeline
+
+        public bool TryAcquireMessage(out Message message)
+        {
+            message = Message;
+            return message.TryAcquire();
+        }
 
         public bool IsCompleted => (Volatile.Read(ref _state) & StateCompleted) != 0;
 
@@ -93,16 +103,15 @@ namespace Orleans.Runtime
 
         private long GetResponseTimeoutStopwatchTicks()
         {
-            var defaultResponseTimeout = (Message.BodyObject as IInvokable)?.GetDefaultResponseTimeout();
-            if (defaultResponseTimeout.HasValue)
+            if (_defaultResponseTimeout.HasValue)
             {
-                return (long)(defaultResponseTimeout.Value.TotalSeconds * Stopwatch.Frequency);
+                return (long)(_defaultResponseTimeout.Value.TotalSeconds * Stopwatch.Frequency);
             }
 
             return shared.ResponseTimeoutStopwatchTicks;
         }
 
-        private TimeSpan GetResponseTimeout() => (Message.BodyObject as IInvokable)?.GetDefaultResponseTimeout() ?? shared.ResponseTimeout;
+        private TimeSpan GetResponseTimeout() => _defaultResponseTimeout ?? shared.ResponseTimeout;
 
         private string GetTargetGrainType()
         {
@@ -133,8 +142,15 @@ namespace Orleans.Runtime
             _applicationRequestInstruments.OnAppRequestsEnd((long)stopwatch.Elapsed.TotalMilliseconds);
             _applicationRequestInstruments.OnAppRequestsCanceled(GetTargetGrainType());
             OrleansCallBackDataEvent.Instance.OnCanceled(Message);
-            context.Complete(Response.FromException(new OperationCanceledException(cancellationToken)));
-            DisposeCancellationRegistration();
+            try
+            {
+                context.Complete(Response.FromException(new OperationCanceledException(cancellationToken)));
+            }
+            finally
+            {
+                DisposeCancellationRegistration();
+                ReleaseRequest("CallbackData.OnCancellation");
+            }
         }
 
         public void OnTimeout()
@@ -164,7 +180,14 @@ namespace Orleans.Runtime
             LogTimeout(this.shared.Logger, timeout, msg, statusMessage);
 
             var exception = new TimeoutException($"Response did not arrive on time in {timeout} for message: {msg}. {statusMessage}");
-            context.Complete(Response.FromException(exception));
+            try
+            {
+                context.Complete(Response.FromException(exception));
+            }
+            finally
+            {
+                ReleaseRequest("CallbackData.OnTimeout");
+            }
         }
 
         public void OnTargetSiloFail()
@@ -184,7 +207,14 @@ namespace Orleans.Runtime
             var statusMessage = lastKnownStatus is StatusResponse status ? $"Last known status is {status}. " : string.Empty;
             LogTargetSiloFail(this.shared.Logger, msg, statusMessage, Constants.TroubleshootingHelpLink);
             var exception = new SiloUnavailableException($"The target silo became unavailable for message: {msg}. {statusMessage}See {Constants.TroubleshootingHelpLink} for troubleshooting help.");
-            this.context.Complete(Response.FromException(exception));
+            try
+            {
+                this.context.Complete(Response.FromException(exception));
+            }
+            finally
+            {
+                ReleaseRequest("CallbackData.OnTargetSiloFail");
+            }
         }
 
         public void OnHostShutdown()
@@ -194,14 +224,21 @@ namespace Orleans.Runtime
                 return;
             }
 
-            this.stopwatch.Stop();
-            this.shared.Unregister(this.Message);
+            stopwatch.Stop();
+            shared.Unregister(Message);
             DisposeCancellationRegistration();
-            _applicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
+            _applicationRequestInstruments.OnAppRequestsEnd((long)stopwatch.Elapsed.TotalMilliseconds);
 
-            var msg = this.Message;
-            var exception = new SiloUnavailableException($"The local Orleans host is shutting down and can no longer process the request: {msg}.");
-            this.context.Complete(Response.FromException(exception));
+            var message = Message;
+            var exception = new SiloUnavailableException($"The local Orleans host is shutting down and can no longer process the request: {message}.");
+            try
+            {
+                context.Complete(Response.FromException(exception));
+            }
+            finally
+            {
+                ReleaseRequest("CallbackData.OnHostShutdown");
+            }
         }
 
         public void DoCallback(Message response)
@@ -218,18 +255,31 @@ namespace Orleans.Runtime
             _applicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
 
             // do callback outside the CallbackData lock. Just not a good practice to hold a lock for this unrelated operation.
-            ResponseCallback(response, this.context);
+            try
+            {
+                ResponseCallback(response, this.context);
+            }
+            finally
+            {
+                ReleaseRequest("CallbackData.DoCallback");
+            }
         }
 
         private bool TryComplete() => (Interlocked.Or(ref _state, StateCompleted) & StateCompleted) == 0;
 
         private void DisposeCancellationRegistration()
         {
-            // If registration is still pending, its publisher observes completion and disposes it.
+            // The publisher disposes a pending registration after observing completion.
             if ((Volatile.Read(ref _state) & StateCancellationRegistrationPublished) != 0)
             {
                 _cancellationTokenRegistration.Dispose();
             }
+        }
+
+        private void ReleaseRequest(string tag)
+        {
+            Message.MarkTransferred($"{tag}:ReleaseRequest");
+            Message.Release();
         }
 
         private static void ResponseCallback(Message message, IResponseCompletionSource context)

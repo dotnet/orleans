@@ -48,14 +48,14 @@ namespace Orleans.Runtime.Messaging
 
         protected override void RecordMessageReceive(Message msg, int numTotalBytes, int headerBytes)
         {
-            MessagingInstrumentation.OnMessageReceive(msg, numTotalBytes, headerBytes, ConnectionDirection);
-            this.gatewayInstruments.OnGatewayReceived();
+            MessagingMetrics.OnMessageReceive(msg, numTotalBytes, headerBytes, ConnectionDirection);
+            gatewayInstruments.OnGatewayReceived();
         }
 
         protected override void RecordMessageSend(Message msg, int numTotalBytes, int headerBytes)
         {
-            MessagingInstrumentation.OnMessageSend(msg, numTotalBytes, headerBytes, ConnectionDirection);
-            this.gatewayInstruments.OnGatewaySent();
+            MessagingMetrics.OnMessageSend(msg, numTotalBytes, headerBytes, ConnectionDirection);
+            gatewayInstruments.OnGatewaySent();
         }
 
         protected override void OnReceivedMessage(Message msg)
@@ -64,17 +64,23 @@ namespace Orleans.Runtime.Messaging
             if (msg.IsExpired)
             {
                 this.MessagingTrace.OnDropExpiredMessage(msg, MessagingInstruments.Phase.Receive);
+                msg.ReleaseDropped("ExpiredAtReceive");
                 return;
             }
 
             // Are we overloaded?
             if (this.overloadDetector.IsOverloaded)
             {
-                MessagingInstrumentation.OnRejectedMessage(msg);
+                MessagingMetrics.OnRejectedMessage(msg);
                 Message rejection = this.MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.GatewayTooBusy, "Shedding load");
-                this.messageCenter.TryDeliverToProxy(rejection);
+                if (!this.messageCenter.TryDeliverToProxy(rejection))
+                {
+                    rejection.ReleaseDropped("GatewayOverloadRejectionUndeliverable");
+                }
+
                 LogRejectingRequestDueToOverloading(this.Log, msg);
-                this.gatewayInstruments.OnGatewayLoadShedding();
+                gatewayInstruments.OnGatewayLoadShedding();
+                msg.ReleaseDropped("RejectedGatewayOverload");
                 return;
             }
 
@@ -91,7 +97,7 @@ namespace Orleans.Runtime.Messaging
                     msg.TargetGrain = systemTargetId.WithSiloAddress(this.myAddress).GrainId;
                 }
 
-                MessagingInstrumentation.OnMessageReRoute(msg);
+                MessagingMetrics.OnMessageReRoute(msg);
                 this.messageCenter.RerouteMessage(msg);
             }
             else
@@ -149,6 +155,7 @@ namespace Orleans.Runtime.Messaging
             if (msg.IsExpired)
             {
                 this.MessagingTrace.OnDropExpiredMessage(msg, MessagingInstruments.Phase.Send);
+                msg.ReleaseDropped("ExpiredAtSend");
                 return false;
             }
 
@@ -160,7 +167,7 @@ namespace Orleans.Runtime.Messaging
 
         public void FailMessage(Message msg, string reason)
         {
-            MessagingInstrumentation.OnFailedSentMessage(msg);
+            MessagingMetrics.OnFailedSentMessage(msg);
             if (msg.Direction == Message.Directions.Request)
             {
                 LogSiloRejectingMessage(this.Log, this.myAddress, msg, reason);
@@ -171,18 +178,18 @@ namespace Orleans.Runtime.Messaging
                     Message.RejectionTypes.Transient,
                     $"Silo {this.myAddress} is rejecting message: {msg}. Reason = {reason}",
                     new SiloUnavailableException());
+                msg.ReleaseDropped("FailedSendRequest");
             }
             else
             {
                 LogSiloDroppingMessage(this.Log, this.myAddress, msg, reason);
-                MessagingInstrumentation.OnDroppedSentMessage(msg);
+                MessagingMetrics.OnDroppedSentMessage(msg);
+                msg.ReleaseDropped("FailedSendNonRequest");
             }
         }
 
         protected override void RetryMessage(Message msg, Exception? ex = null)
         {
-            if (msg == null) return;
-
             if (msg.RetryCount < MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES)
             {
                 msg.RetryCount++;

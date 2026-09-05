@@ -49,21 +49,27 @@ namespace UnitTests.Serialization
         public void MessageTest_TtlUpdatedOnAccess(int initialTimeToLiveMilliseconds)
         {
             var message = this.messageFactory.CreateMessage(null, InvokeMethodOptions.None);
+            try
+            {
+                message.TimeToLive = TimeSpan.FromMilliseconds(initialTimeToLiveMilliseconds);
+                var expirationTimestamp = message.GetTimeToExpiryTimestamp();
+                WaitForTimestamp(expirationTimestamp - initialTimeToLiveMilliseconds + 10);
 
-            message.TimeToLive = TimeSpan.FromMilliseconds(initialTimeToLiveMilliseconds);
-            var expirationTimestamp = message._timeToExpiry.GetRawTimestamp();
-            WaitForTimestamp(expirationTimestamp - initialTimeToLiveMilliseconds + 10);
+                var accessStarted = CoarseStopwatch.GetTimestamp();
+                var timeToLive = message.TimeToLive;
+                var accessCompleted = CoarseStopwatch.GetTimestamp();
 
-            var accessStarted = CoarseStopwatch.GetTimestamp();
-            var timeToLive = message.TimeToLive;
-            var accessCompleted = CoarseStopwatch.GetTimestamp();
-
-            Assert.NotNull(timeToLive);
-            Assert.True(timeToLive.Value < TimeSpan.FromMilliseconds(initialTimeToLiveMilliseconds));
-            Assert.InRange(
-                timeToLive.Value,
-                TimeSpan.FromMilliseconds(expirationTimestamp - accessCompleted),
-                TimeSpan.FromMilliseconds(expirationTimestamp - accessStarted));
+                Assert.NotNull(timeToLive);
+                Assert.True(timeToLive.Value < TimeSpan.FromMilliseconds(initialTimeToLiveMilliseconds));
+                Assert.InRange(
+                    timeToLive.Value,
+                    TimeSpan.FromMilliseconds(expirationTimestamp - accessCompleted),
+                    TimeSpan.FromMilliseconds(expirationTimestamp - accessStarted));
+            }
+            finally
+            {
+                message.Release();
+            }
         }
 
         [TestSuite("Functional")]
@@ -74,18 +80,31 @@ namespace UnitTests.Serialization
         public void MessageTest_TtlUpdatedOnSerialization(int initialTimeToLiveMilliseconds)
         {
             var message = this.messageFactory.CreateMessage(null, InvokeMethodOptions.None);
+            try
+            {
+                message.TimeToLive = TimeSpan.FromMilliseconds(initialTimeToLiveMilliseconds);
+                var sourceExpirationTimestamp = message.GetTimeToExpiryTimestamp();
+                WaitForTimestamp(sourceExpirationTimestamp - initialTimeToLiveMilliseconds + 10);
+                var deserializedMessage = RoundTripMessage(message, out var serialization, out var deserialization);
+                try
+                {
+                    var deserializedExpirationTimestamp = deserializedMessage.GetTimeToExpiryTimestamp();
 
-            message.TimeToLive = TimeSpan.FromMilliseconds(initialTimeToLiveMilliseconds);
-            var sourceExpirationTimestamp = message._timeToExpiry.GetRawTimestamp();
-            WaitForTimestamp(sourceExpirationTimestamp - initialTimeToLiveMilliseconds + 10);
-            var deserializedMessage = RoundTripMessage(message, out var serialization, out var deserialization);
-            var deserializedExpirationTimestamp = deserializedMessage._timeToExpiry.GetRawTimestamp();
-
-            Assert.NotNull(deserializedMessage.TimeToLive);
-            Assert.InRange(
-                deserializedExpirationTimestamp,
-                sourceExpirationTimestamp - serialization.Completed + deserialization.Started,
-                sourceExpirationTimestamp - serialization.Started + deserialization.Completed);
+                    Assert.NotNull(deserializedMessage.TimeToLive);
+                    Assert.InRange(
+                        deserializedExpirationTimestamp,
+                        sourceExpirationTimestamp - serialization.Completed + deserialization.Started,
+                        sourceExpirationTimestamp - serialization.Started + deserialization.Completed);
+                }
+                finally
+                {
+                    deserializedMessage.Release();
+                }
+            }
+            finally
+            {
+                message.Release();
+            }
         }
 
         private static void WaitForTimestamp(long timestamp)
@@ -103,10 +122,16 @@ namespace UnitTests.Serialization
                 RequestContext.Set("big_object", new byte[maxHeaderSize + 1]);
 
                 var message = this.messageFactory.CreateMessage(null, InvokeMethodOptions.None);
-
-                var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: 0));
-                var writer = pipe.Writer;
-                Assert.Throws<InvalidMessageFrameException>(() => this.messageSerializer.Write(writer, message));
+                try
+                {
+                    var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: 0));
+                    var writer = pipe.Writer;
+                    Assert.Throws<InvalidMessageFrameException>(() => this.messageSerializer.Write(writer, message));
+                }
+                finally
+                {
+                    message.Release();
+                }
             }
             finally
             {
@@ -125,10 +150,16 @@ namespace UnitTests.Serialization
             var arg = new byte[maxBodySize + 1];
             var request = new[] { arg };
             var message = this.messageFactory.CreateMessage(request, InvokeMethodOptions.None);
-
-            var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: 0));
-            var writer = pipe.Writer;
-            Assert.Throws<InvalidMessageFrameException>(() => this.messageSerializer.Write(writer, message));
+            try
+            {
+                var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: 0));
+                var writer = pipe.Writer;
+                Assert.Throws<InvalidMessageFrameException>(() => this.messageSerializer.Write(writer, message));
+            }
+            finally
+            {
+                message.Release();
+            }
         }
 
         [TestSuite("Functional")]
@@ -180,7 +211,7 @@ namespace UnitTests.Serialization
             var reader = readResult.Buffer;
             var (requiredBytes, _, _) = this.messageSerializer.TryRead(ref reader, out var deserializedMessage);
             Assert.Equal(0, requiredBytes);
-            return deserializedMessage!;
+            return deserializedMessage!.Value;
         }
 
         private Message RoundTripMessage(
@@ -201,9 +232,10 @@ namespace UnitTests.Serialization
             var (requiredBytes, _, _) = this.messageSerializer.TryRead(ref reader, out var deserializedMessage);
             var deserializationCompleted = CoarseStopwatch.GetTimestamp();
             Assert.Equal(0, requiredBytes);
+            Assert.NotNull(deserializedMessage);
             serialization = (serializationStarted, serializationCompleted);
             deserialization = (deserializationStarted, deserializationCompleted);
-            return deserializedMessage!;
+            return deserializedMessage.Value;
         }
 
         [TestSuite("Functional")]
@@ -232,15 +264,28 @@ namespace UnitTests.Serialization
             }
 
             var message = this.messageFactory.CreateMessage(null, InvokeMethodOptions.None);
-            message.RequestContextData = requestContext;
-
-            var deserializedMessage = RoundTripMessage(message);
-
-            Assert.NotNull(deserializedMessage.RequestContextData);
-            Assert.Equal(entryCount, deserializedMessage.RequestContextData.Count);
-            for (var i = 0; i < entryCount; i++)
+            try
             {
-                Assert.Equal(i, deserializedMessage.RequestContextData[$"key-{i}"]);
+                message.RequestContextData = requestContext;
+
+                var deserializedMessage = RoundTripMessage(message);
+                try
+                {
+                    Assert.NotNull(deserializedMessage.RequestContextData);
+                    Assert.Equal(entryCount, deserializedMessage.RequestContextData.Count);
+                    for (var i = 0; i < entryCount; i++)
+                    {
+                        Assert.Equal(i, deserializedMessage.RequestContextData[$"key-{i}"]);
+                    }
+                }
+                finally
+                {
+                    deserializedMessage.Release();
+                }
+            }
+            finally
+            {
+                message.Release();
             }
         }
 

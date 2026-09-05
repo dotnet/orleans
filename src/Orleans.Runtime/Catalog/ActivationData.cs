@@ -531,6 +531,7 @@ internal sealed partial class ActivationData :
                 // Local-only messages are not allowed to escape the activation.
                 if (message.IsLocalOnly)
                 {
+                    message.ReleaseDropped("ActivationInvalidated");
                     continue;
                 }
 
@@ -849,9 +850,9 @@ internal sealed partial class ActivationData :
                 return;
             }
 
-            if (_blockingRequest is not null)
+            if (_blockingRequest is { } blockingMessage)
             {
-                var message = _blockingRequest;
+                var message = blockingMessage;
                 TimeSpan? timeSinceQueued = default;
                 if (_runningRequests.TryGetValue(message, out var waitTime))
                 {
@@ -880,7 +881,7 @@ internal sealed partial class ActivationData :
             {
                 var message = running.Key;
                 var runDuration = running.Value;
-                if (ReferenceEquals(message, _blockingRequest) || message.IsLocalOnly)
+                if ((_blockingRequest is { } currentBlockingMessage && message == currentBlockingMessage) || message.IsLocalOnly)
                 {
                     continue;
                 }
@@ -1136,7 +1137,7 @@ internal sealed partial class ActivationData :
 
             do
             {
-                Message? message = null;
+                Message message = default;
                 lock (_lock)
                 {
                     if (_waitingRequests.Count <= i)
@@ -1161,7 +1162,7 @@ internal sealed partial class ActivationData :
                             // The activation is not able to process this message right now, so try the next message.
                             ++i;
 
-                            if (_blockingRequest != null)
+                            if (_blockingRequest is { } blockingRequest)
                             {
                                 var currentRequestActiveTime = _busyDuration.Elapsed;
                                 if (currentRequestActiveTime > _shared.MaxRequestProcessingTime && !IsStuckProcessingMessage)
@@ -1175,7 +1176,7 @@ internal sealed partial class ActivationData :
                                         _shared.Logger,
                                         currentRequestActiveTime,
                                         new(this),
-                                        _blockingRequest,
+                                        blockingRequest,
                                         message);
                                 }
                             }
@@ -1211,6 +1212,7 @@ internal sealed partial class ActivationData :
                             _shared.InternalRuntime.MessageCenter.RejectMessage(message, Message.RejectionTypes.Transient, exception);
                         }
 
+                        message.ReleaseDropped("SchedulingException");
                         _waitingRequests.RemoveAt(i);
                         continue;
                     }
@@ -1313,12 +1315,12 @@ internal sealed partial class ActivationData :
                 return true;
             }
 
-            if (_blockingRequest is null)
+            if (_blockingRequest is not { } blockingRequest)
             {
                 return true;
             }
 
-            if (_blockingRequest.IsReadOnly && incoming.IsReadOnly)
+            if (blockingRequest.IsReadOnly && incoming.IsReadOnly)
             {
                 return true;
             }
@@ -1335,7 +1337,7 @@ internal sealed partial class ActivationData :
                 try
                 {
                     return canInterleave.MayInterleave(GrainInstance, incoming)
-                        || canInterleave.MayInterleave(GrainInstance, _blockingRequest);
+                        || canInterleave.MayInterleave(GrainInstance, blockingRequest);
                 }
                 catch (Exception exception)
                 {
@@ -1618,6 +1620,11 @@ internal sealed partial class ActivationData :
 
         // Signal the message pump to see if there is another request which can be processed now that this one has completed
         _workSignal.Signal();
+
+        // Release the message - for local messages, CallbackData still holds a ref so it won't return to pool yet.
+        // For remote messages, this is the terminal owner so it returns to pool.
+        message.MarkTransferred("ActivationData.OnCompletedRequest");
+        message.Release();
     }
 
     public void ReceiveMessage(object message) => ReceiveMessage((Message)message);
@@ -1630,6 +1637,7 @@ internal sealed partial class ActivationData :
         {
             _shared.MessagingProcessingInstruments.OnDispatcherMessageProcessedError(message);
             _shared.InternalRuntime.MessagingTrace.OnDropExpiredMessage(message, MessagingInstruments.Phase.Dispatch);
+            message.ReleaseDropped("ExpiredAtDispatch");
             return;
         }
 
@@ -1666,6 +1674,7 @@ internal sealed partial class ActivationData :
         {
             _shared.MessagingProcessingInstruments.OnDispatcherMessageProcessedError(message);
             _shared.InternalRuntime.MessageCenter.RejectMessage(message, Message.RejectionTypes.Overloaded, overloadException, "Target activation is overloaded " + this);
+            message.ReleaseDropped("RejectedOverload");
             return;
         }
 
@@ -2376,6 +2385,7 @@ internal sealed partial class ActivationData :
         {
             Message? message = null;
             var wasWaiting = false;
+            var acquiredRunningMessage = false;
             lock (_lock)
             {
                 // Check the running requests.
@@ -2383,7 +2393,9 @@ internal sealed partial class ActivationData :
                 {
                     if (candidate.Id == messageId && candidate.SendingGrain == senderGrainId)
                     {
+                        candidate.Acquire();
                         message = candidate;
+                        acquiredRunningMessage = true;
                         break;
                     }
                 }
@@ -2405,22 +2417,39 @@ internal sealed partial class ActivationData :
                 }
             }
 
-            var didCancel = false;
-            if (message is not null && message.BodyObject is IInvokable request)
+            try
             {
-                if (wasWaiting)
+                var didCancel = false;
+                if (message is { } targetMessage && targetMessage.BodyObject is IInvokable request)
                 {
-                    // If the request was waiting, then we necessarily did manage to cancel it, so send the response now.
-                    _shared.InternalRuntime.RuntimeClient.SendResponse(message, Response.FromException(new OperationCanceledException()));
-                    didCancel = true;
+                    if (wasWaiting)
+                    {
+                        // If the request was waiting, then we necessarily did manage to cancel it, so send the response now.
+                        try
+                        {
+                            _shared.InternalRuntime.RuntimeClient.SendResponse(targetMessage, Response.FromException(new OperationCanceledException()));
+                            didCancel = true;
+                        }
+                        finally
+                        {
+                            targetMessage.ReleaseDropped("CanceledWhileWaiting");
+                        }
+                    }
+                    else
+                    {
+                        didCancel = TryCancelInvokable(request) || !request.IsCancellable;
+                    }
                 }
-                else
+
+                return didCancel;
+            }
+            finally
+            {
+                if (acquiredRunningMessage)
                 {
-                    didCancel = TryCancelInvokable(request) || !request.IsCancellable;
+                    message!.Value.Release();
                 }
             }
-
-            return didCancel;
         }
 
         bool TryCancelInvokable(IInvokable request)

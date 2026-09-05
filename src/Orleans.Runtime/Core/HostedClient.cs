@@ -194,6 +194,7 @@ namespace Orleans.Runtime
             if (message.IsExpired)
             {
                 this.messagingTrace.OnDropExpiredMessage(message, MessagingInstruments.Phase.Receive);
+                message.ReleaseDropped("ExpiredAtDispatch");
                 return true;
             }
 
@@ -203,8 +204,11 @@ namespace Orleans.Runtime
 
         public void ReceiveMessage(object message)
         {
-            var msg = (Message)message;
+            ReceiveMessage((Message)message);
+        }
 
+        public void ReceiveMessage(Message msg)
+        {
             if (msg.Direction == Message.Directions.Response)
             {
                 // Requests are made through the runtime client, so deliver responses to the runtime client so that the request callback can be executed.
@@ -213,7 +217,10 @@ namespace Orleans.Runtime
             else
             {
                 // Requests against client objects are scheduled for execution on the client.
-                this.incomingMessages.Writer.TryWrite(msg);
+                if (!this.incomingMessages.Writer.TryWrite(msg))
+                {
+                    msg.ReleaseDropped("HostedClientStopped");
+                }
             }
         }
 
@@ -249,7 +256,6 @@ namespace Orleans.Runtime
 
                     while (reader.TryRead(out var message))
                     {
-                        if (message == null) continue;
                         switch (message.Direction)
                         {
                             case Message.Directions.OneWay:
@@ -258,6 +264,7 @@ namespace Orleans.Runtime
                                 break;
                             default:
                                 LogErrorUnsupportedMessage(this.logger, message);
+                                message.ReleaseDropped("UnsupportedMessageDirection");
                                 break;
                         }
                     }
