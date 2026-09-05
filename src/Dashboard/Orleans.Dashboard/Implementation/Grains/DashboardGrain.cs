@@ -304,10 +304,14 @@ internal sealed class DashboardGrain : Grain, IDashboardGrain
 
         try
         {
-            var implementationType = _typeManifestOptions.InterfaceImplementations
-                .FirstOrDefault(w => w.FullName!.Equals(grainType))!;
+            ArgumentException.ThrowIfNullOrWhiteSpace(id);
+            ArgumentException.ThrowIfNullOrWhiteSpace(grainType);
 
-            var mappedGrainId = GrainStateHelper.GetGrainId(id!, implementationType);
+            var implementationType = _typeManifestOptions.InterfaceImplementations
+                .FirstOrDefault(w => string.Equals(w.FullName, grainType, StringComparison.Ordinal))
+                ?? throw new ArgumentException($"Unknown grain type '{grainType}'.", nameof(grainType));
+
+            var mappedGrainId = GrainStateHelper.GetGrainId(id, implementationType);
             object? grainId = mappedGrainId.Item1;
             string keyExtension = mappedGrainId.Item2;
 
@@ -381,7 +385,10 @@ internal sealed class DashboardGrain : Grain, IDashboardGrain
         }
         catch (Exception ex)
         {
-            result.TryAdd("error", string.Concat(ex.Message, " - ", ex?.InnerException!.Message));
+            var error = ex.InnerException is { } innerException
+                ? string.Concat(ex.Message, " - ", innerException.Message)
+                : ex.Message;
+            result.TryAdd("error", error);
         }
 
         return JsonSerializer.Serialize(result, options: new JsonSerializerOptions()

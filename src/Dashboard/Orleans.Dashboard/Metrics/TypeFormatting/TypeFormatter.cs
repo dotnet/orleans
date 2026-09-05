@@ -1,6 +1,7 @@
-using Orleans.Serialization.TypeSystem;
+using System;
 using System.Collections.Concurrent;
 using System.Linq;
+using Orleans.Serialization.TypeSystem;
 
 namespace Orleans.Dashboard.Metrics.TypeFormatting;
 
@@ -30,12 +31,12 @@ internal sealed class TypeFormatter
 
                 const string SystemPrefix = "System.";
 
-                if (name.StartsWith(SystemPrefix))
+                if (name.StartsWith(SystemPrefix, StringComparison.Ordinal))
                 {
                     name = name[SystemPrefix.Length..];
                 }
 
-                var genericCardinalityIndex = name.IndexOf('`');
+                var genericCardinalityIndex = name.IndexOf('`', StringComparison.Ordinal);
 
                 if (genericCardinalityIndex > 0)
                 {
