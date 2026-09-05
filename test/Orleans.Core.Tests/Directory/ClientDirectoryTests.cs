@@ -428,7 +428,8 @@ namespace NonSilo.Tests.Directory
             remote.GetClientRoutes(default!, Arg.Any<CancellationToken>())
                 .ReturnsForAnyArgs(Task.FromResult(ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId>, long)>.Empty));
             otherRemote.GetClientRoutes(default!, Arg.Any<CancellationToken>())
-                .ReturnsForAnyArgs(_ => throw new TimeoutException("The unrelated client's directory owner did not respond."));
+                .ReturnsForAnyArgs(_ => Task.FromException<ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId>, long)>>(
+                    new TimeoutException("The unrelated client's directory owner did not respond.")));
 
             _directory.InvalidateCache(clientId);
             _directory.InvalidateCache(otherClientId);
