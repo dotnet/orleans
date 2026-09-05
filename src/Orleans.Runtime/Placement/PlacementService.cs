@@ -103,6 +103,9 @@ namespace Orleans.Runtime.Placement
 
         private bool IsStopping => _shutdownCts.IsCancellationRequested;
 
+        internal bool IsUsingGrainDirectory(GrainId grainId)
+            => _strategyResolver.GetPlacementStrategy(grainId.Type).IsUsingGrainDirectory;
+
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
         {
             lifecycle.Subscribe(
