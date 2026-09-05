@@ -638,6 +638,59 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
         }
 
         [Fact]
+        public async Task AppendAsync_WhenPayloadOffsetExceedsWalLength_ThrowsBeforeRewrite()
+        {
+            var client = Substitute.For<IAmazonS3>();
+            client.PutObjectAsync(Arg.Any<PutObjectRequest>(), Arg.Any<CancellationToken>())
+                .Returns(Task.FromResult(new PutObjectResponse { ETag = "etag-1" }));
+            var properties = new GetObjectMetadataResponse
+            {
+                ETag = "etag-1",
+                ContentLength = 3,
+                LastModified = DateTime.UtcNow,
+                PartsCount = 1,
+            };
+            properties.Metadata.Add(S3JournalStorage.WalGenerationMetadataKey, "generation");
+            properties.Metadata.Add(S3JournalStorage.MetadataVersionMetadataKey, "version");
+            properties.Metadata.Add(S3JournalStorage.CheckpointOffsetMetadataKey, "10");
+            client.GetObjectMetadataAsync(
+                    Arg.Any<GetObjectMetadataRequest>(),
+                    Arg.Any<CancellationToken>())
+                .Returns(Task.FromResult(properties));
+            var walResponse = new GetObjectResponse
+            {
+                ETag = properties.ETag,
+                ContentLength = properties.ContentLength,
+                PartsCount = properties.PartsCount,
+                ResponseStream = new MemoryStream(new byte[properties.ContentLength], writable: false),
+            };
+            foreach (var key in properties.Metadata.Keys)
+            {
+                walResponse.Metadata.Add(key, properties.Metadata[key]);
+            }
+
+            client.GetObjectAsync(Arg.Any<GetObjectRequest>(), Arg.Any<CancellationToken>())
+                .Returns(Task.FromResult(walResponse));
+            var storage = CreateStorage(
+                client,
+                new S3JournalStorageOptions
+                {
+                    BucketName = BucketName,
+                    UseS3ExpressAppend = false,
+                });
+            await storage.CreateIfNotExistsAsync(cancellationToken: CancellationToken.None);
+            client.ClearReceivedCalls();
+
+            var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+                () => storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None).AsTask());
+
+            Assert.Contains("payload offset 10", exception.Message);
+            await client.DidNotReceive().PutObjectAsync(
+                Arg.Any<PutObjectRequest>(),
+                Arg.Any<CancellationToken>());
+        }
+
+        [Fact]
         public async Task CreateIfNotExistsAsync_WhenConditionalRequestConflicts_Retries()
         {
             var client = Substitute.For<IAmazonS3>();
@@ -1073,10 +1126,12 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
         [Theory]
         [InlineData(HttpStatusCode.PreconditionFailed)]
         [InlineData(HttpStatusCode.Conflict)]
-        public async Task ReplaceAsync_WhenWalPublicationIsDefinitivelyRejected_DeletesUnreferencedCheckpoint(
+        public async Task ReplaceAsync_WhenWalPublicationIsDefinitivelyRejected_DeletesUnreferencedCheckpointUsingCallerCancellation(
             HttpStatusCode statusCode)
         {
             var client = Substitute.For<IAmazonS3>();
+            using var cancellation = new CancellationTokenSource();
+            var cancellationToken = cancellation.Token;
             PutObjectRequest? createRequest = null;
             string? checkpointName = null;
             client.PutObjectAsync(
@@ -1122,14 +1177,20 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
                     UseS3ExpressAppend = false,
                     MaxMetadataOnlyConflictRetries = 0,
                 });
-            await storage.CreateIfNotExistsAsync(cancellationToken: CancellationToken.None);
+            await storage.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
 
             await Assert.ThrowsAsync<InconsistentStateException>(
-                () => storage.ReplaceAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None).AsTask());
+                () => storage.ReplaceAsync(new ReadOnlySequence<byte>([1]), cancellationToken).AsTask());
 
             Assert.NotNull(checkpointName);
             Assert.NotNull(deleteRequest);
             Assert.Equal(checkpointName, deleteRequest.Key);
+            await client.Received(2).GetObjectMetadataAsync(
+                Arg.Any<GetObjectMetadataRequest>(),
+                cancellationToken);
+            await client.Received(1).DeleteObjectAsync(
+                Arg.Is<DeleteObjectRequest>(request => request.Key == checkpointName),
+                cancellationToken);
         }
 
         [Fact]

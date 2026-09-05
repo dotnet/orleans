@@ -637,7 +637,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
                 }
                 catch (InconsistentStateException) when (reclaimCheckpointOnFailure)
                 {
-                    await DeleteCheckpointIfUnreferencedAsync(checkpointName).ConfigureAwait(false);
+                    await DeleteCheckpointIfUnreferencedAsync(checkpointName, cancellationToken).ConfigureAwait(false);
                     throw;
                 }
 
@@ -715,6 +715,12 @@ internal sealed partial class S3JournalStorage : IJournalStorage
 
         var walMetadata = CopyMetadata(walResult.Metadata);
         var manifest = CreateWalManifest(walMetadata);
+        if (manifest.WalOffset > walResult.ContentLength)
+        {
+            throw new InvalidOperationException(
+                $"S3 journal payload offset {manifest.WalOffset:N0} exceeds WAL length {walResult.ContentLength:N0}.");
+        }
+
         var actualProviderState = CreateWalProviderState(manifest, walResult.ContentLength, walResult.PartsCount);
         if (!IsSameLogicalWal(actualProviderState, expectedProviderState))
         {
@@ -1018,13 +1024,15 @@ internal sealed partial class S3JournalStorage : IJournalStorage
         }
     }
 
-    private async ValueTask DeleteCheckpointIfUnreferencedAsync(string checkpointName)
+    private async ValueTask DeleteCheckpointIfUnreferencedAsync(
+        string checkpointName,
+        CancellationToken cancellationToken)
     {
         try
         {
             var current = await TryLoadWalStateAsync(
                 expectedETag: null,
-                CancellationToken.None,
+                cancellationToken,
                 updateCache: false).ConfigureAwait(false);
             if (current is not null
                 && string.Equals(current.Value.Manifest.Checkpoint?.Name, checkpointName, StringComparison.Ordinal))
@@ -1032,7 +1040,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
                 return;
             }
 
-            await DeleteCheckpointIfExistsAsync(checkpointName, CancellationToken.None).ConfigureAwait(false);
+            await DeleteCheckpointIfExistsAsync(checkpointName, cancellationToken).ConfigureAwait(false);
         }
         catch (AmazonS3Exception exception)
         {
