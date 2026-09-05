@@ -913,7 +913,9 @@ public sealed class CodecProviderGeneratedTarget<T>
     public T Value { get; set; } = default!;
 }
 
-public sealed class CodecProviderCustomTarget<T>;
+public sealed class CodecProviderCustomTarget<T>
+{
+}
 
 public sealed class CustomGenericCodec<T> : IFieldCodec<CodecProviderCustomTarget<T>>
 {
