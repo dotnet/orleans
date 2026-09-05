@@ -51,6 +51,7 @@ internal sealed class AdoNetQueueAdapterReceiver : IQueueAdapterReceiver, IQueue
             dataAdapter,
             evictionStrategy,
             logger,
+            maxCacheSizeBytes: streamOptions.MaxCacheSizeBytes,
             maxCacheSize: cacheOptions.CacheSize);
         _inner = new RecoverableStreamReceiver<AdoNetStreamMessage>(
             _source,

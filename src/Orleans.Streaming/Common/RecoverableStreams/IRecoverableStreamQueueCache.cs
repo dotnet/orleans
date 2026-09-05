@@ -13,8 +13,13 @@ namespace Orleans.Providers.Streams.Common;
 public interface IRecoverableStreamQueueCache<TQueueMessage> : IQueueCache, IDisposable
 {
     /// <summary>
-    /// Packs and adds ordered source records to the cache.
+    /// Packs and adds an ordered prefix of source records to the cache.
     /// </summary>
+    /// <returns>The positions of the admitted prefix, in source order.</returns>
+    /// <remarks>
+    /// The receiver retains the remaining records for a subsequent admission attempt.
+    /// A packing exception leaves the cache's previously admitted contents intact.
+    /// </remarks>
     IReadOnlyList<StreamPosition> Add(
         IReadOnlyList<TQueueMessage> messages,
         DateTime dequeueTimeUtc);

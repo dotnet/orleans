@@ -47,6 +47,17 @@ public class AdoNetStreamOptions
     public int MaxMessagesPerRead { get; set; } = 1_000;
 
     /// <summary>
+    /// Gets or sets the per-partition budget for retained encoded cache segments, in bytes.
+    /// The default is 64 MiB.
+    /// </summary>
+    /// <remarks>
+    /// The budget includes payload framing. Records are admitted in order, and an empty cache admits
+    /// one oversized record so delivery can make progress. Additional memory includes one fetched batch
+    /// bounded by <see cref="MaxMessagesPerRead"/>, buffer slack and pool retention, metadata, and delivery objects.
+    /// </remarks>
+    public long MaxCacheSizeBytes { get; set; } = 64 * 1024 * 1024;
+
+    /// <summary>
     /// Gets or sets the interval between checkpoint persistence attempts.
     /// </summary>
     public TimeSpan CheckpointPersistInterval { get; set; } = TimeSpan.FromSeconds(5);
