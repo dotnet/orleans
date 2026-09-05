@@ -367,6 +367,86 @@ namespace NonSilo.Tests.Directory
         }
 
         [Theory]
+        [InlineData(1, false)]
+        [InlineData(1, true)]
+        [InlineData(5, false)]
+        [InlineData(5, true)]
+        public async Task DiscoveryRefreshesNewlyRelevantGateway(int discoveryAttempt, bool refreshFails)
+        {
+            var clientId = Client("discovered");
+            var otherClientId = Client("already-invalidated");
+            var remoteSilo = Silo("127.0.0.1:222@100");
+            var remote = await AddRemoteClient(remoteSilo, otherClientId);
+            var failure = new TimeoutException("Client directory owner did not respond.");
+            var calls = 0;
+            remote.GetClientRoutes(default!, Arg.Any<CancellationToken>()).ReturnsForAnyArgs(info =>
+            {
+                var versions = info.ArgAt<ImmutableDictionary<SiloAddress, long>>(0);
+                var call = Interlocked.Increment(ref calls);
+                if (call <= discoveryAttempt)
+                {
+                    Assert.Equal(2, versions[remoteSilo]);
+                    return Task.FromResult(call == discoveryAttempt
+                        ? CreateRoutes(remoteSilo, 3, clientId, otherClientId)
+                        : ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId>, long)>.Empty);
+                }
+
+                Assert.Equal(discoveryAttempt + 1, call);
+                Assert.Equal(3, versions[remoteSilo]);
+                return refreshFails
+                    ? throw failure
+                    : Task.FromResult(ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId>, long)>.Empty);
+            });
+
+            _directory.InvalidateCache(otherClientId);
+            Assert.False(_directory.TryLocalLookup(clientId, out _));
+            if (refreshFails)
+            {
+                Assert.Same(failure, await Assert.ThrowsAsync<TimeoutException>(() => _directory.Lookup(clientId).AsTask()));
+                Assert.False(_directory.TryLocalLookup(clientId, out _));
+            }
+            else
+            {
+                Assert.Equal(Gateway.GetClientActivationAddress(clientId, remoteSilo), Assert.Single(await _directory.Lookup(clientId)));
+                Assert.True(_directory.TryLocalLookup(clientId, out _));
+            }
+
+            _ = remote.Received(discoveryAttempt + 1).GetClientRoutes(
+                Arg.Any<ImmutableDictionary<SiloAddress, long>>(),
+                Arg.Any<CancellationToken>());
+        }
+
+        [Fact]
+        public async Task InvalidationRefreshesOnlyRequestedClientGateways()
+        {
+            var clientId = Client("requested");
+            var otherClientId = Client("unrelated");
+            var remoteSilo = Silo("127.0.0.1:222@100");
+            var otherSilo = Silo("127.0.0.1:333@100");
+            var remote = await AddRemoteClient(remoteSilo, clientId);
+            var otherRemote = await AddRemoteClient(otherSilo, otherClientId);
+            remote.GetClientRoutes(default!, Arg.Any<CancellationToken>())
+                .ReturnsForAnyArgs(Task.FromResult(ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId>, long)>.Empty));
+            otherRemote.GetClientRoutes(default!, Arg.Any<CancellationToken>())
+                .ReturnsForAnyArgs(_ => throw new TimeoutException("The unrelated client's directory owner did not respond."));
+
+            _directory.InvalidateCache(clientId);
+            _directory.InvalidateCache(otherClientId);
+            Assert.False(_directory.TryLocalLookup(clientId, out _));
+            Assert.False(_directory.TryLocalLookup(otherClientId, out _));
+
+            Assert.Equal(Gateway.GetClientActivationAddress(clientId, remoteSilo), Assert.Single(await _directory.Lookup(clientId)));
+            Assert.True(_directory.TryLocalLookup(clientId, out _));
+            Assert.False(_directory.TryLocalLookup(otherClientId, out _));
+            _ = remote.Received(1).GetClientRoutes(
+                Arg.Any<ImmutableDictionary<SiloAddress, long>>(),
+                Arg.Any<CancellationToken>());
+            _ = otherRemote.DidNotReceive().GetClientRoutes(
+                Arg.Any<ImmutableDictionary<SiloAddress, long>>(),
+                Arg.Any<CancellationToken>());
+        }
+
+        [Theory]
         [InlineData(false)]
         [InlineData(true)]
         public async Task InvalidationRevalidatesReconnectedGateway(bool sameVersion)
