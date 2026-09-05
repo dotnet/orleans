@@ -23,5 +23,18 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="cachedMessage">The cached message.</param>
         /// <returns>The sequence token.</returns>
         StreamSequenceToken GetSequenceToken(ref CachedMessage cachedMessage);
+
+        /// <summary>
+        /// Compares a cached message with a stream sequence token.
+        /// </summary>
+        /// <param name="cachedMessage">The cached message.</param>
+        /// <param name="token">The sequence token.</param>
+        /// <returns>A value indicating the relative order of the cached message and token.</returns>
+        /// <remarks>
+        /// The default implementation uses the allocation-free sequence number and event index fields.
+        /// Providers with external offsets can override this method and compare encoded offset data directly.
+        /// </remarks>
+        int Compare(ref CachedMessage cachedMessage, StreamSequenceToken token)
+            => cachedMessage.Compare(token);
     }
 }
