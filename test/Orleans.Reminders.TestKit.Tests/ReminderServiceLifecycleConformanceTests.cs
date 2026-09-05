@@ -200,14 +200,11 @@ public sealed class FaultyReminderServiceLifecycleTests
             cancellation.CancelAfter(TimeSpan.FromMinutes(2));
             await fixture.Harness.WaitForStartupReadinessAsync(cancellation.Token);
             var table = Assert.IsType<IdealizedReminderTable>(fixture.Harness.ReminderTable);
-            var rangeReads = table.Operations.Count(operation =>
-                operation.Kind == ReminderTableOperationKind.ReadRange);
+            var rangeReads = table.OperationCount(ReminderTableOperationKind.ReadRange);
 
             await fixture.Harness.WaitForTopologyReconciliationAsync(cancellation.Token);
 
-            Assert.Equal(
-                rangeReads,
-                table.Operations.Count(operation => operation.Kind == ReminderTableOperationKind.ReadRange));
+            Assert.Equal(rangeReads, table.OperationCount(ReminderTableOperationKind.ReadRange));
         }
         finally
         {
