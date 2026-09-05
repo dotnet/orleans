@@ -708,7 +708,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     /// <summary>
     /// Called when the grain activates. Starts the background pump if there are pending durable messages.
     /// </summary>
-    public Task OnStart(CancellationToken cancellationToken = default)
+    public async Task OnStart(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         DurableMessagingActivationValidator.Validate(_grainContext);
@@ -729,7 +729,6 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
             QueueEnsureJobScheduled(replaceExisting: true);
         }
 
-        return Task.CompletedTask;
     }
 
     /// <summary>
