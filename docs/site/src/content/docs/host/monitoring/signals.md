@@ -54,6 +54,12 @@ If spans appear as separate traces, confirm <xref:Orleans.Hosting.ClientBuilderE
 
 Avoid recording grain keys and state values by default. They can be high-cardinality or sensitive. If an incident requires them, use restricted, time-limited capture and remove it afterward.
 
+## Stream consumer cleanup
+
+Subscribe to <xref:Orleans.Streaming.Diagnostics.StreamingEvents.AllEvents*> to correlate a consumer's delivery and cleanup transitions by provider, stream, subscription, consumer endpoint, and silo. <xref:Orleans.Streaming.Diagnostics.StreamingEvents.MessageDeliveryFailed> includes the attempted position and original exception. <xref:Orleans.Streaming.Diagnostics.StreamingEvents.SubscriptionUnregistration> reports when the pulling agent requests pubsub cleanup and when that request completes or fails. <xref:Orleans.Streaming.Diagnostics.StreamingEvents.SubscriptionUnregistered> marks the successful durable removal.
+
+When a client route becomes stale, the runtime resolves the client through the client directory. An available gateway receives the request; an unavailable client produces <xref:Orleans.Runtime.ClientNotAvailableException>, which initiates subscription cleanup. For a cleanup timeout, capture the last observed transition and its exception: a delivery failure identifies the routing or consumer failure, a pending unregistration identifies the pubsub request, and a failed unregistration identifies its storage or callback failure. Keep diagnostic capture bounded and retain positions and identifiers rather than event payloads.
+
 ## Baseline alerts
 
 Tune alerts against normal traffic and service objectives. A practical initial set is:
