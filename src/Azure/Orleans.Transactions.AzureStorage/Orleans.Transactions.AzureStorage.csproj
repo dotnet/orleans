@@ -10,6 +10,7 @@
     <RootNamespace>Orleans.Transactions.AzureStorage</RootNamespace>
     <DefineConstants>$(DefineConstants);ORLEANS_TRANSACTIONS</DefineConstants>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <WarningsAsErrors>$(WarningsAsErrors);CA1062</WarningsAsErrors>
   </PropertyGroup>
 
   <ItemGroup>

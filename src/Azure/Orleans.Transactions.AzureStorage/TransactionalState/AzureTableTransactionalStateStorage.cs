@@ -135,8 +135,11 @@ namespace Orleans.Transactions.AzureStorage
         }
 
         /// <inheritdoc />
+        /// <exception cref="ArgumentNullException"><paramref name="metadata"/> is <see langword="null"/>.</exception>
         public async Task<string> Store(string? expectedETag, TransactionalStateMetaData metadata, List<PendingTransactionState<TState>>? statesToPrepare, long? commitUpTo, long? abortAfter)
         {
+            ArgumentNullException.ThrowIfNull(metadata);
+
             if (_storeRequiresLoad)
             {
                 throw new InvalidOperationException("Load must complete successfully before Store can be called again after a failed Store operation.");
