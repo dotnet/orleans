@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Net;
 using System.Text;
@@ -38,6 +39,7 @@ namespace Orleans.GrainDirectory.Redis
         /// <param name="directoryOptions">The Redis grain directory options.</param>
         /// <param name="clusterOptions">The cluster options.</param>
         /// <param name="logger">The logger.</param>
+        [SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "ActivatorUtilities supplies the options and services from dependency injection.")]
         public RedisGrainDirectory(
             RedisGrainDirectoryOptions directoryOptions,
             IOptions<ClusterOptions> clusterOptions,
@@ -84,6 +86,7 @@ namespace Orleans.GrainDirectory.Redis
         /// </summary>
         /// <param name="address">The grain address to register.</param>
         /// <returns>The grain address registered in the directory.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="address"/> is <see langword="null"/>.</exception>
         public Task<GrainAddress?> Register(GrainAddress address) => Register(address, null);
 
         /// <summary>
@@ -92,8 +95,11 @@ namespace Orleans.GrainDirectory.Redis
         /// <param name="address">The grain address to register.</param>
         /// <param name="previousAddress">The previous registration to replace, or <see langword="null"/> to require an empty entry.</param>
         /// <returns>The grain address registered in the directory.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="address"/> is <see langword="null"/>.</exception>
         public async Task<GrainAddress?> Register(GrainAddress address, GrainAddress? previousAddress)
         {
+            ArgumentNullException.ThrowIfNull(address);
+
             const string RegisterScript =
                 """
                 local cur = redis.call('GET', KEYS[1])
@@ -159,8 +165,11 @@ namespace Orleans.GrainDirectory.Redis
         /// </summary>
         /// <param name="address">The grain address to remove.</param>
         /// <returns>A task representing the operation.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="address"/> is <see langword="null"/>.</exception>
         public async Task Unregister(GrainAddress address)
         {
+            ArgumentNullException.ThrowIfNull(address);
+
             const string DeleteScript =
                 """
                 local cur = redis.call('GET', KEYS[1])
@@ -289,7 +298,7 @@ namespace Orleans.GrainDirectory.Redis
             }
         }
 
-        private RedisKey GetKey(GrainId grainId) => _keyPrefix.Append(grainId.ToString());
+        internal RedisKey GetKey(GrainId grainId) => _keyPrefix.Append(grainId.ToString());
 
         #region Logging
         private void LogConnectionRestored(object? sender, ConnectionFailedEventArgs e)

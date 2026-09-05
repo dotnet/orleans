@@ -36,8 +36,12 @@ namespace Orleans.Configuration
         /// </summary>
         /// <param name="options">The Redis grain directory options.</param>
         /// <returns>A task which returns a provider-owned connection multiplexer.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="options"/> is <see langword="null"/>.</exception>
         public static async Task<(IConnectionMultiplexer Multiplexer, bool IsShared)> DefaultCreateMultiplexer(RedisGrainDirectoryOptions options)
-            => (Multiplexer: await ConnectionMultiplexer.ConnectAsync(options.ConfigurationOptions!), IsShared: false);
+        {
+            ArgumentNullException.ThrowIfNull(options);
+            return (Multiplexer: await ConnectionMultiplexer.ConnectAsync(options.ConfigurationOptions!), IsShared: false);
+        }
     }
 
     internal class RedactRedisConfigurationOptions : RedactAttribute

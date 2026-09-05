@@ -8,6 +8,7 @@
     <PackageTags>$(PackageTags) Redis Grain Directory</PackageTags>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <WarningsAsErrors>$(WarningsAsErrors);CA1062</WarningsAsErrors>
   </PropertyGroup>
 
   <ItemGroup>
@@ -28,4 +29,3 @@
     <InternalsVisibleTo Include="Orleans.Redis.Tests" />
   </ItemGroup>
 </Project>
-
