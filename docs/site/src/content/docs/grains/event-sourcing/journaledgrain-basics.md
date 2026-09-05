@@ -63,7 +63,7 @@ The returned task completes after the conditional append is resolved. `false` me
 
 :::code language="csharp" source="../../snippets/compiled/EventSourcing/EventSourcingSnippets.cs" id="refresh_now":::
 
-<xref:Orleans.EventSourcing.JournaledGrain`2.RetrieveConfirmedEvents*> returns a confirmed segment only when the provider retains and exposes it. State storage and custom storage don't expose events through this API; log storage does.
+<xref:Orleans.EventSourcing.JournaledGrain`2.RetrieveConfirmedEvents*> returns a confirmed segment when the provider retains and exposes it. Log storage exposes the retained log. Custom storage exposes events when its <xref:Orleans.EventSourcing.CustomStorage.ICustomStorageInterface`2.RetrieveLogSegment*> implementation returns them. State storage retains snapshots instead of event segments.
 
 <xref:Orleans.EventSourcing.JournaledGrain`2.ClearLogAsync*> resets state and discards confirmed and unconfirmed events only when supported by the provider. Clearing a log is destructive and isn't a schema-migration mechanism.
 
