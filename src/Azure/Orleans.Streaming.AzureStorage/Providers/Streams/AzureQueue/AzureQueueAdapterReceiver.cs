@@ -289,11 +289,23 @@ namespace Orleans.Providers.Streams.AzureQueue
 
         private async Task ConfirmMessagesDeliveredAsync(IAzureQueueDataManager queueRef, HashSet<PendingDelivery> delivered)
         {
-            await Task.WhenAll(delivered.Select(item => queueRef.DeleteQueueMessage(item.Message)));
-
-            lock (pendingLock)
+            var deletions = delivered.ToDictionary(
+                static item => item,
+                async item => await queueRef.DeleteQueueMessage(item.Message));
+            try
             {
-                pending.RemoveAll(delivered.Contains);
+                await Task.WhenAll(deletions.Values);
+            }
+            finally
+            {
+                var confirmed = deletions
+                    .Where(static item => item.Value.IsCompletedSuccessfully)
+                    .Select(static item => item.Key)
+                    .ToHashSet();
+                lock (pendingLock)
+                {
+                    pending.RemoveAll(confirmed.Contains);
+                }
             }
         }
 

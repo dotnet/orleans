@@ -91,7 +91,7 @@ public class AzureQueueAdapterReceiverTests
         var message = CreateMessage();
         var queue = new TestQueueDataManager(message)
         {
-            DeleteException = new InvalidOperationException("delete failed")
+            OnDelete = _ => Task.FromException(new InvalidOperationException("delete failed"))
         };
         var receiver = new AzureQueueAdapterReceiver(
             "test-queue",
@@ -108,11 +108,49 @@ public class AzureQueueAdapterReceiverTests
         Assert.Same(message, Assert.Single(queue.ReleasedMessages));
     }
 
-    private static QueueMessage CreateMessage()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PartialDeleteFailureReleasesOnlyUnconfirmedMessages(bool throwSynchronously)
+    {
+        var failed = CreateMessage("failed");
+        var confirmed = CreateMessage("confirmed");
+        var unacknowledged = CreateMessage("unacknowledged");
+        var queue = new TestQueueDataManager(failed, confirmed, unacknowledged)
+        {
+            OnDelete = message =>
+            {
+                if (!ReferenceEquals(message, failed))
+                {
+                    return Task.CompletedTask;
+                }
+
+                var exception = new InvalidOperationException("delete failed");
+                return throwSynchronously ? throw exception : Task.FromException(exception);
+            }
+        };
+        var receiver = new AzureQueueAdapterReceiver(
+            "test-queue",
+            NullLoggerFactory.Instance,
+            queue,
+            new TestQueueDataAdapter());
+        await receiver.Initialize(TimeSpan.FromSeconds(1));
+        var received = await receiver.GetQueueMessagesAsync(3);
+        Assert.Equal(3, received.Count);
+
+        await receiver.MessagesDeliveredAsync([received[0], received[1]]);
+        await receiver.MessagesDeliveredAsync([received[1]]);
+        await receiver.Shutdown(TimeSpan.FromSeconds(1));
+
+        Assert.Equal([failed, confirmed], queue.DeletedMessages);
+        Assert.Equal([failed, unacknowledged], queue.ReleasedMessages);
+    }
+
+    private static QueueMessage CreateMessage(string messageId = "message-id")
     {
         var now = DateTimeOffset.UtcNow;
         return QueuesModelFactory.QueueMessage(
-            "message-id",
+            messageId,
             "pop-receipt",
             "payload",
             dequeueCount: 1,
@@ -121,32 +159,33 @@ public class AzureQueueAdapterReceiverTests
             expiresOn: now.AddDays(1));
     }
 
-    private sealed class TestQueueDataManager(QueueMessage message) : IAzureQueueDataManager
+    private sealed class TestQueueDataManager(params QueueMessage[] messages) : IAzureQueueDataManager
     {
-        private readonly Queue<QueueMessage> _messages = new([message]);
+        private readonly Queue<QueueMessage> _messages = new(messages);
 
         public List<QueueMessage> DeletedMessages { get; } = [];
 
         public List<QueueMessage> ReleasedMessages { get; } = [];
 
-        public Exception? DeleteException { get; init; }
+        public Func<QueueMessage, Task> OnDelete { get; init; } = _ => Task.CompletedTask;
 
         public Task InitQueueAsync() => Task.CompletedTask;
 
         public Task<IEnumerable<QueueMessage>> GetQueueMessages(int? count = null)
         {
-            if (_messages.TryDequeue(out var message))
+            List<QueueMessage> result = [];
+            while (result.Count < (count ?? 1) && _messages.TryDequeue(out var message))
             {
-                return Task.FromResult<IEnumerable<QueueMessage>>([message]);
+                result.Add(message);
             }
 
-            return Task.FromResult<IEnumerable<QueueMessage>>([]);
+            return Task.FromResult<IEnumerable<QueueMessage>>(result);
         }
 
         public Task DeleteQueueMessage(QueueMessage message)
         {
             DeletedMessages.Add(message);
-            return DeleteException is null ? Task.CompletedTask : Task.FromException(DeleteException);
+            return OnDelete(message);
         }
 
         public Task ReleaseQueueMessage(QueueMessage message, CancellationToken cancellationToken)
