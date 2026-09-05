@@ -183,6 +183,31 @@ public sealed class SQSStreamProviderBuilderTests
         Assert.Same(keyedAdapter, factoryAdapter);
     }
 
+    [Fact]
+    public async Task AspireGeneratedConfiguration_OrdersIndexedAttributeListsNumerically()
+    {
+        await using var app = await SqsAspireTestApp.CreateAsync(
+            ProviderName,
+            [
+                ("Region", "us-east-1"),
+                ("ReceiveMessageAttributes:0", "zero"),
+                ("ReceiveMessageAttributes:1", "one"),
+                ("ReceiveMessageAttributes:10", "ten"),
+                ("ReceiveMessageAttributes:2", "two"),
+                ("ReceiveMessageSystemAttributes:0", "system-zero"),
+                ("ReceiveMessageSystemAttributes:1", "system-one"),
+                ("ReceiveMessageSystemAttributes:10", "system-ten"),
+                ("ReceiveMessageSystemAttributes:2", "system-two"),
+            ]);
+        using var host = await app.BuildSiloHostAsync();
+        var options = GetOptions<SqsOptions>(host.Services, ProviderName);
+
+        Assert.Equal(["zero", "one", "two", "ten"], options.ReceiveMessageAttributes);
+        Assert.Equal(
+            ["system-zero", "system-one", "system-two", "system-ten"],
+            options.ReceiveMessageSystemAttributes);
+    }
+
     [Theory]
     [MemberData(nameof(InvalidConfigurations))]
     public async Task AspireGeneratedConfiguration_InvalidSiloConfigurationThrowsActionableError(

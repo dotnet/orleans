@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -274,6 +275,7 @@ public sealed class SqsStreamProviderBuilder : IProviderBuilder<ISiloBuilder>, I
     private static void ConfigureList(IConfigurationSection section, List<string> values)
     {
         var configuredValues = section.GetChildren()
+            .OrderBy(child => GetConfigurationIndex(child.Key))
             .Select(child => child.Value)
             .Where(value => !string.IsNullOrWhiteSpace(value))
             .Select(value => value!)
@@ -284,6 +286,11 @@ public sealed class SqsStreamProviderBuilder : IProviderBuilder<ISiloBuilder>, I
             values.AddRange(configuredValues);
         }
     }
+
+    private static int GetConfigurationIndex(string key)
+        => int.TryParse(key, NumberStyles.None, CultureInfo.InvariantCulture, out var index)
+            ? index
+            : int.MaxValue;
 
     private static string? GetFirstNonWhiteSpace(params string?[] values)
         => values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
