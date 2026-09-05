@@ -1,3 +1,4 @@
+using System.Data.Common;
 using System.Globalization;
 using Orleans.Providers.Streams.Common;
 
@@ -34,7 +35,15 @@ internal sealed partial class AdoNetRecoverableStream(
             options.StartFromNow,
             cancellationToken);
         Volatile.Write(ref _acquisitionTask, acquisitionTask);
-        var partition = await acquisitionTask;
+        AdoNetStreamPartitionState partition;
+        try
+        {
+            partition = await acquisitionTask;
+        }
+        catch (DbException exception) when (cancellationToken.IsCancellationRequested)
+        {
+            throw new OperationCanceledException("ADO.NET stream partition acquisition was canceled.", exception, cancellationToken);
+        }
         cancellationToken.ThrowIfCancellationRequested();
         _partition = partition;
         _readOffset = partition.Checkpoint ?? 0;
