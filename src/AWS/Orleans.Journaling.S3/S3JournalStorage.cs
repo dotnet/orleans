@@ -1290,7 +1290,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
 
     private static Dictionary<string, string> CopyCallerMetadata(IDictionary<string, string>? metadata)
     {
-        var result = new Dictionary<string, string>(StringComparer.Ordinal);
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         if (metadata is null)
         {
             return result;
@@ -1312,7 +1312,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
 
     private static Dictionary<string, string> CopyAndValidateCallerMetadata(IReadOnlyDictionary<string, string>? set)
     {
-        var result = new Dictionary<string, string>(StringComparer.Ordinal);
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         if (set is null)
         {
             return result;
@@ -1355,10 +1355,10 @@ internal sealed partial class S3JournalStorage : IJournalStorage
     {
         if (remove is null)
         {
-            return new HashSet<string>(StringComparer.Ordinal);
+            return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         }
 
-        var result = new HashSet<string>(StringComparer.Ordinal);
+        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var rawPropertyName in remove)
         {
             ArgumentNullException.ThrowIfNull(rawPropertyName, nameof(remove));

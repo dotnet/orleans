@@ -886,6 +886,45 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
         }
 
         [Fact]
+        public async Task UpdateMetadataAsync_WhenSetKeysNormalizeToSameName_ThrowsArgumentException()
+        {
+            var client = Substitute.For<IAmazonS3>();
+            var storage = CreateStorage(client, new S3JournalStorageOptions { BucketName = BucketName });
+            var set = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["Catalog"] = "open",
+                ["x-amz-meta-catalog"] = "closed",
+            };
+
+            await Assert.ThrowsAsync<ArgumentException>(
+                () => storage.UpdateMetadataAsync(
+                    set: set,
+                    cancellationToken: TestContext.Current.CancellationToken).AsTask());
+
+            await client.DidNotReceiveWithAnyArgs().GetObjectMetadataAsync(
+                default!,
+                TestContext.Current.CancellationToken);
+        }
+
+        [Fact]
+        public async Task UpdateMetadataAsync_WhenSetAndRemoveDifferOnlyByCase_ThrowsArgumentException()
+        {
+            var client = Substitute.For<IAmazonS3>();
+            var storage = CreateStorage(client, new S3JournalStorageOptions { BucketName = BucketName });
+
+            var exception = await Assert.ThrowsAsync<ArgumentException>(
+                () => storage.UpdateMetadataAsync(
+                    set: new Dictionary<string, string> { ["Catalog"] = "closed" },
+                    remove: ["catalog"],
+                    cancellationToken: TestContext.Current.CancellationToken).AsTask());
+
+            Assert.Equal("remove", exception.ParamName);
+            await client.DidNotReceiveWithAnyArgs().GetObjectMetadataAsync(
+                default!,
+                TestContext.Current.CancellationToken);
+        }
+
+        [Fact]
         public async Task UpdateMetadataAsync_NoOpRecoversS3ExpressPartCount()
         {
             var client = Substitute.For<IAmazonS3>();
