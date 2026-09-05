@@ -419,7 +419,7 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
     }
 }
 
-internal sealed class GrainScheduledTaskHandle(TaskId taskId, IDurableTaskRequest request, IDurableTaskServer grain, DurableTaskResponse? lastResponse) : IScheduledTaskHandle
+internal sealed class GrainScheduledTaskHandle(TaskId taskId, IDurableTaskRequest? request, IDurableTaskServer grain, DurableTaskResponse? lastResponse) : IScheduledTaskHandle
 {
     public TaskId TaskId { get; } = taskId;
     public DurableTaskResponse? LastResponse { get; private set; } = lastResponse;
@@ -444,7 +444,10 @@ internal sealed class GrainScheduledTaskHandle(TaskId taskId, IDurableTaskReques
 
     public async ValueTask<DurableTaskResponse> ScheduleAsync(CancellationToken cancellationToken)
     {
-        return await grain.ScheduleAsync(TaskId, request, cancellationToken);
+        return await grain.ScheduleAsync(
+            TaskId,
+            request ?? throw new InvalidOperationException("An attached durable task cannot be scheduled."),
+            cancellationToken);
     }
 
     public async ValueTask<DurableTaskResponse> WaitAsync(CancellationToken cancellationToken)
@@ -472,13 +475,6 @@ internal sealed class GrainScheduledTaskHandle(TaskId taskId, IDurableTaskReques
 
     private DurableTaskResponse DecodeResponse(DurableTaskResponse response)
     {
-        if (response is ExceptionDurableTaskResponse { Exception: DurableTaskTerminalFailure failure }
-            && failure.TaskId != TaskId)
-        {
-            throw new InvalidOperationException(
-                $"Received terminal failure for durable task '{failure.TaskId}' while observing '{TaskId}'.");
-        }
-
         return LastResponse = response;
     }
 }
