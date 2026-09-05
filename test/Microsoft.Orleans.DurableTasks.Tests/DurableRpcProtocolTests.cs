@@ -163,6 +163,7 @@ public sealed class DurableRpcProtocolTests
     [Theory]
     [InlineData("target", "one", "root/delay", 7)]
     [InlineData("target", "two", "root/delay", 7)]
+    [InlineData("other-target", "one", "root/delay", 7)]
     [InlineData("target", "one", "root/other", 7)]
     [InlineData("target", "one", "root/delay", 8)]
     public void ResumeJobIdIsStableForExactIdentityAndDistinctForChangedIdentity(
@@ -519,12 +520,40 @@ public sealed class DurableRpcProtocolTests
     }
 
     [Fact]
-    public async Task AttachedDurableTask_StoredNotFoundFailureWithSameTaskIdRemainsWorkflowFailure()
+    public void GetDurableTaskRejectsNullTarget()
+    {
+        var exception = Assert.Throws<ArgumentNullException>(
+            () => DurableTaskGrainExtensions.GetDurableTask<int>(null!, "root"));
+
+        Assert.Equal("target", exception.ParamName);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void GetDurableTaskRejectsEmptyOrWhitespaceRootId(string rootId)
+    {
+        var target = Substitute.For<IAddressable>();
+
+        var exception = Assert.Throws<ArgumentException>(
+            () => target.GetDurableTask<int>(rootId));
+
+        Assert.Equal("rootId", exception.ParamName);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AttachedDurableTask_StoredNotFoundFailureRemainsWorkflowFailure(
+        bool useChildTaskId)
     {
         var rootId = TaskId.Parse("root/attached-failed");
+        var failureTaskId = useChildTaskId
+            ? TaskId.Parse("root/attached-failed/child")
+            : rootId;
         var grain = new TombstoneResponseDurableTaskServer(
             rootId,
-            rootId,
+            failureTaskId,
             returnFailureResponse: true);
         ScheduledTask<int> task = new AttachedScheduledTask<int>(rootId, grain);
 
@@ -535,7 +564,7 @@ public sealed class DurableRpcProtocolTests
         var failedResponse = Assert.IsType<ExceptionDurableTaskResponse>(response);
         var failure = Assert.IsType<DurableTaskNotFoundException>(failedResponse.Exception);
         Assert.Equal(rootId, task.Id);
-        Assert.Equal(rootId, failure.TaskId);
+        Assert.Equal(failureTaskId, failure.TaskId);
         Assert.Equal(0, grain.ScheduleCallCount);
         Assert.Equal(1, grain.SubscribeOrPollCallCount);
     }

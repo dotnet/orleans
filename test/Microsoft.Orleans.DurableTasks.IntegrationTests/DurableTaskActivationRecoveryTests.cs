@@ -29,12 +29,13 @@ public sealed class DurableTaskActivationRecoveryTests : IAsyncLifetime
     public ValueTask InitializeAsync() => _fixture.InitializeAsync();
     public ValueTask DisposeAsync() => _fixture.DisposeAsync();
 
-    [Fact]
-    public async Task ExistingTerminalTaskRecoversAcrossActivationWithoutReexecution()
+    [Theory]
+    [InlineData("default-durable-rpc-round-trip")]
+    [InlineData("escaped/root\\identity")]
+    public async Task ExistingTerminalTaskRecoversAcrossActivationWithoutReexecution(string rootId)
     {
         const int argument = 41;
         const int expectedResult = 130;
-        const string rootId = "default-durable-rpc-round-trip";
         var cancellationToken = TestContext.Current.CancellationToken;
         var grain = _fixture.Client.GetGrain<IDurableTaskRecoveryTestGrain>(Guid.NewGuid());
         var grainId = grain.GetGrainId();
@@ -61,11 +62,36 @@ public sealed class DurableTaskActivationRecoveryTests : IAsyncLifetime
             new DurableTaskInvocationSnapshot(1, activationBefore, argument),
             _fixture.Probe.GetInvocation(grainId));
     }
+
+    [Fact]
+    public async Task PendingTaskReplaysPersistedLogicalTimeAcrossActivation()
+    {
+        const string rootId = "logical-time-replay";
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var grain = _fixture.Client.GetGrain<IDurableTaskRecoveryTestGrain>(Guid.NewGuid());
+        var grainId = grain.GetGrainId();
+        var scheduled = await grain.ObserveLogicalTimeAsync().ScheduleAsync(rootId, cancellationToken);
+        await _fixture.Probe.WaitForLogicalTimeCountAsync(grainId, 1, cancellationToken);
+
+        await grain.RequestDeactivationAsync();
+        _ = await grain.GetActivationIdAsync();
+        var attached = grain.GetDurableTask<DateTimeOffset>(rootId);
+        await _fixture.Probe.WaitForLogicalTimeCountAsync(grainId, 2, cancellationToken);
+        var observations = _fixture.Probe.GetLogicalTimes(grainId);
+
+        Assert.Equal(2, observations.Count);
+        Assert.Equal(observations[0], observations[1]);
+        Assert.False(await attached.IsCompletedAsync(
+            new PollingOptions { PollTimeout = TimeSpan.Zero },
+            cancellationToken));
+        await attached.CancelAsync(cancellationToken);
+    }
 }
 
 public interface IDurableTaskRecoveryTestGrain : IGrainWithGuidKey
 {
     DurableTask<int> ComputeAsync(int value);
+    DurableTask<DateTimeOffset> ObserveLogicalTimeAsync();
     Task<Guid> GetActivationIdAsync();
     Task RequestDeactivationAsync();
 }
@@ -76,6 +102,7 @@ public sealed class DurableTaskRecoveryProbe
 {
     private readonly ConcurrentDictionary<GrainId, DurableTaskInvocationSnapshot> _invocations = [];
     private readonly ConcurrentDictionary<GrainId, int> _activations = [];
+    private readonly ConcurrentDictionary<GrainId, List<DateTimeOffset>> _logicalTimes = [];
     private TaskCompletionSource _changed = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     public void RecordActivation(GrainId grainId)
@@ -96,6 +123,30 @@ public sealed class DurableTaskRecoveryProbe
     public DurableTaskInvocationSnapshot GetInvocation(GrainId grainId) =>
         _invocations.TryGetValue(grainId, out var snapshot) ? snapshot : default;
 
+    public void RecordLogicalTime(GrainId grainId, DateTimeOffset value)
+    {
+        var values = _logicalTimes.GetOrAdd(grainId, static _ => []);
+        lock (values)
+        {
+            values.Add(value);
+        }
+
+        SignalChanged();
+    }
+
+    public IReadOnlyList<DateTimeOffset> GetLogicalTimes(GrainId grainId)
+    {
+        if (!_logicalTimes.TryGetValue(grainId, out var values))
+        {
+            return [];
+        }
+
+        lock (values)
+        {
+            return [.. values];
+        }
+    }
+
     public async Task WaitForActivationCountAsync(
         GrainId grainId,
         int expected,
@@ -109,6 +160,30 @@ public sealed class DurableTaskRecoveryProbe
             lock (_activations)
             {
                 if (_activations.TryGetValue(grainId, out count) && count >= expected)
+                {
+                    return;
+                }
+
+                changed = _changed.Task;
+            }
+
+            await changed.WaitAsync(timeout.Token);
+        }
+    }
+
+    public async Task WaitForLogicalTimeCountAsync(
+        GrainId grainId,
+        int expected,
+        CancellationToken cancellationToken)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(30));
+        while (GetLogicalTimes(grainId).Count < expected)
+        {
+            Task changed;
+            lock (_activations)
+            {
+                if (GetLogicalTimes(grainId).Count >= expected)
                 {
                     return;
                 }
@@ -146,6 +221,14 @@ public sealed class DurableTaskRecoveryTestGrain(DurableTaskRecoveryProbe probe)
     {
         probe.RecordInvocation(this.GetGrainId(), _activationId, value);
         return DurableTask.FromResult(checked((value * 3) + 7));
+    }
+
+    public async DurableTask<DateTimeOffset> ObserveLogicalTimeAsync()
+    {
+        var value = DurableExecutionContext.Current!.UtcNow;
+        probe.RecordLogicalTime(this.GetGrainId(), value);
+        await DurableTask.Delay(TimeSpan.FromHours(1)).WithId("wait");
+        return value;
     }
 
     public Task<Guid> GetActivationIdAsync() => Task.FromResult(_activationId);
