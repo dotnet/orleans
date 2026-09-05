@@ -36,6 +36,25 @@ public sealed class HandlerRoutingContractTests : IDisposable
         Assert.Equal("orders/submit", handler.ExposedRoute);
     }
 
+    [Fact]
+    public void RouteKeyHandler_NullRoute_ThrowsArgumentNullException()
+    {
+        var exception = Assert.Throws<ArgumentNullException>(() => new ExactHandler(null!));
+
+        Assert.Equal("routeKey", exception.ParamName);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" \t\r\n")]
+    public void RouteKeyHandler_EmptyOrWhitespaceRoute_ThrowsArgumentException(string route)
+    {
+        var exception = Assert.Throws<ArgumentException>(() => new ExactHandler(route));
+
+        Assert.IsNotType<ArgumentNullException>(exception);
+        Assert.Equal("routeKey", exception.ParamName);
+    }
+
     [Theory]
     [InlineData("orders/new", true, "new")]
     [InlineData("orders/new/priority", true, "new/priority")]
