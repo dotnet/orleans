@@ -18,7 +18,7 @@ using static Orleans.Internal.StandardExtensions;
 
 namespace Orleans
 {
-    internal partial class OutsideRuntimeClient : IRuntimeClient, IDisposable, IClusterConnectionStatusListener
+    internal partial class OutsideRuntimeClient : IRuntimeClient, IRuntimeClientTestAccessor, IDisposable, IClusterConnectionStatusListener
     {
         internal static bool TestOnlyThrowExceptionDuringInit { get; set; }
 
@@ -97,7 +97,7 @@ namespace Orleans
                     TimeSpan.FromSeconds(1)));
             this.callbackTimer = new PeriodicTimer(period, timeProvider);
             this.sharedCallbackData = new SharedCallbackData(
-                msg => this.UnregisterCallback(msg.Id),
+                this.UnregisterCallback,
                 this.loggerFactory.CreateLogger<CallbackData>(),
                 this.clientMessagingOptions.ResponseTimeout,
                 this.clientMessagingOptions.CancelRequestOnTimeout,
@@ -304,6 +304,8 @@ namespace Orleans
                 callbacks.TryAdd(message.Id, callbackData);
                 callbackData.SubscribeForCancellation(cancellationToken);
 
+                // Shutdown sets _isStopping before sweeping callbacks. Recheck it after registration so that
+                // a callback published after the sweep passed it completes and removes itself here.
                 if (Volatile.Read(ref _isStopping) != 0)
                 {
                     callbackData.OnHostShutdown();
@@ -379,9 +381,9 @@ namespace Orleans
             }
         }
 
-        private void UnregisterCallback(CorrelationId id)
+        private void UnregisterCallback(CallbackData callback)
         {
-            callbacks.TryRemove(id, out _);
+            callbacks.TryRemove(KeyValuePair.Create(callback.Message.Id, callback));
         }
 
         private void ConstructorReset()
@@ -475,7 +477,7 @@ namespace Orleans
             }
         }
 
-        public int GetRunningRequestsCount(GrainInterfaceType grainInterfaceType)
+        int IRuntimeClientTestAccessor.GetRunningRequestCount(GrainInterfaceType grainInterfaceType)
             => this.callbacks.Count(c => c.Value.Message.InterfaceType == grainInterfaceType);
 
         /// <inheritdoc />

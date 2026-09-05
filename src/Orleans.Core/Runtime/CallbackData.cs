@@ -129,7 +129,7 @@ namespace Orleans.Runtime
 
             stopwatch.Stop();
             SignalCancellation();
-            shared.Unregister(Message);
+            shared.Unregister(this);
             _applicationRequestInstruments.OnAppRequestsEnd((long)stopwatch.Elapsed.TotalMilliseconds);
             _applicationRequestInstruments.OnAppRequestsCanceled(GetTargetGrainType());
             OrleansCallBackDataEvent.Instance.OnCanceled(Message);
@@ -150,7 +150,7 @@ namespace Orleans.Runtime
                 SignalCancellation();
             }
 
-            this.shared.Unregister(this.Message);
+            this.shared.Unregister(this);
             DisposeCancellationRegistration();
             _applicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
             _applicationRequestInstruments.OnAppRequestsTimedOut(GetTargetGrainType());
@@ -175,7 +175,7 @@ namespace Orleans.Runtime
             }
 
             this.stopwatch.Stop();
-            this.shared.Unregister(this.Message);
+            this.shared.Unregister(this);
             DisposeCancellationRegistration();
             _applicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
 
@@ -195,7 +195,7 @@ namespace Orleans.Runtime
             }
 
             this.stopwatch.Stop();
-            this.shared.Unregister(this.Message);
+            this.shared.Unregister(this);
             DisposeCancellationRegistration();
             _applicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
 
@@ -206,9 +206,14 @@ namespace Orleans.Runtime
 
         public void DoCallback(Message response)
         {
+            TryDoCallback(response);
+        }
+
+        internal bool TryDoCallback(Message response)
+        {
             if (!TryComplete())
             {
-                return;
+                return false;
             }
 
             OrleansCallBackDataEvent.Instance.DoCallback(this.Message);
@@ -219,6 +224,7 @@ namespace Orleans.Runtime
 
             // do callback outside the CallbackData lock. Just not a good practice to hold a lock for this unrelated operation.
             ResponseCallback(response, this.context);
+            return true;
         }
 
         private bool TryComplete() => (Interlocked.Or(ref _state, StateCompleted) & StateCompleted) == 0;

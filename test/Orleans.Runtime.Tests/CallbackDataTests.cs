@@ -68,7 +68,7 @@ public class CallbackDataTests
 
     private static CallbackData CreateCallback(
         IResponseCompletionSource completion,
-        Action<Message> unregister,
+        Action<CallbackData> unregister,
         ApplicationRequestInstruments instruments)
     {
         var shared = new SharedCallbackData(
