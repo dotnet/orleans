@@ -681,6 +681,10 @@ dotnet_diagnostic.CA2000.severity = warning
 [src/Orleans.Serialization.SystemTextJson/**.cs]
 dotnet_diagnostic.CA2000.severity = warning
 
+# CA1062: Validate arguments of public methods
+[src/Azure/Orleans.Reminders.Cosmos/**.cs]
+dotnet_diagnostic.CA1062.severity = warning
+
 # Production source enforces the correctness baseline. Tests, samples, documentation,
 # playgrounds, templates, and tools retain advisory diagnostics during this rollout.
 [src/**/*.{cs,vb}]
