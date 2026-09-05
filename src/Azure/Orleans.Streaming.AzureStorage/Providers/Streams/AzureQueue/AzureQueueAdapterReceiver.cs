@@ -16,12 +16,16 @@ namespace Orleans.Providers.Streams.AzureQueue
     /// </summary>
     internal partial class AzureQueueAdapterReceiver : IQueueAdapterReceiver
     {
-        private AzureQueueDataManager? queue;
+        private const int MaxConcurrentReleases = 32;
+        private IAzureQueueDataManager? queue;
         private long lastReadMessage;
-        private Task? outstandingTask;
         private readonly ILogger logger;
         private readonly IQueueDataAdapter<string, IBatchContainer> dataAdapter;
         private readonly List<PendingDelivery> pending;
+        private readonly object pendingLock = new();
+        private int activeOperations;
+        private TaskCompletionSource? operationsCompleted;
+        private bool shutdownCompleted;
 
         private readonly string azureQueueName;
 
@@ -35,7 +39,7 @@ namespace Orleans.Providers.Streams.AzureQueue
             return new AzureQueueAdapterReceiver(azureQueueName, loggerFactory, queue, dataAdapter);
         }
 
-        private AzureQueueAdapterReceiver(string azureQueueName, ILoggerFactory loggerFactory, AzureQueueDataManager queue, IQueueDataAdapter<string, IBatchContainer> dataAdapter)
+        internal AzureQueueAdapterReceiver(string azureQueueName, ILoggerFactory loggerFactory, IAzureQueueDataManager queue, IQueueDataAdapter<string, IBatchContainer> dataAdapter)
         {
             this.azureQueueName = azureQueueName ?? throw new ArgumentNullException(nameof(azureQueueName));
             this.queue = queue ?? throw new ArgumentNullException(nameof(queue));
@@ -55,79 +59,163 @@ namespace Orleans.Providers.Streams.AzureQueue
 
         public async Task Shutdown(TimeSpan timeout)
         {
+            using var timeoutCancellation = new CancellationTokenSource(timeout);
+            IAzureQueueDataManager? queueRef;
+            Task? pendingOperations;
+
+            lock (pendingLock)
+            {
+                queueRef = queue;
+                queue = null;
+                pendingOperations = operationsCompleted?.Task;
+            }
+
             try
             {
-                // await the last storage operation, so after we shutdown and stop this receiver we don't get async operation completions from pending storage operations.
-                if (outstandingTask != null)
-                    await outstandingTask;
+                if (pendingOperations != null)
+                {
+                    try
+                    {
+                        await pendingOperations.WaitAsync(timeoutCancellation.Token);
+                    }
+                    catch (OperationCanceledException exception) when (timeoutCancellation.IsCancellationRequested)
+                    {
+                        LogWarningPendingOperationException(exception, azureQueueName);
+                    }
+                    catch (Exception exception)
+                    {
+                        LogWarningPendingOperationException(exception, azureQueueName);
+                    }
+                }
+
+                QueueMessage[] pendingMessages;
+                lock (pendingLock)
+                {
+                    pendingMessages = pending.Select(static item => item.Message).ToArray();
+                }
+
+                if (queueRef is not null && pendingMessages.Length > 0)
+                {
+                    var releaseTask = ReleaseMessagesAsync(queueRef, pendingMessages, timeoutCancellation.Token);
+                    try
+                    {
+                        await releaseTask.WaitAsync(timeoutCancellation.Token);
+                    }
+                    catch (OperationCanceledException exception) when (timeoutCancellation.IsCancellationRequested)
+                    {
+                        releaseTask.Ignore();
+                        LogWarningReleaseQueueMessage(exception, azureQueueName, pendingMessages.Length);
+                    }
+                    catch (Exception exception)
+                    {
+                        LogWarningReleaseQueueMessage(exception, azureQueueName, pendingMessages.Length);
+                    }
+                }
             }
             finally
             {
-                // remember that we shut down so we never try to read from the queue again.
-                queue = null;
+                lock (pendingLock)
+                {
+                    pending.Clear();
+                    shutdownCompleted = true;
+                }
             }
         }
 
         public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
         {
+            IAzureQueueDataManager? queueRef;
+            lock (pendingLock)
+            {
+                queueRef = queue;
+                if (queueRef is null)
+                {
+                    return Array.Empty<IBatchContainer>();
+                }
+
+                BeginOperation();
+            }
+
             const int MaxNumberOfMessagesToPeek = 32;
 
             try
             {
-                var queueRef = queue; // store direct ref, in case we are somehow asked to shutdown while we are receiving.
-                if (queueRef == null) return new List<IBatchContainer>();
-
                 int count = maxCount < 0 || maxCount == QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG ?
                     MaxNumberOfMessagesToPeek : Math.Min(maxCount, MaxNumberOfMessagesToPeek);
 
-                var task = queueRef.GetQueueMessages(count);
-                outstandingTask = task;
-                IEnumerable<QueueMessage> messages = await task;
+                var messages = (await queueRef.GetQueueMessages(count)).ToArray();
 
                 List<IBatchContainer> azureQueueMessages = new List<IBatchContainer>();
+                List<PendingDelivery> pendingDeliveries = new List<PendingDelivery>();
                 foreach (var message in messages)
                 {
                     IBatchContainer container = this.dataAdapter.FromQueueMessage(message.MessageText, lastReadMessage++);
                     azureQueueMessages.Add(container);
-                    this.pending.Add(new PendingDelivery(container.SequenceToken, message));
+                    pendingDeliveries.Add(new PendingDelivery(container, message));
+                }
+
+                var shutdownStarted = false;
+                lock (pendingLock)
+                {
+                    shutdownStarted = !ReferenceEquals(queue, queueRef);
+                    if (shutdownStarted && shutdownCompleted)
+                    {
+                        pendingDeliveries.Clear();
+                    }
+
+                    if (pendingDeliveries.Count > 0)
+                    {
+                        var messageIds = pendingDeliveries
+                            .Select(static item => item.Message.MessageId)
+                            .ToHashSet(StringComparer.Ordinal);
+                        pending.RemoveAll(item => messageIds.Contains(item.Message.MessageId));
+                    }
+
+                    pending.AddRange(pendingDeliveries);
+                }
+
+                if (shutdownStarted)
+                {
+                    return Array.Empty<IBatchContainer>();
                 }
 
                 return azureQueueMessages;
             }
             finally
             {
-                outstandingTask = null;
+                EndOperation();
             }
         }
 
         public async Task MessagesDeliveredAsync(IList<IBatchContainer> messages)
         {
+            IAzureQueueDataManager? queueRef;
+            lock (pendingLock)
+            {
+                queueRef = queue;
+                if (messages.Count == 0 || queueRef is null)
+                {
+                    return;
+                }
+
+                BeginOperation();
+            }
+
             try
             {
-                var queueRef = queue; // store direct ref, in case we are somehow asked to shutdown while we are receiving.
-                if (messages.Count == 0 || queueRef == null) return;
-                // get sequence tokens of delivered messages
-                List<StreamSequenceToken> deliveredTokens = messages.Select(message => message.SequenceToken!).ToList();
-                // find oldest delivered message
-                StreamSequenceToken oldest = deliveredTokens.Max()!;
-                // finalize all pending messages at or befor the oldest
-                List<PendingDelivery> finalizedDeliveries = pending
-                    .Where(pendingDelivery => !pendingDelivery.Token.Newer(oldest))
-                    .ToList();
-                if (finalizedDeliveries.Count == 0) return;
-                // remove all finalized deliveries from pending, regardless of if it was delivered or not.
-                pending.RemoveRange(0, finalizedDeliveries.Count);
-                // get the queue messages for all finalized deliveries that were delivered.
-                List<QueueMessage> deliveredCloudQueueMessages = finalizedDeliveries
-                    .Where(finalized => deliveredTokens.Contains(finalized.Token))
-                    .Select(finalized => finalized.Message)
-                    .ToList();
-                if (deliveredCloudQueueMessages.Count == 0) return;
-                // delete all delivered queue messages from the queue.  Anything finalized but not delivered will show back up later
-                outstandingTask = Task.WhenAll(deliveredCloudQueueMessages.Select(queueRef.DeleteQueueMessage));
+                HashSet<PendingDelivery> delivered;
+                lock (pendingLock)
+                {
+                    delivered = messages
+                        .Select(message => pending.Find(item => ReferenceEquals(item.Batch, message)))
+                        .OfType<PendingDelivery>()
+                        .ToHashSet();
+                }
+                if (delivered.Count == 0) return;
+
                 try
                 {
-                    await outstandingTask;
+                    await ConfirmMessagesDeliveredAsync(queueRef, delivered);
                 }
                 catch (Exception exc)
                 {
@@ -136,7 +224,88 @@ namespace Orleans.Providers.Streams.AzureQueue
             }
             finally
             {
-                outstandingTask = null;
+                EndOperation();
+            }
+        }
+
+        private void BeginOperation()
+        {
+            if (activeOperations++ == 0)
+            {
+                operationsCompleted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            }
+        }
+
+        private void EndOperation()
+        {
+            TaskCompletionSource? completed = null;
+            lock (pendingLock)
+            {
+                if (--activeOperations == 0)
+                {
+                    completed = operationsCompleted;
+                    operationsCompleted = null;
+                }
+            }
+
+            completed?.TrySetResult();
+        }
+
+        private static async Task ReleaseMessagesAsync(
+            IAzureQueueDataManager queueRef,
+            IEnumerable<QueueMessage> messages,
+            CancellationToken cancellationToken)
+        {
+            List<Exception>? failures = null;
+            foreach (var batch in messages.Chunk(MaxConcurrentReleases))
+            {
+                var results = await Task.WhenAll(batch.Select(ReleaseMessage));
+                foreach (var failure in results.OfType<Exception>())
+                {
+                    (failures ??= []).Add(failure);
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+
+            if (failures is not null)
+            {
+                throw new AggregateException("One or more Azure Queue messages could not be released.", failures);
+            }
+
+            async Task<Exception?> ReleaseMessage(QueueMessage message)
+            {
+                try
+                {
+                    await queueRef.ReleaseQueueMessage(message, cancellationToken);
+                    return null;
+                }
+                catch (Exception exception)
+                {
+                    return exception;
+                }
+            }
+        }
+
+        private async Task ConfirmMessagesDeliveredAsync(IAzureQueueDataManager queueRef, HashSet<PendingDelivery> delivered)
+        {
+            var deletions = delivered.ToDictionary(
+                static item => item,
+                async item => await queueRef.DeleteQueueMessage(item.Message));
+            try
+            {
+                await Task.WhenAll(deletions.Values);
+            }
+            finally
+            {
+                var confirmed = deletions
+                    .Where(static item => item.Value.IsCompletedSuccessfully)
+                    .Select(static item => item.Key)
+                    .ToHashSet();
+                lock (pendingLock)
+                {
+                    pending.RemoveAll(confirmed.Contains);
+                }
             }
         }
 
@@ -147,17 +316,31 @@ namespace Orleans.Providers.Streams.AzureQueue
         )]
         private partial void LogWarningOnDeleteQueueMessage(Exception exception, string queueName);
 
-        private class PendingDelivery
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            EventId = (int)AzureQueueErrorCode.AzureQueue_17,
+            Message = "Exception while awaiting a pending operation for Azure queue {QueueName}. Continuing shutdown cleanup."
+        )]
+        private partial void LogWarningPendingOperationException(Exception exception, string queueName);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            EventId = (int)AzureQueueErrorCode.AzureQueue_18,
+            Message = "An error occurred while releasing up to {MessageCount} pending messages for Azure queue {QueueName}."
+        )]
+        private partial void LogWarningReleaseQueueMessage(Exception exception, string queueName, int messageCount);
+
+        private sealed class PendingDelivery
         {
-            public PendingDelivery(StreamSequenceToken token, QueueMessage message)
+            public PendingDelivery(IBatchContainer batch, QueueMessage message)
             {
-                this.Token = token;
+                this.Batch = batch;
                 this.Message = message;
             }
 
-            public QueueMessage Message { get; }
+            public IBatchContainer Batch { get; }
 
-            public StreamSequenceToken Token { get; }
+            public QueueMessage Message { get; }
         }
     }
 }

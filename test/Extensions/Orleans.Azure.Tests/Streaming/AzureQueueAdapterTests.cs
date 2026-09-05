@@ -71,6 +71,67 @@ namespace Tester.AzureUtils.Streaming
                 TestContext.Current.CancellationToken);
         }
 
+        [Fact, TestCategory("Functional")]
+        public async Task ShutdownReleasesPendingMessages()
+        {
+            var options = new AzureQueueOptions
+            {
+                MessageVisibilityTimeout = TimeSpan.FromMinutes(1),
+                QueueNames = [azureQueueNames[0]]
+            };
+            options.ConfigureTestDefaults();
+            var serializer = this.fixture.Services.GetRequiredService<Serializer>();
+            var adapterFactory = new AzureQueueAdapterFactory(
+                AZURE_QUEUE_STREAM_PROVIDER_NAME,
+                options,
+                new SimpleQueueCacheOptions(),
+                new AzureQueueDataAdapterV2(serializer),
+                loggerFactory);
+            adapterFactory.Init();
+
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var adapter = await ((IQueueAdapterFactory)adapterFactory).CreateAdapter(cancellationToken);
+            var queueId = Assert.Single(adapterFactory.GetStreamQueueMapper().GetAllQueues());
+            var receiver = adapter.CreateReceiver(queueId);
+            await receiver.Initialize(TimeSpan.FromSeconds(10), cancellationToken);
+
+            var streamId = StreamId.Create("handoff", Guid.NewGuid());
+            await adapter.QueueMessageBatchAsync(streamId, [42], null, null);
+            var received = await WaitForMessage(receiver, "the initial receiver", cancellationToken);
+            Assert.Equal(42, Assert.Single(received.GetEvents<int>()).Item1);
+
+            await receiver.Shutdown(TimeSpan.FromSeconds(10), cancellationToken);
+
+            var replacement = adapter.CreateReceiver(queueId);
+            await replacement.Initialize(TimeSpan.FromSeconds(10), cancellationToken);
+            var redelivered = await WaitForMessage(replacement, "the replacement receiver after handoff", cancellationToken);
+            Assert.Equal(42, Assert.Single(redelivered.GetEvents<int>()).Item1);
+
+            await replacement.MessagesDeliveredAsync([redelivered], cancellationToken);
+            await replacement.Shutdown(TimeSpan.FromSeconds(10), cancellationToken);
+        }
+
+        private static async Task<IBatchContainer> WaitForMessage(
+            IQueueAdapterReceiver receiver,
+            string phase,
+            CancellationToken cancellationToken)
+        {
+            var timeout = TimeSpan.FromSeconds(10);
+            var started = DateTime.UtcNow;
+            while (DateTime.UtcNow - started < timeout)
+            {
+                var messages = await receiver.GetQueueMessagesAsync(1, cancellationToken);
+                if (messages.Count > 0)
+                {
+                    return Assert.Single(messages);
+                }
+
+                await Task.Delay(TimeSpan.FromMilliseconds(100), cancellationToken);
+            }
+
+            throw new TimeoutException($"Timed out after {timeout} waiting for one Azure Queue message during {phase}; observed 0.");
+        }
+
         private async Task SendAndReceiveFromQueueAdapter(
             IQueueAdapterFactory adapterFactory,
             CancellationToken cancellationToken)
