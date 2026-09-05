@@ -69,6 +69,26 @@ public class FirestoreGrainDirectoryTests : GrainDirectoryTests<FirestoreGrainDi
         Assert.Null(await GrainDirectory.Lookup(address.GrainId));
     }
 
+    [Fact]
+    public async Task RegisterNullReplacementPreservesPreviousRegistration()
+    {
+        var previousAddress = new GrainAddress
+        {
+            ActivationId = ActivationId.NewId(),
+            GrainId = GrainId.Parse($"user/{Guid.NewGuid():N}"),
+            SiloAddress = SiloAddress.FromParsableString("10.0.23.12:1000@5678"),
+            MembershipVersion = new MembershipVersion(51),
+        };
+        await GrainDirectory.Register(previousAddress);
+        IGrainDirectory directory = GrainDirectory;
+
+        var exception = await Assert.ThrowsAsync<ArgumentNullException>(
+            () => RegisterWithoutCancellation(directory, null!, previousAddress));
+
+        Assert.Equal("address", exception.ParamName);
+        Assert.Equal(previousAddress, await GrainDirectory.Lookup(previousAddress.GrainId));
+    }
+
     public async ValueTask InitializeAsync()
     {
         var clusterOptions = new ClusterOptions
@@ -91,4 +111,10 @@ public class FirestoreGrainDirectoryTests : GrainDirectoryTests<FirestoreGrainDi
     }
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+
+    private static Task<GrainAddress?> RegisterWithoutCancellation(
+        IGrainDirectory directory,
+        GrainAddress address,
+        GrainAddress? previousAddress) =>
+        directory.Register(address, previousAddress);
 }
