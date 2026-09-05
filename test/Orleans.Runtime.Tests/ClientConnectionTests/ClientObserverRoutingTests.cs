@@ -15,6 +15,9 @@ namespace Tester.ClientConnectionTests;
 [TestCategory("BVT")]
 public class ClientObserverRoutingTests
 {
+    public static ClientNotAvailableException CreateUnavailableClientException()
+        => new(ClientGrainId.Create().GrainId);
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
