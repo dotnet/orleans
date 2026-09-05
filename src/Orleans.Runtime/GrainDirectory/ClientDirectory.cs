@@ -103,20 +103,19 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
 
         async ValueTask<List<GrainAddress>> LookupClientAsync(GrainId grainId)
         {
-            await RefreshInvalidatedRoutes();
-            if (TryLocalLookup(grainId, out var refreshedRoutes))
+            var result = await RefreshInvalidatedRoutes(grainId);
+            if (result is not null)
             {
                 if (ShouldPublish())
                 {
                     _schedulePublishUpdate();
                 }
 
-                return refreshedRoutes;
+                return result;
             }
 
             var seed = Random.Shared.Next();
             var attemptsRemaining = 5;
-            List<GrainAddress>? result = null;
             while (attemptsRemaining-- > 0 && _remoteDirectories is var remoteDirectories && remoteDirectories.Length > 0)
             {
                 try
@@ -139,26 +138,21 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
                     LogErrorCallingRemoteClientDirectory(exception);
                 }
 
-                // Try again to find the requested client's routes.
-                // Note that this occurs whether the remote update call succeeded or failed.
-                if (TryLocalLookup(grainId, out result) && result.Count > 0)
+                // Discovery can reveal a route whose owner is already pending refresh.
+                result = await RefreshInvalidatedRoutes(grainId);
+                if (result is not null)
                 {
                     break;
                 }
             }
 
+            result ??= await RefreshInvalidatedRoutes(grainId);
             if (ShouldPublish())
             {
                 _schedulePublishUpdate();
             }
 
-            // Try one last time to find the requested client's routes.
-            if (result is null && !TryLocalLookup(grainId, out result))
-            {
-                result = [];
-            }
-
-            return result;
+            return result ?? [];
         }
     }
 
@@ -218,36 +212,42 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
         }
     }
 
-    private async Task RefreshInvalidatedRoutes()
+    private async ValueTask<List<GrainAddress>?> RefreshInvalidatedRoutes(GrainId grainId)
     {
-        while (_pendingRefreshes is { Count: > 0 } pending)
+        while (true)
         {
-            foreach (var entry in pending)
+            SiloAddress silo;
+            object token;
+            ImmutableDictionary<SiloAddress, long> versionVector;
+            lock (_lockObj)
             {
-                ImmutableDictionary<SiloAddress, long> versionVector;
-                lock (_lockObj)
+                if (TryLocalLookup(grainId, out var addresses))
                 {
-                    EnsureRefreshed();
-                    if (!_pendingRefreshes.TryGetValue(entry.Key, out var token) || !ReferenceEquals(token, entry.Value))
-                    {
-                        continue;
-                    }
-
-                    versionVector = _table.ToImmutableDictionary(e => e.Key, e => e.Value.Version);
+                    return addresses;
                 }
 
-                var remote = _grainFactory.GetSystemTarget<IRemoteClientDirectory>(Constants.ClientDirectoryType, entry.Key);
-                var delta = await remote.GetClientRoutes(versionVector, _stoppingCts.Token);
-                lock (_lockObj)
+                if (!_currentSnapshot.TryGetValue(grainId, out var candidates))
                 {
-                    UpdateRoutingTable(delta);
+                    return null;
+                }
 
-                    // Keep the versioned row while refreshing: a same-version response confirms it,
-                    // and a delayed response only completes the invalidation which initiated its read.
-                    if (_pendingRefreshes.TryGetValue(entry.Key, out var token) && ReferenceEquals(token, entry.Value))
-                    {
-                        _pendingRefreshes = _pendingRefreshes.Remove(entry.Key);
-                    }
+                // A cached candidate excluded by TryLocalLookup has a pending owner refresh.
+                silo = candidates[0].SiloAddress!;
+                token = _pendingRefreshes[silo];
+                versionVector = _table.ToImmutableDictionary(e => e.Key, e => e.Value.Version);
+            }
+
+            var remote = _grainFactory.GetSystemTarget<IRemoteClientDirectory>(Constants.ClientDirectoryType, silo);
+            var delta = await remote.GetClientRoutes(versionVector, _stoppingCts.Token);
+            lock (_lockObj)
+            {
+                UpdateRoutingTable(delta);
+
+                // Keep the versioned row while refreshing: a same-version response confirms it,
+                // and a delayed response only completes the invalidation which initiated its read.
+                if (_pendingRefreshes.TryGetValue(silo, out var currentToken) && ReferenceEquals(currentToken, token))
+                {
+                    _pendingRefreshes = _pendingRefreshes.Remove(silo);
                 }
             }
         }
