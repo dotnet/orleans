@@ -2,9 +2,9 @@ namespace Orleans.Runtime.ClusterServices;
 
 internal enum ClusterServiceExecutionDisposition
 {
-    RejectedBeforeExecution,
-    Executed,
-    OutcomeUnknown
+    OutcomeUnknown = 0,
+    Executed = 1,
+    RejectedBeforeExecution = 2
 }
 
 internal enum ClusterServiceRetryReason
