@@ -579,7 +579,7 @@ jobs:
       if: always()
       run: docker rm -f dynamodb || true
   test-s3:
-    name: AWS S3 journaling provider tests
+    name: AWS S3 provider tests
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
