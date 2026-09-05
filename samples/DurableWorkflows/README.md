@@ -37,6 +37,8 @@ Approval and cancellation commands return `202 Accepted`. Their `Location` heade
 After submitting a command, clients should poll that status resource instead of repeating
 the mutation solely to discover completion.
 
+GET polls the retained task state and returns `404 Not Found` for a missing or expired root task. A retained workflow execution failure remains a `200 OK` status response with `status: "failed"` and a safe error summary.
+
 ```json
 {
   "taskId": "approval-approval-1",

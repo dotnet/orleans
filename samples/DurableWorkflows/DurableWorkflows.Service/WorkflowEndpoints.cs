@@ -1,5 +1,5 @@
-using Orleans.DurableTasks;
 using Microsoft.AspNetCore.Mvc;
+using Orleans.DurableTasks;
 
 namespace DurableWorkflows;
 
@@ -122,23 +122,9 @@ public static class WorkflowEndpoints
             return InvalidId();
         }
 
-        var snapshot = await client.GetGrain<IApprovalGrain>(correlationId).GetSnapshotAsync();
-        if (snapshot.Subject is null)
-        {
-            return Missing();
-        }
-
-        try
-        {
-            var scheduled = await client.GetGrain<IWorkflowGrain>(correlationId)
-                .RunApprovalAsync(new(correlationId, snapshot.Subject))
-                .ScheduleAsync(RootId("approval", correlationId), cancellationToken);
-            return Results.Ok(await GetStatusAsync<ApprovalWorkflowResult>(scheduled, cancellationToken));
-        }
-        catch (InvalidOperationException)
-        {
-            return Missing();
-        }
+        var scheduled = client.GetGrain<IWorkflowGrain>(correlationId)
+            .GetDurableTask<ApprovalWorkflowResult>(RootId("approval", correlationId));
+        return await GetStatusAsync<ApprovalWorkflowResult>(scheduled, cancellationToken);
     }
 
     private static async Task<IResult> StartCancellationAsync(
@@ -196,23 +182,9 @@ public static class WorkflowEndpoints
             return InvalidId();
         }
 
-        var snapshot = await client.GetGrain<ICancellationGrain>(cancellationId).GetSnapshotAsync();
-        if (!snapshot.Registered)
-        {
-            return Missing();
-        }
-
-        try
-        {
-            var scheduled = await client.GetGrain<IWorkflowGrain>(cancellationId)
-                .RunCancellationAsync(cancellationId)
-                .ScheduleAsync(RootId("cancellation", cancellationId), cancellationToken);
-            return Results.Ok(await GetStatusAsync<CancellationWorkflowResult>(scheduled, cancellationToken));
-        }
-        catch (InvalidOperationException)
-        {
-            return Missing();
-        }
+        var scheduled = client.GetGrain<IWorkflowGrain>(cancellationId)
+            .GetDurableTask<CancellationWorkflowResult>(RootId("cancellation", cancellationId));
+        return await GetStatusAsync<CancellationWorkflowResult>(scheduled, cancellationToken);
     }
 
     private static async Task<IResult> RunOrderAsync(
@@ -257,12 +229,17 @@ public static class WorkflowEndpoints
         return scheduled;
     }
 
-    private static async Task<WorkflowStatusResponse> GetStatusAsync<TResult>(
+    private static async Task<IResult> GetStatusAsync<TResult>(
         ScheduledTask<TResult> scheduled,
         CancellationToken cancellationToken)
     {
         var response = await scheduled.GetResponseAsync(PollImmediately, cancellationToken);
-        return response.ResponseKind switch
+        if (response.Exception is DurableTaskNotFoundException missing && missing.TaskId == scheduled.Id)
+        {
+            return Missing();
+        }
+
+        WorkflowStatusResponse status = response.ResponseKind switch
         {
             DurableTaskResponseKind.None or DurableTaskResponseKind.Pending =>
                 new(scheduled.Id.ToString(), "pending", null, null),
@@ -276,6 +253,7 @@ public static class WorkflowEndpoints
                 new(scheduled.Id.ToString(), "failed", null, "Workflow execution failed."),
             _ => throw new InvalidOperationException("Unknown durable task response.")
         };
+        return Results.Ok(status);
     }
 
     private static IResult Accepted(string kind, string id, TaskId taskId)

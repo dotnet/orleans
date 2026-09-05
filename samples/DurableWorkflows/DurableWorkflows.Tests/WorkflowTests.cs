@@ -1,4 +1,3 @@
-using Orleans.DurableTasks;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -10,7 +9,9 @@ using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Time.Testing;
 using Orleans.Configuration;
+using Orleans.DurableTasks;
 using Orleans.Hosting;
 using Orleans.Journaling;
 using Orleans.TestingHost;
@@ -176,7 +177,10 @@ public sealed class WorkflowTests : IAsyncLifetime
     internal static VolatileJournalStorageProvider CreateStorage() =>
         new(Options.Create(new JournaledStateManagerOptions { JournalFormatKey = "orleans-binary" }));
 
-    internal static InProcessTestCluster CreateCluster(short silos, VolatileJournalStorageProvider storage)
+    internal static InProcessTestCluster CreateCluster(
+        short silos,
+        VolatileJournalStorageProvider storage,
+        TimeProvider? timeProvider = null)
     {
         var builder = new InProcessTestClusterBuilder(silos);
         builder.ConfigureClient(clientBuilder => clientBuilder.AddDurableTasks());
@@ -190,6 +194,11 @@ public sealed class WorkflowTests : IAsyncLifetime
             siloBuilder.Services.RemoveAll<IJournalStorageCatalog>();
             siloBuilder.Services.AddSingleton<IJournalStorageProvider>(storage);
             siloBuilder.Services.AddSingleton<IJournalStorageCatalog>(storage);
+            if (timeProvider is not null)
+            {
+                siloBuilder.Services.AddSingleton(timeProvider);
+                siloBuilder.Services.UseTimeProviderForBackgroundAreas(TimeProvider.System);
+            }
         });
         return builder.Build();
     }
@@ -238,13 +247,14 @@ public sealed class WorkflowRecoveryTests
 public sealed class WorkflowEndpointTests : IAsyncLifetime
 {
     private readonly VolatileJournalStorageProvider _storage = WorkflowTests.CreateStorage();
+    private readonly FakeTimeProvider _timeProvider = new(DateTimeOffset.UtcNow);
     private InProcessTestCluster _cluster = null!;
     private WebApplication _app = null!;
     private HttpClient _http = null!;
 
     public async ValueTask InitializeAsync()
     {
-        _cluster = WorkflowTests.CreateCluster(1, _storage);
+        _cluster = WorkflowTests.CreateCluster(1, _storage, _timeProvider);
         await _cluster.DeployAsync();
 
         var builder = WebApplication.CreateSlimBuilder();
@@ -404,18 +414,101 @@ public sealed class WorkflowEndpointTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.NotFound, missingCancellation.StatusCode);
     }
 
+    [Theory]
+    [InlineData("approval")]
+    [InlineData("cancellation")]
+    public async Task StatusLeavesRegisteredButUnscheduledWorkflowsMissing(string kind)
+    {
+        var id = UniqueId();
+        if (kind == "approval")
+        {
+            await _cluster.Client.GetGrain<IApprovalGrain>(id).RegisterRequestAsync("registered");
+        }
+        else
+        {
+            await _cluster.Client.GetGrain<ICancellationGrain>(id).RegisterRequestAsync();
+        }
+
+        var location = $"/workflows/{kind}/{id}/status";
+        using var first = await _http.GetAsync(location);
+        using var repeated = await _http.GetAsync(location);
+
+        Assert.Equal(HttpStatusCode.NotFound, first.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, repeated.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("approval")]
+    [InlineData("cancellation")]
+    public async Task ExpiredStatusRemainsMissingAcrossWorkflowReactivation(string kind)
+    {
+        var id = UniqueId();
+        using var submit = kind == "approval"
+            ? await _http.PutAsJsonAsync(
+                $"/workflows/approval/{id}",
+                new ApprovalSubmission("retained", Approved: true, "completed"))
+            : await _http.DeleteAsync($"/workflows/cancellation/{id}?reason=completed");
+        Assert.Equal(HttpStatusCode.Accepted, submit.StatusCode);
+        var location = $"/workflows/{kind}/{id}/status";
+        await WaitForStatusAsync(location, "succeeded");
+
+        _timeProvider.Advance(TimeSpan.FromHours(2));
+        var workflow = _cluster.Client.GetGrain<IWorkflowGrain>(id);
+        // Completing another root on this grain sweeps responses past the one-hour retention period.
+        var cleanup = await workflow.RunBasicAsync("cleanup").ScheduleAsync($"cleanup-{id}");
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        Assert.Equal("CLEANUP", (await cleanup.WaitAsync(timeout.Token)).Output);
+
+        using var expired = await _http.GetAsync(location);
+        Assert.Equal(HttpStatusCode.NotFound, expired.StatusCode);
+        await _cluster.DeactivateAsync(workflow);
+        using var recovered = await _http.GetAsync(location);
+        Assert.Equal(HttpStatusCode.NotFound, recovered.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("approval")]
+    [InlineData("cancellation")]
+    public async Task StatusPreservesExecutionFailureAsSafeTerminalResult(string kind)
+    {
+        var id = UniqueId();
+        var workflow = _cluster.Client.GetGrain<IWorkflowGrain>(id);
+        ScheduledTask scheduled = kind == "approval"
+            ? await workflow.RunApprovalAsync(new("mismatched-id", "invalid")).ScheduleAsync($"approval-{id}")
+            : await workflow.RunCancellationAsync("mismatched-id").ScheduleAsync($"cancellation-{id}");
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var failure = await scheduled.GetResponseAsync(timeout.Token);
+        Assert.IsType<InvalidOperationException>(failure.Exception);
+
+        var status = await GetStatusAsync($"/workflows/{kind}/{id}/status");
+        Assert.Equal("failed", status.Status);
+        Assert.Equal(scheduled.Id.ToString(), status.TaskId);
+        Assert.Equal(JsonValueKind.Null, status.Result.ValueKind);
+        Assert.Equal("Workflow execution failed.", status.Error);
+    }
+
     private async Task<StatusDocument> WaitForStatusAsync(string location, string expected)
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        while (true)
+        StatusDocument? lastStatus = null;
+        try
         {
-            var status = await GetStatusAsync(location, timeout.Token);
-            if (string.Equals(status.Status, expected, StringComparison.Ordinal))
+            while (true)
             {
-                return status;
-            }
+                lastStatus = await GetStatusAsync(location, timeout.Token);
+                if (string.Equals(lastStatus.Status, expected, StringComparison.Ordinal))
+                {
+                    return lastStatus;
+                }
 
-            await Task.Delay(TimeSpan.FromMilliseconds(25), timeout.Token);
+                await Task.Delay(TimeSpan.FromMilliseconds(25), timeout.Token);
+            }
+        }
+        catch (OperationCanceledException exception) when (timeout.IsCancellationRequested)
+        {
+            throw new TimeoutException(
+                $"Workflow status at '{location}' did not reach '{expected}'. Last response: {lastStatus}.",
+                exception);
         }
     }
 
