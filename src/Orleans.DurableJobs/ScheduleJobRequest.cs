@@ -17,7 +17,7 @@ public readonly struct ScheduleJobRequest
     /// its due-time shard. The first request determines the due time and trace context.
     /// A conflicting request using the same identifier is rejected.
     /// </remarks>
-    internal string? JobId { get; init; }
+    public string? JobId { get; init; }
 
     /// <summary>
     /// Gets the grain identifier of the target grain that will receive the durable job.
