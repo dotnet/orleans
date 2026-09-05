@@ -36,6 +36,7 @@ public partial class FirestoreGrainDirectory : IGrainDirectory, ILifecyclePartic
     {
         ArgumentNullException.ThrowIfNull(clusterOptions);
         ArgumentNullException.ThrowIfNull(firestoreOptions);
+        ArgumentNullException.ThrowIfNull(loggerFactory);
 
         this._clusterId = clusterOptions.Value.ClusterId;
         this._logger = loggerFactory.CreateLogger<FirestoreGrainDirectory>();

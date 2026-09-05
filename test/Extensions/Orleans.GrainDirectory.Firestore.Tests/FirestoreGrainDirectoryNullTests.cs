@@ -35,6 +35,17 @@ public class FirestoreGrainDirectoryNullTests
     }
 
     [Fact]
+    public void Constructor_NullLoggerFactory_ThrowsArgumentNullException()
+    {
+        var exception = Assert.Throws<ArgumentNullException>(() => new FirestoreGrainDirectory(
+            CreateClusterOptions(),
+            CreateFirestoreOptions(),
+            null!));
+
+        Assert.Equal("loggerFactory", exception.ParamName);
+    }
+
+    [Fact]
     public async Task Register_NullAddress_ThrowsArgumentNullException()
     {
         var directory = CreateGrainDirectory();
