@@ -28,7 +28,6 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 $unpublishedSampleDependencies = @(
-    (Join-Path $repositoryRoot 'src/Orleans.DurableTasks.Abstractions/Orleans.DurableTasks.Abstractions.csproj')
     (Join-Path $repositoryRoot 'src/Microsoft.Orleans.DurableTasks/Microsoft.Orleans.DurableTasks.csproj')
 )
 foreach ($project in $unpublishedSampleDependencies) {

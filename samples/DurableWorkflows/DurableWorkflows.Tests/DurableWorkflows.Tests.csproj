@@ -4,13 +4,14 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
     <IsTestingPlatformApplication>true</IsTestingPlatformApplication>
     <OutputType>Exe</OutputType>
     <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
     <NoWarn>$(NoWarn);ORLEANSEXP003;ORLEANSEXP005;xUnit1051</NoWarn>
     <OrleansDocumentationVersionException>
-      This publication-gated sample requires the unreleased Durable Tasks and Journaling packages.
+      Repository sample validation explicitly packs the incubating Microsoft.Orleans.DurableTasks adapter into its local feed.
     </OrleansDocumentationVersionException>
   </PropertyGroup>
 

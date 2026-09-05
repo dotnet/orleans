@@ -116,7 +116,8 @@ foreach ($projectPath in $projectFiles) {
 
         if ($reference.Include.StartsWith('Microsoft.Orleans.', [System.StringComparison]::OrdinalIgnoreCase) -and
             -not $sourcePackageIds.Contains($reference.Include) -and
-            [string]::IsNullOrWhiteSpace($publicationException)) {
+            ($reference.Include -ne 'Microsoft.Orleans.DurableTasks' -or
+             [string]::IsNullOrWhiteSpace($publicationException))) {
             throw "$projectPath references '$($reference.Include)', which is not produced by Orleans.slnx."
         }
     }

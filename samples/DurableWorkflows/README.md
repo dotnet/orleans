@@ -61,12 +61,15 @@ For manual process failover, start an approval workflow, stop its active `servic
 
 ## Publication gate
 
-Repository sample validation explicitly packs `Microsoft.Orleans.DurableTasks` and `Orleans.DurableTasks.Abstractions` into its isolated local feed without adding source-project reference shims. Normal builds keep both packages unpublished, and copied samples restore from public feeds after an explicit publication decision. Keep this PR draft and dependent while the packages remain unpublished.
+Repository sample validation builds an isolated local package feed from the current sources. `Microsoft.Orleans.DurableTasks.Abstractions` and `Microsoft.Orleans.DurableMessaging` are alpha foundations packed by the normal solution build. Validation explicitly packs the incubating `Microsoft.Orleans.DurableTasks` RPC adapter for this sample and selects the exact local package version throughout the Orleans package family.
+
+Standalone restore requires public publication of every referenced package and its dependencies. The alpha foundations still await their first publication, and the RPC adapter requires an explicit publication decision. Until those packages are available, use the repository's `samples/Build-Samples.ps1` package-boundary build.
 
 ## Test
 
 ```shell
-dotnet test DurableWorkflows.Tests
+dotnet test --project DurableWorkflows.Tests/DurableWorkflows.Tests.csproj --framework net10.0 --minimum-expected-tests 1
 ```
 
 Tests cover successful workflows, approval and rejection, cancellation recovery, failed saga compensation, replay/idempotency, and cross-silo recovery.
+Repository CI runs these tests against the packages produced by the sample build.
