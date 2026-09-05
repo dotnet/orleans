@@ -6,7 +6,6 @@ using Microsoft.Extensions.Options;
 using Orleans.Serialization.Configuration;
 using Orleans.Serialization.Hosting;
 using Orleans.Serialization.Serializers;
-using Orleans.Serialization.Session;
 using Orleans.Serialization.TypeSystem;
 using Xunit;
 
