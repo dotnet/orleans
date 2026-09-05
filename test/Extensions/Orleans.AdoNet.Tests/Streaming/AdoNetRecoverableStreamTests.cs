@@ -1,4 +1,5 @@
 using System.Data;
+using System.Data.Common;
 using System.Reflection;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -18,6 +19,37 @@ namespace Tester.AdoNet.Streaming;
 [TestArea("Streaming")]
 public class AdoNetRecoverableStreamTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Load_ProviderDatabaseFailureHonorsCancellationWithoutHidingOtherFailures(bool canceled)
+    {
+        var storage = new BlockingRelationalStorage();
+        var source = CreateSource(storage);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var load = source.Load(cancellation.Token).AsTask();
+        await storage.AcquisitionStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        var databaseFailure = new AcquisitionDatabaseException("Provider command canceled.");
+        if (canceled)
+        {
+            cancellation.Cancel();
+        }
+
+        storage.FailAcquisition(databaseFailure);
+        if (canceled)
+        {
+            var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => load);
+            Assert.Equal(cancellation.Token, exception.CancellationToken);
+            Assert.Same(databaseFailure, exception.InnerException);
+        }
+        else
+        {
+            Assert.Same(databaseFailure, await Assert.ThrowsAsync<AcquisitionDatabaseException>(() => load));
+        }
+
+        Assert.True(source.AcquisitionCompletion.IsCompleted);
+    }
+
     [Fact]
     public async Task ConcurrentCreateAdapterCallsConstructOnce()
     {
@@ -675,6 +707,8 @@ public class AdoNetRecoverableStreamTests
         }
     }
 
+    private sealed class AcquisitionDatabaseException(string message) : DbException(message);
+
     private sealed class BlockingRelationalStorage : IRelationalStorage
     {
         private readonly TaskCompletionSource<AdoNetStreamPartitionState> acquisition =
@@ -688,6 +722,8 @@ public class AdoNetRecoverableStreamTests
         public string InvariantName => AdoNetInvariants.InvariantNameSqlServer;
 
         public string ConnectionString => string.Empty;
+
+        public void FailAcquisition(Exception exception) => acquisition.SetException(exception);
 
         public void CompleteAcquisition(long ownerEpoch)
             => acquisition.SetResult(new(

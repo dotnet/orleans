@@ -237,17 +237,20 @@ public abstract class AdoNetQueueAdapterTests(string invariant, TestEnvironmentF
             Assert.Equal(1, await command.ExecuteNonQueryAsync(cancellationToken));
         }
 
-        await using var observer = lockConnection.CreateCommand();
-        observer.Transaction = transaction;
-        observer.CommandText = invariant switch
+        await using var ownerCommand = lockConnection.CreateCommand();
+        ownerCommand.Transaction = transaction;
+        ownerCommand.CommandText = invariant switch
         {
             AdoNetInvariants.InvariantNameSqlServer => "SELECT @@SPID",
             AdoNetInvariants.InvariantNameMySql => "SELECT CONNECTION_ID()",
             AdoNetInvariants.InvariantNamePostgreSql => "SELECT pg_backend_pid()",
             _ => throw new NotSupportedException(invariant),
         };
-        var lockOwner = Convert.ToInt64(await observer.ExecuteScalarAsync(cancellationToken), CultureInfo.InvariantCulture);
-        observer.CommandText = GetBlockedAcquisitionQuery(lockConnection);
+        var lockOwner = Convert.ToInt64(await ownerCommand.ExecuteScalarAsync(cancellationToken), CultureInfo.InvariantCulture);
+        await using var observerConnection = CreateConnection();
+        await observerConnection.OpenAsync(cancellationToken);
+        await using var observer = observerConnection.CreateCommand();
+        observer.CommandText = GetBlockedAcquisitionQuery(observerConnection);
         AddParameter(observer, "LockOwner", lockOwner);
         using var readCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var lockReleased = false;
@@ -316,6 +319,12 @@ public abstract class AdoNetQueueAdapterTests(string invariant, TestEnvironmentF
             => TestingUtils.WaitUntilAsync(
                 async (lastTry, token) =>
                 {
+                    if (expected > 0 && read is { IsCompleted: true })
+                    {
+                        await read;
+                        Assert.Fail("Acquisition completed before the held partition lock was released.");
+                    }
+
                     var actual = Convert.ToInt32(await observer.ExecuteScalarAsync(token), CultureInfo.InvariantCulture);
                     if (lastTry)
                     {

@@ -401,13 +401,13 @@ public sealed class RecoveryCacheMemoryTests
         using var cache = CreateCache(64, adapter, pool);
         var receiver = new RecoverableStreamReceiver<TestRecord>(source, adapter, cache, new Checkpointer(), false);
         var read = receiver.GetQueueMessagesAsync(1000, CancellationToken.None);
-        await source.Started.Task;
+        await source.Started.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         await receiver.Shutdown(Timeout.InfiniteTimeSpan);
         Assert.True(source.ReadCancellation.IsCancellationRequested);
         source.Completion.SetResult([Record(1, 40), Record(2, 40)]);
 
-        Assert.Empty(await read);
+        Assert.Empty(await read.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
         Assert.Equal(0, adapter.PackCount);
         Assert.Equal(0, cache.SizeInBytes);
         Assert.Equal(0, pool.AllocationCount);

@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Net;
 using System.Reactive.Linq;
 using NSubstitute;
 using Orleans.Configuration;
@@ -22,6 +23,7 @@ public partial class PersistentStreamPullingAgentTests
     {
         var streamId = new QualifiedStreamId("provider", StreamId.Create("unregister", Guid.NewGuid()));
         var subscriptionId = GuidId.GetGuidId(Guid.NewGuid());
+        var siloAddress = SiloAddress.New(IPAddress.Loopback, 11111, 1);
         var token = new EventSequenceTokenV2(1);
         var cache = new ScriptedQueueCache();
         cache.AddToCache([new TestBatchContainer(streamId.StreamId, token)]);
@@ -61,8 +63,15 @@ public partial class PersistentStreamPullingAgentTests
             Assert.Same(consumer, failed.Consumer);
             Assert.Equal(token, failed.SequenceToken);
             Assert.Equal(streamId.StreamId, failed.StreamId);
-            Assert.Equal(StreamingEvents.SubscriptionUnregistrationStage.Requested,
-                Assert.Single(events.OfType<StreamingEvents.SubscriptionUnregistration>()).Stage);
+            Assert.Equal(streamId.ProviderName, failed.StreamProvider);
+            Assert.Equal(siloAddress, failed.SiloAddress);
+            var requested = Assert.Single(events.OfType<StreamingEvents.SubscriptionUnregistration>());
+            Assert.Equal(StreamingEvents.SubscriptionUnregistrationStage.Requested, requested.Stage);
+            Assert.Equal(streamId.ProviderName, requested.StreamProvider);
+            Assert.Equal(streamId.StreamId, requested.StreamId);
+            Assert.Equal(siloAddress, requested.SiloAddress);
+            Assert.Same(consumer, requested.Consumer);
+            Assert.Null(requested.Exception);
             Assert.False(outcome.Task.IsCompleted);
 
             var exception = new InvalidOperationException("unregistration storage failure");
@@ -80,6 +89,8 @@ public partial class PersistentStreamPullingAgentTests
                 failUnregistration ? StreamingEvents.SubscriptionUnregistrationStage.Failed : StreamingEvents.SubscriptionUnregistrationStage.Completed,
                 completed.Stage);
             Assert.Equal(streamId.StreamId, completed.StreamId);
+            Assert.Equal(streamId.ProviderName, completed.StreamProvider);
+            Assert.Equal(siloAddress, completed.SiloAddress);
             Assert.Same(consumer, completed.Consumer);
             Assert.Same(failUnregistration ? exception : null, completed.Exception);
             _ = pubSub.Received(1).UnregisterConsumer(subscriptionId, streamId, Arg.Any<CancellationToken>());
