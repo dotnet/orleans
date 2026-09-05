@@ -53,6 +53,19 @@ public sealed class DurableMessagingMetricProbe : IDisposable
             jobName,
             TestContext.Current.CancellationToken);
 
+    public Task WaitForCountAsync(
+        string instrument,
+        long expected,
+        string jobName,
+        CancellationToken cancellationToken) =>
+        WaitForCountWithCancellationAsync(instrument, expected, jobName, cancellationToken);
+
+    public Task WaitForCountAsync(
+        string instrument,
+        long expected,
+        CancellationToken cancellationToken) =>
+        WaitForCountWithCancellationAsync(instrument, expected, string.Empty, cancellationToken);
+
     public async Task WaitForCountWithCancellationAsync(
         string instrument,
         long expected,

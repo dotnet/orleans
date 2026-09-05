@@ -1294,6 +1294,12 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
         DurableEnvelope envelope) =>
         DeliverWithCancellationAsync(receiver, envelope, TestContext.Current.CancellationToken);
 
+    private static Task<DeliveryResult> DeliverAsync(
+        IDurableMessagingTestGrain receiver,
+        DurableEnvelope envelope,
+        CancellationToken cancellationToken) =>
+        DeliverWithCancellationAsync(receiver, envelope, cancellationToken);
+
     private static async Task<DeliveryResult> DeliverWithCancellationAsync(
         IDurableMessagingTestGrain receiver,
         DurableEnvelope envelope,

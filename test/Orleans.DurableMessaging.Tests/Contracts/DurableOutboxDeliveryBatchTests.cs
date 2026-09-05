@@ -725,6 +725,9 @@ public sealed class DurableOutboxDeliveryBatchTests
         public Task DeliverAsync() =>
             DeliverWithCancellationAsync(TestContext.Current.CancellationToken);
 
+        public Task DeliverAsync(CancellationToken cancellationToken) =>
+            DeliverWithCancellationAsync(cancellationToken);
+
         public Task DeliverWithCancellationAsync(CancellationToken cancellationToken) =>
             (Task)_deliverMethod.Invoke(_outbox, [cancellationToken])!;
 

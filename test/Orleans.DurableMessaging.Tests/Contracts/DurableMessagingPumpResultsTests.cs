@@ -155,6 +155,9 @@ public sealed class DurableMessagingPumpResultsTests
         public bool TryStart(object key, out object execution) =>
             TryStartWithCancellation(key, out execution, TestContext.Current.CancellationToken);
 
+        public bool TryStart(object key, out object execution, CancellationToken cancellationToken) =>
+            TryStartWithCancellation(key, out execution, cancellationToken);
+
         public bool TryStartWithCancellation(
             object key,
             out object execution,

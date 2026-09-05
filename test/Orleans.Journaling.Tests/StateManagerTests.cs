@@ -682,22 +682,22 @@ public class StateManagerTests : JournalingTestBase
         var sut = CreateTestSystem(storage: storage);
         var dictionary = new DurableDictionary<string, int>("dict", sut.Manager, CreateDictionaryCodec<string, int>());
 
-        await sut.Lifecycle.OnStart();
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         dictionary.Add("persisted", 1);
-        await sut.Manager.WriteStateAsync(CancellationToken.None);
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         storage.NextAppendException = new InconsistentStateException("Expected write conflict.");
         storage.NextReadException = new IOException("Expected recovery failure.");
         dictionary.Add("discarded", 2);
         await Assert.ThrowsAsync<InconsistentStateException>(
-            () => sut.Manager.WriteStateAsync(CancellationToken.None).AsTask());
+            () => sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask());
 
         dictionary.Add("new", 3);
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => sut.Manager.WriteStateAsync(CancellationToken.None).AsTask());
+            () => sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask());
         Assert.Contains("RevertPendingChangesAsync", exception.Message, StringComparison.Ordinal);
 
-        await sut.Manager.RevertPendingChangesAsync(CancellationToken.None);
+        await sut.Manager.RevertPendingChangesAsync(TestContext.Current.CancellationToken);
         Assert.Equal(1, dictionary["persisted"]);
         Assert.False(dictionary.ContainsKey("discarded"));
         Assert.False(dictionary.ContainsKey("new"));
@@ -971,19 +971,19 @@ public class StateManagerTests : JournalingTestBase
         var sut = CreateTestSystem(storage: storage);
         var value = new DurableValue<int>("value", sut.Manager, CreateValueCodec<int>());
 
-        await sut.Lifecycle.OnStart();
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         value.Value = 1;
-        await sut.Manager.WriteStateAsync(CancellationToken.None);
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
         value.Value = 2;
         storage.NextReadException = new InconsistentStateException("Expected explicit recovery conflict.");
 
         await Assert.ThrowsAsync<InconsistentStateException>(
-            () => sut.Manager.RevertPendingChangesAsync(CancellationToken.None).AsTask());
+            () => sut.Manager.RevertPendingChangesAsync(TestContext.Current.CancellationToken).AsTask());
         var writeException = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => sut.Manager.WriteStateAsync(CancellationToken.None).AsTask());
+            () => sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask());
         Assert.Contains("fenced", writeException.Message, StringComparison.OrdinalIgnoreCase);
 
-        await sut.Manager.RevertPendingChangesAsync(CancellationToken.None);
+        await sut.Manager.RevertPendingChangesAsync(TestContext.Current.CancellationToken);
         Assert.Equal(1, value.Value);
     }
 
