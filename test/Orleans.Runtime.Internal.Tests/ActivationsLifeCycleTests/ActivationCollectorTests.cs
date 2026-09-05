@@ -249,9 +249,9 @@ namespace UnitTests.ActivationsLifeCycleTests
         public async Task ManualCollectionShouldNotCollectBusyActivations()
         {
             var cancellationToken = TestContext.Current.CancellationToken;
-            await Initialize(DEFAULT_IDLE_TIMEOUT, cancellationToken);
+            await Initialize(TimeSpan.FromHours(1), cancellationToken);
 
-            TimeSpan shortIdleTimeout = FORCED_COLLECTION_WAIT_TIME;
+            var manualCollectionWaitTime = FORCED_COLLECTION_WAIT_TIME;
             const int idleGrainCount = 500;
             const int busyGrainCount = 500;
             var idleGrainTypeName = RuntimeTypeNameFormatter.Format(typeof(IdleActivationGcTestGrain1));
@@ -267,51 +267,34 @@ namespace UnitTests.ActivationsLifeCycleTests
                 tasks0.Add(g.Nop());
             }
             await Task.WhenAll(tasks0);
-            using var workerCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            async Task busyWorker(CancellationToken cancellationToken)
+
+            logger.LogInformation("ManualCollectionShouldNotCollectBusyActivations: activating {Count} idle grains.", idleGrainCount);
+            tasks0.Clear();
+            for (var i = 0; i < idleGrainCount; ++i)
             {
-                logger.LogInformation("ManualCollectionShouldNotCollectBusyActivations: busyWorker started");
-                while (true)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    List<Task> tasks1 = new List<Task>(busyGrains.Count);
-                    foreach (var g in busyGrains)
-                        tasks1.Add(g.Nop());
-                    await Task.WhenAll(tasks1);
-                }
+                IIdleActivationGcTestGrain1 g = this.testCluster.GrainFactory!.GetGrain<IIdleActivationGcTestGrain1>(Guid.NewGuid());
+                tasks0.Add(g.Nop());
             }
-            var workerTask = Task.Run(() => busyWorker(workerCancellation.Token), cancellationToken);
+            await Task.WhenAll(tasks0);
+
+            int activationsCreated = await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, idleGrainTypeName) + await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, busyGrainTypeName);
+            Assert.Equal(idleGrainCount + busyGrainCount, activationsCreated);
+
+            logger.LogInformation(
+                "ManualCollectionShouldNotCollectBusyActivations: grains activated; waiting {TotalSeconds} sec before manual collection.",
+                manualCollectionWaitTime.TotalSeconds);
+            await Task.Delay(manualCollectionWaitTime, cancellationToken);
+
+            using var callBarrier = BusyActivationGcTestGrain1.ArmBlockingCallBarrier(busyGrainCount);
+            var busyCalls = busyGrains.Select(grain => grain.BlockUntilReleased()).ToArray();
             try
             {
-                logger.LogInformation("ManualCollectionShouldNotCollectBusyActivations: activating {Count} idle grains.", idleGrainCount);
-                tasks0.Clear();
-                for (var i = 0; i < idleGrainCount; ++i)
-                {
-                    IIdleActivationGcTestGrain1 g = this.testCluster.GrainFactory!.GetGrain<IIdleActivationGcTestGrain1>(Guid.NewGuid());
-                    tasks0.Add(g.Nop());
-                }
-                await Task.WhenAll(tasks0);
+                await callBarrier.WaitForParticipantsAsync(TestConstants.InitTimeout, cancellationToken);
 
-                int activationsCreated = await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, idleGrainTypeName) + await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, busyGrainTypeName);
-                Assert.Equal(idleGrainCount + busyGrainCount, activationsCreated);
-
-                logger.LogInformation(
-                    "ManualCollectionShouldNotCollectBusyActivations: grains activated; waiting {TotalSeconds} sec (activation GC idle timeout is {DefaultIdleTime} sec).",
-                    shortIdleTimeout.TotalSeconds,
-                    DEFAULT_IDLE_TIMEOUT.TotalSeconds);
-                await Task.Delay(shortIdleTimeout, cancellationToken);
-
-                TimeSpan everything = TimeSpan.FromMinutes(10);
-                logger.LogInformation("ManualCollectionShouldNotCollectBusyActivations: triggering manual collection (timespan is {TotalSeconds} sec).", everything.TotalSeconds);
+                logger.LogInformation("ManualCollectionShouldNotCollectBusyActivations: triggering manual collection (age limit is {TotalSeconds} sec).", FORCED_COLLECTION_AGE_LIMIT.TotalSeconds);
                 IManagementGrain mgmtGrain = this.testCluster.GrainFactory!.GetGrain<IManagementGrain>(0);
-                await mgmtGrain.ForceActivationCollection(everything, cancellationToken);
+                await mgmtGrain.ForceActivationCollection(FORCED_COLLECTION_AGE_LIMIT, cancellationToken);
 
-                logger.LogInformation(
-                    "ManualCollectionShouldNotCollectBusyActivations: waiting for idle activation count to converge to zero (activation GC idle timeout is {DefaultIdleTime} sec).",
-                    DEFAULT_IDLE_TIMEOUT.TotalSeconds);
-                await WaitForActivationCountToConverge(idleGrainTypeName, expectedCount: 0, cancellationToken);
-
-                // we should have only collected grains from the idle category (IdleActivationGcTestGrain).
                 int idleActivationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, idleGrainTypeName);
                 int busyActivationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, busyGrainTypeName);
                 Assert.Equal(0, idleActivationsNotCollected);
@@ -319,7 +302,8 @@ namespace UnitTests.ActivationsLifeCycleTests
             }
             finally
             {
-                await CancelWorkerAsync(workerCancellation, workerTask);
+                callBarrier.Release();
+                await Task.WhenAll(busyCalls).WaitAsync(TestConstants.InitTimeout, cancellationToken);
             }
         }
 
