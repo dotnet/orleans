@@ -12,6 +12,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.DurableJobs;
@@ -21,6 +22,7 @@ namespace Orleans.DurableTasks.Runtime;
 
 internal sealed partial class DurableTaskGrainRuntime(
     IDurableTaskGrainStorage storage,
+    [FromKeyedServices("$task-logical-times")] IDurableDictionary<TaskId, DateTimeOffset> logicalTimes,
     DurableTaskGrainRuntimeShared shared,
     IEnumerable<IDurableTaskMessageTransport> messageTransports,
     IJournaledStateManager stateManager) :
@@ -59,6 +61,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     private Task _recoveryReconciliation = Task.CompletedTask;
     private readonly DurableTaskGrainRuntimeShared _shared = shared;
     private readonly IDurableTaskGrainStorage _storage = storage;
+    private readonly IDurableDictionary<TaskId, DateTimeOffset> _logicalTimes = logicalTimes;
     private readonly IDurableTaskMessageTransport? _messageTransport = messageTransports.SingleOrDefault();
     private readonly IJournaledStateManager _stateManager = stateManager;
     private readonly CancellationTokenSource _deactivationCts = new();
@@ -175,11 +178,18 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// <returns>The new execution context.</returns>
     private GrainDurableExecutionContext CreateExecutionContext(TaskId taskId)
     {
-        return _executionContexts.GetOrAdd(taskId, static (id, runtime) => new(
+        if (!_logicalTimes.TryGetValue(taskId, out var utcNow))
+        {
+            utcNow = UtcNow;
+            _logicalTimes[taskId] = utcNow;
+        }
+
+        return _executionContexts.GetOrAdd(taskId, static (id, state) => new(
             id,
-            runtime,
+            state.Runtime,
             TaskScheduler.Current,
-            runtime._deactivationCts.Token), this);
+            state.Runtime._deactivationCts.Token,
+            state.UtcNow), (Runtime: this, UtcNow: utcNow));
     }
 
     /// <summary>
@@ -440,19 +450,23 @@ internal sealed partial class DurableTaskGrainRuntime(
             return;
         }
 
-        TryGetExecutionContext(taskId, out var executionContext);
-        _storage.RequestCancellation(taskId, state);
-        await SetResponseAsync(
-            taskId,
-            DurableTaskResponse.FromException(new OperationCanceledException()),
+        var propagation = await WithResponseAndJournalWriteGatesAsync(
+            async () =>
+            {
+                var staged = StageCancellationTree(taskId, callerId: default);
+                await SetResponseCoreAsync(
+                    taskId,
+                    DurableTaskResponse.FromException(new OperationCanceledException()),
+                    cancellationToken,
+                    persist: true,
+                    journalWriteGateHeld: true);
+                return (staged.Contexts, staged.Handles);
+            },
             cancellationToken);
-        if (executionContext is not null)
-        {
-            var cancellation = DurableTaskRuntimeHelper.RequestCancellationAsync(
-                executionContext,
-                CancellationToken.None);
-            await cancellation.WaitAsync(cancellationToken);
-        }
+        await PropagateCancellationAsync(
+            propagation.Contexts,
+            propagation.Handles,
+            cancellationToken);
     }
 
     public async ValueTask<DurableTaskResponse> ScheduleDelayAsync(
@@ -695,7 +709,19 @@ internal sealed partial class DurableTaskGrainRuntime(
     private async Task ResumePendingTasksCoreAsync(CancellationToken cancellationToken)
     {
         ThrowIfStopping();
-        foreach (var (taskId, state) in _storage.Tasks.ToList())
+        var tasks = _storage.Tasks.ToList();
+        foreach (var (taskId, state) in tasks)
+        {
+            if (state.Request is not null
+                && state.Result is not { IsCompleted: true }
+                && !state.CancellationRequestedAt.HasValue
+                && state.DueTime is null)
+            {
+                _taskHandles.GetOrAdd(taskId, id => new TaskHandle(id, this));
+            }
+        }
+
+        foreach (var (taskId, state) in tasks)
         {
             if (state.Result is { IsCompleted: true })
             {
@@ -1202,7 +1228,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             {
                 if (state.TombstonedAt.HasValue)
                 {
-                    CompleteTaskHandle(taskId, DurableTaskTerminalFailure.CreateResponse(taskId));
+                    CompleteTaskHandle(taskId, DurableTaskNotFoundException.CreateResponse(taskId));
                 }
                 else if (state.Result is { IsCompleted: true } response)
                 {
@@ -1725,6 +1751,13 @@ internal sealed partial class DurableTaskGrainRuntime(
             return handle;
         }
 
+        if (handle is TaskHandle cachedHandle
+            && cachedHandle.ResponseTask.IsCompletedSuccessfully
+            && cachedHandle.ResponseTask.Result.IsCompleted)
+        {
+            return handle;
+        }
+
         for (var ancestorId = taskId.Parent(); !ancestorId.IsDefault; ancestorId = ancestorId.Parent())
         {
             if (_storage.TryGetTask(ancestorId, out var ancestorState)
@@ -2197,6 +2230,7 @@ internal sealed partial class DurableTaskGrainRuntime(
 
             _executionContexts.TryRemove(taskId, out _);
             _taskHandles.TryRemove(taskId, out _);
+            _logicalTimes.Remove(taskId);
         }
     }
 
@@ -2209,9 +2243,10 @@ internal sealed partial class DurableTaskGrainRuntime(
             _shared.Logger.LogTrace("{Id} received polling request for task {TaskId}", GrainId, taskId);
         }
 
-        if (_storage.TryGetTask(taskId, out var taskState) && taskState.TombstonedAt.HasValue)
+        if (!_storage.TryGetTask(taskId, out var taskState)
+            || taskState.TombstonedAt.HasValue)
         {
-            return DurableTaskTerminalFailure.CreateResponse(taskId);
+            throw new DurableTaskNotFoundException(taskId);
         }
 
         var handle = GetScheduledTaskHandle(taskId);
@@ -2456,7 +2491,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         {
             if (taskState.TombstonedAt.HasValue)
             {
-                handle = new CompletedTaskHandle(taskId, DurableTaskTerminalFailure.CreateResponse(taskId));
+                handle = new CompletedTaskHandle(taskId, DurableTaskNotFoundException.CreateResponse(taskId));
                 return true;
             }
 
