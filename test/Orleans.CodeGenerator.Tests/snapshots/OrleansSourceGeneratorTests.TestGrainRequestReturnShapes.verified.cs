@@ -960,25 +960,25 @@ namespace OrleansCodeGen.TestProject
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
-            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IRequestShapeGrain_GrainReference_179DFF79));
-            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IRequestShapeGrain_GrainReference_3637890A));
-            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IRequestShapeGrain_GrainReference_547E1673));
-            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IRequestShapeGrain_GrainReference_7597183B));
-            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IRequestShapeGrain_GrainReference_D2239DF3));
-            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IRequestShapeGrain_GrainReference_EB0D9BAC));
-            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IRequestShapeGrain_GrainReference_179DFF79));
-            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IRequestShapeGrain_GrainReference_3637890A));
-            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IRequestShapeGrain_GrainReference_547E1673));
-            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IRequestShapeGrain_GrainReference_7597183B));
-            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IRequestShapeGrain_GrainReference_D2239DF3));
-            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IRequestShapeGrain_GrainReference_EB0D9BAC));
-            config.InterfaceProxies.Add(typeof(OrleansCodeGen.TestProject.Proxy_IRequestShapeGrain));
-            config.Interfaces.Add(typeof(global::TestProject.IRequestShapeGrain));
-            config.Activators.Add(typeof(OrleansCodeGen.TestProject.Activator_Invokable_IRequestShapeGrain_GrainReference_179DFF79));
-            config.Activators.Add(typeof(OrleansCodeGen.TestProject.Activator_Invokable_IRequestShapeGrain_GrainReference_3637890A));
-            config.Activators.Add(typeof(OrleansCodeGen.TestProject.Activator_Invokable_IRequestShapeGrain_GrainReference_547E1673));
-            config.Activators.Add(typeof(OrleansCodeGen.TestProject.Activator_Invokable_IRequestShapeGrain_GrainReference_D2239DF3));
-            config.Activators.Add(typeof(OrleansCodeGen.TestProject.Activator_Invokable_IRequestShapeGrain_GrainReference_EB0D9BAC));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IRequestShapeGrain_GrainReference_179DFF79));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IRequestShapeGrain_GrainReference_3637890A));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IRequestShapeGrain_GrainReference_547E1673));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IRequestShapeGrain_GrainReference_7597183B));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IRequestShapeGrain_GrainReference_D2239DF3));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IRequestShapeGrain_GrainReference_EB0D9BAC));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IRequestShapeGrain_GrainReference_179DFF79));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IRequestShapeGrain_GrainReference_3637890A));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IRequestShapeGrain_GrainReference_547E1673));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IRequestShapeGrain_GrainReference_7597183B));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IRequestShapeGrain_GrainReference_D2239DF3));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IRequestShapeGrain_GrainReference_EB0D9BAC));
+            config.AddInterfaceProxy(typeof(OrleansCodeGen.TestProject.Proxy_IRequestShapeGrain));
+            config.AddInterface(typeof(global::TestProject.IRequestShapeGrain));
+            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_Invokable_IRequestShapeGrain_GrainReference_179DFF79));
+            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_Invokable_IRequestShapeGrain_GrainReference_3637890A));
+            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_Invokable_IRequestShapeGrain_GrainReference_547E1673));
+            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_Invokable_IRequestShapeGrain_GrainReference_D2239DF3));
+            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_Invokable_IRequestShapeGrain_GrainReference_EB0D9BAC));
             var n1 = config.CompoundTypeAliases.Add("inv");
             var n2 = n1.Add(typeof(global::Orleans.Runtime.GrainReference));
             var n3 = n2.Add(typeof(global::TestProject.IRequestShapeGrain));
