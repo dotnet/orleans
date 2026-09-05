@@ -60,25 +60,27 @@ public abstract class ScheduledTask
     /// <summary>
     /// Returns the first scheduled task whose response completes, including failed or canceled durable
     /// responses. Wait cancellation and transport failures are propagated, and losing waits are canceled
-    /// without canceling the durable tasks.
+    /// without canceling the durable tasks. Candidates are captured when this method is called.
     /// </summary>
     public static async Task<ScheduledTask> WhenAny(IReadOnlyList<ScheduledTask> tasks, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(tasks);
-        return tasks[await WaitForAnyIndexAsync(tasks, cancellationToken).ConfigureAwait(false)];
+        var candidates = tasks.ToArray();
+        return candidates[await WaitForAnyIndexAsync(candidates, cancellationToken).ConfigureAwait(false)];
     }
 
     /// <summary>
     /// Returns the first scheduled task whose response completes, including failed or canceled durable
     /// responses. Wait cancellation and transport failures are propagated, and losing waits are canceled
-    /// without canceling the durable tasks.
+    /// without canceling the durable tasks. Candidates are captured when this method is called.
     /// </summary>
     public static async Task<ScheduledTask<TResult>> WhenAny<TResult>(
         IReadOnlyList<ScheduledTask<TResult>> tasks,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(tasks);
-        return tasks[await WaitForAnyIndexAsync(tasks, cancellationToken).ConfigureAwait(false)];
+        var candidates = tasks.ToArray();
+        return candidates[await WaitForAnyIndexAsync(candidates, cancellationToken).ConfigureAwait(false)];
     }
 
     private static async Task<int> WaitForAnyIndexAsync<TTask>(
