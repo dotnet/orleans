@@ -128,9 +128,9 @@ The `WithOrleansProviderType(...)` resource annotation is implemented upstream i
 
 ### Grain journaling
 
-Aspire provisions and starts the backing resource, then the silo configures the Orleans journal provider from the injected resource reference. The [Journaling with Azure Blob JSON sample](../grains/journaling/samples.md) demonstrates this explicit path with Azurite and verifies state recovery after grain reactivation.
+Aspire provisions and starts the backing resource, then the silo configures the Orleans journal provider from the injected resource reference. The [Journaling with Azure Blob JSON sample](../grains/journaling/samples.md) demonstrates programmatic provider registration with Azurite and verifies state recovery after grain reactivation.
 
-Configuration-driven journaling providers use the `Orleans:GrainJournaling` section:
+The equivalent configuration-driven path uses the `Orleans:GrainJournaling` section:
 
 ```json
 {

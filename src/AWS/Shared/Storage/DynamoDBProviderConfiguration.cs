@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Text;
 using Microsoft.Extensions.Configuration;
 using Orleans.Runtime;
@@ -92,6 +93,54 @@ namespace Orleans.Reminders.DynamoDB
             }
 
             return null;
+        }
+
+        public int? GetInt32(string name)
+        {
+            var value = GetNonEmpty(_providerSection[name]);
+            if (value is null)
+            {
+                return null;
+            }
+
+            if (!int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var result))
+            {
+                throw CreateInvalidValueException(name, value, "an integer");
+            }
+
+            return result;
+        }
+
+        public bool? GetBoolean(string name)
+        {
+            var value = GetNonEmpty(_providerSection[name]);
+            if (value is null)
+            {
+                return null;
+            }
+
+            if (!bool.TryParse(value, out var result))
+            {
+                throw CreateInvalidValueException(name, value, "a Boolean");
+            }
+
+            return result;
+        }
+
+        public TimeSpan? GetTimeSpan(string name)
+        {
+            var value = GetNonEmpty(_providerSection[name]);
+            if (value is null)
+            {
+                return null;
+            }
+
+            if (!TimeSpan.TryParse(value, CultureInfo.InvariantCulture, out var result))
+            {
+                throw CreateInvalidValueException(name, value, "a time span");
+            }
+
+            return result;
         }
 
         public static void ValidateClientOptions(DynamoDBClientOptions options, string providerName)
@@ -259,6 +308,14 @@ namespace Orleans.Reminders.DynamoDB
 
         private static string? GetNonEmpty(string? value)
             => string.IsNullOrWhiteSpace(value) ? null : value;
+
+        private OrleansConfigurationException CreateInvalidValueException(
+            string name,
+            string value,
+            string expectedType)
+            => new(
+                $"DynamoDB provider configuration section '{_providerSection.Path}' setting '{name}' " +
+                $"must be {expectedType}, but the configured value is '{value}'.");
 
         private static void SetIfPresent(Action<string> setter, string? value)
         {
