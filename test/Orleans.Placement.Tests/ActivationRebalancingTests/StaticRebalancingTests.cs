@@ -14,14 +14,18 @@ namespace UnitTests.ActivationRebalancingTests;
 public class StaticRebalancingTests(RebalancerFixture fixture, ITestOutputHelper output)
     : RebalancingTestBase<RebalancerFixture>(fixture, output), IClassFixture<RebalancerFixture>
 {
+    private static readonly TimeSpan RebalancerSuspensionDuration = TimeSpan.FromMinutes(2);
+
     [Fact]
     public async Task Should_Move_Activations_From_Silo1_And_Silo3_To_Silo2_And_Silo4()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var tasks = new List<Task>();
         using var rebalancerEvents = RebalancerDiagnosticObserver.Create(Cluster);
+        using var grainEvents = GrainDiagnosticObserver.Create(Cluster);
         var rebalancer = Cluster.Client!.GetGrain<IActivationRebalancerWorker>(0);
         var rebalancerHost = (await rebalancer.GetReport(cancellationToken)).Host;
+        await rebalancer.SuspendRebalancing(RebalancerSuspensionDuration, cancellationToken);
 
         AddTestActivations(tasks, Silo1, 300);
         AddTestActivations(tasks, Silo2, 30);
@@ -31,12 +35,13 @@ public class StaticRebalancingTests(RebalancerFixture fixture, ITestOutputHelper
         await Task.WhenAll(tasks);
         rebalancerEvents.Clear();
 
+        var testGrainType = GrainFactory.GetGrain<IRebalancingTestGrain>(Guid.Empty).GetGrainId().Type;
         var stats = await MgmtGrain.GetDetailedGrainStatistics(null, null, cancellationToken);
 
-        var initialSilo1Activations = GetActivationCount(stats, Silo1);
-        var initialSilo2Activations = GetActivationCount(stats, Silo2);
-        var initialSilo3Activations = GetActivationCount(stats, Silo3);
-        var initialSilo4Activations = GetActivationCount(stats, Silo4);
+        var initialSilo1Activations = GetActivationCount(stats, Silo1, testGrainType);
+        var initialSilo2Activations = GetActivationCount(stats, Silo2, testGrainType);
+        var initialSilo3Activations = GetActivationCount(stats, Silo3, testGrainType);
+        var initialSilo4Activations = GetActivationCount(stats, Silo4, testGrainType);
 
         OutputHelper.WriteLine(
            $"Pre-rebalancing activations:\n" +
@@ -50,16 +55,29 @@ public class StaticRebalancingTests(RebalancerFixture fixture, ITestOutputHelper
         var silo3Activations = initialSilo3Activations;
         var silo4Activations = initialSilo4Activations;
 
+        await MgmtGrain.ForceRuntimeStatisticsCollection([rebalancerHost], cancellationToken);
+        grainEvents.Clear();
+        var silo1Migration = grainEvents.WaitForAnyGrainDeactivatedAsync(
+            deactivated =>
+                deactivated.Reason.ReasonCode is DeactivationReasonCode.Migrating &&
+                deactivated.GrainContext.GrainId.Type.Equals(testGrainType) &&
+                Silo1.Equals(deactivated.GrainContext.Address.SiloAddress));
+        var silo3Migration = grainEvents.WaitForAnyGrainDeactivatedAsync(
+            deactivated =>
+                deactivated.Reason.ReasonCode is DeactivationReasonCode.Migrating &&
+                deactivated.GrainContext.GrainId.Type.Equals(testGrainType) &&
+                Silo3.Equals(deactivated.GrainContext.Address.SiloAddress));
+
         const int observedCycles = 3;
-        await rebalancerEvents
-            .WaitForCycleCountAsync(rebalancerHost, observedCycles)
-            .WaitAsync(cancellationToken);
+        var observedRebalancing = rebalancerEvents.WaitForCycleCountAsync(rebalancerHost, observedCycles);
+        await rebalancer.ResumeRebalancing(cancellationToken);
+        await Task.WhenAll(observedRebalancing, silo1Migration, silo3Migration).WaitAsync(cancellationToken);
 
         stats = await MgmtGrain.GetDetailedGrainStatistics(null, null, cancellationToken);
-        silo1Activations = GetActivationCount(stats, Silo1);
-        silo2Activations = GetActivationCount(stats, Silo2);
-        silo3Activations = GetActivationCount(stats, Silo3);
-        silo4Activations = GetActivationCount(stats, Silo4);
+        silo1Activations = GetActivationCount(stats, Silo1, testGrainType);
+        silo2Activations = GetActivationCount(stats, Silo2, testGrainType);
+        silo3Activations = GetActivationCount(stats, Silo3, testGrainType);
+        silo4Activations = GetActivationCount(stats, Silo4, testGrainType);
 
         Assert.True(silo1Activations < initialSilo1Activations,
             $"Did not expect Silo1 to have more activations than what it started with: " +

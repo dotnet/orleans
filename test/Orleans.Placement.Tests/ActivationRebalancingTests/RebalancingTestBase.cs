@@ -37,6 +37,12 @@ public abstract class RebalancingTestBase<TFixture>
     protected static int GetActivationCount(DetailedGrainStatistic[] stats, SiloAddress silo) =>
         stats.Count(x => x.SiloAddress.Equals(silo));
 
+    protected static int GetActivationCount(
+        DetailedGrainStatistic[] stats,
+        SiloAddress silo,
+        GrainType grainType) =>
+        stats.Count(x => x.SiloAddress.Equals(silo) && x.GrainId.Type.Equals(grainType));
+
     protected void AddTestActivations(List<Task> tasks, SiloAddress silo, int count)
     {
         RequestContext.Set(IPlacementDirector.PlacementHintKey, silo);
