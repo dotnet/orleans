@@ -352,12 +352,12 @@ namespace OrleansCodeGen.TestProject
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
-            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_SimpleRecord));
-            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_RecordWithExtraProperty));
-            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_RecordStructWithParameterId));
-            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_SimpleRecord));
-            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_RecordWithExtraProperty));
-            config.Copiers.Add(typeof(global::Orleans.Serialization.Cloning.ShallowCopier<global::TestProject.RecordStructWithParameterId>));
+            AddImplementationType(config.Serializers, typeof(OrleansCodeGen.TestProject.Codec_SimpleRecord));
+            AddImplementationType(config.Serializers, typeof(OrleansCodeGen.TestProject.Codec_RecordWithExtraProperty));
+            AddImplementationType(config.Serializers, typeof(OrleansCodeGen.TestProject.Codec_RecordStructWithParameterId));
+            AddImplementationType(config.Copiers, typeof(OrleansCodeGen.TestProject.Copier_SimpleRecord));
+            AddImplementationType(config.Copiers, typeof(OrleansCodeGen.TestProject.Copier_RecordWithExtraProperty));
+            AddImplementationType(config.Copiers, typeof(global::Orleans.Serialization.Cloning.ShallowCopier<global::TestProject.RecordStructWithParameterId>));
         }
     }
 }

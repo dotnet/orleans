@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Reflection.Emit;
 
@@ -26,19 +27,43 @@ namespace Orleans.Serialization.Utilities
     /// </summary>
     public static class FieldAccessor
     {
-        /// <summary>
-        /// Returns a delegate to get the value of a specified field.
-        /// </summary>
-        /// <returns>A delegate to get the value of a specified field.</returns>
-        public static Delegate GetGetter(Type declaringType, string fieldName) => GetGetter(declaringType, fieldName, false);
+#if NET5_0_OR_GREATER
+        private const DynamicallyAccessedMemberTypes FieldMembers =
+            DynamicallyAccessedMemberTypes.PublicFields
+            | DynamicallyAccessedMemberTypes.NonPublicFields;
+#endif
 
         /// <summary>
         /// Returns a delegate to get the value of a specified field.
         /// </summary>
         /// <returns>A delegate to get the value of a specified field.</returns>
-        public static Delegate GetValueGetter(Type declaringType, string fieldName) => GetGetter(declaringType, fieldName, true);
+        public static Delegate GetGetter(
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(FieldMembers)]
+#endif
+            Type declaringType,
+            string fieldName)
+            => GetGetter(declaringType, fieldName, false);
 
-        private static Delegate GetGetter(Type declaringType, string fieldName, bool byref)
+        /// <summary>
+        /// Returns a delegate to get the value of a specified field.
+        /// </summary>
+        /// <returns>A delegate to get the value of a specified field.</returns>
+        public static Delegate GetValueGetter(
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(FieldMembers)]
+#endif
+            Type declaringType,
+            string fieldName)
+            => GetGetter(declaringType, fieldName, true);
+
+        private static Delegate GetGetter(
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(FieldMembers)]
+#endif
+            Type declaringType,
+            string fieldName,
+            bool byref)
         {
             var field = declaringType.GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)!;
             var parameterTypes = new[] { typeof(object), byref ? declaringType.MakeByRefType() : declaringType };
@@ -58,15 +83,33 @@ namespace Orleans.Serialization.Utilities
         /// Returns a delegate to set the value of this field for an instance.
         /// </summary>
         /// <returns>A delegate to set the value of this field for an instance.</returns>
-        public static Delegate GetReferenceSetter(Type declaringType, string fieldName) => GetSetter(declaringType, fieldName, false);
+        public static Delegate GetReferenceSetter(
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(FieldMembers)]
+#endif
+            Type declaringType,
+            string fieldName)
+            => GetSetter(declaringType, fieldName, false);
 
         /// <summary>
         /// Returns a delegate to set the value of this field for an instance.
         /// </summary>
         /// <returns>A delegate to set the value of this field for an instance.</returns>
-        public static Delegate GetValueSetter(Type declaringType, string fieldName) => GetSetter(declaringType, fieldName, true);
+        public static Delegate GetValueSetter(
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(FieldMembers)]
+#endif
+            Type declaringType,
+            string fieldName)
+            => GetSetter(declaringType, fieldName, true);
 
-        private static Delegate GetSetter(Type declaringType, string fieldName, bool byref)
+        private static Delegate GetSetter(
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(FieldMembers)]
+#endif
+            Type declaringType,
+            string fieldName,
+            bool byref)
         {
             var field = declaringType.GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)!;
             var parameterTypes = new[] { typeof(object), byref ? declaringType.MakeByRefType() : declaringType, field.FieldType };

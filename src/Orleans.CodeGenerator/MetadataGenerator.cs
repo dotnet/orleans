@@ -42,67 +42,66 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
             generatedInvokableActivatorMetadataNames);
         var serializableRegistrations = GetOrderedSerializableRegistrations(model, generatedInvokables);
 
-        var addSerializerMethod = configParam.Member("Serializers").Member("Add");
+        var addImplementationTypeMethod = IdentifierName("AddImplementationType");
         foreach (var registration in serializableRegistrations)
         {
-            AddRegistration(body, addSerializerMethod, registration.SerializerTypeSyntax);
+            AddRegistration(body, addImplementationTypeMethod, configParam.Member("Serializers"), registration.SerializerTypeSyntax);
         }
 
         foreach (var type in model.RegisteredCodecs.Where(static codec => codec.Kind == RegisteredCodecKind.Serializer))
         {
-            AddRegistration(body, addSerializerMethod, GetOpenTypeSyntax(type.Type));
+            AddRegistration(body, addImplementationTypeMethod, configParam.Member("Serializers"), GetOpenTypeSyntax(type.Type));
         }
 
-        var addCopierMethod = configParam.Member("Copiers").Member("Add");
         foreach (var registration in serializableRegistrations)
         {
             if (registration.CopierTypeSyntax is not null)
             {
-                AddRegistration(body, addCopierMethod, registration.CopierTypeSyntax);
+                AddRegistration(body, addImplementationTypeMethod, configParam.Member("Copiers"), registration.CopierTypeSyntax);
             }
         }
 
         foreach (var type in model.RegisteredCodecs.Where(static codec => codec.Kind == RegisteredCodecKind.Copier))
         {
-            AddRegistration(body, addCopierMethod, GetOpenTypeSyntax(type.Type));
+            AddRegistration(body, addImplementationTypeMethod, configParam.Member("Copiers"), GetOpenTypeSyntax(type.Type));
         }
 
-        var addConverterMethod = configParam.Member("Converters").Member("Add");
         foreach (var type in model.RegisteredCodecs.Where(static codec => codec.Kind == RegisteredCodecKind.Converter))
         {
-            AddRegistration(body, addConverterMethod, GetOpenTypeSyntax(type.Type));
+            AddRegistration(body, addImplementationTypeMethod, configParam.Member("Converters"), GetOpenTypeSyntax(type.Type));
         }
 
-        var addProxyMethod = configParam.Member("InterfaceProxies").Member("Add");
+        var addMetadataTypeMethod = IdentifierName("AddMetadataType");
         foreach (var type in orderedProxyInterfaces)
         {
-            AddRegistration(body, addProxyMethod, GetGeneratedProxyTypeSyntax(type));
+            AddRegistration(body, addMetadataTypeMethod, configParam.Member("InterfaceProxies"), GetGeneratedProxyTypeSyntax(type));
         }
 
-        var addInvokableInterfaceMethod = configParam.Member("Interfaces").Member("Add");
+        var addInterfaceTypeMethod = IdentifierName("AddInterfaceType");
         foreach (var type in orderedProxyInterfaces.Select(static proxy => proxy.InterfaceType).Distinct())
         {
-            AddRegistration(body, addInvokableInterfaceMethod, GetOpenTypeSyntax(type));
+            AddRegistration(body, addInterfaceTypeMethod, configParam.Member("Interfaces"), GetOpenTypeSyntax(type));
         }
 
-        var addInvokableInterfaceImplementationMethod = configParam.Member("InterfaceImplementations").Member("Add");
         foreach (var type in GetOrderedInterfaceImplementations(model.InterfaceImplementations))
         {
-            AddRegistration(body, addInvokableInterfaceImplementationMethod, GetOpenTypeSyntax(type.ImplementationType));
+            AddRegistration(
+                body,
+                configParam.Member("InterfaceImplementations").Member("Add"),
+                GetOpenTypeSyntax(type.ImplementationType));
         }
 
-        var addActivatorMethod = configParam.Member("Activators").Member("Add");
         foreach (var registration in serializableRegistrations)
         {
             if (registration.ActivatorTypeSyntax is not null)
             {
-                AddRegistration(body, addActivatorMethod, registration.ActivatorTypeSyntax);
+                AddRegistration(body, addImplementationTypeMethod, configParam.Member("Activators"), registration.ActivatorTypeSyntax);
             }
         }
 
         foreach (var type in model.RegisteredCodecs.Where(static codec => codec.Kind == RegisteredCodecKind.Activator))
         {
-            AddRegistration(body, addActivatorMethod, GetOpenTypeSyntax(type.Type));
+            AddRegistration(body, addImplementationTypeMethod, configParam.Member("Activators"), GetOpenTypeSyntax(type.Type));
         }
 
         var addWellKnownTypeIdMethod = configParam.Member("WellKnownTypeIds").Member("Add");
@@ -613,6 +612,20 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
         }
 
         return null;
+    }
+
+    private static void AddRegistration(
+        List<StatementSyntax> body,
+        ExpressionSyntax addMethod,
+        ExpressionSyntax collection,
+        TypeSyntax typeSyntax)
+    {
+        body.Add(ExpressionStatement(InvocationExpression(addMethod,
+            ArgumentList(SeparatedList(
+            [
+                Argument(collection),
+                Argument(TypeOfExpression(typeSyntax)),
+            ])))));
     }
 
     private static void AddRegistration(List<StatementSyntax> body, ExpressionSyntax addMethod, TypeSyntax typeSyntax)

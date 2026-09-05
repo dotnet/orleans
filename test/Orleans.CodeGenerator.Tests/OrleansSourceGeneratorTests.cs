@@ -2523,12 +2523,12 @@ public class DemoClass
                 .DescendantNodes()
                 .OfType<InvocationExpressionSyntax>())
             .Where(static invocation =>
-                invocation.Expression is MemberAccessExpressionSyntax
+                invocation.Expression is IdentifierNameSyntax { Identifier.ValueText: "AddImplementationType" }
+                && invocation.ArgumentList.Arguments.FirstOrDefault()?.Expression is MemberAccessExpressionSyntax
                 {
-                    Name.Identifier.ValueText: "Add",
-                    Expression: MemberAccessExpressionSyntax { Name.Identifier.ValueText: "Activators" }
+                    Name.Identifier.ValueText: "Activators"
                 })
-            .Select(static invocation => invocation.ArgumentList.Arguments.FirstOrDefault()?.Expression)
+            .Select(static invocation => invocation.ArgumentList.Arguments.ElementAtOrDefault(1)?.Expression)
             .OfType<TypeOfExpressionSyntax>()
             .Select(static typeOfExpression => GetGeneratedClassIdentifier(typeOfExpression.Type.ToString().Split('.').Last()))
             .Where(static name => name.StartsWith("Activator_Invokable_", StringComparison.Ordinal))

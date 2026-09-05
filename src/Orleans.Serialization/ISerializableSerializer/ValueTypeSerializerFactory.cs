@@ -1,11 +1,17 @@
 using System;
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Runtime.Serialization;
 using System.Security;
 
 namespace Orleans.Serialization
 {
+#if NET5_0_OR_GREATER
+    [RequiresUnreferencedCode(
+        "ISerializable value-type support reflects over serialization constructors and callback methods. "
+        + "Preserve public and non-public constructors and methods on serialized types.")]
+#endif
     internal class ValueTypeSerializerFactory
     {
         private readonly SerializationConstructorFactory _constructorFactory;

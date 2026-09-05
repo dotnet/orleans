@@ -11,6 +11,13 @@
     <EnableSingleFileAnalyzer Condition="'$(TargetFramework)' == 'net10.0'">true</EnableSingleFileAnalyzer>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    <WarningsAsErrors>$(WarningsAsErrors);IL2067;IL2070;IL2075;IL2091</WarningsAsErrors>
+    <!-- Keep the remaining trim and AOT backlog visible in the compatibility audit while enforcing this bounded rollout. -->
+    <NoWarn Condition="'$(EnableCompatibilityAnalyzerAudit)' != 'true'">$(NoWarn);IL2026;IL2055;IL2057;IL2060;IL2071;IL2077;IL2090;IL2096;IL3050;IL4000</NoWarn>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.DependencyModel" />

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.Serialization;
@@ -12,8 +13,12 @@ namespace Orleans.Serialization
     /// </summary>
     internal sealed class SerializationCallbacksFactory
     {
+#if NET5_0_OR_GREATER
+        private const DynamicallyAccessedMemberTypes CallbackMethods =
+            DynamicallyAccessedMemberTypes.PublicMethods | DynamicallyAccessedMemberTypes.NonPublicMethods;
+#endif
+
         private readonly ConcurrentDictionary<Type, object> _cache = new();
-        private readonly Func<Type, object> _factory = t => CreateTypedCallbacks<Action<object, StreamingContext>>(t, typeof(object));
 
         /// <summary>
         /// Gets serialization callbacks for reference types.
@@ -21,8 +26,20 @@ namespace Orleans.Serialization
         /// <param name="type">The type.</param>
         /// <returns>Serialization callbacks.</returns>
         [SecurityCritical]
-        public SerializationCallbacks<Action<object, StreamingContext>> GetReferenceTypeCallbacks(Type type) => (
-            SerializationCallbacks<Action<object, StreamingContext>>)_cache.GetOrAdd(type, _factory);
+        public SerializationCallbacks<Action<object, StreamingContext>> GetReferenceTypeCallbacks(
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(CallbackMethods)]
+#endif
+            Type type)
+        {
+            if (_cache.TryGetValue(type, out var existing))
+            {
+                return (SerializationCallbacks<Action<object, StreamingContext>>)existing;
+            }
+
+            var created = CreateTypedCallbacks<Action<object, StreamingContext>>(type, typeof(object));
+            return (SerializationCallbacks<Action<object, StreamingContext>>)_cache.GetOrAdd(type, created);
+        }
 
         /// <summary>
         /// Gets serialization callbacks for value types.
@@ -32,14 +49,40 @@ namespace Orleans.Serialization
         /// <param name="type">The type.</param>
         /// <returns>Serialization callbacks.</returns>
         [SecurityCritical]
-        public SerializationCallbacks<TDelegate> GetValueTypeCallbacks<TOwner, TDelegate>(Type type) where TOwner : struct where TDelegate : Delegate
+        public SerializationCallbacks<TDelegate> GetValueTypeCallbacks<TOwner, TDelegate>(
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(CallbackMethods)]
+#endif
+            Type type)
+            where TOwner : struct
+            where TDelegate : Delegate
             => GetValueTypeCallbacks<TDelegate>(type, typeof(TOwner));
 
-        private SerializationCallbacks<TDelegate> GetValueTypeCallbacks<TDelegate>(Type type, Type owner) where TDelegate : Delegate
-            => (SerializationCallbacks<TDelegate>)_cache.GetOrAdd(type, CreateTypedCallbacks<TDelegate>, owner);
+        private SerializationCallbacks<TDelegate> GetValueTypeCallbacks<TDelegate>(
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(CallbackMethods)]
+#endif
+            Type type,
+            Type owner)
+            where TDelegate : Delegate
+        {
+            if (_cache.TryGetValue(type, out var existing))
+            {
+                return (SerializationCallbacks<TDelegate>)existing;
+            }
+
+            var created = CreateTypedCallbacks<TDelegate>(type, owner);
+            return (SerializationCallbacks<TDelegate>)_cache.GetOrAdd(type, created);
+        }
 
         [SecurityCritical]
-        private static SerializationCallbacks<TDelegate> CreateTypedCallbacks<TDelegate>(Type type, Type owner) where TDelegate : Delegate
+        private static SerializationCallbacks<TDelegate> CreateTypedCallbacks<TDelegate>(
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(CallbackMethods)]
+#endif
+            Type type,
+            Type owner)
+            where TDelegate : Delegate
         {
             var onDeserializing = default(TDelegate);
             var onDeserialized = default(TDelegate);

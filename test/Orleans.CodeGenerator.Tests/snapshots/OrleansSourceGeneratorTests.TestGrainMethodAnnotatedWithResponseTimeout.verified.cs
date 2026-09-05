@@ -156,10 +156,10 @@ namespace OrleansCodeGen.TestProject
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
-            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8));
-            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8));
-            config.InterfaceProxies.Add(typeof(OrleansCodeGen.TestProject.Proxy_IResponseTimeoutGrain));
-            config.Interfaces.Add(typeof(global::TestProject.IResponseTimeoutGrain));
+            AddImplementationType(config.Serializers, typeof(OrleansCodeGen.TestProject.Codec_Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8));
+            AddImplementationType(config.Copiers, typeof(OrleansCodeGen.TestProject.Copier_Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8));
+            AddMetadataType(config.InterfaceProxies, typeof(OrleansCodeGen.TestProject.Proxy_IResponseTimeoutGrain));
+            AddInterfaceType(config.Interfaces, typeof(global::TestProject.IResponseTimeoutGrain));
             config.InterfaceImplementations.Add(typeof(global::TestProject.ResponseTimeoutGrain));
             var n1 = config.CompoundTypeAliases.Add("inv");
             var n2 = n1.Add(typeof(global::Orleans.Runtime.GrainReference));

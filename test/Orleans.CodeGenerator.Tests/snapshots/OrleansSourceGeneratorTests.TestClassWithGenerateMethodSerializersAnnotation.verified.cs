@@ -160,10 +160,10 @@ namespace OrleansCodeGen.TestProject
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
-            config.Serializers.Add(typeof(OrleansCodeGen.Codec_Invokable_IMyGrain_GrainReference_6D39E404));
-            config.Copiers.Add(typeof(OrleansCodeGen.Copier_Invokable_IMyGrain_GrainReference_6D39E404));
-            config.InterfaceProxies.Add(typeof(OrleansCodeGen.Proxy_IMyGrain));
-            config.Interfaces.Add(typeof(global::IMyGrain));
+            AddImplementationType(config.Serializers, typeof(OrleansCodeGen.Codec_Invokable_IMyGrain_GrainReference_6D39E404));
+            AddImplementationType(config.Copiers, typeof(OrleansCodeGen.Copier_Invokable_IMyGrain_GrainReference_6D39E404));
+            AddMetadataType(config.InterfaceProxies, typeof(OrleansCodeGen.Proxy_IMyGrain));
+            AddInterfaceType(config.Interfaces, typeof(global::IMyGrain));
             var n1 = config.CompoundTypeAliases.Add("inv");
             var n2 = n1.Add(typeof(global::Orleans.Runtime.GrainReference));
             var n3 = n2.Add(typeof(global::IMyGrain));

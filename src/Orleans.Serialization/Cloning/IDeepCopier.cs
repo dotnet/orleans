@@ -311,6 +311,12 @@ namespace Orleans.Serialization.Cloning
             return Types.GetOrAdd(type, IsShallowCopyableInternal(type));
         }
 
+#if NET5_0_OR_GREATER
+        [UnconditionalSuppressMessage(
+            "Trimming",
+            "IL2070",
+            Justification = "The reflected branch only handles value types. The runtime preserves every instance field which contributes to a value type's layout, including non-public fields, so trimming cannot change this shallow-copyability decision.")]
+#endif
         private static bool IsShallowCopyableInternal(Type type)
         {
             if (type.IsPrimitive || type.IsEnum)

@@ -209,12 +209,12 @@ namespace OrleansCodeGen.TestProject
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
-            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_PublicDemoData));
-            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_InternalDemoData));
-            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_PublicDemoData));
-            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_InternalDemoData));
-            config.Activators.Add(typeof(OrleansCodeGen.TestProject.Activator_PublicDemoData));
-            config.Activators.Add(typeof(OrleansCodeGen.TestProject.Activator_InternalDemoData));
+            AddImplementationType(config.Serializers, typeof(OrleansCodeGen.TestProject.Codec_PublicDemoData));
+            AddImplementationType(config.Serializers, typeof(OrleansCodeGen.TestProject.Codec_InternalDemoData));
+            AddImplementationType(config.Copiers, typeof(OrleansCodeGen.TestProject.Copier_PublicDemoData));
+            AddImplementationType(config.Copiers, typeof(OrleansCodeGen.TestProject.Copier_InternalDemoData));
+            AddImplementationType(config.Activators, typeof(OrleansCodeGen.TestProject.Activator_PublicDemoData));
+            AddImplementationType(config.Activators, typeof(OrleansCodeGen.TestProject.Activator_InternalDemoData));
         }
     }
 }

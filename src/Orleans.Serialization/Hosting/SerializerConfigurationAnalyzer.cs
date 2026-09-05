@@ -2,6 +2,7 @@ using Orleans.Serialization.Configuration;
 using Orleans.Serialization.Serializers;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
@@ -30,7 +31,7 @@ namespace Orleans.Serialization
             var allComplaints = new Dictionary<Type, SerializerConfigurationComplaint>();
             foreach (var @interface in options.Interfaces)
             {
-                foreach (var method in @interface.GetMethods(BindingFlags.Instance | BindingFlags.Public))
+                foreach (var method in GetInterfaceMethods(@interface))
                 {
                     if (typeof(Task).IsAssignableFrom(method.ReturnType))
                     {
@@ -93,6 +94,15 @@ namespace Orleans.Serialization
                 return true;
             }
         }
+
+#if NET5_0_OR_GREATER
+        [UnconditionalSuppressMessage(
+            "Trimming",
+            "IL2070",
+            Justification = "Generated manifests register grain interfaces through TypeManifestProviderBase.AddInterfaceType, which preserves public and non-public methods and inherited interfaces. The HashSet<Type> boundary cannot retain that annotation.")]
+#endif
+        private static MethodInfo[] GetInterfaceMethods(Type interfaceType)
+            => interfaceType.GetMethods(BindingFlags.Instance | BindingFlags.Public);
 
         /// <summary>
         /// Represents a configuration issue regarding the serializability of a type used in interface methods.

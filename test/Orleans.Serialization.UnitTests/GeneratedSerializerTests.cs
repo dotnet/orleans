@@ -731,7 +731,110 @@ public class GeneratedSerializerTests : IDisposable
         Assert.True(original.SequenceEqual(result));
     }
 
+    [Fact]
+    public void CodecProvider_ActivatesGeneratedCodecForClosedGenericType()
+    {
+        var options = _serviceProvider.GetRequiredService<
+            Microsoft.Extensions.Options.IOptions<Orleans.Serialization.Configuration.TypeManifestOptions>>().Value;
+        var expectedType = GetRegisteredImplementationType(
+            options.Serializers,
+            typeof(IFieldCodec<>),
+            typeof(CodecProviderGeneratedTarget<string>));
+
+        var codec = _codecProvider.GetCodec<CodecProviderGeneratedTarget<string>>();
+
+        Assert.Equal(expectedType, codec.GetType());
+    }
+
+    [Fact]
+    public void CodecProvider_ActivatesGeneratedCopierForClosedGenericType()
+    {
+        var options = _serviceProvider.GetRequiredService<
+            Microsoft.Extensions.Options.IOptions<Orleans.Serialization.Configuration.TypeManifestOptions>>().Value;
+        var expectedType = GetRegisteredImplementationType(
+            options.Copiers,
+            typeof(Orleans.Serialization.Cloning.IDeepCopier<>),
+            typeof(CodecProviderGeneratedTarget<string>));
+
+        var copier = _codecProvider.GetDeepCopier<CodecProviderGeneratedTarget<string>>();
+
+        Assert.Equal(expectedType, copier.GetType());
+    }
+
+    [Fact]
+    public void CodecProvider_ActivatesGeneratedActivatorForClosedGenericType()
+    {
+        var options = _serviceProvider.GetRequiredService<
+            Microsoft.Extensions.Options.IOptions<Orleans.Serialization.Configuration.TypeManifestOptions>>().Value;
+        var expectedType = GetRegisteredImplementationType(
+            options.Activators,
+            typeof(Orleans.Serialization.Activators.IActivator<>),
+            typeof(CodecProviderGeneratedTarget<string>));
+
+        var activator = _codecProvider.GetActivator<CodecProviderGeneratedTarget<string>>();
+
+        Assert.Equal(expectedType, activator.GetType());
+    }
+
+    [Fact]
+    public void CodecProvider_ClosesAndActivatesGenericCustomCodecRegistration()
+    {
+        using var serviceProvider = CreateCustomRegistrationServiceProvider();
+        var codec = serviceProvider.GetRequiredService<CodecProvider>().GetCodec<CodecProviderCustomTarget<string>>();
+
+        Assert.IsType<CustomGenericCodec<string>>(codec);
+    }
+
+    [Fact]
+    public void CodecProvider_ClosesAndActivatesGenericCustomCopierRegistration()
+    {
+        using var serviceProvider = CreateCustomRegistrationServiceProvider();
+        var copier = serviceProvider.GetRequiredService<CodecProvider>().GetDeepCopier<CodecProviderCustomTarget<string>>();
+
+        Assert.IsType<CustomGenericCopier<string>>(copier);
+    }
+
+    [Fact]
+    public void CodecProvider_ClosesAndActivatesGenericCustomActivatorRegistration()
+    {
+        using var serviceProvider = CreateCustomRegistrationServiceProvider();
+        var activator = serviceProvider.GetRequiredService<CodecProvider>().GetActivator<CodecProviderCustomTarget<string>>();
+
+        Assert.IsType<CustomGenericActivator<string>>(activator);
+    }
+
     public void Dispose() => _serviceProvider?.Dispose();
+
+    private static ServiceProvider CreateCustomRegistrationServiceProvider()
+    {
+        return new ServiceCollection()
+            .AddSerializer(builder => builder.Configure(options =>
+            {
+                options.Serializers.Add(typeof(CustomGenericCodec<>));
+                options.Copiers.Add(typeof(CustomGenericCopier<>));
+                options.Activators.Add(typeof(CustomGenericActivator<>));
+            }))
+            .BuildServiceProvider();
+    }
+
+    private static Type GetRegisteredImplementationType(
+        IEnumerable<Type> implementationTypes,
+        Type contractTypeDefinition,
+        Type targetType)
+    {
+        var targetTypeDefinition = targetType.GetGenericTypeDefinition();
+        var implementationType = Assert.Single(
+            implementationTypes,
+            type => type.GetInterfaces().Any(
+                contract => contract.IsGenericType
+                    && contract.GetGenericTypeDefinition() == contractTypeDefinition
+                    && contract.GenericTypeArguments[0].IsGenericType
+                    && contract.GenericTypeArguments[0].GetGenericTypeDefinition() == targetTypeDefinition));
+
+        Assert.True(implementationType.IsGenericTypeDefinition);
+        Assert.Equal(targetType.GenericTypeArguments.Length, implementationType.GetGenericArguments().Length);
+        return implementationType.MakeGenericType(targetType.GenericTypeArguments);
+    }
 
     private T RoundTripThroughCodec<T>(T original)
     {
@@ -801,4 +904,53 @@ public class GeneratedSerializerTests : IDisposable
 
         return result;
     }
+}
+
+[GenerateSerializer]
+public sealed class CodecProviderGeneratedTarget<T>
+{
+    [Id(0)]
+    public T Value { get; set; } = default!;
+}
+
+public sealed class CodecProviderCustomTarget<T>;
+
+public sealed class CustomGenericCodec<T> : IFieldCodec<CodecProviderCustomTarget<T>>
+{
+    public CustomGenericCodec()
+    {
+    }
+
+    public void WriteField<TBufferWriter>(
+        ref Writer<TBufferWriter> writer,
+        uint fieldIdDelta,
+        [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType,
+        [System.Diagnostics.CodeAnalysis.AllowNull] CodecProviderCustomTarget<T> value)
+        where TBufferWriter : System.Buffers.IBufferWriter<byte> =>
+        throw new NotSupportedException("This codec is used only to verify registration activation.");
+
+    public CodecProviderCustomTarget<T> ReadValue<TInput>(
+        ref Reader<TInput> reader,
+        Orleans.Serialization.WireProtocol.Field field) =>
+        throw new NotSupportedException("This codec is used only to verify registration activation.");
+}
+
+public sealed class CustomGenericCopier<T> : Orleans.Serialization.Cloning.IDeepCopier<CodecProviderCustomTarget<T>>
+{
+    public CustomGenericCopier()
+    {
+    }
+
+    public CodecProviderCustomTarget<T> DeepCopy(
+        CodecProviderCustomTarget<T> input,
+        Orleans.Serialization.Cloning.CopyContext context) => input;
+}
+
+public sealed class CustomGenericActivator<T> : Orleans.Serialization.Activators.IActivator<CodecProviderCustomTarget<T>>
+{
+    public CustomGenericActivator()
+    {
+    }
+
+    public CodecProviderCustomTarget<T> Create() => new();
 }

@@ -104,6 +104,12 @@ namespace Orleans.Serialization.Serializers
             AddFromMetadata(_converters, metadata.Converters, typeof(IConverter<,>));
             AddFromMetadata(_baseCopiers, metadata.Copiers, typeof(IBaseCopier<>));
 
+#if NET5_0_OR_GREATER
+            [UnconditionalSuppressMessage(
+                "Trimming",
+                "IL2075",
+                Justification = "Generated manifests register implementation types through TypeManifestProviderBase.AddImplementationType, which preserves implemented interfaces. The HashSet<Type> boundary cannot retain that annotation.")]
+#endif
             static void AddFromMetadata(Dictionary<Type, Type> resultCollection, HashSet<Type> metadataCollection, Type genericType)
             {
                 Debug.Assert(genericType.GetGenericArguments().Length >= 1);
@@ -479,6 +485,22 @@ namespace Orleans.Serialization.Serializers
             }
         }
 
+#if NET5_0_OR_GREATER
+        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(DefaultReferenceTypeActivator<>))]
+        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(DefaultValueTypeActivator<>))]
+        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(ConcreteTypeSerializer<,>))]
+        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(ValueSerializer<,>))]
+        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(ArrayCodec<>))]
+        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(MultiDimensionalArrayCodec<>))]
+        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(SurrogateCodec<,,>))]
+        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(ValueTypeSurrogateCodec<,,>))]
+        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(ArrayCopier<>))]
+        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(MultiDimensionalArrayCopier<>))]
+        [UnconditionalSuppressMessage(
+            "Trimming",
+            "IL2067",
+            Justification = "Generated manifests register implementation types through TypeManifestProviderBase.AddImplementationType, which preserves public constructors. Built-in dynamically closed implementations are rooted by DynamicDependency attributes. Other implementation types are resolved from dependency injection before this activation path. The TypeManifestOptions and dictionary boundaries cannot retain the annotation.")]
+#endif
         private object GetServiceOrCreateInstance(Type type, object[]? constructorArguments = null)
         {
             var result = OrleansGeneratedCodeHelper.TryGetService(type);

@@ -166,6 +166,12 @@ public class TypeConverter
             });
         }
 
+#if NET5_0_OR_GREATER
+        [UnconditionalSuppressMessage(
+            "Trimming",
+            "IL2075",
+            Justification = "Generated manifests register implementation types through TypeManifestProviderBase.AddImplementationType, which preserves implemented interfaces. The HashSet<Type> boundary cannot retain that annotation.")]
+#endif
         void AddFromMetadata(HashSet<Type> metadataCollection, Type genericType)
         {
             Debug.Assert(genericType.GetGenericArguments().Length >= 1);
@@ -213,6 +219,12 @@ public class TypeConverter
             AddAllowedType(genericArgument);
         }
 
+#if NET5_0_OR_GREATER
+        [UnconditionalSuppressMessage(
+            "Trimming",
+            "IL2070",
+            Justification = "Generated manifests register proxy metadata through TypeManifestProviderBase.AddMetadataType, which preserves implemented interfaces. The intermediate Type values cannot retain that annotation.")]
+#endif
         void AddAllowedType(Type type)
         {
             FormatAndAddAllowedType(type);
