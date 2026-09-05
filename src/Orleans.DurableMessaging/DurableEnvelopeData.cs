@@ -6,6 +6,7 @@ using System.Linq;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Session;
+using Orleans.Serialization.TypeSystem;
 
 namespace Orleans.DurableMessaging;
 
@@ -48,6 +49,12 @@ public sealed class DurableEnvelopeData
     [Id(2)]
     private Dictionary<string, (int Offset, int Length)>? _contextIndices;
 
+    [Id(3)]
+    private string? _bodyType;
+
+    [Id(4), Immutable]
+    private Dictionary<string, string>? _contextTypes;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="DurableEnvelopeData"/> class.
     /// </summary>
@@ -79,7 +86,13 @@ public sealed class DurableEnvelopeData
     /// <returns>True if deserialization succeeded; otherwise, false.</returns>
     public bool TryGetBody<T>([MaybeNull] out T value)
     {
-        if (_sessionPool is null || _bodySlice.Length == 0)
+        if (_sessionPool is null
+            || _bodySlice.Length == 0
+            || (_bodyType is not null
+                && !string.Equals(
+                    _bodyType,
+                    RuntimeTypeNameFormatter.Format(typeof(T)),
+                    StringComparison.Ordinal)))
         {
             value = default;
             return false;
@@ -111,7 +124,15 @@ public sealed class DurableEnvelopeData
     /// <returns>True if the key exists and deserialization succeeded; otherwise, false.</returns>
     public bool TryGetContextValue<T>(string key, [MaybeNull] out T value)
     {
-        if (_sessionPool is null || _contextIndices is null || !_contextIndices.TryGetValue(key, out var slice))
+        if (_sessionPool is null
+            || _contextIndices is null
+            || !_contextIndices.TryGetValue(key, out var slice)
+            || (_contextTypes is not null
+                && (!_contextTypes.TryGetValue(key, out var contextType)
+                    || !string.Equals(
+                        contextType,
+                        RuntimeTypeNameFormatter.Format(typeof(T)),
+                        StringComparison.Ordinal))))
         {
             value = default;
             return false;
@@ -162,10 +183,38 @@ public sealed class DurableEnvelopeData
         byte[] buffer,
         (int Offset, int Length) bodySlice,
         Dictionary<string, (int Offset, int Length)>? contextIndices)
+        => InitializeWithTypes(buffer, bodySlice, contextIndices, bodyType: null, contextTypes: null);
+
+    internal bool HasEquivalentDeclaredTypes(DurableEnvelopeData other)
+    {
+        if (!string.Equals(_bodyType, other._bodyType, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (_contextTypes is null || other._contextTypes is null)
+        {
+            return _contextTypes is null && other._contextTypes is null;
+        }
+
+        return _contextTypes.Count == other._contextTypes.Count
+            && _contextTypes.All(pair =>
+                other._contextTypes.TryGetValue(pair.Key, out var otherType)
+                && string.Equals(pair.Value, otherType, StringComparison.Ordinal));
+    }
+
+    internal void InitializeWithTypes(
+        byte[] buffer,
+        (int Offset, int Length) bodySlice,
+        Dictionary<string, (int Offset, int Length)>? contextIndices,
+        string? bodyType,
+        Dictionary<string, string>? contextTypes)
     {
         _buffer = buffer;
         _bodySlice = bodySlice;
         _contextIndices = contextIndices;
+        _bodyType = bodyType;
+        _contextTypes = contextTypes;
     }
 
 }

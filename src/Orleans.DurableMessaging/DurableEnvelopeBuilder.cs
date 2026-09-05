@@ -7,6 +7,7 @@ using Orleans.Serialization;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Session;
+using Orleans.Serialization.TypeSystem;
 
 namespace Orleans.DurableMessaging;
 
@@ -47,8 +48,10 @@ public sealed class DurableEnvelopeBuilder : IBufferWriter<byte>
 
     // MigrationContext-style keyed context storage
     private Dictionary<string, (int Offset, int Length)>? _contextIndices;
+    private Dictionary<string, string>? _contextTypes;
     private ArrayBufferWriter<byte> _buffer = new();
     private (int Offset, int Length) _bodySlice;
+    private string? _bodyType;
     private bool _bodyWritten;
     private bool _built;
 
@@ -125,6 +128,7 @@ public sealed class DurableEnvelopeBuilder : IBufferWriter<byte>
         SessionPool.CodecProvider.GetCodec<T>().WriteField(ref writer, 0, typeof(T), body);
         writer.Commit();
         _bodySlice = (startOffset, _buffer.WrittenCount - startOffset);
+        _bodyType = RuntimeTypeNameFormatter.Format(typeof(T));
         _bodyWritten = true;
 
         return this;
@@ -237,6 +241,7 @@ public sealed class DurableEnvelopeBuilder : IBufferWriter<byte>
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
 
         _contextIndices ??= new(StringComparer.Ordinal);
+        _contextTypes ??= new(StringComparer.Ordinal);
 
         if (_contextIndices.ContainsKey(key))
         {
@@ -249,6 +254,7 @@ public sealed class DurableEnvelopeBuilder : IBufferWriter<byte>
         SessionPool.CodecProvider.GetCodec<T>().WriteField(ref writer, 0, typeof(T), value);
         writer.Commit();
         _contextIndices[key] = (startOffset, _buffer.WrittenCount - startOffset);
+        _contextTypes[key] = RuntimeTypeNameFormatter.Format(typeof(T));
 
         return this;
     }
@@ -289,7 +295,7 @@ public sealed class DurableEnvelopeBuilder : IBufferWriter<byte>
         var buffer = _buffer.WrittenSpan.ToArray();
         _buffer = new ArrayBufferWriter<byte>();
         var data = new DurableEnvelopeData(SessionPool);
-        data.Initialize(buffer, _bodySlice, _contextIndices);
+        data.InitializeWithTypes(buffer, _bodySlice, _contextIndices, _bodyType, _contextTypes);
         _built = true;
 
         return new DurableEnvelope
@@ -315,8 +321,10 @@ public sealed class DurableEnvelopeBuilder : IBufferWriter<byte>
         _correlationKey = null;
         _replyTo = null;
         _contextIndices = null;
+        _contextTypes = null;
         _buffer = new ArrayBufferWriter<byte>();
         _bodySlice = default;
+        _bodyType = null;
         _bodyWritten = false;
         _built = false;
     }

@@ -303,6 +303,8 @@ namespace Orleans.DurableMessaging.Configuration
     {
         public System.TimeSpan BackpressureRetryDelay { get { throw null; } set { } }
 
+        public System.TimeSpan DeadLetterRetentionPeriod { get { throw null; } set { } }
+
         public System.TimeSpan DeduplicationWindow { get { throw null; } set { } }
 
         public int InboxBatchSize { get { throw null; } set { } }
@@ -314,6 +316,8 @@ namespace Orleans.DurableMessaging.Configuration
         public System.TimeSpan MaxOutboxRetryAge { get { throw null; } set { } }
 
         public int MaxProcessingAttempts { get { throw null; } set { } }
+
+        public int MaxRetainedDeadLetters { get { throw null; } set { } }
 
         public int OutboxBatchSize { get { throw null; } set { } }
 
@@ -438,7 +442,7 @@ namespace OrleansCodeGen.Orleans.DurableMessaging
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_DurableEnvelopeData : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.DurableMessaging.DurableEnvelopeData>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
-        public Copier_DurableEnvelopeData(global::Orleans.Serialization.Activators.IActivator<global::Orleans.DurableMessaging.DurableEnvelopeData> _activator) { }
+        public Copier_DurableEnvelopeData(global::Orleans.Serialization.Activators.IActivator<global::Orleans.DurableMessaging.DurableEnvelopeData> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
 
         public global::Orleans.DurableMessaging.DurableEnvelopeData DeepCopy(global::Orleans.DurableMessaging.DurableEnvelopeData original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
@@ -457,7 +461,6 @@ namespace OrleansCodeGen.Orleans.DurableMessaging
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), "Ext", typeof(global::Orleans.DurableMessaging.IDurableInboxExtension), typeof(global::Orleans.DurableMessaging.IDurableInboxExtension), "DeliverAsync" })]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), "Ext", typeof(global::Orleans.DurableMessaging.IDurableInboxExtension), typeof(global::Orleans.DurableMessaging.IDurableInboxExtension), "03DB806B" })]
     public sealed partial class Invokable_IDurableInboxExtension_GrainReference_Ext_03DB806B : global::Orleans.Runtime.Request<global::Orleans.DurableMessaging.DeliveryResult>
     {
         public global::Orleans.DurableMessaging.DurableEnvelope arg0;
