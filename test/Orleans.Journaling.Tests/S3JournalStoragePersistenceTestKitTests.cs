@@ -311,12 +311,13 @@ internal sealed class JournalGrainStorageAdapter(Func<JournalId, IJournalStorage
 
     public async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var journalId = CreateJournalId(grainType, grainId);
         var gate = _locks.GetOrAdd(journalId, static _ => new SemaphoreSlim(1, 1));
-        await gate.WaitAsync(TestContext.Current.CancellationToken);
+        await gate.WaitAsync(cancellationToken);
         try
         {
-            var current = await ReadAsync<T>(createStorage(journalId));
+            var current = await ReadAsync<T>(createStorage(journalId), cancellationToken);
             if (current.Metadata is null)
             {
                 grainState.State = CreateDefaultState<T>();
@@ -339,17 +340,18 @@ internal sealed class JournalGrainStorageAdapter(Func<JournalId, IJournalStorage
 
     public async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var journalId = CreateJournalId(grainType, grainId);
         var gate = _locks.GetOrAdd(journalId, static _ => new SemaphoreSlim(1, 1));
-        await gate.WaitAsync(TestContext.Current.CancellationToken);
+        await gate.WaitAsync(cancellationToken);
         try
         {
             var storage = createStorage(journalId);
-            var current = await ReadAsync<T>(storage);
+            var current = await ReadAsync<T>(storage, cancellationToken);
             if (grainState.ETag is null)
             {
                 if (current.Metadata is not null
-                    || !await storage.CreateIfNotExistsAsync(cancellationToken: CancellationToken.None))
+                    || !await storage.CreateIfNotExistsAsync(cancellationToken: cancellationToken))
                 {
                     throw new InconsistentStateException("The S3 journal storage record already exists.");
                 }
@@ -361,8 +363,8 @@ internal sealed class JournalGrainStorageAdapter(Func<JournalId, IJournalStorage
 
             var payload = JsonSerializer.SerializeToUtf8Bytes(
                 new JournalStorageEnvelope<T> { RecordExists = true, State = grainState.State });
-            await storage.ReplaceAsync(new ReadOnlySequence<byte>(payload), CancellationToken.None);
-            var metadata = await storage.GetMetadataAsync(CancellationToken.None)
+            await storage.ReplaceAsync(new ReadOnlySequence<byte>(payload), cancellationToken);
+            var metadata = await storage.GetMetadataAsync(cancellationToken)
                 ?? throw new InvalidOperationException("The S3 journal storage record was not visible after a successful write.");
             grainState.ETag = metadata.ETag;
             grainState.RecordExists = true;
@@ -375,13 +377,14 @@ internal sealed class JournalGrainStorageAdapter(Func<JournalId, IJournalStorage
 
     public async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var journalId = CreateJournalId(grainType, grainId);
         var gate = _locks.GetOrAdd(journalId, static _ => new SemaphoreSlim(1, 1));
-        await gate.WaitAsync(TestContext.Current.CancellationToken);
+        await gate.WaitAsync(cancellationToken);
         try
         {
             var storage = createStorage(journalId);
-            var current = await ReadAsync<T>(storage);
+            var current = await ReadAsync<T>(storage, cancellationToken);
             if (current.Metadata is null)
             {
                 if (grainState.ETag is not null)
@@ -402,8 +405,8 @@ internal sealed class JournalGrainStorageAdapter(Func<JournalId, IJournalStorage
 
             var payload = JsonSerializer.SerializeToUtf8Bytes(
                 new JournalStorageEnvelope<T> { RecordExists = false, State = CreateDefaultState<T>() });
-            await storage.ReplaceAsync(new ReadOnlySequence<byte>(payload), CancellationToken.None);
-            var metadata = await storage.GetMetadataAsync(CancellationToken.None)
+            await storage.ReplaceAsync(new ReadOnlySequence<byte>(payload), cancellationToken);
+            var metadata = await storage.GetMetadataAsync(cancellationToken)
                 ?? throw new InvalidOperationException("The S3 journal storage tombstone was not visible after a successful clear.");
             grainState.State = CreateDefaultState<T>();
             grainState.ETag = metadata.ETag;
@@ -415,11 +418,11 @@ internal sealed class JournalGrainStorageAdapter(Func<JournalId, IJournalStorage
         }
     }
 
-    private static async Task<JournalStorageReadResult<T>> ReadAsync<T>(IJournalStorage storage)
+    private static async Task<JournalStorageReadResult<T>> ReadAsync<T>(IJournalStorage storage, CancellationToken cancellationToken)
     {
         var consumer = new BufferingJournalStorageConsumer();
-        await storage.ReadAsync(consumer, CancellationToken.None);
-        var metadata = await storage.GetMetadataAsync(CancellationToken.None);
+        await storage.ReadAsync(consumer, cancellationToken);
+        var metadata = await storage.GetMetadataAsync(cancellationToken);
         if (metadata is null)
         {
             return new(default!, null);
