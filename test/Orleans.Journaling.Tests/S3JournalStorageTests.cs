@@ -22,8 +22,11 @@ using Xunit;
 namespace Orleans.Journaling.Tests;
 
 [TestSuite("BVT")]
-[TestProvider("None")]
+[TestProvider("S3")]
 [TestCategory("BVT")]
+[TestCategory("AWS")]
+[TestCategory("S3")]
+[TestArea("Journaling")]
 public sealed class S3JournalStorageTests : IAsyncLifetime
 {
     private const int MinioPort = 9000;

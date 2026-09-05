@@ -19,8 +19,10 @@ using Orleans.Storage;
 namespace Orleans.Journaling.Tests;
 
 [TestSuite("BVT")]
-[TestProvider("None")]
+[TestProvider("S3")]
 [TestCategory("BVT")]
+[TestCategory("AWS")]
+[TestCategory("S3")]
 [TestCategory("Persistence")]
 [TestArea("Journaling")]
 public sealed class S3JournalStoragePersistenceTestKitTests

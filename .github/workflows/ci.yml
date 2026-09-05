@@ -578,6 +578,21 @@ jobs:
     - name: Clean up DynamoDB Local
       if: always()
       run: docker rm -f dynamodb || true
+  test-s3:
+    name: AWS S3 journaling provider tests
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        framework: ["net8.0", "net10.0"]
+    steps:
+    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+    - name: Test
+      uses: ./.github/actions/run-tests
+      with:
+        artifact-name: test_output_${{ github.job }}_${{ matrix.framework }}
+        framework: ${{ matrix.framework }}
+        provider: S3
   test-sqs:
     name: AWS SQS provider tests
     runs-on: ubuntu-latest
