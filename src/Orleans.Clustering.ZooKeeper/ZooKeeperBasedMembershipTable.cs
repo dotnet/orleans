@@ -63,11 +63,19 @@ namespace Orleans.Runtime.Membership
         /// <param name="logger">The logger.</param>
         /// <param name="membershipTableOptions">The ZooKeeper clustering options.</param>
         /// <param name="clusterOptions">The cluster identity options.</param>
+        /// <exception cref="ArgumentNullException">
+        /// <paramref name="logger"/>, <paramref name="membershipTableOptions"/>, or <paramref name="clusterOptions"/> is
+        /// <see langword="null"/>.
+        /// </exception>
         public ZooKeeperBasedMembershipTable(
             ILogger<ZooKeeperBasedMembershipTable> logger,
             IOptions<ZooKeeperClusteringSiloOptions> membershipTableOptions,
             IOptions<ClusterOptions> clusterOptions)
         {
+            ArgumentNullException.ThrowIfNull(logger);
+            ArgumentNullException.ThrowIfNull(membershipTableOptions);
+            ArgumentNullException.ThrowIfNull(clusterOptions);
+
             this.logger = logger;
             var options = membershipTableOptions.Value;
             watcher = new ZooKeeperWatcher(logger);
@@ -178,8 +186,14 @@ namespace Orleans.Runtime.Membership
         /// <param name="entry">MembershipEntry to be inserted.</param>
         /// <param name="tableVersion">The new TableVersion for this table, along with its etag.</param>
         /// <returns>True if the insert operation succeeded and false otherwise.</returns>
+        /// <exception cref="ArgumentNullException">
+        /// <paramref name="entry"/> or <paramref name="tableVersion"/> is <see langword="null"/>.
+        /// </exception>
         public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion)
         {
+            ArgumentNullException.ThrowIfNull(entry);
+            ArgumentNullException.ThrowIfNull(tableVersion);
+
             string rowPath = ConvertToRowPath(entry.SiloAddress);
             string rowIAmAlivePath = ConvertToRowIAmAlivePath(entry.SiloAddress);
             byte[] newRowData = Serialize(entry);
@@ -210,8 +224,16 @@ namespace Orleans.Runtime.Membership
         /// <param name="etag">The etag  for the given MembershipEntry.</param>
         /// <param name="tableVersion">The new TableVersion for this table, along with its etag.</param>
         /// <returns>True if the update operation succeeded and false otherwise.</returns>
+        /// <exception cref="ArgumentNullException">
+        /// <paramref name="entry"/>, <paramref name="etag"/>, or <paramref name="tableVersion"/> is
+        /// <see langword="null"/>.
+        /// </exception>
         public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion)
         {
+            ArgumentNullException.ThrowIfNull(entry);
+            ArgumentNullException.ThrowIfNull(etag);
+            ArgumentNullException.ThrowIfNull(tableVersion);
+
             string rowPath = ConvertToRowPath(entry.SiloAddress);
             string rowIAmAlivePath = ConvertToRowIAmAlivePath(entry.SiloAddress);
             var newRowData = Serialize(entry);
@@ -238,8 +260,11 @@ namespace Orleans.Runtime.Membership
         /// </summary>
         /// <param name="entry">The target MembershipEntry tp update</param>
         /// <returns>Task representing the successful execution of this operation. </returns>
+        /// <exception cref="ArgumentNullException"><paramref name="entry"/> is <see langword="null"/>.</exception>
         public Task UpdateIAmAlive(MembershipEntry entry)
         {
+            ArgumentNullException.ThrowIfNull(entry);
+
             string rowIAmAlivePath = ConvertToRowIAmAlivePath(entry.SiloAddress);
             byte[] newRowIAmAliveData = Serialize(entry.IAmAliveTime);
             //update the data for IAmAlive unconditionally
@@ -327,14 +352,14 @@ namespace Orleans.Runtime.Membership
             return new TableVersion(version, version.ToString(CultureInfo.InvariantCulture));
         }
 
-        private static byte[] Serialize(object obj)
+        internal static byte[] Serialize(object obj)
         {
             return
                 Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(obj, Formatting.None,
                     MembershipSerializerSettings.Instance));
         }
 
-        private static T Deserialize<T>(byte[] data)
+        internal static T Deserialize<T>(byte[] data)
         {
             return JsonConvert.DeserializeObject<T>(Encoding.UTF8.GetString(data), MembershipSerializerSettings.Instance)!;
         }

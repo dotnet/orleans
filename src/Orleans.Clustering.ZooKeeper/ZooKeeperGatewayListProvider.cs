@@ -34,12 +34,21 @@ namespace Orleans.Runtime.Membership
         /// <param name="options">The ZooKeeper gateway discovery options.</param>
         /// <param name="gatewayOptions">The gateway discovery refresh options.</param>
         /// <param name="clusterOptions">The cluster identity options.</param>
+        /// <exception cref="ArgumentNullException">
+        /// <paramref name="logger"/>, <paramref name="options"/>, <paramref name="gatewayOptions"/>, or
+        /// <paramref name="clusterOptions"/> is <see langword="null"/>.
+        /// </exception>
         public ZooKeeperGatewayListProvider(
             ILogger<ZooKeeperGatewayListProvider> logger,
             IOptions<ZooKeeperGatewayListProviderOptions> options,
             IOptions<GatewayOptions> gatewayOptions,
             IOptions<ClusterOptions> clusterOptions)
         {
+            ArgumentNullException.ThrowIfNull(logger);
+            ArgumentNullException.ThrowIfNull(options);
+            ArgumentNullException.ThrowIfNull(gatewayOptions);
+            ArgumentNullException.ThrowIfNull(clusterOptions);
+
             _watcher = new ZooKeeperWatcher(logger);
             _deploymentPath = "/" + clusterOptions.Value.ClusterId;
             _deploymentConnectionString = options.Value.ConnectionString + _deploymentPath;
