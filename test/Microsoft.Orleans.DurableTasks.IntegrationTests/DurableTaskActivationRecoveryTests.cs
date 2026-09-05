@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.DurableJobs;
 using Orleans.DurableTasks;
@@ -9,7 +10,7 @@ using Orleans.Journaling;
 using Orleans.TestingHost;
 using Xunit;
 
-namespace Microsoft.Orleans.DurableTasks.Tests;
+namespace Microsoft.Orleans.DurableTasks.IntegrationTests;
 
 [CollectionDefinition(Name, DisableParallelization = true)]
 public sealed class DurableTaskRecoveryCollection
@@ -44,6 +45,8 @@ public sealed class DurableTaskActivationRecoveryTests : IAsyncLifetime
         Assert.Equal(
             new DurableTaskInvocationSnapshot(1, activationBefore, argument),
             _fixture.Probe.GetInvocation(grainId));
+        var attachedBefore = grain.GetDurableTask<int>(rootId);
+        Assert.Equal(expectedResult, await attachedBefore.WaitAsync(cancellationToken));
 
         await grain.RequestDeactivationAsync();
         var activationAfter = await grain.GetActivationIdAsync();
@@ -159,6 +162,8 @@ internal sealed class DurableTaskRecoveryFixture : IAsyncLifetime
     public DurableTaskRecoveryFixture()
     {
         Probe = new();
+        Storage = new VolatileJournalStorageProvider(
+            Options.Create(new JournaledStateManagerOptions { JournalFormatKey = "orleans-binary" }));
         var clusterId = $"durable-task-recovery-{Guid.NewGuid():N}";
         var serviceId = $"durable-task-recovery-service-{Guid.NewGuid():N}";
         var builder = new InProcessTestClusterBuilder();
@@ -184,7 +189,7 @@ internal sealed class DurableTaskRecoveryFixture : IAsyncLifetime
             siloBuilder.Services.AddSingleton(Probe);
             siloBuilder.Services.RemoveAll<IJournalStorageProvider>();
             siloBuilder.Services.RemoveAll<IJournalStorageCatalog>();
-            siloBuilder.Services.AddSingleton<VolatileJournalStorageProvider>();
+            siloBuilder.Services.AddSingleton(Storage);
             siloBuilder.Services.AddSingleton<IJournalStorageProvider>(
                 services => services.GetRequiredService<VolatileJournalStorageProvider>());
             siloBuilder.Services.AddSingleton<IJournalStorageCatalog>(
@@ -196,6 +201,7 @@ internal sealed class DurableTaskRecoveryFixture : IAsyncLifetime
     public InProcessTestCluster Cluster { get; }
     public IClusterClient Client => Cluster.Client!;
     public DurableTaskRecoveryProbe Probe { get; }
+    public VolatileJournalStorageProvider Storage { get; }
 
     public ValueTask InitializeAsync() => new(Cluster.DeployAsync());
     public ValueTask DisposeAsync() => Cluster.DisposeAsync();
