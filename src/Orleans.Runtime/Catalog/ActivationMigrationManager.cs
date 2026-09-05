@@ -127,28 +127,9 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
         // Otherwise, there could be a race where the original silo removes the activation from its catalog, receives a new message for that activation,
         // and re-activates it before the new activation on this silo has been registered with the directory.
         using var waitActivity = ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.WaitMigration);
-        while (true)
+        foreach (var activation in activations)
         {
-            var allActiveOrTerminal = true;
-            foreach (var activation in activations)
-            {
-                lock (activation)
-                {
-                    if (activation.State is not (ActivationState.Valid or ActivationState.Invalid))
-                    {
-                        allActiveOrTerminal = false;
-                        break;
-                    }
-                }
-            }
-
-            if (allActiveOrTerminal)
-            {
-                break;
-            }
-
-            // Wait a short amount of time and poll the activations again.
-            await Task.Delay(5, cancellationToken);
+            await activation.WaitForActivationReadyAsync(cancellationToken);
         }
     }
 

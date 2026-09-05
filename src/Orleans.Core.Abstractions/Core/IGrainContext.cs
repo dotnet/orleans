@@ -125,62 +125,6 @@ namespace Orleans.Runtime
     }
 
     /// <summary>
-    /// Defines functionality required for grains which are subject to activation collection.
-    /// </summary>
-    internal interface ICollectibleGrainContext : IGrainContext
-    {
-        /// <summary>
-        /// Gets a value indicating whether the instance is available to process messages.
-        /// </summary>
-        bool IsValid { get; }
-
-        /// <summary>
-        /// Gets a value indicating whether this instance is exempt from collection.
-        /// </summary>
-        bool IsExemptFromCollection { get; }
-
-        /// <summary>
-        /// Gets a value indicating whether this instance is not currently processing a request.
-        /// </summary>
-        bool IsInactive { get; }
-
-        /// <summary>
-        /// Gets the collection age limit, which defines how long an instance must be inactive before it is eligible for collection.
-        /// </summary>
-        TimeSpan CollectionAgeLimit { get; }
-
-        /// <summary>
-        /// Gets the keep alive override value, which is the earliest time after which this instance will be available for collection.
-        /// </summary>
-        DateTime KeepAliveUntil { get; }
-
-        /// <summary>
-        /// Gets or sets the collection ticket, which is a special value used for tracking this activation's lifetime.
-        /// </summary>
-        DateTime CollectionTicket { get; set; }
-
-        /// <summary>
-        /// Gets a value indicating whether this activation has been idle longer than its <see cref="CollectionAgeLimit"/>.
-        /// </summary>
-        /// <returns><see langword="true"/> if the activation is stale, otherwise <see langword="false"/>.</returns>
-        bool IsStale();
-
-        /// <summary>
-        /// Gets the duration which this activation has been idle for.
-        /// </summary>
-        /// <returns>
-        /// The duration which this activation has been idle for.
-        /// </returns>
-        TimeSpan GetIdleness();
-
-        /// <summary>
-        /// Delays activation collection until at least until the specified duration has elapsed.
-        /// </summary>
-        /// <param name="timeSpan">The period of time to delay activation collection for.</param>
-        void DelayDeactivation(TimeSpan timeSpan);
-    }
-
-    /// <summary>
     /// Functionality to schedule tasks on a grain.
     /// </summary>
     public interface IWorkItemScheduler

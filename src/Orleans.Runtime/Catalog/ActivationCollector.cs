@@ -24,8 +24,10 @@ namespace Orleans.Runtime
         private readonly TimeSpan shortestAgeLimit;
         private readonly ConcurrentDictionary<DateTime, Bucket> buckets = new();
         private readonly CancellationTokenSource _shutdownCts = new();
-        private DateTime nextTicket;
-        private static readonly List<ICollectibleGrainContext> nothing = new(0);
+        private readonly TimeProvider _timeProvider;
+        private long _nextTicketTicks;
+        private static readonly List<ICollectibleGrainContext> nothing = [];
+        private static readonly IReadOnlyList<CollectionClaim> NoClaims = Array.Empty<CollectionClaim>();
         private readonly ILogger logger;
         private int collectionNumber;
 
@@ -56,11 +58,12 @@ namespace Orleans.Runtime
             IEnvironmentStatisticsProvider environmentStatisticsProvider,
             CatalogInstruments catalogInstruments)
         {
+            _timeProvider = timeProvider;
             _grainCollectionOptions = options.Value;
             _catalogInstruments = catalogInstruments;
 
             shortestAgeLimit = new(_grainCollectionOptions.ClassSpecificCollectionAge.Values.Aggregate(_grainCollectionOptions.CollectionAge.Ticks, (a, v) => Math.Min(a, v.Ticks)));
-            nextTicket = MakeTicketFromDateTime(timeProvider.GetUtcNow().UtcDateTime);
+            _nextTicketTicks = MakeTicketFromDateTime(timeProvider.GetUtcNow().UtcDateTime).Ticks;
             this.logger = logger;
             _collectionTimer = new PeriodicTimer(_grainCollectionOptions.CollectionQuantum);
 
@@ -74,7 +77,7 @@ namespace Orleans.Runtime
         // Return the number of activations that were used (touched) in the last recencyPeriod.
         public int GetNumRecentlyUsed(TimeSpan recencyPeriod)
         {
-            var now = DateTime.UtcNow;
+            var now = _timeProvider.GetUtcNow().UtcDateTime;
             int sum = 0;
             foreach (var bucket in buckets)
             {
@@ -85,7 +88,7 @@ namespace Orleans.Runtime
                 var timeSinceLastUsed = shortestAgeLimit - timeTillCollection;
                 if (timeSinceLastUsed <= recencyPeriod)
                 {
-                    sum += bucket.Value.Items.Count;
+                    sum += bucket.Value.Count;
                 }
             }
 
@@ -114,21 +117,15 @@ namespace Orleans.Runtime
         /// <param name="now">The current time, used to calculate when the grain becomes eligible for collection.</param>
         public void ScheduleCollection(ICollectibleGrainContext item, TimeSpan timeout, DateTime now)
         {
-            lock (item)
+            if (item.IsExemptFromCollection)
             {
-                if (item.IsExemptFromCollection)
-                {
-                    return;
-                }
+                return;
+            }
 
-                DateTime ticket = MakeTicketFromTimeSpan(timeout, now);
-
-                if (default != item.CollectionTicket)
-                {
-                    throw new InvalidOperationException("Call CancelCollection before calling ScheduleCollection.");
-                }
-
-                Add(item, ticket);
+            var registration = GetOrCreateCollectionRegistration(item);
+            if (!TryScheduleCollection(registration, timeout, now, throwIfExpired: true))
+            {
+                throw new InvalidOperationException("Call TryCancelCollection before calling ScheduleCollection.");
             }
         }
 
@@ -142,136 +139,141 @@ namespace Orleans.Runtime
             if (item is null) return false;
             if (item.IsExemptFromCollection) return false;
 
-            lock (item)
-            {
-                DateTime ticket = item.CollectionTicket;
-                if (default == ticket) return false;
-                if (IsExpired(ticket)) return false;
-
-                // first, we attempt to remove the ticket.
-                Bucket? bucket;
-                if (!buckets.TryGetValue(ticket, out bucket) || !bucket.TryRemove(item)) return false;
-            }
-
-            return true;
+            return GetCollectionRegistration(item) is { } registration && registration.TryCancel();
         }
 
         /// <summary>
         /// Tries the reschedule collection.
         /// </summary>
         /// <param name="item">The grain context.</param>
-        /// <returns><see langword="true"/> if collection was canceled, <see langword="false"/> otherwise.</returns>
+        /// <returns><see langword="true"/> if collection was rescheduled, <see langword="false"/> otherwise.</returns>
         public bool TryRescheduleCollection(ICollectibleGrainContext item)
         {
             if (item.IsExemptFromCollection) return false;
-
-            lock (item)
-            {
-                if (TryRescheduleCollection_Impl(item, item.CollectionAgeLimit)) return true;
-
-                item.CollectionTicket = default;
-                return false;
-            }
+            if (GetCollectionRegistration(item) is not { } registration) return false;
+            return TryRescheduleCollection(registration, item.CollectionAgeLimit);
         }
 
-        private bool TryRescheduleCollection_Impl(ICollectibleGrainContext item, TimeSpan timeout)
+        private bool TryRescheduleCollection(CollectionRegistration registration, TimeSpan timeout)
         {
-            // note: we expect the activation lock to be held.
-            if (default == item.CollectionTicket) return false;
-            ThrowIfTicketIsInvalid(item.CollectionTicket);
-            if (IsExpired(item.CollectionTicket)) return false;
-
-            DateTime oldTicket = item.CollectionTicket;
-            DateTime newTicket = MakeTicketFromTimeSpan(timeout, DateTime.UtcNow);
-            // if the ticket value doesn't change, then the source and destination bucket are the same and there's nothing to do.
-            if (newTicket.Equals(oldTicket)) return true;
-
-            Bucket? bucket;
-            if (!buckets.TryGetValue(oldTicket, out bucket) || !bucket.TryRemove(item))
+            while (registration.TryGetScheduledTicket(out var oldTicket))
             {
-                // fail: item is not associated with currentKey.
-                return false;
+                ThrowIfTicketIsInvalid(oldTicket);
+                if (!IsExpired(oldTicket))
+                {
+                    if (!TryMakeTicketFromTimeSpan(timeout, _timeProvider.GetUtcNow().UtcDateTime, out var rescheduledTicket))
+                    {
+                        break;
+                    }
+
+                    if (rescheduledTicket.Equals(oldTicket)) return true;
+
+                    var bucket = GetOrCreateBucket(rescheduledTicket);
+                    if (registration.TryReschedule(bucket))
+                    {
+                        if (!IsExpired(rescheduledTicket))
+                        {
+                            return true;
+                        }
+
+                        registration.TryCancel();
+                        bucket.CloseForCleanup();
+                        break;
+                    }
+
+                    continue;
+                }
+
+                break;
             }
 
-            // it shouldn't be possible for Add to throw an exception here, as only one concurrent competitor should be able to reach to this point in the method.
-            Add(item, newTicket);
-            return true;
+            registration.TryCancel();
+            return TryScheduleCollection(registration, timeout, _timeProvider.GetUtcNow().UtcDateTime, throwIfExpired: false);
         }
 
-        private bool DequeueQuantum([NotNullWhen(true)] out List<ICollectibleGrainContext>? items, DateTime now)
+        private bool DequeueQuantum([NotNullWhen(true)] out IReadOnlyList<CollectionClaim>? items, DateTime now)
         {
-            DateTime key;
-            lock (buckets)
+            long ticketTicks;
+            while (true)
             {
-                if (nextTicket > now)
+                ticketTicks = Volatile.Read(ref _nextTicketTicks);
+                if (ticketTicks > now.Ticks)
                 {
                     items = null;
                     return false;
                 }
 
-                key = nextTicket;
-                nextTicket += _grainCollectionOptions.CollectionQuantum;
+                var remainingTicks = DateTime.MaxValue.Ticks - ticketTicks;
+                var nextTicketTicks = _grainCollectionOptions.CollectionQuantum.Ticks >= remainingTicks
+                    ? DateTime.MaxValue.Ticks
+                    : ticketTicks + _grainCollectionOptions.CollectionQuantum.Ticks;
+                if (Interlocked.CompareExchange(ref _nextTicketTicks, nextTicketTicks, ticketTicks) == ticketTicks)
+                {
+                    break;
+                }
             }
 
-            Bucket? bucket;
-            if (!buckets.TryRemove(key, out bucket))
+            var key = new DateTime(ticketTicks, DateTimeKind.Utc);
+            buckets.TryRemove(key, out var bucket);
+            if (bucket is null)
             {
-                items = nothing;
+                if (ticketTicks == DateTime.MaxValue.Ticks)
+                {
+                    items = null;
+                    return false;
+                }
+
+                items = NoClaims;
                 return true;
             }
 
-            items = bucket.CancelAll();
+            items = bucket.CloseAndClaimAll();
             return true;
         }
 
         /// <inheritdoc/>
         public override string ToString()
         {
-            var now = DateTime.UtcNow;
+            var now = _timeProvider.GetUtcNow().UtcDateTime;
             var all = buckets.ToList();
-            var bucketsText = Utils.EnumerableToString(all.OrderBy(bucket => bucket.Key), bucket => $"{Utils.TimeSpanToString(bucket.Key - now)}->{bucket.Value.Items.Count} items");
-            return $"<#Activations={all.Sum(b => b.Value.Items.Count)}, #Buckets={all.Count}, buckets={bucketsText}>";
+            var bucketsText = Utils.EnumerableToString(all.OrderBy(bucket => bucket.Key), bucket => $"{Utils.TimeSpanToString(bucket.Key - now)}->{bucket.Value.Count} items");
+            return $"<#Activations={all.Sum(b => b.Value.Count)}, #Buckets={all.Count}, buckets={bucketsText}>";
         }
 
-        /// <summary>
-        /// Scans for activations that are due for collection.
-        /// </summary>
-        /// <returns>A list of activations that are due for collection.</returns>
-        public List<ICollectibleGrainContext> ScanStale()
+        private List<ICollectibleGrainContext> ScanStale(DeactivationReason reason, CancellationToken cancellationToken)
         {
-            var now = DateTime.UtcNow;
+            var now = _timeProvider.GetUtcNow().UtcDateTime;
             List<ICollectibleGrainContext>? condemned = null;
-            while (DequeueQuantum(out var activations, now))
+            while (DequeueQuantum(out var claims, now))
             {
-                // At this point, all tickets associated with activations are cancelled and any attempts to reschedule will fail silently.
-                // If the activation is to be reactivated, it's our job to clear the activation's copy of the ticket.
-                foreach (var activation in activations)
+                for (var i = 0; i < claims.Count; i++)
                 {
-                    lock (activation)
+                    var claim = claims[i];
+                    if (!claim.Registration.IsClaimed(claim.SourceBucket))
                     {
-                        activation.CollectionTicket = default;
-                        if (!activation.IsValid)
-                        {
-                            // This is not an error scenario because the activation may have become invalid between the time
-                            // we captured a snapshot in 'DequeueQuantum' and now. We are not be able to observe such changes.
-                            // Do nothing: don't collect, don't reschedule.
-                        }
-                        else if (activation.KeepAliveUntil > now)
-                        {
-                            var keepAliveDuration = activation.KeepAliveUntil - now;
-                            var timeout = TimeSpan.FromTicks(Math.Max(keepAliveDuration.Ticks, activation.CollectionAgeLimit.Ticks));
-                            ScheduleCollection(activation, timeout, now);
-                        }
-                        else if (!activation.IsInactive || !activation.IsStale())
-                        {
-                            ScheduleCollection(activation, activation.CollectionAgeLimit, now);
-                        }
-                        else
-                        {
-                            // Atomically set Deactivating state, to disallow any new requests or new timer ticks to be dispatched on this activation.
+                        continue;
+                    }
+
+                    var activation = claim.Registration.Context;
+                    var result = activation.TryDeactivateForCollection(
+                        reason,
+                        now,
+                        activation.CollectionAgeLimit,
+                        respectKeepAlive: true,
+                        cancellationToken);
+                    switch (result.Action)
+                    {
+                        case ActivationCollectionAction.StartedDeactivation:
+                            claim.Registration.TryCompleteClaim(claim.SourceBucket);
                             condemned ??= [];
                             condemned.Add(activation);
-                        }
+                            break;
+                        case ActivationCollectionAction.Reschedule:
+                            RescheduleClaim(claim, result.RescheduleAfter, now);
+                            break;
+                        default:
+                            claim.Registration.TryCompleteClaim(claim.SourceBucket);
+                            break;
                     }
                 }
             }
@@ -279,57 +281,85 @@ namespace Orleans.Runtime
             return condemned ?? nothing;
         }
 
-        /// <summary>
-        /// Scans for activations that have been idle for the specified age limit.
-        /// </summary>
-        /// <param name="ageLimit">The age limit.</param>
-        /// <returns>The grain activations which have been idle for at least the specified age limit.</returns>
-        public List<ICollectibleGrainContext> ScanAll(TimeSpan ageLimit)
+        private List<ICollectibleGrainContext> ScanAll(
+            TimeSpan ageLimit,
+            DeactivationReason reason,
+            CancellationToken cancellationToken)
         {
             List<ICollectibleGrainContext>? condemned = null;
-            var now = DateTime.UtcNow;
+            var now = _timeProvider.GetUtcNow().UtcDateTime;
             foreach (var kv in buckets)
             {
                 var bucket = kv.Value;
-                foreach (var kvp in bucket.Items)
+                if (bucket.Registrations is not { } registrations)
                 {
-                    var activation = kvp.Value;
-                    lock (activation)
-                    {
-                        if (!activation.IsValid)
-                        {
-                            // Do nothing: don't collect, don't reschedule.
-                        }
-                        else if (activation.KeepAliveUntil > now)
-                        {
-                            // do nothing
-                        }
-                        else if (!activation.IsInactive)
-                        {
-                            // do nothing
-                        }
-                        else
-                        {
-                            if (activation.GetIdleness() >= ageLimit)
-                            {
-                                if (bucket.TryRemove(activation))
-                                {
-                                    condemned ??= [];
-                                    condemned.Add(activation);
-                                }
+                    continue;
+                }
 
-                                // someone else has already deactivated the activation, so there's nothing to do.
-                            }
-                            else
-                            {
-                                // activation is not idle long enough for collection. do nothing.
-                            }
-                        }
+                foreach (var entry in registrations)
+                {
+                    var registration = entry.Key;
+                    if (!registration.IsScheduledIn(bucket))
+                    {
+                        continue;
+                    }
+
+                    var activation = registration.Context;
+                    var result = activation.TryDeactivateForCollection(
+                        reason,
+                        now,
+                        ageLimit,
+                        respectKeepAlive: true,
+                        cancellationToken);
+                    if (result.Action is ActivationCollectionAction.StartedDeactivation)
+                    {
+                        registration.TryCancel();
+                        condemned ??= [];
+                        condemned.Add(activation);
+                    }
+                    else if (result.Action is ActivationCollectionAction.Remove)
+                    {
+                        registration.TryCancel();
                     }
                 }
             }
 
             return condemned ?? nothing;
+        }
+
+        private void RescheduleClaim(CollectionClaim claim, TimeSpan timeout, DateTime now)
+        {
+            while (claim.Registration.IsClaimed(claim.SourceBucket))
+            {
+                if (!TryMakeTicketFromTimeSpan(timeout, now, out var ticket))
+                {
+                    now = GetInternalScheduleBaseline();
+                    continue;
+                }
+
+                var bucket = GetOrCreateBucket(ticket);
+                if (claim.Registration.TryRescheduleClaim(claim.SourceBucket, bucket))
+                {
+                    if (IsExpired(ticket))
+                    {
+                        bucket.CloseForCleanup();
+                        if (claim.Registration.TryClaim(bucket, out var retryClaim))
+                        {
+                            claim = retryClaim;
+                            now = GetInternalScheduleBaseline();
+                            continue;
+                        }
+                    }
+
+                    return;
+                }
+
+                if (IsExpired(ticket))
+                {
+                    bucket.CloseForCleanup();
+                    now = GetInternalScheduleBaseline();
+                }
+            }
         }
 
         // Internal for testing. It's expected that when this returns true, activation shedding will occur.
@@ -382,29 +412,49 @@ namespace Orleans.Runtime
             LogBeforeCollection(number, memBefore, _activationCount, this);
 
             var candidates = new List<ICollectibleGrainContext>(count);
+            var reason = new DeactivationReason(
+                DeactivationReasonCode.HighMemoryPressure,
+                $"Process memory utilization exceeded the configured limit of '{_grainCollectionOptions.MemoryUsageLimitPercentage}'. Detected memory usage is {memBefore} MB.");
 
             // snapshot to avoid concurrency collection modification issues
             var bucketSnapshot = buckets.ToArray();
             Array.Sort(bucketSnapshot, static (left, right) => left.Key.CompareTo(right.Key));
             foreach (var bucket in bucketSnapshot)
             {
-                foreach (var item in bucket.Value.Items)
+                if (bucket.Value.Registrations is not { } registrations)
                 {
+                    continue;
+                }
+
+                foreach (var entry in registrations)
+                {
+                    var registration = entry.Key;
                     if (candidates.Count >= count)
                     {
                         break;
                     }
 
-                    var activation = item.Value;
-                    lock (activation)
+                    if (!registration.IsScheduledIn(bucket.Value))
                     {
-                        if (!activation.IsValid || !activation.IsInactive)
-                        {
-                            continue;
-                        }
+                        continue;
                     }
 
-                    candidates.Add(activation);
+                    var activation = registration.Context;
+                    var result = activation.TryDeactivateForCollection(
+                        reason,
+                        _timeProvider.GetUtcNow().UtcDateTime,
+                        ageLimit: TimeSpan.Zero,
+                        respectKeepAlive: false,
+                        cancellationToken);
+                    if (result.Action is ActivationCollectionAction.StartedDeactivation)
+                    {
+                        registration.TryCancel();
+                        candidates.Add(activation);
+                    }
+                    else if (result.Action is ActivationCollectionAction.Remove)
+                    {
+                        registration.TryCancel();
+                    }
                 }
 
                 if (candidates.Count >= count)
@@ -418,11 +468,7 @@ namespace Orleans.Runtime
             {
                 LogCollectActivations(new(candidates));
 
-                var reason = new DeactivationReason(
-                    DeactivationReasonCode.HighMemoryPressure,
-                    $"Process memory utilization exceeded the configured limit of '{_grainCollectionOptions.MemoryUsageLimitPercentage}'. Detected memory usage is {memBefore} MB.");
-
-                await DeactivateActivationsFromCollector(
+                await AwaitDeactivatedActivationsFromCollector(
                     candidates,
                     cancellationToken,
                     reason,
@@ -458,10 +504,22 @@ namespace Orleans.Runtime
 
         private bool IsExpired(DateTime ticket)
         {
-            return ticket < nextTicket;
+            return ticket.Ticks < Volatile.Read(ref _nextTicketTicks);
         }
 
         public DateTime MakeTicketFromDateTime(DateTime timestamp)
+        {
+            var ticket = CalculateTicket(timestamp);
+            var nextTicketTicks = Volatile.Read(ref _nextTicketTicks);
+            if (ticket.Ticks < nextTicketTicks)
+            {
+                throw new ArgumentException(string.Format("The earliest collection that can be scheduled from now is for {0}", new DateTime(nextTicketTicks - _grainCollectionOptions.CollectionQuantum.Ticks + 1, DateTimeKind.Utc)));
+            }
+
+            return ticket;
+        }
+
+        private DateTime CalculateTicket(DateTime timestamp)
         {
             // Round the timestamp to the next _grainCollectionOptions.CollectionQuantum. e.g. if the _grainCollectionOptions.CollectionQuantum is 1 minute and the timestamp is 3:45:22, then the ticket will be 3:46.
             // Note that TimeStamp.Ticks and DateTime.Ticks both return a long.
@@ -471,31 +529,98 @@ namespace Orleans.Runtime
                 return DateTime.MaxValue;
             }
 
-            var ticket = new DateTime(ticketTicks, DateTimeKind.Utc);
-            if (ticket < nextTicket)
-            {
-                throw new ArgumentException(string.Format("The earliest collection that can be scheduled from now is for {0}", new DateTime(nextTicket.Ticks - _grainCollectionOptions.CollectionQuantum.Ticks + 1, DateTimeKind.Utc)));
-            }
-
-            return ticket;
+            return new DateTime(ticketTicks, DateTimeKind.Utc);
         }
 
-        private DateTime MakeTicketFromTimeSpan(TimeSpan timeout, DateTime now)
+        private bool TryMakeTicketFromTimeSpan(TimeSpan timeout, DateTime now, out DateTime ticket)
         {
             if (timeout < _grainCollectionOptions.CollectionQuantum)
             {
                 throw new ArgumentException(string.Format("timeout must be at least {0}, but it is {1}", _grainCollectionOptions.CollectionQuantum, timeout), nameof(timeout));
             }
 
-            return MakeTicketFromDateTime(now + timeout);
+            ticket = CalculateTicket(now + timeout);
+            return !IsExpired(ticket);
         }
 
-        private void Add(ICollectibleGrainContext item, DateTime ticket)
+        private Bucket GetOrCreateBucket(DateTime ticket)
+            => buckets.GetOrAdd(ticket, static (ticket, owner) => new(owner, ticket), this);
+
+        private void RemoveClosedBucket(DateTime ticket, Bucket bucket)
+            => ((ICollection<KeyValuePair<DateTime, Bucket>>)buckets).Remove(new(ticket, bucket));
+
+        private static CollectionRegistration? GetCollectionRegistration(ICollectibleGrainContext item)
+            => item.CollectionRegistration as CollectionRegistration;
+
+        private static CollectionRegistration GetOrCreateCollectionRegistration(ICollectibleGrainContext item)
         {
-            // note: we expect the activation lock to be held.
-            item.CollectionTicket = ticket;
-            var bucket = buckets.GetOrAdd(ticket, _ => new Bucket());
-            bucket.Add(item);
+            if (GetCollectionRegistration(item) is { } existing)
+            {
+                return existing;
+            }
+
+            var candidate = new CollectionRegistration(item);
+            return (CollectionRegistration)item.GetOrSetCollectionRegistration(candidate);
+        }
+
+        private bool TryScheduleCollection(CollectionRegistration registration, TimeSpan timeout, DateTime now, bool throwIfExpired)
+        {
+            while (!registration.IsScheduled && !registration.IsRetired)
+            {
+                if (!TryMakeTicketFromTimeSpan(timeout, now, out var ticket))
+                {
+                    if (throwIfExpired)
+                    {
+                        MakeTicketFromDateTime(now + timeout);
+                    }
+
+                    now = GetInternalScheduleBaseline();
+                    continue;
+                }
+
+                var bucket = GetOrCreateBucket(ticket);
+                if (registration.TrySchedule(bucket))
+                {
+                    if (!IsExpired(ticket))
+                    {
+                        return true;
+                    }
+
+                    registration.TryCancel();
+                    bucket.CloseForCleanup();
+                }
+
+                now = GetInternalScheduleBaseline();
+            }
+
+            return false;
+        }
+
+        private DateTime GetInternalScheduleBaseline()
+        {
+            var now = _timeProvider.GetUtcNow().UtcDateTime;
+            var nextTicketTicks = Volatile.Read(ref _nextTicketTicks);
+            return now.Ticks >= nextTicketTicks ? now : new DateTime(nextTicketTicks, DateTimeKind.Utc);
+        }
+
+        internal DateTime GetCollectionTicketForTesting(ICollectibleGrainContext item)
+            => GetCollectionRegistration(item) is { } registration ? registration.Ticket : default;
+
+        internal bool HasActiveCollectionRegistrationForTesting(ICollectibleGrainContext item)
+            => GetCollectionRegistration(item) is { IsRetired: false };
+
+        private void EnsureCollectionScheduled(ICollectibleGrainContext item)
+        {
+            if (item.IsExemptFromCollection)
+            {
+                return;
+            }
+
+            var registration = GetOrCreateCollectionRegistration(item);
+            if (!registration.IsScheduled)
+            {
+                TryScheduleCollection(registration, item.CollectionAgeLimit, _timeProvider.GetUtcNow().UtcDateTime, throwIfExpired: false);
+            }
         }
 
         void IActivationWorkingSetObserver.OnAdded(IActivationWorkingSetMember member)
@@ -503,14 +628,7 @@ namespace Orleans.Runtime
             if (member is ICollectibleGrainContext activation)
             {
                 Interlocked.Increment(ref _activationCount);
-                if (activation.CollectionTicket == default)
-                {
-                    ScheduleCollection(activation, activation.CollectionAgeLimit, DateTime.UtcNow);
-                }
-                else
-                {
-                    TryRescheduleCollection(activation);
-                }
+                ScheduleCollection(activation, activation.CollectionAgeLimit, _timeProvider.GetUtcNow().UtcDateTime);
             }
         }
 
@@ -522,24 +640,31 @@ namespace Orleans.Runtime
 
         void IActivationWorkingSetObserver.OnEvicted(IActivationWorkingSetMember member)
         {
-            if (member is ICollectibleGrainContext activation && activation.CollectionTicket == default)
+            if (member is ICollectibleGrainContext activation)
             {
-                TryRescheduleCollection(activation);
+                EnsureCollectionScheduled(activation);
             }
         }
 
         void IActivationWorkingSetObserver.OnDeactivating(IActivationWorkingSetMember member)
         {
-            if (member is ICollectibleGrainContext activation)
+            if (member is ICollectibleGrainContext activation
+                && GetCollectionRegistration(activation) is { } registration)
             {
-                TryCancelCollection(activation);
+                registration.Retire();
             }
         }
 
         void IActivationWorkingSetObserver.OnDeactivated(IActivationWorkingSetMember member)
         {
             Interlocked.Decrement(ref _activationCount);
-            _ = TryCancelCollection(member as ICollectibleGrainContext);
+            if (member is ICollectibleGrainContext activation)
+            {
+                if (GetCollectionRegistration(activation) is { } registration)
+                {
+                    registration.Retire();
+                }
+            }
         }
 
         private Task Start(CancellationToken cancellationToken)
@@ -667,15 +792,18 @@ namespace Orleans.Runtime
 
             LogBeforeCollection(number, memBefore, _activationCount, this);
 
-            List<ICollectibleGrainContext> list = scanStale ? ScanStale() : ScanAll(ageLimit);
+            var deactivationReason = GetDeactivationReason();
+            List<ICollectibleGrainContext> list = scanStale
+                ? ScanStale(deactivationReason, cancellationToken)
+                : ScanAll(ageLimit, deactivationReason, cancellationToken);
             _catalogInstruments.OnActivationCollected();
             if (list is { Count: > 0 })
             {
                 LogCollectActivations(new(list));
-                await DeactivateActivationsFromCollector(
+                await AwaitDeactivatedActivationsFromCollector(
                     list,
                     cancellationToken,
-                    deactivationReason: null,
+                    deactivationReason,
                     collectionSource: scanStale ? ActivationCollectionEvents.CollectionSource.Stale : ActivationCollectionEvents.CollectionSource.AgeLimit,
                     ageLimit: ageLimit);
             }
@@ -686,33 +814,43 @@ namespace Orleans.Runtime
             LogAfterCollection(number, memAfter, _activationCount, list?.Count ?? 0, this, watch.Elapsed);
         }
 
-        private async Task DeactivateActivationsFromCollector(
+        private async Task AwaitDeactivatedActivationsFromCollector(
             List<ICollectibleGrainContext> list,
             CancellationToken cancellationToken,
-            DeactivationReason? deactivationReason,
+            DeactivationReason deactivationReason,
             ActivationCollectionEvents.CollectionSource collectionSource,
             TimeSpan ageLimit)
         {
             LogDeactivateActivationsFromCollector(list.Count);
             _catalogInstruments.ActivationShutdownViaCollection();
 
-            deactivationReason ??= GetDeactivationReason();
-
             var options = new ParallelOptions
             {
-                // Avoid passing the cancellation token, since we want all of these activations to be deactivated, even if cancellation is triggered.
+                // Continue observing completion when the caller cancels its WaitAsync below.
                 CancellationToken = CancellationToken.None,
                 MaxDegreeOfParallelism = Environment.ProcessorCount * 512
             };
 
-            await Parallel.ForEachAsync(list, options, async (activationData, token) =>
+            var deactivationTask = Parallel.ForEachAsync(list, options, async (activationData, token) =>
             {
-                // Continue deactivation when ready.
-                activationData.Deactivate(deactivationReason.Value, cancellationToken);
                 await activationData.Deactivated.ConfigureAwait(false);
-            }).WaitAsync(cancellationToken);
+            });
 
-            ActivationCollectionEvents.EmitCollectionCompleted(collectionSource, ageLimit, deactivationReason.Value, list);
+            try
+            {
+                await deactivationTask.WaitAsync(cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                _ = deactivationTask.ContinueWith(
+                    static task => _ = task.Exception,
+                    CancellationToken.None,
+                    TaskContinuationOptions.ExecuteSynchronously | TaskContinuationOptions.OnlyOnFaulted,
+                    TaskScheduler.Default);
+                throw;
+            }
+
+            ActivationCollectionEvents.EmitCollectionCompleted(collectionSource, ageLimit, deactivationReason, list);
         }
 
         public void Dispose()
@@ -722,55 +860,321 @@ namespace Orleans.Runtime
             _memBasedDeactivationTimer?.Dispose();
         }
 
-        private class Bucket
-        {
-            public ConcurrentDictionary<ICollectibleGrainContext, ICollectibleGrainContext> Items { get; } = new(ReferenceEqualsComparer.Default);
+        private readonly record struct CollectionClaim(CollectionRegistration Registration, Bucket SourceBucket);
 
-            public void Add(ICollectibleGrainContext item)
+        private enum CollectionRegistrationState
+        {
+            None,
+            Scheduled,
+            Claimed,
+            Retired
+        }
+
+        private sealed class CollectionRegistration(ICollectibleGrainContext context) : IActivationCollectionRegistration
+        {
+#if NET10_0_OR_GREATER
+            private readonly Lock _lock = new();
+#else
+            private readonly object _lock = new();
+#endif
+            private Bucket? _bucket;
+            private CollectionRegistrationState _state;
+
+            public ICollectibleGrainContext Context { get; } = context;
+
+            public bool IsScheduled
             {
-                if (!Items.TryAdd(item, item))
+                get
                 {
-                    throw new InvalidOperationException("item is already associated with this bucket");
+                    lock (_lock)
+                    {
+                        return _state is CollectionRegistrationState.Scheduled;
+                    }
                 }
             }
 
-            public bool TryRemove(ICollectibleGrainContext item)
+            public bool IsRetired
             {
-                lock (item)
+                get
                 {
-                    if (item.CollectionTicket == default)
+                    lock (_lock)
+                    {
+                        return _state is CollectionRegistrationState.Retired;
+                    }
+                }
+            }
+
+            public DateTime Ticket
+            {
+                get
+                {
+                    lock (_lock)
+                    {
+                        return _state is CollectionRegistrationState.Scheduled ? _bucket!.Ticket : default;
+                    }
+                }
+            }
+
+            public bool TrySchedule(Bucket bucket)
+            {
+                lock (_lock)
+                {
+                    if (_state is CollectionRegistrationState.Scheduled or CollectionRegistrationState.Retired)
                     {
                         return false;
                     }
 
-                    item.CollectionTicket = default;
-                }
-
-                return Items.TryRemove(item, out _);
-            }
-
-            public List<ICollectibleGrainContext> CancelAll()
-            {
-                List<ICollectibleGrainContext>? result = null;
-                foreach (var pair in Items)
-                {
-                    // Attempt to cancel the item. if we succeed, it wasn't already cancelled and we can return it. otherwise, we silently ignore it.
-                    var item = pair.Value;
-                    lock (item)
+                    if (!bucket.TryAdd(this))
                     {
-                        if (item.CollectionTicket == default)
-                        {
-                            continue;
-                        }
-
-                        item.CollectionTicket = default;
+                        return false;
                     }
 
-                    result ??= [];
-                    result.Add(pair.Value);
+                    _bucket = bucket;
+                    _state = CollectionRegistrationState.Scheduled;
+                    return true;
+                }
+            }
+
+            public bool TryGetScheduledTicket(out DateTime ticket)
+            {
+                lock (_lock)
+                {
+                    if (_state is CollectionRegistrationState.Scheduled)
+                    {
+                        ticket = _bucket!.Ticket;
+                        return true;
+                    }
+
+                    ticket = default;
+                    return false;
+                }
+            }
+
+            public bool TryReschedule(Bucket bucket)
+            {
+                lock (_lock)
+                {
+                    if (_state is not CollectionRegistrationState.Scheduled)
+                    {
+                        return false;
+                    }
+
+                    if (ReferenceEquals(_bucket, bucket))
+                    {
+                        return true;
+                    }
+
+                    if (!bucket.TryAdd(this))
+                    {
+                        return false;
+                    }
+
+                    _bucket!.TryRemove(this);
+                    _bucket = bucket;
+                    return true;
+                }
+            }
+
+            public bool TryCancel()
+            {
+                lock (_lock)
+                {
+                    if (_state is CollectionRegistrationState.None or CollectionRegistrationState.Retired)
+                    {
+                        return false;
+                    }
+
+                    _bucket?.TryRemove(this);
+                    _bucket = null;
+                    _state = CollectionRegistrationState.None;
+                    return true;
+                }
+            }
+
+            public void Retire()
+            {
+                lock (_lock)
+                {
+                    _bucket?.TryRemove(this);
+                    _bucket = null;
+                    _state = CollectionRegistrationState.Retired;
+                }
+            }
+
+            public bool IsScheduledIn(Bucket bucket)
+            {
+                lock (_lock)
+                {
+                    return _state is CollectionRegistrationState.Scheduled && ReferenceEquals(_bucket, bucket);
+                }
+            }
+
+            public bool IsClaimed(Bucket sourceBucket)
+            {
+                lock (_lock)
+                {
+                    return _state is CollectionRegistrationState.Claimed && ReferenceEquals(_bucket, sourceBucket);
+                }
+            }
+
+            public bool TryClaim(Bucket bucket, out CollectionClaim claim)
+            {
+                lock (_lock)
+                {
+                    if (_state is not CollectionRegistrationState.Scheduled || !ReferenceEquals(_bucket, bucket))
+                    {
+                        claim = default;
+                        return false;
+                    }
+
+                    // Buckets close permanently before claiming, so their identity uniquely identifies this claim.
+                    _state = CollectionRegistrationState.Claimed;
+                    claim = new CollectionClaim(this, bucket);
+                    return true;
+                }
+            }
+
+            public bool TryCompleteClaim(Bucket sourceBucket)
+            {
+                lock (_lock)
+                {
+                    if (_state is not CollectionRegistrationState.Claimed || !ReferenceEquals(_bucket, sourceBucket))
+                    {
+                        return false;
+                    }
+
+                    _bucket = null;
+                    _state = CollectionRegistrationState.None;
+                    return true;
+                }
+            }
+
+            public bool TryRescheduleClaim(Bucket sourceBucket, Bucket bucket)
+            {
+                lock (_lock)
+                {
+                    if (_state is not CollectionRegistrationState.Claimed || !ReferenceEquals(_bucket, sourceBucket))
+                    {
+                        return false;
+                    }
+
+                    if (!bucket.TryAdd(this))
+                    {
+                        return false;
+                    }
+
+                    _bucket = bucket;
+                    _state = CollectionRegistrationState.Scheduled;
+                    return true;
+                }
+            }
+        }
+
+        private sealed class Bucket(ActivationCollector owner, DateTime ticket)
+        {
+            private readonly ActivationCollector _owner = owner;
+            private readonly DateTime _ticket = ticket;
+            private ConcurrentDictionary<CollectionRegistration, byte>? _items;
+            private int _activeAdders;
+            private int _closed;
+
+            public int Count => Volatile.Read(ref _items)?.Count ?? 0;
+
+            public DateTime Ticket => _ticket;
+
+            public ConcurrentDictionary<CollectionRegistration, byte>? Registrations => Volatile.Read(ref _items);
+
+            public bool TryAdd(CollectionRegistration registration)
+            {
+                Interlocked.Increment(ref _activeAdders);
+                try
+                {
+                    if (Volatile.Read(ref _closed) != 0)
+                    {
+                        return false;
+                    }
+
+                    var items = LazyInitializer.EnsureInitialized(
+                        ref _items,
+                        static () => new ConcurrentDictionary<CollectionRegistration, byte>(ReferenceEqualsComparer.Default));
+                    if (!items.TryAdd(registration, 0))
+                    {
+                        return false;
+                    }
+
+                    if (Volatile.Read(ref _closed) == 0)
+                    {
+                        return true;
+                    }
+
+                    items.TryRemove(registration, out _);
+                    return false;
+                }
+                finally
+                {
+                    if (Interlocked.Decrement(ref _activeAdders) == 0)
+                    {
+                        RemoveIfClosedAndEmpty();
+                    }
+                }
+            }
+
+            public void TryRemove(CollectionRegistration registration)
+            {
+                Volatile.Read(ref _items)?.TryRemove(registration, out _);
+                RemoveIfClosedAndEmpty();
+            }
+
+            public void CloseForCleanup()
+            {
+                Interlocked.Exchange(ref _closed, 1);
+                RemoveIfClosedAndEmpty();
+            }
+
+            public IReadOnlyList<CollectionClaim> CloseAndClaimAll()
+            {
+                Interlocked.Exchange(ref _closed, 1);
+                WaitForAdders();
+                var items = Volatile.Read(ref _items);
+                if (items is null)
+                {
+                    return NoClaims;
                 }
 
-                return result ?? nothing;
+                List<CollectionClaim>? result = null;
+                // Closure and the adder drain prevent new entries; removals are validated by TryClaim.
+                foreach (var entry in items)
+                {
+                    var registration = entry.Key;
+                    if (registration.TryClaim(this, out var claim))
+                    {
+                        result ??= [];
+                        result.Add(claim);
+                    }
+                }
+
+                // A closed bucket keeps no dictionary storage after its claims have been extracted.
+                Volatile.Write(ref _items, null);
+                return result ?? NoClaims;
+            }
+
+            private void RemoveIfClosedAndEmpty()
+            {
+                if (Volatile.Read(ref _closed) != 0
+                    && Volatile.Read(ref _activeAdders) == 0
+                    && Volatile.Read(ref _items) is not { IsEmpty: false })
+                {
+                    _owner.RemoveClosedBucket(_ticket, this);
+                }
+            }
+
+            private void WaitForAdders()
+            {
+                var spinner = new SpinWait();
+                while (Volatile.Read(ref _activeAdders) != 0)
+                {
+                    spinner.SpinOnce();
+                }
             }
         }
 

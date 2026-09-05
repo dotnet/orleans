@@ -97,10 +97,7 @@ namespace Orleans.Runtime
                 {
                     if (member is ActivationData activation)
                     {
-                        lock (activation)
-                        {
-                            activation.AnalyzeWorkload(now, messageCenter, _messageFactory, options);
-                        }
+                        activation.AnalyzeWorkload(now, messageCenter, _messageFactory, options);
                     }
 
                     if (++iteration % 100 == 0)

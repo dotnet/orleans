@@ -60,7 +60,7 @@ namespace Orleans.Runtime
 
         public void OnActivated(IActivationWorkingSetMember member)
         {
-            Debug.Assert(member is not ICollectibleGrainContext collectible || collectible.IsValid);
+            Debug.Assert(member is not ActivationData activation || activation.IsValid);
             if (_members.TryAdd(member, new MemberState()))
             {
                 Interlocked.Increment(ref _activeCount);
