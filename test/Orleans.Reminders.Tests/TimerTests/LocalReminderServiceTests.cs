@@ -257,6 +257,103 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
     [TestSuite("BVT")]
     [TestProvider("None")]
     [Fact, TestCategory("BVT")]
+    public async Task InitialRead_RetriesWhenRangeChangeIsQueuedBehindReadCompletion()
+    {
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cancellation.CancelAfter(TestConstants.InitTimeout);
+        var firstRead = new RangeReadGate(cancellation.Token);
+        NullReturningReminderTable? initialTable = null;
+        var builder = new InProcessTestClusterBuilder(1);
+        var clock = builder.AddReminderTestClock();
+        builder.ConfigureSilo((_, siloBuilder) =>
+        {
+            var table = new NullReturningReminderTable(initialTable is null ? firstRead : null);
+            initialTable ??= table;
+
+            siloBuilder.AddReminders();
+            siloBuilder.ConfigureServices(services =>
+            {
+                services.AddSingleton(table);
+                services.AddSingleton<IReminderTable>(
+                    static provider => provider.GetRequiredService<NullReturningReminderTable>());
+            });
+        });
+
+        var cluster = builder.Build();
+        InProcessSiloHandle? joinedSilo = null;
+        try
+        {
+            await cluster.DeployAsync(cancellation.Token);
+            await firstRead.WaitUntilBlockedAsync(cancellation.Token);
+            var initialSilo = Assert.Single(cluster.Silos);
+            var reminderService = initialSilo.ServiceProvider.GetRequiredService<LocalReminderService>();
+            var schedulerBlocked = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var releaseScheduler = new ManualResetEventSlim();
+            var blockingTask = new Task(() =>
+            {
+                schedulerBlocked.TrySetResult();
+                releaseScheduler.Wait(cancellation.Token);
+            });
+            reminderService.Scheduler.QueueTask(blockingTask);
+            await schedulerBlocked.Task.WaitAsync(cancellation.Token);
+
+            var secondRead = Assert.IsType<NullReturningReminderTable>(initialTable)
+                .BlockNextRangeRead(cancellation.Token);
+            try
+            {
+                firstRead.Release();
+                joinedSilo = Assert.Single(await cluster.StartSilosAsync(1, cancellation.Token));
+                await reminderService.TestOnlyWaitForSiloStatusListeners(cancellation.Token);
+                var started = clock.DiagnosticObserver.WaitForReminderServiceStartedAsync(
+                    cancellation.Token,
+                    initialSilo.SiloAddress);
+
+                releaseScheduler.Set();
+                await blockingTask.WaitAsync(cancellation.Token);
+                await secondRead.WaitUntilBlockedAsync(cancellation.Token);
+                Assert.False(started.IsCompleted);
+
+                secondRead.Release();
+                await started;
+            }
+            finally
+            {
+                releaseScheduler.Set();
+                firstRead.Release();
+                secondRead.Release();
+                await blockingTask.WaitAsync(cancellation.Token);
+            }
+        }
+        finally
+        {
+            try
+            {
+                using var cleanupCancellation = new CancellationTokenSource(TestConstants.InitTimeout);
+                if (joinedSilo is not null)
+                {
+                    await cluster.StopSiloAsync(joinedSilo, cleanupCancellation.Token);
+                }
+
+                await cluster.StopAllSilosAsync(cleanupCancellation.Token);
+            }
+            finally
+            {
+                try
+                {
+                    using var disposeCancellation = new CancellationTokenSource(TestConstants.InitTimeout);
+                    await cluster.DisposeAsync().AsTask().WaitAsync(disposeCancellation.Token);
+                }
+                finally
+                {
+                    clock.Dispose();
+                }
+            }
+        }
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
     public async Task SiloStatusListenerBarrier_WaitsForCurrentMembershipVersion()
     {
         var initialSilo = Assert.Single(fixture.HostedCluster.Silos);
@@ -989,6 +1086,15 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
         private int rangeReadCount;
         private RangeReadGate? nextRangeRead;
 
+        public NullReturningReminderTable()
+        {
+        }
+
+        public NullReturningReminderTable(RangeReadGate? initialRead)
+        {
+            nextRangeRead = initialRead;
+        }
+
         public int RangeReadCount => Volatile.Read(ref rangeReadCount);
 
         public RangeReadGate BlockNextRangeRead(CancellationToken cancellationToken)
@@ -1004,17 +1110,17 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
 
         public Task StartAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 
-        public async Task<ReminderTableData> ReadRows(uint begin, uint end)
+        public Task<ReminderTableData> ReadRows(uint begin, uint end)
         {
             Interlocked.Increment(ref rangeReadCount);
             if (Interlocked.Exchange(ref nextRangeRead, null) is { } gate)
             {
                 gate.MarkBlocked();
-                await gate.WaitForReleaseAsync();
+                return gate.Task;
             }
 
             // Simulate a provider binary compiled before the return value was annotated as non-null.
-            return null!;
+            return Task.FromResult<ReminderTableData>(null!);
         }
 
         public Task<ReminderTableData> ReadRows(GrainId grainId) => throw new NotSupportedException();
@@ -1028,18 +1134,23 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
         public Task TestOnlyClearTable() => throw new NotSupportedException();
     }
 
-    private sealed class RangeReadGate(CancellationToken cancellationToken)
+    private sealed class RangeReadGate
     {
         private readonly TaskCompletionSource blocked = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        private readonly TaskCompletionSource release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<ReminderTableData> release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public RangeReadGate(CancellationToken cancellationToken)
+        {
+            cancellationToken.Register(() => release.TrySetCanceled(cancellationToken));
+        }
+
+        public Task<ReminderTableData> Task => release.Task;
 
         public void MarkBlocked() => blocked.TrySetResult();
 
         public Task WaitUntilBlockedAsync(CancellationToken cancellationToken) => blocked.Task.WaitAsync(cancellationToken);
 
-        public Task WaitForReleaseAsync() => release.Task.WaitAsync(cancellationToken);
-
-        public void Release() => release.TrySetResult();
+        public void Release() => release.TrySetResult(null!);
 
         public void Fail(Exception exception) => release.TrySetException(exception);
     }
