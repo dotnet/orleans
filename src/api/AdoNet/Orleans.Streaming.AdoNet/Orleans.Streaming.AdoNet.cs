@@ -28,6 +28,8 @@ namespace Orleans.Configuration
 
         public string Invariant { get { throw null; } set { } }
 
+        public long MaxCacheSizeBytes { get { throw null; } set { } }
+
         public System.TimeSpan? MaximumRetentionPeriod { get { throw null; } set { } }
 
         public int MaxMessagesPerRead { get { throw null; } set { } }
