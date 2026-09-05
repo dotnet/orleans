@@ -435,14 +435,31 @@ public sealed class GrainDiagnosticObserver : IDisposable, IObserver<GrainLifecy
 
     private void SignalDeactivationWaiters(GrainLifecycleEvents.Deactivated deactivated)
     {
+        DeactivationWaiter[] waiters;
         lock (_deactivationWaitersLock)
         {
-            for (var i = _deactivationWaiters.Count - 1; i >= 0; i--)
+            waiters = [.. _deactivationWaiters];
+        }
+
+        List<DeactivationWaiter>? completedWaiters = null;
+        foreach (var waiter in waiters)
+        {
+            if (waiter.TryComplete(deactivated))
             {
-                if (_deactivationWaiters[i].TryComplete(deactivated))
-                {
-                    _deactivationWaiters.RemoveAt(i);
-                }
+                (completedWaiters ??= []).Add(waiter);
+            }
+        }
+
+        if (completedWaiters is null)
+        {
+            return;
+        }
+
+        lock (_deactivationWaitersLock)
+        {
+            foreach (var waiter in completedWaiters)
+            {
+                _deactivationWaiters.Remove(waiter);
             }
         }
     }

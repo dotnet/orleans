@@ -114,6 +114,44 @@ public class DiagnosticInfrastructureRegressionTests
     [TestSuite("BVT")]
     [TestProvider("None")]
     [Fact, TestCategory("BVT")]
+    public async Task GrainDiagnosticObserver_BlockedPredicate_DoesNotBlockDisposal()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var observer = GrainDiagnosticObserver.CreateForAllSilos();
+        var grainContext = Substitute.For<IGrainContext>();
+        grainContext.GrainId.Returns(GrainId.Create("test", "blocking-predicate"));
+        var predicateEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releasePredicate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var waitTask = observer.WaitForAnyGrainDeactivatedAsync(
+            _ =>
+            {
+                predicateEntered.TrySetResult();
+                releasePredicate.Task.GetAwaiter().GetResult();
+                return false;
+            },
+            TimeSpan.FromSeconds(5));
+
+        var emitTask = Task.Run(() => GrainLifecycleEvents.EmitDeactivated(
+            grainContext,
+            new(DeactivationReasonCode.ApplicationRequested, "test")), cancellationToken);
+        await predicateEntered.Task.WaitAsync(TimeSpan.FromSeconds(1), cancellationToken);
+
+        try
+        {
+            await Task.Run(observer.Dispose, cancellationToken).WaitAsync(TimeSpan.FromSeconds(1), cancellationToken);
+        }
+        finally
+        {
+            releasePredicate.TrySetResult();
+        }
+
+        await emitTask.WaitAsync(cancellationToken);
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => waitTask);
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
     public async Task GrainDiagnosticObserver_Dispose_CompletesPredicateWaiters()
     {
         var observer = GrainDiagnosticObserver.CreateForAllSilos();

@@ -14,6 +14,8 @@ namespace UnitTests.ActivationRebalancingTests;
 public class StaticRebalancingTests(RebalancerFixture fixture, ITestOutputHelper output)
     : RebalancingTestBase<RebalancerFixture>(fixture, output), IClassFixture<RebalancerFixture>
 {
+    private static readonly TimeSpan RebalancerSuspensionDuration = TimeSpan.FromMinutes(2);
+
     [Fact]
     public async Task Should_Move_Activations_From_Silo1_And_Silo3_To_Silo2_And_Silo4()
     {
@@ -23,7 +25,7 @@ public class StaticRebalancingTests(RebalancerFixture fixture, ITestOutputHelper
         using var grainEvents = GrainDiagnosticObserver.Create(Cluster);
         var rebalancer = Cluster.Client!.GetGrain<IActivationRebalancerWorker>(0);
         var rebalancerHost = (await rebalancer.GetReport(cancellationToken)).Host;
-        await rebalancer.SuspendRebalancing(null, cancellationToken);
+        await rebalancer.SuspendRebalancing(RebalancerSuspensionDuration, cancellationToken);
 
         AddTestActivations(tasks, Silo1, 300);
         AddTestActivations(tasks, Silo2, 30);
