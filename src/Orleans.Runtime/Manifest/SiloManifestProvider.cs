@@ -13,6 +13,12 @@ namespace Orleans.Metadata
     /// </summary>
     internal class SiloManifestProvider
     {
+        private readonly IEnumerable<IGrainPropertiesProvider> _grainPropertiesProviders;
+        private readonly IEnumerable<IGrainInterfacePropertiesProvider> _grainInterfacePropertiesProviders;
+        private readonly IOptions<GrainTypeOptions> _grainTypeOptions;
+        private readonly GrainTypeResolver _typeProvider;
+        private readonly GrainInterfaceTypeResolver _interfaceIdProvider;
+
         public SiloManifestProvider(
             IEnumerable<IGrainPropertiesProvider> grainPropertiesProviders,
             IEnumerable<IGrainInterfacePropertiesProvider> grainInterfacePropertiesProviders,
@@ -21,15 +27,33 @@ namespace Orleans.Metadata
             GrainInterfaceTypeResolver interfaceIdProvider,
             TypeConverter typeConverter)
         {
+            _grainPropertiesProviders = grainPropertiesProviders;
+            _grainInterfacePropertiesProviders = grainInterfacePropertiesProviders;
+            _grainTypeOptions = grainTypeOptions;
+            _typeProvider = typeProvider;
+            _interfaceIdProvider = interfaceIdProvider;
             var (grainProperties, grainTypes) = CreateGrainManifest(grainPropertiesProviders, grainTypeOptions, typeProvider);
             var interfaces = CreateInterfaceManifest(grainInterfacePropertiesProviders, grainTypeOptions, interfaceIdProvider);
             this.SiloManifest = new GrainManifest(grainProperties, interfaces);
             this.GrainTypeMap = new GrainClassMap(typeConverter, grainTypes);
         }
 
-        public GrainManifest SiloManifest { get; }
+        public GrainManifest SiloManifest { get; private set; }
 
         public GrainClassMap GrainTypeMap { get; }
+
+        /// <summary>
+        /// Rebuilds the silo manifest and grain class map after a hot reload metadata update. Throws if the
+        /// rebuilt manifest is invalid (e.g. duplicate grain type names); callers must leave the previous
+        /// manifest in place in that case.
+        /// </summary>
+        public void OnManifestUpdated()
+        {
+            var (grainProperties, grainTypes) = CreateGrainManifest(_grainPropertiesProviders, _grainTypeOptions, _typeProvider);
+            var interfaces = CreateInterfaceManifest(_grainInterfacePropertiesProviders, _grainTypeOptions, _interfaceIdProvider);
+            SiloManifest = new GrainManifest(grainProperties, interfaces);
+            GrainTypeMap.OnManifestUpdated(grainTypes);
+        }
 
         private static ImmutableDictionary<GrainInterfaceType, GrainInterfaceProperties> CreateInterfaceManifest(
             IEnumerable<IGrainInterfacePropertiesProvider> propertyProviders,
