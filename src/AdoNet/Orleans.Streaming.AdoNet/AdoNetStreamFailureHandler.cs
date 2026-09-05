@@ -49,6 +49,7 @@ internal partial class AdoNetStreamFailureHandler : IStreamFailureHandler
     }
 
     [LoggerMessage(
+        EventId = 1,
         Level = LogLevel.Warning,
         Message = "ADO.NET stream delivery failed for subscription {SubscriptionId} on provider {ProviderName}, stream {StreamId}, at {SequenceToken}. The partition record remains available.")]
     private static partial void LogDeliveryFailure(
@@ -59,6 +60,7 @@ internal partial class AdoNetStreamFailureHandler : IStreamFailureHandler
         StreamSequenceToken? sequenceToken);
 
     [LoggerMessage(
+        EventId = 2,
         Level = LogLevel.Warning,
         Message = "ADO.NET stream subscription {SubscriptionId} failed on provider {ProviderName}, stream {StreamId}, at {SequenceToken}. The partition record remains available.")]
     private static partial void LogSubscriptionFailure(
