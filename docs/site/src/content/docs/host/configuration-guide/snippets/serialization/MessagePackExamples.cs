@@ -44,7 +44,7 @@ public static class MessagePackConfiguration
         {
             siloBuilder.UseLocalhostClustering();
             siloBuilder.Services.AddSerializer(serializerBuilder => serializerBuilder.AddMessagePackSerializer(
-                isSerializable: type => type.Namespace?.StartsWith("MyApp.Messages") == true,
+                isSerializable: type => type.Namespace?.StartsWith("MyApp.Messages", StringComparison.Ordinal) == true,
                 isCopyable: type => false,
                 messagePackSerializerOptions: null
             ));

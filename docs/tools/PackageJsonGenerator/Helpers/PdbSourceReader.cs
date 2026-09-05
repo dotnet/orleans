@@ -427,10 +427,10 @@ internal sealed class PdbSourceReader : IDisposable
             bool isMatch = mname == memberName
                 || (memberName == ".ctor" && mname == ".ctor")
                 || (mname == ".ctor" && memberName == tname)
-                || (mname.StartsWith("get_") && mname[4..] == memberName)
-                || (mname.StartsWith("set_") && mname[4..] == memberName)
-                || (mname.StartsWith("add_") && mname[4..] == memberName)
-                || (mname.StartsWith("remove_") && mname[7..] == memberName);
+                || (mname.StartsWith("get_", StringComparison.Ordinal) && mname[4..] == memberName)
+                || (mname.StartsWith("set_", StringComparison.Ordinal) && mname[4..] == memberName)
+                || (mname.StartsWith("add_", StringComparison.Ordinal) && mname[4..] == memberName)
+                || (mname.StartsWith("remove_", StringComparison.Ordinal) && mname[7..] == memberName);
 
             if (!isMatch) continue;
 

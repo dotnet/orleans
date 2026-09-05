@@ -14,7 +14,8 @@ public static class IncomingFilterConfiguration
             // on the RequestContext which can then be read by other filters or the grain.
             if (string.Equals(
                 context.InterfaceMethod.Name,
-                nameof(IMyGrain.MyInterceptedMethod)))
+                nameof(IMyGrain.MyInterceptedMethod),
+                StringComparison.Ordinal))
             {
                 RequestContext.Set(
                     "intercepted value", "this value was added by the filter");

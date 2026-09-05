@@ -279,7 +279,7 @@ public static class PackageJsonGenerator
 
     private static bool IsCompilerGenerated(INamedTypeSymbol type)
     {
-        return type.Name.StartsWith("<") ||
+        return type.Name.StartsWith("<", StringComparison.Ordinal) ||
                type.GetAttributes().Any(a =>
                    a.AttributeClass?.Name == "CompilerGeneratedAttribute");
     }
@@ -440,7 +440,9 @@ public static class PackageJsonGenerator
             var trimmed = lines[i].TrimStart();
 
             // Skip comment lines
-            if (trimmed.StartsWith("//") || trimmed.StartsWith("/*") || trimmed.StartsWith("*"))
+            if (trimmed.StartsWith("//", StringComparison.Ordinal)
+                || trimmed.StartsWith("/*", StringComparison.Ordinal)
+                || trimmed.StartsWith("*", StringComparison.Ordinal))
                 continue;
 
             if (pattern.IsMatch(lines[i]))
