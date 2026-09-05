@@ -213,6 +213,20 @@ public class EventHubCheckpointerTests
         }
     }
 
+    private sealed class InvalidArgumentEventHubReceiver : IEventHubReceiver
+    {
+        public int CloseCount { get; private set; }
+
+        public Task<IEnumerable<EventData>> ReceiveAsync(int maxCount, TimeSpan waitTime)
+            => throw new ArgumentException("The receiver rejected an unrelated argument.");
+
+        public Task CloseAsync()
+        {
+            CloseCount++;
+            return Task.CompletedTask;
+        }
+    }
+
     private sealed class CancellableEventHubReceiver : IEventHubReceiver
     {
         public TaskCompletionSource<CancellationToken> ReceiveStarted { get; } = new(
@@ -434,6 +448,30 @@ public class EventHubCheckpointerTests
         receiver.UpdateDeliveryProgress(recoveredToken, DateTime.UtcNow);
         Assert.Equal("10", checkpointer.LastOffset);
         Assert.Equal(1, checkpointer.UpdateCount);
+    }
+
+    [TestSuite("BVT")]
+    [Fact, TestCategory("BVT")]
+    public async Task GetQueueMessagesAsync_WhenArgumentFailureIsNotAnInvalidOffset_DoesNotReset()
+    {
+        var checkpointer = new TestCheckpointer
+        {
+            LoadedOffset = "123",
+        };
+        var eventHubReceiver = new InvalidArgumentEventHubReceiver();
+        var offsets = new List<string>();
+        var receiver = await CreateReceiver(
+            checkpointer,
+            eventHubReceiver: eventHubReceiver,
+            onReceiverCreated: offsets.Add);
+
+        var exception = await Assert.ThrowsAsync<ArgumentException>(
+            () => receiver.GetQueueMessagesAsync(10, CancellationToken.None));
+
+        Assert.Equal("The receiver rejected an unrelated argument.", exception.Message);
+        Assert.Equal(0, checkpointer.ResetCount);
+        Assert.Equal(0, eventHubReceiver.CloseCount);
+        Assert.Equal(["123"], offsets);
     }
 
     [TestSuite("BVT")]

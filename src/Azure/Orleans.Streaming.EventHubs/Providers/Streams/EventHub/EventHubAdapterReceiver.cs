@@ -229,7 +229,7 @@ internal partial class EventHubAdapterReceiver : IQueueAdapterReceiver, IQueueCa
             this.monitor?.TrackRead(false, watch.Elapsed, ex);
             LogWarningFailedToReadFromEventHubPartition(this.settings.Hub.EventHubName, this.settings.Partition, ex);
 
-            if (ex is ArgumentException && this.receiverUsesCheckpoint)
+            if (this.receiverUsesCheckpoint && IsInvalidOffsetException(ex))
             {
                 try
                 {
@@ -282,6 +282,11 @@ internal partial class EventHubAdapterReceiver : IQueueAdapterReceiver, IQueueCa
         }
         return batches;
     }
+
+    private static bool IsInvalidOffsetException(Exception exception)
+        => exception is ArgumentException
+        && exception.Message.StartsWith("The supplied offset", StringComparison.OrdinalIgnoreCase)
+        && exception.Message.Contains(" is invalid.", StringComparison.OrdinalIgnoreCase);
 
     private async Task ResetReceiver(CancellationToken cancellationToken)
     {
