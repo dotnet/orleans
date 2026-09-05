@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Design;
 
 namespace Orleans.Clustering.EntityFrameworkCore.MySql.Data;
 
-public class MySqlClusterDbContextFactory: IDesignTimeDbContextFactory<MySqlClusterDbContext>
+public class MySqlClusterDbContextFactory : IDesignTimeDbContextFactory<MySqlClusterDbContext>
 {
     public MySqlClusterDbContext CreateDbContext(string[] args)
     {

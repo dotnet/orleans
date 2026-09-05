@@ -46,7 +46,7 @@ internal class EFMembershipTable<TDbContext, TETag> : IMembershipTable where TDb
 
             if (record is not null) return;
 
-            record = new ClusterRecord<TETag> {Version = 0, Id = this._clusterId, Timestamp = DateTimeOffset.UtcNow};
+            record = new ClusterRecord<TETag> { Version = 0, Id = this._clusterId, Timestamp = DateTimeOffset.UtcNow };
 
             ctx.Clusters.Add(record);
             try
@@ -163,7 +163,7 @@ internal class EFMembershipTable<TDbContext, TETag> : IMembershipTable where TDb
                 return new MembershipTableData(version);
             }
 
-            var memEntries = new List<Tuple<MembershipEntry, string>> {Tuple.Create(ConvertRecord(record), this._etagConverter.FromDbETag(record.ETag))};
+            var memEntries = new List<Tuple<MembershipEntry, string>> { Tuple.Create(ConvertRecord(record), this._etagConverter.FromDbETag(record.ETag)) };
 
             return new MembershipTableData(memEntries, version);
         }
@@ -375,6 +375,6 @@ internal class EFMembershipTable<TDbContext, TETag> : IMembershipTable where TDb
 
     private ClusterRecord<TETag> ConvertToRecord(in TableVersion tableVersion)
     {
-        return new() {Id = this._clusterId, Version = tableVersion.Version, Timestamp = DateTimeOffset.UtcNow, ETag = this._etagConverter.ToDbETag(tableVersion.VersionEtag)};
+        return new() { Id = this._clusterId, Version = tableVersion.Version, Timestamp = DateTimeOffset.UtcNow, ETag = this._etagConverter.ToDbETag(tableVersion.VersionEtag) };
     }
 }

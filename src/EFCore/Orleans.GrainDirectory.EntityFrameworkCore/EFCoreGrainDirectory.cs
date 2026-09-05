@@ -250,7 +250,7 @@ public class EFCoreGrainDirectory<TDbContext, TETag> : IGrainDirectory, ILifecyc
 
     public GrainAddress ToGrainAddress(GrainActivationRecord<TETag> record)
     {
-        return new GrainAddress {GrainId = GrainId.Parse(record.GrainId), SiloAddress = SiloAddress.FromParsableString(record.SiloAddress), ActivationId = ActivationId.FromParsableString(record.ActivationId), MembershipVersion = new MembershipVersion(record.MembershipVersion)};
+        return new GrainAddress { GrainId = GrainId.Parse(record.GrainId), SiloAddress = SiloAddress.FromParsableString(record.SiloAddress), ActivationId = ActivationId.FromParsableString(record.ActivationId), MembershipVersion = new MembershipVersion(record.MembershipVersion) };
     }
 
     private GrainActivationRecord<TETag> FromGrainAddress(GrainAddress address)
