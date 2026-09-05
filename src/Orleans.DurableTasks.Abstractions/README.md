@@ -98,8 +98,10 @@ decision ID, then leaves all other scheduled tasks running. A host can obtain a 
 returned ID when cancellation or further observation is required.
 
 `ScheduledTask.WhenAny` returns the first task whose durable response arrives, including a
-failed or canceled response. Caller cancellation and host wait failures are propagated. After
-selection, it cancels and drains the losing wait operations without canceling the durable tasks.
+failed or canceled response. It captures its candidates when called, preserving the selected
+task's identity when the caller subsequently reuses or changes the input collection. Caller
+cancellation and host wait failures are propagated. After selection, it cancels and drains the
+losing wait operations without canceling the durable tasks.
 
 ## Host responsibilities
 
