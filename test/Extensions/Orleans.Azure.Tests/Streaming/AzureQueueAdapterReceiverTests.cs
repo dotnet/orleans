@@ -65,6 +65,29 @@ public class AzureQueueAdapterReceiverTests
     }
 
     [Fact]
+    public async Task ShutdownCancelsPendingReleaseAtDeadline()
+    {
+        var message = CreateMessage();
+        var queue = new DelayedQueueDataManager(message);
+        var receiver = new AzureQueueAdapterReceiver(
+            "test-queue",
+            NullLoggerFactory.Instance,
+            queue,
+            new TestQueueDataAdapter());
+        await receiver.Initialize(TimeSpan.FromSeconds(1));
+
+        var receiveTask = receiver.GetQueueMessagesAsync(1);
+        await queue.ReceiveStarted.Task;
+        var shutdownTask = receiver.Shutdown(TimeSpan.FromMilliseconds(100));
+        queue.CompleteReceive();
+
+        await queue.ReleaseStarted.Task;
+        await shutdownTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        await queue.ReleaseCanceled.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.Empty(await receiveTask);
+    }
+
+    [Fact]
     public async Task DeliveredMessagesAreDeletedInsteadOfReleased()
     {
         var message = CreateMessage();
@@ -169,6 +192,9 @@ public class AzureQueueAdapterReceiverTests
         public TaskCompletionSource ReleaseStarted { get; } =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+        public TaskCompletionSource ReleaseCanceled { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
         public List<QueueMessage> ReleasedMessages { get; } = [];
 
         public Task InitQueueAsync() => Task.CompletedTask;
@@ -185,7 +211,15 @@ public class AzureQueueAdapterReceiverTests
         {
             ReleasedMessages.Add(message);
             ReleaseStarted.TrySetResult();
-            await _release.Task.WaitAsync(cancellationToken);
+            try
+            {
+                await _release.Task.WaitAsync(cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                ReleaseCanceled.TrySetResult();
+                throw;
+            }
         }
 
         public void CompleteReceive() => _receive.TrySetResult([message]);

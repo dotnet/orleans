@@ -25,6 +25,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         private readonly object pendingLock = new();
         private int activeOperations;
         private TaskCompletionSource? operationsCompleted;
+        private bool shutdownCompleted;
 
         private readonly string azureQueueName;
 
@@ -116,6 +117,7 @@ namespace Orleans.Providers.Streams.AzureQueue
                 lock (pendingLock)
                 {
                     pending.Clear();
+                    shutdownCompleted = true;
                 }
             }
         }
@@ -152,9 +154,11 @@ namespace Orleans.Providers.Streams.AzureQueue
                     pendingDeliveries.Add(new PendingDelivery(container, message));
                 }
 
+                var shutdownStarted = false;
                 lock (pendingLock)
                 {
-                    if (!ReferenceEquals(queue, queueRef))
+                    shutdownStarted = !ReferenceEquals(queue, queueRef);
+                    if (shutdownStarted && shutdownCompleted)
                     {
                         pendingDeliveries.Clear();
                     }
@@ -167,17 +171,8 @@ namespace Orleans.Providers.Streams.AzureQueue
                     pending.AddRange(pendingDeliveries);
                 }
 
-                if (pendingDeliveries.Count == 0 && messages.Length > 0)
+                if (shutdownStarted)
                 {
-                    try
-                    {
-                        await ReleaseMessagesAsync(queueRef, messages, CancellationToken.None);
-                    }
-                    catch (Exception exception)
-                    {
-                        LogWarningReleaseQueueMessage(exception, azureQueueName, messages.Length);
-                    }
-
                     return Array.Empty<IBatchContainer>();
                 }
 
