@@ -91,6 +91,170 @@ public class DurableTaskTests
         Assert.True(host.LastDelayCancellationToken.IsCancellationRequested);
     }
 
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(false, false, true)]
+    [InlineData(false, true, false)]
+    [InlineData(false, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(true, false, true)]
+    [InlineData(true, true, false)]
+    [InlineData(true, true, true)]
+    public async Task DelegateExecutionCancellationKeepsDurableRequestDistinct(
+        bool generic,
+        bool withState,
+        bool durableCancellation)
+    {
+        using var executionAbort = new CancellationTokenSource();
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var context = new TestContext(host, TaskId.CreateRoot("abortable-delegate"), DateTimeOffset.UnixEpoch, executionAbort.Token);
+        var started = new TaskCompletionSource<CancellationToken>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var tokenObservers = 0;
+        var durableCallbacks = 0;
+        using var observer = context.CancellationToken.Register(() => tokenObservers++);
+        await using var registration = await context.RegisterCancellationCallbackAsync(_ =>
+        {
+            durableCallbacks++;
+            return ValueTask.CompletedTask;
+        }, Xunit.TestContext.Current.CancellationToken);
+        DurableTask definition = (generic, withState) switch
+        {
+            (false, false) => DurableTask.Run(WaitAsync),
+            (false, true) => DurableTask.Run<Func<CancellationToken, Task>>(
+                static async (callback, token) => await callback(token), WaitAsync),
+            (true, false) => DurableTask.Run<int>(async token => { await WaitAsync(token); return 42; }),
+            (true, true) => DurableTask.Run<Func<CancellationToken, Task>, int>(
+                static async (callback, token) => { await callback(token); return 42; }, WaitAsync),
+        };
+
+        var execution = DurableTaskRuntimeHelper.RunAsync(definition, context).AsTask();
+        try
+        {
+            var executionToken = await started.Task.WaitAsync(TimeSpan.FromSeconds(10), Xunit.TestContext.Current.CancellationToken);
+            Assert.False(executionToken.IsCancellationRequested);
+            Assert.NotEqual(context.CancellationToken, executionToken);
+            if (durableCancellation)
+            {
+                await DurableTaskRuntimeHelper.RequestCancellationAsync(context, Xunit.TestContext.Current.CancellationToken);
+            }
+            else
+            {
+                executionAbort.Cancel();
+            }
+
+            var response = await execution.WaitAsync(TimeSpan.FromSeconds(10), Xunit.TestContext.Current.CancellationToken);
+
+            Assert.Equal(DurableTaskStatus.Canceled, response.Status);
+            Assert.Equal(executionToken, Assert.IsAssignableFrom<OperationCanceledException>(response.Exception).CancellationToken);
+            Assert.Equal(durableCancellation, context.IsCancellationRequested);
+            Assert.Equal(durableCancellation, context.CancellationToken.IsCancellationRequested);
+            Assert.Equal(durableCancellation ? 1 : 0, tokenObservers);
+            Assert.Equal(durableCancellation ? 1 : 0, durableCallbacks);
+            Assert.Equal(!durableCancellation, executionAbort.IsCancellationRequested);
+        }
+        finally
+        {
+            await DurableTaskRuntimeHelper.RequestCancellationAsync(context, CancellationToken.None);
+            await execution.WaitAsync(TimeSpan.FromSeconds(10), Xunit.TestContext.Current.CancellationToken);
+        }
+
+        async Task WaitAsync(CancellationToken token)
+        {
+            started.SetResult(token);
+            await Task.Delay(Timeout.InfiniteTimeSpan, token);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SynchronousDelegatesReceiveExecutionCancellation(bool durableCancellation)
+    {
+        using var executionAbort = new CancellationTokenSource();
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var context = new TestContext(host, TaskId.CreateRoot("abortable-sync-delegates"), DateTimeOffset.UnixEpoch, executionAbort.Token);
+        if (durableCancellation)
+        {
+            await DurableTaskRuntimeHelper.RequestCancellationAsync(context, Xunit.TestContext.Current.CancellationToken);
+        }
+        else
+        {
+            executionAbort.Cancel();
+        }
+
+        var observedTokens = new List<CancellationToken>();
+        DurableTask[] definitions =
+        [
+            DurableTask.Run(Observe),
+            DurableTask.Run(token => { Observe(token); return 42; }),
+            DurableTask.Run<Action<CancellationToken>>(static (callback, token) => callback(token), Observe),
+            DurableTask.Run<Action<CancellationToken>, int>(static (callback, token) => { callback(token); return 42; }, Observe),
+        ];
+        foreach (var definition in definitions)
+        {
+            var response = await DurableTaskRuntimeHelper.RunAsync(definition, context);
+            Assert.Equal(DurableTaskStatus.Canceled, response.Status);
+            Assert.Equal(observedTokens[^1], Assert.IsAssignableFrom<OperationCanceledException>(response.Exception).CancellationToken);
+        }
+
+        Assert.Equal(4, observedTokens.Count);
+        Assert.All(observedTokens, token => Assert.True(token.IsCancellationRequested));
+        Assert.Equal(durableCancellation, context.IsCancellationRequested);
+        Assert.Equal(durableCancellation, context.CancellationToken.IsCancellationRequested);
+
+        void Observe(CancellationToken token)
+        {
+            observedTokens.Add(token);
+            token.ThrowIfCancellationRequested();
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DelayReceivesExecutionCancellation(bool durableCancellation)
+    {
+        using var executionAbort = new CancellationTokenSource();
+        var started = new TaskCompletionSource<CancellationToken>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var now = DateTimeOffset.UnixEpoch;
+        var host = new TestHost(now)
+        {
+            DelayCallback = async token =>
+            {
+                started.SetResult(token);
+                await Task.Delay(Timeout.InfiniteTimeSpan, token);
+                return DurableTaskResponse.Completed;
+            },
+        };
+        var context = new TestContext(host, TaskId.CreateRoot("abortable-delay"), now, executionAbort.Token);
+        var execution = DurableTaskRuntimeHelper.RunAsync(DurableTask.Delay(TimeSpan.FromMinutes(3)), context).AsTask();
+        try
+        {
+            var executionToken = await started.Task.WaitAsync(TimeSpan.FromSeconds(10), Xunit.TestContext.Current.CancellationToken);
+            if (durableCancellation)
+            {
+                await DurableTaskRuntimeHelper.RequestCancellationAsync(context, Xunit.TestContext.Current.CancellationToken);
+            }
+            else
+            {
+                executionAbort.Cancel();
+            }
+
+            var response = await execution.WaitAsync(TimeSpan.FromSeconds(10), Xunit.TestContext.Current.CancellationToken);
+
+            Assert.Equal(DurableTaskStatus.Canceled, response.Status);
+            Assert.Equal(executionToken, Assert.IsAssignableFrom<OperationCanceledException>(response.Exception).CancellationToken);
+            Assert.Equal(now.AddMinutes(3), host.LastDelayDueTime);
+            Assert.Equal(durableCancellation, context.IsCancellationRequested);
+            Assert.Equal(durableCancellation, context.CancellationToken.IsCancellationRequested);
+        }
+        finally
+        {
+            await DurableTaskRuntimeHelper.RequestCancellationAsync(context, CancellationToken.None);
+            await execution.WaitAsync(TimeSpan.FromSeconds(10), Xunit.TestContext.Current.CancellationToken);
+        }
+    }
+
     [Fact]
     public async Task DelegateRunnerRestoresPriorAmbientContext()
     {
@@ -4893,6 +5057,8 @@ internal sealed class TestHost(DateTimeOffset utcNow)
 
     public bool DelayFailureIsAsynchronous { get; init; }
 
+    public Func<CancellationToken, ValueTask<DurableTaskResponse>>? DelayCallback { get; init; }
+
     public TestContext CreateContext(TaskId taskId) => new(this, taskId, utcNow);
 
     public RootDefinition<TResult> CreateRootDefinition<TResult>(Func<TestContext, ValueTask<DurableTaskResponse>> run) => new(this, run);
@@ -4950,7 +5116,9 @@ internal sealed class TestHost(DateTimeOffset utcNow)
                 : throw exception;
         }
 
-        return new(DurableTaskResponse.Completed);
+        return DelayCallback is { } callback
+            ? callback(cancellationToken)
+            : new(DurableTaskResponse.Completed);
     }
 
     internal Entry GetEntry(TaskId id) => _entries.GetOrAdd(id, static (taskId, state) => state.CreateEntry(taskId), this);
@@ -5057,7 +5225,11 @@ internal sealed class TestHost(DateTimeOffset utcNow)
     }
 }
 
-internal sealed class TestContext(TestHost host, TaskId id, DateTimeOffset utcNow) : DurableExecutionContext(id)
+internal sealed class TestContext(
+    TestHost host,
+    TaskId id,
+    DateTimeOffset utcNow,
+    CancellationToken executionAbortToken = default) : DurableExecutionContext(id, executionAbortToken)
 {
     public override DateTimeOffset UtcNow => utcNow;
 
