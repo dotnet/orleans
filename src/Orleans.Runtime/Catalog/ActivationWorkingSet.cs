@@ -59,60 +59,109 @@ internal sealed partial class ActivationWorkingSet : IActivationWorkingSet, ILif
     public void OnActivated(IActivationWorkingSetMember member)
     {
         Debug.Assert(member is not ActivationData activation || activation.IsValid);
-        if (!_members.TryAdd(member, 0))
+        if (member is ActivationData)
         {
-            throw new InvalidOperationException($"Member {member} is already a member of the working set");
+            AddMember();
+        }
+        else
+        {
+            lock (member)
+            {
+                AddMember();
+            }
         }
 
-        if (member is IActivationWorkingSetMemberStatus status)
-        {
-            status.IsInWorkingSet = true;
-            status.IsIdle = false;
-        }
-
-        Interlocked.Increment(ref _activeCount);
         foreach (var observer in _observers)
         {
             observer.OnAdded(member);
+        }
+
+        void AddMember()
+        {
+            if (!_members.TryAdd(member, 0))
+            {
+                throw new InvalidOperationException($"Member {member} is already a member of the working set");
+            }
+
+            if (member is IActivationWorkingSetMemberStatus status)
+            {
+                status.IsInWorkingSet = true;
+                status.IsIdle = false;
+            }
+
+            Interlocked.Increment(ref _activeCount);
         }
     }
 
     public void OnActive(IActivationWorkingSetMember member)
     {
-        var added = _members.TryAdd(member, 0);
-        if (member is IActivationWorkingSetMemberStatus status)
+        if (member is ActivationData)
         {
-            status.IsInWorkingSet = true;
-            status.IsIdle = false;
+            MarkActive();
         }
-        else if (!added)
+        else
         {
-            _members[member] = 0;
-        }
-
-        if (added)
-        {
-            Interlocked.Increment(ref _activeCount);
+            lock (member)
+            {
+                MarkActive();
+            }
         }
 
         foreach (var observer in _observers)
         {
             observer.OnActive(member);
         }
+
+        void MarkActive()
+        {
+            var added = _members.TryAdd(member, 0);
+            if (member is IActivationWorkingSetMemberStatus status)
+            {
+                status.IsInWorkingSet = true;
+                status.IsIdle = false;
+            }
+            else if (!added)
+            {
+                _members.TryUpdate(member, 0, IsIdleMask);
+            }
+
+            if (added)
+            {
+                Interlocked.Increment(ref _activeCount);
+            }
+        }
     }
 
     public void OnEvicted(IActivationWorkingSetMember member)
     {
-        var removed = _members.TryRemove(member, out _);
-        if (removed && member is IActivationWorkingSetMemberStatus status)
+        bool removed;
+        if (member is ActivationData)
         {
-            status.IsInWorkingSet = false;
-            status.IsIdle = false;
+            removed = RemoveMember();
+        }
+        else
+        {
+            lock (member)
+            {
+                removed = RemoveMember();
+            }
         }
 
         if (removed)
         {
             OnEvictedCore(member);
+        }
+
+        bool RemoveMember()
+        {
+            var result = _members.TryRemove(member, out _);
+            if (result && member is IActivationWorkingSetMemberStatus status)
+            {
+                status.IsInWorkingSet = false;
+                status.IsIdle = false;
+            }
+
+            return result;
         }
     }
 
@@ -163,68 +212,16 @@ internal sealed partial class ActivationWorkingSet : IActivationWorkingSet, ILif
 
     private void VisitMember(IActivationWorkingSetMember member)
     {
-        MemberVisitResult result;
-        // Enumeration can retain a member across removal and re-addition. CLOCK state is advisory, so visit the
-        // member's current state instead of adding a dictionary validation to every scan.
-        var status = member as IActivationWorkingSetMemberStatus;
-        byte dictionaryState = 0;
-        if ((status is null && !_members.TryGetValue(member, out dictionaryState))
-            || (status is not null && !status.IsInWorkingSet))
+        var result = MemberVisitResult.None;
+        if (member is ActivationData)
         {
-            result = MemberVisitResult.None;
+            VisitCore();
         }
         else
         {
-            var wouldRemove = status is not null
-                ? status.IsIdle
-                : (dictionaryState & IsIdleMask) != 0;
-            if (member.IsCandidateForRemoval(wouldRemove))
+            lock (member)
             {
-                if (wouldRemove)
-                {
-                    if (_members.TryRemove(member, out _))
-                    {
-                        if (status is not null)
-                        {
-                            status.WasRemovedByCollection = true;
-                            status.IsInWorkingSet = false;
-                            status.IsIdle = false;
-                        }
-
-                        Interlocked.Decrement(ref _activeCount);
-                        result = MemberVisitResult.Evicted;
-                    }
-                    else
-                    {
-                        result = MemberVisitResult.None;
-                    }
-                }
-                else
-                {
-                    if (status is not null)
-                    {
-                        status.IsIdle = true;
-                    }
-                    else
-                    {
-                        _members[member] = IsIdleMask;
-                    }
-
-                    result = MemberVisitResult.Idle;
-                }
-            }
-            else
-            {
-                if (wouldRemove && status is not null)
-                {
-                    status.IsIdle = false;
-                }
-                else if (wouldRemove)
-                {
-                    _members[member] = 0;
-                }
-
-                result = MemberVisitResult.Active;
+                VisitCore();
             }
         }
 
@@ -241,6 +238,83 @@ internal sealed partial class ActivationWorkingSet : IActivationWorkingSet, ILif
                 case MemberVisitResult.Evicted:
                     observer.OnEvicted(member);
                     break;
+            }
+        }
+
+        void VisitCore()
+        {
+        // Enumeration can retain a member across removal and re-addition. CLOCK state is advisory, so visit the
+        // member's current state instead of adding a dictionary validation to every scan.
+            var status = member as IActivationWorkingSetMemberStatus;
+            byte dictionaryState = 0;
+            if ((status is null && !_members.TryGetValue(member, out dictionaryState))
+                || (status is not null && !status.IsInWorkingSet))
+            {
+                result = MemberVisitResult.None;
+            }
+            else
+            {
+                var wouldRemove = status is not null
+                    ? status.IsIdle
+                    : (dictionaryState & IsIdleMask) != 0;
+                if (member.IsCandidateForRemoval(wouldRemove))
+                {
+                    if (wouldRemove)
+                    {
+                        if (_members.TryRemove(member, out _))
+                        {
+                            if (status is not null)
+                            {
+                                status.WasRemovedByCollection = true;
+                                status.IsInWorkingSet = false;
+                                status.IsIdle = false;
+                            }
+
+                            Interlocked.Decrement(ref _activeCount);
+                            result = MemberVisitResult.Evicted;
+                        }
+                        else
+                        {
+                            result = MemberVisitResult.None;
+                        }
+                    }
+                    else
+                    {
+                        if (status is not null)
+                        {
+                            status.IsIdle = true;
+                        }
+                        else
+                        {
+                            result = _members.TryUpdate(member, IsIdleMask, 0)
+                                ? MemberVisitResult.Idle
+                                : MemberVisitResult.None;
+                        }
+
+                        if (status is not null)
+                        {
+                            result = MemberVisitResult.Idle;
+                        }
+                    }
+                }
+                else
+                {
+                    if (wouldRemove && status is not null)
+                    {
+                        status.IsIdle = false;
+                        result = MemberVisitResult.Active;
+                    }
+                    else if (wouldRemove)
+                    {
+                        result = _members.TryUpdate(member, 0, IsIdleMask)
+                            ? MemberVisitResult.Active
+                            : MemberVisitResult.None;
+                    }
+                    else
+                    {
+                        result = MemberVisitResult.Active;
+                    }
+                }
             }
         }
     }
