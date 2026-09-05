@@ -265,6 +265,44 @@ namespace Orleans.Transactions.Azure.Tests
         private static readonly string MetadataJson = JsonConvert.SerializeObject(new TransactionalStateMetaData());
 
         [Fact]
+        public async Task Store_NullMetadata_ThrowsBeforeWritingAndStorageRemainsUsable()
+        {
+            var table = new ScriptedTableClient { PersistTransactions = true };
+            var storage = CreateStorage(table);
+            var initial = await storage.Load();
+
+            var exception = await Assert.ThrowsAsync<ArgumentNullException>(
+                () => storage.Store(initial.ETag, null!, [], null, null));
+
+            Assert.Equal("metadata", exception.ParamName);
+            Assert.Empty(table.SubmittedTransactions);
+
+            var etag = await storage.Store(initial.ETag, initial.Metadata, [], null, null);
+
+            Assert.Equal(new ETag("batch-1").ToString(), etag);
+            Assert.Single(table.SubmittedTransactions);
+        }
+
+        [Fact]
+        public async Task Store_ValidMetadata_PersistsAndLoadsNormally()
+        {
+            var table = new ScriptedTableClient { PersistTransactions = true };
+            var storage = CreateStorage(table);
+            var initial = await storage.Load();
+            var timestamp = DateTime.UtcNow;
+            var metadata = new TransactionalStateMetaData { TimeStamp = timestamp };
+
+            var etag = await storage.Store(initial.ETag, metadata, [], null, null);
+            var loaded = await CreateStorage(table).Load();
+
+            Assert.Equal(etag, loaded.ETag);
+            Assert.Equal(timestamp, loaded.Metadata.TimeStamp);
+            Assert.Equal(0, loaded.CommittedSequenceId);
+            Assert.Equal(0, loaded.CommittedState.State);
+            Assert.Empty(loaded.PendingStates);
+        }
+
+        [Fact]
         public async Task Load_WhenBoundaryChangesDuringStateRead_RetriesAndReturnsCoherentSnapshot()
         {
             var table = new ScriptedTableClient { StorageVersion = "old" };

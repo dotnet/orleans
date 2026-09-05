@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
 using Azure.Data.Tables;
@@ -44,6 +45,7 @@ namespace Orleans.Transactions.AzureStorage
         /// <param name="clusterOptions">The cluster options.</param>
         /// <param name="services">The service provider.</param>
         /// <param name="loggerFactory">The logger factory.</param>
+        [SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "ActivatorUtilities resolves the non-null IOptions<ClusterOptions> instance from dependency injection.")]
         public AzureTableTransactionalStateStorageFactory(string name, AzureTableTransactionalStateOptions options, IOptions<ClusterOptions> clusterOptions, IServiceProvider services, ILoggerFactory loggerFactory)
         {
             this.name = name;
@@ -54,6 +56,7 @@ namespace Orleans.Transactions.AzureStorage
         }
 
         /// <inheritdoc />
+        [SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "Orleans invokes transactional state storage factories with the current non-null grain context.")]
         public ITransactionalStateStorage<TState> Create<TState>(string stateName, IGrainContext context) where TState : class, new()
         {
             string partitionKey = MakePartitionKey(context, stateName);
