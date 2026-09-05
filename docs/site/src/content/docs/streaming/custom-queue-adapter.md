@@ -1,7 +1,7 @@
 ---
 title: Write a custom persistent-stream queue adapter
 description: Implement and register an Orleans persistent-stream queue adapter for an external queue technology.
-ms.date: 08/18/2026
+ms.date: 09/03/2026
 ms.topic: how-to
 ---
 
@@ -49,9 +49,13 @@ The factory composes the adapter with queue mapping, caching, and failure handli
 
 :::code language="csharp" source="snippets/streaming/CustomQueueAdapter.cs" id="custom_queue_factory":::
 
-`SimpleQueueAdapterCache` is suitable for a non-rewindable adapter whose queue remains the durability boundary. A rewindable adapter usually needs a cache and sequence-token implementation which can position cursors at retained historical messages.
+`SimpleQueueAdapterCache` is suitable when subscription cursors only use the live cache. A retained-history adapter can compose <xref:Orleans.Providers.Streams.Common.RecoverableStreamReceiver`1>, <xref:Orleans.Providers.Streams.Common.IRecoverableStreamReplaySourceFactory`1>, and <xref:Orleans.Providers.Streams.Common.IRecoverableStreamReplaySource`1>. The singleton live source owns the durable queue checkpoint. Each historical source owns an independent read position and cancellation lifetime.
 
-`AddPersistentStreams` leaves checkpointing to the adapter. The non-rewindable example acknowledges completed messages through its receiver and therefore has no independent checkpoint. For a retained-log transport, implement an <xref:Orleans.Streams.IStreamQueueCheckpointerFactory>, have the receiver or cache load and update the per-partition position, and register it as a named component with `ConfigureComponent`. Persist a checkpoint only after all consumers have advanced beyond the corresponding cached messages. A no-op checkpointer is suitable only when replay position is deliberately disposable.
+The cache implements <xref:Orleans.Streams.IQueueCacheRetainedReplay> to opt into retained-history cursor semantics. The receiver returns <xref:Orleans.Streams.IAsyncQueueCacheCursor> when a token predates the live cache. Its non-reentrant `MoveNextAsync` call distinguishes an available item, a temporary provider tail, and completed handoff to live delivery. The receiver bounds concurrent readers, queued admissions, replay cache capacity, and read batch size through <xref:Orleans.Configuration.RecoverableStreamReplayOptions>. Overlapping cursors reuse retained partition fragments when their ranges are compatible.
+
+Use provider tokens which encode enough identity to reject a token from another provider or partition. Validate retention and establish any external replay protection atomically during reader admission. Surface expired or malformed positions as <xref:Orleans.Streams.DataNotAvailableException>. Treat throttling, iterator renewal, and transient transport errors according to the provider's retry contract.
+
+`AddPersistentStreams` leaves checkpointing to the adapter. The non-rewindable example acknowledges completed messages through its receiver and therefore has no independent checkpoint. For a partitioned stream transport, implement an <xref:Orleans.Streams.IStreamQueueCheckpointerFactory>, have the receiver or cache load and update the stream partition position, and register it as a named component with `ConfigureComponent`. Treat a requested cursor start as inclusive: selecting that position does not confirm its record. Persist only the earliest contiguous partition position which every subscription has delivered, intentionally filtered, or safely scanned as belonging to another stream. A no-op checkpointer is suitable only when replay position is deliberately disposable.
 
 ## Register the provider
 
@@ -75,6 +79,9 @@ Test the adapter against the real queue service, including:
 1. queue ownership moving between silos during membership changes;
 1. duplicate delivery and consumer idempotency;
 1. stable stream-to-partition mapping across restarts and upgrades; and
-1. sustained load beyond cache capacity to verify backpressure and queue retention.
+1. sustained load beyond cache capacity to verify backpressure and queue retention;
+1. quiet and busy streams sharing a partition, including restart after the quiet cursor scans unrelated records;
+1. cancellation while partition ownership acquisition is blocked, followed by reassignment and late command completion; and
+1. sequence-token equality, ordering, and hashing in both comparison directions.
 
 Monitor queue depth and oldest-message age by partition, receive and acknowledgement latency, redelivery count, throttling, pulling-agent errors, and consumer delivery failures. Alert before retention or visibility limits can cause data loss or a redelivery storm.

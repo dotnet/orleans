@@ -46,12 +46,17 @@ public sealed class RelationalOrleansQueriesUnitTests
 
     private static readonly string[] StreamingQueryKeys =
     [
-        "QueueStreamMessageKey",
-        "GetStreamMessagesKey",
-        "ConfirmStreamMessagesKey",
-        "FailStreamMessageKey",
-        "EvictStreamMessagesKey",
-        "EvictStreamDeadLettersKey",
+        "StreamSchemaVersionKey",
+        "AppendStreamMessageKey",
+        "AcquireStreamPartitionKey",
+        "ReadStreamMessagesKey",
+        "AdvanceStreamCheckpointKey",
+        "GetStreamPartitionBoundsKey",
+        "CleanupStreamMessagesKey",
+        "AcquireStreamReplayLeaseKey",
+        "ReadStreamReplayMessagesKey",
+        "UpdateStreamReplayLeaseKey",
+        "ReleaseStreamReplayLeaseKey",
     ];
 
     private static readonly string[] DirectoryQueryKeys =
@@ -316,186 +321,6 @@ public sealed class RelationalOrleansQueriesUnitTests
         storage.VerifyComplete();
     }
 
-    [Fact]
-    public async Task GetStreamMessages_ReturnsRowsSortedByQueueAndSequence()
-    {
-        var now = new DateTime(2026, 8, 27, 16, 0, 0, DateTimeKind.Utc);
-        var storage = ExpectQueryLoad(new ScriptedRelationalStorage(), StreamingQueryKeys)
-            .ExpectRead(
-                Sql("GetStreamMessagesKey"),
-                CreateTable(
-                    StreamMessageColumns,
-                    ["service-e", "provider-a", "queue-a", 20L, 2, now, now.AddHours(1), now.AddMinutes(-2), now.AddMinutes(-1), new byte[] { 2, 0 }],
-                    ["service-e", "provider-a", "queue-a", 3L, 1, now, now.AddHours(2), now.AddMinutes(-4), now.AddMinutes(-3), new byte[] { 0, 3 }]));
-        var queries = await StreamingQueries.CreateInstance(storage);
-
-        var result = await queries.GetStreamMessagesAsync("service-e", "provider-a", "queue-a", 25, 4, 30, 60, 90, 10);
-
-        Assert.Equal([3L, 20L], result.Select(message => message.MessageId));
-        Assert.Equal([0, 3], result[0].Payload);
-        Assert.Equal(2, result[1].Dequeued);
-        AssertParameters(
-            AssertOperationCall(storage, Sql("GetStreamMessagesKey")),
-            ("ServiceId", "service-e"),
-            ("ProviderId", "provider-a"),
-            ("QueueId", "queue-a"),
-            ("MaxCount", 25),
-            ("MaxAttempts", 4),
-            ("VisibilityTimeout", 30),
-            ("RemovalTimeout", 60),
-            ("EvictionInterval", 90),
-            ("EvictionBatchSize", 10));
-        storage.VerifyComplete();
-    }
-
-    [Fact]
-    public async Task GetStreamMessages_ReturnsEmptyWhenNoRowsExist()
-    {
-        var storage = ExpectQueryLoad(new ScriptedRelationalStorage(), StreamingQueryKeys)
-            .ExpectRead(Sql("GetStreamMessagesKey"));
-        var queries = await StreamingQueries.CreateInstance(storage);
-
-        var result = await queries.GetStreamMessagesAsync("service-f", "provider-b", "queue-b", 5, 2, 10, 20, 30, 4);
-
-        Assert.Empty(result);
-        AssertParameters(
-            AssertOperationCall(storage, Sql("GetStreamMessagesKey")),
-            ("ServiceId", "service-f"),
-            ("ProviderId", "provider-b"),
-            ("QueueId", "queue-b"),
-            ("MaxCount", 5),
-            ("MaxAttempts", 2),
-            ("VisibilityTimeout", 10),
-            ("RemovalTimeout", 20),
-            ("EvictionInterval", 30),
-            ("EvictionBatchSize", 4));
-        storage.VerifyComplete();
-    }
-
-    [Fact]
-    public async Task ConfirmStreamMessages_EmptySet_DoesNotExecuteMutation()
-    {
-        var storage = ExpectQueryLoad(new ScriptedRelationalStorage(), StreamingQueryKeys);
-        var queries = await StreamingQueries.CreateInstance(storage);
-
-        var result = await queries.ConfirmStreamMessagesAsync("service-g", "provider-c", "queue-c", []);
-
-        Assert.Empty(result);
-        Assert.Single(storage.Calls);
-        storage.VerifyComplete();
-    }
-
-    [Fact]
-    public async Task ConfirmStreamMessages_CapturesReceiptParameters()
-    {
-        var storage = ExpectQueryLoad(new ScriptedRelationalStorage(), StreamingQueryKeys)
-            .ExpectRead(
-                Sql("ConfirmStreamMessagesKey"),
-                CreateTable(
-                    StreamConfirmationColumns,
-                    ["service-g", "provider-c", "queue-c", 11L],
-                    ["service-g", "provider-c", "queue-c", 12L]));
-        var queries = await StreamingQueries.CreateInstance(storage);
-
-        var result = await queries.ConfirmStreamMessagesAsync(
-            "service-g",
-            "provider-c",
-            "queue-c",
-            [new(11, 3), new(12, 4)]);
-
-        Assert.Equal([11L, 12L], result.Select(ack => ack.MessageId));
-        Assert.All(result, ack => Assert.Equal("queue-c", ack.QueueId));
-        AssertParameters(
-            AssertOperationCall(storage, Sql("ConfirmStreamMessagesKey")),
-            ("ServiceId", "service-g"),
-            ("ProviderId", "provider-c"),
-            ("QueueId", "queue-c"),
-            ("Items", "11:3|12:4"));
-        storage.VerifyComplete();
-
-        var singletonStorage = ExpectQueryLoad(new ScriptedRelationalStorage(), StreamingQueryKeys)
-            .ExpectRead(
-                Sql("ConfirmStreamMessagesKey"),
-                CreateTable(StreamConfirmationColumns, ["service-g", "provider-c", "queue-c", 13L]));
-        var singletonQueries = await StreamingQueries.CreateInstance(singletonStorage);
-
-        var singletonResult = await singletonQueries.ConfirmStreamMessagesAsync(
-            "service-g",
-            "provider-c",
-            "queue-c",
-            [new(13, 5)]);
-
-        Assert.Equal([13L], singletonResult.Select(ack => ack.MessageId));
-        AssertParameters(
-            AssertOperationCall(singletonStorage, Sql("ConfirmStreamMessagesKey")),
-            ("ServiceId", "service-g"),
-            ("ProviderId", "provider-c"),
-            ("QueueId", "queue-c"),
-            ("Items", "13:5"));
-        singletonStorage.VerifyComplete();
-    }
-
-    [Fact]
-    public async Task ReleaseStreamMessages_EmptySet_DoesNotExecuteMutation()
-    {
-        var storage = ExpectQueryLoad(new ScriptedRelationalStorage(), StreamingQueryKeys);
-        var queries = await StreamingQueries.CreateInstance(storage);
-
-        var result = await queries.ReleaseStreamMessagesAsync("service-h", "provider-d", "queue-d", []);
-
-        Assert.Empty(result);
-        Assert.Single(storage.Calls);
-        storage.VerifyComplete();
-    }
-
-    [Fact]
-    public async Task ReleaseStreamMessages_CapturesReceiptParameters()
-    {
-        var storage = ExpectQueryLoad(new ScriptedRelationalStorage(), StreamingQueryKeys)
-            .ExpectRead(
-                Sql("ConfirmStreamMessagesKey"),
-                CreateTable(
-                    StreamConfirmationColumns,
-                    ["service-h", "provider-d", "queue-d", 21L],
-                    ["service-h", "provider-d", "queue-d", 22L]));
-        var queries = await StreamingQueries.CreateInstance(storage);
-
-        var result = await queries.ReleaseStreamMessagesAsync(
-            "service-h",
-            "provider-d",
-            "queue-d",
-            [new(21, 5), new(22, 6)]);
-
-        Assert.Equal([21L, 22L], result.Select(ack => ack.MessageId));
-        AssertParameters(
-            AssertOperationCall(storage, Sql("ConfirmStreamMessagesKey")),
-            ("ServiceId", "service-h"),
-            ("ProviderId", "provider-d"),
-            ("QueueId", "queue-d"),
-            ("Items", "21:-5|22:-6"));
-        storage.VerifyComplete();
-
-        var singletonStorage = ExpectQueryLoad(new ScriptedRelationalStorage(), StreamingQueryKeys)
-            .ExpectRead(
-                Sql("ConfirmStreamMessagesKey"),
-                CreateTable(StreamConfirmationColumns, ["service-h", "provider-d", "queue-d", 23L]));
-        var singletonQueries = await StreamingQueries.CreateInstance(singletonStorage);
-
-        var singletonResult = await singletonQueries.ReleaseStreamMessagesAsync(
-            "service-h",
-            "provider-d",
-            "queue-d",
-            [new(23, 7)]);
-
-        Assert.Equal([23L], singletonResult.Select(ack => ack.MessageId));
-        AssertParameters(
-            AssertOperationCall(singletonStorage, Sql("ConfirmStreamMessagesKey")),
-            ("ServiceId", "service-h"),
-            ("ProviderId", "provider-d"),
-            ("QueueId", "queue-d"),
-            ("Items", "23:-7"));
-        singletonStorage.VerifyComplete();
-    }
 
     [Fact]
     public async Task GrainDirectoryLookup_ReturnsSingleEntry()
@@ -585,12 +410,18 @@ public sealed class RelationalOrleansQueriesUnitTests
         membershipStorage.VerifyComplete();
 
         var streamingStorage = ExpectQueryLoad(new ScriptedRelationalStorage(), StreamingQueryKeys)
-            .ExpectReadException(Sql("GetStreamMessagesKey"), expected);
+            .ExpectReadException(Sql("ReadStreamMessagesKey"), expected);
         var streamingQueries = await StreamingQueries.CreateInstance(streamingStorage);
         var streamingError = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => streamingQueries.GetStreamMessagesAsync("service-error", "provider-error", "queue-error", 5, 2, 10, 20, 30, 4));
+            () => streamingQueries.ReadStreamMessagesAsync(
+                "service-error",
+                "provider-error",
+                "queue-error",
+                afterMessageId: 0,
+                maxCount: 5,
+                TestContext.Current.CancellationToken));
         Assert.Same(expected, streamingError);
-        AssertOperationCall(streamingStorage, Sql("GetStreamMessagesKey"));
+        AssertOperationCall(streamingStorage, Sql("ReadStreamMessagesKey"));
         streamingStorage.VerifyComplete();
 
         var directoryStorage = ExpectQueryLoad(new ScriptedRelationalStorage(), DirectoryQueryKeys)
@@ -684,40 +515,6 @@ public sealed class RelationalOrleansQueriesUnitTests
             ("ClusterId", "cluster-unregister-all"),
             ("ProviderId", "directory-unregister-all"),
             ("SiloAddresses", SiloAddresses));
-        storage.VerifyComplete();
-    }
-
-    [Fact]
-    public async Task QueueStreamMessageAsync_ReturnsAcknowledgementAndCapturesParameters()
-    {
-        byte[] payload = [0, 1, 127, 255];
-        var storage = ExpectQueryLoad(new ScriptedRelationalStorage(), StreamingQueryKeys)
-            .ExpectRead(
-                Sql("QueueStreamMessageKey"),
-                CreateTable(
-                    StreamConfirmationColumns,
-                    ["service-queue", "provider-queue", "queue-queue", 9_876_543_210L]));
-        var queries = await StreamingQueries.CreateInstance(storage);
-
-        var result = await queries.QueueStreamMessageAsync(
-            "service-queue",
-            "provider-queue",
-            "queue-queue",
-            payload,
-            3_600);
-
-        Assert.Equal(
-            new AdoNetStreamMessageAck("service-queue", "provider-queue", "queue-queue", 9_876_543_210L),
-            result);
-        var call = AssertOperationCall(storage, Sql("QueueStreamMessageKey"));
-        AssertParameters(
-            call,
-            ("ServiceId", "service-queue"),
-            ("ProviderId", "provider-queue"),
-            ("QueueId", "queue-queue"),
-            ("Payload", payload),
-            ("ExpiryTimeout", 3_600));
-        Assert.Equal(payload, Assert.IsType<byte[]>(Parameter(call, "Payload").Value));
         storage.VerifyComplete();
     }
 
@@ -992,57 +789,6 @@ public sealed class RelationalOrleansQueriesUnitTests
         storage.VerifyComplete();
     }
 
-    [Fact]
-    public async Task FailStreamMessageAsync_ExecutesSentinelQueryAndCapturesParameters()
-    {
-        var storage = ExpectQueryLoad(new ScriptedRelationalStorage(), StreamingQueryKeys)
-            .ExpectExecute(Sql("FailStreamMessageKey"), affectedRows: 1);
-        var queries = await StreamingQueries.CreateInstance(storage);
-
-        await queries.FailStreamMessageAsync(
-            "service-fail",
-            "provider-fail",
-            "queue-fail",
-            4_294_967_297L,
-            8,
-            7_200);
-
-        AssertParameters(
-            AssertOperationCall(storage, Sql("FailStreamMessageKey"), ExpectedCallKind.Execute),
-            ("ServiceId", "service-fail"),
-            ("ProviderId", "provider-fail"),
-            ("QueueId", "queue-fail"),
-            ("MessageId", 4_294_967_297L),
-            ("MaxAttempts", 8),
-            ("RemovalTimeout", 7_200));
-        storage.VerifyComplete();
-    }
-
-    [Theory]
-    [InlineData(0, "serviceId")]
-    [InlineData(1, "providerId")]
-    [InlineData(2, "queueId")]
-    public async Task QueueStreamMessageAsync_WithNullRequiredArgument_ThrowsArgumentNullException(
-        int nullIndex,
-        string expectedParameterName)
-    {
-        var arguments = new string?[] { "service-null", "provider-null", "queue-null" };
-        arguments[nullIndex] = null;
-        var storage = ExpectQueryLoad(new ScriptedRelationalStorage(), StreamingQueryKeys);
-        var queries = await StreamingQueries.CreateInstance(storage);
-
-        var exception = await Assert.ThrowsAsync<ArgumentNullException>(
-            () => queries.QueueStreamMessageAsync(
-                arguments[0]!,
-                arguments[1]!,
-                arguments[2]!,
-                [1, 2, 3],
-                60));
-
-        Assert.Equal(expectedParameterName, exception.ParamName);
-        AssertOnlyQueryLoadCall(storage);
-        storage.VerifyComplete();
-    }
 
     [Theory]
     [InlineData(0, "clusterId")]
@@ -1140,53 +886,6 @@ public sealed class RelationalOrleansQueriesUnitTests
         storage.VerifyComplete();
     }
 
-    [Fact]
-    public async Task EvictStreamMessagesAsync_ExecutesSentinelQueryAndCapturesParameters()
-    {
-        var storage = ExpectQueryLoad(new ScriptedRelationalStorage(), StreamingQueryKeys)
-            .ExpectExecute(Sql("EvictStreamMessagesKey"), affectedRows: 37);
-        var queries = await StreamingQueries.CreateInstance(storage);
-
-        await queries.EvictStreamMessagesAsync(
-            "service-evict",
-            "provider-evict",
-            "queue-evict",
-            37,
-            8,
-            7_200);
-
-        AssertParameters(
-            AssertOperationCall(storage, Sql("EvictStreamMessagesKey"), ExpectedCallKind.Execute),
-            ("ServiceId", "service-evict"),
-            ("ProviderId", "provider-evict"),
-            ("QueueId", "queue-evict"),
-            ("MaxCount", 37),
-            ("MaxAttempts", 8),
-            ("RemovalTimeout", 7_200));
-        storage.VerifyComplete();
-    }
-
-    [Fact]
-    public async Task EvictStreamDeadLettersAsync_ExecutesSentinelQueryAndCapturesParameters()
-    {
-        var storage = ExpectQueryLoad(new ScriptedRelationalStorage(), StreamingQueryKeys)
-            .ExpectExecute(Sql("EvictStreamDeadLettersKey"), affectedRows: 43);
-        var queries = await StreamingQueries.CreateInstance(storage);
-
-        await queries.EvictStreamDeadLettersAsync(
-            "service-dead-letter",
-            "provider-dead-letter",
-            "queue-dead-letter",
-            43);
-
-        AssertParameters(
-            AssertOperationCall(storage, Sql("EvictStreamDeadLettersKey"), ExpectedCallKind.Execute),
-            ("ServiceId", "service-dead-letter"),
-            ("ProviderId", "provider-dead-letter"),
-            ("QueueId", "queue-dead-letter"),
-            ("MaxCount", 43));
-        storage.VerifyComplete();
-    }
 
     [Fact]
     public async Task UpdateIAmAliveTimeAsync_ExecutesSentinelQueryAndCapturesUtcValue()
@@ -1289,27 +988,6 @@ public sealed class RelationalOrleansQueriesUnitTests
         Assert.False(reader.Read());
     }
 
-    private static readonly (string Name, Type Type)[] StreamMessageColumns =
-    [
-        ("ServiceId", typeof(string)),
-        ("ProviderId", typeof(string)),
-        ("QueueId", typeof(string)),
-        ("MessageId", typeof(long)),
-        ("Dequeued", typeof(int)),
-        ("VisibleOn", typeof(DateTime)),
-        ("ExpiresOn", typeof(DateTime)),
-        ("CreatedOn", typeof(DateTime)),
-        ("ModifiedOn", typeof(DateTime)),
-        ("Payload", typeof(byte[])),
-    ];
-
-    private static readonly (string Name, Type Type)[] StreamConfirmationColumns =
-    [
-        ("ServiceId", typeof(string)),
-        ("ProviderId", typeof(string)),
-        ("QueueId", typeof(string)),
-        ("MessageId", typeof(long)),
-    ];
 
     private static readonly (string Name, Type Type)[] DirectoryEntryColumns =
     [
@@ -1325,7 +1003,9 @@ public sealed class RelationalOrleansQueriesUnitTests
         IEnumerable<string> keys) =>
         storage.ExpectRead(
             GetQueriesSql,
-            CreateQueryTable(keys.Select(key => (key, Sql(key))).ToArray()));
+            CreateQueryTable(keys
+                .Select(key => (key, key == "StreamSchemaVersionKey" ? "3" : Sql(key)))
+                .ToArray()));
 
     private static DataTable CreateQueryTable(params (string Key, string Query)[] queries) =>
         CreateTable(

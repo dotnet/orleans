@@ -4,8 +4,8 @@ namespace Orleans.Streaming.AdoNet;
 /// The <see cref="IBatchContainer"/> implementation for the ADONET provider.
 /// </summary>
 /// <remarks>
-/// 1. This class only supports binary serialization as performance and data size is the priority for database storage.
-/// 2. Though the <see cref="SequenceToken"/> is supported here, it is not yet used, as the ADO.NET provider is not rewindable.
+/// This class uses binary serialization to prioritize database storage performance and payload size.
+/// Its <see cref="SequenceToken"/> identifies a record position in the partition history.
 /// </remarks>
 [GenerateSerializer]
 [Alias("Orleans.Streaming.AdoNet.AdoNetBatchContainer")]
@@ -51,8 +51,11 @@ internal class AdoNetBatchContainer : IBatchContainer
         return SequenceToken is null
             ? throw new InvalidOperationException($"Cannot get events from a half-baked {nameof(AdoNetBatchContainer)}")
             : Events
-                .OfType<T>()
-                .Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, SequenceToken.CreateSequenceTokenForEvent(i)));
+                .Select((item, index) => (item, index))
+                .Where(static entry => entry.item is T)
+                .Select(entry => Tuple.Create<T, StreamSequenceToken>(
+                    (T)entry.item,
+                    SequenceToken.CreateSequenceTokenForEvent(entry.index)));
     }
 
     public bool ImportRequestContext()
@@ -80,8 +83,12 @@ internal class AdoNetBatchContainer : IBatchContainer
 
         // A stored stream message always contains a serialized batch container.
         var container = serializer.Deserialize(message.Payload)!;
-        container.SequenceToken = new(message.MessageId);
-        container.Dequeued = message.Dequeued;
+        container.SequenceToken = new AdoNetStreamSequenceToken(
+            message.ServiceId,
+            message.ProviderId,
+            message.QueueId,
+            message.MessageId);
+        container.Dequeued = 0;
 
         return container;
     }

@@ -10,27 +10,35 @@ namespace Orleans.Configuration
 {
     public partial class AdoNetStreamOptions
     {
+        public System.TimeSpan CheckpointPersistInterval { get { throw null; } set { } }
+
+        public int CleanupBatchSize { get { throw null; } set { } }
+
+        public System.TimeSpan CleanupInterval { get { throw null; } set { } }
+
         [Redact]
         public string? ConnectionString { get { throw null; } set { } }
 
         [Redact]
         public System.Data.Common.DbDataSource? DataSource { get { throw null; } set { } }
 
-        public System.TimeSpan DeadLetterEvictionTimeout { get { throw null; } set { } }
-
-        public int EvictionBatchSize { get { throw null; } set { } }
-
-        public System.TimeSpan EvictionInterval { get { throw null; } set { } }
-
-        public System.TimeSpan ExpiryTimeout { get { throw null; } set { } }
+        public bool FaultOnDeliveryFailure { get { throw null; } set { } }
 
         public System.TimeSpan InitializationTimeout { get { throw null; } set { } }
 
         public string Invariant { get { throw null; } set { } }
 
-        public int MaxAttempts { get { throw null; } set { } }
+        public System.TimeSpan? MaximumRetentionPeriod { get { throw null; } set { } }
 
-        public System.TimeSpan VisibilityTimeout { get { throw null; } set { } }
+        public int MaxMessagesPerRead { get { throw null; } set { } }
+
+        public System.TimeSpan ReplayLeaseDuration { get { throw null; } set { } }
+
+        public System.TimeSpan ReplayLeaseRenewalInterval { get { throw null; } set { } }
+
+        public System.TimeSpan RetentionPeriod { get { throw null; } set { } }
+
+        public bool StartFromNow { get { throw null; } set { } }
     }
 
     public partial class AdoNetStreamOptionsValidator : IConfigurationValidator
@@ -52,6 +60,8 @@ namespace Orleans.Hosting
         public ClusterClientAdoNetStreamConfigurator ConfigureCache(int cacheSize = 4096) { throw null; }
 
         public ClusterClientAdoNetStreamConfigurator ConfigurePartitioning(int partitions = 8) { throw null; }
+
+        public ClusterClientAdoNetStreamConfigurator ConfigureReplay(System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.RecoverableStreamReplayOptions>> configureOptions) { throw null; }
     }
 
     public static partial class ClusterClientAdoNetStreamExtensions
@@ -70,6 +80,8 @@ namespace Orleans.Hosting
         public SiloAdoNetStreamConfigurator ConfigureCache(int cacheSize = 4096) { throw null; }
 
         public SiloAdoNetStreamConfigurator ConfigurePartitioning(int partitions = 8) { throw null; }
+
+        public SiloAdoNetStreamConfigurator ConfigureReplay(System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.RecoverableStreamReplayOptions>> configureOptions) { throw null; }
     }
 
     public static partial class SiloBuilderAdoNetStreamExtensions

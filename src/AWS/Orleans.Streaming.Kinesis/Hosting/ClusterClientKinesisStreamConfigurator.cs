@@ -22,6 +22,7 @@ namespace Orleans.Hosting
             this.ConfigureDelegate(services =>
             {
                 services.ConfigureNamedOptionForLogging<KinesisStreamOptions>(name)
+                    .ConfigureNamedOptionForLogging<RecoverableStreamReplayOptions>(name)
                     .ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name)
                     .AddTransient<IConfigurationValidator>(sp => new KinesisStreamOptionsValidator(sp.GetOptionsByName<KinesisStreamOptions>(name), name));
             });
@@ -48,6 +49,17 @@ namespace Orleans.Hosting
         public ClusterClientKinesisStreamConfigurator ConfigureKinesis(Action<KinesisStreamOptions> configureOptions)
         {
             this.ConfigureKinesis(ob => ob.Configure(configureOptions));
+            return this;
+        }
+
+        /// <summary>
+        /// Configures retained-history readers and replay buffering for this provider.
+        /// </summary>
+        /// <param name="configureOptions">The replay configuration delegate.</param>
+        /// <returns>This configurator.</returns>
+        public ClusterClientKinesisStreamConfigurator ConfigureReplay(Action<OptionsBuilder<RecoverableStreamReplayOptions>> configureOptions)
+        {
+            this.Configure(configureOptions);
             return this;
         }
     }
