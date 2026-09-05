@@ -656,7 +656,7 @@ internal sealed partial class ActivationData :
                     TimeSpan.FromTicks(Math.Max(keepAliveDuration.Ticks, CollectionAgeLimit.Ticks)));
             }
 
-            if (_waitingRequests.Count > 0 || _runningRequests.Count > 0 || _idleDuration.Elapsed < ageLimit)
+            if (_requestStatus != 0 || _idleDuration.Elapsed < ageLimit)
             {
                 return ActivationCollectionResult.Reschedule(CollectionAgeLimit);
             }

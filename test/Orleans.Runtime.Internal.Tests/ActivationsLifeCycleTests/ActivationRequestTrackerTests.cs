@@ -238,7 +238,7 @@ public sealed class ActivationRequestTrackerTests
     public void RecurringActivation_RetainsTrackerAfterThirdCycleUntilDeactivatingRequestCompletes()
     {
         var activation = CreateActivation();
-        activation.SetState(ActivationState.Valid);
+        SetState(activation, ActivationState.Valid);
         var message = CreateMessage(1);
 
         ActivationRequestTracker firstTracker;
@@ -291,7 +291,7 @@ public sealed class ActivationRequestTrackerTests
             recurringTracker.RemoveWaitingAt(0);
             recurringTracker.AddRunning(message, CoarseStopwatch.StartNew());
             UpdateRequestStatus(activation, recurringTracker);
-            activation.SetState(ActivationState.Deactivating);
+            SetState(activation, ActivationState.Deactivating);
             ReturnRequestTrackerIfEmpty(activation);
         }
 
@@ -646,6 +646,9 @@ public sealed class ActivationRequestTrackerTests
 
     [UnsafeAccessor(UnsafeAccessorKind.Method, Name = "UpdateRequestStatus")]
     private static extern void UpdateRequestStatus(ActivationData activation, ActivationRequestTracker requestTracker);
+
+    [UnsafeAccessor(UnsafeAccessorKind.Method, Name = "SetState")]
+    private static extern void SetState(ActivationData activation, ActivationState state);
 
     private sealed class RequestModel
     {
