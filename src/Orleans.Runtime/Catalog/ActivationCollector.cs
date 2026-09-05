@@ -128,7 +128,7 @@ namespace Orleans.Runtime
             var registration = _registrations.GetValue(item, static item => new(item));
             if (!TryScheduleCollection(registration, timeout, now, throwIfExpired: true))
             {
-                throw new InvalidOperationException("Call CancelCollection before calling ScheduleCollection.");
+                throw new InvalidOperationException("Call TryCancelCollection before calling ScheduleCollection.");
             }
         }
 
@@ -149,7 +149,7 @@ namespace Orleans.Runtime
         /// Tries the reschedule collection.
         /// </summary>
         /// <param name="item">The grain context.</param>
-        /// <returns><see langword="true"/> if collection was canceled, <see langword="false"/> otherwise.</returns>
+        /// <returns><see langword="true"/> if collection was rescheduled, <see langword="false"/> otherwise.</returns>
         public bool TryRescheduleCollection(ICollectibleGrainContext item)
         {
             if (item.IsExemptFromCollection) return false;
