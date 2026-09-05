@@ -99,8 +99,113 @@ namespace UnitTests.Runtime
 
             Assert.Null(exception);
             Assert.True(rescheduled);
-            Assert.NotEqual(default, collector.GetCollectionTicketForTesting(activation));
-            Assert.NotEqual(DateTime.MaxValue, collector.GetCollectionTicketForTesting(activation));
+            Assert.Equal(now.AddMinutes(5), collector.GetCollectionTicketForTesting(activation));
+        }
+
+        [Fact, TestCategory("Activation")]
+        public void CollectionTicket_FollowsBucketAcrossScheduleCancelAndRetire()
+        {
+            var member = PrepareActivation(5, collector);
+            var activation = (ICollectibleGrainContext)member;
+            var now = timeProvider.GetUtcNow().UtcDateTime;
+            collector.ScheduleCollection(activation, activation.CollectionAgeLimit, now);
+            var registration = activation.CollectionRegistration;
+
+            Assert.Equal(now.AddMinutes(5), collector.GetCollectionTicketForTesting(activation));
+            Assert.True(collector.TryRescheduleCollection(activation));
+            Assert.Equal(now.AddMinutes(5), collector.GetCollectionTicketForTesting(activation));
+
+            timeProvider.Advance(TimeSpan.FromMinutes(1));
+            Assert.True(collector.TryRescheduleCollection(activation));
+            Assert.Equal(now.AddMinutes(6), collector.GetCollectionTicketForTesting(activation));
+
+            Assert.True(collector.TryCancelCollection(activation));
+            Assert.Equal(default, collector.GetCollectionTicketForTesting(activation));
+            collector.ScheduleCollection(activation, activation.CollectionAgeLimit, timeProvider.GetUtcNow().UtcDateTime);
+            Assert.Equal(now.AddMinutes(6), collector.GetCollectionTicketForTesting(activation));
+            Assert.Same(registration, activation.CollectionRegistration);
+
+            ((IActivationWorkingSetObserver)collector).OnDeactivating(member);
+            Assert.Equal(default, collector.GetCollectionTicketForTesting(activation));
+            Assert.False(collector.TryRescheduleCollection(activation));
+        }
+
+        [Fact, TestCategory("Activation")]
+        public async Task CollectStaleActivations_ReschedulesClaimsIntoNextBucket()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var ageLimit = TimeSpan.FromMinutes(1);
+            var activation = Substitute.For<ICollectibleGrainContext>();
+            ConfigureCollectionRegistrationSlot(activation);
+            activation.CollectionAgeLimit.Returns(ageLimit);
+            activation.TryDeactivateForCollection(
+                    Arg.Any<DeactivationReason>(),
+                    Arg.Any<DateTime>(),
+                    Arg.Any<TimeSpan>(),
+                    Arg.Any<bool>(),
+                    Arg.Any<CancellationToken>())
+                .Returns(_ =>
+                {
+                    Assert.Equal(default, collector.GetCollectionTicketForTesting(activation));
+                    return ActivationCollectionResult.Reschedule(ageLimit);
+                });
+
+            var now = timeProvider.GetUtcNow().UtcDateTime;
+            collector.ScheduleCollection(activation, ageLimit, now);
+            var registration = activation.CollectionRegistration;
+            timeProvider.Advance(ageLimit);
+            await collector.CollectStaleActivations(cancellationToken);
+            Assert.Equal(now.AddMinutes(2), collector.GetCollectionTicketForTesting(activation));
+
+            timeProvider.Advance(ageLimit);
+            await collector.CollectStaleActivations(cancellationToken);
+            Assert.Equal(now.AddMinutes(3), collector.GetCollectionTicketForTesting(activation));
+            Assert.Same(registration, activation.CollectionRegistration);
+            activation.Received(2).TryDeactivateForCollection(
+                Arg.Any<DeactivationReason>(), Arg.Any<DateTime>(), ageLimit, true, cancellationToken);
+        }
+
+        [Theory, TestCategory("Activation")]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task CollectionScans_VisitEveryRegistrationDuringRemoval(bool scanStale)
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var observer = (IActivationWorkingSetObserver)collector;
+            var activations = new ICollectibleGrainContext[8];
+            for (var i = 0; i < activations.Length; i++)
+            {
+                var member = PrepareActivation(1, collector);
+                var activation = (ICollectibleGrainContext)member;
+                activations[i] = activation;
+                activation.TryDeactivateForCollection(
+                        Arg.Any<DeactivationReason>(),
+                        Arg.Any<DateTime>(),
+                        Arg.Any<TimeSpan>(),
+                        Arg.Any<bool>(),
+                        Arg.Any<CancellationToken>())
+                    .Returns(_ =>
+                    {
+                        observer.OnDeactivating(member);
+                        return ActivationCollectionResult.StartedDeactivation;
+                    });
+                observer.OnAdded(member);
+            }
+
+            timeProvider.Advance(TimeSpan.FromMinutes(1));
+            await (scanStale
+                ? collector.CollectStaleActivations(cancellationToken)
+                : collector.CollectActivations(TimeSpan.FromMinutes(1), cancellationToken));
+
+            foreach (var activation in activations)
+            {
+                activation.Received(1).TryDeactivateForCollection(
+                    Arg.Any<DeactivationReason>(), Arg.Any<DateTime>(), TimeSpan.FromMinutes(1), true, cancellationToken);
+                Assert.False(collector.HasActiveCollectionRegistrationForTesting(activation));
+                Assert.Equal(default, collector.GetCollectionTicketForTesting(activation));
+            }
+
+            Assert.Equal(0, collector._activationCount);
         }
 
         [Fact, TestCategory("Activation")]

@@ -28,7 +28,7 @@ namespace Orleans.Runtime
         private long _nextTicketTicks;
         private static readonly List<ICollectibleGrainContext> nothing = [];
         private static readonly IReadOnlyList<CollectionClaim> NoClaims = Array.Empty<CollectionClaim>();
-        private static readonly IEnumerable<CollectionRegistration> NoRegistrations = Array.Empty<CollectionRegistration>();
+        private static readonly IEnumerable<KeyValuePair<CollectionRegistration, byte>> NoRegistrations = Array.Empty<KeyValuePair<CollectionRegistration, byte>>();
         private readonly ILogger logger;
         private int collectionNumber;
 
@@ -170,7 +170,7 @@ namespace Orleans.Runtime
                     if (rescheduledTicket.Equals(oldTicket)) return true;
 
                     var bucket = GetOrCreateBucket(rescheduledTicket);
-                    if (registration.TryReschedule(bucket, rescheduledTicket))
+                    if (registration.TryReschedule(bucket))
                     {
                         if (!IsExpired(rescheduledTicket))
                         {
@@ -238,8 +238,9 @@ namespace Orleans.Runtime
             List<ICollectibleGrainContext>? condemned = null;
             while (DequeueQuantum(out var claims, now))
             {
-                foreach (var claim in claims)
+                for (var i = 0; i < claims.Count; i++)
                 {
+                    var claim = claims[i];
                     var activation = claim.Registration.Context;
                     var result = activation.TryDeactivateForCollection(
                         reason,
@@ -277,8 +278,9 @@ namespace Orleans.Runtime
             foreach (var kv in buckets)
             {
                 var bucket = kv.Value;
-                foreach (var registration in bucket.Registrations)
+                foreach (var entry in bucket.Registrations)
                 {
+                    var registration = entry.Key;
                     if (!registration.IsScheduledIn(bucket))
                     {
                         continue;
@@ -319,7 +321,7 @@ namespace Orleans.Runtime
                 }
 
                 var bucket = GetOrCreateBucket(ticket);
-                if (claim.Registration.TryRescheduleClaim(claim.Generation, bucket, ticket))
+                if (claim.Registration.TryRescheduleClaim(claim.Generation, bucket))
                 {
                     if (IsExpired(ticket))
                     {
@@ -400,8 +402,9 @@ namespace Orleans.Runtime
             Array.Sort(bucketSnapshot, static (left, right) => left.Key.CompareTo(right.Key));
             foreach (var bucket in bucketSnapshot)
             {
-                foreach (var registration in bucket.Value.Registrations)
+                foreach (var entry in bucket.Value.Registrations)
                 {
+                    var registration = entry.Key;
                     if (candidates.Count >= count)
                     {
                         break;
@@ -552,7 +555,7 @@ namespace Orleans.Runtime
                 }
 
                 var bucket = GetOrCreateBucket(ticket);
-                if (registration.TrySchedule(bucket, ticket))
+                if (registration.TrySchedule(bucket))
                 {
                     if (!IsExpired(ticket))
                     {
@@ -839,7 +842,6 @@ namespace Orleans.Runtime
             private Bucket? _bucket;
             private long _generation;
             private CollectionRegistrationState _state;
-            private DateTime _ticket;
 
             public ICollectibleGrainContext Context { get; } = context;
 
@@ -871,12 +873,12 @@ namespace Orleans.Runtime
                 {
                     lock (_lock)
                     {
-                        return _state is CollectionRegistrationState.Scheduled ? _ticket : default;
+                        return _state is CollectionRegistrationState.Scheduled ? _bucket!.Ticket : default;
                     }
                 }
             }
 
-            public bool TrySchedule(Bucket bucket, DateTime ticket)
+            public bool TrySchedule(Bucket bucket)
             {
                 lock (_lock)
                 {
@@ -891,7 +893,6 @@ namespace Orleans.Runtime
                     }
 
                     _bucket = bucket;
-                    _ticket = ticket;
                     _state = CollectionRegistrationState.Scheduled;
                     _generation++;
                     return true;
@@ -904,7 +905,7 @@ namespace Orleans.Runtime
                 {
                     if (_state is CollectionRegistrationState.Scheduled)
                     {
-                        ticket = _ticket;
+                        ticket = _bucket!.Ticket;
                         return true;
                     }
 
@@ -913,7 +914,7 @@ namespace Orleans.Runtime
                 }
             }
 
-            public bool TryReschedule(Bucket bucket, DateTime ticket)
+            public bool TryReschedule(Bucket bucket)
             {
                 lock (_lock)
                 {
@@ -924,7 +925,6 @@ namespace Orleans.Runtime
 
                     if (ReferenceEquals(_bucket, bucket))
                     {
-                        _ticket = ticket;
                         return true;
                     }
 
@@ -935,7 +935,6 @@ namespace Orleans.Runtime
 
                     _bucket!.TryRemove(this);
                     _bucket = bucket;
-                    _ticket = ticket;
                     _generation++;
                     return true;
                 }
@@ -952,7 +951,6 @@ namespace Orleans.Runtime
 
                     _bucket?.TryRemove(this);
                     _bucket = null;
-                    _ticket = default;
                     _state = CollectionRegistrationState.None;
                     _generation++;
                     return true;
@@ -965,7 +963,6 @@ namespace Orleans.Runtime
                 {
                     _bucket?.TryRemove(this);
                     _bucket = null;
-                    _ticket = default;
                     _state = CollectionRegistrationState.Retired;
                     _generation++;
                 }
@@ -998,7 +995,6 @@ namespace Orleans.Runtime
                     }
 
                     _bucket = null;
-                    _ticket = default;
                     _state = CollectionRegistrationState.Claimed;
                     var generation = ++_generation;
                     claim = new CollectionClaim(this, generation);
@@ -1021,7 +1017,7 @@ namespace Orleans.Runtime
                 }
             }
 
-            public bool TryRescheduleClaim(long generation, Bucket bucket, DateTime ticket)
+            public bool TryRescheduleClaim(long generation, Bucket bucket)
             {
                 lock (_lock)
                 {
@@ -1036,7 +1032,6 @@ namespace Orleans.Runtime
                     }
 
                     _bucket = bucket;
-                    _ticket = ticket;
                     _state = CollectionRegistrationState.Scheduled;
                     _generation++;
                     return true;
@@ -1054,8 +1049,10 @@ namespace Orleans.Runtime
 
             public int Count => Volatile.Read(ref _items)?.Count ?? 0;
 
-            public IEnumerable<CollectionRegistration> Registrations
-                => Volatile.Read(ref _items)?.Keys ?? NoRegistrations;
+            public DateTime Ticket => _ticket;
+
+            public IEnumerable<KeyValuePair<CollectionRegistration, byte>> Registrations
+                => Volatile.Read(ref _items) ?? NoRegistrations;
 
             public bool TryAdd(CollectionRegistration registration)
             {
@@ -1115,8 +1112,10 @@ namespace Orleans.Runtime
                 }
 
                 List<CollectionClaim>? result = null;
-                foreach (var registration in items.Keys)
+                // Closure and the adder drain prevent new entries; removals are validated by TryClaim.
+                foreach (var entry in items)
                 {
+                    var registration = entry.Key;
                     if (registration.TryClaim(this, out var claim))
                     {
                         result ??= [];
@@ -1124,7 +1123,8 @@ namespace Orleans.Runtime
                     }
                 }
 
-                items.Clear();
+                // A closed bucket keeps no dictionary storage after its claims have been extracted.
+                Volatile.Write(ref _items, null);
                 return result ?? NoClaims;
             }
 
