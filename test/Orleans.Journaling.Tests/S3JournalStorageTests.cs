@@ -1549,7 +1549,7 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
 
     private S3JournalStorage CreateStorage(string journalId, string? journalFormatKey = null)
     {
-        var options = CreateOptions(journalFormatKey);
+        var options = CreateOptions();
         return new S3JournalStorage(
             new S3JournalStorage.S3JournalStorageShared(
                 NullLogger<S3JournalStorage>.Instance,
@@ -1572,7 +1572,7 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
             static (sp, _) => sp.GetRequiredService<OrleansBinaryJournalFormat>());
         using var serviceProvider = services.BuildServiceProvider();
         var provider = new S3JournalStorageProvider(
-            Options.Create(CreateOptions(journalFormatKey: null)),
+            Options.Create(CreateOptions()),
             Options.Create(new JournaledStateManagerOptions { JournalFormatKey = OrleansBinaryJournalFormat.JournalFormatKey }),
             serviceProvider,
             NullLogger<S3JournalStorage>.Instance);
@@ -1580,7 +1580,7 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
         return provider;
     }
 
-    private S3JournalStorageOptions CreateOptions(string? journalFormatKey)
+    private S3JournalStorageOptions CreateOptions()
     {
         return new S3JournalStorageOptions
         {

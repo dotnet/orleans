@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Amazon;
 using Amazon.Runtime;
 using Amazon.S3;
@@ -37,6 +38,7 @@ public sealed class S3JournalStorageOptions
     /// <remarks>
     /// The caller retains ownership of this client and disposes it after the silo stops.
     /// </remarks>
+    [DisallowNull]
     public IAmazonS3? S3Client
     {
         get => _s3Client;
