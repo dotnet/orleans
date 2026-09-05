@@ -134,9 +134,10 @@ namespace Scaler.Services
             var silos = detailedHosts
                             .Where(x => x.Status == SiloStatus.Active)
                             .Select(_ => new SiloInfo(_.SiloName, _.SiloAddress.ToGatewayUri().AbsoluteUri));
+            var activeGrainCount = activeGrainsOfSpecifiedType.Count();
             var activeSiloCount = silos.Count(_ => _.SiloName.Contains(siloNameFilter, StringComparison.OrdinalIgnoreCase));
-            _logger.LogInformation($"Found {activeGrainsOfSpecifiedType.Count()} instances of {grainType} in cluster, with {activeSiloCount} '{siloNameFilter}' silos in the cluster hosting {grainType} grains.");
-            return new GrainSaturationSummary(activeGrainsOfSpecifiedType.Count(), activeSiloCount);
+            _logger.LogInformation($"Found {activeGrainCount} instances of {grainType} in cluster, with {activeSiloCount} '{siloNameFilter}' silos in the cluster hosting {grainType} grains.");
+            return new GrainSaturationSummary(activeGrainCount, activeSiloCount);
         }
     }
 
