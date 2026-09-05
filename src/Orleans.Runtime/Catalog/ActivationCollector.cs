@@ -203,7 +203,10 @@ namespace Orleans.Runtime
                     return false;
                 }
 
-                var nextTicketTicks = checked(ticketTicks + _grainCollectionOptions.CollectionQuantum.Ticks);
+                var remainingTicks = DateTime.MaxValue.Ticks - ticketTicks;
+                var nextTicketTicks = _grainCollectionOptions.CollectionQuantum.Ticks >= remainingTicks
+                    ? DateTime.MaxValue.Ticks
+                    : ticketTicks + _grainCollectionOptions.CollectionQuantum.Ticks;
                 if (Interlocked.CompareExchange(ref _nextTicketTicks, nextTicketTicks, ticketTicks) == ticketTicks)
                 {
                     break;
@@ -214,6 +217,12 @@ namespace Orleans.Runtime
             buckets.TryRemove(key, out var bucket);
             if (bucket is null)
             {
+                if (ticketTicks == DateTime.MaxValue.Ticks)
+                {
+                    items = null;
+                    return false;
+                }
+
                 items = NoClaims;
                 return true;
             }
