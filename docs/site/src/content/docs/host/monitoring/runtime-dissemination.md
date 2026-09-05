@@ -29,7 +29,7 @@ Use rates over the same interval and split by `namespace` where available:
 | Broadcast send failures | `timeout` indicates the hop lifetime expired; `error` indicates an RPC or transport failure. |
 | Anti-entropy exchanges and values | Periodic repair remains active and returns bounded work. |
 | Anti-entropy failures | Selected repair peers timed out or failed. Rotating peer selection should let later rounds use other peers. |
-| Publications | `accepted` measures work admitted to peer pumps. `rejected` identifies disabled, unavailable, invalid, or over-budget publications which retain the component's direct path. |
+| Publications | `accepted` measures work admitted to peer pumps. `rejected` identifies disabled, unavailable, invalid, over-budget, or queue-rejected publications which retain the component's direct path. |
 | Queue admission rejected | One namespace reached its per-peer distinct-key bound. |
 | Pump failures | `recovered` records an isolated iteration failure; `permanent` records a pump whose waiters were failed explicitly. |
 
@@ -63,7 +63,7 @@ Compare returned values with <xref:Orleans.Configuration.DisseminationOptions.Ma
 
 ### Rejected publications increase
 
-Break down by `namespace` and `reason`. Validate peer version compatibility, payload limits, and namespace enablement. Deployment-load, membership, and manifest integrations retain direct paths, so also inspect their component-specific logs and metrics for the authoritative outcome.
+Break down by `namespace` and `reason`. Validate peer version compatibility, payload limits, and namespace enablement. `queue-rejected` identifies a full or stopping broadcast queue; correlate it with queue admission rejection and silo lifecycle activity. Deployment-load, membership, and manifest integrations retain direct paths, so also inspect their component-specific logs and metrics for the authoritative outcome.
 
 ## DiagnosticListener events
 

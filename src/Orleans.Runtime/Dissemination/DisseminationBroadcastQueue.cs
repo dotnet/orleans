@@ -24,6 +24,8 @@ internal sealed partial class DisseminationBroadcastQueue
     private readonly object _lock = new();
     private readonly Dictionary<SiloAddress, PeerQueuePump> _peers = [];
     private readonly SemaphoreSlim _sendGate;
+    private readonly int _maxConcurrentSends;
+    private bool _sendGateShutdown;
     private bool _stopped;
 
     public DisseminationBroadcastQueue(
@@ -43,24 +45,28 @@ internal sealed partial class DisseminationBroadcastQueue
         _namespaces = _disseminationNamespaces.ToFrozenDictionary(static ns => ns.Name);
         _logger = logger;
         _responseObserver = responseObserver;
-        _sendGate = new(Math.Max(1, options.CurrentValue.MaxConcurrentSends));
+        _maxConcurrentSends = Math.Max(1, options.CurrentValue.MaxConcurrentSends);
+        _sendGate = new(_maxConcurrentSends);
     }
 
-    public void Notify(
+    public bool Notify(
         SiloAddress peer,
         IDisseminationNamespace disseminationNamespace,
         DisseminationKey key)
     {
+        PeerQueuePump pump;
         lock (_lock)
         {
-            // A late notification during shutdown is a no-op; the peer pumps are already draining or gone.
             if (_stopped)
             {
-                return;
+                return false;
             }
 
-            GetOrCreatePeerUnsafe(peer).Notify(disseminationNamespace, key);
+            pump = GetOrCreatePeerUnsafe(peer);
         }
+
+        // Notification diagnostics run outside the queue lock and can reenter the queue.
+        return pump.Notify(disseminationNamespace, key);
     }
 
     public void ObservePeerVersion(
@@ -120,8 +126,27 @@ internal sealed partial class DisseminationBroadcastQueue
         }
         finally
         {
-            // Pumps have stopped, so no further send can acquire the gate.
-            _sendGate.Dispose();
+            lock (_lock)
+            {
+                _sendGateShutdown = true;
+                if (_sendGate.CurrentCount == _maxConcurrentSends)
+                {
+                    _sendGate.Dispose();
+                }
+            }
+        }
+    }
+
+    private void ReleaseSendGate()
+    {
+        lock (_lock)
+        {
+            _sendGate.Release();
+            // An RPC can outlive its pump when the runtime waits for remote cancellation acknowledgment.
+            if (_sendGateShutdown && _sendGate.CurrentCount == _maxConcurrentSends)
+            {
+                _sendGate.Dispose();
+            }
         }
     }
 
@@ -276,13 +301,17 @@ internal sealed partial class DisseminationBroadcastQueue
 
         private int DirtyCount { get; set; }
 
-        public void Notify(IDisseminationNamespace disseminationNamespace, DisseminationKey key)
+        public bool Notify(IDisseminationNamespace disseminationNamespace, DisseminationKey key)
         {
             ScheduledFlush? scheduled = null;
             var admissionRejected = false;
             lock (_lock)
             {
-                ObjectDisposedException.ThrowIf(_stopping, this);
+                if (_stopping)
+                {
+                    return false;
+                }
+
                 if (_pumpFailure is { } pumpFailure)
                 {
                     throw new InvalidOperationException($"The dissemination broadcast pump for {Peer} has failed.", pumpFailure);
@@ -349,6 +378,7 @@ internal sealed partial class DisseminationBroadcastQueue
             }
 
             EmitScheduled(scheduled);
+            return !admissionRejected;
         }
 
         private void EmitScheduled(ScheduledFlush? scheduled)
@@ -942,21 +972,22 @@ internal sealed partial class DisseminationBroadcastQueue
             try
             {
                 await _owner._sendGate.WaitAsync(sendCancellation.Token);
+                var batch = new DisseminationBroadcastBatch
+                {
+                    Sender = _owner._localSilo,
+                    Values = valuesByNamespace,
+                };
+                var sendTask = SendWithGateLease(batch, sendCancellation.Token);
                 try
                 {
-                    var batch = new DisseminationBroadcastBatch
-                    {
-                        Sender = _owner._localSilo,
-                        Values = valuesByNamespace,
-                    };
-
-                    var response = await GetTarget().PushBroadcast(batch, sendCancellation.Token);
+                    var response = await sendTask.WaitAsync(sendCancellation.Token);
                     DisseminationInstruments.OnBroadcastSent(batch.Values, "tree");
                     return response;
                 }
-                finally
+                catch (OperationCanceledException) when (sendCancellation.IsCancellationRequested)
                 {
-                    _owner._sendGate.Release();
+                    ObserveLateSend(sendTask).Ignore();
+                    throw;
                 }
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -974,6 +1005,36 @@ internal sealed partial class DisseminationBroadcastQueue
                 DisseminationInstruments.OnBroadcastSendFailure(DisseminationFailureReason.Error);
                 LogDebugDisseminationSendFailed(_owner._logger, exception, Peer);
                 return null;
+            }
+        }
+
+        private async Task<DisseminationBroadcastResponse> SendWithGateLease(
+            DisseminationBroadcastBatch batch,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                return await GetTarget().PushBroadcast(batch, cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                // Keep outstanding RPCs bounded even after the pump's local deadline expires.
+                _owner.ReleaseSendGate();
+            }
+        }
+
+        private async Task ObserveLateSend(Task<DisseminationBroadcastResponse> sendTask)
+        {
+            try
+            {
+                await sendTask.ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception exception)
+            {
+                LogDebugDisseminationSendFailed(_owner._logger, exception, Peer);
             }
         }
 
@@ -1174,12 +1235,16 @@ internal sealed partial class DisseminationBroadcastQueue
 
         private void CompleteUnsendable(PendingKeyWork work)
         {
-            // Keep peer knowledge, but stop retrying until a later publication wakes the key.
+            // Release admission capacity while preserving peer knowledge for a later publication.
             lock (_lock)
             {
-                if (TryGetKeyStateUnsafe(work, out _, out var keyState))
+                if (TryGetKeyStateUnsafe(work, out var namespaceState, out var keyState))
                 {
                     keyState.InFlight = false;
+                    if (keyState.NotificationGeneration == work.NotificationGeneration && !keyState.Dirty)
+                    {
+                        namespaceState.RetireKey(work.Key, keyState);
+                    }
                 }
             }
         }

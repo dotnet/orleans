@@ -102,16 +102,17 @@ internal sealed partial class DisseminationProtocol
 
         // Notifications carry identity only; each peer pump asks the namespace for the latest repair at send time.
         RecordValueUpdate(disseminationNamespace.Name, key, publishedVersion);
+        var accepted = true;
         foreach (var peer in membership.OriginatorTreeTargets)
         {
-            _broadcastQueue.Notify(peer, disseminationNamespace, key);
+            accepted &= _broadcastQueue.Notify(peer, disseminationNamespace, key);
         }
 
         DisseminationInstruments.OnPublication(
             disseminationNamespace.Name,
-            accepted: true,
-            reason: "none");
-        return true;
+            accepted,
+            reason: accepted ? "none" : "queue-rejected");
+        return accepted;
     }
 
     public async Task<DisseminationBroadcastResponse> ReceiveBroadcast(
@@ -839,6 +840,7 @@ internal sealed partial class DisseminationProtocol
         DisseminationOptions options,
         CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var namespaceName = disseminationNamespace.Name;
         if (!ValidatePayloadSize(disseminationNamespace, item.Value, options))
         {

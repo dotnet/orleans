@@ -91,7 +91,7 @@ Each integration has its own <xref:Orleans.Configuration.DisseminationNamespaceO
 
 Each destination has one independent pump. Repeated notifications coalesce by namespace and key, high-priority namespaces bypass the coalescing window, and batches obey global item and byte bounds plus namespace payload bounds. A process-wide semaphore limits concurrent sends without coupling one peer's retry state to another peer.
 
-`MaxPendingItemCount` bounds distinct retained keys per namespace and peer. A notification for an admitted key refreshes its generation at the limit. A new key is rejected until acknowledgment-driven completion or membership pruning releases capacity. The runtime emits a rejection metric and a diagnostic event without including the key.
+`MaxPendingItemCount` bounds distinct retained keys per namespace and peer. A notification for an admitted key refreshes its generation at the limit. A new key is rejected until acknowledgment-driven completion, an oversized repair, or membership pruning releases capacity. Oversized repairs retain acknowledged peer versions separately so a later publication can resume from the established baseline. The runtime emits a rejection metric and a diagnostic event without including the key. A rejected tree target makes publication return `false`, allowing the producer's direct path to deliver the update.
 
 A successful RPC is transport completion. The receiver response is the evidence which advances the peer ledger. Missing or prefix acknowledgments retain work for repair. Transport timeout and failure requeue the generation with exponential backoff capped by the anti-entropy interval. A newer notification can replace that schedule with its own urgency.
 
@@ -121,7 +121,7 @@ The cluster-manifest provider rotates through a bounded set of Active peers. Fet
 
 Protocol dictionaries use focused locks for membership projections, response cursors, value-update timestamps, peer capability evidence, and per-peer pump state. Network calls, namespace application, logging, diagnostic callbacks, and waiter continuations run outside those locks. Waiters use asynchronous continuations.
 
-Caller cancellation owns public operation lifetime. Per-hop value TTL bounds broadcast transport and anti-entropy round lifetime. Shutdown cancellation reaches queued send-gate waits, active RPCs, anti-entropy exchanges, pump timers, and drain waiters.
+Caller cancellation owns public operation lifetime and is checked before each received value is applied. Per-hop value TTL bounds broadcast transport and anti-entropy round lifetime. Broadcast pumps enforce their deadline independently of the runtime's cancellation-acknowledgment setting. An outstanding RPC retains its concurrency slot until completion, and semaphore disposal follows the last outstanding RPC after pump shutdown. Late RPC faults are observed and logged. Shutdown cancellation reaches queued send-gate waits, active RPCs, anti-entropy exchanges, pump timers, and drain waiters.
 
 ## Observability
 

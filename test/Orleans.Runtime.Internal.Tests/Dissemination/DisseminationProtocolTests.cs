@@ -4683,6 +4683,8 @@ public class DisseminationProtocolTests
         private readonly List<TimeSpan> _timerDueTimes = [];
         private int _throwOnNextTimerChange;
 
+        public Action<TimeSpan>? TimerCreated { get; set; }
+
         public IReadOnlyList<TimeSpan> TimerDueTimes
         {
             get
@@ -4703,7 +4705,9 @@ public class DisseminationProtocolTests
         public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
         {
             RecordTimerChange(dueTime);
-            return new RecordingTimer(this, _inner.CreateTimer(callback, state, dueTime, period));
+            var timer = new RecordingTimer(this, _inner.CreateTimer(callback, state, dueTime, period));
+            TimerCreated?.Invoke(dueTime);
+            return timer;
         }
 
         public void Advance(TimeSpan duration) => _inner.Advance(duration);
@@ -7689,6 +7693,280 @@ public class DisseminationProtocolTests
             logger.Entries,
             entry => entry.EventId.Name == "LogDebugDisseminationDiagnosticFailed"
                 && Equals(entry.State["Namespace"], ns.Name));
+    }
+
+    [Fact]
+    public async Task AntiEntropyStopsBeforeNextValueWhenCallerIsCanceledAfterApply()
+    {
+        var sender = CreateSilo(39001);
+        var local = CreateSilo(39002);
+        var transport = new FakeTransport(local, sender);
+        var cancelingKey = new DisseminationKey("canceling-apply");
+        var laterKey = new DisseminationKey("must-not-apply");
+        using var cancellation = new CancellationTokenSource();
+        var ns = new Phase6ThrowingNamespace(local, cancelingKey)
+        {
+            Failure = (_, _) =>
+            {
+                cancellation.Cancel();
+                return ValueTask.FromResult(DisseminationApplyResult.Applied);
+            },
+        };
+        transport.ExchangeAntiEntropyHandler = (_, _, _) => ValueTask.FromResult(new DisseminationAntiEntropyResponse
+        {
+            Sender = sender,
+            Values = new()
+            {
+                [ns.Name] =
+                [
+                    ns.CreateItem(sender, cancelingKey, sequence: 1),
+                    ns.CreateItem(sender, laterKey, sequence: 2),
+                ],
+            },
+        });
+        var protocol = CreateProtocol(transport, [ns]);
+
+        try
+        {
+            var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => protocol.RunAntiEntropyRound(cancellation.Token));
+
+            Assert.Equal(cancellation.Token, exception.CancellationToken);
+            Assert.Equal([cancelingKey], ns.ApplyAttempts);
+            Assert.Equal(0, ns.GetVersion(laterKey));
+        }
+        finally
+        {
+            await protocol.StopAsync(TestContext.Current.CancellationToken);
+        }
+    }
+
+    [Fact]
+    public async Task PeerQueueAdmitsNewKeyAfterOversizedRepair()
+    {
+        var local = CreateSilo(39003);
+        var peer = CreateSilo(39004);
+        var transport = new FakeTransport(local, peer);
+        var ns = new FakeNamespace(local);
+        ns.Options.MaxPendingItemCount = 1;
+        ns.Options.MaxPayloadBytes = sizeof(long);
+        ns.PublishValue(new DisseminationValue("oversized", 0, 1, new byte[sizeof(long) + 1]));
+        ns.SetValue("valid", version: 1);
+        var queue = CreateBroadcastQueue(transport, [ns], timeProvider: new FakeTimeProvider());
+
+        try
+        {
+            queue.Notify(peer, ns, "oversized");
+            await queue.FlushPendingBroadcast(TestContext.Current.CancellationToken);
+            Assert.Empty(transport.BroadcastBatches);
+
+            queue.Notify(peer, ns, "valid");
+            await queue.FlushPendingBroadcast(TestContext.Current.CancellationToken);
+
+            var batch = Assert.Single(transport.BroadcastBatches);
+            var value = Assert.Single(GetBroadcastValues(batch.Batch));
+            Assert.Equal(new DisseminationKey("valid"), value.Value.Key);
+            Assert.Equal(1, value.Value.ToVersion);
+        }
+        finally
+        {
+            await queue.StopAsync(TestContext.Current.CancellationToken);
+        }
+    }
+
+    [Fact]
+    public async Task PublishReturnsFalseWhenPeerQueueRejectsNewKey()
+    {
+        var local = CreateSilo(39005);
+        var peer = CreateSilo(39006);
+        var transport = new FakeTransport(local, peer);
+        var ns = new FakeNamespace(local);
+        ns.Options.MaxPendingItemCount = 1;
+        var sendStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseSend = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        transport.SendBroadcastHandler = async (_, _, cancellationToken) =>
+        {
+            sendStarted.TrySetResult();
+            await releaseSend.Task.WaitAsync(cancellationToken);
+        };
+        var protocol = CreateProtocol(transport, ns, timeProvider: new FakeTimeProvider());
+
+        try
+        {
+            Assert.True(await PublishValue(protocol, ns, ns.CreateValue("first", 1), TestContext.Current.CancellationToken));
+            await sendStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+            Assert.False(await PublishValue(protocol, ns, ns.CreateValue("second", 1), TestContext.Current.CancellationToken));
+            Assert.True(await PublishValue(protocol, ns, ns.CreateValue("first", 2), TestContext.Current.CancellationToken));
+        }
+        finally
+        {
+            releaseSend.TrySetResult();
+            await protocol.StopAsync(TestContext.Current.CancellationToken);
+        }
+    }
+
+    [Fact]
+    public async Task BroadcastDeadlineCompletesFlushBeforeRemoteCancellationAcknowledgment()
+    {
+        var local = CreateSilo(39011);
+        var peer = CreateSilo(39012);
+        var transport = new FakeTransport(local, peer);
+        var ns = new FakeNamespace(local);
+        ns.Options.StaleItemTtl = TimeSpan.FromSeconds(1);
+        ns.Options.MaxCoalescingDelay = TimeSpan.FromSeconds(10);
+        ns.SetValue("value", version: 1);
+        var clock = new FakeTimeProvider();
+        var response = new TaskCompletionSource<DisseminationBroadcastResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var sendStarted = new TaskCompletionSource<CancellationToken>(TaskCreationOptions.RunContinuationsAsynchronously);
+        transport.SendBroadcastResponseHandler = (_, _, cancellationToken) =>
+        {
+            sendStarted.TrySetResult(cancellationToken);
+            return response.Task;
+        };
+        var queue = CreateBroadcastQueue(transport, [ns], timeProvider: clock);
+
+        try
+        {
+            queue.Notify(peer, ns, "value");
+            var flush = queue.FlushPendingBroadcast(TestContext.Current.CancellationToken);
+            var sendCancellation = await sendStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+            clock.Advance(ns.Options.StaleItemTtl);
+            await flush.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+            Assert.True(sendCancellation.IsCancellationRequested);
+            Assert.False(response.Task.IsCompleted);
+            ns.Options.Enabled = false;
+            await queue.StopAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            Assert.False(response.Task.IsCompleted);
+        }
+        finally
+        {
+            response.TrySetResult(new DisseminationBroadcastResponse());
+            await queue.StopAsync(TestContext.Current.CancellationToken);
+        }
+    }
+
+    [Fact]
+    public async Task TimedOutBroadcastRetainsConcurrencySlotUntilRpcCompletes()
+    {
+        var local = CreateSilo(39013);
+        var peer = CreateSilo(39014);
+        var transport = new FakeTransport(local, peer);
+        var ns = new FakeNamespace(local);
+        ns.Options.StaleItemTtl = TimeSpan.FromSeconds(1);
+        ns.Options.MaxCoalescingDelay = TimeSpan.FromSeconds(10);
+        ns.SetValue("value", version: 1);
+        var clock = new RecordingFakeTimeProvider();
+        var response = new TaskCompletionSource<DisseminationBroadcastResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var sendStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var sendCount = 0;
+        transport.SendBroadcastResponseHandler = (_, _, _) =>
+        {
+            Interlocked.Increment(ref sendCount);
+            sendStarted.TrySetResult();
+            return response.Task;
+        };
+        var queue = CreateBroadcastQueue(transport, [ns], options => options.MaxConcurrentSends = 1, clock);
+
+        try
+        {
+            queue.Notify(peer, ns, "value");
+            var firstFlush = queue.FlushPendingBroadcast(TestContext.Current.CancellationToken);
+            await sendStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            clock.Advance(ns.Options.StaleItemTtl);
+            await firstFlush.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+            var retryLifetimeStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            clock.TimerCreated = dueTime =>
+            {
+                if (dueTime == ns.Options.StaleItemTtl)
+                {
+                    retryLifetimeStarted.TrySetResult();
+                }
+            };
+            var retryFlush = queue.FlushPendingBroadcast(TestContext.Current.CancellationToken);
+            await retryLifetimeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            clock.Advance(ns.Options.StaleItemTtl);
+            await retryFlush.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+            Assert.Equal(1, Volatile.Read(ref sendCount));
+            Assert.False(response.Task.IsCompleted);
+        }
+        finally
+        {
+            ns.Options.Enabled = false;
+            response.TrySetResult(new DisseminationBroadcastResponse());
+            await queue.StopAsync(TestContext.Current.CancellationToken);
+        }
+    }
+
+    [Fact]
+    public async Task PublishReturnsFalseAfterBroadcastQueueStops()
+    {
+        var local = CreateSilo(39007);
+        var peer = CreateSilo(39008);
+        var transport = new FakeTransport(local, peer);
+        var ns = new FakeNamespace(local);
+        var protocol = CreateProtocol(transport, ns);
+        await protocol.StopAsync(TestContext.Current.CancellationToken);
+
+        Assert.False(await PublishValue(protocol, ns, ns.CreateValue("value", 1), TestContext.Current.CancellationToken));
+        Assert.Empty(transport.BroadcastBatches);
+    }
+
+    [Fact]
+    public async Task BroadcastNotificationDiagnosticsRunOutsideQueueLock()
+    {
+        var local = CreateSilo(39009);
+        var peer = CreateSilo(39010);
+        var transport = new FakeTransport(local, peer);
+        var ns = new FakeNamespace(local);
+        ns.SetValue("value", version: 1);
+        var queue = CreateBroadcastQueue(transport, [ns], timeProvider: new FakeTimeProvider());
+        var callbackEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseCallback = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var observer = DisseminationEvents.Listener.Subscribe(
+            new QueueReentryObserver(local, () =>
+            {
+                callbackEntered.TrySetResult();
+                releaseCallback.Task.GetAwaiter().GetResult();
+            }),
+            static name => name == DisseminationEvents.BroadcastScheduledEventName);
+        var notification = Task.Run(() => queue.Notify(peer, ns, "value"), TestContext.Current.CancellationToken);
+
+        try
+        {
+            await callbackEntered.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await Task.Run(() => queue.ObservePeerVersion(peer, ns.Name, "value", 0), TestContext.Current.CancellationToken)
+                .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        }
+        finally
+        {
+            releaseCallback.TrySetResult();
+            Assert.True(await notification);
+            await queue.StopAsync(TestContext.Current.CancellationToken);
+        }
+    }
+
+    private sealed class QueueReentryObserver(SiloAddress localSilo, Action callback) : IObserver<KeyValuePair<string, object?>>
+    {
+        public void OnNext(KeyValuePair<string, object?> value)
+        {
+            if (value.Value is DisseminationBroadcastScheduledEvent scheduled && Equals(scheduled.LocalSilo, localSilo))
+            {
+                callback();
+            }
+        }
+
+        public void OnCompleted()
+        {
+        }
+
+        public void OnError(Exception error)
+        {
+        }
     }
 
     private static DisseminationProtocol CreatePhase6Protocol(
