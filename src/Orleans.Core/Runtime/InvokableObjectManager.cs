@@ -54,7 +54,13 @@ namespace Orleans
 
         public bool TryDeregister(ObserverGrainId objectId)
         {
-            return this.localObjects.TryRemove(objectId, out _);
+            if (!this.localObjects.TryRemove(objectId, out var objectData))
+            {
+                return false;
+            }
+
+            objectData.OnDeregistered();
+            return true;
         }
 
         public void Dispatch(Message message)
@@ -79,6 +85,7 @@ namespace Orleans
         {
             private static readonly Func<object?, Task> HandleFunc = self => ((LocalObjectData)self!).LocalObjectMessagePumpAsync();
             private readonly InvokableObjectManager _manager;
+            private readonly HashSet<(GrainId SenderGrainId, CorrelationId MessageId)> _pendingCancellations = [];
             private readonly Dictionary<Message, Task?> _runningRequests = [];
             private Task? _messagePumpTask;
 
@@ -158,31 +165,56 @@ namespace Orleans
                 // These messages need to be processed right away, even if another request is currently running.
                 if (message.IsAlwaysInterleave)
                 {
-                    // Track the running request so it can be cancelled.
+                    bool wasCancelled;
                     lock (Messages)
                     {
-                        var task = Task.Factory.StartNew(
-                            static state =>
-                            {
-                                var (self, msg) = ((LocalObjectData, Message))state!;
-                                return self.ProcessMessageAsync(msg);
-                            },
-                            (this, message),
-                            CancellationToken.None,
-                            TaskCreationOptions.DenyChildAttach,
-                            TaskScheduler.Default).Unwrap();
-                        _runningRequests.Add(message, task);
+                        wasCancelled = _pendingCancellations.Remove((message.SendingGrain, message.Id));
+                        if (!wasCancelled)
+                        {
+                            // Track the running request so it can be cancelled.
+                            var task = Task.Factory.StartNew(
+                                static state =>
+                                {
+                                    var (self, msg) = ((LocalObjectData, Message))state!;
+                                    return self.ProcessMessageAsync(msg);
+                                },
+                                (this, message),
+                                CancellationToken.None,
+                                TaskCreationOptions.DenyChildAttach,
+                                TaskScheduler.Default).Unwrap();
+                            _runningRequests.Add(message, task);
+                        }
+                    }
+
+                    if (wasCancelled)
+                    {
+                        SendCanceledResponse(message);
                     }
 
                     return;
                 }
 
                 bool start;
+                bool wasWaitingCancellation;
                 lock (this.Messages)
                 {
-                    this.Messages.Enqueue(message);
-                    start = !this.Running;
-                    this.Running = true;
+                    wasWaitingCancellation = _pendingCancellations.Remove((message.SendingGrain, message.Id));
+                    if (wasWaitingCancellation)
+                    {
+                        start = false;
+                    }
+                    else
+                    {
+                        this.Messages.Enqueue(message);
+                        start = !this.Running;
+                        this.Running = true;
+                    }
+                }
+
+                if (wasWaitingCancellation)
+                {
+                    SendCanceledResponse(message);
+                    return;
                 }
 
                 LogInvokeLocalObjectAsync(_manager.logger, message, start);
@@ -281,6 +313,11 @@ namespace Orleans
                     try
                     {
                         request.SetTarget(this);
+                        if (TryTakePendingCancellation(message))
+                        {
+                            TryCancelInvokable(request);
+                        }
+
                         var filters = _manager.GrainCallFilters;
                         Response response;
                         if (filters is { Count: > 0 } || LocalObject is IIncomingGrainCallFilter)
@@ -320,6 +357,38 @@ namespace Orleans
                     LogErrorProcessingMessage(_manager.logger, outerException, message);
                 }
             }
+
+            internal void OnDeregistered()
+            {
+                lock (Messages)
+                {
+                    _pendingCancellations.Clear();
+                }
+            }
+
+            private bool TryTakePendingCancellation(Message message)
+            {
+                lock (Messages)
+                {
+                    return _pendingCancellations.Remove((message.SendingGrain, message.Id));
+                }
+            }
+
+            private bool TryCancelInvokable(IInvokable request)
+            {
+                try
+                {
+                    return request.TryCancel();
+                }
+                catch (Exception exception)
+                {
+                    LogErrorCancellationCallbackFailed(_manager.logger, exception);
+                    return true;
+                }
+            }
+
+            private void SendCanceledResponse(Message message) =>
+                _manager.runtimeClient.SendResponse(message, Response.FromException(new OperationCanceledException()));
 
             private void SendResponseAsync(Message message, Response resultObject)
             {
@@ -401,33 +470,14 @@ namespace Orleans
                 CancellationToken cancellationToken)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (!TryCancelRequest())
-                {
-                    // The message being canceled may not have arrived yet, so retry a few times.
-                    return RetryCancellationAfterDelay();
-                }
-
+                TryCancelRequest();
                 return ValueTask.CompletedTask;
 
-                async ValueTask RetryCancellationAfterDelay()
-                {
-                    var attemptsRemaining = 3;
-                    do
-                    {
-                        await Task.Delay(1_000, cancellationToken);
-
-                        if (TryCancelRequest())
-                        {
-                            return;
-                        }
-
-                    } while (--attemptsRemaining > 0);
-                }
-
-                bool TryCancelRequest()
+                void TryCancelRequest()
                 {
                     Message? message = null;
                     var wasWaiting = false;
+                    var key = (senderGrainId, messageId);
                     lock (Messages)
                     {
                         // Check the running requests.
@@ -466,6 +516,13 @@ namespace Orleans
                                 }
                             }
                         }
+
+                        if (!wasWaiting)
+                        {
+                            // Cancellation and invocation are delivered independently. Retain cancellation
+                            // until the matching invocation is admitted or has initialized its local token.
+                            _pendingCancellations.Add(key);
+                        }
                     }
 
                     var didCancel = false;
@@ -475,7 +532,7 @@ namespace Orleans
                         // If the message did begin executing, wait for it to observe the cancellation token and respond itself.
                         if (wasWaiting)
                         {
-                            _manager.runtimeClient.SendResponse(message, Response.FromException(new OperationCanceledException()));
+                            SendCanceledResponse(message);
                             didCancel = true;
                         }
                         else if (message.BodyObject is IInvokable invokableRequest)
@@ -489,19 +546,12 @@ namespace Orleans
                         }
                     }
 
-                    return didCancel;
-                }
-
-                bool TryCancelInvokable(IInvokable request)
-                {
-                    try
+                    if (didCancel)
                     {
-                        return request.TryCancel();
-                    }
-                    catch (Exception exception)
-                    {
-                        LogErrorCancellationCallbackFailed(_manager.logger, exception);
-                        return true;
+                        lock (Messages)
+                        {
+                            _pendingCancellations.Remove(key);
+                        }
                     }
                 }
             }
