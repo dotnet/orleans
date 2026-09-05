@@ -2379,8 +2379,12 @@ public class DemoClass
         {
             foreach (var invocation in metadataClass.DescendantNodes().OfType<InvocationExpressionSyntax>())
             {
-                if (invocation.Expression is not MemberAccessExpressionSyntax { Name.Identifier.ValueText: "Add", Expression: MemberAccessExpressionSyntax { Name.Identifier.ValueText: "Serializers" } }
-                    || invocation.ArgumentList.Arguments.FirstOrDefault()?.Expression is not TypeOfExpressionSyntax typeOfExpression)
+                if (invocation.Expression is not IdentifierNameSyntax { Identifier.ValueText: "AddImplementationType" }
+                    || invocation.ArgumentList.Arguments.FirstOrDefault()?.Expression is not MemberAccessExpressionSyntax
+                    {
+                        Name.Identifier.ValueText: "Serializers"
+                    }
+                    || invocation.ArgumentList.Arguments.ElementAtOrDefault(1)?.Expression is not TypeOfExpressionSyntax typeOfExpression)
                 {
                     continue;
                 }
