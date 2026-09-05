@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Threading;
 using System.Threading.Tasks;
 using Azure.Messaging.EventHubs;
 using Azure.Messaging.EventHubs.Producer;
@@ -51,7 +52,9 @@ namespace Orleans.Streaming.EventHubs
         private HashRingBasedPartitionedStreamQueueMapper streamQueueMapper = null!;
         private string[] partitionIds = null!;
         private ConcurrentDictionary<QueueId, EventHubAdapterReceiver> receivers = null!;
-        private EventHubProducerClient client = null!;
+        private IEventHubProducer producer = null!;
+        private readonly object closeLock = new();
+        private Task? closeTask;
 
         /// <summary>
         /// Name of the adapter. Primarily for logging purposes
@@ -238,7 +241,7 @@ namespace Orleans.Streaming.EventHubs
         {
             EventData eventData = this.dataAdapter.ToQueueMessage(streamId, events, token, requestContext);
             string partitionKey = this.dataAdapter.GetPartitionKey(streamId);
-            return this.client.SendAsync(new[] { eventData }, new SendEventOptions { PartitionKey = partitionKey });
+            return this.producer.SendAsync(eventData, partitionKey);
         }
 
         /// <summary>
@@ -273,7 +276,19 @@ namespace Orleans.Streaming.EventHubs
         {
             var connectionOptions = ehOptions.ConnectionOptions;
             var connection = ehOptions.CreateConnection(connectionOptions);
-            this.client = new EventHubProducerClient(connection, new EventHubProducerClientOptions { ConnectionOptions = connectionOptions });
+            var bufferedOptions = ehOptions.BufferedProducerOptions;
+            if (bufferedOptions is not null)
+            {
+                this.producer = new AcknowledgedEventHubProducer(
+                    new BufferedEventHubClient(connection, bufferedOptions, ehOptions.OwnsConnection));
+            }
+            else
+            {
+                this.producer = new EventHubProducer(
+                    connection,
+                    new EventHubProducerClient(connection, new EventHubProducerClientOptions { ConnectionOptions = connectionOptions }),
+                    ehOptions.OwnsConnection);
+            }
         }
 
         /// <summary>
@@ -323,7 +338,15 @@ namespace Orleans.Streaming.EventHubs
         /// <returns>A task which resolves to the partition identifiers.</returns>
         protected virtual async Task<string[]> GetPartitionIdsAsync()
         {
-            return await client.GetPartitionIdsAsync();
+            return await producer.GetPartitionIdsAsync();
+        }
+
+        internal Task CloseAsync(CancellationToken cancellationToken)
+        {
+            lock (closeLock)
+            {
+                return closeTask ??= producer.CloseAsync(cancellationToken);
+            }
         }
 
         /// <summary>
