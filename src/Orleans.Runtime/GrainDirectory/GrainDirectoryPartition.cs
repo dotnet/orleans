@@ -1125,7 +1125,8 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
                 cancellationToken.ThrowIfCancellationRequested();
                 if (!range.Contains(entry.Key))
                 {
-                    throw new InvalidOperationException($"Invariant violated. This host is not the owner of grain '{entry.Key}'.");
+                    throw CreateIntegrityViolationException(
+                        current, entry.Key, $"Invariant violated. This host is not the owner of grain '{entry.Key}'.");
                 }
 
                 DebugAssertOwnership(current, entry.Key);
@@ -1138,7 +1139,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
                 {
                     if (!IsOwner(current, entry.GrainId))
                     {
-                        throw new InvalidOperationException(
+                        throw CreateIntegrityViolationException(current, entry.GrainId,
                             $"Invariant violated. This host was sent a registration for grain '{entry.GrainId}' which it should not own.");
                     }
 
@@ -1147,14 +1148,15 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
                         if (!existingEntry.Equals(entry))
                         {
                             LogErrorIntegrityViolation(_logger, entry, existingEntry);
-                            throw new InvalidOperationException(
+                            throw CreateIntegrityViolationException(current, entry.GrainId,
                                 $"Integrity violation: activation '{entry}' does not match existing directory entry '{existingEntry}'.");
                         }
                     }
                     else
                     {
                         LogErrorIntegrityViolation(_logger, entry);
-                        throw new InvalidOperationException($"Integrity violation: activation '{entry}' not found in directory.");
+                        throw CreateIntegrityViolationException(
+                            current, entry.GrainId, $"Integrity violation: activation '{entry}' not found in directory.");
                     }
                 }
             }
@@ -1226,14 +1228,15 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
                     if (!existingEntry.Equals(activation))
                     {
                         LogErrorIntegrityViolation(_logger, activation, existingEntry);
-                        throw new InvalidOperationException(
+                        throw CreateIntegrityViolationException(current, activation.GrainId,
                             $"Integrity violation: activation '{activation}' does not match existing directory entry '{existingEntry}'.");
                     }
                 }
                 else
                 {
                     LogErrorIntegrityViolation(_logger, activation);
-                    throw new InvalidOperationException($"Integrity violation: activation '{activation}' not found in directory.");
+                    throw CreateIntegrityViolationException(
+                        current, activation.GrainId, $"Integrity violation: activation '{activation}' not found in directory.");
                 }
             }
 
@@ -1250,6 +1253,17 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
                 barrier.Complete();
             }
         }
+    }
+
+    private InvalidOperationException CreateIntegrityViolationException(
+        DirectoryMembershipSnapshot view,
+        GrainId grainId,
+        string message)
+    {
+        var exception = new InvalidOperationException(message);
+        GrainDirectoryEvents.EmitIntegrityViolation(
+            _id, _partitionIndex, view.Version, view.GetRange(_id, _partitionIndex), grainId, exception);
+        return exception;
     }
 
     async ValueTask<GrainDirectoryLeaseCleanupResult> IGrainDirectoryTestHooks.CleanupExpiredLeasesAsync(
