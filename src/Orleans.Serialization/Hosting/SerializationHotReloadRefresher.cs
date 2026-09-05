@@ -1,6 +1,7 @@
 #if NET6_0_OR_GREATER
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using Microsoft.Extensions.Options;
 using Orleans.Serialization.Configuration;
@@ -56,6 +57,10 @@ internal sealed class SerializationHotReloadRefresher : IHotReloadRefreshPartici
 
     public int Phase => 0;
 
+    [UnconditionalSuppressMessage(
+        "Trimming",
+        "IL2072",
+        Justification = "Hot reload manifest providers are generated runtime metadata types and are activated only in metadata-update-capable, non-trimmed development processes.")]
     public void Refresh(HashSet<Assembly>? updatedAssemblies)
     {
         try
@@ -128,6 +133,10 @@ internal sealed class SerializationHotReloadRefresher : IHotReloadRefreshPartici
     /// reload can rename a member while its field-id-keyed accessor field survives, leaving a cached
     /// delegate bound to the old backing field. Release-shaped assemblies are skipped via IsInitOnly.
     /// </summary>
+    [UnconditionalSuppressMessage(
+        "Trimming",
+        "IL2075",
+        Justification = "Hot reload inspects generated codec fields only in metadata-update-capable, non-trimmed development processes.")]
     private void ClearGeneratedAccessorCaches(Assembly assembly)
     {
         try
