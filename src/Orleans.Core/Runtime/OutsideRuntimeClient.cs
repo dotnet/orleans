@@ -266,61 +266,87 @@ namespace Orleans
 
         public void SendRequest(GrainReference target, IInvokable request, IResponseCompletionSource? context, InvokeMethodOptions options)
         {
-            ThrowIfDisposed();
-            var cancellationToken = request.GetCancellationToken();
-            cancellationToken.ThrowIfCancellationRequested();
-            var message = this.messageFactory!.CreateMessage(request, options);
-            OrleansOutsideRuntimeClientEvent.Instance.SendRequest(message);
-
-            message.InterfaceType = target.InterfaceType;
-            message.InterfaceVersion = target.InterfaceVersion;
-            var targetGrainId = target.GrainId;
-            var oneWay = (options & InvokeMethodOptions.OneWay) != 0;
-            message.SendingGrain = CurrentActivationAddress.GrainId;
-            message.TargetGrain = targetGrainId;
-
-            if (SystemTargetGrainId.TryParse(targetGrainId, out var systemTargetGrainId))
+            Message? message = null;
+            CallbackData? callbackData = null;
+            try
             {
-                // If the silo isn't be supplied, it will be filled in by the sender to be the gateway silo
-                message.TargetSilo = systemTargetGrainId.GetSiloAddress();
-            }
+                ThrowIfDisposed();
+                var cancellationToken = request.GetCancellationToken();
+                cancellationToken.ThrowIfCancellationRequested();
+                message = this.messageFactory!.CreateMessage(request, options);
+                OrleansOutsideRuntimeClientEvent.Instance.SendRequest(message);
 
-            if (this.clientMessagingOptions.DropExpiredMessages && message.IsExpirableMessage())
-            {
-                // don't set expiration for system target messages.
-                var ttl = request.GetDefaultResponseTimeout() ?? this.clientMessagingOptions.ResponseTimeout;
-                message.TimeToLive = ttl;
-            }
+                message.InterfaceType = target.InterfaceType;
+                message.InterfaceVersion = target.InterfaceVersion;
+                var targetGrainId = target.GrainId;
+                var oneWay = (options & InvokeMethodOptions.OneWay) != 0;
+                message.SendingGrain = CurrentActivationAddress.GrainId;
+                message.TargetGrain = targetGrainId;
 
-            if (!oneWay)
-            {
-                var callbackData = new CallbackData(this.sharedCallbackData, context!, message, _applicationRequestInstruments);
-                if (Volatile.Read(ref _isStopping) != 0)
+                if (SystemTargetGrainId.TryParse(targetGrainId, out var systemTargetGrainId))
                 {
-                    callbackData.OnHostShutdown();
-                    return;
+                    // If the silo isn't be supplied, it will be filled in by the sender to be the gateway silo
+                    message.TargetSilo = systemTargetGrainId.GetSiloAddress();
                 }
 
-                callbacks.TryAdd(message.Id, callbackData);
-                callbackData.SubscribeForCancellation(cancellationToken);
-
-                if (Volatile.Read(ref _isStopping) != 0)
+                if (this.clientMessagingOptions.DropExpiredMessages && message.IsExpirableMessage())
                 {
-                    callbackData.OnHostShutdown();
-                    return;
+                    // don't set expiration for system target messages.
+                    var ttl = request.GetDefaultResponseTimeout() ?? this.clientMessagingOptions.ResponseTimeout;
+                    message.TimeToLive = ttl;
                 }
+
+                if (!oneWay)
+                {
+                    callbackData = new CallbackData(this.sharedCallbackData, context!, message, _applicationRequestInstruments);
+                    if (Volatile.Read(ref _isStopping) != 0)
+                    {
+                        callbackData.OnHostShutdown();
+                        message.DisposeOwnedBody();
+                        return;
+                    }
+
+                    callbacks.TryAdd(message.Id, callbackData);
+                    callbackData.SubscribeForCancellation(cancellationToken);
+
+                    if (Volatile.Read(ref _isStopping) != 0)
+                    {
+                        callbackData.OnHostShutdown();
+                        message.DisposeOwnedBody();
+                        return;
+                    }
+                }
+                else
+                {
+                    context?.Complete();
+                    if (Volatile.Read(ref _isStopping) != 0)
+                    {
+                        message.DisposeOwnedBody();
+                        return;
+                    }
+                }
+
+                LogSendingMessage(logger, message);
+                MessageCenter!.SendMessage(message);
             }
-            else
+            catch (Exception exception)
             {
-                context?.Complete();
-                if (Volatile.Read(ref _isStopping) != 0)
+                if (message is null)
                 {
-                    return;
+                    request.Dispose();
                 }
-            }
+                else
+                {
+                    message.DisposeOwnedBody();
+                    if (callbackData is not null)
+                    {
+                        callbackData.OnSendFailure(exception);
+                        return;
+                    }
+                }
 
-            LogSendingMessage(logger, message);
-            MessageCenter!.SendMessage(message);
+                throw;
+            }
         }
 
         public void ReceiveResponse(Message response)

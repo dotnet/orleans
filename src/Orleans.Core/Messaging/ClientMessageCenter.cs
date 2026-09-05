@@ -177,6 +177,7 @@ namespace Orleans.Messaging
             if (!Running)
             {
                 LogNotRunning(msg);
+                msg.DisposeOwnedBody();
                 return;
             }
 
@@ -184,10 +185,14 @@ namespace Orleans.Messaging
             if (connectionTask.IsCompletedSuccessfully)
             {
                 var connection = connectionTask.Result;
-                if (connection is null) return;
+                if (connection is null)
+                {
+                    msg.DisposeOwnedBody();
+                    return;
+                }
 
-                connection.Send(msg);
                 LogSendingMessage(msg, connection.RemoteEndPoint);
+                connection.Send(msg);
             }
             else
             {
@@ -200,11 +205,14 @@ namespace Orleans.Messaging
                         var connection = await task;
 
                         // If the connection returned is null then the message was already rejected due to a failure.
-                        if (connection is null) return;
-
-                        connection.Send(message);
+                        if (connection is null)
+                        {
+                            message.DisposeOwnedBody();
+                            return;
+                        }
 
                         LogSendingMessage(message, connection.RemoteEndPoint);
+                        connection.Send(message);
                     }
                     catch (Exception exception)
                     {
@@ -368,7 +376,11 @@ namespace Orleans.Messaging
 
         public void RejectMessage(Message msg, string reason, Exception? exc = null)
         {
-            if (!Running) return;
+            if (!Running)
+            {
+                msg.DisposeOwnedBody();
+                return;
+            }
 
             if (msg.Direction != Message.Directions.Request)
             {
@@ -381,6 +393,8 @@ namespace Orleans.Messaging
                 var error = this.messageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable, reason, exc);
                 DispatchLocalMessage(error);
             }
+
+            msg.DisposeOwnedBody();
         }
 
         internal void OnGatewayConnectionOpen()

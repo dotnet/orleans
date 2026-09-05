@@ -68,6 +68,7 @@ namespace Orleans
             if (!ObserverGrainId.TryParse(message.TargetGrain, out var observerId))
             {
                 LogNotAddressedToAnObserver(logger, message);
+                message.DisposeOwnedBody();
                 return;
             }
 
@@ -78,6 +79,7 @@ namespace Orleans
             else
             {
                 LogUnexpectedTargetInRequest(logger, message.TargetGrain, message);
+                message.DisposeOwnedBody();
             }
         }
 
@@ -89,6 +91,8 @@ namespace Orleans
             private readonly Dictionary<(GrainId SenderGrainId, CorrelationId MessageId), LinkedListNode<(GrainId, CorrelationId)>> _pendingCancellations = [];
             private readonly LinkedList<(GrainId SenderGrainId, CorrelationId MessageId)> _pendingCancellationOrder = [];
             private readonly Dictionary<Message, Task?> _runningRequests = [];
+            private readonly Dictionary<Message, int> _cancellationLeaseCounts = [];
+            private readonly HashSet<Message> _completedRequests = [];
             private Task? _messagePumpTask;
 
             internal LocalObjectData(IAddressable obj, ObserverGrainId observerId, InvokableObjectManager manager)
@@ -160,6 +164,7 @@ namespace Orleans
                     LogObserverGarbageCollected(_manager.logger, this.ObserverId, message);
                     // Try to remove. If it's not there, we don't care.
                     _manager.TryDeregister(this.ObserverId);
+                    message.DisposeOwnedBody();
                     return;
                 }
 
@@ -344,19 +349,32 @@ namespace Orleans
                     {
                         this.ReportException(message, exc);
                     }
-                    finally
-                    {
-                        // Clear the running request when done.
-                        lock (Messages)
-                        {
-                            _runningRequests.Remove(message);
-                        }
-                    }
                 }
                 catch (Exception outerException)
                 {
                     // Ignore and keep looping.
                     LogErrorProcessingMessage(_manager.logger, outerException, message);
+                }
+                finally
+                {
+                    var disposeMessage = false;
+                    lock (Messages)
+                    {
+                        _runningRequests.Remove(message);
+                        if (_cancellationLeaseCounts.ContainsKey(message))
+                        {
+                            _completedRequests.Add(message);
+                        }
+                        else
+                        {
+                            disposeMessage = true;
+                        }
+                    }
+
+                    if (disposeMessage)
+                    {
+                        message.DisposeOwnedBody();
+                    }
                 }
             }
 
@@ -390,8 +408,17 @@ namespace Orleans
                 }
             }
 
-            private void SendCanceledResponse(Message message) =>
-                _manager.runtimeClient.SendResponse(message, Response.FromException(new OperationCanceledException()));
+            private void SendCanceledResponse(Message message)
+            {
+                try
+                {
+                    _manager.runtimeClient.SendResponse(message, Response.FromException(new OperationCanceledException()));
+                }
+                finally
+                {
+                    message.DisposeOwnedBody();
+                }
+            }
 
             private void SendResponseAsync(Message message, Response resultObject)
             {
@@ -481,6 +508,7 @@ namespace Orleans
                     Message? message = null;
                     var wasWaiting = false;
                     var key = (senderGrainId, messageId);
+                    var hasCancellationLease = false;
                     lock (Messages)
                     {
                         // Check the running requests.
@@ -489,6 +517,9 @@ namespace Orleans
                             if (runningRequest.Id == messageId && runningRequest.SendingGrain == senderGrainId)
                             {
                                 message = runningRequest;
+                                _cancellationLeaseCounts.TryGetValue(message, out var leaseCount);
+                                _cancellationLeaseCounts[message] = leaseCount + 1;
+                                hasCancellationLease = true;
                                 break;
                             }
                         }
@@ -529,23 +560,33 @@ namespace Orleans
                     }
 
                     var didCancel = false;
-                    if (message is not null)
+                    try
                     {
-                        // The message never began executing, so send a canceled response immediately.
-                        // If the message did begin executing, wait for it to observe the cancellation token and respond itself.
-                        if (wasWaiting)
+                        if (message is not null)
                         {
-                            SendCanceledResponse(message);
-                            didCancel = true;
+                            // The message never began executing, so send a canceled response immediately.
+                            // If the message did begin executing, wait for it to observe the cancellation token and respond itself.
+                            if (wasWaiting)
+                            {
+                                SendCanceledResponse(message);
+                                didCancel = true;
+                            }
+                            else if (message.BodyObject is IInvokable invokableRequest)
+                            {
+                                didCancel = TryCancelInvokable(invokableRequest) || !invokableRequest.IsCancellable;
+                            }
+                            else
+                            {
+                                // Assume the request is not cancellable.
+                                didCancel = true;
+                            }
                         }
-                        else if (message.BodyObject is IInvokable invokableRequest)
+                    }
+                    finally
+                    {
+                        if (hasCancellationLease)
                         {
-                            didCancel = TryCancelInvokable(invokableRequest) || !invokableRequest.IsCancellable;
-                        }
-                        else
-                        {
-                            // Assume the request is not cancellable.
-                            didCancel = true;
+                            ReleaseCancellationLease(message!);
                         }
                     }
 
@@ -574,6 +615,29 @@ namespace Orleans
                 }
 
                 _pendingCancellations.Add(key, _pendingCancellationOrder.AddLast(key));
+            }
+
+            private void ReleaseCancellationLease(Message message)
+            {
+                var disposeMessage = false;
+                lock (Messages)
+                {
+                    var leaseCount = _cancellationLeaseCounts[message];
+                    if (leaseCount == 1)
+                    {
+                        _cancellationLeaseCounts.Remove(message);
+                        disposeMessage = _completedRequests.Remove(message);
+                    }
+                    else
+                    {
+                        _cancellationLeaseCounts[message] = leaseCount - 1;
+                    }
+                }
+
+                if (disposeMessage)
+                {
+                    message.DisposeOwnedBody();
+                }
             }
 
             private bool RemovePendingCancellation((GrainId SenderGrainId, CorrelationId MessageId) key)

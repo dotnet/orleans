@@ -17,6 +17,16 @@ namespace OrleansCodeGen.TestProject
         public string arg0;
         global::TestProject.IBasicGrain _target;
         private static readonly global::System.Reflection.MethodInfo MethodBackingField = OrleansGeneratedCodeHelper.GetMethodInfoOrDefault(typeof(global::TestProject.IBasicGrain), "SayHello", null, new[] { typeof(string) });
+        private readonly global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IBasicGrain_GrainReference_6B0E24A1> _pool;
+        public Invokable_IBasicGrain_GrainReference_6B0E24A1() : this(null !)
+        {
+        }
+
+        public Invokable_IBasicGrain_GrainReference_6B0E24A1(global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IBasicGrain_GrainReference_6B0E24A1> pool) : base()
+        {
+            _pool = pool;
+        }
+
         public override int GetArgumentCount() => 1;
         public override string GetMethodName() => "SayHello";
         public override string GetInterfaceName() => "TestProject.IBasicGrain";
@@ -29,6 +39,8 @@ namespace OrleansCodeGen.TestProject
         {
             arg0 = default;
             _target = default;
+            Options = default;
+            _pool?.Return(this);
         }
 
         public override object GetArgument(int index)
@@ -61,13 +73,15 @@ namespace OrleansCodeGen.TestProject
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     internal sealed class Proxy_IBasicGrain : global::Orleans.Runtime.GrainReference, global::TestProject.IBasicGrain
     {
+        private readonly global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IBasicGrain_GrainReference_6B0E24A1> _activator_6B0E24A1_1E190F3C;
         public Proxy_IBasicGrain(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.IdSpan arg1) : base(arg0, arg1)
         {
+            _activator_6B0E24A1_1E190F3C = CodecProvider.GetActivator<OrleansCodeGen.TestProject.Invokable_IBasicGrain_GrainReference_6B0E24A1>();
         }
 
         global::System.Threading.Tasks.Task<string> global::TestProject.IBasicGrain.SayHello(string arg0)
         {
-            var request = new OrleansCodeGen.TestProject.Invokable_IBasicGrain_GrainReference_6B0E24A1();
+            var request = _activator_6B0E24A1_1E190F3C.Create();
             request.arg0 = arg0;
             return base.InvokeAsync<string>(request).AsTask();
         }
@@ -77,6 +91,12 @@ namespace OrleansCodeGen.TestProject
     public sealed class Codec_Invokable_IBasicGrain_GrainReference_6B0E24A1 : global::Orleans.Serialization.Codecs.IFieldCodec<OrleansCodeGen.TestProject.Invokable_IBasicGrain_GrainReference_6B0E24A1>
     {
         private readonly global::System.Type _codecFieldType = typeof(OrleansCodeGen.TestProject.Invokable_IBasicGrain_GrainReference_6B0E24A1);
+        private readonly global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IBasicGrain_GrainReference_6B0E24A1> _activator;
+        public Codec_Invokable_IBasicGrain_GrainReference_6B0E24A1(global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IBasicGrain_GrainReference_6B0E24A1> _activator)
+        {
+            this._activator = OrleansGeneratedCodeHelper.UnwrapService(this, _activator);
+        }
+
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, OrleansCodeGen.TestProject.Invokable_IBasicGrain_GrainReference_6B0E24A1 instance)
             where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
@@ -128,7 +148,7 @@ namespace OrleansCodeGen.TestProject
             if (field.IsReference)
                 return ReferenceCodec.ReadReference<OrleansCodeGen.TestProject.Invokable_IBasicGrain_GrainReference_6B0E24A1, TReaderInput>(ref reader, field);
             field.EnsureWireTypeTagDelimited();
-            var result = new OrleansCodeGen.TestProject.Invokable_IBasicGrain_GrainReference_6B0E24A1();
+            var result = _activator.Create();
             ReferenceCodec.MarkValueField(reader.Session);
             Deserialize(ref reader, result);
             return result;
@@ -138,15 +158,33 @@ namespace OrleansCodeGen.TestProject
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Copier_Invokable_IBasicGrain_GrainReference_6B0E24A1 : global::Orleans.Serialization.Cloning.IDeepCopier<OrleansCodeGen.TestProject.Invokable_IBasicGrain_GrainReference_6B0E24A1>
     {
+        private readonly global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IBasicGrain_GrainReference_6B0E24A1> _activator;
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public OrleansCodeGen.TestProject.Invokable_IBasicGrain_GrainReference_6B0E24A1 DeepCopy(OrleansCodeGen.TestProject.Invokable_IBasicGrain_GrainReference_6B0E24A1 original, global::Orleans.Serialization.Cloning.CopyContext context)
         {
             if (original is null)
                 return null;
-            var result = new OrleansCodeGen.TestProject.Invokable_IBasicGrain_GrainReference_6B0E24A1();
+            var result = _activator.Create();
             result.arg0 = original.arg0;
             return result;
         }
+
+        public Copier_Invokable_IBasicGrain_GrainReference_6B0E24A1(global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IBasicGrain_GrainReference_6B0E24A1> _activator)
+        {
+            this._activator = OrleansGeneratedCodeHelper.UnwrapService(this, _activator);
+        }
+    }
+
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    internal sealed class Activator_Invokable_IBasicGrain_GrainReference_6B0E24A1 : global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IBasicGrain_GrainReference_6B0E24A1>
+    {
+        private readonly global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IBasicGrain_GrainReference_6B0E24A1> _arg0;
+        public Activator_Invokable_IBasicGrain_GrainReference_6B0E24A1(global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IBasicGrain_GrainReference_6B0E24A1> arg0)
+        {
+            _arg0 = arg0;
+        }
+
+        public OrleansCodeGen.TestProject.Invokable_IBasicGrain_GrainReference_6B0E24A1 Create() => _arg0.TryGet(out var item) ? item : new OrleansCodeGen.TestProject.Invokable_IBasicGrain_GrainReference_6B0E24A1(_arg0);
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
@@ -256,6 +294,7 @@ namespace OrleansCodeGen.TestProject
             config.AddInterfaceProxy(typeof(OrleansCodeGen.TestProject.Proxy_IBasicGrain));
             config.AddInterface(typeof(global::TestProject.IBasicGrain));
             config.AddInterfaceImplementation(typeof(global::TestProject.BasicGrain));
+            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_Invokable_IBasicGrain_GrainReference_6B0E24A1));
             config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_BasicGrain));
             var n1 = config.CompoundTypeAliases.Add("inv");
             var n2 = n1.Add(typeof(global::Orleans.Runtime.GrainReference));

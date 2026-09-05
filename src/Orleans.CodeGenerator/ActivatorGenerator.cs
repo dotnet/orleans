@@ -1,6 +1,6 @@
-using Orleans.CodeGenerator.SyntaxGeneration;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Orleans.CodeGenerator.SyntaxGeneration;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Orleans.CodeGenerator;
@@ -14,6 +14,7 @@ internal class ActivatorGenerator(IGeneratorServices generatorServices)
         public TypeSyntax Type { get; set; }
         public string FieldName { get; set; }
         public string ParameterName { get; set; }
+        public bool IsInvokablePool { get; set; }
     }
 
     public ClassDeclarationSyntax GenerateActivator(ISerializableTypeDescription type)
@@ -28,7 +29,14 @@ internal class ActivatorGenerator(IGeneratorServices generatorServices)
         {
             foreach (var arg in parameters)
             {
-                orderedFields.Add(new ConstructorArgument { Type = arg, FieldName = $"_arg{index}", ParameterName = $"arg{index}" });
+                orderedFields.Add(new ConstructorArgument
+                {
+                    Type = arg,
+                    FieldName = $"_arg{index}",
+                    ParameterName = $"arg{index}",
+                    IsInvokablePool = type is GeneratedInvokableDescription { UsesInvokablePool: true }
+                        && index == 0,
+                });
                 index++;
             }
         }
@@ -90,11 +98,14 @@ internal class ActivatorGenerator(IGeneratorServices generatorServices)
         {
             parameters.Add(Parameter(field.ParameterName.ToIdentifier()).WithType(field.Type));
 
+            var value = field.IsInvokablePool
+                ? field.ParameterName.ToIdentifierName()
+                : Unwrapped(field.ParameterName.ToIdentifierName());
             body.Add(ExpressionStatement(
-                        AssignmentExpression(
-                            SyntaxKind.SimpleAssignmentExpression,
-                            field.FieldName.ToIdentifierName(),
-                            Unwrapped(field.ParameterName.ToIdentifierName()))));
+                AssignmentExpression(
+                    SyntaxKind.SimpleAssignmentExpression,
+                    field.FieldName.ToIdentifierName(),
+                    value)));
         }
 
         var constructorDeclaration = ConstructorDeclaration(simpleClassName)
@@ -114,6 +125,32 @@ internal class ActivatorGenerator(IGeneratorServices generatorServices)
 
     private static MemberDeclarationSyntax GenerateCreateMethod(ISerializableTypeDescription type, List<ConstructorArgument> orderedFields)
     {
+        foreach (var field in orderedFields)
+        {
+            if (field.IsInvokablePool)
+            {
+                var arguments = orderedFields.Select(static field => Argument(field.FieldName.ToIdentifierName()));
+                var pooledCreateObject = ObjectCreationExpression(type.TypeSyntax)
+                    .WithArgumentList(ArgumentList(SeparatedList(arguments)));
+                var tryGet = InvocationExpression(
+                    field.FieldName.ToIdentifierName().Member("TryGet"),
+                    ArgumentList(
+                        SingletonSeparatedList(
+                            Argument(
+                                DeclarationExpression(
+                                    IdentifierName("var"),
+                                    SingleVariableDesignation(Identifier("item"))))
+                            .WithRefKindKeyword(Token(SyntaxKind.OutKeyword)))));
+
+                return MethodDeclaration(type.TypeSyntax, "Create")
+                    .WithExpressionBody(
+                        ArrowExpressionClause(
+                            ConditionalExpression(tryGet, IdentifierName("item"), pooledCreateObject)))
+                    .WithSemicolonToken(Token(SyntaxKind.SemicolonToken))
+                    .AddModifiers(Token(SyntaxKind.PublicKeyword));
+            }
+        }
+
         ExpressionSyntax createObject;
         if (type.ActivatorConstructorParameters is { Count: > 0 })
         {
@@ -135,4 +172,5 @@ internal class ActivatorGenerator(IGeneratorServices generatorServices)
             .WithSemicolonToken(Token(SyntaxKind.SemicolonToken))
             .AddModifiers(Token(SyntaxKind.PublicKeyword));
     }
+
 }

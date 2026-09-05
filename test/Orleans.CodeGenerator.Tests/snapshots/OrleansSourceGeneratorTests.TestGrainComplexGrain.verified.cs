@@ -21,6 +21,16 @@ namespace OrleansCodeGen.TestProject
         global::TestProject.IComplexGrain _target;
         private static readonly global::System.Reflection.MethodInfo MethodBackingField = OrleansGeneratedCodeHelper.GetMethodInfoOrDefault(typeof(global::TestProject.IComplexGrain), "ProcessData", null, new[] { typeof(int), typeof(string), typeof(global::TestProject.ComplexData), typeof(global::System.Threading.CancellationToken) });
         global::System.Threading.CancellationTokenSource _cts;
+        private readonly global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IComplexGrain_GrainReference_67FE5808> _pool;
+        public Invokable_IComplexGrain_GrainReference_67FE5808() : this(null !)
+        {
+        }
+
+        public Invokable_IComplexGrain_GrainReference_67FE5808(global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IComplexGrain_GrainReference_67FE5808> pool) : base()
+        {
+            _pool = pool;
+        }
+
         public override int GetArgumentCount() => 4;
         public override string GetMethodName() => "ProcessData";
         public override string GetInterfaceName() => "TestProject.IComplexGrain";
@@ -44,6 +54,8 @@ namespace OrleansCodeGen.TestProject
             _target = default;
             _cts?.Dispose();
             _cts = default;
+            Options = default;
+            _pool?.Return(this);
         }
 
         public override object GetArgument(int index)
@@ -105,14 +117,16 @@ namespace OrleansCodeGen.TestProject
     internal sealed class Proxy_IComplexGrain : global::Orleans.Runtime.GrainReference, global::TestProject.IComplexGrain
     {
         private readonly OrleansCodeGen.TestProject.Copier_ComplexData _copier_ComplexData_765A40ED2309AF35;
+        private readonly global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IComplexGrain_GrainReference_67FE5808> _activator_67FE5808_F4F7CFE7;
         public Proxy_IComplexGrain(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.IdSpan arg1) : base(arg0, arg1)
         {
             _copier_ComplexData_765A40ED2309AF35 = OrleansGeneratedCodeHelper.GetService<OrleansCodeGen.TestProject.Copier_ComplexData>(this, CodecProvider);
+            _activator_67FE5808_F4F7CFE7 = CodecProvider.GetActivator<OrleansCodeGen.TestProject.Invokable_IComplexGrain_GrainReference_67FE5808>();
         }
 
         global::System.Threading.Tasks.Task<global::TestProject.ComplexData> global::TestProject.IComplexGrain.ProcessData(int arg0, string arg1, global::TestProject.ComplexData arg2, global::System.Threading.CancellationToken arg3)
         {
-            var request = new OrleansCodeGen.TestProject.Invokable_IComplexGrain_GrainReference_67FE5808();
+            var request = _activator_67FE5808_F4F7CFE7.Create();
             request.arg0 = arg0;
             request.arg1 = arg1;
             using var copyContext = base.CopyContextPool.GetContext();
@@ -234,10 +248,12 @@ namespace OrleansCodeGen.TestProject
     public sealed class Codec_Invokable_IComplexGrain_GrainReference_67FE5808 : global::Orleans.Serialization.Codecs.IFieldCodec<OrleansCodeGen.TestProject.Invokable_IComplexGrain_GrainReference_67FE5808>
     {
         private readonly global::System.Type _codecFieldType = typeof(OrleansCodeGen.TestProject.Invokable_IComplexGrain_GrainReference_67FE5808);
+        private readonly global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IComplexGrain_GrainReference_67FE5808> _activator;
         private readonly global::System.Type _type_ComplexData_765A40ED2309AF35 = typeof(global::TestProject.ComplexData);
         private readonly OrleansCodeGen.TestProject.Codec_ComplexData _codec_ComplexData_765A40ED2309AF35;
-        public Codec_Invokable_IComplexGrain_GrainReference_67FE5808(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider)
+        public Codec_Invokable_IComplexGrain_GrainReference_67FE5808(global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IComplexGrain_GrainReference_67FE5808> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider)
         {
+            this._activator = OrleansGeneratedCodeHelper.UnwrapService(this, _activator);
             _codec_ComplexData_765A40ED2309AF35 = OrleansGeneratedCodeHelper.GetService<OrleansCodeGen.TestProject.Codec_ComplexData>(this, codecProvider);
         }
 
@@ -312,7 +328,7 @@ namespace OrleansCodeGen.TestProject
             if (field.IsReference)
                 return ReferenceCodec.ReadReference<OrleansCodeGen.TestProject.Invokable_IComplexGrain_GrainReference_67FE5808, TReaderInput>(ref reader, field);
             field.EnsureWireTypeTagDelimited();
-            var result = new OrleansCodeGen.TestProject.Invokable_IComplexGrain_GrainReference_67FE5808();
+            var result = _activator.Create();
             ReferenceCodec.MarkValueField(reader.Session);
             Deserialize(ref reader, result);
             return result;
@@ -322,13 +338,14 @@ namespace OrleansCodeGen.TestProject
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Copier_Invokable_IComplexGrain_GrainReference_67FE5808 : global::Orleans.Serialization.Cloning.IDeepCopier<OrleansCodeGen.TestProject.Invokable_IComplexGrain_GrainReference_67FE5808>
     {
+        private readonly global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IComplexGrain_GrainReference_67FE5808> _activator;
         private readonly OrleansCodeGen.TestProject.Copier_ComplexData _copier_ComplexData_765A40ED2309AF35;
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public OrleansCodeGen.TestProject.Invokable_IComplexGrain_GrainReference_67FE5808 DeepCopy(OrleansCodeGen.TestProject.Invokable_IComplexGrain_GrainReference_67FE5808 original, global::Orleans.Serialization.Cloning.CopyContext context)
         {
             if (original is null)
                 return null;
-            var result = new OrleansCodeGen.TestProject.Invokable_IComplexGrain_GrainReference_67FE5808();
+            var result = _activator.Create();
             result.arg0 = original.arg0;
             result.arg1 = original.arg1;
             result.arg2 = _copier_ComplexData_765A40ED2309AF35.DeepCopy(original.arg2, context);
@@ -336,10 +353,23 @@ namespace OrleansCodeGen.TestProject
             return result;
         }
 
-        public Copier_Invokable_IComplexGrain_GrainReference_67FE5808(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider)
+        public Copier_Invokable_IComplexGrain_GrainReference_67FE5808(global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IComplexGrain_GrainReference_67FE5808> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider)
         {
+            this._activator = OrleansGeneratedCodeHelper.UnwrapService(this, _activator);
             _copier_ComplexData_765A40ED2309AF35 = OrleansGeneratedCodeHelper.GetService<OrleansCodeGen.TestProject.Copier_ComplexData>(this, codecProvider);
         }
+    }
+
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    internal sealed class Activator_Invokable_IComplexGrain_GrainReference_67FE5808 : global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IComplexGrain_GrainReference_67FE5808>
+    {
+        private readonly global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IComplexGrain_GrainReference_67FE5808> _arg0;
+        public Activator_Invokable_IComplexGrain_GrainReference_67FE5808(global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IComplexGrain_GrainReference_67FE5808> arg0)
+        {
+            _arg0 = arg0;
+        }
+
+        public OrleansCodeGen.TestProject.Invokable_IComplexGrain_GrainReference_67FE5808 Create() => _arg0.TryGet(out var item) ? item : new OrleansCodeGen.TestProject.Invokable_IComplexGrain_GrainReference_67FE5808(_arg0);
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
@@ -452,6 +482,7 @@ namespace OrleansCodeGen.TestProject
             config.AddInterface(typeof(global::TestProject.IComplexGrain));
             config.AddInterfaceImplementation(typeof(global::TestProject.ComplexGrain));
             config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_ComplexData));
+            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_Invokable_IComplexGrain_GrainReference_67FE5808));
             config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_ComplexGrain));
             var n1 = config.CompoundTypeAliases.Add("inv");
             var n2 = n1.Add(typeof(global::Orleans.Runtime.GrainReference));

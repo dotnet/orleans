@@ -113,8 +113,22 @@ namespace Orleans.Runtime
                     // Finally call the root-level invoker.
                     stage++;
                     var responseCompletionSource = ResponseCompletionSourcePool.Get();
-                    this.sendRequest(this.grainReference, responseCompletionSource, this.request, this.options);
-                    this.Response = await responseCompletionSource.AsValueTask().ConfigureAwait(false);
+                    var requestSent = false;
+                    try
+                    {
+                        this.sendRequest(this.grainReference, responseCompletionSource, this.request, this.options);
+                        requestSent = true;
+                        this.Response = await responseCompletionSource.AsValueTask().ConfigureAwait(false);
+                    }
+                    catch
+                    {
+                        if (!requestSent)
+                        {
+                            responseCompletionSource.Reset();
+                        }
+
+                        throw;
+                    }
 
                     return;
                 }

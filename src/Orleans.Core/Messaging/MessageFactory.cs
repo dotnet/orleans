@@ -4,6 +4,7 @@ using System.Threading;
 using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
 using Orleans.Serialization;
+using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime
 {
@@ -37,6 +38,7 @@ namespace Orleans.Runtime
                 IsUnordered = (options & InvokeMethodOptions.Unordered) != 0,
                 IsAlwaysInterleave = (options & InvokeMethodOptions.AlwaysInterleave) != 0,
                 BodyObject = body,
+                OwnsBodyObject = body is IInvokable,
                 RequestContextData = RequestContextExtensions.Export(_deepCopier),
             };
 

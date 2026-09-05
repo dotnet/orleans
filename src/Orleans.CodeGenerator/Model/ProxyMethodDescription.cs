@@ -1,8 +1,8 @@
-using Orleans.CodeGenerator.SyntaxGeneration;
-using Microsoft.CodeAnalysis;
-using System.Diagnostics;
 using System.Collections.Immutable;
+using System.Diagnostics;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Orleans.CodeGenerator.SyntaxGeneration;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Orleans.CodeGenerator;
@@ -149,6 +149,7 @@ internal class ProxyMethodDescription : IEquatable<ProxyMethodDescription>
         public bool IsImmutable => _invokableDescription.IsImmutable;
         public bool IsExceptionType => _invokableDescription.IsExceptionType;
         public List<TypeSyntax> ActivatorConstructorParameters => _invokableDescription.ActivatorConstructorParameters;
+        public bool UsesInvokablePool => _invokableDescription.UsesInvokablePool;
         public bool HasActivatorConstructor => UseActivator;
         public string? ReturnValueInitializerMethod => _invokableDescription.ReturnValueInitializerMethod;
 

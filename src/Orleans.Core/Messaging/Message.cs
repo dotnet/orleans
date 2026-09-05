@@ -16,6 +16,12 @@ namespace Orleans.Runtime
         [NonSerialized]
         private short _retryCount;
 
+        [NonSerialized]
+        internal bool OwnsBodyObject;
+
+        [NonSerialized]
+        private string? _disposedBodyDescription;
+
         public CoarseStopwatch _timeToExpiry;
 
         public object? BodyObject { get; set; }
@@ -367,6 +373,11 @@ namespace Orleans.Runtime
                 if (!dst.TryWrite($" {request}", out len)) goto grow;
                 dst = dst[len..];
             }
+            else if (_disposedBodyDescription is { } description)
+            {
+                if (!dst.TryWrite($" {description}", out len)) goto grow;
+                dst = dst[len..];
+            }
 
             if (!dst.TryWrite($" #{Id}", out len)) goto grow;
             dst = dst[len..];
@@ -395,6 +406,18 @@ grow:
         }
 
         internal bool IsPing() => _requestContextData?.TryGetValue(RequestContext.PING_APPLICATION_HEADER, out var value) == true && value is bool isPing && isPing;
+
+        internal void DisposeOwnedBody()
+        {
+            if (OwnsBodyObject)
+            {
+                OwnsBodyObject = false;
+                var body = BodyObject;
+                _disposedBodyDescription = body?.ToString();
+                BodyObject = null;
+                (body as IDisposable)?.Dispose();
+            }
+        }
 
         [Flags]
         internal enum MessageFlags : ushort

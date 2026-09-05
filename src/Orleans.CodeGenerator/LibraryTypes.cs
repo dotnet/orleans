@@ -31,6 +31,7 @@ internal sealed class LibraryTypes
         GenerateSerializerAttribute = Type("Orleans.GenerateSerializerAttribute");
         SerializationCallbacksAttribute = Type("Orleans.SerializationCallbacksAttribute");
         IActivator_1 = Type("Orleans.Serialization.Activators.IActivator`1");
+        InvokablePool_1 = Type("Orleans.Serialization.Invocation.InvokablePool`1");
         IBufferWriter = Type("System.Buffers.IBufferWriter`1");
         IdAttributeType = Type(CodeGeneratorOptions.IdAttribute);
         ConstructorAttributeTypes = [.. CodeGeneratorOptions.ConstructorAttributes.Select(Type)];
@@ -213,6 +214,7 @@ internal sealed class LibraryTypes
     public INamedTypeSymbol GenerateMethodSerializersAttribute { get; private set; }
     public INamedTypeSymbol GenerateSerializerAttribute { get; private set; }
     public INamedTypeSymbol IActivator_1 { get; private set; }
+    public INamedTypeSymbol InvokablePool_1 { get; private set; }
     public INamedTypeSymbol IBufferWriter { get; private set; }
     public INamedTypeSymbol IInvokable { get; private set; }
     public INamedTypeSymbol ITargetHolder { get; private set; }
