@@ -162,7 +162,7 @@ public partial class TransactionalStateStorage<TState> : ITransactionalStateStor
         var keyETag = keyEntity.ETag;
         if ((!string.IsNullOrWhiteSpace(keyETag) || !string.IsNullOrWhiteSpace(expectedETag)) && keyETag != expectedETag)
         {
-            throw new ArgumentException(nameof(expectedETag), "Etag does not match");
+            throw new ArgumentException("ETag does not match.", nameof(expectedETag));
         }
 
         try
