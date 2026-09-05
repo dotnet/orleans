@@ -35,6 +35,7 @@ namespace Orleans.Providers.Streams.PersistentStreams
             {
                 throw new ArgumentNullException(nameof(clusterId));
             }
+            ArgumentNullException.ThrowIfNull(azureStorageOptions);
             if (string.IsNullOrEmpty(azureStorageOptions.TableName))
             {
                 throw new ArgumentException("A table name must be configured.", nameof(azureStorageOptions));

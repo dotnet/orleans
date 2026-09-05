@@ -87,6 +87,7 @@ namespace Orleans.Providers.Streams.PersistentStreams
         /// <param name="token"></param>
         public virtual void SetSequenceToken(Serializer<StreamSequenceToken> serializer, StreamSequenceToken? token)
         {
+            ArgumentNullException.ThrowIfNull(serializer);
             SequenceToken = token != null ? serializer.SerializeToArray(token) : null;
         }
 
@@ -96,6 +97,7 @@ namespace Orleans.Providers.Streams.PersistentStreams
         /// <returns></returns>
         public virtual StreamSequenceToken? GetSequenceToken(Serializer<StreamSequenceToken> serializer)
         {
+            ArgumentNullException.ThrowIfNull(serializer);
             return SequenceToken != null ? serializer.Deserialize(SequenceToken) : null;
         }
 

@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 using Orleans.Reminders.Redis;
@@ -37,8 +38,12 @@ namespace Orleans.Configuration
         /// </summary>
         /// <param name="options">The reminder table options containing the Redis connection configuration.</param>
         /// <returns>A task containing the created multiplexer and an indication that the provider owns it.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="options"/> is <see langword="null"/>.</exception>
         public static async Task<(IConnectionMultiplexer Multiplexer, bool IsShared)> DefaultCreateMultiplexer(RedisReminderTableOptions options)
-            => (Multiplexer: await ConnectionMultiplexer.ConnectAsync(options.ConfigurationOptions!), IsShared: false);
+        {
+            ArgumentNullException.ThrowIfNull(options);
+            return (Multiplexer: await ConnectionMultiplexer.ConnectAsync(options.ConfigurationOptions!), IsShared: false);
+        }
     }
 
     internal class RedactRedisConfigurationOptions : RedactAttribute
@@ -57,6 +62,7 @@ namespace Orleans.Configuration
         /// Initializes a new instance of the <see cref="RedisReminderTableOptionsValidator"/> class.
         /// </summary>
         /// <param name="options">The reminder table options to validate.</param>
+        [SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "Microsoft.Extensions.DependencyInjection supplies the registered options instance.")]
         public RedisReminderTableOptionsValidator(IOptions<RedisReminderTableOptions> options)
         {
             _options = options.Value;

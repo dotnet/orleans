@@ -45,8 +45,14 @@ public sealed class RedisStreamingOptions
     /// <summary>
     /// The default multiplexer creation delegate.
     /// </summary>
-    public static async Task<(IConnectionMultiplexer Multiplexer, bool IsShared)> DefaultCreateMultiplexer(RedisStreamingOptions options) =>
-        (await ConnectionMultiplexer.ConnectAsync(options.ConfigurationOptions), false);
+    /// <param name="options">The streaming options containing the Redis connection configuration.</param>
+    /// <returns>A task containing the created multiplexer and an indication that the provider owns it.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="options"/> is <see langword="null"/>.</exception>
+    public static async Task<(IConnectionMultiplexer Multiplexer, bool IsShared)> DefaultCreateMultiplexer(RedisStreamingOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        return (await ConnectionMultiplexer.ConnectAsync(options.ConfigurationOptions), false);
+    }
 }
 
 internal sealed class RedactRedisConfigurationOptionsAttribute : RedactAttribute

@@ -55,8 +55,14 @@ namespace Orleans.Persistence
         /// <summary>
         /// The default multiplexer creation delegate.
         /// </summary>
+        /// <param name="options">The storage options containing the Redis connection configuration.</param>
+        /// <returns>A task containing the created multiplexer and an indication that the provider owns it.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="options"/> is <see langword="null"/>.</exception>
         public static async Task<(IConnectionMultiplexer Multiplexer, bool IsShared)> DefaultCreateMultiplexer(RedisStorageOptions options)
-            => (Multiplexer: await ConnectionMultiplexer.ConnectAsync(options.ConfigurationOptions!), IsShared: false);
+        {
+            ArgumentNullException.ThrowIfNull(options);
+            return (Multiplexer: await ConnectionMultiplexer.ConnectAsync(options.ConfigurationOptions!), IsShared: false);
+        }
     }
 
     /// <summary>
@@ -71,8 +77,11 @@ namespace Orleans.Persistence
         /// This method is provided as a compatibility utility for users who are migrating from prerelease versions of the Redis storage provider.
         /// </remarks>
         /// <param name="optionsBuilder">The options builder.</param>
+        /// <exception cref="ArgumentNullException"><paramref name="optionsBuilder"/> is <see langword="null"/>.</exception>
         public static void UseGetRedisKeyIgnoringGrainType(this OptionsBuilder<RedisStorageOptions> optionsBuilder)
         {
+            ArgumentNullException.ThrowIfNull(optionsBuilder);
+
             optionsBuilder.Configure((RedisStorageOptions options, IOptions<ClusterOptions> clusterOptions) =>
             {
                 RedisKey keyPrefix = Encoding.UTF8.GetBytes($"{clusterOptions.Value.ServiceId}/state/");

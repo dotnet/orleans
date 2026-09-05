@@ -34,6 +34,8 @@ namespace Orleans.Providers.Streams.AzureQueue
         /// <param name="storageConnectionString">The azure storage connection string.</param>
         public static async Task DeleteAllUsedAzureQueues(ILoggerFactory loggerFactory, List<string> azureQueueNames, string storageConnectionString)
         {
+            ArgumentNullException.ThrowIfNull(azureQueueNames);
+
             var options = new AzureQueueOptions();
             options.QueueServiceClient = new(storageConnectionString);
             await DeleteAllUsedAzureQueues(loggerFactory, azureQueueNames, options);
@@ -47,6 +49,8 @@ namespace Orleans.Providers.Streams.AzureQueue
         /// <param name="queueOptions">The azure storage options.</param>
         public static async Task DeleteAllUsedAzureQueues(ILoggerFactory loggerFactory, List<string> azureQueueNames, AzureQueueOptions queueOptions)
         {
+            ArgumentNullException.ThrowIfNull(azureQueueNames);
+
             var deleteTasks = new List<Task>();
             foreach (var queueName in azureQueueNames)
             {
@@ -65,6 +69,8 @@ namespace Orleans.Providers.Streams.AzureQueue
         /// <param name="storageConnectionString">The azure storage connection string.</param>
         public static async Task ClearAllUsedAzureQueues(ILoggerFactory loggerFactory, List<string> azureQueueNames, string storageConnectionString)
         {
+            ArgumentNullException.ThrowIfNull(azureQueueNames);
+
             var options = new AzureQueueOptions();
             options.QueueServiceClient = new(storageConnectionString);
             await ClearAllUsedAzureQueues(loggerFactory, azureQueueNames, options);
@@ -78,6 +84,8 @@ namespace Orleans.Providers.Streams.AzureQueue
         /// <param name="queueOptions">The azure storage options.</param>
         public static async Task ClearAllUsedAzureQueues(ILoggerFactory loggerFactory, List<string> azureQueueNames, AzureQueueOptions queueOptions)
         {
+            ArgumentNullException.ThrowIfNull(azureQueueNames);
+
             var deleteTasks = new List<Task>();
             foreach (var queueName in azureQueueNames)
             {

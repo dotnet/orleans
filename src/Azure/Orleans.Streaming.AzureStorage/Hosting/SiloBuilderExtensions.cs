@@ -86,8 +86,12 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure silo to use azure blob lease provider
         /// </summary>
+        /// <exception cref="ArgumentNullException"><paramref name="configurator"/> or <paramref name="configureOptions"/> is <see langword="null"/>.</exception>
         public static void UseAzureBlobLeaseProvider(this ISiloPersistentStreamConfigurator configurator, Action<OptionsBuilder<AzureBlobLeaseProviderOptions>> configureOptions)
         {
+            ArgumentNullException.ThrowIfNull(configurator);
+            ArgumentNullException.ThrowIfNull(configureOptions);
+
             configurator.ConfigureDelegate(services =>
             {
                 services.AddTransient(sp => AzureBlobLeaseProviderOptionsValidator.Create(sp, configurator.Name));

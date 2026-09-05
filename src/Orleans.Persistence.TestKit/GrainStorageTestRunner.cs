@@ -67,6 +67,7 @@ public abstract class GrainStorageTestRunner
 
     /// <inheritdoc cref="Store_WriteRead{T}(string, GrainId, GrainState{T})"/>
     /// <param name="cancellationToken">A token which cancels the storage operations.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="grainState"/> is <see langword="null"/>.</exception>
     protected async Task Store_WriteRead<T>(
         string grainTypeName,
         GrainId grainId,
@@ -74,6 +75,9 @@ public abstract class GrainStorageTestRunner
         CancellationToken cancellationToken)
         where T : new()
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        ArgumentNullException.ThrowIfNull(grainState);
+
         await Storage.WriteStateAsync(grainTypeName, grainId, grainState, cancellationToken).ConfigureAwait(false);
         var storedGrainState = new GrainState<T> { State = new T() };
         await Storage.ReadStateAsync(grainTypeName, grainId, storedGrainState, cancellationToken).ConfigureAwait(false);
@@ -95,6 +99,7 @@ public abstract class GrainStorageTestRunner
 
     /// <inheritdoc cref="Store_WriteClearRead{T}(string, GrainId, GrainState{T})"/>
     /// <param name="cancellationToken">A token which cancels the storage operations.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="grainState"/> is <see langword="null"/>.</exception>
     protected async Task Store_WriteClearRead<T>(
         string grainTypeName,
         GrainId grainId,
@@ -102,6 +107,9 @@ public abstract class GrainStorageTestRunner
         CancellationToken cancellationToken)
         where T : new()
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        ArgumentNullException.ThrowIfNull(grainState);
+
         // A legal situation for clearing has to be arranged by writing a state to the storage before clearing it.
         // Writing and clearing both change the ETag, so they should differ.
         await Storage.WriteStateAsync(grainTypeName, grainId, grainState, cancellationToken);
