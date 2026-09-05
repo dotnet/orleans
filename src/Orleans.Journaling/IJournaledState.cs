@@ -40,6 +40,15 @@ namespace Orleans.Journaling;
 public interface IJournaledState
 {
     /// <summary>
+    /// Gets a value indicating whether this state has changes which have not been materialized in the journal buffer.
+    /// </summary>
+    /// <remarks>
+    /// Implementations which stage mutations outside the shared journal buffer must override this property.
+    /// States which write directly to their assigned <see cref="JournalStreamWriter"/> are tracked by the buffer itself.
+    /// </remarks>
+    bool HasPendingChanges => false;
+
+    /// <summary>
     /// Replays one entry during journal recovery.
     /// </summary>
     /// <param name="entry">The entry to replay.</param>

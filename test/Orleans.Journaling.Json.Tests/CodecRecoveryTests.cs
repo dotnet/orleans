@@ -40,7 +40,7 @@ public class CodecRecoveryTests : JournalingTestBase
         dict.Add("alpha", 1);
         dict.Add("beta", 2);
         dict.Add("gamma", 3);
-        await sut.Manager.WriteStateAsync(CancellationToken.None);
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         // Recovery phase — new manager, same storage
         var sut2 = CreateTestSystem(storage);
@@ -72,7 +72,7 @@ public class CodecRecoveryTests : JournalingTestBase
 
         dict.Add("alpha", 1);
         dict.Add("beta", 2);
-        await sut.Manager.WriteStateAsync(CancellationToken.None);
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
         var journal = Encoding.UTF8.GetString(storage.Segments.Single());
         Assert.Equal(
             """[0,["set","dict",8]]""" + "\n" +
@@ -107,7 +107,7 @@ public class CodecRecoveryTests : JournalingTestBase
         list.Add("one");
         list.Add("two");
         list.Add("three");
-        await sut.Manager.WriteStateAsync(CancellationToken.None);
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         // Recovery phase
         var sut2 = CreateTestSystemWithJsonCodec(storage, jsonOptions);
@@ -135,7 +135,7 @@ public class CodecRecoveryTests : JournalingTestBase
         await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
 
         value.Value = 42;
-        await sut.Manager.WriteStateAsync(CancellationToken.None);
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         // Recovery phase
         var sut2 = CreateTestSystemWithJsonCodec(storage, jsonOptions);
@@ -169,7 +169,7 @@ public class CodecRecoveryTests : JournalingTestBase
         set.Add("b");
         ((IStorage<string>)state).State = "state-value";
         Assert.True(tcs.TrySetResult(17));
-        await sut.Manager.WriteStateAsync(CancellationToken.None);
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         var sut2 = CreateTestSystemWithJsonCodec(storage, jsonOptions);
         var queue2 = new DurableQueue<string>("queue", sut2.Manager, new JsonDurableQueueCommandCodec<string>(jsonOptions));
@@ -201,7 +201,7 @@ public class CodecRecoveryTests : JournalingTestBase
         var dict = CreateFormatAwareDictionary(first, OrleansBinaryJournalFormat.JournalFormatKey);
         await first.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         dict.Add("alpha", 1);
-        await first.Manager.WriteStateAsync(CancellationToken.None);
+        await first.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
         Assert.Equal(OrleansBinaryJournalFormat.JournalFormatKey, storage.StoredJournalFormatKey);
 
         storage.SetConfiguredJournalFormatKey(JsonJournalExtensions.JournalFormatKey);
@@ -212,7 +212,7 @@ public class CodecRecoveryTests : JournalingTestBase
         Assert.Equal(1, recoveredDict["alpha"]);
 
         recoveredDict.Add("beta", 2);
-        await recovered.Manager.WriteStateAsync(CancellationToken.None);
+        await recovered.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(JsonJournalExtensions.JournalFormatKey, storage.StoredJournalFormatKey);
         Assert.Single(storage.Segments);
@@ -229,7 +229,7 @@ public class CodecRecoveryTests : JournalingTestBase
         var dict = CreateFormatAwareDictionary(first, JsonJournalExtensions.JournalFormatKey);
         await first.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         dict.Add("alpha", 1);
-        await first.Manager.WriteStateAsync(CancellationToken.None);
+        await first.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
         Assert.Equal(JsonJournalExtensions.JournalFormatKey, storage.StoredJournalFormatKey);
 
         storage.SetConfiguredJournalFormatKey(OrleansBinaryJournalFormat.JournalFormatKey);
@@ -240,12 +240,42 @@ public class CodecRecoveryTests : JournalingTestBase
         Assert.Equal(1, recoveredDict["alpha"]);
 
         recoveredDict.Add("beta", 2);
-        await recovered.Manager.WriteStateAsync(CancellationToken.None);
+        await recovered.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(OrleansBinaryJournalFormat.JournalFormatKey, storage.StoredJournalFormatKey);
         Assert.Single(storage.Segments);
 
         using var final = CreateFormatAwareTestSystem(storage, OrleansBinaryJournalFormat.JournalFormatKey);
+        var finalDict = CreateFormatAwareDictionary(final, OrleansBinaryJournalFormat.JournalFormatKey);
+        await final.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+        Assert.Equal(1, finalDict["alpha"]);
+        Assert.Equal(2, finalDict["beta"]);
+    }
+
+    [Fact]
+    public async Task Recovery_JsonJournalWithBinaryFormat_ReplacesWithoutAppendingDuringMigration()
+    {
+        var innerStorage = new VolatileJournalStorage(JsonJournalExtensions.JournalFormatKey);
+        using var first = CreateFormatAwareTestSystem(innerStorage, JsonJournalExtensions.JournalFormatKey);
+        var dict = CreateFormatAwareDictionary(first, JsonJournalExtensions.JournalFormatKey);
+        await first.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+        dict.Add("alpha", 1);
+        await first.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
+
+        innerStorage.SetConfiguredJournalFormatKey(OrleansBinaryJournalFormat.JournalFormatKey);
+        var storage = new CountingStorage(innerStorage);
+        using var recovered = CreateFormatAwareTestSystem(storage, OrleansBinaryJournalFormat.JournalFormatKey);
+        var recoveredDict = CreateFormatAwareDictionary(recovered, OrleansBinaryJournalFormat.JournalFormatKey);
+        await recovered.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+
+        recoveredDict.Add("beta", 2);
+        await recovered.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(0, storage.AppendCount);
+        Assert.Equal(1, storage.ReplaceCount);
+        Assert.Equal(OrleansBinaryJournalFormat.JournalFormatKey, innerStorage.StoredJournalFormatKey);
+
+        using var final = CreateFormatAwareTestSystem(innerStorage, OrleansBinaryJournalFormat.JournalFormatKey);
         var finalDict = CreateFormatAwareDictionary(final, OrleansBinaryJournalFormat.JournalFormatKey);
         await final.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         Assert.Equal(1, finalDict["alpha"]);
@@ -260,7 +290,7 @@ public class CodecRecoveryTests : JournalingTestBase
         var dict = CreateFormatAwareDictionary(first, JsonJournalExtensions.JournalFormatKey);
         await first.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         dict.Add("alpha", 1);
-        await first.Manager.WriteStateAsync(CancellationToken.None);
+        await first.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
         var metadataLessStorage = new MetadataOverridingStorage(storage, storedJournalFormatKey: null);
 
         using var recovered = CreateFormatAwareTestSystem(metadataLessStorage, JsonJournalExtensions.JournalFormatKey);
@@ -270,7 +300,7 @@ public class CodecRecoveryTests : JournalingTestBase
         Assert.Equal(1, recoveredDict["alpha"]);
 
         recoveredDict.Add("beta", 2);
-        await recovered.Manager.WriteStateAsync(CancellationToken.None);
+        await recovered.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(JsonJournalExtensions.JournalFormatKey, storage.StoredJournalFormatKey);
         Assert.Equal(2, storage.Segments.Count);
@@ -287,7 +317,7 @@ public class CodecRecoveryTests : JournalingTestBase
         await system.Lifecycle.OnStart(TestContext.Current.CancellationToken);
 
         dict.Add("alpha", 1);
-        await system.Manager.WriteStateAsync(CancellationToken.None);
+        await system.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(JsonJournalExtensions.JournalFormatKey, storage.StoredJournalFormatKey);
         Assert.Contains("""[8,["set","alpha",1]]""", Encoding.UTF8.GetString(storage.Segments.Single()), StringComparison.Ordinal);
@@ -301,7 +331,7 @@ public class CodecRecoveryTests : JournalingTestBase
         var dict = CreateFormatAwareDictionary(first, OrleansBinaryJournalFormat.JournalFormatKey, "dict");
         await first.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         dict.Add("alpha", 1);
-        await first.Manager.WriteStateAsync(CancellationToken.None);
+        await first.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         storage.SetConfiguredJournalFormatKey(JsonJournalExtensions.JournalFormatKey);
         using var recovered = CreateFormatAwareTestSystem(storage, JsonJournalExtensions.JournalFormatKey);
@@ -310,7 +340,7 @@ public class CodecRecoveryTests : JournalingTestBase
 
         other.Add("beta", 2);
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => recovered.Manager.WriteStateAsync(CancellationToken.None).AsTask());
+            () => recovered.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask());
 
         Assert.Contains("Cannot migrate journal", exception.Message, StringComparison.Ordinal);
         Assert.Contains("not currently registered", exception.Message, StringComparison.Ordinal);
@@ -330,6 +360,83 @@ public class CodecRecoveryTests : JournalingTestBase
             TestContext.Current.CancellationToken);
 
         Assert.Contains(expectedInnerMessage, exception.InnerException!.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Recovery_MigrationReplaceFails_PreservesOldMixedJournalAndRetriesWithoutAppend()
+    {
+        var innerStorage = new VolatileJournalStorage(JsonJournalExtensions.JournalFormatKey);
+        using (var first = CreateFormatAwareTestSystem(innerStorage, JsonJournalExtensions.JournalFormatKey))
+        {
+            var list = CreateFormatAwareList(first, JsonJournalExtensions.JournalFormatKey);
+            var value = CreateFormatAwareValue(first, JsonJournalExtensions.JournalFormatKey);
+            await first.Lifecycle.OnStart(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+            list.Add("baseline");
+            value.Value = 10;
+            await first.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            list.Add("old-batch");
+            value.Value = 20;
+            await first.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        }
+
+        var oldCheckpoint = innerStorage.Segments.Select(static segment => segment.ToArray()).ToArray();
+        innerStorage.SetConfiguredJournalFormatKey(OrleansBinaryJournalFormat.JournalFormatKey);
+        var expected = new IOException("Expected migration replacement failure.");
+        var storage = new FaultingCountingStorage(innerStorage) { NextReplaceException = expected };
+        using var migrating = CreateFormatAwareTestSystem(storage, OrleansBinaryJournalFormat.JournalFormatKey);
+        var migratingList = CreateFormatAwareList(migrating, OrleansBinaryJournalFormat.JournalFormatKey);
+        var migratingValue = CreateFormatAwareValue(migrating, OrleansBinaryJournalFormat.JournalFormatKey);
+        await migrating.Lifecycle.OnStart(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        migratingList.Add("migration-pending");
+        migratingValue.Value = 30;
+        var exception = await Assert.ThrowsAsync<IOException>(
+            () => migrating.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
+        var failedCheckpoint = innerStorage.Segments.Select(static segment => segment.ToArray()).ToArray();
+        var replaceAttemptsAfterFailure = storage.ReplaceAttempts;
+        var committedReplacesAfterFailure = storage.CommittedReplaces;
+        var appendAttemptsAfterFailure = storage.AppendAttempts;
+        var committedAppendsAfterFailure = storage.CommittedAppends;
+        var pendingAfterFailure = migrating.Manager.HasPendingWrites;
+
+        var oldRecoveryStorage = new VolatileJournalStorage(JsonJournalExtensions.JournalFormatKey);
+        foreach (var segment in failedCheckpoint)
+        {
+            await oldRecoveryStorage.AppendAsync(new ReadOnlySequence<byte>(segment), TestContext.Current.CancellationToken);
+        }
+
+        using var failedRecovery = CreateFormatAwareTestSystem(oldRecoveryStorage, JsonJournalExtensions.JournalFormatKey);
+        var failedList = CreateFormatAwareList(failedRecovery, JsonJournalExtensions.JournalFormatKey);
+        var failedValue = CreateFormatAwareValue(failedRecovery, JsonJournalExtensions.JournalFormatKey);
+        await failedRecovery.Lifecycle.OnStart(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        await migrating.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        using var final = CreateFormatAwareTestSystem(innerStorage, OrleansBinaryJournalFormat.JournalFormatKey);
+        var finalList = CreateFormatAwareList(final, OrleansBinaryJournalFormat.JournalFormatKey);
+        var finalValue = CreateFormatAwareValue(final, OrleansBinaryJournalFormat.JournalFormatKey);
+        await final.Lifecycle.OnStart(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        Assert.Same(expected, exception);
+        Assert.Equal(1, replaceAttemptsAfterFailure);
+        Assert.Equal(0, committedReplacesAfterFailure);
+        Assert.Equal(0, appendAttemptsAfterFailure);
+        Assert.Equal(0, committedAppendsAfterFailure);
+        Assert.Equal(oldCheckpoint.SelectMany(static segment => segment), failedCheckpoint.SelectMany(static segment => segment));
+        Assert.Equal(["baseline", "old-batch"], failedList.ToArray());
+        Assert.Equal(20, failedValue.Value);
+        Assert.True(pendingAfterFailure);
+        Assert.Equal(["baseline", "old-batch", "migration-pending"], migratingList.ToArray());
+        Assert.Equal(30, migratingValue.Value);
+        Assert.Equal(2, storage.ReplaceAttempts);
+        Assert.Equal(1, storage.CommittedReplaces);
+        Assert.Equal(0, storage.AppendAttempts);
+        Assert.Equal(0, storage.CommittedAppends);
+        Assert.Equal(OrleansBinaryJournalFormat.JournalFormatKey, innerStorage.StoredJournalFormatKey);
+        Assert.Single(innerStorage.Segments);
+        Assert.Equal(["baseline", "old-batch", "migration-pending"], finalList.ToArray());
+        Assert.Equal(30, finalValue.Value);
     }
 
     internal (IJournaledStateManager Manager, IJournalStorage Storage, ILifecycleSubject Lifecycle) CreateTestSystemWithJsonCodec(IJournalStorage? storage = null, System.Text.Json.JsonSerializerOptions? jsonOptions = null)
@@ -392,6 +499,14 @@ public class CodecRecoveryTests : JournalingTestBase
             typeof(IDurableDictionaryCommandCodec<,>),
             OrleansBinaryJournalFormat.JournalFormatKey,
             typeof(OrleansBinaryDurableDictionaryCommandCodec<,>));
+        services.AddKeyedSingleton(
+            typeof(IDurableListCommandCodec<>),
+            OrleansBinaryJournalFormat.JournalFormatKey,
+            typeof(OrleansBinaryDurableListCommandCodec<>));
+        services.AddKeyedSingleton(
+            typeof(IDurableValueCommandCodec<>),
+            OrleansBinaryJournalFormat.JournalFormatKey,
+            typeof(OrleansBinaryDurableValueCommandCodec<>));
 
         var jsonOptions = CreateJsonOptions();
         services.Configure<JsonJournalOptions>(options => options.SerializerOptions = jsonOptions);
@@ -400,6 +515,14 @@ public class CodecRecoveryTests : JournalingTestBase
             typeof(IDurableDictionaryCommandCodec<,>),
             JsonJournalExtensions.JournalFormatKey,
             typeof(JsonDurableDictionaryCommandCodecService<,>));
+        services.AddKeyedSingleton(
+            typeof(IDurableListCommandCodec<>),
+            JsonJournalExtensions.JournalFormatKey,
+            typeof(JsonDurableListCommandCodecService<>));
+        services.AddKeyedSingleton(
+            typeof(IDurableValueCommandCodec<>),
+            JsonJournalExtensions.JournalFormatKey,
+            typeof(JsonDurableValueCommandCodecService<>));
 
         var serviceProvider = services.BuildServiceProvider();
         var managerOptions = new JournaledStateManagerOptions
@@ -426,6 +549,26 @@ public class CodecRecoveryTests : JournalingTestBase
             name,
             system.Manager,
             JournalFormatServices.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<string, int>>(
+                system.ServiceProvider,
+                writeJournalFormatKey));
+
+    private static DurableList<string> CreateFormatAwareList(
+        FormatAwareTestSystem system,
+        string writeJournalFormatKey)
+        => new(
+            "list",
+            system.Manager,
+            JournalFormatServices.GetRequiredCommandCodec<IDurableListCommandCodec<string>>(
+                system.ServiceProvider,
+                writeJournalFormatKey));
+
+    private static DurableValue<int> CreateFormatAwareValue(
+        FormatAwareTestSystem system,
+        string writeJournalFormatKey)
+        => new(
+            "value",
+            system.Manager,
+            JournalFormatServices.GetRequiredCommandCodec<IDurableValueCommandCodec<int>>(
                 system.ServiceProvider,
                 writeJournalFormatKey));
 
@@ -506,6 +649,74 @@ public class CodecRecoveryTests : JournalingTestBase
                 cancellationToken.ThrowIfCancellationRequested();
                 yield return segment;
             }
+        }
+    }
+
+    private sealed class CountingStorage(VolatileJournalStorage inner) : IJournalStorage
+    {
+        public int AppendCount { get; private set; }
+
+        public int ReplaceCount { get; private set; }
+
+        public bool IsCompactionRequested => inner.IsCompactionRequested;
+
+        public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+        {
+            AppendCount++;
+            return inner.AppendAsync(value, cancellationToken);
+        }
+
+        public ValueTask DeleteAsync(CancellationToken cancellationToken)
+            => inner.DeleteAsync(cancellationToken);
+
+        public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
+            => inner.ReadAsync(consumer, cancellationToken);
+
+        public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+        {
+            ReplaceCount++;
+            return inner.ReplaceAsync(value, cancellationToken);
+        }
+    }
+
+    private sealed class FaultingCountingStorage(VolatileJournalStorage inner) : IJournalStorage
+    {
+        public int AppendAttempts { get; private set; }
+
+        public int ReplaceAttempts { get; private set; }
+
+        public int CommittedAppends { get; private set; }
+
+        public int CommittedReplaces { get; private set; }
+
+        public Exception? NextReplaceException { get; set; }
+
+        public bool IsCompactionRequested => inner.IsCompactionRequested;
+
+        public async ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+        {
+            AppendAttempts++;
+            await inner.AppendAsync(value, cancellationToken);
+            CommittedAppends++;
+        }
+
+        public ValueTask DeleteAsync(CancellationToken cancellationToken)
+            => inner.DeleteAsync(cancellationToken);
+
+        public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
+            => inner.ReadAsync(consumer, cancellationToken);
+
+        public async ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+        {
+            ReplaceAttempts++;
+            if (NextReplaceException is { } exception)
+            {
+                NextReplaceException = null;
+                throw exception;
+            }
+
+            await inner.ReplaceAsync(value, cancellationToken);
+            CommittedReplaces++;
         }
     }
 

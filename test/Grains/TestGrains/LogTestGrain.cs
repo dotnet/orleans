@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Orleans.EventSourcing;
 using UnitTests.GrainInterfaces;
 
@@ -66,6 +67,7 @@ namespace TestGrains
     /// </summary>
     public abstract class LogTestGrain : JournaledGrain<MyGrainState, object>, UnitTests.GrainInterfaces.ILogTestGrain
     {
+        private static readonly ConcurrentDictionary<long, CancellationTokenSource> PendingClearCancellations = new();
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
@@ -160,6 +162,13 @@ namespace TestGrains
             return RefreshNow();
         }
 
+        public async Task RaiseEventsWithUnsupportedSecond()
+        {
+            RaiseEvent(new UpdateA { Val = 41 });
+            RaiseEvent(new UnsupportedLogEvent());
+            await ConfirmEvents();
+        }
+
         public Task<int> GetConfirmedVersion()
         {
             return Task.FromResult(this.Version);
@@ -190,10 +199,45 @@ namespace TestGrains
             return ClearLogAsync();
         }
 
+        public async Task ClearWithCancellation()
+        {
+            var grainId = this.GetPrimaryKeyLong();
+            using var cancellation = new CancellationTokenSource();
+            if (!PendingClearCancellations.TryAdd(grainId, cancellation))
+            {
+                throw new InvalidOperationException($"A cancellable clear is already pending for grain '{grainId}'.");
+            }
+
+            try
+            {
+                await ClearLogAsync(cancellation.Token);
+            }
+            finally
+            {
+                PendingClearCancellations.TryRemove(new(grainId, cancellation));
+            }
+        }
+
+        public static bool CancelPendingClear(long grainId) =>
+            PendingClearCancellations.TryGetValue(grainId, out var cancellation) && TryCancel(cancellation);
+
+        private static bool TryCancel(CancellationTokenSource cancellation)
+        {
+            cancellation.Cancel();
+            return true;
+        }
+
         public Task<IReadOnlyList<object>> GetEventLog()
         {
             return this.RetrieveConfirmedEvents(0, Version);
         }
 
+        public Task<IReadOnlyList<object>> GetEventLogSegment(int fromVersion, int toVersion)
+        {
+            return RetrieveConfirmedEvents(fromVersion, toVersion);
+        }
+
     }
+
+    internal sealed class UnsupportedLogEvent;
 }
