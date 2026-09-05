@@ -38,6 +38,7 @@ Use this runtime map and the following topic list to choose the required depth. 
 - [Runtime architecture](runtime-architecture.md) follows a call through client, messaging, placement, directory, activation, and scheduling components.
 - [Activation lifecycle and migration](activation-lifecycle.md) explains creation, activation, collection, deactivation, and state transfer.
 - [Cluster membership](cluster-management.md) describes the failure detector, membership table, ordered views, and death-vote protocol.
+- [View-synchronous cluster services](view-synchronous-cluster-services.md) connects ownership transitions, state continuity, recovery, and fencing to the underlying research and runtime implementation.
 - [Grain directory](grain-directory.md) distinguishes the default `LocalGrainDirectory` DHT from the experimental distributed directory.
 - [Scheduling and turn execution](scheduler.md) explains `WorkItemGroup`, continuations, interleaving, and single-threaded execution.
 - [Messaging and delivery semantics](messaging-delivery-guarantees.md) traces requests and explains why a timeout has an unknown outcome.
