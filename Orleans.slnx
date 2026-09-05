@@ -105,6 +105,24 @@
   <Folder Name="/src/Extensions/Cassandra/">
     <Project Path="src/Cassandra/Orleans.Clustering.Cassandra/Orleans.Clustering.Cassandra.csproj" />
   </Folder>
+  <Folder Name="/src/Extensions/EFCore/">
+    <Project Path="src/EFCore/Orleans.Clustering.EntityFrameworkCore.MySql/Orleans.Clustering.EntityFrameworkCore.MySql.csproj" />
+    <Project Path="src/EFCore/Orleans.Clustering.EntityFrameworkCore.PostgreSQL/Orleans.Clustering.EntityFrameworkCore.PostgreSQL.csproj" />
+    <Project Path="src/EFCore/Orleans.Clustering.EntityFrameworkCore.SqlServer/Orleans.Clustering.EntityFrameworkCore.SqlServer.csproj" />
+    <Project Path="src/EFCore/Orleans.Clustering.EntityFrameworkCore/Orleans.Clustering.EntityFrameworkCore.csproj" />
+    <Project Path="src/EFCore/Orleans.GrainDirectory.EntityFrameworkCore.MySql/Orleans.GrainDirectory.EntityFrameworkCore.MySql.csproj" />
+    <Project Path="src/EFCore/Orleans.GrainDirectory.EntityFrameworkCore.PostgreSQL/Orleans.GrainDirectory.EntityFrameworkCore.PostgreSQL.csproj" />
+    <Project Path="src/EFCore/Orleans.GrainDirectory.EntityFrameworkCore.SqlServer/Orleans.GrainDirectory.EntityFrameworkCore.SqlServer.csproj" />
+    <Project Path="src/EFCore/Orleans.GrainDirectory.EntityFrameworkCore/Orleans.GrainDirectory.EntityFrameworkCore.csproj" />
+    <Project Path="src/EFCore/Orleans.Persistence.EntityFrameworkCore.MySql/Orleans.Persistence.EntityFrameworkCore.MySql.csproj" />
+    <Project Path="src/EFCore/Orleans.Persistence.EntityFrameworkCore.PostgreSQL/Orleans.Persistence.EntityFrameworkCore.PostgreSQL.csproj" />
+    <Project Path="src/EFCore/Orleans.Persistence.EntityFrameworkCore.SqlServer/Orleans.Persistence.EntityFrameworkCore.SqlServer.csproj" />
+    <Project Path="src/EFCore/Orleans.Persistence.EntityFrameworkCore/Orleans.Persistence.EntityFrameworkCore.csproj" />
+    <Project Path="src/EFCore/Orleans.Reminders.EntityFrameworkCore.MySql/Orleans.Reminders.EntityFrameworkCore.MySql.csproj" />
+    <Project Path="src/EFCore/Orleans.Reminders.EntityFrameworkCore.PostgreSQL/Orleans.Reminders.EntityFrameworkCore.PostgreSQL.csproj" />
+    <Project Path="src/EFCore/Orleans.Reminders.EntityFrameworkCore.SqlServer/Orleans.Reminders.EntityFrameworkCore.SqlServer.csproj" />
+    <Project Path="src/EFCore/Orleans.Reminders.EntityFrameworkCore/Orleans.Reminders.EntityFrameworkCore.csproj" />
+  </Folder>
   <Folder Name="/src/Extensions/Google/">
     <Project Path="src/Google/Orleans.Clustering.Firestore/Orleans.Clustering.Firestore.csproj" />
     <Project Path="src/Google/Orleans.GrainDirectory.Firestore/Orleans.GrainDirectory.Firestore.csproj" />
@@ -190,6 +208,7 @@
     <Project Path="test/Extensions/Orleans.DurableJobs.AzureStorage.Tests/Orleans.DurableJobs.AzureStorage.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.Clustering.ZooKeeper.Tests/Orleans.Clustering.ZooKeeper.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.Streaming.NATS.Tests/Orleans.Streaming.NATS.Tests.csproj" />
+    <Project Path="test/Extensions/Orleans.EntityFrameworkCore.Tests/Orleans.EntityFrameworkCore.Tests.csproj" />
   </Folder>
   <Folder Name="/test/Grains/">
     <Project Path="test/Grains/TestFSharp/TestFSharp.fsproj" />

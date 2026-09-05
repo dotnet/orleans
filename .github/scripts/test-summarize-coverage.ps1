@@ -1235,8 +1235,8 @@ exit 0
         $workflow = Get-Content -Raw -LiteralPath $workflowPath
         $runTestsAction = Get-Content -Raw -LiteralPath $runTestsActionPath
         $dotnetTestAction = Get-Content -Raw -LiteralPath $dotnetTestActionPath
-        Assert-Equal 19 ([regex]::Matches($workflow, 'uses: \./\.github/actions/run-tests')).Count 'Test action count differs.'
-        Assert-Equal 17 ([regex]::Matches($workflow, '(?m)^\s{8}provider: [A-Za-z]')).Count 'Provider-discovered test partition count differs.'
+        Assert-Equal 20 ([regex]::Matches($workflow, 'uses: \./\.github/actions/run-tests')).Count 'Test action count differs.'
+        Assert-Equal 14 ([regex]::Matches($workflow, '(?m)^\s{8}provider: [A-Za-z]')).Count 'Provider-discovered test partition count differs.'
         Assert-Equal 2 ([regex]::Matches($runTestsAction, 'uses: \./\.github/actions/dotnet-test')).Count 'Native test action invocation count differs.'
         Assert-Equal 2 ([regex]::Matches($runTestsAction, "format\('/\[\(Provider=\{0\}\)")).Count 'Standard provider filter count differs.'
         $directTestCommands = ([regex]::Matches($dotnetTestAction, 'dotnet test --solution Orleans\.slnx')).Count

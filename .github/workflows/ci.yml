@@ -151,6 +151,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        provider: ["PostgreSql", "EFCore-PostgreSql"]
         framework: ["net8.0", "net10.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
@@ -175,9 +176,9 @@ jobs:
     - name: Test
       uses: ./.github/actions/run-tests
       with:
-        artifact-name: test_output_${{ github.job }}_${{ matrix.framework }}
+        artifact-name: test_output_${{ github.job }}_${{ matrix.provider }}_${{ matrix.framework }}
         framework: ${{ matrix.framework }}
-        provider: PostgreSql
+        provider: ${{ matrix.provider }}
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="False positive")]
         ORLEANSPOSTGRESCONNECTIONSTRING: "Server=127.0.0.1;Port=5432;Pooling=false;User Id=postgres;Password=postgres;SSL Mode=Disable"
@@ -197,6 +198,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        provider: ["MySql", "EFCore-MySql"]
         framework: ["net8.0", "net10.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
@@ -242,12 +244,27 @@ jobs:
     - name: Test
       uses: ./.github/actions/run-tests
       with:
-        artifact-name: test_output_${{ github.job }}_${{ matrix.framework }}
+        artifact-name: test_output_${{ github.job }}_${{ matrix.provider }}_${{ matrix.framework }}
         framework: ${{ matrix.framework }}
-        provider: MySql
+        provider: ${{ matrix.provider }}
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
         ORLEANSMYSQLCONNECTIONSTRING: "Server=127.0.0.1;Port=3306;UId=root;Pwd=mariadb;"
+  test-efcore-unit:
+    name: Entity Framework Core provider unit tests
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        framework: ["net8.0", "net10.0"]
+    steps:
+    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+    - name: Test
+      uses: ./.github/actions/run-tests
+      with:
+        artifact-name: test_output_${{ github.job }}_${{ matrix.framework }}
+        filter-query: /[(Area=EFCore)&(Provider=None)&(Suite=BVT)]
+        framework: ${{ matrix.framework }}
   test-sqlserver:
     name: Microsoft SQL Server provider tests
     runs-on: ubuntu-latest
@@ -259,6 +276,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        provider: ["SqlServer", "EFCore-SqlServer"]
         framework: ["net8.0", "net10.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
@@ -284,9 +302,9 @@ jobs:
     - name: Test
       uses: ./.github/actions/run-tests
       with:
-        artifact-name: test_output_${{ github.job }}_${{ matrix.framework }}
+        artifact-name: test_output_${{ github.job }}_${{ matrix.provider }}_${{ matrix.framework }}
         framework: ${{ matrix.framework }}
-        provider: SqlServer
+        provider: ${{ matrix.provider }}
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
         ORLEANSMSSQLCONNECTIONSTRING: "Server=127.0.0.1,1433;User Id=SA;Password=yourWeak(!)Password;TrustServerCertificate=True;"
@@ -871,6 +889,7 @@ jobs:
       - test-cassandra
       - test-postgres
       - test-mariadb
+      - test-efcore-unit
       - test-sqlserver
       - test-sqlite
       - test-azure-storage
