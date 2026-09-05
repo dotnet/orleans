@@ -70,7 +70,7 @@ Standalone restore requires public publication of every referenced package and i
 ## Test
 
 ```shell
-dotnet test --project DurableWorkflows.Tests/DurableWorkflows.Tests.csproj --framework net10.0 --minimum-expected-tests 1
+dotnet run --project DurableWorkflows.Tests/DurableWorkflows.Tests.csproj --framework net10.0
 ```
 
 Tests cover successful workflows, approval and rejection, cancellation recovery, failed saga compensation, replay/idempotency, and cross-silo recovery.
