@@ -18,6 +18,7 @@
   <ItemGroup>
     <Compile Include="..\Shared\Storage\DynamoDBStorage.cs" Link="Storage\DynamoDBStorage.cs" />
     <Compile Include="..\Shared\Storage\DynamoDBClientOptions.cs" Link="Storage\DynamoDBClientOptions.cs" />
+    <Compile Include="..\Shared\Storage\DynamoDBProviderConfiguration.cs" Link="Storage\DynamoDBProviderConfiguration.cs" />
     <Compile Include="..\Shared\AWSUtils.cs" Link="AWSUtils.cs" />
   </ItemGroup>
 
@@ -37,4 +38,3 @@
     <InternalsVisibleTo Include="Orleans.AWS.Tests" />
   </ItemGroup>
 </Project>
-

@@ -26,3 +26,5 @@ When <xref:Orleans.Reminders.DynamoDB.DynamoDBClientOptions.AccessKey> and <xref
 The example uses on-demand capacity and an infrastructure-managed table. Set <xref:Orleans.Configuration.DynamoDBReminderStorageOptions.UseProvisionedThroughput> to `true` and configure <xref:Orleans.Configuration.DynamoDBReminderStorageOptions.ReadCapacityUnits> and <xref:Orleans.Configuration.DynamoDBReminderStorageOptions.WriteCapacityUnits> for provisioned capacity.
 
 <xref:Orleans.Configuration.DynamoDBReminderStorageOptions.CreateIfNotExists> and <xref:Orleans.Configuration.DynamoDBReminderStorageOptions.UpdateIfExists> allow the provider to create the reminder table and update its provisioned capacity. Infrastructure-managed provisioning keeps table lifecycle and capacity changes in the deployment workflow.
+
+For Aspire AppHost configuration, DynamoDB Local, and structured AWS CDK or CloudFormation outputs, see [Use Amazon DynamoDB with Aspire](../../host/dynamodb-aspire).

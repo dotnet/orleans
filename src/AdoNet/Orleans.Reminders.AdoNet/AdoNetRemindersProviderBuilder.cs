@@ -6,8 +6,15 @@ using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Providers;
+using Orleans.Reminders.AdoNet.Storage;
 
 [assembly: RegisterProvider("AdoNet", "Reminders", "Silo", typeof(AdoNetRemindersProviderBuilder))]
+[assembly: RegisterProvider("SqlServerDatabase", "Reminders", "Silo", typeof(AdoNetRemindersProviderBuilder))]
+[assembly: RegisterProvider("AzureSqlDatabase", "Reminders", "Silo", typeof(AdoNetRemindersProviderBuilder))]
+[assembly: RegisterProvider("PostgresDatabase", "Reminders", "Silo", typeof(AdoNetRemindersProviderBuilder))]
+[assembly: RegisterProvider("AzurePostgresFlexibleServerDatabase", "Reminders", "Silo", typeof(AdoNetRemindersProviderBuilder))]
+[assembly: RegisterProvider("MySqlDatabase", "Reminders", "Silo", typeof(AdoNetRemindersProviderBuilder))]
+[assembly: RegisterProvider("OracleDatabase", "Reminders", "Silo", typeof(AdoNetRemindersProviderBuilder))]
 
 namespace Orleans.Hosting;
 
@@ -17,20 +24,14 @@ internal sealed class AdoNetRemindersProviderBuilder : IProviderBuilder<ISiloBui
     {
         builder.UseAdoNetReminderService((OptionsBuilder<AdoNetReminderTableOptions> optionsBuilder) => optionsBuilder.Configure<IServiceProvider>((options, services) =>
             {
-                var invariant = configurationSection[nameof(options.Invariant)];
-                if (!string.IsNullOrEmpty(invariant))
+                var invariant = AdoNetProviderConfiguration.GetInvariant(configurationSection);
+                if (!string.IsNullOrWhiteSpace(invariant))
                 {
                     options.Invariant = invariant;
                 }
 
-                var connectionString = configurationSection[nameof(options.ConnectionString)];
-                var connectionName = configurationSection["ConnectionName"];
-                if (string.IsNullOrEmpty(connectionString) && !string.IsNullOrEmpty(connectionName))
-                {
-                    connectionString = services.GetRequiredService<IConfiguration>().GetConnectionString(connectionName);
-                }
-
-                if (!string.IsNullOrEmpty(connectionString))
+                var connectionString = AdoNetProviderConfiguration.GetConnectionString(configurationSection, services);
+                if (!string.IsNullOrWhiteSpace(connectionString))
                 {
                     options.ConnectionString = connectionString;
                 }

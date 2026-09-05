@@ -56,6 +56,14 @@ Register [Azure Event Hubs](https://learn.microsoft.com/azure/event-hubs/event-h
 
 New subscriptions can [begin with messages retained in the pulling agent's local cache](subscription-start-positions.md). This cache-local replay keeps the Event Hubs partition receiver and checkpoint at their current positions.
 
+Aspire can provision the Event Hubs namespace, hub, consumer group, and Azure Table checkpoint resource while emitting the Orleans stream-provider configuration:
+
+:::code language="csharp" source="../host/snippets/aspire/AppHost/AppHostExamples.cs" id="event_hubs_aspire":::
+
+Register the keyed checkpoint client before Orleans activates the stream provider:
+
+:::code language="csharp" source="../host/snippets/aspire/Silo/SiloProgram.cs" id="event_hubs_silo":::
+
 The Event Hubs provider supports a custom data adapter for provider-specific wire formats. See [Integrate external stream producers and consumers](external-streams.md) when a non-Orleans application must publish to or consume from the same Event Hub.
 
 ## Amazon Kinesis
@@ -72,7 +80,9 @@ Register [ADO.NET](https://learn.microsoft.com/dotnet/framework/data/adonet/ado-
 
 ## NATS JetStream streaming (alpha)
 
-Register [NATS JetStream](https://docs.nats.io/nats-concepts/jetstream) with `AddNatsStreams`. The provider creates or uses a JetStream stream and deterministic subject partitions. File-backed storage is the default; memory-backed JetStream storage is optional and not durable across server loss. Changes to `NatsOptions.PartitionCount` require corresponding server-side stream updates. The provider isn't rewindable.
+Register [NATS JetStream](https://docs.nats.io/nats-concepts/jetstream) with `AddNatsStreams`. The provider creates or uses a JetStream stream and deterministic subject partitions. File-backed storage is the default; memory-backed storage serves transient workloads. Changes to `NatsOptions.PartitionCount` require corresponding server-side stream updates. The provider delivers events through durable JetStream consumers.
+
+Aspire applications can model the server with `Aspire.Hosting.Nats`, enable JetStream with `WithJetStream`, and connect it to Orleans with `WithStreaming`. Silo and client projects register the matching keyed `INatsConnection` with `AddKeyedNatsClient` before calling `UseOrleans` or `UseOrleansClient`. The package [README](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.NATS) contains the complete AppHost and application configuration.
 
 ## Redis Streams streaming (alpha)
 

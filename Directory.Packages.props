@@ -7,6 +7,7 @@
     <PackageVersion Include="Aspire.Azure.Data.Tables" Version="13.0.0" />
     <PackageVersion Include="Aspire.Azure.Storage.Blobs" Version="13.0.0" />
     <PackageVersion Include="Aspire.Azure.Storage.Queues" Version="13.0.0" />
+    <PackageVersion Include="Aspire.Microsoft.Azure.Cosmos" Version="13.0.0" />
     <PackageVersion Include="Aspire.Hosting.AppHost" Version="13.1.1" />
     <PackageVersion Include="Aspire.Hosting.Orleans" Version="13.1.1" />
     <PackageVersion Include="Aspire.Hosting.Redis" Version="13.1.1" />
@@ -132,12 +133,21 @@
     <PackageVersion Update="Aspire.Azure.Data.Tables" Version="13.2.4" />
     <PackageVersion Update="Aspire.Azure.Storage.Blobs" Version="13.2.4" />
     <PackageVersion Update="Aspire.Azure.Storage.Queues" Version="13.2.4" />
+    <PackageVersion Update="Aspire.Microsoft.Azure.Cosmos" Version="13.2.4" />
     <PackageVersion Update="Aspire.Hosting.AppHost" Version="13.2.4" />
+    <PackageVersion Include="Aspire.Hosting.Azure.CosmosDB" Version="13.2.4" />
     <PackageVersion Include="Aspire.Hosting.Azure.EventHubs" Version="13.2.4" />
+    <PackageVersion Include="Aspire.Hosting.Azure.Redis" Version="13.2.4" />
     <PackageVersion Include="Aspire.Hosting.Azure.Storage" Version="13.2.4" />
+    <PackageVersion Include="Aspire.Hosting.MySql" Version="13.2.4" />
+    <PackageVersion Include="Aspire.Hosting.Nats" Version="13.2.4" />
+    <PackageVersion Include="Aspire.Hosting.Oracle" Version="13.2.4" />
     <PackageVersion Update="Aspire.Hosting.Orleans" Version="13.2.4" />
+    <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="13.2.4" />
     <PackageVersion Update="Aspire.Hosting.Redis" Version="13.2.4" />
+    <PackageVersion Include="Aspire.Hosting.SqlServer" Version="13.2.4" />
     <PackageVersion Include="Aspire.Hosting.Testing" Version="13.2.4" />
+    <PackageVersion Include="Aspire.NATS.Net" Version="13.2.4" />
     <PackageVersion Update="Aspire.StackExchange.Redis" Version="13.2.4" />
     <PackageVersion Update="BenchmarkDotNet" Version="0.15.6" />
     <PackageVersion Update="FSharp.Core" Version="10.0.103" />

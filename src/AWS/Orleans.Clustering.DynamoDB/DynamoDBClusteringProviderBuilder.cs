@@ -1,6 +1,10 @@
 using System;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Orleans;
+using Orleans.Clustering.DynamoDB;
+using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Providers;
 
@@ -13,135 +17,83 @@ internal sealed class DynamoDBClusteringProviderBuilder : IProviderBuilder<ISilo
 {
     public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
     {
-        builder.UseDynamoDBClustering(options =>
+        builder.UseDynamoDBClustering((OptionsBuilder<DynamoDBClusteringOptions> optionsBuilder) =>
+            optionsBuilder.Configure<IConfiguration>((options, configuration) =>
             {
-                var accessKey = configurationSection[nameof(options.AccessKey)];
-                if (!string.IsNullOrEmpty(accessKey))
-                {
-                    options.AccessKey = accessKey;
-                }
+                var providerConfiguration = DynamoDBProviderConfiguration.Create(configurationSection, configuration);
+                providerConfiguration.ConfigureClientOptions(options);
 
-                var secretKey = configurationSection[nameof(options.SecretKey)];
-                if (!string.IsNullOrEmpty(secretKey))
-                {
-                    options.SecretKey = secretKey;
-                }
-
-                var region = configurationSection[nameof(options.Service)] ?? configurationSection["Region"];
-                if (!string.IsNullOrEmpty(region))
-                {
-                    options.Service = region;
-                }
-
-                var token = configurationSection[nameof(options.SecretKey)];
-                if (!string.IsNullOrEmpty(token))
-                {
-                    options.Token = token;
-                }
-
-                var profileName = configurationSection[nameof(options.SecretKey)];
-                if (!string.IsNullOrEmpty(profileName))
-                {
-                    options.ProfileName = profileName;
-                }
-
-                var tableName = configurationSection[nameof(options.TableName)];
-                if (!string.IsNullOrEmpty(tableName))
+                var tableName = providerConfiguration.GetValue(nameof(options.TableName));
+                if (tableName is not null)
                 {
                     options.TableName = tableName;
                 }
 
-                if (int.TryParse(configurationSection[nameof(options.ReadCapacityUnits)], out var rcu))
+                if (providerConfiguration.GetInt32(nameof(options.ReadCapacityUnits)) is { } rcu)
                 {
                     options.ReadCapacityUnits = rcu;
                 }
 
-                if (int.TryParse(configurationSection[nameof(options.WriteCapacityUnits)], out var wcu))
+                if (providerConfiguration.GetInt32(nameof(options.WriteCapacityUnits)) is { } wcu)
                 {
                     options.WriteCapacityUnits = wcu;
                 }
 
-                if (bool.TryParse(configurationSection[nameof(options.UseProvisionedThroughput)], out var upt))
+                if (providerConfiguration.GetBoolean(nameof(options.UseProvisionedThroughput)) is { } upt)
                 {
                     options.UseProvisionedThroughput = upt;
                 }
 
-                if (bool.TryParse(configurationSection[nameof(options.CreateIfNotExists)], out var cine))
+                if (providerConfiguration.GetBoolean(nameof(options.CreateIfNotExists)) is { } cine)
                 {
                     options.CreateIfNotExists = cine;
                 }
 
-                if (bool.TryParse(configurationSection[nameof(options.UpdateIfExists)], out var uie))
+                if (providerConfiguration.GetBoolean(nameof(options.UpdateIfExists)) is { } uie)
                 {
                     options.UpdateIfExists = uie;
                 }
-            });
+            }));
     }
 
     public void Configure(IClientBuilder builder, string? name, IConfigurationSection configurationSection)
     {
-        builder.UseDynamoDBClustering(options =>
+        builder.UseDynamoDBClustering((OptionsBuilder<DynamoDBGatewayOptions> optionsBuilder) =>
+            optionsBuilder.Configure<IConfiguration>((options, configuration) =>
             {
-                var accessKey = configurationSection[nameof(options.AccessKey)];
-                if (!string.IsNullOrEmpty(accessKey))
-                {
-                    options.AccessKey = accessKey;
-                }
+                var providerConfiguration = DynamoDBProviderConfiguration.Create(configurationSection, configuration);
+                providerConfiguration.ConfigureClientOptions(options);
 
-                var secretKey = configurationSection[nameof(options.SecretKey)];
-                if (!string.IsNullOrEmpty(secretKey))
-                {
-                    options.SecretKey = secretKey;
-                }
-
-                var region = configurationSection[nameof(options.Service)] ?? configurationSection["Region"];
-                if (!string.IsNullOrEmpty(region))
-                {
-                    options.Service = region;
-                }
-
-                var token = configurationSection[nameof(options.SecretKey)];
-                if (!string.IsNullOrEmpty(token))
-                {
-                    options.Token = token;
-                }
-
-                var profileName = configurationSection[nameof(options.SecretKey)];
-                if (!string.IsNullOrEmpty(profileName))
-                {
-                    options.ProfileName = profileName;
-                }
-
-                var tableName = configurationSection[nameof(options.TableName)];
-                if (!string.IsNullOrEmpty(tableName))
+                var tableName = providerConfiguration.GetValue(nameof(options.TableName));
+                if (tableName is not null)
                 {
                     options.TableName = tableName;
                 }
 
-                if (int.TryParse(configurationSection[nameof(options.ReadCapacityUnits)], out var rcu))
+                if (providerConfiguration.GetInt32(nameof(options.ReadCapacityUnits)) is { } rcu)
                 {
                     options.ReadCapacityUnits = rcu;
                 }
 
-                if (int.TryParse(configurationSection[nameof(options.WriteCapacityUnits)], out var wcu))
+                if (providerConfiguration.GetInt32(nameof(options.WriteCapacityUnits)) is { } wcu)
                 {
                     options.WriteCapacityUnits = wcu;
                 }
 
-                if (bool.TryParse(configurationSection[nameof(options.UseProvisionedThroughput)], out var upt))
+                if (providerConfiguration.GetBoolean(nameof(options.UseProvisionedThroughput)) is { } upt)
                 {
                     options.UseProvisionedThroughput = upt;
                 }
 
-                if (bool.TryParse(configurationSection[nameof(options.CreateIfNotExists)], out var cine))
+                if (providerConfiguration.GetBoolean(nameof(options.CreateIfNotExists)) is { } cine)
                 {
                     options.CreateIfNotExists = cine;
                 }
 
-                if (bool.TryParse(configurationSection[nameof(options.UpdateIfExists)], out var uie))
+                if (providerConfiguration.GetBoolean(nameof(options.UpdateIfExists)) is { } uie)
                 {
                     options.UpdateIfExists = uie;
                 }
-            });
+            }));
     }
 }

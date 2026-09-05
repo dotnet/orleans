@@ -1,7 +1,9 @@
+using System;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Reminders.DynamoDB;
-using System;
+using Orleans.Runtime;
 
 namespace Orleans.Hosting
 {
@@ -27,6 +29,9 @@ namespace Orleans.Hosting
             services.AddReminders();
             services.AddSingleton<IReminderTable, DynamoDBReminderTable>();
             services.Configure<DynamoDBReminderStorageOptions>(configure);
+            services.AddTransient<IConfigurationValidator>(sp =>
+                new DynamoDBReminderStorageOptionsValidator(
+                    sp.GetRequiredService<IOptions<DynamoDBReminderStorageOptions>>().Value));
             services.ConfigureFormatter<DynamoDBReminderStorageOptions>();
             return services;
         }

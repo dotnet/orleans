@@ -10,19 +10,30 @@
 
   <!-- <apphost_packages> -->
   <ItemGroup>
+    <!-- Amazon.CDK.Lib is not strong-name signed; the .NET SDK suppresses CS8002 for .NETCoreApp targets. -->
+    <PackageReference Include="Amazon.CDK.Lib" Version="2.262.0" />
     <PackageReference Include="Aspire.Hosting.AppHost" Version="13.4.6" />
+    <!-- Aspire.Hosting.AWS 13.6.0 targets the Aspire.Hosting 13.4.6 dependency baseline used by this AppHost. -->
+    <PackageReference Include="Aspire.Hosting.AWS" Version="13.6.0" />
     <PackageReference Include="Aspire.Hosting.Orleans" Version="13.4.6" />
     <PackageReference Include="Aspire.Hosting.Redis" Version="13.4.6" />
   </ItemGroup>
   <!-- </apphost_packages> -->
 
   <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.Azure.CosmosDB" Version="13.4.6" />
+    <PackageReference Include="Aspire.Hosting.Azure.EventHubs" Version="13.4.6" />
+    <PackageReference Include="Aspire.Hosting.Azure.Redis" Version="13.4.6" />
     <PackageReference Include="Aspire.Hosting.Azure.Storage" Version="13.4.6" />
+    <PackageReference Include="Aspire.Hosting.MySql" Version="13.4.6" />
+    <PackageReference Include="Aspire.Hosting.Oracle" Version="13.4.6" />
+    <PackageReference Include="Aspire.Hosting.PostgreSQL" Version="13.4.6" />
     <PackageReference Include="Aspire.Hosting.SqlServer" Version="13.4.6" />
   </ItemGroup>
 
-  <!-- Project references removed - Silo and Client are library projects
-       used only for the snippet examples. We provide stub IProjectMetadata
-       types in Projects.cs for compilation. -->
+  <ItemGroup>
+    <ProjectReference Include="..\Client\Client.csproj" />
+    <ProjectReference Include="..\Silo\Silo.csproj" />
+  </ItemGroup>
 
 </Project>

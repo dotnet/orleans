@@ -1,4 +1,5 @@
 using Orleans.Reminders.DynamoDB;
+using Orleans.Runtime;
 
 namespace Orleans.Configuration
 {
@@ -37,5 +38,16 @@ namespace Orleans.Configuration
         /// Defaults to 'OrleansReminders'.
         /// </summary>
         public string TableName { get; set; } = "OrleansReminders";
+    }
+    internal sealed class DynamoDBReminderStorageOptionsValidator(DynamoDBReminderStorageOptions options) : IConfigurationValidator
+    {
+        public void ValidateConfiguration()
+            => DynamoDBProviderConfiguration.ValidateTableOptions(
+                options,
+                options.TableName,
+                options.UseProvisionedThroughput,
+                options.ReadCapacityUnits,
+                options.WriteCapacityUnits,
+                "DynamoDB reminder storage");
     }
 }
