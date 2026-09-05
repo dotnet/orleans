@@ -262,10 +262,12 @@ namespace Orleans.Providers.Streams.Common
                 return;
             }
 
-            // If sequenceToken is too new to be in cache, unset token, and wait for more data.
+            // The retained partition prefix precedes the requested start, so it is safe to scan
+            // while keeping the inclusive target pending for a later read.
             CachedMessage newestMessage = newestBlock.Value.NewestMessage;
             if (cacheDataAdapter.Compare(ref newestMessage, sequenceToken) < 0)
             {
+                cursor.RecordScanned(cacheDataAdapter.GetSequenceToken(ref newestMessage));
                 cursor.State = CursorStates.Unset;
                 cursor.SequenceToken = sequenceToken;
                 return;
@@ -335,17 +337,18 @@ namespace Orleans.Providers.Streams.Common
 
         private void SetCursorAtEarliestAvailable(Cursor cursor)
         {
-            if (messageBlocks.Last is { } oldestBlock)
+            if (IsEmpty)
             {
-                cursor.State = CursorStates.EarliestAvailableSet;
-                cursor.CurrentBlock = oldestBlock;
-                cursor.Index = oldestBlock.Value.OldestMessageIndex;
-                cursor.SequenceToken = oldestBlock.Value.GetOldestSequenceToken(cacheDataAdapter);
-                cursor.BlockGeneration = oldestBlock.Value.Generation;
+                SetWaitingAtCurrentEnd(cursor);
                 return;
             }
 
-            SetWaitingAtCurrentEnd(cursor);
+            var oldestBlock = messageBlocks.Last!;
+            cursor.State = CursorStates.EarliestAvailableSet;
+            cursor.CurrentBlock = oldestBlock;
+            cursor.Index = oldestBlock.Value.OldestMessageIndex;
+            cursor.SequenceToken = oldestBlock.Value.GetOldestSequenceToken(cacheDataAdapter);
+            cursor.BlockGeneration = oldestBlock.Value.Generation;
         }
 
         private void SetWaitingAtCurrentEnd(Cursor cursor)

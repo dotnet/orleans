@@ -463,8 +463,11 @@ namespace UnitTests.StreamingTests
                 messagingInstruments: CreateMessagingInstruments(),
                 messagingProcessingInstruments: CreateMessagingProcessingInstruments());
 
-            receiver ??= Substitute.For<IQueueAdapterReceiver>();
-            receiver.Initialize(Arg.Any<TimeSpan>()).Returns(Task.CompletedTask);
+            if (receiver is null)
+            {
+                receiver = Substitute.For<IQueueAdapterReceiver>();
+                receiver.Initialize(Arg.Any<TimeSpan>()).Returns(Task.CompletedTask);
+            }
 
             var queueAdapter = Substitute.For<IQueueAdapter>();
             queueAdapter.Name.Returns("provider");
