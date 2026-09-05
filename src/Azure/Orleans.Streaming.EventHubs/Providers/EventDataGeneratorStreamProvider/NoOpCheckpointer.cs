@@ -8,6 +8,8 @@ namespace Orleans.Streaming.EventHubs.Testing;
 public class NoOpCheckpointerFactory : IStreamQueueCheckpointerFactory
 {
     public static NoOpCheckpointerFactory Instance = new NoOpCheckpointerFactory();
+
+    [Obsolete("Use the overload which accepts a CancellationToken.")]
     public Task<IStreamQueueCheckpointer<string>> Create(string partition)
         => Create(partition, CancellationToken.None);
 
