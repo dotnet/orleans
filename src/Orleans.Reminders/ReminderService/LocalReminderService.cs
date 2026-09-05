@@ -617,6 +617,7 @@ namespace Orleans.Runtime.ReminderService
                 {
                     var rangeSerialNumber = RangeSerialNumber;
                     await this.ReadAndUpdateReminders();
+                    await this.QueueAction(static _ => { }, state: 0);
                     if (rangeSerialNumber == RangeSerialNumber)
                     {
                         break;
