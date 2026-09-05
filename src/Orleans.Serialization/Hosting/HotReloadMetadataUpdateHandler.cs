@@ -5,9 +5,8 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Reflection.Metadata;
 using Orleans.Serialization.Configuration;
-using Orleans.Serialization.Hosting;
 
-[assembly: MetadataUpdateHandler(typeof(HotReloadMetadataUpdateHandler))]
+[assembly: MetadataUpdateHandler(typeof(Orleans.Serialization.Hosting.HotReloadMetadataUpdateHandler))]
 
 namespace Orleans.Serialization.Hosting;
 
