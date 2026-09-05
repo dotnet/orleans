@@ -292,6 +292,7 @@ public sealed class ReminderTestKitClusterIntegrationTests
             Assert.Equal(0, observer.GetActiveReminderCount(grainId, "exact-due-recovery"));
 
             await using var blockedRead = oracle.BlockNext(ReminderTableOperationKind.ReadRange);
+            await using var followingRead = oracle.BlockNext(ReminderTableOperationKind.ReadRange);
             await AdvanceUntilAsync(clock, blockedRead.WaitUntilBlockedAsync(cancellation.Token), cancellation.Token);
             var remaining = firstTickTime - clock.UtcNow.UtcDateTime;
             Assert.True(remaining > TimeSpan.Zero);
@@ -307,9 +308,12 @@ public sealed class ReminderTestKitClusterIntegrationTests
             Assert.Equal(firstTickTime, persisted.StartAt);
             Assert.Equal(period, persisted.Period);
 
+            var followingReadBlocked = followingRead.WaitUntilBlockedAsync(cancellation.Token);
             var tick = observer.WaitForReminderTickAsync(grainId, cancellation.Token, "exact-due-recovery");
             await clock.AdvanceAsync(clock.RefreshReminderListPeriod, cancellation.Token);
+            await followingReadBlocked;
             var completed = await tick;
+            followingRead.Release();
 
             Assert.Equal(firstTickTime, completed.Status.FirstTickTime);
             Assert.Equal(firstTickTime + clock.RefreshReminderListPeriod, completed.Status.CurrentTickTime);
