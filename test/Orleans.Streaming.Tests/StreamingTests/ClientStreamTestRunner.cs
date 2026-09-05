@@ -12,7 +12,6 @@ namespace Tester.StreamingTests
 {
     public class ClientStreamTestRunner
     {
-        private static readonly Func<Task<int>> DefaultDeliveryFailureCount = () => Task.FromResult(0);
         private static readonly TimeSpan _timeout = TimeSpan.FromMinutes(3);
 
         private readonly TestCluster testHost;
@@ -52,9 +51,6 @@ namespace Tester.StreamingTests
             bool waitForRetryTimeouts = false,
             CancellationToken cancellationToken = default)
         {
-            var hasDeliveryFailureCounter = getDeliveryFailureCount is not null;
-            getDeliveryFailureCount ??= DefaultDeliveryFailureCount;
-
             Guid streamGuid = Guid.NewGuid();
             var streamId = StreamId.Create(streamNamespace, streamGuid);
             int[] eventCount = { 0 };
@@ -76,15 +72,28 @@ namespace Tester.StreamingTests
             await ProduceEventsToClient(streamProviderName, streamGuid, streamNamespace, 10, eventCount, cancellationToken);
 
             // Wait for the dropped client's subscription to be removed after delivery fails.
-            if (waitForRetryTimeouts && hasDeliveryFailureCounter)
+            if (waitForRetryTimeouts)
             {
                 using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 cts.CancelAfter(_timeout);
-                await streamingObserver.WaitForSubscriptionUnregisteredAsync(streamId, droppedSubscriptionId, streamProviderName, cts.Token);
+                try
+                {
+                    await streamingObserver.WaitForSubscriptionUnregisteredAsync(streamId, droppedSubscriptionId, streamProviderName, cts.Token);
+                }
+                catch (OperationCanceledException exception) when (!cancellationToken.IsCancellationRequested && cts.IsCancellationRequested)
+                {
+                    var diagnostics = streamingObserver.GetSubscriptionDiagnostics(streamId, droppedSubscriptionId, streamProviderName);
+                    var message = $"Timed out unregistering dropped subscription {droppedSubscriptionId} on {streamProviderName}/{streamId}. "
+                        + $"Dropped clients: {string.Join(", ", droppedClients)}.{Environment.NewLine}{diagnostics}";
+                    output?.WriteLine(message);
+                    throw new TimeoutException(message, exception);
+                }
             }
 
-            int deliveryFailureCount = await getDeliveryFailureCount();
-            Assert.Equal(0, deliveryFailureCount);
+            if (getDeliveryFailureCount is not null)
+            {
+                Assert.Equal(0, await getDeliveryFailureCount());
+            }
         }
 
         private Task<StreamSubscriptionHandle<int>> SubscribeToStream(string streamProviderName, Guid streamGuid, string streamNamespace,

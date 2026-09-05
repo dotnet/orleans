@@ -45,9 +45,23 @@ Persistent providers expose common configuration through their stream configurat
 - <xref:Orleans.Configuration.StreamPullingAgentOptions.MaxEventDeliveryTime> bounds delivery attempts before the configured failure handler is involved.
 - <xref:Orleans.Configuration.SimpleQueueCacheOptions.CacheSize> controls item capacity for providers using the simple queue cache.
 
-Provider-specific controls matter as much as common controls: <xref:Orleans.Configuration.AzureQueueOptions.QueueNames>, Event Hubs partitions and cache-pressure settings, Redis `ReadCount` and retention, NATS `BatchSize` and `PartitionCount`, and ADO.NET visibility, expiry, and dead-letter settings.
+Provider-specific controls matter as much as common controls: <xref:Orleans.Configuration.AzureQueueOptions.QueueNames>, Event Hubs partitions and cache-pressure settings, Redis `ReadCount` and retention, NATS `BatchSize` and `PartitionCount`, and ADO.NET read size, checkpoints, and retention.
 
 Change one bottleneck at a time. More queues can increase parallelism but also broker cost, polling load, cache memory, and rebalance work. Reducing polling delay can lower latency while increasing empty reads.
+
+### Budget ADO.NET and Kinesis recovery caches
+
+<xref:Orleans.Configuration.AdoNetStreamOptions.MaxCacheSizeBytes> and <xref:Orleans.Streaming.Kinesis.KinesisStreamOptions.MaxCacheSizeBytes> set an independent encoded-data budget for each partition or shard. Each defaults to 64 MiB. The budget counts retained cache segments: serialized payloads and their length framing, plus encoded Kinesis shard sequence numbers. <xref:Orleans.Configuration.SimpleQueueCacheOptions.CacheSize> also caps retained records, with a default of 4,096.
+
+The receiver admits records in source order until either capacity is reached. It keeps the remainder of one fetched batch for subsequent admission and advances the source read offset only through admitted records. If the next record exceeds the available bytes, the cache applies backpressure until safe subscription delivery progress releases enough capacity. An empty cache admits one record larger than the configured budget; that record is delivered and released before further admission. Set producer record-size limits to bound this progress exception.
+
+Plan silo memory from the number of locally owned partitions, including the highest partition count expected during reassignment. For example, 16 partitions with 64 MiB budgets permit 1 GiB of retained encoded segments before the oversized-record exception. Add headroom for:
+
+- One fetched source batch per partition. ADO.NET reads at most <xref:Orleans.Configuration.AdoNetStreamOptions.MaxMessagesPerRead> records, defaulting to 1,000. Kinesis reads at most 1,000 records, also subject to the service response limit. These records can retain provider response buffers and decoded objects while waiting for admission.
+- Buffer capacity and free-pool retention. Each partition uses 1 MiB pooled buffers; records larger than a pooled buffer use an exact-sized standalone buffer. Sequential packing leaves unused tails, and the oldest buffer can retain a delivered prefix while later records in that buffer remain cached. Pooled buffers are retained for reuse up to the pool's observed high-water mark.
+- Cache metadata, source record wrappers, in-flight delivery copies, deserialized events, and the rest of the silo workload. Delivery batching and event object shape affect this headroom.
+
+Use encoded record sizes together with producer record-size limits to choose the budget and read count. Lower read counts reduce staged-batch memory at the cost of more source requests. Monitor sustained cache pressure and provider backlog; provision retention to cover the slowest required consumer's recovery window. Safe delivery progress releases both record and byte capacity, and shutdown releases staged records and active cache-buffer ownership.
 
 ## Observe health
 

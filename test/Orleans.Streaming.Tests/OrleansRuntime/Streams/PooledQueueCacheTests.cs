@@ -267,6 +267,58 @@ namespace UnitTests.OrleansRuntime.Streams
             Assert.Equal(2, message.SequenceToken.SequenceNumber);
         }
 
+        [Theory, TestCategory("BVT"), TestCategory("Streaming")]
+        [InlineData(1)]
+        [InlineData(16 * 1024)]
+        public void EarliestAvailableCursorCreatedAfterDrainingBlock_WaitsForFirstMatchingMessage(int messageCount)
+        {
+            var (cache, converter) = CreateCache();
+            var targetStream = StreamId.Create(TestStreamNamespace, Guid.NewGuid());
+            var otherStream = StreamId.Create(TestStreamNamespace, Guid.NewGuid());
+            var now = DateTime.UnixEpoch;
+            var messages = Enumerable.Range(1, messageCount)
+                .Select(sequence => converter.ToCachedMessage(
+                    new TestQueueMessage { StreamId = targetStream, SequenceNumber = sequence }, now))
+                .ToList();
+            cache.Add(messages, now);
+            long sequenceNumber = messageCount;
+            byte[] payload = [1, 2, 3];
+
+            for (var cycle = 0; cycle < 2; cycle++)
+            {
+                while (!cache.IsEmpty)
+                {
+                    cache.RemoveOldestMessage();
+                }
+
+                Assert.Equal(0, cache.ItemCount);
+                Assert.Null(cache.Oldest);
+                Assert.Null(cache.Newest);
+                var cursor = cache.GetCursorAtPosition(targetStream, StreamSubscriptionStartPosition.EarliestAvailable);
+                Assert.False(cache.TryGetNextMessage(cursor, out _));
+
+                cache.Add(
+                [
+                    converter.ToCachedMessage(
+                        new TestQueueMessage { StreamId = otherStream, SequenceNumber = ++sequenceNumber }, now),
+                ], now);
+                Assert.False(cache.TryGetNextMessage(cursor, out _));
+
+                cache.Add(
+                [
+                    converter.ToCachedMessage(
+                        new TestQueueMessage { StreamId = targetStream, SequenceNumber = ++sequenceNumber, Data = payload }, now),
+                ], now);
+
+                Assert.True(cache.TryGetNextMessage(cursor, out var message));
+                var batch = Assert.IsType<TestBatchContainer>(message);
+                Assert.Equal(targetStream, batch.StreamId);
+                Assert.Equal(sequenceNumber, batch.SequenceToken.SequenceNumber);
+                Assert.Equal(payload, batch.Data);
+                Assert.False(cache.TryGetNextMessage(cursor, out _));
+            }
+        }
+
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public void EarliestAvailableWaitingCursorSurvivesAnchorPurge()
         {

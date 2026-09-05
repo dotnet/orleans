@@ -409,6 +409,52 @@ public sealed class StreamingDiagnosticObserver : IDisposable
     }
 
     /// <summary>
+    /// Summarizes the most recent lifecycle events for one subscription.
+    /// </summary>
+    public string GetSubscriptionDiagnostics(StreamId streamId, Guid subscriptionId, string streamProvider)
+    {
+        var recent = new Queue<string>();
+        using var subscription = _events.Subscribe(value =>
+        {
+            var entry = value switch
+            {
+                StreamingEvents.MessageDeliveryFailed failed
+                    when MatchesSubscription(failed.StreamId, failed.SubscriptionId, failed.StreamProvider, streamId, subscriptionId, streamProvider)
+                    => $"Delivery failed on {failed.SiloAddress} to {failed.Consumer} at {failed.SequenceToken}: {failed.Exception}",
+                StreamingEvents.SubscriptionUnregistration unregister
+                    when MatchesSubscription(unregister.StreamId, unregister.SubscriptionId, unregister.StreamProvider, streamId, subscriptionId, streamProvider)
+                    => $"Unregistration {unregister.Stage} on {unregister.SiloAddress} for {unregister.Consumer}: {unregister.Exception}",
+                StreamingEvents.SubscriptionUnregistered unregistered
+                    when MatchesSubscription(unregistered.StreamId, unregistered.SubscriptionId, unregistered.StreamProvider, streamId, subscriptionId, streamProvider)
+                    => $"Durably unregistered on {unregistered.SiloAddress}",
+                StreamingEvents.SubscriptionAttached attached
+                    when MatchesSubscription(attached.StreamId, attached.SubscriptionId, attached.StreamProvider, streamId, subscriptionId, streamProvider)
+                    => $"Attached on {attached.SiloAddress} to {attached.ConsumerGrainId}",
+                StreamingEvents.ConsumerCursorDrained drained
+                    when MatchesSubscription(drained.StreamId, drained.SubscriptionId, drained.StreamProvider, streamId, subscriptionId, streamProvider)
+                    => $"Cursor drained on {drained.SiloAddress}",
+                _ => null,
+            };
+            if (entry is not null)
+            {
+                lock (recent)
+                {
+                    if (recent.Count == 16)
+                    {
+                        recent.Dequeue();
+                    }
+
+                    recent.Enqueue(entry);
+                }
+            }
+        });
+        lock (recent)
+        {
+            return recent.Count == 0 ? "No matching lifecycle events were observed." : string.Join(Environment.NewLine, recent);
+        }
+    }
+
+    /// <summary>
     /// Waits for a specific number of subscriptions to be durably removed from a stream.
     /// </summary>
     public async Task WaitForSubscriptionUnregisteredCountAsync(StreamId streamId, int expectedCount, string? streamProvider, CancellationToken cancellationToken)

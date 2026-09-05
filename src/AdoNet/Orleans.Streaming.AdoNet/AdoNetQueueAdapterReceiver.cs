@@ -1,47 +1,18 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Orleans.Streaming.AdoNet;
 
-internal interface IStreamMessageQueries
-{
-    Task<IList<AdoNetStreamMessage>> GetStreamMessagesAsync(
-        string serviceId,
-        string providerId,
-        string queueId,
-        int maxCount,
-        int maxAttempts,
-        int visibilityTimeout,
-        int removalTimeout,
-        int evictionInterval,
-        int evictionBatchSize);
-
-    Task<IList<AdoNetStreamConfirmationAck>> ConfirmStreamMessagesAsync(
-        string serviceId,
-        string providerId,
-        string queueId,
-        IList<AdoNetStreamConfirmation> messages);
-
-    Task<IList<AdoNetStreamConfirmationAck>> ReleaseStreamMessagesAsync(
-        string serviceId,
-        string providerId,
-        string queueId,
-        IList<AdoNetStreamConfirmation> messages);
-}
-
 /// <summary>
-/// Receives message batches from an individual queue of an ADO.NET provider.
+/// Receives records from one stream partition through the recoverable stream partition pipeline.
 /// </summary>
-internal partial class AdoNetQueueAdapterReceiver(string providerId, string queueId, AdoNetStreamOptions streamOptions, ClusterOptions clusterOptions, SimpleQueueCacheOptions cacheOptions, IStreamMessageQueries queries, Serializer<AdoNetBatchContainer> serializer, ILogger<AdoNetQueueAdapterReceiver> logger) : IQueueAdapterReceiver
+internal sealed class AdoNetQueueAdapterReceiver : IQueueAdapterReceiver, IQueueCache
 {
-    private readonly ILogger<AdoNetQueueAdapterReceiver> _logger = logger;
-    private readonly object _lock = new();
-    private readonly Dictionary<long, PendingMessage> _pendingMessages = [];
+    private const int BufferSize = 1024 * 1024;
+    private readonly RecoverableStreamReceiver<AdoNetStreamMessage> _inner;
+    private readonly AdoNetRecoverableStream _source;
+    private int _shutdownNotified;
 
-    /// <summary>
-    /// Flags that no further work should be attempted.
-    /// </summary>
-    private bool _shutdown;
-
-    private int _activeOperations;
-    private TaskCompletionSource? _operationsCompleted;
+    internal Action<AdoNetQueueAdapterReceiver>? OnShutdown { get; set; }
 
     public AdoNetQueueAdapterReceiver(
         string providerId,
@@ -52,256 +23,117 @@ internal partial class AdoNetQueueAdapterReceiver(string providerId, string queu
         RelationalOrleansQueries queries,
         Serializer<AdoNetBatchContainer> serializer,
         ILogger<AdoNetQueueAdapterReceiver> logger)
-        : this(providerId, queueId, streamOptions, clusterOptions, cacheOptions, new RelationalStreamMessageQueries(queries), serializer, logger)
     {
+        _source = new AdoNetRecoverableStream(
+            clusterOptions.ServiceId,
+            providerId,
+            queueId,
+            streamOptions,
+            queries,
+            logger);
+        var checkpointer = new StreamQueueCheckpointer(
+            _source,
+            new StreamQueueCheckpointerOptions
+            {
+                CheckpointComparer = StreamCheckpointComparers.Numeric,
+                PersistInterval = streamOptions.CheckpointPersistInterval,
+            });
+        var dataAdapter = new AdoNetRecoverableStreamDataAdapter(serializer);
+        var bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(BufferSize));
+        var evictionStrategy = new ChronologicalEvictionStrategy(
+            logger,
+            new TimePurgePredicate(TimeSpan.MaxValue, TimeSpan.MaxValue),
+            cacheMonitor: null,
+            monitorWriteInterval: null);
+        var cache = new RecoverableStreamQueueCache<AdoNetStreamMessage>(
+            Math.Min(streamOptions.MaxMessagesPerRead, cacheOptions.CacheSize),
+            bufferPool,
+            dataAdapter,
+            evictionStrategy,
+            logger,
+            maxCacheSizeBytes: streamOptions.MaxCacheSizeBytes,
+            maxCacheSize: cacheOptions.CacheSize);
+        _inner = new RecoverableStreamReceiver<AdoNetStreamMessage>(
+            _source,
+            dataAdapter,
+            cache,
+            checkpointer,
+            streamOptions.StartFromNow);
     }
 
-    /// <summary>
-    /// This receiver does not require initialization.
-    /// </summary>
-    public Task Initialize(TimeSpan timeout) => Task.CompletedTask;
+    public Task Initialize(TimeSpan timeout) => _inner.Initialize(timeout);
 
-    /// <summary>
-    /// Waits for any outstanding work before shutting down.
-    /// </summary>
     public async Task Shutdown(TimeSpan timeout)
     {
-        Task? operationsCompleted;
-        lock (_lock)
-        {
-            _shutdown = true;
-            operationsCompleted = _operationsCompleted?.Task;
-        }
-
-        if (operationsCompleted is not null)
-        {
-            try
-            {
-                await operationsCompleted.WaitAsync(timeout);
-            }
-            catch (Exception ex)
-            {
-                LogShutdownFault(ex, clusterOptions.ServiceId, providerId, queueId);
-                return;
-            }
-        }
-
-        List<AdoNetStreamConfirmation> pending;
-        lock (_lock)
-        {
-            RemoveExpiredPendingMessages();
-            if (_pendingMessages.Count == 0)
-            {
-                return;
-            }
-
-            pending = _pendingMessages
-                .Select(static item => new AdoNetStreamConfirmation(item.Key, item.Value.Dequeued))
-                .ToList();
-        }
-
         try
         {
-            var released = await queries.ReleaseStreamMessagesAsync(clusterOptions.ServiceId, providerId, queueId, pending).WaitAsync(timeout);
-            lock (_lock)
-            {
-                foreach (var message in released)
-                {
-                    _pendingMessages.Remove(message.MessageId);
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            LogReleaseFailed(ex, clusterOptions.ServiceId, providerId, queueId, pending);
-        }
-    }
-
-    /// <inheritdoc />
-    public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
-    {
-        if (!TryBeginOperation())
-        {
-            return [];
-        }
-
-        // cap max count as appropriate
-        maxCount = Math.Min(maxCount, cacheOptions.CacheSize);
-
-        try
-        {
-            var messages = await queries.GetStreamMessagesAsync(
-                clusterOptions.ServiceId,
-                providerId,
-                queueId,
-                maxCount,
-                streamOptions.MaxAttempts,
-                streamOptions.VisibilityTimeout.TotalSecondsCeiling(),
-                streamOptions.DeadLetterEvictionTimeout.TotalSecondsCeiling(),
-                streamOptions.EvictionInterval.TotalSecondsCeiling(),
-                streamOptions.EvictionBatchSize);
-
-            lock (_lock)
-            {
-                RemoveExpiredPendingMessages();
-                foreach (var message in messages)
-                {
-                    _pendingMessages[message.MessageId] = new(message.Dequeued, message.ExpiresOn);
-                }
-            }
-
-            // convert the messages into standard batch containers
-            return messages.Select(x => AdoNetBatchContainer.FromMessage(serializer, x)).Cast<IBatchContainer>().ToList();
-        }
-        catch (Exception ex)
-        {
-            LogDequeueFailed(ex, clusterOptions.ServiceId, providerId, queueId);
-            throw;
+            await _inner.Shutdown(timeout);
         }
         finally
         {
-            EndOperation();
-        }
-    }
-
-    /// <inheritdoc />
-    public async Task MessagesDeliveredAsync(IList<IBatchContainer> messages)
-    {
-        // skip work if there are no messages to deliver
-        if (messages.Count == 0)
-        {
-            return;
-        }
-
-        if (!TryBeginOperation())
-        {
-            return;
-        }
-
-        // get the identifiers for the messages to confirm
-        var items = messages.Cast<AdoNetBatchContainer>().Select(x => new AdoNetStreamConfirmation(x.SequenceToken.SequenceNumber, x.Dequeued)).ToList();
-
-        try
-        {
-            try
+            var acquisitionCompletion = _source.AcquisitionCompletion;
+            if (acquisitionCompletion.IsCompleted)
             {
-                var confirmed = await queries.ConfirmStreamMessagesAsync(clusterOptions.ServiceId, providerId, queueId, items);
-                var receipts = items.ToDictionary(static item => item.MessageId, static item => item.Dequeued);
-                lock (_lock)
-                {
-                    foreach (var message in confirmed)
-                    {
-                        if (receipts.TryGetValue(message.MessageId, out var receipt)
-                            && _pendingMessages.TryGetValue(message.MessageId, out var pending)
-                            && receipt == pending.Dequeued)
-                        {
-                            _pendingMessages.Remove(message.MessageId);
-                        }
-                    }
-                }
+                NotifyShutdown();
             }
-            catch (Exception ex)
+            else
             {
-                LogConfirmationFailed(ex, clusterOptions.ServiceId, providerId, queueId, items);
-                throw;
+                _ = NotifyShutdownAfterAcquisition(acquisitionCompletion, NotifyShutdown);
             }
         }
-        finally
+    }
+
+    internal static async Task NotifyShutdownAfterAcquisition(
+        Task acquisitionCompletion,
+        Action notifyShutdown)
+    {
+        ArgumentNullException.ThrowIfNull(acquisitionCompletion);
+        ArgumentNullException.ThrowIfNull(notifyShutdown);
+        await acquisitionCompletion.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+        notifyShutdown();
+    }
+
+    private void NotifyShutdown()
+    {
+        if (Interlocked.Exchange(ref _shutdownNotified, 1) == 0)
         {
-            EndOperation();
+            OnShutdown?.Invoke(this);
         }
     }
 
-    private bool TryBeginOperation()
-    {
-        lock (_lock)
-        {
-            if (_shutdown)
-            {
-                return false;
-            }
+    public Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
+        => _inner.GetQueueMessagesAsync(maxCount, CancellationToken.None);
 
-            if (_activeOperations++ == 0)
-            {
-                _operationsCompleted = new(TaskCreationOptions.RunContinuationsAsynchronously);
-            }
+    public Task<IList<IBatchContainer>> GetQueueMessagesAsync(
+        int maxCount,
+        CancellationToken cancellationToken)
+        => _inner.GetQueueMessagesAsync(maxCount, cancellationToken);
 
-            return true;
-        }
-    }
+    public Task MessagesDeliveredAsync(IList<IBatchContainer> messages)
+        => _inner.MessagesDeliveredAsync(messages, CancellationToken.None);
 
-    private void EndOperation()
-    {
-        TaskCompletionSource? operationsCompleted = null;
-        lock (_lock)
-        {
-            if (--_activeOperations == 0)
-            {
-                operationsCompleted = _operationsCompleted;
-                _operationsCompleted = null;
-            }
-        }
+    public Task MessagesDeliveredAsync(
+        IList<IBatchContainer> messages,
+        CancellationToken cancellationToken)
+        => _inner.MessagesDeliveredAsync(messages, cancellationToken);
 
-        operationsCompleted?.TrySetResult();
-    }
+    public int GetMaxAddCount() => _inner.GetMaxAddCount();
 
-    private void RemoveExpiredPendingMessages()
-    {
-        var now = DateTime.UtcNow;
-        var expired = _pendingMessages
-            .Where(message => message.Value.ExpiresOn <= now)
-            .Select(static message => message.Key)
-            .ToList();
-        foreach (var messageId in expired)
-        {
-            _pendingMessages.Remove(messageId);
-        }
-    }
+    public void AddToCache(IList<IBatchContainer> messages) => _inner.AddToCache(messages);
 
-    private readonly record struct PendingMessage(int Dequeued, DateTime ExpiresOn);
+    public bool TryPurgeFromCache([MaybeNullWhen(false)] out IList<IBatchContainer> purgedItems)
+        => _inner.TryPurgeFromCache(out purgedItems);
 
-    private sealed class RelationalStreamMessageQueries(RelationalOrleansQueries queries) : IStreamMessageQueries
-    {
-        public Task<IList<AdoNetStreamMessage>> GetStreamMessagesAsync(
-            string serviceId,
-            string providerId,
-            string queueId,
-            int maxCount,
-            int maxAttempts,
-            int visibilityTimeout,
-            int removalTimeout,
-            int evictionInterval,
-            int evictionBatchSize) =>
-            queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, evictionInterval, evictionBatchSize);
+    public IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken? token)
+        => _inner.GetCacheCursor(streamId, token);
 
-        public Task<IList<AdoNetStreamConfirmationAck>> ConfirmStreamMessagesAsync(
-            string serviceId,
-            string providerId,
-            string queueId,
-            IList<AdoNetStreamConfirmation> messages) =>
-            queries.ConfirmStreamMessagesAsync(serviceId, providerId, queueId, messages);
+    public IQueueCacheCursor GetCacheCursorAtPosition(
+        StreamId streamId,
+        StreamSubscriptionStartPosition startPosition)
+        => _inner.GetCacheCursorAtPosition(streamId, startPosition);
 
-        public Task<IList<AdoNetStreamConfirmationAck>> ReleaseStreamMessagesAsync(
-            string serviceId,
-            string providerId,
-            string queueId,
-            IList<AdoNetStreamConfirmation> messages) =>
-            queries.ReleaseStreamMessagesAsync(serviceId, providerId, queueId, messages);
-    }
+    public bool IsUnderPressure() => _inner.IsUnderPressure();
 
-    #region Logging
-
-    [LoggerMessage(1, LogLevel.Error, "Failed to get messages from ({ServiceId}, {ProviderId}, {QueueId})")]
-    private partial void LogDequeueFailed(Exception exception, string serviceId, string providerId, string queueId);
-
-    [LoggerMessage(2, LogLevel.Error, "Failed to confirm messages for ({ServiceId}, {ProviderId}, {QueueId}, {@Items})")]
-    private partial void LogConfirmationFailed(Exception exception, string serviceId, string providerId, string queueId, List<AdoNetStreamConfirmation> items);
-
-    [LoggerMessage(3, LogLevel.Warning, "Handled fault while shutting down receiver for ({ServiceId}, {ProviderId}, {QueueId})")]
-    private partial void LogShutdownFault(Exception exception, string serviceId, string providerId, string queueId);
-
-    [LoggerMessage(4, LogLevel.Warning, "Failed to release messages while shutting down receiver for ({ServiceId}, {ProviderId}, {QueueId}, {@Items})")]
-    private partial void LogReleaseFailed(Exception exception, string serviceId, string providerId, string queueId, List<AdoNetStreamConfirmation> items);
-
-    #endregion Logging
+    public void UpdateDeliveryProgress(StreamSequenceToken? earliestSubscriptionToken, DateTime utcNow)
+        => _inner.UpdateDeliveryProgress(earliestSubscriptionToken, utcNow);
 }

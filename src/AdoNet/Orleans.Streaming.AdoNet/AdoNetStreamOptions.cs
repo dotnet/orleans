@@ -28,38 +28,68 @@ public class AdoNetStreamOptions
     public DbDataSource? DataSource { get; set; }
 
     /// <summary>
-    /// The maximum number of attempts to deliver a message.
-    /// The message is eventually moved to dead letters if these many attempts are made without success.
+    /// Gets or sets a value indicating whether a new partition checkpoint starts at the current partition history tail.
     /// </summary>
-    public int MaxAttempts { get; set; } = 5;
+    /// <remarks>
+    /// When <see langword="false"/>, a new checkpoint starts immediately before the earliest retained record.
+    /// This setting is only used while initializing a partition which does not have a checkpoint.
+    /// </remarks>
+    public bool StartFromNow { get; set; }
 
     /// <summary>
-    /// The timeout until a message is allowed to be dequeued again if not yet confirmed.
+    /// Gets or sets a value indicating whether a subscription is faulted after delivery failure handling.
     /// </summary>
-    public TimeSpan VisibilityTimeout { get; set; } = TimeSpan.FromMinutes(1);
+    public bool FaultOnDeliveryFailure { get; set; }
 
     /// <summary>
-    /// The expiry timeout until a message is considered expired and moved to dead letters regardless of attempts.
-    /// The message is only moved if the current attempt is also past its visibility timeout.
+    /// Gets or sets the maximum number of stream records returned by a partition read.
     /// </summary>
-    public TimeSpan ExpiryTimeout { get; set; } = TimeSpan.FromMinutes(10);
+    public int MaxMessagesPerRead { get; set; } = 1_000;
 
     /// <summary>
-    /// The removal timeout until a failed message is deleted from the dead letters table.
+    /// Gets or sets the per-partition budget for retained encoded cache segments, in bytes.
+    /// The default is 64 MiB.
     /// </summary>
-    public TimeSpan DeadLetterEvictionTimeout { get; set; } = TimeSpan.FromDays(7);
+    /// <remarks>
+    /// The budget includes payload framing. Records are admitted in order, and an empty cache admits
+    /// one oversized record so delivery can make progress. Additional memory includes one fetched batch
+    /// bounded by <see cref="MaxMessagesPerRead"/>, buffer slack and pool retention, metadata, and delivery objects.
+    /// </remarks>
+    public long MaxCacheSizeBytes { get; set; } = 64 * 1024 * 1024;
 
     /// <summary>
-    /// The period of time between eviction activities.
-    /// These include moving expired messages to dead letters and removing dead letters after their own lifetime.
-    /// This period is cluster wide and will not change with the number of silos.
+    /// Gets or sets the interval between checkpoint persistence attempts.
     /// </summary>
-    public TimeSpan EvictionInterval { get; set; } = TimeSpan.FromSeconds(10);
+    public TimeSpan CheckpointPersistInterval { get; set; } = TimeSpan.FromSeconds(5);
 
     /// <summary>
-    /// The maximum number of messages affected by an eviction batch.
+    /// Gets or sets the minimum amount of time that a stream record is retained after it is checkpointed.
     /// </summary>
-    public int EvictionBatchSize { get; set; } = 1000;
+    /// <remarks>
+    /// Storage routines use whole seconds. Fractional values are rounded upward so configured retention is never shortened.
+    /// </remarks>
+    public TimeSpan RetentionPeriod { get; set; } = TimeSpan.FromDays(1);
+
+    /// <summary>
+    /// Gets or sets an optional hard retention ceiling.
+    /// </summary>
+    /// <remarks>
+    /// Stream records older than this value can be deleted even when they are newer than the checkpoint.
+    /// Such deletions are reported by storage so that the receiver can emit gap diagnostics.
+    /// Fractional values are rounded upward to whole seconds.
+    /// </remarks>
+    public TimeSpan? MaximumRetentionPeriod { get; set; }
+
+    /// <summary>
+    /// Gets or sets the interval between cleanup attempts for a partition.
+    /// </summary>
+    /// <remarks>Fractional values are rounded upward to whole seconds.</remarks>
+    public TimeSpan CleanupInterval { get; set; } = TimeSpan.FromMinutes(1);
+
+    /// <summary>
+    /// Gets or sets the maximum number of stream records deleted by one cleanup operation.
+    /// </summary>
+    public int CleanupBatchSize { get; set; } = 1_000;
 
     /// <summary>
     /// A safety timeout for underlying database initialization.

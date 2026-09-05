@@ -51,7 +51,7 @@ The factory composes the adapter with queue mapping, caching, and failure handli
 
 `SimpleQueueAdapterCache` is suitable for a non-rewindable adapter whose queue remains the durability boundary. A rewindable adapter usually needs a cache and sequence-token implementation which can position cursors at retained historical messages.
 
-`AddPersistentStreams` leaves checkpointing to the adapter. The non-rewindable example acknowledges completed messages through its receiver and therefore has no independent checkpoint. For a retained-log transport, implement an <xref:Orleans.Streams.IStreamQueueCheckpointerFactory>, have the receiver or cache load and update the per-partition position, and register it as a named component with `ConfigureComponent`. Persist a checkpoint only after all consumers have advanced beyond the corresponding cached messages. A no-op checkpointer is suitable only when replay position is deliberately disposable.
+`AddPersistentStreams` leaves checkpointing to the adapter. The non-rewindable example acknowledges completed messages through its receiver and therefore has no independent checkpoint. For a partitioned stream transport, implement an <xref:Orleans.Streams.IStreamQueueCheckpointerFactory>, have the receiver or cache load and update the stream partition position, and register it as a named component with `ConfigureComponent`. Treat a requested cursor start as inclusive: selecting that position does not confirm its record. Persist only the earliest contiguous partition position which every subscription has delivered, intentionally filtered, or safely scanned as belonging to another stream. A no-op checkpointer is suitable only when replay position is deliberately disposable.
 
 ## Register the provider
 
@@ -65,6 +65,23 @@ Register the same provider name and compatible mapping on Orleans clients which 
 
 Keep the provider name and partition count stable. Changing either can map an existing stream to a different queue and strand previously enqueued messages. Configure durable `PubSubStore` grain storage for explicit subscriptions in production; `PubSubStore` preserves subscription records independently from queue durability.
 
+## Recover persisted token positions during an upgrade
+
+Earlier inherited `CreateSequenceTokenForEvent` implementations returned an exact <xref:Orleans.Providers.Streams.Common.EventSequenceToken> or <xref:Orleans.Providers.Streams.Common.EventSequenceTokenV2>, including when the batch token had a custom subtype. Current factories preserve the concrete subtype and its metadata while changing the event index.
+
+Orleans recovers these saved positions according to the provider's token contract:
+
+| Token contract | Persisted positions supported during recovery |
+| --- | --- |
+| Generic V1/V2 and custom subclasses inheriting the complete numeric contract | Exact V1 and V2 positions compare with current tokens by sequence number and event index, with matching equality and hashes across the family. |
+| Event Hubs V1/V2 and custom subclasses inheriting the complete Event Hubs contract | Exact V1 positions from the earlier inherited factory are normalized within Event Hubs recovery comparisons. The sequence number and event index identify the position; current delivered tokens retain their Event Hubs offset and custom metadata. |
+| Kinesis | Persisted Kinesis tokens retain the numeric shard offset as the authoritative position, followed by event index, across receiver restarts. |
+| Redis | Persisted Redis tokens retain the entry ID, per-millisecond sequence number, and event index. |
+
+The complete contract includes both equality overloads, ordering, hashing, and their interface implementations. An ordinary custom token which inherits these implementations shares its base family's numeric identity; additional metadata is preserved on delivery. A custom token which overrides any part of the contract owns the migration of its persisted positions and must implement consistent equality, ordering, and hashing together.
+
+Event Hubs, Kinesis, and Redis each retain their provider-specific public equality contract. Event Hubs recovery uses a sequence-only token with an empty offset for a legacy position whose factory omitted the offset; offset-bearing tokens come from the current provider data. Keep stream identity and partition mapping stable when replaying persisted positions.
+
 ## Validate failure behavior
 
 Test the adapter against the real queue service, including:
@@ -75,6 +92,9 @@ Test the adapter against the real queue service, including:
 1. queue ownership moving between silos during membership changes;
 1. duplicate delivery and consumer idempotency;
 1. stable stream-to-partition mapping across restarts and upgrades; and
-1. sustained load beyond cache capacity to verify backpressure and queue retention.
+1. sustained load beyond cache capacity to verify backpressure and queue retention;
+1. quiet and busy streams sharing a partition, including restart after the quiet cursor scans unrelated records;
+1. cancellation while partition ownership acquisition is blocked, followed by reassignment and late command completion; and
+1. sequence-token equality, ordering, and hashing in both comparison directions.
 
 Monitor queue depth and oldest-message age by partition, receive and acknowledgement latency, redelivery count, throttling, pulling-agent errors, and consumer delivery failures. Alert before retention or visibility limits can cause data loss or a redelivery storm.

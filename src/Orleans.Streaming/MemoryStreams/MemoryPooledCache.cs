@@ -172,6 +172,11 @@ namespace Orleans.Providers
         {
             purgedItems = null!; // Return value is always false, per [MaybeNullWhen(false)] on the interface.
             this.evictionStrategy.PerformPurge(DateTime.UtcNow);
+            if (cache.IsEmpty)
+            {
+                currentBuffer = null;
+            }
+
             return false;
         }
 
