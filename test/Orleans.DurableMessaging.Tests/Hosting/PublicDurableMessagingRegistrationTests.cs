@@ -68,6 +68,19 @@ public sealed class PublicDurableMessagingRegistrationTests
     }
 
     [Fact]
+    public void AddDurableMessaging_PreservesExplicitBinaryJournalFormat()
+    {
+        var services = new ServiceCollection();
+        services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = "orleans-binary");
+        services.AddDurableMessaging();
+        using var provider = services.BuildServiceProvider();
+
+        Assert.Equal(
+            "orleans-binary",
+            provider.GetRequiredService<IOptions<JournaledStateManagerOptions>>().Value.JournalFormatKey);
+    }
+
+    [Fact]
     public void AddDurableMessaging_RejectsConflictingJournalFormat()
     {
         var services = new ServiceCollection();
