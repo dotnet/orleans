@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
@@ -36,7 +36,7 @@ public sealed class SqlServerClusterDbContext : ClusterDbContext<SqlServerCluste
             value => value == null ? null : string.Join(",", value),
             value => string.IsNullOrEmpty(value)
                 ? new List<string>()
-                : value.Split(new[] {','}, StringSplitOptions.RemoveEmptyEntries).ToList());
+                : value.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries).ToList());
 
         var listComparer = new ValueComparer<List<string>>(
             (left, right) => ReferenceEquals(left, right) || left != null && right != null && left.SequenceEqual(right),
@@ -45,7 +45,7 @@ public sealed class SqlServerClusterDbContext : ClusterDbContext<SqlServerCluste
 
         modelBuilder.Entity<SiloRecord<byte[]>>(c =>
         {
-            c.HasKey(p => new {p.ClusterId, p.Address, p.Port, p.Generation}).IsClustered(false).HasName("PK_Silo");
+            c.HasKey(p => new { p.ClusterId, p.Address, p.Port, p.Generation }).IsClustered(false).HasName("PK_Silo");
             c.Property(p => p.ClusterId).UseCollation(IdentifierCollation);
             c.Property(p => p.Address).HasMaxLength(45).UseCollation(IdentifierCollation).IsRequired();
             c.Property(p => p.Port).IsRequired();
@@ -66,8 +66,8 @@ public sealed class SqlServerClusterDbContext : ClusterDbContext<SqlServerCluste
                 .HasForeignKey(p => p.ClusterId);
 
             c.HasIndex(p => p.ClusterId).IsClustered(false).HasDatabaseName("IDX_Silo_ClusterId");
-            c.HasIndex(p => new {p.ClusterId, p.Status}).IsClustered(false).HasDatabaseName("IDX_Silo_ClusterId_Status");
-            c.HasIndex(p => new {p.ClusterId, p.Status, p.IAmAliveTime}).IsClustered(false).HasDatabaseName("IDX_Silo_ClusterId_Status_IAmAlive");
+            c.HasIndex(p => new { p.ClusterId, p.Status }).IsClustered(false).HasDatabaseName("IDX_Silo_ClusterId_Status");
+            c.HasIndex(p => new { p.ClusterId, p.Status, p.IAmAliveTime }).IsClustered(false).HasDatabaseName("IDX_Silo_ClusterId_Status_IAmAlive");
         });
     }
 }

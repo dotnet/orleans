@@ -44,7 +44,7 @@ public class ClusterDbContext<TDbContext, TETag> : DbContext where TDbContext : 
 
         modelBuilder.Entity<SiloRecord<TETag>>(c =>
         {
-            c.HasKey(p => new {p.ClusterId, p.Address, p.Port, p.Generation});
+            c.HasKey(p => new { p.ClusterId, p.Address, p.Port, p.Generation });
             c.Property(p => p.Address).HasMaxLength(45).IsRequired();
             c.Property(p => p.Port).IsRequired();
             c.Property(p => p.Generation).IsRequired();

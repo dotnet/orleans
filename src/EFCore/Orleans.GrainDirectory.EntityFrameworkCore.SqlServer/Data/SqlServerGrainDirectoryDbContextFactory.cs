@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Design;
 
 namespace Orleans.GrainDirectory.EntityFrameworkCore.SqlServer.Data;
 
-public class SqlServerGrainDirectoryDbContextFactory: IDesignTimeDbContextFactory<SqlServerGrainDirectoryDbContext>
+public class SqlServerGrainDirectoryDbContextFactory : IDesignTimeDbContextFactory<SqlServerGrainDirectoryDbContext>
 {
     public SqlServerGrainDirectoryDbContext CreateDbContext(string[] args)
     {

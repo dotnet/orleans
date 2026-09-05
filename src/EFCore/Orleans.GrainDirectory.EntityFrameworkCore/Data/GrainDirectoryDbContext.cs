@@ -15,7 +15,7 @@ public class GrainDirectoryDbContext<TDbContext, TETag> : DbContext where TDbCon
     {
         modelBuilder.Entity<GrainActivationRecord<TETag>>(c =>
         {
-            c.HasKey(p => new {p.ClusterIdHash, p.GrainIdHash});
+            c.HasKey(p => new { p.ClusterIdHash, p.GrainIdHash });
             c.Property(p => p.ClusterIdHash).HasMaxLength(32).IsRequired().UsePropertyAccessMode(PropertyAccessMode.Property);
             c.Property(p => p.GrainIdHash).HasMaxLength(32).IsRequired().UsePropertyAccessMode(PropertyAccessMode.Property);
             c.Property(p => p.SiloAddressHash).HasMaxLength(32).IsRequired().UsePropertyAccessMode(PropertyAccessMode.Property);
@@ -25,7 +25,7 @@ public class GrainDirectoryDbContext<TDbContext, TETag> : DbContext where TDbCon
             c.Property(p => p.ActivationId).IsRequired();
             c.Property(p => p.MembershipVersion).IsRequired();
             c.Property(p => p.ETag).IsRequired().IsConcurrencyToken();
-            c.HasIndex(p => new {p.ClusterIdHash, p.SiloAddressHash});
+            c.HasIndex(p => new { p.ClusterIdHash, p.SiloAddressHash });
         });
     }
 }

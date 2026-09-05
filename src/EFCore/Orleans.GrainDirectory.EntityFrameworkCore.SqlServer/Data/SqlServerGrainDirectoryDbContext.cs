@@ -17,7 +17,7 @@ public class SqlServerGrainDirectoryDbContext : GrainDirectoryDbContext<SqlServe
 
         modelBuilder.Entity<GrainActivationRecord<byte[]>>(c =>
         {
-            c.HasKey(p => new {p.ClusterIdHash, p.GrainIdHash}).IsClustered(false).HasName("PK_Activations");
+            c.HasKey(p => new { p.ClusterIdHash, p.GrainIdHash }).IsClustered(false).HasName("PK_Activations");
             c.Property(p => p.ClusterIdHash).HasColumnType("binary(32)");
             c.Property(p => p.GrainIdHash).HasColumnType("binary(32)");
             c.Property(p => p.SiloAddressHash).HasColumnType("binary(32)");
@@ -27,7 +27,7 @@ public class SqlServerGrainDirectoryDbContext : GrainDirectoryDbContext<SqlServe
             c.Property(p => p.ActivationId).HasColumnType("nvarchar(max)").UseCollation(IdentifierCollation);
             c.Property(p => p.ETag).IsRequired().IsRowVersion();
 
-            c.HasIndex(p => new {p.ClusterIdHash, p.SiloAddressHash}).IsClustered(false).HasDatabaseName("IDX_Activations_ClusterIdHash_SiloAddressHash");
+            c.HasIndex(p => new { p.ClusterIdHash, p.SiloAddressHash }).IsClustered(false).HasDatabaseName("IDX_Activations_ClusterIdHash_SiloAddressHash");
         });
     }
 }

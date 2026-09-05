@@ -1,4 +1,4 @@
-﻿using TestExtensions;
+using TestExtensions;
 
 namespace Orleans.EntityFrameworkCore.Tests;
 
