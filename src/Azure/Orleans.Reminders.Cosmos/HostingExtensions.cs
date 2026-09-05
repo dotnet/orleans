@@ -23,6 +23,9 @@ public static class HostingExtensions
     /// </returns>
     public static ISiloBuilder UseCosmosReminderService(this ISiloBuilder builder, Action<CosmosReminderTableOptions> configure)
     {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(configure);
+
         builder.Services.UseCosmosReminderService(configure);
         return builder;
     }
@@ -41,6 +44,9 @@ public static class HostingExtensions
     /// </returns>
     public static ISiloBuilder UseCosmosReminderService(this ISiloBuilder builder, Action<OptionsBuilder<CosmosReminderTableOptions>> configure)
     {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(configure);
+
         builder.Services.UseCosmosReminderService(configure);
         return builder;
     }
@@ -58,7 +64,12 @@ public static class HostingExtensions
     /// The provided <see cref="IServiceCollection"/>, for chaining.
     /// </returns>
     public static IServiceCollection UseCosmosReminderService(this IServiceCollection services, Action<CosmosReminderTableOptions> configure)
-        => services.UseCosmosReminderService(optionsBuilder => optionsBuilder.Configure(configure));
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configure);
+
+        return services.UseCosmosReminderService(optionsBuilder => optionsBuilder.Configure(configure));
+    }
 
     /// <summary>
     /// Adds reminder storage backed by Azure Cosmos DB.
@@ -74,6 +85,9 @@ public static class HostingExtensions
     /// </returns>
     public static IServiceCollection UseCosmosReminderService(this IServiceCollection services, Action<OptionsBuilder<CosmosReminderTableOptions>> configure)
     {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configure);
+
         services.AddReminders();
         services.AddCosmosReadRetryPolicy();
         services.AddSingleton<IReminderTable, CosmosReminderTable>();
