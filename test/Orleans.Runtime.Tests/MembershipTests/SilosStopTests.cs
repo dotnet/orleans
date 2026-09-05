@@ -1,9 +1,15 @@
 using System.Net;
+using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
+using Orleans.Core.Diagnostics;
+using Orleans.Messaging;
 using Orleans.Runtime;
+using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Placement;
 using Orleans.TestingHost;
+using Orleans.TestingHost.Diagnostics;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
@@ -35,7 +41,9 @@ namespace UnitTests.MembershipTests
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 var clusterOptions = configuration.GetTestClusterOptions();
-                clientBuilder.UseStaticClustering(new IPEndPoint(IPAddress.Loopback, clusterOptions.BaseGatewayPort));
+                clientBuilder
+                    .Configure<ClientMessagingOptions>(options => options.DropExpiredMessages = false)
+                    .UseStaticClustering(new IPEndPoint(IPAddress.Loopback, clusterOptions.BaseGatewayPort));
             }
         }
 
@@ -61,19 +69,447 @@ namespace UnitTests.MembershipTests
             await Assert.ThrowsAsync<SiloUnavailableException>(() => promise);
         }
 
+        [Fact, TestCategory("Liveness")]
+        public async Task GatewayRequestSentBeforeSiloDeathIsRejected()
+        {
+            var runtimeClient = Client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();
+            var gateway = GetGateway();
+            var previousResponseTimeout = runtimeClient.GetResponseTimeout();
+            runtimeClient.SetResponseTimeout(TimeSpan.FromMinutes(1));
+            try
+            {
+                var target = await GetGrainOnTargetSilo(HostedCluster.SecondarySilos[0]);
+                Assert.NotNull(target);
+
+                var observer = new LongRunningTaskObserver();
+                var observerReference = GrainFactory.CreateObjectReference<ILongRunningTaskObserver>(observer);
+                try
+                {
+                    var callId = Guid.NewGuid();
+                    var promise = target.LongWaitWithStartNotification(
+                        TimeSpan.FromMinutes(1),
+                        callId,
+                        observerReference,
+                        CancellationToken.None);
+
+                    await observer.WaitForCallToStart(callId);
+                    Assert.False(promise.IsCompleted);
+                    Assert.Equal(1, gateway.TrackedRequestClientCount);
+
+                    await HostedCluster.KillSiloAsync(
+                        HostedCluster.SecondarySilos[0],
+                        TestContext.Current.CancellationToken);
+
+                    await Assert.ThrowsAsync<SiloUnavailableException>(
+                        () => promise.WaitAsync(TimeSpan.FromSeconds(20), TestContext.Current.CancellationToken));
+                    Assert.Equal(0, gateway.TrackedRequestClientCount);
+                }
+                finally
+                {
+                    GrainFactory.DeleteObjectReference<ILongRunningTaskObserver>(observerReference);
+                }
+            }
+            finally
+            {
+                runtimeClient.SetResponseTimeout(previousResponseTimeout);
+            }
+        }
+
+        [Fact, TestCategory("Liveness")]
+        public async Task CompletedGatewayForwardedRequestStopsTrackingClient()
+        {
+            var gateway = GetGateway();
+            var target = await GetGrainOnTargetSilo(HostedCluster.SecondarySilos[0]);
+            Assert.NotNull(target);
+
+            var observer = new LongRunningTaskObserver();
+            var observerReference = GrainFactory.CreateObjectReference<ILongRunningTaskObserver>(observer);
+            try
+            {
+                var callId = Guid.NewGuid();
+                var promise = target.LongWaitWithStartNotification(
+                    TimeSpan.FromSeconds(5),
+                    callId,
+                    observerReference,
+                    CancellationToken.None);
+
+                await observer.WaitForCallToStart(callId);
+                Assert.Equal(1, gateway.TrackedRequestClientCount);
+
+                await promise;
+                Assert.Equal(0, gateway.TrackedRequestClientCount);
+            }
+            finally
+            {
+                GrainFactory.DeleteObjectReference<ILongRunningTaskObserver>(observerReference);
+            }
+        }
+
+        [Fact, TestCategory("Liveness")]
+        public async Task GatewayForwardedRequestCancellationAndSiloDeathRaceClearsTracking()
+        {
+            var gateway = GetGateway();
+            var clientId = Assert.Single(((IConnectedClientCollection)gateway).GetConnectedClientIds());
+            var targetSilo = HostedCluster.SecondarySilos[0];
+            var target = await GetGrainOnTargetSilo(targetSilo);
+            Assert.NotNull(target);
+            using var gatewayEvents = new DiagnosticEventCollector(GatewayEvents.ListenerName);
+
+            var observer = new LongRunningTaskObserver();
+            var observerReference = GrainFactory.CreateObjectReference<ILongRunningTaskObserver>(observer);
+            try
+            {
+                using var cancellation = new CancellationTokenSource();
+                var callId = Guid.NewGuid();
+                var promise = target.LongWaitWithStartNotification(
+                    TimeSpan.FromMinutes(1),
+                    callId,
+                    observerReference,
+                    cancellation.Token);
+
+                await observer.WaitForCallToStart(callId);
+                Assert.Equal(1, gateway.TrackedRequestClientCount);
+                gatewayEvents.Clear();
+                var trackingStoppedTask = gatewayEvents.WaitForEventAsync(
+                    nameof(GatewayEvents.RequestTrackingStopped),
+                    diagnosticEvent => diagnosticEvent.Payload is GatewayEvents.RequestTrackingStopped stopped
+                        && stopped.ClientId.Equals(clientId),
+                    TimeSpan.FromSeconds(30),
+                    TestContext.Current.CancellationToken);
+
+                var releaseRace = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                var cancelTask = Task.Run(
+                    async () =>
+                    {
+                        await releaseRace.Task;
+                        await cancellation.CancelAsync();
+                    },
+                    TestContext.Current.CancellationToken);
+                var killTask = Task.Run(
+                    async () =>
+                    {
+                        await releaseRace.Task;
+                        await HostedCluster.KillSiloAsync(targetSilo, TestContext.Current.CancellationToken);
+                    },
+                    TestContext.Current.CancellationToken);
+
+                releaseRace.SetResult();
+                await Task.WhenAll(cancelTask, killTask);
+
+                var exception = await Record.ExceptionAsync(
+                    () => promise.WaitAsync(TimeSpan.FromSeconds(20), TestContext.Current.CancellationToken));
+                Assert.True(
+                    exception is OperationCanceledException or SiloUnavailableException,
+                    $"Expected cancellation or dead-silo rejection, but received {exception?.GetType().FullName ?? "no exception"}: {exception}");
+                var trackingStopped = Assert.IsType<GatewayEvents.RequestTrackingStopped>(
+                    (await trackingStoppedTask).Payload);
+                Assert.Equal(HostedCluster.Primary!.SiloAddress, trackingStopped.SiloAddress);
+                Assert.Equal(clientId, trackingStopped.ClientId);
+                Assert.Equal(0, gateway.TrackedRequestClientCount);
+                await HostedCluster.WaitForLivenessToStabilizeAsync(didKill: true)
+                    .WaitAsync(TestContext.Current.CancellationToken);
+                Assert.Single(
+                    gatewayEvents.GetEvents(nameof(GatewayEvents.RequestTrackingStopped)),
+                    diagnosticEvent => diagnosticEvent.Payload is GatewayEvents.RequestTrackingStopped stopped
+                        && stopped.ClientId.Equals(clientId));
+            }
+            finally
+            {
+                GrainFactory.DeleteObjectReference<ILongRunningTaskObserver>(observerReference);
+            }
+        }
+
+        [Fact, TestCategory("Liveness")]
+        public async Task ClientShutdownWithGatewayForwardedRequestClearsTracking()
+        {
+            var gateway = GetGateway();
+            var target = await GetGrainOnTargetSilo(HostedCluster.SecondarySilos[0]);
+            Assert.NotNull(target);
+
+            var observer = new LongRunningTaskObserver();
+            ILongRunningTaskObserver? observerReference = GrainFactory.CreateObjectReference<ILongRunningTaskObserver>(observer);
+            try
+            {
+                var callId = Guid.NewGuid();
+                var promise = target.LongWaitWithStartNotification(
+                    TimeSpan.FromMinutes(1),
+                    callId,
+                    observerReference,
+                    CancellationToken.None);
+
+                await observer.WaitForCallToStart(callId);
+                GrainFactory.DeleteObjectReference<ILongRunningTaskObserver>(observerReference);
+                observerReference = null;
+                Assert.Equal(1, gateway.TrackedRequestClientCount);
+
+                await HostedCluster.StopClusterClientAsync(TestContext.Current.CancellationToken);
+
+                await Assert.ThrowsAsync<SiloUnavailableException>(() => promise);
+                Assert.Equal(0, gateway.TrackedRequestClientCount);
+            }
+            finally
+            {
+                if (observerReference is not null)
+                {
+                    GrainFactory.DeleteObjectReference<ILongRunningTaskObserver>(observerReference);
+                }
+            }
+        }
+
+        [Fact, TestCategory("Liveness")]
+        public async Task GatewayDeadSiloRejectionClearsAmbientRequestContextForExternalClient()
+        {
+            const string contextKey = "gateway-rejection-sentinel";
+            const string contextValue = "must-not-leak";
+            var primaryServices = ((InProcessSiloHandle)HostedCluster.Primary!).ServiceProvider;
+            var gateway = primaryServices.GetRequiredService<MessageCenter>().Gateway!;
+            var messageFactory = primaryServices.GetRequiredService<MessageFactory>();
+            var connectionManager = primaryServices.GetRequiredService<ConnectionManager>();
+            var clientId = Assert.Single(((IConnectedClientCollection)gateway).GetConnectedClientIds());
+            var targetSilo = HostedCluster.SecondarySilos[0].SiloAddress;
+            var destination = await connectionManager.GetConnection(targetSilo);
+            var request = new Message
+            {
+                Id = new CorrelationId(1),
+                Direction = Message.Directions.Request,
+                SendingSilo = HostedCluster.Primary!.SiloAddress,
+                SendingGrain = clientId,
+                TargetSilo = targetSilo,
+                TargetGrain = GrainId.Create("target", Guid.NewGuid().ToString()),
+            };
+            Assert.True(gateway.TryGetClientState(request, out var client));
+
+            await HostedCluster.KillSiloAsync(
+                HostedCluster.SecondarySilos[0],
+                TestContext.Current.CancellationToken);
+            await HostedCluster.WaitForLivenessToStabilizeAsync(didKill: true)
+                .WaitAsync(TestContext.Current.CancellationToken);
+
+            using var gatewayEvents = new DiagnosticEventCollector(GatewayEvents.ListenerName);
+            var rejectionEventTask = gatewayEvents.WaitForEventAsync(
+                nameof(GatewayEvents.DeadSiloRequestRejected),
+                diagnosticEvent => diagnosticEvent.Payload is GatewayEvents.DeadSiloRequestRejected rejected
+                    && rejected.ClientId.Equals(clientId)
+                    && rejected.Rejection.Id.Equals(request.Id),
+                TimeSpan.FromSeconds(30),
+                TestContext.Current.CancellationToken);
+
+            RequestContext.Set(contextKey, contextValue);
+            try
+            {
+                var unsanitizedRejection = messageFactory.CreateRejectionResponse(
+                    request,
+                    Message.RejectionTypes.Transient,
+                    "Target silo became unavailable");
+                Assert.Equal(contextValue, unsanitizedRejection.RequestContextData![contextKey]);
+
+                client.SendRequest(request, destination);
+
+                var diagnosticEvent = await rejectionEventTask;
+                var rejected = Assert.IsType<GatewayEvents.DeadSiloRequestRejected>(diagnosticEvent.Payload);
+                Assert.Equal(HostedCluster.Primary.SiloAddress, rejected.SiloAddress);
+                Assert.Equal(clientId, rejected.ClientId);
+                var rejection = rejected.Rejection;
+                Assert.Equal(request.Id, rejection.Id);
+                Assert.Equal(Message.Directions.Response, rejection.Direction);
+                Assert.Equal(Message.ResponseTypes.Rejection, rejection.Result);
+                Assert.Equal(clientId, rejection.TargetGrain);
+                Assert.Null(rejection.RequestContextData);
+                Assert.Equal(0, gateway.TrackedRequestClientCount);
+                await Task.Yield();
+                Assert.Single(
+                    gatewayEvents.GetEvents(nameof(GatewayEvents.DeadSiloRequestRejected)),
+                    diagnosticEvent => diagnosticEvent.Payload is GatewayEvents.DeadSiloRequestRejected duplicate
+                        && duplicate.ClientId.Equals(clientId)
+                        && duplicate.Rejection.Id.Equals(request.Id));
+            }
+            finally
+            {
+                RequestContext.Remove(contextKey);
+            }
+        }
+
+        [Fact, TestCategory("Liveness")]
+        public async Task DeadSiloRejectionDoesNotStealSameIdRetry()
+        {
+            var primaryServices = ((InProcessSiloHandle)HostedCluster.Primary!).ServiceProvider;
+            var gateway = primaryServices.GetRequiredService<MessageCenter>().Gateway!;
+            var clientId = Assert.Single(((IConnectedClientCollection)gateway).GetConnectedClientIds());
+            var deadSilo = HostedCluster.SecondarySilos[0];
+            var destination = new RecordingConnection();
+            var original = new Message
+            {
+                Id = new CorrelationId(2),
+                Direction = Message.Directions.Request,
+                SendingSilo = HostedCluster.Primary!.SiloAddress,
+                SendingGrain = clientId,
+                TargetSilo = deadSilo.SiloAddress,
+                TargetGrain = GrainId.Create("target", Guid.NewGuid().ToString()),
+            };
+            var retry = new Message
+            {
+                Id = original.Id,
+                Direction = Message.Directions.Request,
+                SendingSilo = original.SendingSilo,
+                SendingGrain = original.SendingGrain,
+                TargetSilo = HostedCluster.Primary.SiloAddress,
+                TargetGrain = GrainId.Create("target", Guid.NewGuid().ToString()),
+            };
+            Assert.True(gateway.TryGetClientState(original, out var client));
+
+            await HostedCluster.KillSiloAsync(deadSilo, TestContext.Current.CancellationToken);
+            await HostedCluster.WaitForLivenessToStabilizeAsync(didKill: true)
+                .WaitAsync(TestContext.Current.CancellationToken);
+
+            using var gatewayEvents = new DiagnosticEventCollector(GatewayEvents.ListenerName);
+            var retryInserted = 0;
+            var trackingStoppedTask = gatewayEvents.WaitForEventAsync(
+                nameof(GatewayEvents.RequestTrackingStopped),
+                diagnosticEvent =>
+                {
+                    if (diagnosticEvent.Payload is not GatewayEvents.RequestTrackingStopped stopped
+                        || !stopped.ClientId.Equals(clientId))
+                    {
+                        return false;
+                    }
+
+                    if (Interlocked.Exchange(ref retryInserted, 1) == 0)
+                    {
+                        client.SendRequest(retry, destination);
+                    }
+
+                    return true;
+                },
+                TimeSpan.FromSeconds(30),
+                TestContext.Current.CancellationToken);
+            client.SendRequest(original, destination);
+
+            await trackingStoppedTask;
+            Assert.Equal(1, Volatile.Read(ref retryInserted));
+            Assert.Same(retry, Assert.Single(destination.Messages));
+            Assert.Equal(1, gateway.TrackedRequestClientCount);
+            await Task.Yield();
+            Assert.DoesNotContain(
+                gatewayEvents.GetEvents(nameof(GatewayEvents.DeadSiloRequestRejected)),
+                diagnosticEvent => diagnosticEvent.Payload is GatewayEvents.DeadSiloRequestRejected duplicate
+                    && duplicate.ClientId.Equals(clientId)
+                    && duplicate.Rejection.Id.Equals(original.Id));
+
+            client.ClearPendingRequests();
+            Assert.Equal(0, gateway.TrackedRequestClientCount);
+        }
+
+        [Fact, TestCategory("Liveness")]
+        public async Task ThrowingDiagnosticObserverDoesNotInterruptDeadSiloRejection()
+        {
+            var primaryServices = ((InProcessSiloHandle)HostedCluster.Primary!).ServiceProvider;
+            var gateway = primaryServices.GetRequiredService<MessageCenter>().Gateway!;
+            var clientId = Assert.Single(((IConnectedClientCollection)gateway).GetConnectedClientIds());
+            var deadSilo = HostedCluster.SecondarySilos[0];
+            var request = new Message
+            {
+                Id = new CorrelationId(3),
+                Direction = Message.Directions.Request,
+                SendingSilo = HostedCluster.Primary!.SiloAddress,
+                SendingGrain = clientId,
+                TargetSilo = deadSilo.SiloAddress,
+                TargetGrain = GrainId.Create("target", Guid.NewGuid().ToString()),
+            };
+            Assert.True(gateway.TryGetClientState(request, out var client));
+
+            await HostedCluster.KillSiloAsync(deadSilo, TestContext.Current.CancellationToken);
+            await HostedCluster.WaitForLivenessToStabilizeAsync(didKill: true)
+                .WaitAsync(TestContext.Current.CancellationToken);
+
+            using var subscription = GatewayEvents.AllEvents.Subscribe(new ThrowingGatewayEventObserver());
+
+            client.SendRequest(request, new RecordingConnection());
+
+            Assert.Equal(0, gateway.TrackedRequestClientCount);
+        }
+
         private async Task<ILongRunningTaskGrain<bool>?> GetGrainOnTargetSilo(SiloHandle siloHandle)
         {
             const int maxRetry = 10;
             for (int i = 0; i < maxRetry; i++)
             {
                 RequestContext.Set(IPlacementDirector.PlacementHintKey, siloHandle.SiloAddress);
-                var grain = GrainFactory.GetGrain<ILongRunningTaskGrain<bool>>(Guid.NewGuid());
-                var instanceId = await grain.GetRuntimeInstanceId();
-                if (instanceId.Contains(siloHandle.SiloAddress.Endpoint.ToString()))
-                    return grain;
+                try
+                {
+                    var grain = GrainFactory.GetGrain<ILongRunningTaskGrain<bool>>(Guid.NewGuid());
+                    var instanceId = await grain.GetRuntimeInstanceId();
+                    if (instanceId.Contains(siloHandle.SiloAddress.Endpoint.ToString()))
+                        return grain;
+                }
+                finally
+                {
+                    RequestContext.Remove(IPlacementDirector.PlacementHintKey);
+                }
+
                 await Task.Delay(100);
             }
             return null;
+        }
+
+        private Gateway GetGateway() =>
+            ((InProcessSiloHandle)HostedCluster.Primary!).ServiceProvider.GetRequiredService<MessageCenter>().Gateway!;
+
+        private sealed class LongRunningTaskObserver : ILongRunningTaskObserver
+        {
+            private readonly TaskCompletionSource<Guid> _startedCall = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            public void OnCallStarted(Guid callId) => _startedCall.TrySetResult(callId);
+
+            public async Task WaitForCallToStart(Guid callId)
+            {
+                var startedCallId = await _startedCall.Task.WaitAsync(TimeSpan.FromSeconds(30));
+                Assert.Equal(callId, startedCallId);
+            }
+        }
+
+        private sealed class RecordingConnection()
+            : Connection(new DefaultConnectionContext(), static _ => Task.CompletedTask, shared: null!)
+        {
+            public List<Message> Messages { get; } = [];
+
+            protected override ConnectionDirection ConnectionDirection => ConnectionDirection.SiloToSilo;
+
+            protected override IMessageCenter MessageCenter => null!;
+
+            public override void Send(Message message) => Messages.Add(message);
+
+            protected override bool PrepareMessageForSend(Message msg) => throw new NotSupportedException();
+
+            protected override void RetryMessage(Message msg, Exception? ex = null) => throw new NotSupportedException();
+
+            protected override void RecordMessageReceive(Message msg, int numTotalBytes, int headerBytes) =>
+                throw new NotSupportedException();
+
+            protected override void RecordMessageSend(Message msg, int numTotalBytes, int headerBytes) =>
+                throw new NotSupportedException();
+
+            protected override void OnReceivedMessage(Message message) => throw new NotSupportedException();
+
+            protected override void OnSendMessageFailure(Message message, string error) => throw new NotSupportedException();
+        }
+
+        private sealed class ThrowingGatewayEventObserver : IObserver<GatewayEvents.GatewayEvent>
+        {
+            public void OnCompleted()
+            {
+            }
+
+            public void OnError(Exception error)
+            {
+            }
+
+            public void OnNext(GatewayEvents.GatewayEvent value)
+            {
+                if (value is GatewayEvents.RequestTrackingStopped or GatewayEvents.DeadSiloRequestRejected)
+                {
+                    throw new InvalidOperationException("Test diagnostic observer failure.");
+                }
+            }
         }
     }
 }

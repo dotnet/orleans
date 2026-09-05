@@ -141,7 +141,9 @@ namespace Orleans.Runtime.Messaging
             get => this.sniffIncomingMessageHandler;
         }
 
-        public void SendMessage(Message msg)
+        public void SendMessage(Message msg) => SendMessage(msg, sendMessage: null);
+
+        internal void SendMessage(Message msg, Action<Message, Connection?, Exception?>? sendMessage)
         {
             Debug.Assert(!msg.IsLocalOnly);
 
@@ -186,8 +188,11 @@ namespace Orleans.Runtime.Messaging
                     return;
                 }
 
-                // First check to see if it's really destined for a proxied client, instead of a local grain.
-                if (TryDeliverToProxy(msg))
+                // Route responses through the ingress gateway while it is live so that it observes request completion.
+                // If that gateway is dead, another gateway connected to the client can deliver the response locally.
+                var routeViaTargetSilo = ShouldRouteResponseViaTargetSilo(msg, _siloAddress);
+                var targetSiloIsDead = routeViaTargetSilo && siloStatusOracle.IsDeadSilo(msg.TargetSilo!);
+                if (CanDeliverToProxyLocally(msg, _siloAddress, targetSiloIsDead) && TryDeliverToProxy(msg))
                 {
                     // Message was successfully delivered to the proxy.
                     return;
@@ -212,7 +217,15 @@ namespace Orleans.Runtime.Messaging
                 {
                     if (this.connectionManager.TryGetConnection(targetSilo, out var existingConnection))
                     {
-                        existingConnection.Send(msg);
+                        if (sendMessage is null)
+                        {
+                            existingConnection.Send(msg);
+                        }
+                        else
+                        {
+                            sendMessage(msg, existingConnection, null);
+                        }
+
                         return;
                     }
                     else if (this.siloStatusOracle.IsDeadSilo(targetSilo))
@@ -220,11 +233,24 @@ namespace Orleans.Runtime.Messaging
                         // Do not try to establish
                         if (msg.Direction is Message.Directions.Request or Message.Directions.OneWay)
                         {
-                            this.messagingTrace.OnRejectSendMessageToDeadSilo(_siloAddress, msg);
-                            this.SendRejection(msg, Message.RejectionTypes.Transient, "Target silo is known to be dead", new SiloUnavailableException());
+                            if (sendMessage is null)
+                            {
+                                RejectMessage();
+                            }
+                            else
+                            {
+                                this.messagingTrace.OnRejectSendMessageToDeadSilo(_siloAddress, msg);
+                                sendMessage(msg, null, null);
+                            }
                         }
 
                         return;
+
+                        void RejectMessage()
+                        {
+                            this.messagingTrace.OnRejectSendMessageToDeadSilo(_siloAddress, msg);
+                            this.SendRejection(msg, Message.RejectionTypes.Transient, "Target silo is known to be dead", new SiloUnavailableException());
+                        }
                     }
                     else
                     {
@@ -232,22 +258,62 @@ namespace Orleans.Runtime.Messaging
                         if (connectionTask.IsCompletedSuccessfully)
                         {
                             var sender = connectionTask.Result;
-                            sender.Send(msg);
+                            if (sendMessage is null)
+                            {
+                                sender.Send(msg);
+                            }
+                            else
+                            {
+                                sendMessage(msg, sender, null);
+                            }
                         }
                         else
                         {
-                            _ = SendAsync(this, connectionTask, msg);
+                            _ = SendAsync(this, connectionTask, msg, sendMessage);
 
-                            static async Task SendAsync(MessageCenter messageCenter, ValueTask<Connection> connectionTask, Message msg)
+                            static async Task SendAsync(
+                                MessageCenter messageCenter,
+                                ValueTask<Connection> connectionTask,
+                                Message msg,
+                                Action<Message, Connection?, Exception?>? sendMessage)
                             {
                                 try
                                 {
                                     var sender = await connectionTask;
-                                    sender.Send(msg);
+                                    if (sendMessage is null)
+                                    {
+                                        sender.Send(msg);
+                                    }
+                                    else
+                                    {
+                                        sendMessage(msg, sender, null);
+                                    }
                                 }
                                 catch (Exception exception)
                                 {
-                                    messageCenter.SendRejection(msg, Message.RejectionTypes.Transient, $"Exception while sending message: {exception}");
+                                    if (msg.Direction == Message.Directions.Response
+                                        && msg.TargetSilo is { } targetSilo
+                                        && CanDeliverToProxyLocally(
+                                            msg,
+                                            messageCenter._siloAddress,
+                                            messageCenter.siloStatusOracle.IsDeadSilo(targetSilo))
+                                        && messageCenter.TryDeliverToProxy(msg))
+                                    {
+                                        return;
+                                    }
+                                    else if (sendMessage is null)
+                                    {
+                                        RejectMessage();
+                                    }
+                                    else
+                                    {
+                                        sendMessage(msg, null, exception);
+                                    }
+
+                                    void RejectMessage() => messageCenter.SendRejection(
+                                        msg,
+                                        Message.RejectionTypes.Transient,
+                                        $"Exception while sending message: {exception}");
                                 }
                             }
                         }
@@ -255,6 +321,17 @@ namespace Orleans.Runtime.Messaging
                 }
             }
         }
+
+        internal static bool ShouldRouteResponseViaTargetSilo(Message message, SiloAddress localSilo) =>
+            message.Direction == Message.Directions.Response
+            && message.TargetSilo is { } targetSilo
+            && !targetSilo.Matches(localSilo);
+
+        internal static bool CanDeliverToProxyLocally(
+            Message message,
+            SiloAddress localSilo,
+            bool targetSiloIsDead) =>
+            !ShouldRouteResponseViaTargetSilo(message, localSilo) || targetSiloIsDead;
 
         public void DispatchLocalMessage(Message message) => ReceiveMessage(message);
 
@@ -431,6 +508,13 @@ namespace Orleans.Runtime.Messaging
             ResendMessageImpl(message);
         }
 
+        internal void RerouteMessage(
+            Message message,
+            Action<Message, Connection?, Exception?> sendMessage)
+        {
+            ResendMessageImpl(message, sendMessage: sendMessage);
+        }
+
         private bool TryForwardMessage(Message message, SiloAddress? forwardingAddress)
         {
             if (!MayForward(message, this.messagingOptions)) return false;
@@ -438,11 +522,20 @@ namespace Orleans.Runtime.Messaging
             message.ForwardCount = message.ForwardCount + 1;
             _messagingProcessingInstruments.OnDispatcherMessageForwared(message);
 
-            ResendMessageImpl(message, forwardingAddress);
+            Action<Message, Connection?, Exception?>? sendMessage = null;
+            if (Gateway?.TryGetClientState(message, out var client) is true)
+            {
+                sendMessage = client.SendMessage;
+            }
+
+            ResendMessageImpl(message, forwardingAddress, sendMessage);
             return true;
         }
 
-        private void ResendMessageImpl(Message message, SiloAddress? forwardingAddress = null)
+        private void ResendMessageImpl(
+            Message message,
+            SiloAddress? forwardingAddress = null,
+            Action<Message, Connection?, Exception?>? sendMessage = null)
         {
             LogDebugResend(log, message);
 
@@ -454,12 +547,12 @@ namespace Orleans.Runtime.Messaging
             else if (forwardingAddress != null)
             {
                 message.TargetSilo = forwardingAddress;
-                SendMessage(message);
+                SendMessage(message, sendMessage);
             }
             else
             {
                 message.TargetSilo = null;
-                _ = AddressAndSendMessage(message);
+                _ = AddressAndSendMessage(message, sendMessage);
             }
         }
 
@@ -477,7 +570,9 @@ namespace Orleans.Runtime.Messaging
         /// - add ordering info and maintain send order
         ///
         /// </summary>
-        internal Task AddressAndSendMessage(Message message)
+        internal Task AddressAndSendMessage(
+            Message message,
+            Action<Message, Connection?, Exception?>? sendMessage = null)
         {
             try
             {
@@ -487,7 +582,7 @@ namespace Orleans.Runtime.Messaging
                     return SendMessageAsync(messageAddressingTask, message);
                 }
 
-                SendMessage(message);
+                SendMessage(message, sendMessage);
             }
             catch (Exception ex)
             {
@@ -508,7 +603,7 @@ namespace Orleans.Runtime.Messaging
                     return;
                 }
 
-                SendMessage(m);
+                SendMessage(m, sendMessage);
             }
 
             void OnAddressingFailure(Message m, Exception ex)
