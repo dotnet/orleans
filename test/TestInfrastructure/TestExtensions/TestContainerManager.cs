@@ -80,7 +80,8 @@ internal sealed class TestContainerManager<TContainer>
             using var dockerClient = endpointAuthConfig
                 .GetDockerClientConfiguration(Guid.NewGuid())
                 .CreateClient();
-            var dockerInfo = await dockerClient.System.GetSystemInfoAsync().ConfigureAwait(false);
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            var dockerInfo = await dockerClient.System.GetSystemInfoAsync(timeout.Token).ConfigureAwait(false);
             return string.Equals(dockerInfo.OSType, "windows", StringComparison.OrdinalIgnoreCase)
                 ? "Docker is running in Windows container mode."
                 : null;
