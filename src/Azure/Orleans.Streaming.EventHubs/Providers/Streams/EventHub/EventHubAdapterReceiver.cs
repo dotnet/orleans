@@ -52,6 +52,7 @@ namespace Orleans.Streaming.EventHubs
         private readonly IQueueAdapterReceiverMonitor monitor;
         private readonly LoadSheddingOptions loadSheddingOptions;
         private readonly IEnvironmentStatisticsProvider environmentStatisticsProvider;
+        private readonly object cacheLock = new();
         private IEventHubQueueCache? cache;
 
         private IEventHubReceiver? receiver;
@@ -59,7 +60,12 @@ namespace Orleans.Streaming.EventHubs
         private readonly Func<EventHubPartitionSettings, string, ILogger, IEventHubReceiver> eventHubReceiverFactory;
 
         private IStreamQueueCheckpointer<string>? checkpointer;
-        private AggregatedQueueFlowController flowController = null!;
+        private AggregatedQueueFlowController flowController = new(MaxMessagesPerRead);
+        private bool receiverUsesCheckpoint;
+        private IEventHubQueueCache? recoveryCache;
+        private Dictionary<Cursor, RecoveredCursorProgress>? recoveredCursorProgress;
+        private readonly HashSet<Cursor> cursors = new(ReferenceEqualityComparer.Instance);
+        private HashSet<Cursor>? recoveryPendingCursors;
 
         // Receiver life cycle
         private int receiverState = ReceiverShutdown;
@@ -69,7 +75,10 @@ namespace Orleans.Streaming.EventHubs
 
         public int GetMaxAddCount()
         {
-            return this.flowController.GetMaxAddCount();
+            lock (this.cacheLock)
+            {
+                return this.flowController.GetMaxAddCount();
+            }
         }
 
         public EventHubAdapterReceiver(EventHubPartitionSettings settings,
@@ -136,22 +145,36 @@ namespace Orleans.Streaming.EventHubs
             var watch = Stopwatch.StartNew();
             try
             {
-                this.checkpointer = await this.checkpointerFactory(
+                var checkpointer = await this.checkpointerFactory(
                     this.settings.Partition,
                     cancellationToken);
-                if (this.cache != null)
-                {
-                    this.cache.Dispose();
-                    this.cache = null;
-                }
-                this.cache = this.cacheFactory(this.settings.Partition, this.checkpointer, this.loggerFactory);
-                this.flowController = new AggregatedQueueFlowController(MaxMessagesPerRead) { this.cache, LoadShedQueueFlowController.CreateAsPercentOfLoadSheddingLimit(this.loadSheddingOptions, environmentStatisticsProvider) };
-                string offset = await this.checkpointer.Load(cancellationToken);
-                if (!this.checkpointer.CheckpointExists)
+                string offset = await checkpointer.Load(cancellationToken);
+                var receiverUsesCheckpoint = checkpointer.CheckpointExists;
+                if (!receiverUsesCheckpoint)
                 {
                     offset = EventHubConstants.StartOfStream;
                 }
 
+                var cache = this.cacheFactory(this.settings.Partition, checkpointer, this.loggerFactory);
+                var flowController = new AggregatedQueueFlowController(MaxMessagesPerRead)
+                {
+                    cache,
+                    LoadShedQueueFlowController.CreateAsPercentOfLoadSheddingLimit(this.loadSheddingOptions, environmentStatisticsProvider)
+                };
+
+                lock (this.cacheLock)
+                {
+                    this.cache?.Dispose();
+                    this.checkpointer = checkpointer;
+                    this.cache = cache;
+                    this.flowController = flowController;
+                    if (this.recoveredCursorProgress is not null)
+                    {
+                        this.recoveryCache = cache;
+                    }
+                }
+
+                this.receiverUsesCheckpoint = receiverUsesCheckpoint;
                 this.receiver = this.eventHubReceiverFactory(this.settings, offset, this.logger);
                 watch.Stop();
                 this.monitor?.TrackInitialization(true, watch.Elapsed, null);
@@ -209,9 +232,23 @@ namespace Orleans.Streaming.EventHubs
                 this.monitor?.TrackRead(false, watch.Elapsed, ex);
                 LogWarningFailedToReadFromEventHubPartition(this.settings.Hub.EventHubName, this.settings.Partition, ex);
 
-                if (ex is ArgumentException && this.checkpointer?.CheckpointExists == true)
+                if (this.receiverUsesCheckpoint && IsInvalidOffsetException(ex))
                 {
-                    await ResetReceiver(cancellationToken);
+                    try
+                    {
+                        await ResetReceiver(cancellationToken);
+                    }
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                    {
+                        throw;
+                    }
+                    catch (Exception recoveryException)
+                    {
+                        LogWarningFailedToRecoverFromInvalidCheckpoint(
+                            this.settings.Hub.EventHubName,
+                            this.settings.Partition,
+                            recoveryException);
+                    }
                 }
                 throw;
             }
@@ -231,7 +268,17 @@ namespace Orleans.Streaming.EventHubs
 
             this.monitor?.TrackMessagesReceived(messages.Count, oldestMessageEnqueueTime, newestMessageEnqueueTime);
 
-            List<StreamPosition> messageStreamPositions = this.cache!.Add(messages, dequeueTimeUtc);
+            List<StreamPosition> messageStreamPositions;
+            lock (this.cacheLock)
+            {
+                if (this.cache is null)
+                {
+                    return batches;
+                }
+
+                messageStreamPositions = this.cache.Add(messages, dequeueTimeUtc);
+            }
+
             foreach (var streamPosition in messageStreamPositions)
             {
                 batches.Add(new StreamActivityNotificationBatch(streamPosition));
@@ -239,29 +286,78 @@ namespace Orleans.Streaming.EventHubs
             return batches;
         }
 
+        private static bool IsInvalidOffsetException(Exception exception)
+            => exception is ArgumentException
+            && exception.Message.StartsWith("The supplied offset", StringComparison.OrdinalIgnoreCase)
+            && exception.Message.Contains(" is invalid.", StringComparison.OrdinalIgnoreCase);
+
         private async Task ResetReceiver(CancellationToken cancellationToken)
         {
-            var checkpointer = Interlocked.Exchange(ref this.checkpointer, null);
-            var receiver = Interlocked.Exchange(ref this.receiver, null);
-            var cache = Interlocked.Exchange(ref this.cache, null);
+            IStreamQueueCheckpointer<string> checkpointer;
+            lock (this.cacheLock)
+            {
+                checkpointer = this.checkpointer!;
+                this.recoveryCache = null;
+                this.recoveredCursorProgress = new Dictionary<Cursor, RecoveredCursorProgress>(ReferenceEqualityComparer.Instance);
+                this.recoveryPendingCursors = new HashSet<Cursor>(this.cursors, ReferenceEqualityComparer.Instance);
+            }
 
             try
             {
-                await checkpointer!.Reset(cancellationToken);
+                await checkpointer.Reset(cancellationToken);
             }
-            finally
+            catch
             {
-                try
+                lock (this.cacheLock)
                 {
-                    cache?.Dispose();
+                    this.recoveryCache = null;
+                    this.recoveredCursorProgress = null;
+                    this.recoveryPendingCursors = null;
                 }
-                finally
+
+                throw;
+            }
+
+            this.receiverUsesCheckpoint = false;
+            var receiver = Interlocked.Exchange(ref this.receiver, null);
+            var exceptions = new List<Exception>();
+            try
+            {
+                if (receiver is not null)
                 {
-                    if (receiver is not null)
-                    {
-                        await receiver.CloseAsync(cancellationToken);
-                    }
+                    await receiver.CloseAsync(cancellationToken);
                 }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                exceptions.Add(exception);
+            }
+
+            try
+            {
+                await Initialize(cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                exceptions.Add(exception);
+            }
+
+            if (exceptions.Count == 1)
+            {
+                ExceptionDispatchInfo.Capture(exceptions[0]).Throw();
+            }
+
+            if (exceptions.Count > 1)
+            {
+                throw new AggregateException(exceptions);
             }
         }
 
@@ -274,10 +370,21 @@ namespace Orleans.Streaming.EventHubs
         {
             purgedItems = null;
 
-            //if not under pressure, signal the cache to do a time based purge
-            //if under pressure, which means consuming speed is less than producing speed, then shouldn't purge, and don't read more message into the cache
-            if (!this.IsUnderPressure())
-                this.cache!.SignalPurge();
+            lock (this.cacheLock)
+            {
+                var cache = this.cache;
+                if (cache is null)
+                {
+                    return false;
+                }
+
+                //if not under pressure, signal the cache to do a time based purge
+                //if under pressure, which means consuming speed is less than producing speed, then shouldn't purge, and don't read more message into the cache
+                if (!this.IsUnderPressure())
+                {
+                    cache.SignalPurge();
+                }
+            }
 
             return false;
         }
@@ -285,27 +392,48 @@ namespace Orleans.Streaming.EventHubs
         [Obsolete("Use IQueueCache.TryGetCacheCursor instead.")]
         public IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken? token)
         {
-            return new Cursor(this.cache!, streamId, token);
+            return new Cursor(this, streamId, token);
         }
 
         QueueCacheCursorResult<IQueueCacheCursor> IQueueCache.TryGetCacheCursor(
             StreamId streamId,
             StreamSequenceToken? token)
         {
-            return WrapCursorResult(this.cache!.TryGetCursor(streamId, token));
+            lock (this.cacheLock)
+            {
+                var cache = this.cache!;
+                return WrapCursorResult(
+                    streamId,
+                    cache,
+                    cache.TryGetCursor(streamId, token),
+                    ReferenceEquals(cache, this.recoveryCache) ? token : null);
+            }
         }
 
         QueueCacheCursorResult<IQueueCacheCursor> IQueueCache.TryGetCacheCursorAtPosition(
             StreamId streamId,
             StreamSubscriptionStartPosition startPosition)
         {
-            return WrapCursorResult(this.cache!.TryGetCursorAtPosition(streamId, startPosition));
+            lock (this.cacheLock)
+            {
+                var cache = this.cache!;
+                return WrapCursorResult(
+                    streamId,
+                    cache,
+                    cache.TryGetCursorAtPosition(streamId, startPosition),
+                    resumeToken: null);
+            }
         }
 
-        private QueueCacheCursorResult<IQueueCacheCursor> WrapCursorResult(QueueCacheCursorResult<object> result)
+        private QueueCacheCursorResult<IQueueCacheCursor> WrapCursorResult(
+            StreamId streamId,
+            IEventHubQueueCache cache,
+            QueueCacheCursorResult<object> result,
+            StreamSequenceToken? resumeToken)
             => result.Kind switch
             {
-                QueueCacheCursorResultKind.Success => QueueCacheCursorResult<IQueueCacheCursor>.FromCursor(new Cursor(this.cache!, result.Cursor!)),
+                QueueCacheCursorResultKind.Success => QueueCacheCursorResult<IQueueCacheCursor>.FromCursor(
+                    new Cursor(this, streamId, cache, result.Cursor!, resumeToken)),
                 QueueCacheCursorResultKind.CacheMiss => QueueCacheCursorResult<IQueueCacheCursor>.FromCacheMiss(result.CacheMiss!.Value),
                 QueueCacheCursorResultKind.NotSupported => QueueCacheCursorResult<IQueueCacheCursor>.NotSupported,
                 _ => throw new InvalidOperationException("The cursor result is not initialized."),
@@ -326,7 +454,66 @@ namespace Orleans.Streaming.EventHubs
             if (earliestSubscriptionToken is IEventHubPartitionLocation location
                 && long.TryParse(location.EventHubOffset, NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
             {
-                this.checkpointer?.Update(location.EventHubOffset, utcNow, CancellationToken.None);
+                IStreamQueueCheckpointer<string>? checkpointer;
+                lock (this.cacheLock)
+                {
+                    if (this.recoveredCursorProgress is { } recoveredProgress)
+                    {
+                        if (this.recoveryPendingCursors is { Count: > 0 }
+                            || !recoveredProgress.Values.Any(
+                                progress => ReferenceEquals(progress.DeliveredToken, earliestSubscriptionToken)
+                                    || ReferenceEquals(progress.ResumeToken, earliestSubscriptionToken)))
+                        {
+                            return;
+                        }
+
+                        this.recoveryCache = null;
+                        this.recoveredCursorProgress = null;
+                        this.recoveryPendingCursors = null;
+                    }
+
+                    checkpointer = this.checkpointer;
+                }
+
+                checkpointer?.Update(location.EventHubOffset, utcNow, CancellationToken.None);
+            }
+        }
+
+        private void RecordRecoveredDeliveryToken(
+            Cursor cursor,
+            IEventHubQueueCache? cursorCache,
+            StreamSequenceToken deliveredToken,
+            StreamSequenceToken? resumeToken)
+        {
+            if (this.recoveredCursorProgress is not { } cursorProgress
+                || !ReferenceEquals(cursorCache, this.recoveryCache))
+            {
+                return;
+            }
+
+            cursorProgress.TryGetValue(cursor, out var previousProgress);
+            cursorProgress[cursor] = new(
+                deliveredToken,
+                previousProgress.ResumeToken ?? resumeToken);
+            this.recoveryPendingCursors?.Remove(cursor);
+        }
+
+        private void ClearRecoveredDeliveryToken(Cursor cursor)
+        {
+            this.recoveredCursorProgress?.Remove(cursor);
+        }
+
+        private readonly record struct RecoveredCursorProgress(
+            StreamSequenceToken DeliveredToken,
+            StreamSequenceToken? ResumeToken);
+
+        private void UnregisterCursor(Cursor cursor)
+        {
+            lock (this.cacheLock)
+            {
+                this.ClearRecoveredDeliveryToken(cursor);
+                this.recoveryPendingCursors?.Remove(cursor);
+                this.cursors.Remove(cursor);
             }
         }
 
@@ -360,9 +547,7 @@ namespace Orleans.Streaming.EventHubs
                     shutdownExceptions.Add(ex);
                 }
 
-                // clear cache and receiver
-                IEventHubQueueCache? localCache = Interlocked.Exchange(ref this.cache, null);
-
+                // clear receiver
                 var localReceiver = Interlocked.Exchange(ref this.receiver, null);
 
                 // start closing receiver
@@ -384,7 +569,12 @@ namespace Orleans.Streaming.EventHubs
                 // dispose of cache
                 try
                 {
-                    localCache?.Dispose();
+                    lock (this.cacheLock)
+                    {
+                        var localCache = this.cache;
+                        this.cache = null;
+                        localCache?.Dispose();
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -466,26 +656,51 @@ namespace Orleans.Streaming.EventHubs
 
         private class Cursor : IQueueCacheCursor
         {
-            private readonly IEventHubQueueCache cache;
-            private readonly object cursor;
+            private readonly EventHubAdapterReceiver owner;
+            private readonly StreamId streamId;
+            private IEventHubQueueCache? cache;
+            private object? cursor;
             private IBatchContainer? current;
+            private StreamSequenceToken? recoveryResumeToken;
+            private QueueCacheCursorMoveResult? pendingMoveResult;
 
-            public Cursor(IEventHubQueueCache cache, StreamId streamId, StreamSequenceToken? token)
+            public Cursor(EventHubAdapterReceiver owner, StreamId streamId, StreamSequenceToken? token)
             {
-                this.cache = cache;
+                this.owner = owner;
+                this.streamId = streamId;
+                lock (owner.cacheLock)
+                {
+                    this.cache = owner.cache!;
 #pragma warning disable CS0618 // Preserve the exact legacy exception and cursor behavior.
-                this.cursor = cache.GetCursor(streamId, token);
+                    this.cursor = this.cache.GetCursor(streamId, token);
 #pragma warning restore CS0618
+                    if (ReferenceEquals(this.cache, owner.recoveryCache))
+                    {
+                        this.recoveryResumeToken = token;
+                    }
+
+                    owner.cursors.Add(this);
+                }
             }
 
-            public Cursor(IEventHubQueueCache cache, object cursor)
+            public Cursor(
+                EventHubAdapterReceiver owner,
+                StreamId streamId,
+                IEventHubQueueCache cache,
+                object cursor,
+                StreamSequenceToken? resumeToken)
             {
+                this.owner = owner;
+                this.streamId = streamId;
                 this.cache = cache;
                 this.cursor = cursor;
+                this.recoveryResumeToken = resumeToken;
+                owner.cursors.Add(this);
             }
 
             public void Dispose()
             {
+                this.owner.UnregisterCursor(this);
             }
 
             public IBatchContainer? GetCurrent(out Exception? exception)
@@ -497,32 +712,175 @@ namespace Orleans.Streaming.EventHubs
             [Obsolete("Use MoveNextWithResult instead.")]
             public bool MoveNext()
             {
-#pragma warning disable CS0618 // Preserve the exact legacy exception and cursor behavior.
-                if (!this.cache.TryGetNextMessage(this.cursor, out var next))
-#pragma warning restore CS0618
+                lock (this.owner.cacheLock)
                 {
-                    this.current = null;
-                    return false;
-                }
+                    if (this.pendingMoveResult is { } pendingResult)
+                    {
+                        this.pendingMoveResult = null;
+                        this.current = null;
+                        if (pendingResult.CacheMiss is { } cacheMiss)
+                        {
+                            Invalidate();
+                            throw cacheMiss.ToException();
+                        }
 
-                this.current = next;
-                return true;
+                        if (pendingResult.Kind == QueueCacheCursorMoveResultKind.NoData)
+                        {
+                            return false;
+                        }
+
+                        throw new InvalidOperationException("The cursor move result is not initialized.");
+                    }
+
+                    if (this.cache is null || this.cursor is null || !ReferenceEquals(this.cache, this.owner.cache))
+                    {
+                        this.current = null;
+                        return false;
+                    }
+
+                    try
+                    {
+#pragma warning disable CS0618 // Preserve the exact legacy exception and cursor behavior.
+                        if (!this.cache.TryGetNextMessage(this.cursor, out var next))
+#pragma warning restore CS0618
+                        {
+                            this.current = null;
+                            return false;
+                        }
+
+                        SetCurrent(next);
+                        return true;
+                    }
+                    catch
+                    {
+                        Invalidate();
+                        throw;
+                    }
+                }
             }
 
             public QueueCacheCursorMoveResult MoveNextWithResult()
             {
-                var result = this.cache.TryGetNextMessageWithResult(this.cursor, out var next);
-                this.current = result.Kind == QueueCacheCursorMoveResultKind.Success ? next : null;
-                return result;
+                lock (this.owner.cacheLock)
+                {
+                    if (this.pendingMoveResult is { } pendingResult)
+                    {
+                        this.pendingMoveResult = null;
+                        this.current = null;
+                        if (pendingResult.Kind == QueueCacheCursorMoveResultKind.CacheMiss)
+                        {
+                            Invalidate();
+                        }
+
+                        return pendingResult;
+                    }
+
+                    if (this.cache is null || this.cursor is null || !ReferenceEquals(this.cache, this.owner.cache))
+                    {
+                        this.current = null;
+                        return QueueCacheCursorMoveResult.NoData;
+                    }
+
+                    QueueCacheCursorMoveResult result;
+                    IBatchContainer? next;
+                    try
+                    {
+                        result = this.cache.TryGetNextMessageWithResult(this.cursor, out next);
+                    }
+                    catch
+                    {
+                        Invalidate();
+                        throw;
+                    }
+
+                    switch (result.Kind)
+                    {
+                        case QueueCacheCursorMoveResultKind.Success:
+                            SetCurrent(next ?? throw new InvalidOperationException(
+                                "A successful cursor move did not produce a current item."));
+                            break;
+                        case QueueCacheCursorMoveResultKind.CacheMiss:
+                            this.current = null;
+                            Invalidate();
+                            break;
+                        case QueueCacheCursorMoveResultKind.NoData:
+                            this.current = null;
+                            break;
+                        default:
+                            throw new InvalidOperationException("The cursor move result is not initialized.");
+                    }
+
+                    return result;
+                }
             }
 
-            public void Refresh(StreamSequenceToken? token)
+            public void Refresh(StreamSequenceToken token)
             {
-                this.cache.Refresh(this.cursor, token);
+                lock (this.owner.cacheLock)
+                {
+                    var cache = this.owner.cache;
+                    if (cache is null)
+                    {
+                        this.owner.ClearRecoveredDeliveryToken(this);
+                        this.cache = null;
+                        this.cursor = null;
+                        this.current = null;
+                        this.recoveryResumeToken = null;
+                        this.pendingMoveResult = null;
+                        return;
+                    }
+
+                    if (!ReferenceEquals(this.cache, cache))
+                    {
+                        this.owner.ClearRecoveredDeliveryToken(this);
+                        this.cache = cache;
+                        this.current = null;
+                        this.recoveryResumeToken = null;
+                        var result = cache.TryGetCursor(this.streamId, token);
+                        switch (result.Kind)
+                        {
+                            case QueueCacheCursorResultKind.Success:
+                                this.cursor = result.Cursor;
+                                this.pendingMoveResult = null;
+                                break;
+                            case QueueCacheCursorResultKind.CacheMiss:
+                                this.cursor = null;
+                                this.pendingMoveResult = QueueCacheCursorMoveResult.FromCacheMiss(result.CacheMiss!.Value);
+                                break;
+                            default:
+                                throw new InvalidOperationException("The cursor result is not initialized.");
+                        }
+
+                        return;
+                    }
+
+                    cache.Refresh(this.cursor!, token);
+                }
             }
 
             public void RecordDeliveryFailure()
             {
+            }
+
+            private void SetCurrent(IBatchContainer next)
+            {
+                this.current = next;
+                this.owner.RecordRecoveredDeliveryToken(
+                    this,
+                    this.cache,
+                    next.SequenceToken,
+                    this.recoveryResumeToken);
+                this.recoveryResumeToken = null;
+            }
+
+            private void Invalidate()
+            {
+                this.owner.UnregisterCursor(this);
+                this.cache = null;
+                this.cursor = null;
+                this.current = null;
+                this.recoveryResumeToken = null;
+                this.pendingMoveResult = null;
             }
         }
 
@@ -540,7 +898,7 @@ namespace Orleans.Streaming.EventHubs
 
         [LoggerMessage(
             Level = LogLevel.Warning,
-            EventId = (int)OrleansEventHubErrorCode.FailedPartitionRead,
+            EventId = (int)OrleansEventHubErrorCode.RetryReceiverInit,
             Message = "Retrying initialization of EventHub partition {EventHubName}-{Partition}."
         )]
         private partial void LogWarningRetryingInitializationOfEventHubPartition(string eventHubName, string partition);
@@ -551,5 +909,12 @@ namespace Orleans.Streaming.EventHubs
             Message = "Failed to read from EventHub partition {EventHubName}-{Partition}"
         )]
         private partial void LogWarningFailedToReadFromEventHubPartition(string eventHubName, string partition, Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            EventId = (int)OrleansEventHubErrorCode.RetryReceiverInit,
+            Message = "Failed to recover EventHub partition {EventHubName}-{Partition} from an invalid checkpoint. The original read failure will be rethrown."
+        )]
+        private partial void LogWarningFailedToRecoverFromInvalidCheckpoint(string eventHubName, string partition, Exception exception);
     }
 }
