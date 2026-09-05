@@ -35,4 +35,10 @@ internal static class OrleansBinaryCommandCodecHelpers
             reader.Session.Reset();
         }
     }
+
+    public static T ReadIndependentValue<T, TInput>(IFieldCodec<T> codec, ref Reader<TInput> reader)
+    {
+        // Snapshot writers serialize each value with a fresh session, so replay must use the same boundary.
+        return ReadValue(codec, ref reader);
+    }
 }

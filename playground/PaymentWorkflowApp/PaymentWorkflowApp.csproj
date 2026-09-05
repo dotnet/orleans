@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="LiteDB" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\System.Distributed.DurableTasks\System.Distributed.DurableTasks.csproj" />
+    <ProjectReference Include="..\..\src\Orleans.Server\Orleans.Server.csproj" />
+  </ItemGroup>
+
+</Project>

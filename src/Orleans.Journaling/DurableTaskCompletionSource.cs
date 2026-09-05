@@ -47,6 +47,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
     private readonly IDurableTaskCompletionSourceCommandCodec<T> _codec;
     private readonly DeepCopier<T> _copier;
     private readonly DeepCopier<Exception> _exceptionCopier;
+    private readonly IJournaledStateMutationGuard? _mutationGuard;
 
     private TaskCompletionSource<T> _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private DurableTaskCompletionSourceStatus _status;
@@ -65,6 +66,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         _codec = JournalFormatServices.GetRequiredCommandCodec<IDurableTaskCompletionSourceCommandCodec<T>>(serviceProvider, shared.JournalFormatKey);
         _copier = copier;
         _exceptionCopier = exceptionCopier;
+        _mutationGuard = manager as IJournaledStateMutationGuard;
         manager.RegisterState(key, this);
     }
 
@@ -79,11 +81,13 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         _codec = codec;
         _copier = copier;
         _exceptionCopier = exceptionCopier;
+        _mutationGuard = manager as IJournaledStateMutationGuard;
         manager.RegisterState(key, this);
     }
 
     public bool TrySetResult(T value)
     {
+        _mutationGuard?.ThrowIfMutationBlocked();
         if (_status is not DurableTaskCompletionSourceStatus.Pending)
         {
             return false;
@@ -96,6 +100,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
 
     public bool TrySetException(Exception exception)
     {
+        _mutationGuard?.ThrowIfMutationBlocked();
         if (_status is not DurableTaskCompletionSourceStatus.Pending)
         {
             return false;
@@ -108,6 +113,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
 
     public bool TrySetCanceled()
     {
+        _mutationGuard?.ThrowIfMutationBlocked();
         if (_status is not DurableTaskCompletionSourceStatus.Pending)
         {
             return false;

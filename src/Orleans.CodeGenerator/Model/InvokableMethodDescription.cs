@@ -103,6 +103,26 @@ internal sealed class InvokableMethodDescription : IEquatable<InvokableMethodDes
             }
         }
 
+        // Support custom return types on grain interfaces.
+        // This may be the wrong place to do this: it may be more efficient to centralize it so that it's computed once per type.
+        if (Method.ReturnType.GetAttributes(GenerationContext.LibraryTypes.InvokableBaseTypeAttribute, out var returnTypeAttributes))
+        {
+            foreach (var attr in returnTypeAttributes)
+            {
+                var ctorArgs = attr.ConstructorArguments;
+                var proxyBaseType = (INamedTypeSymbol)ctorArgs[0].Value!;
+                var returnType = (INamedTypeSymbol)ctorArgs[1].Value!;
+                var invokableBaseType = (INamedTypeSymbol)ctorArgs[2].Value!;
+                if (!SymbolEqualityComparer.Default.Equals(ProxyBase.ProxyBaseType, proxyBaseType))
+                {
+                    // This attribute does not apply to this particular invoker, since it is for a different proxy base type.
+                    continue;
+                }
+
+                invokableBaseTypes[returnType] = invokableBaseType;
+            }
+        }
+
         AllTypeParameters = new List<(string Name, ITypeParameterSymbol Parameter)>();
         MethodTypeParameters = new List<(string Name, ITypeParameterSymbol Parameter)>();
 

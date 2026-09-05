@@ -29,15 +29,26 @@ namespace Orleans.Runtime
             var types = new List<Type>();
             foreach (var parameter in parameters)
             {
-                // Look for attribute with a facet marker interface - supports only single facet attribute
-                var attribute = parameter.GetCustomAttributes()
-                                         .FirstOrDefault(static attribute => FacetMarkerInterfaceType.IsInstanceOfType(attribute));
+                Factory<IGrainContext, object> argumentFactory;
+                if (parameter.GetCustomAttribute<FromKeyedServicesAttribute>() is not null)
+                {
+                    // ActivatorUtilities resolves keyed constructor parameters by position and attribute.
+                    // Supplying them as explicit typed arguments can bind to an earlier unkeyed parameter
+                    // when both parameters have the same type.
+                    continue;
+                }
+                else
+                {
+                    // Look for attribute with a facet marker interface - supports only single facet attribute
+                    var attribute = parameter.GetCustomAttributes()
+                                             .FirstOrDefault(static attribute => FacetMarkerInterfaceType.IsInstanceOfType(attribute));
 
-                if (attribute is null) continue;
+                    if (attribute is null) continue;
 
-                // Since the IAttributeToFactoryMapper is specific to the attribute specialization, we create a generic method to provide a attribute independent call pattern.
-                var getFactory = GetFactoryMethod.MakeGenericMethod(attribute.GetType());
-                var argumentFactory = (Factory<IGrainContext, object>)getFactory.Invoke(this, [serviceProvider, parameter, attribute, grainType])!;
+                    // Since the IAttributeToFactoryMapper is specific to the attribute specialization, we create a generic method to provide a attribute independent call pattern.
+                    var getFactory = GetFactoryMethod.MakeGenericMethod(attribute.GetType());
+                    argumentFactory = (Factory<IGrainContext, object>)getFactory.Invoke(this, [serviceProvider, parameter, attribute, grainType])!;
+                }
 
                 // Record the argument factory
                 _argumentFactories.Add(argumentFactory);

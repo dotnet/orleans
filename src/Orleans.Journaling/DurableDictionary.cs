@@ -10,13 +10,30 @@ namespace Orleans.Journaling;
 /// </summary>
 /// <typeparam name="K">The type of keys in the dictionary.</typeparam>
 /// <typeparam name="V">The type of values in the dictionary.</typeparam>
+/// <remarks>
+/// When a value implements <see cref="IDisposable"/>, the dictionary assumes ownership after a successful mutation.
+/// It disposes the value when the last reference to it is replaced or removed, when the dictionary is cleared, or
+/// when recovery resets the dictionary. A value is not owned when encoding its mutation fails.
+/// </remarks>
 public interface IDurableDictionary<K, V> : IDictionary<K, V> where K : notnull
 {
 }
 
+internal interface IDurableDictionaryOwnership<K> where K : notnull
+{
+    bool Remove(K key, bool disposeValue);
+}
+
 [DebuggerTypeProxy(typeof(IDurableDictionaryDebugView<,>))]
 [DebuggerDisplay("Count = {Count}")]
-internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledState, IDurableDictionaryCommandHandler<K, V> where K : notnull
+internal class DurableDictionary<K, V> :
+    IDurableDictionary<K, V>,
+    IDurableDictionaryOwnership<K>,
+    IJournaledState,
+    IJournaledStateWriteParticipant,
+    IDisposable,
+    IDurableDictionaryCommandHandler<K, V>
+    where K : notnull
 {
     private readonly IDurableDictionaryCommandCodec<K, V> _codec;
     private readonly Dictionary<K, V> _items = [];
@@ -69,8 +86,9 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledSta
 
     void IJournaledState.Reset(JournalStreamWriter writer)
     {
-        _items.Clear();
+        ApplyClear();
         _writer = writer;
+        OnReset();
     }
 
     void IJournaledState.AppendEntries(JournalStreamWriter writer)
@@ -92,6 +110,9 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledSta
     public bool Contains(K key) => _items.ContainsKey(key);
 
     public bool Remove(K key)
+        => Remove(key, disposeValue: true);
+
+    protected bool Remove(K key, bool disposeValue)
     {
         if (!_items.ContainsKey(key))
         {
@@ -99,9 +120,11 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledSta
         }
 
         WriteRemove(key);
-        ApplyRemove(key);
+        ApplyRemove(key, disposeValue);
         return true;
     }
+
+    bool IDurableDictionaryOwnership<K>.Remove(K key, bool disposeValue) => Remove(key, disposeValue);
 
     private void WriteRemove(K key)
     {
@@ -117,14 +140,115 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledSta
 
     protected virtual void OnSet(K key, V value) { }
 
+    /// <summary>
+    /// Called after this state has contributed its pending mutations to the current durable write.
+    /// </summary>
+    protected virtual void OnWritePreparing() { }
+
+    void IJournaledStateWriteParticipant.OnWritePreparing() => OnWritePreparing();
+
+    /// <summary>
+    /// Called when pending writes have been durably persisted.
+    /// Override in derived classes to receive write completion notifications.
+    /// </summary>
+    protected virtual void OnWriteCompleted() { }
+
+    /// <summary>
+    /// Called when recovery resets this state before replaying durable entries.
+    /// </summary>
+    protected virtual void OnReset() { }
+
+    void IJournaledState.OnWriteCompleted() => OnWriteCompleted();
+
     private void ApplySet(K key, V value)
     {
-        _items[key] = value;
+        if (_items.TryGetValue(key, out var previous) && !ReferenceEquals(previous, value))
+        {
+            _items[key] = value;
+            DisposeIfUnreferenced(previous);
+        }
+        else
+        {
+            _items[key] = value;
+        }
+
         OnSet(key, value);
     }
 
-    internal bool ApplyRemove(K key) => _items.Remove(key);
-    private void ApplyClear() => _items.Clear();
+    internal bool ApplyRemove(K key, bool disposeValue = true)
+    {
+        if (!_items.Remove(key, out var value))
+        {
+            return false;
+        }
+
+        if (disposeValue)
+        {
+            DisposeIfUnreferenced(value);
+        }
+
+        return true;
+    }
+
+    private void ApplyClear()
+    {
+        Dictionary<object, IDisposable>? disposables = null;
+        foreach (var value in _items.Values)
+        {
+            if (value is IDisposable disposable)
+            {
+                (disposables ??= new(ReferenceEqualityComparer.Instance))
+                    .TryAdd(GetDisposalIdentity(value, disposable), disposable);
+            }
+        }
+
+        _items.Clear();
+        if (disposables is not null)
+        {
+            List<Exception>? exceptions = null;
+            foreach (var disposable in disposables.Values)
+            {
+                try
+                {
+                    disposable.Dispose();
+                }
+                catch (Exception exception)
+                {
+                    (exceptions ??= []).Add(exception);
+                }
+            }
+
+            if (exceptions is not null)
+            {
+                throw new AggregateException("One or more durable dictionary values failed to dispose.", exceptions);
+            }
+        }
+    }
+
+    private void DisposeIfUnreferenced(V value)
+    {
+        if (value is not IDisposable disposable)
+        {
+            return;
+        }
+
+        var identity = GetDisposalIdentity(value, disposable);
+        foreach (var candidate in _items.Values)
+        {
+            if (candidate is IDisposable candidateDisposable
+                && ReferenceEquals(GetDisposalIdentity(candidate, candidateDisposable), identity))
+            {
+                return;
+            }
+        }
+
+        disposable.Dispose();
+    }
+
+    private static object GetDisposalIdentity(V value, IDisposable disposable) =>
+        value is IJournaledResourceOwner owner ? owner.ResourceIdentity : disposable;
+
+    void IDisposable.Dispose() => ApplyClear();
     void IDurableDictionaryCommandHandler<K, V>.ApplySet(K key, V value) => ApplySet(key, value);
     void IDurableDictionaryCommandHandler<K, V>.ApplyRemove(K key) => ApplyRemove(key);
     void IDurableDictionaryCommandHandler<K, V>.ApplyClear() => ApplyClear();
@@ -132,6 +256,7 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledSta
     {
         ApplyClear();
         _items.EnsureCapacity(capacityHint);
+        OnReset();
     }
 
     protected virtual JournalStreamWriter GetWriter()
@@ -166,7 +291,7 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledSta
         }
 
         WriteRemove(item.Key);
-        _ = ((ICollection<KeyValuePair<K, V>>)_items).Remove(item);
+        _ = ApplyRemove(item.Key);
         return true;
     }
 

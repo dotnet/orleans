@@ -1,0 +1,31 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageId>System.Distributed.DurableTasks</PackageId>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <WarningLevel>3</WarningLevel>
+    <AnalysisLevel>preview</AnalysisLevel>
+    <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
+    <OrleansBuildTimeCodeGen>false</OrleansBuildTimeCodeGen>
+    <VersionSuffix Condition="$(VersionSuffix) != ''">$(VersionSuffix).alpha.1</VersionSuffix>
+    <VersionSuffix Condition="$(VersionSuffix) == ''">alpha.1</VersionSuffix>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Remove="Orleans.Metadata.FrameworkPartAttribute" />
+    <InternalsVisibleTo Include="Orleans.DurableTasks.Tests" />
+    <InternalsVisibleTo Include="Orleans.Runtime" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Options" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

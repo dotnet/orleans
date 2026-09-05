@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
+    <Nullable>enable</Nullable>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)playground\WorkflowsApp\WorkflowsApp.Service\WorkflowsApp.Service.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
+  </ItemGroup>
+
+</Project>

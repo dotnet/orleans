@@ -12,5 +12,8 @@ namespace Orleans.Runtime
         /// Gets the singleton instance of this class.
         /// </summary>
         internal static SiloRoleBasedPlacement Singleton { get; } = new SiloRoleBasedPlacement();
+
+        /// <inheritdoc />
+        public override bool IsGrain => true;
     }
 }

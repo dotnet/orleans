@@ -329,17 +329,11 @@ internal sealed partial class ShardExecutor
                 LogExecutingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, jobContext.Job.TargetGrainId, jobContext.Job.DueTime);
 
                 var target = _grainFactory.GetGrain<IDurableJobReceiverExtension>(jobContext.Job.TargetGrainId);
-
                 var result = await target.HandleDurableJobAsync(jobContext, attemptCancellationToken);
-
-                // Handle the result based on status
                 while (result.IsInProgress)
                 {
-                    // Enter polling loop
                     LogPollingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, result.PollAfterDelay.Value);
-
                     await Task.Delay(result.PollAfterDelay.Value, _timeProvider, attemptCancellationToken);
-
                     result = await target.HandleDurableJobAsync(jobContext, attemptCancellationToken);
                 }
 
@@ -403,6 +397,7 @@ internal sealed partial class ShardExecutor
                                 notifyOwnershipLost();
                             }
                         }
+
                         break;
                     case DurableJobRunStatus.RescheduleRequested:
                         failureException = new InvalidOperationException(
