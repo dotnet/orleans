@@ -268,6 +268,32 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
             await provider.CloseAsync(CancellationToken.None);
         }
 
+        [Fact]
+        public async Task ListAsync_WhenParserReturnsDefaultJournalId_SkipsObject()
+        {
+            var client = CreateTrackingClient();
+            client.ListObjectsV2Async(Arg.Any<ListObjectsV2Request>(), Arg.Any<CancellationToken>())
+                .Returns(Task.FromResult(new ListObjectsV2Response
+                {
+                    IsTruncated = false,
+                    S3Objects = [new S3Object { Key = "invalid/wal" }],
+                }));
+            var options = CreateOptions();
+            options.S3Client = client;
+            options.TryParseJournalId = static _ => default(JournalId);
+            var provider = CreateProvider(options);
+            await provider.InitializeAsync(CancellationToken.None);
+
+            var listed = new List<JournalId>();
+            await foreach (var journalId in provider.ListAsync(cancellationToken: CancellationToken.None))
+            {
+                listed.Add(journalId);
+            }
+
+            Assert.Empty(listed);
+            await provider.CloseAsync(CancellationToken.None);
+        }
+
         private static S3JournalStorageOptions CreateOptions() => new()
         {
             BucketName = "journaling-tests",

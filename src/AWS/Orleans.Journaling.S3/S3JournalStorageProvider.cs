@@ -74,7 +74,7 @@ internal sealed class S3JournalStorageProvider : ILifecycleParticipant<ISiloLife
 
                 var storageIdValue = item.Key[..^"/wal".Length];
                 var journalId = _options.TryParseJournalId(storageIdValue);
-                if (journalId is not { } id || !prefix.IsPrefixOf(id))
+                if (journalId is not { IsDefault: false } id || !prefix.IsPrefixOf(id))
                 {
                     continue;
                 }
