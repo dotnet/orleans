@@ -27,10 +27,8 @@ public partial class PersistentStreamPullingAgentTests
         cache.AddToCache([new TestBatchContainer(streamId.StreamId, token)]);
         var (accessor, pubSub, streamData) = await CreateInitializedAgentWithStream(
             streamId, token, cache, new StreamPullingAgentOptions());
-        var unavailable = new ClientNotAvailableException(ClientGrainId.Create().GrainId);
-        var consumer = Substitute.For<IStreamConsumerExtension>();
-        consumer.DeliverBatch(default!, default, default!, default, default)
-            .ReturnsForAnyArgs(Task.FromException<StreamHandshakeToken?>(unavailable));
+        var unavailable = Tester.ClientConnectionTests.ClientObserverRoutingTests.CreateUnavailableClientException();
+        var consumer = new UnavailableConsumer(unavailable);
         var data = streamData.AddConsumer(subscriptionId, streamId, consumer, filterData: null, DateTime.UtcNow);
         data.Cursor = cache.GetCacheCursor(streamId.StreamId, token);
         data.IsRegistered = true;
@@ -50,6 +48,28 @@ public partial class PersistentStreamPullingAgentTests
                 if (registration.Stage != StreamingEvents.SubscriptionUnregistrationStage.Requested)
                 {
                     outcome.TrySetResult(registration);
+                }
+
+                private sealed class UnavailableConsumer(ClientNotAvailableException exception) : IStreamConsumerExtension
+                {
+                    public Task<StreamHandshakeToken?> DeliverImmutable(GuidId subscriptionId, QualifiedStreamId streamId, object item,
+                        StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken, CancellationToken cancellationToken)
+                        => throw new NotSupportedException();
+
+                    public Task<StreamHandshakeToken?> DeliverMutable(GuidId subscriptionId, QualifiedStreamId streamId, object item,
+                        StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken, CancellationToken cancellationToken)
+                        => throw new NotSupportedException();
+
+                    public Task<StreamHandshakeToken?> DeliverBatch(GuidId subscriptionId, QualifiedStreamId streamId, IBatchContainer item,
+                        StreamHandshakeToken? handshakeToken, CancellationToken cancellationToken)
+                        => Task.FromException<StreamHandshakeToken?>(exception);
+
+                    public Task CompleteStream(GuidId subscriptionId, CancellationToken cancellationToken) => Task.CompletedTask;
+
+                    public Task ErrorInStream(GuidId subscriptionId, Exception error, CancellationToken cancellationToken) => Task.CompletedTask;
+
+                    public Task<StreamHandshakeToken?> GetSequenceToken(GuidId subscriptionId, CancellationToken cancellationToken)
+                        => Task.FromResult<StreamHandshakeToken?>(null);
                 }
             }
         });
