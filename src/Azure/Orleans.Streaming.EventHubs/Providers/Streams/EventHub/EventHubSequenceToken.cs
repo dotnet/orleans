@@ -3,6 +3,7 @@ using System;
 using System.Globalization;
 using Newtonsoft.Json;
 using Orleans.Providers.Streams.Common;
+using Orleans.Streams;
 
 namespace Orleans.Streaming.EventHubs
 {
@@ -31,6 +32,13 @@ namespace Orleans.Streaming.EventHubs
     ///   indicates which application layer event this token is for, within an EventHub message.  It is required for uniqueness
     ///   and ordering of application layer events within an EventHub message.
     /// </summary>
+    /// <remarks>
+    /// Event Hub token versions and subclasses which inherit their complete equality, ordering,
+    /// and hashing contract compare using the Event Hubs sequence number and event index.
+    /// During recovery, Orleans interprets exact <see cref="EventSequenceToken"/> positions from
+    /// the earlier inherited event-token factory in this provider's sequence-number space.
+    /// Delivered event tokens preserve their concrete type and Event Hubs offset.
+    /// </remarks>
     [Serializable]
     [GenerateSerializer]
     public class EventHubSequenceToken : EventSequenceToken, IEventHubPartitionLocation
@@ -64,6 +72,47 @@ namespace Orleans.Streaming.EventHubs
         {
         }
 
+        internal override StreamSequenceToken NormalizeLegacyToken(StreamSequenceToken token)
+        {
+            if (token.GetType() == typeof(EventSequenceToken) && HasInheritedEventHubContract(this))
+            {
+                // The former inherited factory persisted the position without the offset.
+                // Empty offsets also identify sequence-only tokens produced by EventHubDataAdapter.
+                return new EventHubSequenceToken(string.Empty, token.SequenceNumber, token.EventIndex);
+            }
+
+            return token;
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(StreamSequenceToken? other)
+        {
+            return other is not null
+                && IsCompatibleEventHubToken(other)
+                && other.SequenceNumber == SequenceNumber
+                && other.EventIndex == EventIndex;
+        }
+
+        /// <inheritdoc />
+        public override int CompareTo(StreamSequenceToken? other)
+        {
+            if (other is null)
+            {
+                return 1;
+            }
+
+            if (!IsCompatibleEventHubToken(other))
+            {
+                throw new ArgumentOutOfRangeException(nameof(other));
+            }
+
+            var difference = SequenceNumber.CompareTo(other.SequenceNumber);
+            return difference != 0 ? difference : EventIndex.CompareTo(other.EventIndex);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode() => HashCode.Combine(SequenceNumber, EventIndex);
+
         /// <summary>Returns a string that represents the current object.</summary>
         /// <returns>A string that represents the current object.</returns>
         /// <filterpriority>2</filterpriority>
@@ -71,5 +120,21 @@ namespace Orleans.Streaming.EventHubs
         {
             return string.Format(CultureInfo.InvariantCulture, "EventHubSequenceToken(EventHubOffset: {0}, SequenceNumber: {1}, EventIndex: {2})", EventHubOffset, SequenceNumber, EventIndex);
         }
+
+        private bool IsCompatibleEventHubToken(StreamSequenceToken? other)
+        {
+            if (other is null)
+            {
+                return false;
+            }
+
+            return GetType() == other.GetType()
+                || other is EventHubSequenceToken
+                    && HasInheritedEventHubContract(this)
+                    && HasInheritedEventHubContract(other);
+        }
+
+        private static bool HasInheritedEventHubContract(StreamSequenceToken token)
+            => EventSequenceTokenCompatibility.HasInheritedContract(token, typeof(EventHubSequenceToken), typeof(EventSequenceToken));
     }
 }

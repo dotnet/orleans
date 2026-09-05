@@ -20,9 +20,9 @@
     <InternalsVisibleTo Include="Orleans.Core.Tests" />
     <InternalsVisibleTo Include="Orleans.DefaultCluster.Tests" />
     <InternalsVisibleTo Include="Orleans.Runtime.Internal.Tests" />
+    <InternalsVisibleTo Include="Orleans.Streaming.EventHubs" />
     <InternalsVisibleTo Include="Orleans.Streaming.Tests" />
     <InternalsVisibleTo Include="TestExtensions" />
     <InternalsVisibleTo Include="TestInternalGrains" />
   </ItemGroup>
 </Project>
-

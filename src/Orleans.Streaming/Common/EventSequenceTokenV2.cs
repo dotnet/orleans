@@ -8,6 +8,12 @@ namespace Orleans.Providers.Streams.Common
     /// <summary>
     /// Stream sequence token that tracks sequence number and event index
     /// </summary>
+    /// <remarks>
+    /// <see cref="EventSequenceTokenV2"/> and <see cref="EventSequenceToken"/> share a numeric
+    /// position contract with subclasses which inherit their complete equality, ordering, and
+    /// hashing implementations. This includes exact base tokens persisted by earlier event-token
+    /// factories. Subclasses which override that contract define their own compatibility.
+    /// </remarks>
     [Serializable]
     [GenerateSerializer]
     public class EventSequenceTokenV2 : StreamSequenceToken
@@ -61,24 +67,27 @@ namespace Orleans.Providers.Streams.Common
         /// Creates a sequence token for a specific event in the current batch
         /// </summary>
         /// <param name="eventInd">The event index.</param>
-        /// <returns>A new sequence token.</returns>
-        public EventSequenceTokenV2 CreateSequenceTokenForEvent(int eventInd)
+        /// <returns>A token with the same concrete runtime type and position metadata, targeting the specified event.</returns>
+        public virtual EventSequenceTokenV2 CreateSequenceTokenForEvent(int eventInd)
         {
-            return new EventSequenceTokenV2(SequenceNumber, eventInd);
+            var result = (EventSequenceTokenV2)MemberwiseClone();
+            result.EventIndex = eventInd;
+            return result;
         }
 
         /// <inheritdoc/>
         public override bool Equals(object? obj)
         {
-            return Equals(obj as EventSequenceTokenV2);
+            return obj is StreamSequenceToken token && Equals(token);
         }
 
         /// <inheritdoc/>
         public override bool Equals(StreamSequenceToken? other)
         {
-            var token = other as EventSequenceTokenV2;
-            return token != null && (token.SequenceNumber == SequenceNumber &&
-                                     token.EventIndex == EventIndex);
+            return other is not null
+                && EventSequenceTokenCompatibility.IsCompatibleNumericToken(this, other)
+                && other.SequenceNumber == SequenceNumber
+                && other.EventIndex == EventIndex;
         }
 
         /// <inheritdoc/>
@@ -87,12 +96,11 @@ namespace Orleans.Providers.Streams.Common
             if (other == null)
                 return 1;
 
-            var token = other as EventSequenceTokenV2;
-            if (token == null)
+            if (!EventSequenceTokenCompatibility.IsCompatibleNumericToken(this, other))
                 throw new ArgumentOutOfRangeException(nameof(other));
 
-            int difference = SequenceNumber.CompareTo(token.SequenceNumber);
-            return difference != 0 ? difference : EventIndex.CompareTo(token.EventIndex);
+            int difference = SequenceNumber.CompareTo(other.SequenceNumber);
+            return difference != 0 ? difference : EventIndex.CompareTo(other.EventIndex);
         }
 
         /// <inheritdoc/>
