@@ -53,6 +53,7 @@ public class StaticRebalancingTests(RebalancerFixture fixture, ITestOutputHelper
         var silo3Activations = initialSilo3Activations;
         var silo4Activations = initialSilo4Activations;
 
+        await MgmtGrain.ForceRuntimeStatisticsCollection([rebalancerHost], cancellationToken);
         grainEvents.Clear();
         var silo1Migration = grainEvents.WaitForAnyGrainDeactivatedAsync(
             deactivated =>
