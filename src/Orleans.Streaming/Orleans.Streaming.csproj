@@ -21,6 +21,7 @@
     <InternalsVisibleTo Include="Orleans.DefaultCluster.Tests" />
     <InternalsVisibleTo Include="Orleans.Runtime.Internal.Tests" />
     <InternalsVisibleTo Include="Orleans.Streaming.EventHubs" />
+    <InternalsVisibleTo Include="Orleans.Streaming.Kinesis.Tests" />
     <InternalsVisibleTo Include="Orleans.Streaming.Tests" />
     <InternalsVisibleTo Include="TestExtensions" />
     <InternalsVisibleTo Include="TestInternalGrains" />
