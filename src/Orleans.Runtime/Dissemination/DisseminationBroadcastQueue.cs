@@ -324,7 +324,7 @@ internal sealed partial class DisseminationBroadcastQueue
             _owner = owner;
             _flushTimer = new(owner._timeProvider);
             using var _ = new ExecutionContextSuppressor();
-            _flushTask = RunScheduledFlush();
+            _flushTask = RunScheduledFlush(_shutdownCts.Token);
         }
 
         public SiloAddress Peer { get; }
@@ -649,9 +649,8 @@ internal sealed partial class DisseminationBroadcastQueue
             }
         }
 
-        private async Task RunScheduledFlush()
+        private async Task RunScheduledFlush(CancellationToken cancellationToken)
         {
-            var cancellationToken = _shutdownCts.Token;
             try
             {
                 while (await _flushTimer.WaitAsync(cancellationToken))
@@ -1038,7 +1037,7 @@ internal sealed partial class DisseminationBroadcastQueue
                 }
                 catch (OperationCanceledException) when (sendCancellation.IsCancellationRequested)
                 {
-                    ObserveLateSend(sendTask).Ignore();
+                    ObserveLateSend(sendTask);
                     throw;
                 }
             }
@@ -1075,19 +1074,14 @@ internal sealed partial class DisseminationBroadcastQueue
             }
         }
 
-        private async Task ObserveLateSend(Task<DisseminationBroadcastResponse> sendTask)
+        private void ObserveLateSend(Task<DisseminationBroadcastResponse> sendTask)
         {
-            try
-            {
-                await sendTask.ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-            }
-            catch (Exception exception)
-            {
-                LogDebugDisseminationSendFailed(_owner._logger, exception, Peer);
-            }
+            // Fault observation follows transport completion after the operation's cancellation.
+            sendTask.ContinueWith(
+                task => LogDebugDisseminationSendFailed(_owner._logger, task.Exception!, Peer),
+                CancellationToken.None,
+                TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default).Ignore();
         }
 
         private IDisseminationSystemTarget GetTarget() =>

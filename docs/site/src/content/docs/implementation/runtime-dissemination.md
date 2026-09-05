@@ -127,6 +127,10 @@ Protocol dictionaries use focused locks for membership projections, response cur
 
 Caller cancellation owns public operation lifetime and is checked before each received value is applied. Per-hop value TTL bounds broadcast transport and anti-entropy round lifetime. Broadcast pumps enforce their deadline independently of the runtime's cancellation-acknowledgment setting. An outstanding RPC retains its concurrency slot until completion, and semaphore disposal follows the last outstanding RPC after pump shutdown. Late RPC faults are observed and logged. Shutdown cancellation reaches queued send-gate waits, active RPCs, anti-entropy exchanges, pump timers, and drain waiters.
 
+Dissemination and manifest RPC contracts carry cancellation through their implementations and callers. Background loops receive their owned shutdown token explicitly. Deployment-load timer callbacks forward the timer's cancellation token through publication and direct statistics RPCs, and disposing the timer cancels an active publication. Completion-only fault observers follow the underlying operation through its terminal result so cancellation preserves fault observation and resource cleanup.
+
+Shared membership refreshes use the manager's shutdown lifetime, while each caller controls its own wait. Terminal membership-status publication uses a separate bounded cleanup token after the heartbeat loop stops. Cancellation bounds the wait for legacy membership-storage operations while those operations retain their provider-defined completion semantics.
+
 ## Observability
 
 The standard `Microsoft.Orleans` meter exposes publication outcomes, broadcast volume, payload bytes, apply outcomes, retries, failures, anti-entropy work, drops, pump failures, and queue admission rejection. Dimensions are bounded to namespace, direction, kind, result, reason, truncation, and pump status. Diagnostic events provide payload-level apply/drop detail and deterministic pump scheduling detail for short-lived investigation.

@@ -30,6 +30,7 @@ internal sealed class MembershipDisseminationNamespace(
         MembershipTableSnapshot snapshot,
         CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         // Remember the exact snapshot before waking peer pumps so it is immediately repairable.
         RememberSnapshot(snapshot);
         return await disseminationService.Publish(
@@ -132,6 +133,7 @@ internal sealed class MembershipDisseminationNamespace(
         DisseminationValue value,
         CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (value.Key != DisseminationKey.Default)
         {
             return DisseminationApplyResult.Rejected;
@@ -201,6 +203,7 @@ internal sealed class MembershipDisseminationNamespace(
 
     private async ValueTask<DisseminationApplyResult> ApplyDiff(MembershipTableSnapshotDiff diff, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var current = membershipManager.CurrentSnapshot;
         if (current.Version.Value > diff.Version.Value)
         {

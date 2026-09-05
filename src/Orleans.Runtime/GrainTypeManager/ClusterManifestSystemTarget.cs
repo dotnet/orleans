@@ -37,8 +37,9 @@ namespace Orleans.Runtime
             return new(_clusterManifestProvider.Current);
         }
 
-        public ValueTask<ClusterManifestHashSummary> GetClusterManifestHashSummary()
+        public ValueTask<ClusterManifestHashSummary> GetClusterManifestHashSummary(CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var manifest = _clusterManifestProvider.Current;
 
             // Reuse the summary while the version is unchanged. Individual content hashes are cached by
@@ -48,6 +49,7 @@ namespace Orleans.Runtime
                 var hashes = new Dictionary<SiloAddress, ManifestHash>();
                 foreach (var siloManifest in manifest.Silos)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     hashes[siloManifest.Key] = ManifestHashCalculator.ComputeHash(siloManifest.Value);
                 }
 
@@ -58,10 +60,17 @@ namespace Orleans.Runtime
             return new(_cachedHashSummary);
         }
 
-        public ValueTask<ManifestHash> GetSiloManifestHash() => new(_siloManifestHash);
+        public ValueTask<ManifestHash> GetSiloManifestHash(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return new(_siloManifestHash);
+        }
 
-        public ValueTask<GrainManifest?> GetSiloManifestByHash(ManifestHash hash) =>
-            new(hash == _siloManifestHash ? _siloManifest : null);
+        public ValueTask<GrainManifest?> GetSiloManifestByHash(ManifestHash hash, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return new(hash == _siloManifestHash ? _siloManifest : null);
+        }
 
         public ValueTask<ClusterManifestUpdate?> GetClusterManifestUpdate(
             MajorMinorVersion version,

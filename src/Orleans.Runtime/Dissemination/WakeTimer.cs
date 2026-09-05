@@ -97,7 +97,7 @@ internal sealed class WakeTimer : IDisposable
     /// called, the method returns <see langword="true"/> immediately. Cancelling a wait does not disarm the timer,
     /// so a later waiter can still observe the scheduled wakeup.
     /// </remarks>
-    public async ValueTask<bool> WaitAsync(CancellationToken cancellationToken = default)
+    public async ValueTask<bool> WaitAsync(CancellationToken cancellationToken)
     {
         TaskCompletionSource<bool> waiter;
         lock (_lock)

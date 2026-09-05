@@ -61,6 +61,7 @@ internal sealed partial class DisseminationProtocol
         long version,
         CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var options = _options.CurrentValue;
         if (!options.Enabled || !disseminationNamespace.Options.Enabled)
         {
@@ -214,6 +215,7 @@ internal sealed partial class DisseminationProtocol
 
     public async Task RunAntiEntropyRound(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var options = _options.CurrentValue;
         if (!options.Enabled)
         {

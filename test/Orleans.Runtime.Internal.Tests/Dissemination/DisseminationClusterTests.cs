@@ -27,7 +27,9 @@ public sealed class DisseminationClusterTests
     [Fact]
     public async Task MembershipUpdatesAreDisseminatedAcrossRealCluster()
     {
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(120));
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cancellation.CancelAfter(TimeSpan.FromSeconds(120));
+        var cancellationToken = cancellation.Token;
 
         var builder = new InProcessTestClusterBuilder(3);
         builder.ConfigureSilo((_, siloBuilder) =>
@@ -38,8 +40,8 @@ public sealed class DisseminationClusterTests
         });
 
         await using var cluster = builder.Build();
-        await cluster.DeployAsync(TestContext.Current.CancellationToken);
-        await cluster.WaitForLivenessToStabilizeAsync();
+        await cluster.DeployAsync(cancellationToken);
+        await cluster.WaitForLivenessToStabilizeAsync().WaitAsync(cancellationToken);
 
         var existingSilos = cluster.GetActiveSilos().Select(static silo => silo.SiloAddress).ToHashSet();
         var baselineVersion = cluster.Silos[0].ServiceProvider
@@ -54,10 +56,10 @@ public sealed class DisseminationClusterTests
             static name => name == "Dissemination.ValueApply");
 
         // Adding a silo produces new membership updates that must propagate to the existing silos.
-        await cluster.StartAdditionalSiloAsync();
-        await cluster.WaitForLivenessToStabilizeAsync();
+        await cluster.StartAdditionalSiloAsync().WaitAsync(cancellationToken);
+        await cluster.WaitForLivenessToStabilizeAsync().WaitAsync(cancellationToken);
 
-        await observer.Reached.WaitAsync(cancellation.Token);
+        await observer.Reached.WaitAsync(cancellationToken);
 
         Assert.True(
             observer.AppliedSilos.Count >= 2,

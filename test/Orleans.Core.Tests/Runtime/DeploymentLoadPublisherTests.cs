@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
+using Orleans;
 using Orleans.Configuration;
 using Orleans.Core.Diagnostics;
 using Orleans.Runtime;
@@ -15,6 +16,7 @@ using Orleans.Runtime.Dissemination;
 using Orleans.Runtime.Scheduler;
 using Orleans.Serialization;
 using Orleans.Statistics;
+using Orleans.Timers;
 using TestExtensions;
 using Xunit;
 
@@ -89,7 +91,77 @@ public class DeploymentLoadPublisherTests
         Assert.Empty(rig.DirectTarget.ReceivedCalls());
     }
 
-    private static TestRig CreateTestRig(TimeSpan refreshTime)
+    [Fact]
+    public async Task PublishStatistics_PreCanceledToken_PreservesLocalState()
+    {
+        using var rig = CreateTestRig(TimeSpan.FromSeconds(5));
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => rig.Publisher.PublishStatistics(cancellation.Token));
+
+        Assert.Null(rig.Publisher.LocalRuntimeStatistics);
+        Assert.Empty(rig.Publisher.PeriodicStatistics);
+        Assert.Empty(rig.DirectTarget.ReceivedCalls());
+        Assert.Empty(rig.Dissemination.ReceivedCalls());
+    }
+
+    [Fact]
+    public async Task PublicationTimer_PropagatesCancellationToRuntimeStatisticsRpc()
+    {
+        using var timerCancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var timer = Substitute.For<IGrainTimer>();
+        timer.When(value => value.Dispose()).Do(_ => timerCancellation.Cancel());
+        var timerRegistry = Substitute.For<ITimerRegistry>();
+        Func<CancellationToken, Task> tick = null;
+        timerRegistry.RegisterGrainTimer(
+            Arg.Any<IGrainContext>(),
+            Arg.Any<Func<Func<CancellationToken, Task>, CancellationToken, Task>>(),
+            Arg.Any<Func<CancellationToken, Task>>(),
+            Arg.Any<GrainTimerCreationOptions>()).Returns(call =>
+            {
+                var callback = call.ArgAt<Func<Func<CancellationToken, Task>, CancellationToken, Task>>(1);
+                var state = call.ArgAt<Func<CancellationToken, Task>>(2);
+                tick = token => callback(state, token);
+                return timer;
+            });
+        using var rig = CreateTestRig(TimeSpan.FromSeconds(5), timerRegistry);
+        rig.Dissemination.Publish(
+            Arg.Any<IDisseminationNamespace>(), Arg.Any<DisseminationKey>(), Arg.Any<long>(), Arg.Any<CancellationToken>())
+            .Returns(ValueTask.FromResult(false));
+        var lifecycle = new SiloLifecycleSubject(NullLogger<SiloLifecycleSubject>.Instance);
+        ((ILifecycleParticipant<ISiloLifecycle>)rig.Publisher).Participate(lifecycle);
+        await lifecycle.OnStart(TestContext.Current.CancellationToken);
+        Task publication = Task.CompletedTask;
+
+        try
+        {
+            Assert.NotNull(tick);
+            var requestStarted = new TaskCompletionSource<CancellationToken>(TaskCreationOptions.RunContinuationsAsynchronously);
+            rig.DirectTarget.UpdateRuntimeStatistics(
+                Arg.Any<SiloAddress>(), Arg.Any<SiloRuntimeStatistics>(), Arg.Any<CancellationToken>())
+                .Returns(call =>
+                {
+                    var token = call.ArgAt<CancellationToken>(2);
+                    requestStarted.TrySetResult(token);
+                    return Task.Delay(Timeout.InfiniteTimeSpan, token);
+                });
+
+            publication = tick(timerCancellation.Token);
+            var rpcToken = await requestStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            Assert.Equal(timerCancellation.Token, rpcToken);
+        }
+        finally
+        {
+            await lifecycle.OnStop(TestContext.Current.CancellationToken);
+        }
+
+        Assert.True(timerCancellation.IsCancellationRequested);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => publication);
+    }
+
+    private static TestRig CreateTestRig(TimeSpan refreshTime, ITimerRegistry timerRegistry = null)
     {
         var localSilo = SiloAddress.FromParsableString("127.0.0.1:100@100");
         var remoteSilo = SiloAddress.FromParsableString("127.0.0.1:200@100");
@@ -106,6 +178,12 @@ public class DeploymentLoadPublisherTests
         var grainFactory = Substitute.For<IInternalGrainFactory>();
         grainFactory.GetSystemTarget<IDeploymentLoadPublisher>(
             Constants.DeploymentLoadPublisherSystemTargetType, remoteSilo).Returns(directTarget);
+        var environmentStatistics = Substitute.For<IEnvironmentStatisticsProvider>();
+        var loadSheddingOptions = Options.Create(new LoadSheddingOptions());
+        var control = Substitute.For<ISiloControl>();
+        control.GetRuntimeStatistics(Arg.Any<CancellationToken>()).Returns(Task.FromResult(new SiloRuntimeStatistics(
+            0, 0, environmentStatistics, loadSheddingOptions, DateTime.UnixEpoch)));
+        grainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlType, Arg.Any<SiloAddress>()).Returns(control);
         var dissemination = Substitute.For<IDisseminationService>();
         dissemination.Publish(
                 Arg.Any<IDisseminationNamespace>(),
@@ -130,8 +208,8 @@ public class DeploymentLoadPublisherTests
         services.AddSingleton(grainFactory);
         services.AddSingleton(dissemination);
         services.AddSingleton(Substitute.For<IActivationWorkingSet>());
-        services.AddSingleton(Substitute.For<IEnvironmentStatisticsProvider>());
-        services.AddSingleton<IOptions<LoadSheddingOptions>>(Options.Create(new LoadSheddingOptions()));
+        services.AddSingleton(environmentStatistics);
+        services.AddSingleton<IOptions<LoadSheddingOptions>>(loadSheddingOptions);
         services.AddOptions<DeploymentLoadPublisherOptions>().Configure(options =>
         {
             options.DeploymentLoadPublisherRefreshTime = refreshTime;
@@ -144,7 +222,7 @@ public class DeploymentLoadPublisherTests
             NullLoggerFactory.Instance,
             Options.Create(new SchedulingOptions()),
             grainReferenceActivator: null!,
-            timerRegistry: null!,
+            timerRegistry: timerRegistry!,
             serviceProvider.GetRequiredService<ActivationDirectory>(),
             serviceProvider.GetRequiredService<SchedulerInstruments>(),
             serviceProvider.GetRequiredService<GrainInstruments>(),

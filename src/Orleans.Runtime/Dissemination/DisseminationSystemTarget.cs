@@ -38,11 +38,11 @@ internal sealed partial class DisseminationSystemTarget : SystemTarget, IDissemi
         DisseminationKey key,
         long version,
         CancellationToken cancellationToken) =>
-        await this.RunOrQueueTask(async () => await _protocol.Publish(
+        await this.RunOrQueueTask(token => _protocol.Publish(
             disseminationNamespace,
             key,
             version,
-            cancellationToken));
+            token).AsTask(), cancellationToken);
 
     IReadOnlyList<SiloAddress> IDisseminationService.GetUnconfirmedPeers(
         IDisseminationNamespace disseminationNamespace) =>
@@ -69,12 +69,14 @@ internal sealed partial class DisseminationSystemTarget : SystemTarget, IDissemi
 
     private Task StartAsync(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (_antiEntropyTask is { IsCompleted: false })
         {
             return Task.CompletedTask;
         }
 
-        _antiEntropyTask = this.RunOrQueueTask(RunAntiEntropyLoop);
+        var shutdownToken = _shutdownCts.Token;
+        _antiEntropyTask = this.RunOrQueueTask(() => RunAntiEntropyLoop(shutdownToken));
         return Task.CompletedTask;
     }
 
@@ -110,9 +112,8 @@ internal sealed partial class DisseminationSystemTarget : SystemTarget, IDissemi
         }
     }
 
-    private async Task RunAntiEntropyLoop()
+    private async Task RunAntiEntropyLoop(CancellationToken cancellationToken)
     {
-        var cancellationToken = _shutdownCts.Token;
         try
         {
             while (true)

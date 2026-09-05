@@ -33,6 +33,33 @@ namespace UnitTests.Dissemination;
 public class DisseminationProtocolTests
 {
     [Fact]
+    public async Task PublishPropagatesCancellationBeforeQueueing()
+    {
+        var local = CreateSilo(39101);
+        var peer = CreateSilo(39102);
+        var transport = new FakeTransport(local, peer);
+        var ns = new FakeNamespace(local);
+        ns.SetValue(FakeNamespace.DefaultKey, version: 1);
+        var protocol = CreateProtocol(transport, ns);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        try
+        {
+            var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                async () => await protocol.Publish(ns, FakeNamespace.DefaultKey, 1, cancellation.Token));
+
+            Assert.Equal(cancellation.Token, exception.CancellationToken);
+            Assert.Empty(transport.BroadcastBatches);
+            Assert.Equal(0, transport.GetTargetResolutionCount(peer));
+        }
+        finally
+        {
+            await protocol.StopAsync(TestContext.Current.CancellationToken);
+        }
+    }
+
+    [Fact]
     public void PushBroadcastUsesRequestResponseSemantics()
     {
         var method = typeof(IDisseminationSystemTarget).GetMethod(nameof(IDisseminationSystemTarget.PushBroadcast));

@@ -14,6 +14,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Gets the current cluster manifest.
         /// </summary>
+        /// <param name="cancellationToken">The token used to cancel the request.</param>
         /// <returns>The current cluster manifest.</returns>
         [Alias("40D39F85")]
         ValueTask<ClusterManifest> GetClusterManifest(CancellationToken cancellationToken = default);
@@ -21,6 +22,8 @@ namespace Orleans.Runtime
         /// <summary>
         /// Gets an updated cluster manifest if newer than the provided <paramref name="previousVersion"/>.
         /// </summary>
+        /// <param name="previousVersion">The last observed manifest version.</param>
+        /// <param name="cancellationToken">The token used to cancel the request.</param>
         /// <returns>The current cluster manifest, or <see langword="null"/> if it is not newer than the provided version.</returns>
         [Alias("4EFCA109")]
         ValueTask<ClusterManifestUpdate?> GetClusterManifestUpdate(MajorMinorVersion previousVersion, CancellationToken cancellationToken = default);
@@ -28,24 +31,27 @@ namespace Orleans.Runtime
         /// <summary>
         /// Gets a hash summary for the current cluster manifest.
         /// </summary>
+        /// <param name="cancellationToken">The token used to cancel the request.</param>
         /// <returns>The current cluster manifest hash summary.</returns>
         [Alias("25AE6E4A")]
-        ValueTask<ClusterManifestHashSummary> GetClusterManifestHashSummary();
+        ValueTask<ClusterManifestHashSummary> GetClusterManifestHashSummary(CancellationToken cancellationToken);
 
         /// <summary>
         /// Gets the hash of the local silo manifest.
         /// </summary>
+        /// <param name="cancellationToken">The token used to cancel the request.</param>
         /// <returns>The hash of the local silo manifest.</returns>
         [Alias("3D9B7FE6")]
-        ValueTask<ManifestHash> GetSiloManifestHash();
+        ValueTask<ManifestHash> GetSiloManifestHash(CancellationToken cancellationToken);
 
         /// <summary>
         /// Gets the local silo manifest if the provided hash matches it.
         /// </summary>
         /// <param name="hash">The expected manifest hash.</param>
+        /// <param name="cancellationToken">The token used to cancel the request.</param>
         /// <returns>The local silo manifest, or <see langword="null"/> if the hash does not match.</returns>
         [Alias("93B8854F")]
-        ValueTask<GrainManifest?> GetSiloManifestByHash(ManifestHash hash);
+        ValueTask<GrainManifest?> GetSiloManifestByHash(ManifestHash hash, CancellationToken cancellationToken);
     }
 
     /// <summary>

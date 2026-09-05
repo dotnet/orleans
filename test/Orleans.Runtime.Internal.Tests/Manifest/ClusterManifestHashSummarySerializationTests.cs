@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Net;
+using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Metadata;
 using Orleans.Runtime;
@@ -13,6 +14,27 @@ namespace UnitTests.Manifest;
 [TestCategory("BVT"), TestCategory("Serialization")]
 public sealed class ClusterManifestHashSummarySerializationTests
 {
+    [Fact]
+    public void ManifestRpcContractsExposeCancellationTokens()
+    {
+        foreach (var contract in new[] { typeof(IClusterManifestSystemTarget), typeof(ISiloManifestSystemTarget) })
+        {
+            foreach (var method in contract.GetMethods())
+            {
+                var parameters = method.GetParameters();
+                var cancellation = Assert.Single(parameters, parameter => parameter.ParameterType == typeof(CancellationToken));
+                Assert.Equal("cancellationToken", cancellation.Name);
+                Assert.Equal(parameters[^1], cancellation);
+                if (method.Name is nameof(IClusterManifestSystemTarget.GetClusterManifestHashSummary)
+                    or nameof(IClusterManifestSystemTarget.GetSiloManifestHash)
+                    or nameof(IClusterManifestSystemTarget.GetSiloManifestByHash))
+                {
+                    Assert.False(cancellation.HasDefaultValue);
+                }
+            }
+        }
+    }
+
     [Fact]
     public void ManifestHashCalculatorReusesHashForImmutableManifest()
     {
@@ -92,8 +114,17 @@ public sealed class ClusterManifestHashSummarySerializationTests
         Assert.Equal("sha256:fedcba9876543210", result.Value);
         Assert.NotNull(method);
         Assert.Equal(typeof(ValueTask<GrainManifest?>), method!.ReturnType);
-        var parameter = Assert.Single(method.GetParameters());
-        Assert.Equal("hash", parameter.Name);
-        Assert.Equal(typeof(ManifestHash), parameter.ParameterType);
+        Assert.Collection(
+            method.GetParameters(),
+            parameter =>
+            {
+                Assert.Equal("hash", parameter.Name);
+                Assert.Equal(typeof(ManifestHash), parameter.ParameterType);
+            },
+            parameter =>
+            {
+                Assert.Equal("cancellationToken", parameter.Name);
+                Assert.Equal(typeof(CancellationToken), parameter.ParameterType);
+            });
     }
 }

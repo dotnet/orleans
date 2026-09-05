@@ -61,7 +61,7 @@ public class MembershipGossiperTests
             snapshot,
             rig.LocalSilo,
             SiloStatus.ShuttingDown,
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         await Task.WhenAll(directStarted.Task, disseminationStarted.Task);
         Assert.False(gossipTask.IsCompleted);
@@ -80,10 +80,10 @@ public class MembershipGossiperTests
             Arg.Any<IDisseminationNamespace>(),
             DisseminationKey.Default,
             snapshot.Version.Value,
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
         Assert.Equal(DisseminationKey.Default, publishedKey);
         Assert.Equal(snapshot.Version.Value, publishedVersion);
-        Assert.Equal(CancellationToken.None, publishedToken);
+        Assert.Equal(TestContext.Current.CancellationToken, publishedToken);
     }
 
     [Fact]
@@ -107,7 +107,7 @@ public class MembershipGossiperTests
             snapshot,
             rig.LocalSilo,
             SiloStatus.Dead,
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         await directStarted.Task;
         await gossipTask;
@@ -161,6 +161,7 @@ public class MembershipGossiperTests
         try
         {
             await Task.WhenAll(directStarted.Task, disseminationStarted.Task);
+            await rig.RemoteMembershipService.Received(1).MembershipChangeNotification(snapshot, cancellation.Token);
             cancellation.Cancel();
 
             await disseminationCancellationObserved.Task;
@@ -174,6 +175,23 @@ public class MembershipGossiperTests
             releaseDirect.TrySetResult();
             await directCompleted.Task;
         }
+    }
+
+    [Fact]
+    public async Task GossipToRemoteSilos_PreCanceled_DoesNotSendOrPublish()
+    {
+        using var cancellation = new CancellationTokenSource();
+        using var rig = CreateTestRig(
+            _ => Task.CompletedTask,
+            (_, _, _) => ValueTask.FromResult(true));
+        var snapshot = CreateSnapshot(rig.LocalSilo, rig.RemoteSilo, SiloStatus.Active);
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => rig.Gossiper.GossipToRemoteSilos(
+            [rig.RemoteSilo], snapshot, rig.LocalSilo, SiloStatus.Active, cancellation.Token));
+
+        Assert.Empty(rig.RemoteMembershipService.ReceivedCalls());
+        Assert.Empty(rig.DisseminationService.ReceivedCalls());
     }
 
     [Fact]
@@ -215,11 +233,10 @@ public class MembershipGossiperTests
             _ => Task.CompletedTask,
             (_, _, _) => ValueTask.FromResult(true));
         var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var observer = rig.Gossiper.ObserveLateFailure(completion.Task, "Direct membership gossip");
+        rig.Gossiper.ObserveLateFailure(completion.Task, "Direct membership gossip");
 
         completion.TrySetException(new InvalidOperationException("Late direct failure."));
 
-        await observer;
         var lateFailure = await rig.Logger.WaitForLateFailureAsync(TestContext.Current.CancellationToken);
         Assert.Contains("Direct membership gossip", lateFailure, StringComparison.Ordinal);
     }
@@ -253,7 +270,7 @@ public class MembershipGossiperTests
             snapshot,
             rig.LocalSilo,
             SiloStatus.ShuttingDown,
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         await Task.WhenAll(directStarted.Task, disseminationStarted.Task);
 
@@ -273,7 +290,7 @@ public class MembershipGossiperTests
             Arg.Any<IDisseminationNamespace>(),
             DisseminationKey.Default,
             snapshot.Version.Value,
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -298,7 +315,7 @@ public class MembershipGossiperTests
             snapshot,
             rig.LocalSilo,
             SiloStatus.ShuttingDown,
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         // Direct delivery succeeds and the overall gossip completes despite the dissemination
         // publication throwing; direct membership gossip remains authoritative.
@@ -313,7 +330,7 @@ public class MembershipGossiperTests
             Arg.Any<IDisseminationNamespace>(),
             DisseminationKey.Default,
             snapshot.Version.Value,
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -421,7 +438,7 @@ public class MembershipGossiperTests
         localSiloDetails.SiloAddress.Returns(localSilo);
         var remoteMembershipService = Substitute.For<IMembershipService>();
         remoteMembershipService
-            .MembershipChangeNotification(Arg.Any<MembershipTableSnapshot>())
+            .MembershipChangeNotification(Arg.Any<MembershipTableSnapshot>(), Arg.Any<CancellationToken>())
             .Returns(call => directGossip(call.ArgAt<MembershipTableSnapshot>(0)));
         var grainFactory = Substitute.For<IInternalGrainFactory>();
         grainFactory
@@ -577,7 +594,7 @@ public class MembershipGossiperTests
         localSiloDetails.SiloAddress.Returns(localSilo);
         var remoteMembershipService = Substitute.For<IMembershipService>();
         remoteMembershipService
-            .MembershipChangeNotification(Arg.Any<MembershipTableSnapshot>())
+            .MembershipChangeNotification(Arg.Any<MembershipTableSnapshot>(), Arg.Any<CancellationToken>())
             .Returns(call => directGossip(call.ArgAt<MembershipTableSnapshot>(0)));
         var grainFactory = Substitute.For<IInternalGrainFactory>();
         grainFactory

@@ -22,13 +22,14 @@ internal partial class MembershipGossiper(
         SiloStatus updatedStatus,
         CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (gossipPartners.Count == 0) return;
 
         LogDebugGossipingStatusToPartners(logger, updatedSilo, updatedStatus, gossipPartners.Count);
 
         // Direct gossip owns the shutdown-critical delivery path and starts before optional dissemination work.
         var systemTarget = _membershipSystemTarget ??= serviceProvider.GetRequiredService<MembershipSystemTarget>();
-        var directGossipTask = systemTarget.GossipToRemoteSilos(gossipPartners, snapshot, updatedSilo, updatedStatus);
+        var directGossipTask = systemTarget.GossipToRemoteSilos(gossipPartners, snapshot, updatedSilo, updatedStatus, cancellationToken);
         var directGossip = directGossipTask.WaitAsync(cancellationToken);
         try
         {
@@ -43,7 +44,7 @@ internal partial class MembershipGossiper(
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            ObserveLateFailure(directGossipTask, "Direct membership gossip").Ignore();
+            ObserveLateFailure(directGossipTask, "Direct membership gossip");
             throw;
         }
     }
@@ -54,6 +55,7 @@ internal partial class MembershipGossiper(
 
     private async Task TryGossipViaDissemination(MembershipTableSnapshot snapshot, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         try
         {
             var dissemination = serviceProvider.GetService<IDisseminationService>();
@@ -70,7 +72,7 @@ internal partial class MembershipGossiper(
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
-                ObserveLateFailure(publishTask, "Membership dissemination publication").Ignore();
+                ObserveLateFailure(publishTask, "Membership dissemination publication");
                 throw;
             }
         }
@@ -84,16 +86,14 @@ internal partial class MembershipGossiper(
         }
     }
 
-    internal async Task ObserveLateFailure(Task task, string operation)
+    internal void ObserveLateFailure(Task task, string operation)
     {
-        try
-        {
-            await task;
-        }
-        catch (Exception exception)
-        {
-            LogDebugLateMembershipGossipFailure(logger, exception, operation);
-        }
+        // Terminal fault observation remains active after caller cancellation.
+        task.ContinueWith(
+            completed => LogDebugLateMembershipGossipFailure(logger, completed.Exception!.InnerException!, operation),
+            CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default).Ignore();
     }
 
     [LoggerMessage(
