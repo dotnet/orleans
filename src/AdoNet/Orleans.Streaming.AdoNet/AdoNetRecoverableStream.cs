@@ -16,11 +16,17 @@ internal sealed partial class AdoNetRecoverableStream(
     private Task<AdoNetStreamPartitionState>? _acquisitionTask;
     private DataNotAvailableException? _retentionFailure;
     private long? _pendingHardDeletedThrough;
+    private bool _cleanupNeedsReconciliation;
 
     internal Task AcquisitionCompletion => Volatile.Read(ref _acquisitionTask) ?? Task.CompletedTask;
 
     public async ValueTask<StreamCheckpointStoreState> Load(CancellationToken cancellationToken)
     {
+        if (Volatile.Read(ref _retentionFailure) is { } retentionFailure)
+        {
+            throw retentionFailure;
+        }
+
         var acquisitionTask = queries.AcquireStreamPartitionAsync(
             serviceId,
             providerId,
@@ -103,6 +109,12 @@ internal sealed partial class AdoNetRecoverableStream(
             throw retentionFailure;
         }
 
+        if (_cleanupNeedsReconciliation)
+        {
+            await ReconcileRetainedBounds(cancellationToken);
+            _cleanupNeedsReconciliation = false;
+        }
+
         var messages = await queries.ReadStreamMessagesAsync(
             serviceId,
             providerId,
@@ -111,6 +123,26 @@ internal sealed partial class AdoNetRecoverableStream(
             Math.Min(maxCount, options.MaxMessagesPerRead),
             cancellationToken);
 
+        var readThrough = _readOffset;
+        foreach (var message in messages)
+        {
+            if (message.MessageId != readThrough + 1)
+            {
+                throw RetainFailure(
+                    $"has a retention gap: expected message {readThrough + 1}, received message {message.MessageId}.");
+            }
+
+            readThrough = message.MessageId;
+        }
+
+        if (messages.Count == 0)
+        {
+            await ReconcileRetainedBounds(cancellationToken);
+        }
+
+        // A failed response can follow a committed deletion. Reconcile against the admitted
+        // offset on the next read, before allowing any later records into the cache.
+        _cleanupNeedsReconciliation = true;
         var cleanup = await queries.CleanupStreamMessagesAsync(
             serviceId,
             providerId,
@@ -135,21 +167,19 @@ internal sealed partial class AdoNetRecoverableStream(
                 cleanup.Checkpoint);
         }
 
-        var readThrough = messages.Count > 0 ? messages[^1].MessageId : _readOffset;
         if (cleanup.HardDeletedThroughMessageId is { } hardDeletedThrough
             && hardDeletedThrough > readThrough)
         {
-            var failure = new DataNotAvailableException(
-                $"ADO.NET stream partition '{serviceId}/{providerId}/{queueId}' lost unread retained records after "
+            throw RetainFailure(
+                "lost unread retained records after "
                 + $"message {readThrough}: hard retention deleted through message {hardDeletedThrough}.");
-            var retainedFailure = Interlocked.CompareExchange(ref _retentionFailure, failure, comparand: null) ?? failure;
-            throw retainedFailure;
         }
 
         _pendingHardDeletedThrough = cleanup.HardDeletedThroughMessageId is { } deletedThrough
             && deletedThrough > _readOffset
                 ? deletedThrough
                 : null;
+        _cleanupNeedsReconciliation = false;
         return messages as IReadOnlyList<AdoNetStreamMessage> ?? messages.ToList();
     }
 
@@ -174,10 +204,9 @@ internal sealed partial class AdoNetRecoverableStream(
             return;
         }
 
-        var failure = new DataNotAvailableException(
-            $"ADO.NET stream partition '{serviceId}/{providerId}/{queueId}' could not retain hard-deleted records "
+        RetainFailure(
+            "could not retain hard-deleted records "
             + $"through message {hardDeletedThrough} because cache admission failed before the read offset advanced.");
-        Interlocked.CompareExchange(ref _retentionFailure, failure, comparand: null);
         _pendingHardDeletedThrough = null;
     }
 
@@ -190,11 +219,34 @@ internal sealed partial class AdoNetRecoverableStream(
     {
         if (HasRetentionGap(state))
         {
-            throw new DataNotAvailableException(
-                $"ADO.NET stream partition '{serviceId}/{providerId}/{queueId}' has a retention gap: "
+            throw RetainFailure(
+                "has a retention gap: "
                 + $"checkpoint {state.Checkpoint}, earliest retained record {state.EarliestMessageId?.ToString(CultureInfo.InvariantCulture) ?? "<empty>"}, "
                 + $"next message id {state.NextMessageId}, tail {state.TailMessageId?.ToString(CultureInfo.InvariantCulture) ?? "<empty>"}.");
         }
+    }
+
+    private async Task ReconcileRetainedBounds(CancellationToken cancellationToken)
+    {
+        var state = await queries.GetStreamPartitionBoundsAsync(serviceId, providerId, queueId, cancellationToken)
+            ?? throw new InvalidOperationException(
+                $"ADO.NET stream partition '{serviceId}/{providerId}/{queueId}' is missing while reconciling retained history.");
+        var earliestAvailablePosition = state.EarliestMessageId ?? state.NextMessageId;
+        if (_readOffset < earliestAvailablePosition - 1
+            || (state.NextMessageId > _readOffset + 1 && state.TailMessageId <= _readOffset))
+        {
+            throw RetainFailure(
+                $"has a retention gap after admitted message {_readOffset}: "
+                + $"earliest retained record {state.EarliestMessageId?.ToString(CultureInfo.InvariantCulture) ?? "<empty>"}, "
+                + $"next message id {state.NextMessageId}, tail {state.TailMessageId?.ToString(CultureInfo.InvariantCulture) ?? "<empty>"}.");
+        }
+    }
+
+    private DataNotAvailableException RetainFailure(string detail)
+    {
+        var failure = new DataNotAvailableException(
+            $"ADO.NET stream partition '{serviceId}/{providerId}/{queueId}' {detail}");
+        return Interlocked.CompareExchange(ref _retentionFailure, failure, comparand: null) ?? failure;
     }
 
     internal static bool HasRetentionGap(AdoNetStreamPartitionState state)
