@@ -212,6 +212,7 @@ namespace UnitTests.GrainInterfaces
         [AlwaysInterleave]
         Task LongWaitInterleavingWithStartNotification(TimeSpan delay, Guid callId, ILongRunningTaskObserver observer, CancellationToken cancellationToken);
         Task CallOtherLongRunningTask(ILongRunningTaskGrain<T> target, CancellationToken tc, TimeSpan delay, Guid callId);
+        Task CallOtherLongRunningTaskWithStartNotification(ILongRunningTaskGrain<T> target, ILongRunningTaskObserver observer, CancellationToken tc, TimeSpan delay, Guid callId);
         Task CallOtherLongRunningTaskGrainCancellation(ILongRunningTaskGrain<T> target, GrainCancellationToken tc, TimeSpan delay, Guid callId);
         Task CallOtherLongRunningTaskWithLocalGrainCancellationToken(ILongRunningTaskGrain<T> target, TimeSpan delay, TimeSpan delayBeforeCancel, Guid callId);
         Task CallOtherLongRunningTaskWithLocalCancellation(ILongRunningTaskGrain<T> target, TimeSpan delay, TimeSpan delayBeforeCancel, Guid callId);
