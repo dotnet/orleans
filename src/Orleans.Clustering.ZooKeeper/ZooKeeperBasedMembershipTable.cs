@@ -64,13 +64,15 @@ namespace Orleans.Runtime.Membership
         /// <param name="membershipTableOptions">The ZooKeeper clustering options.</param>
         /// <param name="clusterOptions">The cluster identity options.</param>
         /// <exception cref="ArgumentNullException">
-        /// <paramref name="membershipTableOptions"/> or <paramref name="clusterOptions"/> is <see langword="null"/>.
+        /// <paramref name="logger"/>, <paramref name="membershipTableOptions"/>, or <paramref name="clusterOptions"/> is
+        /// <see langword="null"/>.
         /// </exception>
         public ZooKeeperBasedMembershipTable(
             ILogger<ZooKeeperBasedMembershipTable> logger,
             IOptions<ZooKeeperClusteringSiloOptions> membershipTableOptions,
             IOptions<ClusterOptions> clusterOptions)
         {
+            ArgumentNullException.ThrowIfNull(logger);
             ArgumentNullException.ThrowIfNull(membershipTableOptions);
             ArgumentNullException.ThrowIfNull(clusterOptions);
 
@@ -223,11 +225,13 @@ namespace Orleans.Runtime.Membership
         /// <param name="tableVersion">The new TableVersion for this table, along with its etag.</param>
         /// <returns>True if the update operation succeeded and false otherwise.</returns>
         /// <exception cref="ArgumentNullException">
-        /// <paramref name="entry"/> or <paramref name="tableVersion"/> is <see langword="null"/>.
+        /// <paramref name="entry"/>, <paramref name="etag"/>, or <paramref name="tableVersion"/> is
+        /// <see langword="null"/>.
         /// </exception>
         public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion)
         {
             ArgumentNullException.ThrowIfNull(entry);
+            ArgumentNullException.ThrowIfNull(etag);
             ArgumentNullException.ThrowIfNull(tableVersion);
 
             string rowPath = ConvertToRowPath(entry.SiloAddress);

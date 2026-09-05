@@ -16,6 +16,19 @@ namespace UnitTests.MembershipTests
     public sealed class ZooKeeperGatewayListProviderUnitTests
     {
         [Fact]
+        public void Constructor_NullLogger_ThrowsArgumentNullException()
+        {
+            var exception = Assert.Throws<ArgumentNullException>(() =>
+                new ZooKeeperGatewayListProvider(
+                    null!,
+                    CreateProviderOptions(),
+                    CreateGatewayOptions(),
+                    CreateClusterOptions()));
+
+            Assert.Equal("logger", exception.ParamName);
+        }
+
+        [Fact]
         public void Constructor_NullOptions_ThrowsArgumentNullException()
         {
             var exception = Assert.Throws<ArgumentNullException>(() =>

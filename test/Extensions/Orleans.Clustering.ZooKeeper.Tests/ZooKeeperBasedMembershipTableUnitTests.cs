@@ -19,6 +19,18 @@ namespace UnitTests.MembershipTests
     public sealed class ZooKeeperBasedMembershipTableUnitTests
     {
         [Fact]
+        public void Constructor_NullLogger_ThrowsArgumentNullException()
+        {
+            var exception = Assert.Throws<ArgumentNullException>(() =>
+                new ZooKeeperBasedMembershipTable(
+                    null!,
+                    CreateMembershipTableOptions(),
+                    CreateClusterOptions()));
+
+            Assert.Equal("logger", exception.ParamName);
+        }
+
+        [Fact]
         public void Constructor_NullMembershipTableOptions_ThrowsArgumentNullException()
         {
             var exception = Assert.Throws<ArgumentNullException>(() =>
@@ -114,6 +126,21 @@ namespace UnitTests.MembershipTests
             });
 
             Assert.Equal("tableVersion", exception.ParamName);
+            Assert.Null(returnedTask);
+        }
+
+        [Fact]
+        public void UpdateRow_NullEtag_ThrowsArgumentNullException()
+        {
+            var sut = CreateSut();
+            Task<bool>? returnedTask = null;
+
+            var exception = Assert.Throws<ArgumentNullException>(() =>
+            {
+                returnedTask = sut.UpdateRow(CreateMembershipEntry(), null!, CreateTableVersion());
+            });
+
+            Assert.Equal("etag", exception.ParamName);
             Assert.Null(returnedTask);
         }
 
