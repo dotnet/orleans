@@ -75,6 +75,7 @@ namespace OrleansAWSUtils.Storage
         private void ParseDataConnectionString(string dataConnectionString)
         {
             var parameters = SqsConnectionString.Parse(dataConnectionString);
+            SqsConnectionString.ValidateCredentials(parameters);
             if (!parameters.TryGetValue(ServicePropertyName, out var serviceValue))
             {
                 throw new OrleansConfigurationException(
@@ -89,29 +90,30 @@ namespace OrleansAWSUtils.Storage
 
         private void CreateClient()
         {
-            if (service.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
-                service.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            var isServiceEndpoint = service.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+                || service.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
+            var config = isServiceEndpoint
+                ? new AmazonSQSConfig { ServiceURL = service }
+                : new AmazonSQSConfig { RegionEndpoint = AWSUtils.GetRegionEndpoint(service) };
+
+            if (!string.IsNullOrEmpty(accessKey) && !string.IsNullOrEmpty(secretKey) && !string.IsNullOrEmpty(sessionToken))
             {
-                // Local SQS instance (for testing)
-                var credentials = new BasicAWSCredentials("dummy", "dummyKey");
-                sqsClient = new AmazonSQSClient(credentials, new AmazonSQSConfig { ServiceURL = service });
-            }
-            else if (!string.IsNullOrEmpty(accessKey) && !string.IsNullOrEmpty(secretKey) && !string.IsNullOrEmpty(sessionToken))
-            {
-                // AWS SQS instance (auth via explicit credentials)
-                var credentials = new SessionAWSCredentials(accessKey, secretKey, sessionToken);
-                sqsClient = new AmazonSQSClient(credentials, new AmazonSQSConfig { RegionEndpoint = AWSUtils.GetRegionEndpoint(service) });
+                sqsClient = new AmazonSQSClient(
+                    new SessionAWSCredentials(accessKey, secretKey, sessionToken),
+                    config);
             }
             else if (!string.IsNullOrEmpty(accessKey) && !string.IsNullOrEmpty(secretKey))
             {
-                // AWS SQS instance (auth via explicit credentials)
-                var credentials = new BasicAWSCredentials(accessKey, secretKey);
-                sqsClient = new AmazonSQSClient(credentials, new AmazonSQSConfig { RegionEndpoint = AWSUtils.GetRegionEndpoint(service) });
+                sqsClient = new AmazonSQSClient(new BasicAWSCredentials(accessKey, secretKey), config);
+            }
+            else if (isServiceEndpoint)
+            {
+                // Local SQS-compatible services typically require a signed request but do not validate credentials.
+                sqsClient = new AmazonSQSClient(new BasicAWSCredentials("dummy", "dummyKey"), config);
             }
             else
             {
-                // AWS SQS instance (implicit auth - EC2 IAM Roles etc)
-                sqsClient = new AmazonSQSClient(new AmazonSQSConfig { RegionEndpoint = AWSUtils.GetRegionEndpoint(service) });
+                sqsClient = new AmazonSQSClient(config);
             }
         }
 

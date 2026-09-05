@@ -1,4 +1,3 @@
-#if NET10_0
 using Amazon;
 using Amazon.CDK.AWS.SQS;
 using Aspire.Hosting;
@@ -618,4 +617,3 @@ public sealed class SqsStreamingResourceTests
         }
     }
 }
-#endif
