@@ -31,8 +31,9 @@
     <PackageReference Include="Aspire.Hosting.SqlServer" Version="13.4.6" />
   </ItemGroup>
 
-  <!-- Project references removed - Silo and Client are library projects
-       used only for the snippet examples. We provide stub IProjectMetadata
-       types in Projects.cs for compilation. -->
+  <ItemGroup>
+    <ProjectReference Include="..\Client\Client.csproj" />
+    <ProjectReference Include="..\Silo\Silo.csproj" />
+  </ItemGroup>
 
 </Project>

@@ -11,9 +11,12 @@ using Microsoft.Extensions.Options;
 using Orleans.Clustering.AzureStorage;
 using Orleans.Configuration;
 using Orleans.Hosting;
+using Orleans.Journaling;
 using Orleans.Reminders.AzureStorage;
 using TestExtensions;
 using Xunit;
+
+#pragma warning disable ORLEANSEXP005
 
 namespace Tester.AzureUtils;
 
@@ -86,6 +89,32 @@ public sealed class AzureStorageAspireIntegrationTests
             .GetPropertiesAsync(TestContext.Current.CancellationToken);
     }
 
+    [Theory]
+    [InlineData("AzureTableStorage")]
+    [InlineData("AzureBlobStorage")]
+    public async Task AspireConfiguration_ActivatesGrainJournalingProvider(string providerType)
+    {
+        var configuration = await CreateJournalingConfigurationAsync(providerType);
+
+        using var host = CreateHost(configuration);
+        if (providerType == "AzureTableStorage")
+        {
+            var options = host.Services.GetRequiredService<IOptions<AzureTableJournalStorageOptions>>().Value;
+            Assert.Same(
+                host.Services.GetRequiredKeyedService<TableServiceClient>(TablesResourceName),
+                options.TableServiceClient);
+        }
+        else
+        {
+            var options = host.Services.GetRequiredService<IOptions<AzureBlobJournalStorageOptions>>().Value;
+            Assert.Same(
+                host.Services.GetRequiredKeyedService<BlobServiceClient>(BlobsResourceName),
+                options.BlobServiceClient);
+        }
+    }
+
+#pragma warning restore ORLEANSEXP005
+
     private static IHost CreateHost(IConfiguration configuration)
     {
         var hostBuilder = Host.CreateApplicationBuilder();
@@ -144,6 +173,34 @@ public sealed class AzureStorageAspireIntegrationTests
         AssertProvider(configuration, "Reminders", null, "AzureTableStorage", TablesResourceName);
         AssertProvider(configuration, "GrainDirectory", "directory", "AzureTableStorage", TablesResourceName);
         AssertProvider(configuration, "Streaming", "queue-stream", "AzureQueueStorage", QueuesResourceName);
+        return configuration;
+    }
+
+    private static async Task<IConfigurationRoot> CreateJournalingConfigurationAsync(string providerType)
+    {
+        await using var builder = DistributedApplicationTestingBuilder.Create();
+        var storage = builder.AddAzureStorage("storage");
+        var tables = storage.AddTables(TablesResourceName);
+        var blobs = storage.AddBlobs(BlobsResourceName);
+        var orleans = builder.AddOrleans("cluster").WithDevelopmentClustering();
+        var serviceKey = providerType == "AzureTableStorage" ? tables.Resource.Name : blobs.Resource.Name;
+        var silo = builder.AddContainer("silo", "unused")
+            .WithReference(orleans)
+            .WithEnvironment("Orleans__GrainJournaling__ProviderType", providerType)
+            .WithEnvironment("Orleans__GrainJournaling__ServiceKey", serviceKey)
+            .WithEnvironment($"ConnectionStrings__{TablesResourceName}", "UseDevelopmentStorage=true")
+            .WithEnvironment($"ConnectionStrings__{BlobsResourceName}", "UseDevelopmentStorage=true");
+
+        await using var app = await builder.BuildAsync(TestContext.Current.CancellationToken);
+        var configuration = await AspireResourceConfiguration.CreateAsync(
+            silo.Resource,
+            app.Services,
+            include: static key =>
+                key.StartsWith("Orleans__", StringComparison.Ordinal)
+                && !key.StartsWith("Orleans__Endpoints__", StringComparison.Ordinal)
+                || key.StartsWith("ConnectionStrings__", StringComparison.Ordinal));
+
+        AssertProvider(configuration, "GrainJournaling", null, providerType, serviceKey);
         return configuration;
     }
 

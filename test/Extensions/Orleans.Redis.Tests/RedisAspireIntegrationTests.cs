@@ -74,12 +74,14 @@ public sealed class RedisAspireIntegrationTests
         var reminders = services.GetRequiredService<IOptions<RedisReminderTableOptions>>().Value;
         var directory = services.GetRequiredService<IOptionsMonitor<RedisGrainDirectoryOptions>>().Get("directory");
         var streaming = services.GetRequiredService<IOptionsMonitor<RedisStreamingOptions>>().Get("stream");
+        var journaling = services.GetRequiredService<IOptions<RedisJournalStorageOptions>>().Value;
 
         AssertShared(keyedMultiplexer, await clustering.CreateMultiplexer(clustering));
         AssertShared(keyedMultiplexer, await storage.CreateMultiplexer(storage));
         AssertShared(keyedMultiplexer, await reminders.CreateMultiplexer(reminders));
         AssertShared(keyedMultiplexer, await directory.CreateMultiplexer(directory));
         AssertShared(keyedMultiplexer, await streaming.CreateMultiplexer(streaming));
+        AssertShared(keyedMultiplexer, await journaling.CreateMultiplexer(journaling));
         Assert.True(await keyedMultiplexer.GetDatabase().PingAsync() >= TimeSpan.Zero);
     }
 

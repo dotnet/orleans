@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
+using Orleans.Hosting;
 using StackExchange.Redis;
 
 namespace Orleans.Docs.Snippets.Aspire.Silo;
