@@ -40,9 +40,10 @@ on this abstractions assembly.
   completion closes registration atomically and waits for every callback accepted before that
   boundary. Their failures are included in the shared cancellation result.
 - A durable callback registered after cancellation has completed starts immediately in a new
-  callback causality scope. It cannot retroactively change the already-completed shared cancellation
-  result. Its returned registration independently tracks the invocation: asynchronous disposal waits
-  for completion and propagates the callback failure.
+  callback causality scope. When registered from another durable callback, the new scope retains
+  that callback's causality for dependency-cycle handling. Its returned registration independently
+  tracks the invocation: asynchronous disposal waits for completion and propagates the callback
+  failure, while the shared cancellation result remains completed.
 - Callbacks registered directly on `CancellationToken` are ordinary synchronous .NET observers,
   not durable cancellation callbacks. They are for cooperative checks and synchronous cleanup only.
   They follow standard `CancellationToken` behavior: registration-time `ExecutionContext` capture,
