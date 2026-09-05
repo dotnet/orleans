@@ -2,7 +2,11 @@ using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
 using Amazon.Runtime;
 using Microsoft.Extensions.Logging.Abstractions;
+#if TRANSACTIONS_DYNAMODB_TESTS
+using Orleans.Transactions.DynamoDB;
+#else
 using Orleans.AWSUtils.Tests;
+#endif
 using Orleans.Internal;
 using TestExtensions;
 
