@@ -361,7 +361,7 @@ public static class LegacyTokenRecoveryFixture
     {
         var stream = new StreamImpl<int>(
             new QualifiedStreamId("legacy-provider", streamId),
-            Substitute.For<IInternalStreamProvider>(),
+            new RecoveryStreamProvider(),
             isRewindable: true,
             Substitute.For<IRuntimeClient>());
         return new StreamSubscriptionHandleImpl<int>(
@@ -374,6 +374,15 @@ public static class LegacyTokenRecoveryFixture
             filterData: null,
             handshakeState: new() { Token = handshake },
             clusterId: "legacy-cluster");
+    }
+
+    private sealed class RecoveryStreamProvider : IInternalStreamProvider
+    {
+        public IInternalAsyncBatchObserver<T> GetProducerInterface<T>(IAsyncStream<T> streamId)
+            => throw new NotSupportedException();
+
+        public IInternalAsyncObservable<T> GetConsumerInterface<T>(IAsyncStream<T> streamId)
+            => throw new NotSupportedException();
     }
 
     private sealed class RecoveryDataAdapter(Func<long, int, StreamSequenceToken> createToken) : ICacheDataAdapter

@@ -308,7 +308,7 @@ public abstract class AdoNetQueueAdapterTests(string invariant, TestEnvironmentF
             await first.Shutdown(TimeSpan.FromSeconds(20));
             if (read is not null)
             {
-                await ((Task)read).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+                await ((Task)read).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
             }
         }
 
