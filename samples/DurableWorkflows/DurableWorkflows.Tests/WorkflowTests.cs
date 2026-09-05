@@ -14,6 +14,7 @@ using Orleans.Configuration;
 using Orleans.DurableTasks;
 using Orleans.Hosting;
 using Orleans.Journaling;
+using Orleans.Runtime;
 using Orleans.TestingHost;
 using Xunit;
 
@@ -189,6 +190,7 @@ public sealed class WorkflowTests : IAsyncLifetime
             siloBuilder
                 .UseInMemoryDurableJobs()
                 .AddDurableTasks(options => options.ResultRetentionPeriod = TimeSpan.FromHours(1))
+                .AddGrainExtension<IMissingLookupExtension, MissingLookupExtension>()
                 .Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = "orleans-binary");
             siloBuilder.Services.RemoveAll<IJournalStorageProvider>();
             siloBuilder.Services.RemoveAll<IJournalStorageCatalog>();
@@ -487,6 +489,30 @@ public sealed class WorkflowEndpointTests : IAsyncLifetime
         Assert.Equal("Workflow execution failed.", status.Error);
     }
 
+    [Theory]
+    [InlineData("approval")]
+    [InlineData("cancellation")]
+    public async Task SameIdMissingLookupIsRetainedAsWorkflowFailure(string kind)
+    {
+        var id = UniqueId();
+        var rootId = $"{kind}-{id}";
+        var workflow = _cluster.Client.GetGrain<IWorkflowGrain>(id);
+        var scheduled = await workflow.AsReference<IMissingLookupExtension>()
+            .FailWithMissingLookupAsync(rootId, UniqueId())
+            .ScheduleAsync(rootId);
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var failure = await scheduled.GetResponseAsync(timeout.Token);
+        var missing = Assert.IsType<DurableTaskNotFoundException>(failure.Exception);
+        Assert.Equal(scheduled.Id, missing.TaskId);
+
+        await _cluster.DeactivateAsync(workflow);
+        var status = await GetStatusAsync($"/workflows/{kind}/{id}/status");
+        Assert.Equal("failed", status.Status);
+        Assert.Equal(rootId, status.TaskId);
+        Assert.Equal(JsonValueKind.Null, status.Result.ValueKind);
+        Assert.Equal("Workflow execution failed.", status.Error);
+    }
+
     private async Task<StatusDocument> WaitForStatusAsync(string location, string expected)
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
@@ -523,4 +549,19 @@ public sealed class WorkflowEndpointTests : IAsyncLifetime
 
     private sealed record AcceptedDocument(string TaskId, string StatusUrl);
     private sealed record StatusDocument(string TaskId, string Status, JsonElement Result, string? Error);
+}
+
+public interface IMissingLookupExtension : IGrainExtension
+{
+    DurableTask<ApprovalWorkflowResult> FailWithMissingLookupAsync(string rootId, string missingWorkflowId);
+}
+
+public sealed class MissingLookupExtension(IGrainFactory grainFactory) : IMissingLookupExtension
+{
+    public async DurableTask<ApprovalWorkflowResult> FailWithMissingLookupAsync(string rootId, string missingWorkflowId)
+    {
+        var missing = grainFactory.GetGrain<IWorkflowGrain>(missingWorkflowId)
+            .GetDurableTask<ApprovalWorkflowResult>(rootId);
+        return await missing.WaitAsync();
+    }
 }

@@ -233,8 +233,12 @@ public static class WorkflowEndpoints
         ScheduledTask<TResult> scheduled,
         CancellationToken cancellationToken)
     {
-        var response = await scheduled.GetResponseAsync(PollImmediately, cancellationToken);
-        if (response.Exception is DurableTaskNotFoundException missing && missing.TaskId == scheduled.Id)
+        DurableTaskResponse response;
+        try
+        {
+            response = await scheduled.GetResponseAsync(PollImmediately, cancellationToken);
+        }
+        catch (DurableTaskNotFoundException)
         {
             return Missing();
         }
