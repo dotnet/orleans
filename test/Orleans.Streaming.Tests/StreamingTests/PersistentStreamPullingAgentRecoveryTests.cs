@@ -76,15 +76,10 @@ public partial class PersistentStreamPullingAgentTests
         var deliveredTokens = new List<long>();
         var attempts = 0;
         var firstExpectedToken = implicitSubscription ? 8 : 7;
-        var targetConsumer = Substitute.For<IStreamConsumerExtension>();
-        targetConsumer.GetSequenceToken(targetSubscription, Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult<StreamHandshakeToken?>(StreamHandshakeToken.CreateStartToken(new EventSequenceTokenV2(7))));
-        targetConsumer.DeliverBatch(
-                targetSubscription, qualifiedStream, Arg.Any<IBatchContainer>(),
-                Arg.Any<StreamHandshakeToken?>(), Arg.Any<CancellationToken>())
-            .Returns(call =>
+        var targetConsumer = new RecoveryConsumer(
+            StreamHandshakeToken.CreateStartToken(new EventSequenceTokenV2(7)),
+            batch =>
             {
-                var batch = call.Arg<IBatchContainer>();
                 deliveredTokens.Add(batch.SequenceToken.SequenceNumber);
                 if (batch.SequenceToken.SequenceNumber != firstExpectedToken)
                 {
@@ -199,6 +194,7 @@ public partial class PersistentStreamPullingAgentTests
             Assert.Equal(8, targetData.LastProcessedToken?.SequenceNumber);
             Assert.Equal(9, targetData.LastSafePartitionToken?.SequenceNumber);
             Assert.Equal(implicitSubscription ? new long[] { 8, 8 } : new long[] { 7, 7, 8 }, deliveredTokens);
+            Assert.Empty(targetConsumer.Errors);
             Assert.Empty(slowConsumer.Errors);
             await UpdateProgress();
             Assert.Equal(new long[] { 3, 3, 6, safeBeforeDelivery, safeBeforeDelivery, 9 }, checkpoints);
@@ -245,6 +241,47 @@ public partial class PersistentStreamPullingAgentTests
             timeProvider.Advance(options.DeliveryProgressUpdateInterval);
             await accessor.GetPubSubCache();
         }
+    }
+
+    private sealed class RecoveryConsumer(
+        StreamHandshakeToken startToken,
+        Func<IBatchContainer, Task<StreamHandshakeToken?>> deliverBatch) : IStreamConsumerExtension
+    {
+        public List<Exception> Errors { get; } = [];
+
+        public Task<StreamHandshakeToken?> DeliverImmutable(
+            GuidId subscriptionId,
+            QualifiedStreamId streamId,
+            object item,
+            StreamSequenceToken currentToken,
+            StreamHandshakeToken? handshakeToken,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<StreamHandshakeToken?> DeliverMutable(
+            GuidId subscriptionId,
+            QualifiedStreamId streamId,
+            object item,
+            StreamSequenceToken currentToken,
+            StreamHandshakeToken? handshakeToken,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<StreamHandshakeToken?> DeliverBatch(
+            GuidId subscriptionId,
+            QualifiedStreamId streamId,
+            IBatchContainer item,
+            StreamHandshakeToken? handshakeToken,
+            CancellationToken cancellationToken) => deliverBatch(item);
+
+        public Task CompleteStream(GuidId subscriptionId, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task ErrorInStream(GuidId subscriptionId, Exception exc, CancellationToken cancellationToken)
+        {
+            Errors.Add(exc);
+            return Task.CompletedTask;
+        }
+
+        public Task<StreamHandshakeToken?> GetSequenceToken(GuidId subscriptionId, CancellationToken cancellationToken)
+            => Task.FromResult<StreamHandshakeToken?>(startToken);
     }
 
     private sealed class BoundedRecoverySource(IReadOnlyList<RecoveryMessage> messages)
