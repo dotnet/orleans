@@ -253,6 +253,11 @@ public abstract class AdoNetQueueAdapterTests(string invariant, TestEnvironmentF
         var serverVersion = observerConnection.ServerVersion;
         observer.CommandText = GetBlockedAcquisitionQuery(serverVersion);
         AddParameter(observer, "LockOwner", lockOwner);
+        // MariaDB refreshes its InnoDB diagnostic cache only after more than 100ms without a reader.
+        // Polling every 50ms would keep the initial, pre-acquisition snapshot alive.
+        var observationInterval = serverVersion.Contains("MariaDB", StringComparison.OrdinalIgnoreCase)
+            ? TimeSpan.FromMilliseconds(250)
+            : TimeSpan.FromMilliseconds(50);
         using var readCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var lockReleased = false;
         Task<IList<IBatchContainer>> read = null!;
@@ -342,7 +347,7 @@ public abstract class AdoNetQueueAdapterTests(string invariant, TestEnvironmentF
                     return actual == expected;
                 },
                 TimeSpan.FromSeconds(15),
-                TimeSpan.FromMilliseconds(50),
+                observationInterval,
                 cancellationToken,
                 predicateExpression: $"{invariant} acquisition lock wait count for session {lockOwner} becomes {expected}");
 
