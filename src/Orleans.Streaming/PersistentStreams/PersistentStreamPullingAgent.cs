@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Internal;
+using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Runtime.Internal;
 using Orleans.Runtime.Scheduler;
@@ -517,7 +518,7 @@ namespace Orleans.Streams
                     throw new InvalidOperationException("A stream cursor returned no current batch after advancing.");
                 }
 
-                var comparison = batch.SequenceToken.CompareTo(token);
+                var comparison = EventSequenceTokenCompatibility.Compare(batch.SequenceToken, token);
                 if (comparison >= 0)
                 {
                     return comparison > 0 ? batch : null;
@@ -871,10 +872,7 @@ namespace Orleans.Streams
         }
 
         private static bool IsBefore(StreamSequenceToken current, StreamSequenceToken other)
-        {
-            var difference = current.SequenceNumber.CompareTo(other.SequenceNumber);
-            return difference < 0 || difference == 0 && current.EventIndex < other.EventIndex;
-        }
+            => EventSequenceTokenCompatibility.Compare(current, other) < 0;
 
         private void RegisterStream(
             QualifiedStreamId streamId,

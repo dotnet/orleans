@@ -65,6 +65,23 @@ Register the same provider name and compatible mapping on Orleans clients which 
 
 Keep the provider name and partition count stable. Changing either can map an existing stream to a different queue and strand previously enqueued messages. Configure durable `PubSubStore` grain storage for explicit subscriptions in production; `PubSubStore` preserves subscription records independently from queue durability.
 
+## Recover persisted token positions during an upgrade
+
+Earlier inherited `CreateSequenceTokenForEvent` implementations returned an exact <xref:Orleans.Providers.Streams.Common.EventSequenceToken> or <xref:Orleans.Providers.Streams.Common.EventSequenceTokenV2>, including when the batch token had a custom subtype. Current factories preserve the concrete subtype and its metadata while changing the event index.
+
+Orleans recovers these saved positions according to the provider's token contract:
+
+| Token contract | Persisted positions supported during recovery |
+| --- | --- |
+| Generic V1/V2 and custom subclasses inheriting the complete numeric contract | Exact V1 and V2 positions compare with current tokens by sequence number and event index, with matching equality and hashes across the family. |
+| Event Hubs V1/V2 and custom subclasses inheriting the complete Event Hubs contract | Exact V1 positions from the earlier inherited factory are normalized within Event Hubs recovery comparisons. The sequence number and event index identify the position; current delivered tokens retain their Event Hubs offset and custom metadata. |
+| Kinesis | Persisted Kinesis tokens retain the numeric shard offset as the authoritative position, followed by event index, across receiver restarts. |
+| Redis | Persisted Redis tokens retain the entry ID, per-millisecond sequence number, and event index. |
+
+The complete contract includes both equality overloads, ordering, hashing, and their interface implementations. An ordinary custom token which inherits these implementations shares its base family's numeric identity; additional metadata is preserved on delivery. A custom token which overrides any part of the contract owns the migration of its persisted positions and must implement consistent equality, ordering, and hashing together.
+
+Event Hubs, Kinesis, and Redis each retain their provider-specific public equality contract. Event Hubs recovery uses a sequence-only token with an empty offset for a legacy position whose factory omitted the offset; offset-bearing tokens come from the current provider data. Keep stream identity and partition mapping stable when replaying persisted positions.
+
 ## Validate failure behavior
 
 Test the adapter against the real queue service, including:
@@ -75,6 +92,7 @@ Test the adapter against the real queue service, including:
 1. queue ownership moving between silos during membership changes;
 1. duplicate delivery and consumer idempotency;
 1. stable stream-to-partition mapping across restarts and upgrades; and
-1. sustained load beyond cache capacity to verify backpressure and queue retention.
+1. sustained load beyond cache capacity to verify backpressure and queue retention; and
+1. sequence-token equality, ordering, and hashing in both comparison directions.
 
 Monitor queue depth and oldest-message age by partition, receive and acknowledgement latency, redelivery count, throttling, pulling-agent errors, and consumer delivery failures. Alert before retention or visibility limits can cause data loss or a redelivery storm.

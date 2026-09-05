@@ -532,6 +532,12 @@ namespace Orleans.Streaming.EventHubs
         [Newtonsoft.Json.JsonProperty]
         public string EventHubOffset { get { throw null; } }
 
+        public override int CompareTo(Streams.StreamSequenceToken? other) { throw null; }
+
+        public override bool Equals(Streams.StreamSequenceToken? other) { throw null; }
+
+        public override int GetHashCode() { throw null; }
+
         public override string ToString() { throw null; }
     }
 

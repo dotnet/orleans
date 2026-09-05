@@ -173,7 +173,7 @@ namespace Orleans.Providers.Streams.Common
             // Refresh only ever moves a cursor forward. If the cursor is already positioned at or ahead of the
             // requested token (for example an unset cursor waiting on a future token), leave it in place so we do
             // not rewind it and re-deliver events the consumer has already requested to start after.
-            if (cursor.SequenceToken is not null && cursor.SequenceToken.CompareTo(sequenceToken) >= 0)
+            if (cursor.SequenceToken is not null && EventSequenceTokenCompatibility.Compare(cursor.SequenceToken, sequenceToken) >= 0)
             {
                 return;
             }
@@ -264,7 +264,7 @@ namespace Orleans.Providers.Streams.Common
             if (oldestMessage.Compare(sequenceToken) > 0)
             {
                 // Check if we missed an event since we last purged the cache
-                if (this.lastPurgedToken.TryGetValue(cursor.StreamId, out var entry) && sequenceToken.CompareTo(entry.Token) >= 0)
+                if (this.lastPurgedToken.TryGetValue(cursor.StreamId, out var entry) && EventSequenceTokenCompatibility.Compare(sequenceToken, entry.Token) >= 0)
                 {
                     // If the token is more recent than the last purged token, then we didn't lose anything. Start from the oldest message in cache
                     cursor.State = CursorStates.Set;

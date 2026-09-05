@@ -645,7 +645,7 @@ namespace Orleans.Providers.Streams.Common
 
         public override int CompareTo(Orleans.Streams.StreamSequenceToken? other) { throw null; }
 
-        public EventSequenceToken CreateSequenceTokenForEvent(int eventInd) { throw null; }
+        public virtual EventSequenceToken CreateSequenceTokenForEvent(int eventInd) { throw null; }
 
         public override bool Equals(Orleans.Streams.StreamSequenceToken? other) { throw null; }
 
@@ -675,7 +675,7 @@ namespace Orleans.Providers.Streams.Common
 
         public override int CompareTo(Orleans.Streams.StreamSequenceToken? other) { throw null; }
 
-        public EventSequenceTokenV2 CreateSequenceTokenForEvent(int eventInd) { throw null; }
+        public virtual EventSequenceTokenV2 CreateSequenceTokenForEvent(int eventInd) { throw null; }
 
         public override bool Equals(Orleans.Streams.StreamSequenceToken? other) { throw null; }
 
@@ -1202,6 +1202,7 @@ namespace Orleans.Streaming.Diagnostics
             public readonly Runtime.StreamId StreamId;
             public readonly System.Guid SubscriptionId;
             public ItemDelivered(string streamProvider, Runtime.StreamId streamId, System.Guid subscriptionId, Runtime.SiloAddress? siloAddress, Streams.StreamSequenceToken? sequenceToken) : base(default!, default) { }
+
             public ItemDelivered(string streamProvider, Runtime.StreamId streamId, System.Guid subscriptionId, Runtime.SiloAddress? siloAddress, string clusterId, Streams.StreamSequenceToken? sequenceToken) : base(default!, default) { }
         }
 
