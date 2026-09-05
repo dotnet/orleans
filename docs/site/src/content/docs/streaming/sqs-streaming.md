@@ -25,6 +25,28 @@ Configure each Orleans client which publishes through the provider with the same
 
 The `Service` connection value accepts an AWS region such as `us-east-1` or an SQS-compatible endpoint such as `http://localhost:4566`. With a region, the provider uses the [AWS SDK for .NET credential resolution chain](https://docs.aws.amazon.com/sdk-for-net/v4/developer-guide/creds-assign.html) when the connection string contains no explicit credentials. Prefer workload credentials such as an IAM role. A protected connection string can supply `AccessKey`, `SecretKey`, and `SessionToken` when the deployment requires explicit temporary credentials.
 
+## Configure SQS streams with Aspire
+
+Install [`Microsoft.Orleans.Streaming.SQS.Aspire`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.SQS.Aspire) in the AppHost. Its `WithSqsStreaming` extension uses the AWS-supported [`Aspire.Hosting.AWS`](https://www.nuget.org/packages/Aspire.Hosting.AWS) integration to configure AWS SDK for .NET v4 and provision the complete Orleans queue topology through AWS CDK.
+
+Configure the AWS SDK region and one `SqsStreamingOptions` object:
+
+:::code language="csharp" source="../host/snippets/aspire/AppHost/AppHostExamples.cs" id="sqs_streaming_apphost":::
+
+The integration uses those options for both the CDK queue resources and the `Orleans:Streaming:Orders` configuration emitted to every referenced silo and client. The provisioned queue names therefore match the runtime topology exactly. The AWS SDK reference supplies `AWS_PROFILE` and `AWS_REGION`; workload identity and shared AWS configuration remain available through the SDK credential chain.
+
+The extension applies the stable service ID and makes each referenced silo and client wait for the CDK stack automatically. The stack uses CloudFormation in the account and region selected by the AWS SDK configuration. Grant the AppHost credentials permission to create and update the stack; bootstrap the environment when added constructs use CDK assets. See [Provisioning application resources with AWS CDK](https://github.com/aws/integrations-on-dotnet-aspire-for-aws/blob/main/src/Aspire.Hosting.AWS/README.md#provisioning-application-resources-with-aws-cdk) for the integration contract.
+
+The silo activates generated `Orleans:Streaming:Orders` configuration through <xref:Microsoft.Extensions.Hosting.OrleansSiloGenericHostExtensions.UseOrleans*>:
+
+:::code language="csharp" source="../host/snippets/aspire/Silo/SiloProgram.cs" id="sqs_streaming_silo":::
+
+The client activates the matching publishing provider through <xref:Microsoft.Extensions.Hosting.OrleansClientGenericHostExtensions.UseOrleansClient*>:
+
+:::code language="csharp" source="../host/snippets/aspire/Client/ClientProgram.cs" id="sqs_streaming_client":::
+
+For SQS-compatible local services, emit `ServiceEndpoint=http://localhost:9324` in the provider configuration. Provider configuration also accepts `Region`, `ConnectionString`, `ReceiveWaitTimeSeconds`, `VisibilityTimeoutSeconds`, indexed `ReceiveMessageAttributes` and `ReceiveMessageSystemAttributes`, and a keyed `ISQSDataAdapter` through `DataAdapterKey`.
+
 ## Preserve per-stream order with FIFO queues
 
 Set <xref:Orleans.Configuration.SqsOptions.FifoQueue> to use SQS FIFO queues:
@@ -60,7 +82,7 @@ List every application-defined attribute required by the decoder in <xref:Orlean
 | <xref:Orleans.Configuration.SqsOptions.ReceiveMessageAttributes> | Requests the application-defined attributes consumed by a custom data adapter. |
 | <xref:Orleans.Configuration.SqsOptions.ReceiveMessageSystemAttributes> | Requests SQS system attributes consumed by the provider or application adapter. |
 
-Queue-creation settings apply when the queue is absent. Manage changes to retention, visibility, encryption, access policy, and dead-letter redrive policy through SQS administration for existing queues.
+With the Aspire integration, the CDK stack owns queue creation and updates. Define retention, visibility, encryption, access policy, and dead-letter redrive policy in the queue constructs so CloudFormation applies the declared configuration consistently. In non-Aspire hosts, Orleans creates a missing mapped queue when its partition is first used; operators manage subsequent queue-property changes through SQS administration.
 
 Serialized Orleans batches must fit within the [SQS message quotas](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/quotas-messages.html). Bound batch size before messages approach the service limit, and include custom envelope and message-attribute overhead in that calculation.
 

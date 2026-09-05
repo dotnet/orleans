@@ -4,10 +4,12 @@
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
   <ItemGroup>
+    <PackageVersion Include="Amazon.CDK.Lib" Version="2.262.0" />
     <PackageVersion Include="Aspire.Azure.Data.Tables" Version="13.0.0" />
     <PackageVersion Include="Aspire.Azure.Storage.Blobs" Version="13.0.0" />
     <PackageVersion Include="Aspire.Azure.Storage.Queues" Version="13.0.0" />
     <PackageVersion Include="Aspire.Hosting.AppHost" Version="13.1.1" />
+    <PackageVersion Include="Aspire.Hosting.AWS" Version="13.6.0" />
     <PackageVersion Include="Aspire.Hosting.Orleans" Version="13.1.1" />
     <PackageVersion Include="Aspire.Hosting.Redis" Version="13.1.1" />
     <PackageVersion Include="Aspire.StackExchange.Redis" Version="13.1.1" />
@@ -112,7 +114,7 @@
     <PackageVersion Include="System.CommandLine" Version="2.0.0-beta1.21308.1" />
     <PackageVersion Include="System.Diagnostics.PerformanceCounter" Version="8.0.1" />
     <PackageVersion Include="System.Drawing.Common" Version="8.0.24" />
-    <PackageVersion Include="System.IO.Hashing" Version="10.0.3" NoWarn="NU5104" />
+    <PackageVersion Include="System.IO.Hashing" Version="10.0.8" NoWarn="NU5104" />
     <PackageVersion Include="System.IO.Pipelines" Version="8.0.0" />
     <PackageVersion Include="System.Memory.Data" Version="8.0.1" />
     <PackageVersion Include="System.Reactive" Version="6.1.0" />

@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Net;
-using System.Text;
 using System.Threading.Tasks;
 using Amazon.Runtime;
 using Amazon.SQS;
@@ -58,7 +57,7 @@ namespace OrleansAWSUtils.Storage
         {
             if (sqsOptions is null) throw new ArgumentNullException(nameof(sqsOptions));
             this.sqsOptions = sqsOptions;
-            QueueName = ConstructQueueName(queueName, sqsOptions, serviceId);
+            QueueName = SqsQueueName.Create(queueName, sqsOptions.FifoQueue, serviceId);
             ParseDataConnectionString(sqsOptions.ConnectionString);
             Logger = loggerFactory.CreateLogger<SQSStorage>();
             CreateClient();
@@ -75,68 +74,46 @@ namespace OrleansAWSUtils.Storage
 
         private void ParseDataConnectionString(string dataConnectionString)
         {
-            if (string.IsNullOrEmpty(dataConnectionString)) throw new ArgumentNullException(nameof(dataConnectionString));
-
-            var parameters = dataConnectionString.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
-
-            var serviceConfig = Array.Find(parameters, p => p.Contains(ServicePropertyName));
-            if (!string.IsNullOrWhiteSpace(serviceConfig))
+            var parameters = SqsConnectionString.Parse(dataConnectionString);
+            SqsConnectionString.ValidateCredentials(parameters);
+            if (!parameters.TryGetValue(ServicePropertyName, out var serviceValue))
             {
-                var value = serviceConfig.Split('=', StringSplitOptions.RemoveEmptyEntries);
-                if (value.Length == 2 && !string.IsNullOrWhiteSpace(value[1]))
-                    service = value[1];
+                throw new OrleansConfigurationException(
+                    "SQS streaming connection strings require a non-empty Service value containing an AWS region or SQS-compatible endpoint.");
             }
 
-            var secretKeyConfig = Array.Find(parameters, p => p.Contains(SecretKeyPropertyName));
-            if (!string.IsNullOrWhiteSpace(secretKeyConfig))
-            {
-                var value = secretKeyConfig.Split('=', StringSplitOptions.RemoveEmptyEntries);
-                if (value.Length == 2 && !string.IsNullOrWhiteSpace(value[1]))
-                    secretKey = value[1];
-            }
-
-            var accessKeyConfig = Array.Find(parameters, p => p.Contains(AccessKeyPropertyName));
-            if (!string.IsNullOrWhiteSpace(accessKeyConfig))
-            {
-                var value = accessKeyConfig.Split('=', StringSplitOptions.RemoveEmptyEntries);
-                if (value.Length == 2 && !string.IsNullOrWhiteSpace(value[1]))
-                    accessKey = value[1];
-            }
-
-            var sessionTokenConfig = parameters.Where(p => p.Contains(SessionTokenPropertyName)).FirstOrDefault();
-            if (!string.IsNullOrWhiteSpace(sessionTokenConfig))
-            {
-                var value = sessionTokenConfig.Split('=', 2, StringSplitOptions.RemoveEmptyEntries);
-                if (value.Length == 2 && !string.IsNullOrWhiteSpace(value[1]))
-                    sessionToken = value[1];
-            }
+            service = serviceValue;
+            parameters.TryGetValue(SecretKeyPropertyName, out secretKey);
+            parameters.TryGetValue(AccessKeyPropertyName, out accessKey);
+            parameters.TryGetValue(SessionTokenPropertyName, out sessionToken);
         }
 
         private void CreateClient()
         {
-            if (service.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
-                service.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            var isServiceEndpoint = service.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+                || service.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
+            var config = isServiceEndpoint
+                ? new AmazonSQSConfig { ServiceURL = service }
+                : new AmazonSQSConfig { RegionEndpoint = AWSUtils.GetRegionEndpoint(service) };
+
+            if (!string.IsNullOrEmpty(accessKey) && !string.IsNullOrEmpty(secretKey) && !string.IsNullOrEmpty(sessionToken))
             {
-                // Local SQS instance (for testing)
-                var credentials = new BasicAWSCredentials("dummy", "dummyKey");
-                sqsClient = new AmazonSQSClient(credentials, new AmazonSQSConfig { ServiceURL = service });
-            }
-            else if (!string.IsNullOrEmpty(accessKey) && !string.IsNullOrEmpty(secretKey) && !string.IsNullOrEmpty(sessionToken))
-            {
-                // AWS SQS instance (auth via explicit credentials)
-                var credentials = new SessionAWSCredentials(accessKey, secretKey, sessionToken);
-                sqsClient = new AmazonSQSClient(credentials, new AmazonSQSConfig { RegionEndpoint = AWSUtils.GetRegionEndpoint(service) });
+                sqsClient = new AmazonSQSClient(
+                    new SessionAWSCredentials(accessKey, secretKey, sessionToken),
+                    config);
             }
             else if (!string.IsNullOrEmpty(accessKey) && !string.IsNullOrEmpty(secretKey))
             {
-                // AWS SQS instance (auth via explicit credentials)
-                var credentials = new BasicAWSCredentials(accessKey, secretKey);
-                sqsClient = new AmazonSQSClient(credentials, new AmazonSQSConfig { RegionEndpoint = AWSUtils.GetRegionEndpoint(service) });
+                sqsClient = new AmazonSQSClient(new BasicAWSCredentials(accessKey, secretKey), config);
+            }
+            else if (isServiceEndpoint)
+            {
+                // Local SQS-compatible services typically require a signed request but do not validate credentials.
+                sqsClient = new AmazonSQSClient(new BasicAWSCredentials("dummy", "dummyKey"), config);
             }
             else
             {
-                // AWS SQS instance (implicit auth - EC2 IAM Roles etc)
-                sqsClient = new AmazonSQSClient(new AmazonSQSConfig { RegionEndpoint = AWSUtils.GetRegionEndpoint(service) });
+                sqsClient = new AmazonSQSClient(config);
             }
         }
 
@@ -438,24 +415,6 @@ namespace OrleansAWSUtils.Storage
         {
             LogErrorSQSOperation(exc, operation, QueueName);
             throw new AggregateException($"Error doing {operation} for SQS queue {QueueName}", exc);
-        }
-
-        private static string ConstructQueueName(string queueName, SqsOptions sqsOptions, string serviceId)
-        {
-            var queueNameBuilder = new StringBuilder();
-            if (!string.IsNullOrWhiteSpace(serviceId))
-            {
-                queueNameBuilder.Append(serviceId);
-                queueNameBuilder.Append('-');
-            }
-
-            queueNameBuilder.Append(queueName);
-            if (sqsOptions.FifoQueue)
-            {
-                queueNameBuilder.Append(".fifo");
-            }
-
-            return queueNameBuilder.ToString();
         }
 
         [LoggerMessage(
