@@ -15,7 +15,7 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
     private readonly PriorityQueue<JobBucket, DateTimeOffset> _queue = new();
     private readonly Dictionary<string, JobBucket> _jobsIdToBucket = new();
     private readonly Dictionary<DateTimeOffset, JobBucket> _buckets = new();
-    private TaskCompletionSource _queueChanged = CreateQueueChangedSource();
+    private TaskCompletionSource? _queueChangedWaiter;
     private int _jobCount;
     private bool _isComplete;
 #if NET9_0_OR_GREATER
@@ -54,6 +54,8 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
             if (_isComplete)
                 throw new InvalidOperationException("Cannot enqueue job to a completed queue.");
 
+            var wakeCheckRequired = _queueChangedWaiter is not null;
+            var previousNextDueTime = wakeCheckRequired ? GetNextDueTime() : null;
             var bucket = GetJobBucket(job.DueTime);
             var isReplacement = _jobsIdToBucket.TryGetValue(job.Id, out var existingBucket);
             if (existingBucket is not null && !ReferenceEquals(existingBucket, bucket))
@@ -68,7 +70,10 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
                 Volatile.Write(ref _jobCount, _jobCount + 1);
             }
 
-            SignalQueueChanged();
+            if (wakeCheckRequired)
+            {
+                SignalQueueChangedIfNextDueTimeChanged(previousNextDueTime);
+            }
         }
     }
 
@@ -98,6 +103,8 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
         ArgumentException.ThrowIfNullOrWhiteSpace(jobId);
         lock (_syncLock)
         {
+            var wakeCheckRequired = _queueChangedWaiter is not null;
+            var previousNextDueTime = wakeCheckRequired ? GetNextDueTime() : null;
             if (_jobsIdToBucket.TryGetValue(jobId, out var bucket))
             {
                 // Try to remove from bucket (may already be dequeued)
@@ -105,7 +112,11 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
                 _jobsIdToBucket.Remove(jobId);
                 Volatile.Write(ref _jobCount, _jobCount - 1);
                 // Note: The bucket remains in the priority queue until processed
-                SignalQueueChanged();
+                if (wakeCheckRequired)
+                {
+                    SignalQueueChangedIfNextDueTimeChanged(previousNextDueTime);
+                }
+
                 return true;
             }
 
@@ -160,6 +171,8 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
 
         lock (_syncLock)
         {
+            var wakeCheckRequired = _queueChangedWaiter is not null;
+            var previousNextDueTime = wakeCheckRequired ? GetNextDueTime() : null;
             if (!_jobsIdToBucket.TryGetValue(jobId, out var oldBucket) || !oldBucket.TryGetJob(jobId, out var existing))
             {
                 return false;
@@ -183,7 +196,11 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
             var newBucket = GetJobBucket(newDueTime);
             newBucket.AddJob(newJob, dequeueCount);
             _jobsIdToBucket[jobId] = newBucket;
-            SignalQueueChanged();
+            if (wakeCheckRequired)
+            {
+                SignalQueueChangedIfNextDueTimeChanged(previousNextDueTime);
+            }
+
             return true;
         }
     }
@@ -216,12 +233,17 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
     {
         lock (_syncLock)
         {
+            var wakeCheckRequired = _queueChangedWaiter is not null;
+            var previousNextDueTime = wakeCheckRequired ? GetNextDueTime() : null;
             _queue.Clear();
             _jobsIdToBucket.Clear();
             _buckets.Clear();
             Volatile.Write(ref _jobCount, 0);
             _isComplete = false;
-            SignalQueueChanged();
+            if (wakeCheckRequired)
+            {
+                SignalQueueChangedIfNextDueTimeChanged(previousNextDueTime);
+            }
         }
     }
 
@@ -253,7 +275,7 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
                         yield break; // Exit if the queue is frozen and empty
                     }
 
-                    queueChanged = _queueChanged.Task;
+                    queueChanged = GetQueueChangedTask();
                 }
                 else if (_queue.Count > 0)
                 {
@@ -275,13 +297,13 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
                     }
                     else
                     {
-                        queueChanged = _queueChanged.Task;
+                        queueChanged = GetQueueChangedTask();
                         delay = nextBucket.DueTime - now;
                     }
                 }
                 else
                 {
-                    queueChanged = _queueChanged.Task;
+                    queueChanged = GetQueueChangedTask();
                 }
             }
 
@@ -335,12 +357,29 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
         }
     }
 
+    private DateTimeOffset? GetNextDueTime()
+    {
+        RemoveEmptyBuckets();
+        return _queue.Count == 0 ? null : _queue.Peek().DueTime;
+    }
+
+    private void SignalQueueChangedIfNextDueTimeChanged(DateTimeOffset? previousNextDueTime)
+    {
+        if ((_isComplete && _jobCount == 0) || previousNextDueTime != GetNextDueTime())
+        {
+            SignalQueueChanged();
+        }
+    }
+
     private void SignalQueueChanged()
     {
-        var previous = _queueChanged;
-        _queueChanged = CreateQueueChangedSource();
-        previous.TrySetResult();
+        var waiter = _queueChangedWaiter;
+        _queueChangedWaiter = null;
+        waiter?.TrySetResult();
     }
+
+    private Task GetQueueChangedTask()
+        => (_queueChangedWaiter ??= CreateQueueChangedSource()).Task;
 
     private async Task WaitForQueueChangeOrDelayAsync(Task queueChanged, TimeSpan? delay, CancellationToken cancellationToken)
     {
