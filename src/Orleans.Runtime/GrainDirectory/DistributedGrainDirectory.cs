@@ -22,11 +22,10 @@ docs\site\src\content\docs\implementation\view-synchronous-cluster-services.md
 The grain directory in Orleans is a key-value store where the key is a grain identifier and the value is a registration entry which points to an active silo which (potentially)
 hosts the grain.
 
-The directory is partitioned using a consistent hash ring with ranges being assigned to the active silos in the cluster. Grain identifiers are hashed to find the silo which
-owns the section of the ring corresponding to its hash. Each active silo owns a configurable number of ranges. This is similar to the scheme
-used by Amazon Dynamo (see https://www.allthingsdistributed.com/files/amazon-dynamo-sosp2007.pdf) and Apache Cassandra (see
-https://docs.datastax.com/en/cassandra-oss/3.0/cassandra/architecture/archDataDistributeVnodesUsing.html), where multiple "virtual nodes" (ranges) are created for each node
-(host). The size of a partition is determined by the distance between its hash and the hash of the next partition. Range ownership is determined by cluster membership
+The directory uses hash-ring partitioning with a configurable number of virtual nodes per active silo. Each virtual node is a directory partition, and grain identifiers
+are hashed to find their owning partition. Dynamo (see https://www.allthingsdistributed.com/files/amazon-dynamo-sosp2007.pdf) and Apache Cassandra (see
+https://docs.datastax.com/en/cassandra-oss/3.0/cassandra/architecture/archDataDistributeVnodesUsing.html) describe this partitioning scheme.
+A partition spans the clockwise distance from its ring position to the next. Range ownership is determined by cluster membership
 configuration. Cluster membership configurations are called "views" and each view has a monotonically increasing version number. As silos join and leave the cluster, successive
 views are created, resulting in changes to range ownership. This is known as a view change. Directory partitions have two modes of operation: normal operation and view change.
 During normal operation, directory partitions process requests locally without coordination with other hosts. During view changes, hosts coordinate with each other to transfer

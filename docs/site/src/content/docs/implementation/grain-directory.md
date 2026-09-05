@@ -55,10 +55,12 @@ Custom directories own their consistency, availability, and cleanup behavior. Th
 
 <xref:Orleans.Hosting.CoreHostingExtensions.AddDistributedGrainDirectory*?displayProperty=nameWithType> opts into a view-synchronous directory marked with compiler warning **`ORLEANSEXP003`**:
 
-It is not the default. The experimental status allows its API and protocol to evolve.
+Its experimental status allows the API and protocol to evolve.
 
 <a name="partitioning-strategy"></a>
-The implementation divides the hash ring into configurable ranges, analogous to the virtual-node partitioning described by [Dynamo](https://www.allthingsdistributed.com/files/amazon-dynamo-sosp2007.pdf). <xref:Orleans.Configuration.GrainDirectoryOptions.PartitionsPerSilo?displayProperty=nameWithType> defaults to **1**, not 30. A partition normally serves requests locally. During a membership view change, old and new owners coordinate range locks, snapshots, and ownership transfer. The design applies the [virtually synchronous methodology for dynamic service replication](https://www.microsoft.com/en-us/research/publication/virtually-synchronous-methodology-for-dynamic-service-replication/) and has similarities to [Vertical Paxos and primary-backup replication](https://www.microsoft.com/en-us/research/publication/vertical-paxos-and-primary-backup-replication/).
+The directory uses hash-ring partitioning with a configurable number of virtual nodes per silo, the partitioning scheme described by [Dynamo](https://www.allthingsdistributed.com/files/amazon-dynamo-sosp2007.pdf). Each virtual node is a directory partition. <xref:Orleans.Configuration.GrainDirectoryOptions.PartitionsPerSilo?displayProperty=nameWithType> defaults to **1**.
+
+A partition normally serves requests independently. During a membership view change, old and new owners coordinate range gates, snapshots, and ownership transfer using the [Virtual Synchrony approach](https://www.microsoft.com/en-us/research/publication/virtually-synchronous-methodology-for-dynamic-service-replication/). [Vertical Paxos and Primary-Backup Replication](https://www.microsoft.com/en-us/research/publication/vertical-paxos-and-primary-backup-replication/) explains the separation of configuration authority from the work needed to carry state into a new configuration.
 
 <a name="view-change-procedure"></a>
 ```mermaid
