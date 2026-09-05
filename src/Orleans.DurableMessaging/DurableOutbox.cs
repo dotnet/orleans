@@ -494,10 +494,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
 
                     try
                     {
-                        var targetGrain = _grainFactory.GetGrain<IDurableInboxExtension>(envelope.ReceiverId);
-                        var result = await targetGrain.DeliverAsync(
-                            envelope,
-                            cancellationToken).ConfigureAwait(true);
+                        var result = await DeliverToInboxAsync(envelope, cancellationToken).ConfigureAwait(true);
                         if (Volatile.Read(ref _stateGeneration) != stateGeneration)
                         {
                             return;
@@ -598,6 +595,16 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
             _activeDeliveryGeneration = null;
             _deliveryGate.Release();
         }
+    }
+
+    private ValueTask<DeliveryResult> DeliverToInboxAsync(
+        DurableEnvelope envelope,
+        CancellationToken cancellationToken)
+    {
+        var target = envelope.ReceiverId == _grainContext.GrainId
+            ? _grainContext.GetGrainExtension<IDurableInboxExtension>()
+            : _grainFactory.GetGrain<IDurableInboxExtension>(envelope.ReceiverId);
+        return target.DeliverAsync(envelope, cancellationToken);
     }
 
     private void RecordDeliveryFailure(DurableEnvelope envelope, string error)
