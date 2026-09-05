@@ -163,9 +163,12 @@ namespace Orleans.Providers.Streams.AzureQueue
                         pendingDeliveries.Clear();
                     }
 
-                    foreach (var delivery in pendingDeliveries)
+                    if (pendingDeliveries.Count > 0)
                     {
-                        pending.RemoveAll(item => string.Equals(item.Message.MessageId, delivery.Message.MessageId, StringComparison.Ordinal));
+                        var messageIds = pendingDeliveries
+                            .Select(static item => item.Message.MessageId)
+                            .ToHashSet(StringComparer.Ordinal);
+                        pending.RemoveAll(item => messageIds.Contains(item.Message.MessageId));
                     }
 
                     pending.AddRange(pendingDeliveries);
