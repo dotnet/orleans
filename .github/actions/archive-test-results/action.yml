@@ -1,7 +1,11 @@
 name: Archive test results
-description: Upload diagnostics and require coverage for pull requests and the default branch.
+description: Upload diagnostics and coverage produced by the selected test partition.
 
 inputs:
+  coverage:
+    description: Archive coverage for this test partition.
+    required: false
+    default: 'false'
   name:
     description: Artifact name.
     required: true
@@ -30,7 +34,7 @@ runs:
     shell: pwsh
     run: Write-Output '::warning title=Test result artifact upload failed::Test result diagnostics are unavailable. See the preceding upload error.'
   - name: Write coverage metadata
-    if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch))
+    if: inputs.coverage == 'true' && (github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)))
     shell: pwsh
     run: |
       $metadata = [ordered]@{
@@ -43,7 +47,7 @@ runs:
          ConvertTo-Json |
          Set-Content -LiteralPath 'TestResults/${{ inputs.name }}.coverage.json' -Encoding utf8NoBOM
   - name: Archive coverage
-    if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch))
+    if: inputs.coverage == 'true' && (github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)))
     uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
     with:
       name: coverage_${{ inputs.name }}

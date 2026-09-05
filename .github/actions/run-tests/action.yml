@@ -24,15 +24,13 @@ inputs:
     description: Retry the test partition once after a failure.
     required: false
     default: 'false'
-  static-instrumentation:
-    description: Use static coverage instrumentation.
-    required: false
-    default: 'false'
 
 runs:
   using: composite
   steps:
   - uses: ./.github/actions/setup-test-environment
+    with:
+      coverage: ${{ runner.os == 'Linux' && inputs.framework == 'net10.0' }}
   - name: Test
     id: test
     continue-on-error: ${{ inputs.retry == 'true' }}
@@ -42,7 +40,7 @@ runs:
       filter-query: ${{ inputs.filter-query || format('/[(Provider={0})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]', inputs.provider) }}
       framework: ${{ inputs.framework }}
       result-id: ${{ inputs.retry == 'true' && format('{0}-attempt1', inputs.artifact-name) || inputs.artifact-name }}
-      static-instrumentation: ${{ inputs.static-instrumentation }}
+      coverage: ${{ runner.os == 'Linux' && inputs.framework == 'net10.0' }}
     env:
       BuildExternalAssets: ${{ inputs['build-external-assets'] }}
   - name: Retry tests
@@ -54,12 +52,13 @@ runs:
       filter-query: ${{ inputs.filter-query || format('/[(Provider={0})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]', inputs.provider) }}
       framework: ${{ inputs.framework }}
       result-id: ${{ format('{0}-attempt2', inputs.artifact-name) }}
-      static-instrumentation: ${{ inputs.static-instrumentation }}
+      coverage: ${{ runner.os == 'Linux' && inputs.framework == 'net10.0' }}
     env:
       BuildExternalAssets: ${{ inputs['build-external-assets'] }}
   - name: Archive test results
     if: always()
     uses: ./.github/actions/archive-test-results
     with:
+      coverage: ${{ runner.os == 'Linux' && inputs.framework == 'net10.0' }}
       name: ${{ inputs.artifact-name }}
       retention-days: ${{ steps.test.outcome == 'failure' && steps.retry.outcome != 'success' && 14 || 1 }}

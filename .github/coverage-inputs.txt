@@ -5,7 +5,6 @@
 .github/actions/setup-test-environment/action.yml
 .github/coverage-artifacts.txt
 .github/coverage.config.xml
-.github/coverage.static.config.xml
 .github/scripts/coverage-report.ps1
 .github/scripts/invoke-coverage.ps1
 .github/scripts/setup-coverage.ps1

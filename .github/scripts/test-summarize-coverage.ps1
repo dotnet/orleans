@@ -10,7 +10,6 @@ $coverageInputFingerprintScriptPath = Join-Path $PSScriptRoot 'get-coverage-inpu
 $coverageInputsPath = Join-Path $PSScriptRoot '../coverage-inputs.txt'
 $compareCoverageScriptPath = Join-Path $PSScriptRoot 'compare-coverage.ps1'
 $coverageReportScriptPath = Join-Path $PSScriptRoot 'coverage-report.ps1'
-$coverageStaticConfigPath = Join-Path $PSScriptRoot '../coverage.static.config.xml'
 $archiveTestResultsActionPath = Join-Path $PSScriptRoot '../actions/archive-test-results/action.yml'
 $expectedCoverageArtifactsPath = Join-Path $PSScriptRoot '../coverage-artifacts.txt'
 $azureBuildTemplatePath = Join-Path $PSScriptRoot '../../.azure/pipelines/templates/build.yaml'
@@ -673,10 +672,7 @@ try {
         $dotnetTestAction = Get-Content -Raw -LiteralPath $dotnetTestActionPath
         $setupTestEnvironmentAction = Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot '../actions/setup-test-environment/action.yml')
         $coverageReportScript = Get-Content -Raw -LiteralPath $coverageReportScriptPath
-        $coverageConfigs = @(
-            Get-Content -Raw -LiteralPath $coverageConfigPath
-            Get-Content -Raw -LiteralPath $coverageStaticConfigPath
-        )
+        $coverageConfig = Get-Content -Raw -LiteralPath $coverageConfigPath
         Assert-Matches `
             $dotnetTestAction `
             'invoke-coverage\.ps1' `
@@ -685,37 +681,24 @@ try {
             0 `
             ([regex]::Matches($dotnetTestAction, 'ContinuousIntegrationBuild=false')).Count `
             'GitHub coverage must preserve continuous integration build semantics.'
-        foreach ($coverageConfig in $coverageConfigs) {
-            [xml] $coverageConfigXml = $coverageConfig
-            $modulePaths = @($coverageConfigXml.Configuration.CodeCoverage.ModulePaths.Include.ModulePath)
-            Assert-Matches `
-                $coverageConfig `
-                '<DeterministicReport>True</DeterministicReport>' `
-                'Coverage reports must preserve deterministic source paths.'
-            Assert-Matches `
-                $coverageConfig `
-                '<ExcludeAssembliesWithoutSources>None</ExcludeAssembliesWithoutSources>' `
-                'Coverage collection must retain symbol-bearing assemblies with deterministic sources.'
-            Assert-Equal 1 $modulePaths.Count 'Coverage collection must define one product assembly filter.'
-            Assert-Equal '.*[\\/]Orleans\.[^\\/]*\.dll$' $modulePaths[0] 'Coverage product assembly filter differs.'
-            Assert-Equal $true ('C:\repo\src\Orleans.Runtime.dll' -match $modulePaths[0]) 'Coverage collection must include Orleans assemblies.'
-            Assert-Equal $false ('C:\packages\FSharp.Core.dll' -match $modulePaths[0]) 'Coverage collection must exclude FSharp.Core.'
-            Assert-Equal $false ('C:\packages\StackExchange.Redis.dll' -match $modulePaths[0]) 'Coverage collection must exclude StackExchange.Redis.'
-            Assert-Equal $false ('C:\repo\test\Orleans.Runtime.Tests\bin\Debug\net10.0\FSharp.Core.dll' -match $modulePaths[0]) 'Coverage collection must exclude dependencies under Orleans output directories.'
-            Assert-Equal $false ('C:\repo\test\Orleans.Runtime.Tests\bin\Debug\net10.0\StackExchange.Redis.dll' -match $modulePaths[0]) 'Coverage collection must exclude dependencies under Orleans output directories.'
-        }
+        [xml] $coverageConfigXml = $coverageConfig
+        $modulePaths = @($coverageConfigXml.Configuration.CodeCoverage.ModulePaths.Include.ModulePath)
         Assert-Matches `
-            $dotnetTestAction `
-            '-IncludeFiles' `
-            'macOS coverage must specify files for static instrumentation.'
+            $coverageConfig `
+            '<DeterministicReport>True</DeterministicReport>' `
+            'Coverage reports must preserve deterministic source paths.'
         Assert-Matches `
-            $dotnetTestAction `
-            'coverage\.static\.config\.xml' `
-            'macOS coverage must use static-only instrumentation settings.'
-        Assert-Matches `
-            $dotnetTestAction `
-            '--no-build' `
-            'Coverage tests must execute the statically instrumented build.'
+            $coverageConfig `
+            '<ExcludeAssembliesWithoutSources>None</ExcludeAssembliesWithoutSources>' `
+            'Coverage collection must retain symbol-bearing assemblies with deterministic sources.'
+        Assert-Equal 1 $modulePaths.Count 'Coverage collection must define one product assembly filter.'
+        Assert-Equal '.*[\\/]Orleans\.[^\\/]*\.dll$' $modulePaths[0] 'Coverage product assembly filter differs.'
+        Assert-Equal $true ('C:\repo\src\Orleans.Runtime.dll' -match $modulePaths[0]) 'Coverage collection must include Orleans assemblies.'
+        Assert-Equal $false ('C:\packages\FSharp.Core.dll' -match $modulePaths[0]) 'Coverage collection must exclude FSharp.Core.'
+        Assert-Equal $false ('C:\packages\StackExchange.Redis.dll' -match $modulePaths[0]) 'Coverage collection must exclude StackExchange.Redis.'
+        Assert-Equal $false ('C:\repo\test\Orleans.Runtime.Tests\bin\Debug\net10.0\FSharp.Core.dll' -match $modulePaths[0]) 'Coverage collection must exclude dependencies under Orleans output directories.'
+        Assert-Equal $false ('C:\repo\test\Orleans.Runtime.Tests\bin\Debug\net10.0\StackExchange.Redis.dll' -match $modulePaths[0]) 'Coverage collection must exclude dependencies under Orleans output directories.'
+        Assert-Equal 0 ([regex]::Matches($dotnetTestAction, 'coverage\.static\.config\.xml|IncludeFiles|static-instrumentation')).Count 'GitHub coverage must not statically instrument test outputs.'
         Assert-Matches `
             $coverageReportScript `
             'Assert-NotReparsePoint \$coverageDirectory' `
@@ -732,15 +715,15 @@ try {
             $dotnetTestAction `
             'dotnet test --solution Orleans\.slnx' `
             'Test partitions must use native solution discovery.'
-        Assert-Equal 5 ([regex]::Matches($dotnetTestAction, "github\.event_name == 'push'.*?github\.event\.repository\.default_branch")).Count 'Current-main coverage condition count differs.'
+        Assert-Equal 3 ([regex]::Matches($dotnetTestAction, "github\.event_name == 'push'.*?github\.event\.repository\.default_branch")).Count 'Current-main coverage condition count differs.'
         Assert-Matches `
             $dotnetTestAction `
             "github\.event_name != 'push' \|\| github\.ref != format\('refs/heads/\{0\}', github\.event\.repository\.default_branch\)" `
             'Current-main test jobs must use the coverage collector instead of the ordinary test path.'
         Assert-Matches `
             $setupTestEnvironmentAction `
-            "github\.event_name == 'push'.*?github\.event\.repository\.default_branch" `
-            'Current-main test jobs must install the coverage collector.'
+            "inputs\.coverage == 'true'.*?github\.event_name == 'push'.*?github\.event\.repository\.default_branch" `
+            'Selected current-main test jobs must install the coverage collector.'
     }
 
     Invoke-Test 'retries only the uninitialized coverage handle failure' {
@@ -869,8 +852,10 @@ exit 0
             '(?s)Verify tested commit.*?parents -notcontains \$env:HEAD_SHA.*?Download covered source' `
             'The trusted reporter must bind the recorded merge commit to the triggering pull request head.'
         Assert-Equal 0 ([regex]::Matches($workflow, 'name: Checkout covered source')).Count 'The privileged reporter must not check out untrusted pull request code.'
-        Assert-Equal 60 $expectedArtifacts.Count 'Expected coverage artifact count differs.'
-        Assert-Equal 60 (@($expectedArtifacts | Sort-Object -Unique)).Count 'Expected coverage artifact identities must be unique.'
+        Assert-Equal 22 $expectedArtifacts.Count 'Expected coverage artifact count differs.'
+        Assert-Equal 22 (@($expectedArtifacts | Sort-Object -Unique)).Count 'Expected coverage artifact identities must be unique.'
+        Assert-Equal 0 (@($expectedArtifacts | Where-Object { $_ -notmatch 'net10\.0$' })).Count 'Coverage artifacts must target .NET 10.'
+        Assert-Equal 0 (@($expectedArtifacts | Where-Object { $_ -match 'macos|windows' })).Count 'Coverage artifacts must target Linux.'
     }
 
     Invoke-Test 'rejects missing and unexpected coverage artifacts' {
@@ -1182,7 +1167,7 @@ exit 0
             $reportingWorkflow `
             '(?s)Download covered source.*?Verify trusted coverage inputs.*?get-coverage-input-fingerprint\.ps1.*?Summarize coverage' `
             'Pull request coverage inputs must match the pinned trusted reporter before aggregation.'
-        Assert-Equal 13 (@(Get-Content -LiteralPath $coverageInputsPath)).Count 'Trusted coverage input count differs.'
+        Assert-Equal 12 (@(Get-Content -LiteralPath $coverageInputsPath)).Count 'Trusted coverage input count differs.'
         Assert-Matches `
             $reportingWorkflow `
             'github\.event\.workflow_run\.conclusion == ''success''' `
@@ -1209,13 +1194,17 @@ exit 0
             'The current-main ref lookup must encode default branch names.'
     }
 
-    Invoke-Test 'requires every successful test job to upload coverage' {
+    Invoke-Test 'requires selected test jobs to upload coverage' {
         $archiveTestResultsAction = Get-Content -Raw -LiteralPath $archiveTestResultsActionPath
         $runTestsAction = Get-Content -Raw -LiteralPath $runTestsActionPath
         Assert-Matches `
             $archiveTestResultsAction `
             'if-no-files-found: error' `
-            'Each successful pull request or current-main test job must publish coverage.'
+            'Each selected pull request or current-main test job must publish coverage.'
+        Assert-Matches `
+            $archiveTestResultsAction `
+            "inputs\.coverage == 'true'" `
+            'Coverage uploads must be limited to selected test jobs.'
         Assert-Matches `
             $archiveTestResultsAction `
             "github\.event_name == 'push'.*?github\.event\.repository\.default_branch" `
@@ -1224,7 +1213,7 @@ exit 0
         Assert-Matches `
             $archiveTestResultsAction `
             '(?s)path:\s*\|.*?TestResults/\$\{\{ inputs\.name \}\}\.cobertura\.xml.*?TestResults/\$\{\{ inputs\.name \}\}\.coverage\.json' `
-            'Each test job must publish its exact coverage report.'
+            'Each selected test job must publish its exact coverage report.'
         Assert-Equal 2 ([regex]::Matches($archiveTestResultsAction, 'uses: actions/upload-artifact@')).Count 'Each artifact must have one immutable upload attempt.'
         Assert-Equal 0 ([regex]::Matches($archiveTestResultsAction, 'overwrite: true')).Count 'Artifact uploads must not replace an ambiguous partial upload.'
         Assert-Equal 1 ([regex]::Matches($archiveTestResultsAction, 'if-no-files-found: error')).Count 'Coverage upload must require the report.'
@@ -1242,7 +1231,7 @@ exit 0
             'Coverage upload must remain directly gating.'
     }
 
-    Invoke-Test 'collects coverage from every test job' {
+    Invoke-Test 'collects GitHub coverage only on Linux .NET 10' {
         $workflow = Get-Content -Raw -LiteralPath $workflowPath
         $runTestsAction = Get-Content -Raw -LiteralPath $runTestsActionPath
         $dotnetTestAction = Get-Content -Raw -LiteralPath $dotnetTestActionPath
@@ -1252,8 +1241,9 @@ exit 0
         Assert-Equal 2 ([regex]::Matches($runTestsAction, "format\('/\[\(Provider=\{0\}\)")).Count 'Standard provider filter count differs.'
         $directTestCommands = ([regex]::Matches($dotnetTestAction, 'dotnet test --solution Orleans\.slnx')).Count
         $coveredTestCommands = ([regex]::Matches($dotnetTestAction, "(?s)'dotnet'\s*'test'\s*'--solution'\s*'Orleans\.slnx'")).Count
-        Assert-Equal 4 ($directTestCommands + $coveredTestCommands) 'Native test command count differs.'
-        Assert-Matches $dotnetTestAction '--framework "\$\{\{ inputs\.framework \}\}".*?--list-tests' 'Static coverage builds must target and discover the selected framework.'
+        Assert-Equal 2 ($directTestCommands + $coveredTestCommands) 'Native test command count differs.'
+        Assert-Equal 4 ([regex]::Matches($runTestsAction, "runner\.os == 'Linux' && inputs\.framework == 'net10\.0'")).Count 'Coverage selection boundary count differs.'
+        Assert-Equal 0 ([regex]::Matches($workflow + $runTestsAction + $dotnetTestAction, 'static-instrumentation|coverage\.static\.config\.xml|IncludeFiles')).Count 'GitHub coverage must not use static instrumentation.'
         Assert-Equal 1 ([regex]::Matches($workflow, "retry: 'true'")).Count 'Cosmos retry configuration count differs.'
         Assert-Matches $runTestsAction 'attempt1' 'The first retryable attempt must retain distinct test results.'
         Assert-Matches $runTestsAction 'attempt2' 'The second retryable attempt must retain distinct test results.'
@@ -1263,29 +1253,15 @@ exit 0
         Assert-Equal 0 ([regex]::Matches($dotnetTestAction, '--project|--test-modules')).Count 'Native test action must discover projects from the solution.'
     }
 
-    Invoke-Test 'publishes Azure Pipelines coverage' {
+    Invoke-Test 'keeps Azure Pipelines tests outside coverage collection' {
         $azureBuildTemplate = Get-Content -Raw -LiteralPath $azureBuildTemplatePath
         $azureVariables = Get-Content -Raw -LiteralPath $azureVariablesPath
-        Assert-Matches `
-            $azureVariables `
-            'DOTNET_COVERAGE_VERSION:\s*\d+\.\d+\.\d+' `
-            'Azure Pipelines must pin the coverage collector version.'
+        Assert-Equal 0 ([regex]::Matches($azureVariables, 'DOTNET_COVERAGE_VERSION')).Count 'Azure Pipelines must not configure duplicate coverage collection.'
+        Assert-Equal 0 ([regex]::Matches($azureBuildTemplate, 'setup-coverage\.ps1|invoke-coverage\.ps1|PublishCodeCoverage')).Count 'Azure Pipelines must not duplicate canonical GitHub coverage.'
         Assert-Matches `
             $azureBuildTemplate `
-            '(?s)setup-coverage\.ps1.*?invoke-coverage\.ps1.*?coverage-\$\{\{suite\}\}-\$\{\{framework\}\}\.cobertura\.xml' `
-            'Azure Pipelines must use the shared coverage scripts to collect a distinct report from every test job.'
-        Assert-Equal `
-            0 `
-            ([regex]::Matches($azureBuildTemplate, 'ContinuousIntegrationBuild=false')).Count `
-            'Azure Pipelines coverage must preserve continuous integration build semantics.'
-        Assert-Matches `
-            $azureBuildTemplate `
-            '(?s)job: PublishCodeCoverage.*?dependsOn:.*?Test_\$\{\{suite\}\}_\$\{\{ replace\(framework.*?DownloadPipelineArtifact@2.*?itemPattern: ''\*\*/\*\.cobertura\.xml''' `
-            'Azure Pipelines must aggregate coverage after every test matrix job.'
-        Assert-Matches `
-            $azureBuildTemplate `
-            '(?s)PublishCodeCoverageResults@2.*?summaryFileLocation:.*?\*\*/\*\.cobertura\.xml.*?failIfCoverageEmpty: true' `
-            'Azure Pipelines must publish the aggregated coverage and require results.'
+            '(?s)\$executable = \$command\[0\].*?\$arguments = \$command\[1\.\.\(\$command\.Count - 1\)\].*?& \$executable @arguments.*?exit \$LASTEXITCODE' `
+            'Azure Pipelines must execute every test job directly and propagate its exit code.'
     }
 
     Invoke-Test 'validates the coverage tool version' {
