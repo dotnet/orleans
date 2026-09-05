@@ -827,7 +827,7 @@ namespace UnitTests.StreamingTests
             }
         }
 
-        private class RecoverableCacheMissQueueCache : IQueueCache
+        private class RecoverableCacheMissQueueCache : IQueueCache, IQueueCacheRetainedReplay
         {
             private readonly QueueCacheMissException cacheMissException;
             private readonly IReadOnlyList<IBatchContainer> retainedBatches;
@@ -867,6 +867,7 @@ namespace UnitTests.StreamingTests
             public int ReplacementMoveNextCount => (earliestCursor ?? tokenCursor)?.MoveNextCount ?? 0;
             public int ReplacementGetCurrentCount => (earliestCursor ?? tokenCursor)?.GetCurrentCount ?? 0;
             public int ReplacementDisposeCount => (earliestCursor ?? tokenCursor)?.DisposeCount ?? 0;
+            public bool SupportsRetainedReplay { get; set; }
 
             public int GetMaxAddCount() => 1000;
 
@@ -2632,11 +2633,38 @@ namespace UnitTests.StreamingTests
             Assert.Equal(1, queueCache.ReplacementDisposeCount);
         }
 
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
+        [Fact]
+        public async Task ReadFromQueue_RetainedReplayRecoversFromProcessedTokenAfterCacheMiss()
+        {
+            var requestedToken = new EventSequenceTokenV2(1, 2);
+            var newestToken = new EventSequenceTokenV2(20, 4);
+            var exception = new QueueCacheMissException("The live cache entry was purged.");
+
+            var queueCache = await RunCacheMissRecovery(
+                exception,
+                requestedToken,
+                newestToken,
+                supportsEarliestAvailable: false,
+                supportsRetainedReplay: true,
+                processedToken: requestedToken);
+            var recoveryToken = await queueCache.CursorRequested.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken);
+
+            Assert.Equal(requestedToken, recoveryToken);
+            Assert.False(queueCache.StartPositionRequested.IsCompleted);
+        }
+
         private static async Task<RecoverableCacheMissQueueCache> RunCacheMissRecovery(
             QueueCacheMissException exception,
             StreamSequenceToken requestedToken,
             StreamSequenceToken newestToken,
-            bool supportsEarliestAvailable)
+            bool supportsEarliestAvailable,
+            bool supportsRetainedReplay = false,
+            StreamSequenceToken? processedToken = null)
         {
             var pubSub = Substitute.For<IStreamPubSub>();
             pubSub.RegisterProducer(default, default)
@@ -2646,6 +2674,7 @@ namespace UnitTests.StreamingTests
             var streamId = StreamId.Create("namespace", Guid.NewGuid());
             var qualifiedStreamId = new QualifiedStreamId("provider", streamId);
             var queueCache = RecoverableCacheMissQueueCache.Create(exception, supportsEarliestAvailable);
+            queueCache.SupportsRetainedReplay = supportsRetainedReplay;
             var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
             queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
             var receiver = Substitute.For<IQueueAdapterReceiver>();
@@ -2666,6 +2695,7 @@ namespace UnitTests.StreamingTests
                 now: DateTime.UtcNow);
             consumerData.IsRegistered = true;
             consumerData.Cursor = queueCache.CreateCacheMissCursor();
+            consumerData.LastProcessedToken = processedToken;
             queueCache.ResetRequests();
 
             Assert.True(await testAccessor.ReadFromQueue(queueId, receiver, 1));

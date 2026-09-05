@@ -129,6 +129,38 @@ public sealed class RecoverableStreamReceiverTests
     }
 
     [Fact]
+    public async Task Replay_FutureStartAtEmptyTail_WaitsForRequestedLivePosition()
+    {
+        var streamId = StreamId.Create("namespace", Guid.NewGuid());
+        var receiver = CreateReplayReceiver(
+            [
+                new TestQueueMessage(streamId, 1, "target-1"),
+                new TestQueueMessage(streamId, 10, "target-10"),
+            ],
+            new TestReplaySourceFactory([]),
+            new TestCheckpointer(string.Empty));
+        await receiver.Initialize(TimeSpan.FromSeconds(5));
+        using var cursor = Assert.IsAssignableFrom<IAsyncQueueCacheCursor>(
+            receiver.GetCacheCursor(streamId, new EventSequenceTokenV2(10)));
+
+        Assert.Equal(
+            QueueCacheCursorMoveNextResult.Completed,
+            await cursor.MoveNextAsync(CancellationToken.None));
+
+        _ = await receiver.GetQueueMessagesAsync(10, CancellationToken.None);
+
+        Assert.Equal(
+            QueueCacheCursorMoveNextResult.ItemAvailable,
+            await cursor.MoveNextAsync(CancellationToken.None));
+        Assert.Equal(10, cursor.GetCurrent(out _)!.SequenceToken.SequenceNumber);
+        ((IQueueCacheCursorProgress)cursor).RecordDeliverySuccess();
+        Assert.Equal(
+            QueueCacheCursorMoveNextResult.Completed,
+            await cursor.MoveNextAsync(CancellationToken.None));
+        await receiver.Shutdown(TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
     public async Task Replay_DeliveryToken_ResumesAfterAcknowledgedRecord()
     {
         var streamId = StreamId.Create("namespace", Guid.NewGuid());
