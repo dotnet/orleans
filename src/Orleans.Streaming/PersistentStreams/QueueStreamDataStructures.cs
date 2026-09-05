@@ -35,6 +35,8 @@ namespace Orleans.Streams
         [NonSerialized]
         public StreamSequenceToken? PendingStartToken;
         [NonSerialized]
+        public IBatchContainer? PendingBatch;
+        [NonSerialized]
         public bool StartPositionIsProviderDefault;
 
         /// <summary>
@@ -54,6 +56,7 @@ namespace Orleans.Streams
 
         internal void SafeDisposeCursor(ILogger logger)
         {
+            PendingBatch = null;
             if (Cursor is { } cursor)
             {
                 Cursor = null;

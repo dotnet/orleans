@@ -661,7 +661,17 @@ namespace UnitTests.StreamingTests
 
         private sealed class PurgeablePooledQueueCache : IQueueCache
         {
-            private readonly PooledQueueCache cache = new(new CacheDataAdapter(), NullLogger.Instance, null, null);
+            private readonly PooledQueueCache cache;
+
+            public PurgeablePooledQueueCache(bool retainPurgeMetadata = false)
+            {
+                cache = new(
+                    new CacheDataAdapter(),
+                    NullLogger.Instance,
+                    null,
+                    null,
+                    retainPurgeMetadata ? TimeSpan.FromMinutes(1) : null);
+            }
 
             public int GetMaxAddCount() => 1000;
 
@@ -838,6 +848,37 @@ namespace UnitTests.StreamingTests
                 if (handshakeToken is not StartToken)
                 {
                     return Task.FromResult<StreamHandshakeToken?>(startToken);
+                }
+
+                DeliveredTokens.Add(item.SequenceToken);
+                return Task.FromResult<StreamHandshakeToken?>(null);
+            }
+
+            public Task CompleteStream(GuidId subscriptionId, CancellationToken cancellationToken) => Task.CompletedTask;
+
+            public Task ErrorInStream(GuidId subscriptionId, Exception exc, CancellationToken cancellationToken) => Task.CompletedTask;
+
+            public Task<StreamHandshakeToken?> GetSequenceToken(GuidId subscriptionId, CancellationToken cancellationToken)
+                => Task.FromResult<StreamHandshakeToken?>(null);
+        }
+
+        private sealed class RenegotiatingDeliveryTokenConsumer(StreamSequenceToken token) : IStreamConsumerExtension
+        {
+            private readonly StreamHandshakeToken deliveryToken = StreamHandshakeToken.CreateDeliveyToken(token)!;
+
+            public List<StreamSequenceToken> DeliveredTokens { get; } = new();
+
+            public Task<StreamHandshakeToken?> DeliverImmutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken, CancellationToken cancellationToken)
+                => throw new NotSupportedException();
+
+            public Task<StreamHandshakeToken?> DeliverMutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken, CancellationToken cancellationToken)
+                => throw new NotSupportedException();
+
+            public Task<StreamHandshakeToken?> DeliverBatch(GuidId subscriptionId, QualifiedStreamId streamId, IBatchContainer item, StreamHandshakeToken? handshakeToken, CancellationToken cancellationToken)
+            {
+                if (handshakeToken is not DeliveryToken)
+                {
+                    return Task.FromResult<StreamHandshakeToken?>(deliveryToken);
                 }
 
                 DeliveredTokens.Add(item.SequenceToken);
@@ -1225,6 +1266,47 @@ namespace UnitTests.StreamingTests
         [TestProvider("None")]
         [TestArea("Streaming")]
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public async Task InitialImplicitRecoveryDeliversFirstNewerMessageWhenAcknowledgedMessageWasPurged()
+        {
+            var streamId = StreamId.Create("namespace", Guid.NewGuid());
+            var qualifiedStreamId = new QualifiedStreamId("provider", streamId);
+            var acknowledgedToken = new EventSequenceTokenV2(1);
+            var nextToken = new EventSequenceTokenV2(2);
+            var queueCache = new PurgeablePooledQueueCache(retainPurgeMetadata: true);
+            queueCache.AddToCache([new TestBatchContainer(streamId, acknowledgedToken)]);
+            queueCache.Purge();
+            queueCache.AddToCache([new TestBatchContainer(streamId, nextToken)]);
+
+            var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
+            queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
+            var agent = CreateAgent(
+                pubSub: Substitute.For<IStreamPubSub>(),
+                QueueId.GetQueueId("queue", 0u, 0u),
+                queueAdapterCache: queueAdapterCache);
+            var accessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
+            await InitializeAgent(agent);
+            var consumer = new RecordingConsumer(StreamHandshakeToken.CreateStartToken(acknowledgedToken));
+            var consumerData = new StreamConsumerData(
+                GuidId.GetGuidId(SubscriptionMarker.MarkAsImplictSubscriptionId(Guid.NewGuid())),
+                qualifiedStreamId,
+                consumer,
+                filterData: null);
+
+            Assert.True(await accessor.DoHandshakeWithConsumer(consumerData, cacheToken: nextToken));
+            var deliveryTask = accessor.RunConsumerCursor(consumerData);
+            await consumer.Delivered.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            Assert.Equal(nextToken, Assert.Single(consumer.DeliveredTokens));
+            Assert.Empty(consumer.Errors);
+
+            consumer.ReleaseDelivery();
+            await deliveryTask;
+            await accessor.Shutdown();
+        }
+
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task ReattachmentDeliveryTokenOverridesProviderEarliest()
         {
             var streamId = StreamId.Create("namespace", Guid.NewGuid());
@@ -1433,6 +1515,40 @@ namespace UnitTests.StreamingTests
         [TestProvider("None")]
         [TestArea("Streaming")]
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public async Task DeliveryTokenRenegotiationDeliversFirstNewerMessageWhenAcknowledgedMessageWasPurged()
+        {
+            var streamId = StreamId.Create("namespace", Guid.NewGuid());
+            var qualifiedStreamId = new QualifiedStreamId("provider", streamId);
+            var acknowledgedToken = new EventSequenceTokenV2(1);
+            var attemptedToken = new EventSequenceTokenV2(2);
+            var queueCache = new PurgeablePooledQueueCache(retainPurgeMetadata: true);
+            queueCache.AddToCache([new TestBatchContainer(streamId, acknowledgedToken)]);
+            queueCache.Purge();
+            queueCache.AddToCache([new TestBatchContainer(streamId, attemptedToken)]);
+            var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
+            queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
+            var agent = CreateAgent(pubSub: Substitute.For<IStreamPubSub>(), QueueId.GetQueueId("queue", 0u, 0u), queueAdapterCache: queueAdapterCache);
+            var accessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
+            await InitializeAgent(agent);
+            var consumer = new RenegotiatingDeliveryTokenConsumer(acknowledgedToken);
+            var consumerData = new StreamConsumerData(
+                GuidId.GetGuidId(SubscriptionMarker.MarkAsExplicitSubscriptionId(Guid.NewGuid())),
+                qualifiedStreamId,
+                consumer,
+                filterData: null)
+            {
+                Cursor = queueCache.GetCacheCursor(streamId, attemptedToken),
+            };
+
+            await accessor.RunConsumerCursor(consumerData);
+
+            Assert.Equal(attemptedToken, Assert.Single(consumer.DeliveredTokens));
+        }
+
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task ImplicitRecoveryStartTokenAdvancesPastAcknowledgedMessage()
         {
             var streamId = StreamId.Create("namespace", Guid.NewGuid());
@@ -1619,6 +1735,8 @@ namespace UnitTests.StreamingTests
 
         private sealed class RewindConsumer(StreamHandshakeToken rewindToken) : IStreamConsumerExtension
         {
+            private bool rewindRequested;
+
             public TaskCompletionSource<bool> Delivered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
             public Task<StreamHandshakeToken?> DeliverImmutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken, CancellationToken cancellationToken)
@@ -1634,7 +1752,13 @@ namespace UnitTests.StreamingTests
             public Task<StreamHandshakeToken?> DeliverBatch(GuidId subscriptionId, QualifiedStreamId streamId, IBatchContainer item, StreamHandshakeToken? handshakeToken, CancellationToken cancellationToken)
             {
                 Delivered.TrySetResult(true);
-                return Task.FromResult<StreamHandshakeToken?>(rewindToken);
+                if (!rewindRequested)
+                {
+                    rewindRequested = true;
+                    return Task.FromResult<StreamHandshakeToken?>(rewindToken);
+                }
+
+                return Task.FromResult<StreamHandshakeToken?>(null);
             }
 
             public Task CompleteStream(GuidId subscriptionId, CancellationToken cancellationToken) => Task.CompletedTask;
@@ -1785,7 +1909,7 @@ namespace UnitTests.StreamingTests
         [TestProvider("None")]
         [TestArea("Streaming")]
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
-        public async Task Shutdown_UsesReturnedHandshakeTokenForDeliveryProgress()
+        public async Task Shutdown_UsesAcceptedRedeliveryForDeliveryProgress()
         {
             var pubSub = Substitute.For<IStreamPubSub>();
             pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
@@ -1838,7 +1962,7 @@ namespace UnitTests.StreamingTests
             queueCache.ClearDeliveryProgress();
             await testAccessor.Shutdown();
 
-            Assert.Equal(previousToken, Assert.Single(queueCache.DeliveryProgressTokens));
+            Assert.Equal(attemptedToken, Assert.Single(queueCache.DeliveryProgressTokens));
         }
 
         private static Task InitializeAgent(PersistentStreamPullingAgent agent) =>

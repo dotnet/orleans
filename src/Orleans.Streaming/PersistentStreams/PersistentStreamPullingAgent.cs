@@ -424,13 +424,14 @@ namespace Orleans.Streams
                                     && SubscriptionMarker.IsImplicitSubscription(consumerData.SubscriptionId.Guid))
                             {
                                 // Delivery tokens and implicit recovery tokens identify already processed events.
-                                consumerData.Cursor.MoveNext();
+                                consumerData.PendingBatch = AdvanceCursorPastToken(consumerData.Cursor, requestedToken);
                             }
                         }
                         catch (QueueCacheMissException) when (cacheToken is not null)
                         {
                             // A cold stream's triggering batch is the receiver's first available
                             // message, so resume there if the consumer's prior token was evicted.
+                            consumerData.SafeDisposeCursor(logger);
                             consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, cacheToken);
                         }
                     }
@@ -501,6 +502,31 @@ namespace Orleans.Streams
                     || consumerData.LastToken is StartPositionToken startPositionToken
                         && startPositionToken.StartPosition == options.InitialSubscriptionStartPosition);
 
+        private static IBatchContainer? AdvanceCursorPastToken(IQueueCacheCursor cursor, StreamSequenceToken token)
+        {
+            while (cursor.MoveNext())
+            {
+                var batch = cursor.GetCurrent(out var exception);
+                if (exception is not null)
+                {
+                    throw exception;
+                }
+
+                if (batch is null)
+                {
+                    throw new InvalidOperationException("A stream cursor returned no current batch after advancing.");
+                }
+
+                var comparison = batch.SequenceToken.CompareTo(token);
+                if (comparison >= 0)
+                {
+                    return comparison > 0 ? batch : null;
+                }
+            }
+
+            return null;
+        }
+
         private IQueueCacheCursor GetCacheCursorAtStartPosition(
             QualifiedStreamId streamId,
             StartPositionToken startPositionToken,
@@ -517,7 +543,7 @@ namespace Orleans.Streams
                 try
                 {
                     var cursor = queueCache!.GetCacheCursor(consumerData.StreamId, lastProcessedToken);
-                    cursor.MoveNext();
+                    consumerData.PendingBatch = AdvanceCursorPastToken(cursor, lastProcessedToken);
                     return cursor;
                 }
                 catch (QueueCacheMissException)
@@ -540,7 +566,7 @@ namespace Orleans.Streams
                     if (consumerData.LastToken is DeliveryToken
                         || SubscriptionMarker.IsImplicitSubscription(consumerData.SubscriptionId.Guid))
                     {
-                        cursor.MoveNext();
+                        consumerData.PendingBatch = AdvanceCursorPastToken(cursor, handshakeSequenceToken);
                     }
 
                     return cursor;
@@ -1021,7 +1047,7 @@ namespace Orleans.Streams
                     var forceFaultSubscription = false;
                     try
                     {
-                        nextBatch = GetBatchForConsumer(consumerData.Cursor, consumerData.StreamId, consumerData.FilterData);
+                        nextBatch = GetBatchForConsumer(consumerData);
                         if (!nextBatch.HasProgress)
                         {
                             // Only emit cursor-drained when we transitioned from delivering to empty,
@@ -1084,6 +1110,7 @@ namespace Orleans.Streams
                             {
                                 consumerData.LastToken = newToken;
                                 IQueueCacheCursor newCursor;
+                                IBatchContainer? pendingBatch = null;
                                 if (newToken is StartPositionToken startPositionToken)
                                 {
                                     consumerData.LastProcessedToken = null;
@@ -1111,7 +1138,7 @@ namespace Orleans.Streams
                                         {
                                             newCursor = queueCache!.GetCacheCursor(consumerData.StreamId, sequenceToken);
                                             // An implicit recovery token identifies the last event processed by the prior activation.
-                                            newCursor.MoveNext();
+                                            pendingBatch = AdvanceCursorPastToken(newCursor, sequenceToken);
                                         }
                                         catch (QueueCacheMissException)
                                         {
@@ -1135,7 +1162,7 @@ namespace Orleans.Streams
                                     {
                                         newCursor = queueCache!.GetCacheCursor(consumerData.StreamId, sequenceToken); // queueCache must be non-null here: consumerData.Cursor was only ever populated via queueCache.GetCacheCursor.
                                         // The handshake token points to an already processed event, so advance past it.
-                                        newCursor.MoveNext();
+                                        pendingBatch = AdvanceCursorPastToken(newCursor, sequenceToken);
                                     }
                                     catch (QueueCacheMissException)
                                     {
@@ -1152,6 +1179,7 @@ namespace Orleans.Streams
 
                                 consumerData.SafeDisposeCursor(logger);
                                 consumerData.Cursor = newCursor;
+                                consumerData.PendingBatch = pendingBatch;
                             }
                             else
                             {
@@ -1220,16 +1248,30 @@ namespace Orleans.Streams
             public bool HasProgress => ProgressToken is not null;
         }
 
-        private ConsumerBatch GetBatchForConsumer(IQueueCacheCursor cursor, StreamId streamId, string? filterData)
+        private ConsumerBatch GetBatchForConsumer(StreamConsumerData consumerData)
         {
+            var cursor = consumerData.Cursor!;
+            var streamId = consumerData.StreamId.StreamId;
+            var filterData = consumerData.FilterData;
+            var pendingBatch = consumerData.PendingBatch;
+            consumerData.PendingBatch = null;
+
             if (this.options.BatchContainerBatchSize <= 1)
             {
-                if (!cursor.MoveNext())
+                IBatchContainer batchContainer;
+                if (pendingBatch is not null)
+                {
+                    batchContainer = pendingBatch;
+                }
+                else if (cursor.MoveNext())
+                {
+                    batchContainer = cursor.GetCurrent(out _)!; // MoveNext returned true, so GetCurrent is guaranteed non-null here.
+                }
+                else
                 {
                     return default;
                 }
 
-                var batchContainer = cursor.GetCurrent(out _)!; // MoveNext returned true, so GetCurrent is guaranteed non-null here.
                 return ShouldDeliverBatch(streamId, batchContainer, filterData)
                     ? new ConsumerBatch(batchContainer, batchContainer.SequenceToken)
                     : new ConsumerBatch(null, batchContainer.SequenceToken);
@@ -1239,6 +1281,16 @@ namespace Orleans.Streams
                 int i = 0;
                 var batchContainers = new List<IBatchContainer>();
                 StreamSequenceToken? progressToken = null;
+
+                if (pendingBatch is not null)
+                {
+                    progressToken = pendingBatch.SequenceToken;
+                    if (ShouldDeliverBatch(streamId, pendingBatch, filterData))
+                    {
+                        batchContainers.Add(pendingBatch);
+                        i++;
+                    }
+                }
 
                 while (i < this.options.BatchContainerBatchSize)
                 {
