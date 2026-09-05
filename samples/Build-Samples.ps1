@@ -35,8 +35,7 @@ foreach ($project in $unpublishedSampleDependencies) {
         --configuration $Configuration `
         --output $packageSource `
         -p:Version=$packageVersion `
-        -p:IsPackable=true `
-        '-p:PackageReadmeFile=' `
+        -p:PackDurableTaskAdapter=true `
         --nologo
     if ($LASTEXITCODE -ne 0) {
         throw "Unpublished sample dependency package build failed with exit code $LASTEXITCODE."

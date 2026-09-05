@@ -63,7 +63,7 @@ For manual process failover, start an approval workflow, stop its active `servic
 
 ## Publication gate
 
-Repository sample validation builds an isolated local package feed from the current sources. `Microsoft.Orleans.DurableTasks.Abstractions` and `Microsoft.Orleans.DurableMessaging` are alpha foundations packed by the normal solution build. Validation explicitly packs the incubating `Microsoft.Orleans.DurableTasks` RPC adapter for this sample and selects the exact local package version throughout the Orleans package family.
+Repository sample validation builds an isolated local package feed from the current sources. `Microsoft.Orleans.DurableTasks.Abstractions` and `Microsoft.Orleans.DurableMessaging` are alpha foundations included by `dotnet pack Orleans.slnx`. Validation opts into packaging the incubating `Microsoft.Orleans.DurableTasks` RPC adapter using `PackDurableTaskAdapter=true` and selects the exact local package version throughout the Orleans package family.
 
 Standalone restore requires public publication of every referenced package and its dependencies. The alpha foundations still await their first publication, and the RPC adapter requires an explicit publication decision. Until those packages are available, use the repository's `samples/Build-Samples.ps1` package-boundary build.
 
