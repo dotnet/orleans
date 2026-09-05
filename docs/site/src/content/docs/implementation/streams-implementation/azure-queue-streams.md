@@ -1,7 +1,7 @@
 ---
 title: Azure Queue stream implementation
 description: Understand the Orleans Azure Queue adapter, receiver acknowledgement, queue mapping, and configuration surfaces.
-ms.date: 08/18/2026
+ms.date: 09/05/2026
 ms.topic: concept-article
 ---
 
@@ -46,7 +46,9 @@ sequenceDiagram
     Receiver->>Queue: Delete with pop receipt
 ```
 
-If the receiver, agent, or silo fails before delete, the visibility timeout eventually expires and Azure can return the message again. Consumers must tolerate redelivery. If visibility expires while a message is still being processed, delete can fail because the pop receipt is no longer current.
+During graceful queue ownership transfer, the previous receiver uses the [Update Message operation](https://learn.microsoft.com/rest/api/storageservices/update-message) to make every prefetched, unacknowledged message visible immediately. The replacement receiver can therefore resume delivery without waiting for the visibility timeout. Credentials must authorize that operation; a queue service SAS includes the `u` permission. When an update fails, Orleans logs the release failure and Azure makes the message available when its existing visibility lease expires.
+
+If the receiver, agent, or silo fails before this handoff completes, the visibility timeout eventually expires and Azure can return the message again. Consumers must tolerate redelivery. If visibility expires while a message is still being processed, delete can fail because the pop receipt is no longer current.
 
 Source: [`AzureQueueAdapterReceiver`](https://github.com/dotnet/orleans/blob/main/src/Azure/Orleans.Streaming.AzureStorage/Providers/Streams/AzureQueue/AzureQueueAdapterReceiver.cs).
 

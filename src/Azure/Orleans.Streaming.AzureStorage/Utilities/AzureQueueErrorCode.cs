@@ -23,5 +23,8 @@ namespace Orleans.AzureUtils.Utilities
         AzureQueue_13 = AzureQueueBase + 13,
         AzureQueue_14 = AzureQueueBase + 14,
         AzureQueue_15 = AzureQueueBase + 15,
+        AzureQueue_16 = AzureQueueBase + 16,
+        AzureQueue_17 = AzureQueueBase + 17,
+        AzureQueue_18 = AzureQueueBase + 18,
     }
 }

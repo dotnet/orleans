@@ -12,6 +12,17 @@ using Orleans.Configuration;
 
 namespace Orleans.AzureUtils
 {
+    internal interface IAzureQueueDataManager
+    {
+        Task InitQueueAsync();
+
+        Task<IEnumerable<QueueMessage>> GetQueueMessages(int? count = null);
+
+        Task DeleteQueueMessage(QueueMessage message);
+
+        Task ReleaseQueueMessage(QueueMessage message, CancellationToken cancellationToken);
+    }
+
     /// <summary>
     /// How to use the Queue Storage Service: http://www.windowsazure.com/en-us/develop/net/how-to-guides/queue-service/
     /// Windows Azure Storage Abstractions and their Scalability Targets: http://blogs.msdn.com/b/windowsazurestorage/archive/2010/05/10/windows-azure-storage-abstractions-and-their-scalability-targets.aspx
@@ -44,7 +55,7 @@ namespace Orleans.AzureUtils
     /// <remarks>
     /// Used by Azure queue streaming provider.
     /// </remarks>
-    public partial class AzureQueueDataManager
+    public partial class AzureQueueDataManager : IAzureQueueDataManager
     {
         /// <summary> Name of the table queue instance is managing. </summary>
         public string QueueName { get; private set; }
@@ -322,6 +333,34 @@ namespace Orleans.AzureUtils
                 CheckAlertSlowAccess(startTime, "DeleteQueueMessage");
             }
         }
+
+        internal async Task ReleaseQueueMessage(QueueMessage message, CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(message);
+
+            var startTime = DateTime.UtcNow;
+            try
+            {
+                var client = await GetQueueClient();
+                await client.UpdateMessageAsync(
+                    message.MessageId,
+                    message.PopReceipt,
+                    message.Body,
+                    TimeSpan.Zero,
+                    cancellationToken);
+            }
+            catch (Exception exc)
+            {
+                ReportErrorAndRethrow(exc, "ReleaseQueueMessage", AzureQueueErrorCode.AzureQueue_16);
+            }
+            finally
+            {
+                CheckAlertSlowAccess(startTime, "ReleaseQueueMessage");
+            }
+        }
+
+        Task IAzureQueueDataManager.ReleaseQueueMessage(QueueMessage message, CancellationToken cancellationToken) =>
+            ReleaseQueueMessage(message, cancellationToken);
 
         internal async Task GetAndDeleteQueueMessage()
         {

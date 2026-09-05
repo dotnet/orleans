@@ -35,6 +35,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Orleans.Azure.Tests" />
     <InternalsVisibleTo Include="Orleans.Runtime.Tests" />
   </ItemGroup>
 </Project>
