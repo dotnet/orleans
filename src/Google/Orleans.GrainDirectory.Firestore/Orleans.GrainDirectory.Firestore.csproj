@@ -10,6 +10,7 @@
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <DefineConstants>$(DefineConstants);ORLEANS_DIRECTORY</DefineConstants>
     <Nullable>enable</Nullable>
+    <WarningsAsErrors>$(WarningsAsErrors);CA1062</WarningsAsErrors>
   </PropertyGroup>
 
   <ItemGroup>

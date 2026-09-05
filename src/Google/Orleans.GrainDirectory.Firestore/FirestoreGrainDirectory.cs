@@ -34,6 +34,9 @@ public partial class FirestoreGrainDirectory : IGrainDirectory, ILifecyclePartic
         IOptions<FirestoreOptions> firestoreOptions,
         ILoggerFactory loggerFactory)
     {
+        ArgumentNullException.ThrowIfNull(clusterOptions);
+        ArgumentNullException.ThrowIfNull(firestoreOptions);
+
         this._clusterId = clusterOptions.Value.ClusterId;
         this._logger = loggerFactory.CreateLogger<FirestoreGrainDirectory>();
 
@@ -93,6 +96,8 @@ public partial class FirestoreGrainDirectory : IGrainDirectory, ILifecyclePartic
         GrainAddress? previousAddress,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(address);
+
         if (previousAddress is not null)
         {
             await Unregister(previousAddress, cancellationToken).ConfigureAwait(false);
@@ -128,6 +133,8 @@ public partial class FirestoreGrainDirectory : IGrainDirectory, ILifecyclePartic
 
     private async Task Unregister(GrainAddress address, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(address);
+
         try
         {
             var found = await this._dataManager
