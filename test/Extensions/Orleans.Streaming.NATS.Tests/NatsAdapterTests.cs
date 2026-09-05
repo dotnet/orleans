@@ -203,11 +203,14 @@ public class NatsAdapterTests : IAsyncLifetime, IClassFixture<TestEnvironmentFix
                 Assert.True(firstTokensPerQueue.TryGetValue((kvp.Key, streamGuid), out var firstInCache));
 
                 // read all messages in cache for stream
-                IQueueCacheCursor cursor = qCache.GetCacheCursor(streamGuid, firstInCache);
+                var cursorResult = qCache.TryGetCacheCursor(streamGuid, firstInCache);
+                Assert.Equal(QueueCacheCursorResultKind.Success, cursorResult.Kind);
+                var cursor = cursorResult.Cursor;
+                Assert.NotNull(cursor);
                 int messageCount = 0;
                 StreamSequenceToken? tenthInCache = null;
                 StreamSequenceToken lastToken = firstInCache;
-                while (cursor.MoveNext())
+                while (MoveNext(cursor))
                 {
                     messageCount++;
                     var batch = cursor.GetCurrent(out var ex);
@@ -228,9 +231,12 @@ public class NatsAdapterTests : IAsyncLifetime, IClassFixture<TestEnvironmentFix
                 Assert.NotNull(tenthInCache);
 
                 // read all messages from the 10th
-                cursor = qCache.GetCacheCursor(streamGuid, tenthInCache);
+                cursorResult = qCache.TryGetCacheCursor(streamGuid, tenthInCache);
+                Assert.Equal(QueueCacheCursorResultKind.Success, cursorResult.Kind);
+                cursor = cursorResult.Cursor;
+                Assert.NotNull(cursor);
                 messageCount = 0;
-                while (cursor.MoveNext())
+                while (MoveNext(cursor))
                 {
                     messageCount++;
                 }
@@ -241,6 +247,18 @@ public class NatsAdapterTests : IAsyncLifetime, IClassFixture<TestEnvironmentFix
                 Assert.Equal(expected, messageCount);
             }
         }
+    }
+
+    private static bool MoveNext(IQueueCacheCursor cursor)
+    {
+        var result = cursor.MoveNextWithResult();
+        return result.Kind switch
+        {
+            QueueCacheCursorMoveResultKind.Success => true,
+            QueueCacheCursorMoveResultKind.NoData => false,
+            QueueCacheCursorMoveResultKind.CacheMiss => throw result.CacheMiss!.Value.ToException(),
+            _ => throw new InvalidOperationException("The cursor move result is not initialized."),
+        };
     }
 
     private static List<object> CreateEvents(int count)

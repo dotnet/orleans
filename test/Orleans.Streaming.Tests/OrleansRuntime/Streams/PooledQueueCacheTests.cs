@@ -5,6 +5,8 @@ using Orleans.Runtime;
 using Orleans.Streams;
 using Xunit;
 
+#pragma warning disable CS0618 // This suite verifies compatibility of the legacy cursor APIs alongside their replacements.
+
 namespace UnitTests.OrleansRuntime.Streams
 {
     [TestSuite("BVT")]
@@ -25,6 +27,53 @@ namespace UnitTests.OrleansRuntime.Streams
             public long SequenceNumber;
             public byte[] Data { get; init; } = FixedMessage;
             public DateTime EnqueueTimeUtc = DateTime.UtcNow;
+        }
+
+        private sealed class MutatingSequenceToken : StreamSequenceToken
+        {
+            private readonly long _sequenceNumber;
+            private readonly int _mutationRead;
+            private readonly Action _mutation;
+            private int _sequenceReads;
+
+            public MutatingSequenceToken(long sequenceNumber, int mutationRead, Action mutation)
+            {
+                _sequenceNumber = sequenceNumber;
+                _mutationRead = mutationRead;
+                _mutation = mutation;
+            }
+
+            public override long SequenceNumber
+            {
+                get
+                {
+                    if (Interlocked.Increment(ref _sequenceReads) == _mutationRead)
+                    {
+                        _mutation();
+                    }
+
+                    return _sequenceNumber;
+                }
+                protected set => throw new NotSupportedException();
+            }
+
+            public override int EventIndex
+            {
+                get => 0;
+                protected set => throw new NotSupportedException();
+            }
+
+            public override int CompareTo(StreamSequenceToken? other)
+                => other is null
+                    ? 1
+                    : _sequenceNumber != other.SequenceNumber
+                        ? _sequenceNumber.CompareTo(other.SequenceNumber)
+                        : EventIndex.CompareTo(other.EventIndex);
+
+            public override bool Equals(StreamSequenceToken? other)
+                => other is not null
+                    && _sequenceNumber == other.SequenceNumber
+                    && EventIndex == other.EventIndex;
         }
 
         [GenerateSerializer]
@@ -49,7 +98,6 @@ namespace UnitTests.OrleansRuntime.Streams
                 throw new NotImplementedException();
             }
         }
-
 
         private class TestCacheDataAdapter : ICacheDataAdapter
         {
@@ -189,13 +237,33 @@ namespace UnitTests.OrleansRuntime.Streams
                 converter.ToCachedMessage(new TestQueueMessage { StreamId = targetStream, SequenceNumber = 3 }, now),
             ], now);
 
-            var cursor = cache.GetCursorAtPosition(targetStream, StreamSubscriptionStartPosition.EarliestAvailable);
+            var result = cache.TryGetCursorAtPosition(targetStream, StreamSubscriptionStartPosition.EarliestAvailable);
+            Assert.Equal(QueueCacheCursorResultKind.Success, result.Kind);
+            Assert.NotNull(result.Cursor);
+            var cursor = result.Cursor;
 
             Assert.True(cache.TryGetNextMessage(cursor, out var first));
             Assert.Equal(1, first.SequenceToken.SequenceNumber);
             Assert.True(cache.TryGetNextMessage(cursor, out var second));
             Assert.Equal(3, second.SequenceToken.SequenceNumber);
             Assert.False(cache.TryGetNextMessage(cursor, out _));
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public void GetCursorAtPositionPreservesLegacyCursorBehavior()
+        {
+            var (cache, converter) = CreateCache();
+            var stream = StreamId.Create(TestStreamNamespace, Guid.NewGuid());
+            var now = DateTime.UtcNow;
+            cache.Add(
+            [
+                converter.ToCachedMessage(new TestQueueMessage { StreamId = stream, SequenceNumber = 1 }, now),
+            ], now);
+
+            var cursor = cache.GetCursorAtPosition(stream, StreamSubscriptionStartPosition.EarliestAvailable);
+
+            Assert.True(cache.TryGetNextMessage(cursor, out var message));
+            Assert.Equal(1, message.SequenceToken.SequenceNumber);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
@@ -209,7 +277,10 @@ namespace UnitTests.OrleansRuntime.Streams
             [
                 converter.ToCachedMessage(new TestQueueMessage { StreamId = otherStream, SequenceNumber = 100 }, now),
             ], now);
-            var cursor = cache.GetCursorAtPosition(targetStream, StreamSubscriptionStartPosition.EarliestAvailable);
+            var result = cache.TryGetCursorAtPosition(targetStream, StreamSubscriptionStartPosition.EarliestAvailable);
+            Assert.Equal(QueueCacheCursorResultKind.Success, result.Kind);
+            Assert.NotNull(result.Cursor);
+            var cursor = result.Cursor;
 
             Assert.False(cache.TryGetNextMessage(cursor, out _));
 
@@ -230,7 +301,10 @@ namespace UnitTests.OrleansRuntime.Streams
             var (cache, converter) = CreateCache();
             var targetStream = StreamId.Create(TestStreamNamespace, Guid.NewGuid());
             var otherStream = StreamId.Create(TestStreamNamespace, Guid.NewGuid());
-            var cursor = cache.GetCursorAtPosition(targetStream, StreamSubscriptionStartPosition.EarliestAvailable);
+            var result = cache.TryGetCursorAtPosition(targetStream, StreamSubscriptionStartPosition.EarliestAvailable);
+            Assert.Equal(QueueCacheCursorResultKind.Success, result.Kind);
+            Assert.NotNull(result.Cursor);
+            var cursor = result.Cursor;
             var now = DateTime.UtcNow;
 
             cache.Add(
@@ -259,7 +333,10 @@ namespace UnitTests.OrleansRuntime.Streams
                 converter.ToCachedMessage(new TestQueueMessage { StreamId = stream, SequenceNumber = 1 }, now),
                 converter.ToCachedMessage(new TestQueueMessage { StreamId = stream, SequenceNumber = 2 }, now),
             ], now);
-            var cursor = cache.GetCursorAtPosition(stream, StreamSubscriptionStartPosition.EarliestAvailable);
+            var result = cache.TryGetCursorAtPosition(stream, StreamSubscriptionStartPosition.EarliestAvailable);
+            Assert.Equal(QueueCacheCursorResultKind.Success, result.Kind);
+            Assert.NotNull(result.Cursor);
+            var cursor = result.Cursor;
 
             cache.RemoveOldestMessage();
 
@@ -278,7 +355,10 @@ namespace UnitTests.OrleansRuntime.Streams
             [
                 converter.ToCachedMessage(new TestQueueMessage { StreamId = otherStream, SequenceNumber = 100 }, now),
             ], now);
-            var cursor = cache.GetCursorAtPosition(targetStream, StreamSubscriptionStartPosition.EarliestAvailable);
+            var result = cache.TryGetCursorAtPosition(targetStream, StreamSubscriptionStartPosition.EarliestAvailable);
+            Assert.Equal(QueueCacheCursorResultKind.Success, result.Kind);
+            Assert.NotNull(result.Cursor);
+            var cursor = result.Cursor;
             Assert.False(cache.TryGetNextMessage(cursor, out _));
 
             cache.RemoveOldestMessage();
@@ -303,7 +383,10 @@ namespace UnitTests.OrleansRuntime.Streams
                 converter.ToCachedMessage(new TestQueueMessage { StreamId = stream, SequenceNumber = 1 }, now),
             ], now);
 
-            var cursor = cache.GetCursorAtPosition(stream, StreamSubscriptionStartPosition.Latest);
+            var result = cache.TryGetCursorAtPosition(stream, StreamSubscriptionStartPosition.Latest);
+            Assert.Equal(QueueCacheCursorResultKind.Success, result.Kind);
+            Assert.NotNull(result.Cursor);
+            var cursor = result.Cursor;
 
             Assert.False(cache.TryGetNextMessage(cursor, out _));
             cache.Add(
@@ -700,7 +783,14 @@ namespace UnitTests.OrleansRuntime.Streams
             // Enqueue a new message for stream
             EnqueueMessage(streamKey);
 
-            // Should throw since we missed the second message destined for stream
+            var result = cache.TryGetNextMessageWithResult(cursor, out _);
+            Assert.Equal(QueueCacheCursorMoveResultKind.CacheMiss, result.Kind);
+            var cacheMiss = Assert.NotNull(result.CacheMiss);
+            Assert.NotNull(cacheMiss.Requested);
+            Assert.NotNull(cacheMiss.Low);
+            Assert.NotNull(cacheMiss.High);
+
+            // Preserve the legacy API behavior for existing cache implementations.
             Assert.Throws<QueueCacheMissException>(() => cache.TryGetNextMessage(cursor, out _));
 
             long EnqueueMessage(Guid streamId)
@@ -715,6 +805,63 @@ namespace UnitTests.OrleansRuntime.Streams
                 seqNumber++;
                 return msg.SequenceNumber;
             }
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public void TryGetCursorReportsCacheMiss()
+        {
+            var bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(PooledBufferSize));
+            var dataAdapter = new TestCacheDataAdapter();
+            var cache = new PooledQueueCache(dataAdapter, NullLogger.Instance, null, null, TimeSpan.FromSeconds(10));
+            var evictionStrategy = new ChronologicalEvictionStrategy(NullLogger.Instance, new TimePurgePredicate(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1)), null, null);
+            evictionStrategy.PurgeObservable = cache;
+            var converter = new CachedMessageConverter(bufferPool, evictionStrategy);
+            var streamId = StreamId.Create(TestStreamNamespace, Guid.NewGuid());
+            var now = DateTime.UtcNow;
+            var message = new TestQueueMessage
+            {
+                StreamId = streamId,
+                SequenceNumber = 2,
+            };
+            cache.Add([converter.ToCachedMessage(message, now)], now);
+
+            var requestedToken = new EventSequenceTokenV2(1);
+            var result = cache.TryGetCursor(streamId, requestedToken);
+
+            Assert.Equal(QueueCacheCursorResultKind.CacheMiss, result.Kind);
+            Assert.Null(result.Cursor);
+            var cacheMiss = Assert.NotNull(result.CacheMiss);
+            Assert.Same(requestedToken, cacheMiss.RequestedToken);
+            Assert.Equal(message.SequenceNumber, cacheMiss.LowToken!.SequenceNumber);
+            Assert.Equal(message.SequenceNumber, cacheMiss.HighToken!.SequenceNumber);
+            Assert.Equal(requestedToken.ToString(), cacheMiss.Requested);
+            var exception = Assert.Throws<QueueCacheMissException>(() => cache.GetCursor(streamId, requestedToken));
+            Assert.Equal(cacheMiss.Requested, exception.Requested);
+            Assert.Equal(cacheMiss.Low, exception.Low);
+            Assert.Equal(cacheMiss.High, exception.High);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public void TryGetCursorPreservesCacheMissWhenCacheMutatesAfterPreflight()
+        {
+            var (cache, converter) = CreateCache();
+            var streamId = StreamId.Create(TestStreamNamespace, Guid.NewGuid());
+            var now = DateTime.UtcNow;
+            cache.Add(
+            [
+                converter.ToCachedMessage(new TestQueueMessage { StreamId = streamId, SequenceNumber = 1 }, now),
+                converter.ToCachedMessage(new TestQueueMessage { StreamId = streamId, SequenceNumber = 2 }, now),
+            ], now);
+            var requestedToken = new MutatingSequenceToken(1, 3, cache.RemoveOldestMessage);
+
+            var result = cache.TryGetCursor(streamId, requestedToken);
+
+            Assert.Equal(QueueCacheCursorResultKind.CacheMiss, result.Kind);
+            Assert.Null(result.Cursor);
+            var cacheMiss = Assert.NotNull(result.CacheMiss);
+            Assert.Same(requestedToken, cacheMiss.RequestedToken);
+            Assert.Equal(2, cacheMiss.LowToken!.SequenceNumber);
+            Assert.Equal(2, cacheMiss.HighToken!.SequenceNumber);
         }
 
         /// <summary>
@@ -936,3 +1083,5 @@ namespace UnitTests.OrleansRuntime.Streams
         }
     }
 }
+
+#pragma warning restore CS0618

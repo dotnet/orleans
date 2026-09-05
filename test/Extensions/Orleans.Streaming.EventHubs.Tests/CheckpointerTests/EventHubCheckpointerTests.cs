@@ -79,6 +79,8 @@ public class EventHubCheckpointerTests
         public object Cursor { get; } = new();
         public object? RefreshedCursor { get; private set; }
         public StreamSequenceToken? RefreshToken { get; private set; }
+        public QueueCacheMissException? CursorException { get; set; }
+        public QueueCacheMissException? MoveNextException { get; set; }
 
         public int GetMaxAddCount() => 1_000;
 
@@ -88,7 +90,8 @@ public class EventHubCheckpointerTests
             return [];
         }
 
-        public object GetCursor(StreamId streamId, StreamSequenceToken? sequenceToken) => Cursor;
+        public object GetCursor(StreamId streamId, StreamSequenceToken? sequenceToken)
+            => CursorException is { } exception ? throw exception : Cursor;
 
         public void Refresh(object cursor, StreamSequenceToken? sequenceToken)
         {
@@ -98,6 +101,11 @@ public class EventHubCheckpointerTests
 
         public bool TryGetNextMessage(object cursorObj, out IBatchContainer message)
         {
+            if (MoveNextException is { } exception)
+            {
+                throw exception;
+            }
+
             message = null!;
             return false;
         }
@@ -134,6 +142,28 @@ public class EventHubCheckpointerTests
             CloseCount++;
             return Task.CompletedTask;
         }
+    }
+
+    [Fact, TestCategory("BVT")]
+    public void GetCursorAtPositionPreservesLegacyEventHubCacheBehavior()
+    {
+        IEventHubQueueCache cache = new TestEventHubQueueCache();
+        var streamId = StreamId.Create("namespace", Guid.NewGuid());
+
+#pragma warning disable CS0618 // Verify compatibility of the obsolete wrapper.
+        Assert.Same(cache.GetCursor(streamId, null), cache.GetCursorAtPosition(streamId, StreamSubscriptionStartPosition.Latest));
+        Assert.Throws<NotSupportedException>(
+            () => cache.GetCursorAtPosition(streamId, StreamSubscriptionStartPosition.EarliestAvailable));
+
+        var innerException = new InvalidOperationException("inner");
+        var expected = new QueueCacheMissException("provider message", innerException);
+        cache = new TestEventHubQueueCache { CursorException = expected };
+        var actual = Assert.Throws<QueueCacheMissException>(
+            () => cache.GetCursorAtPosition(streamId, StreamSubscriptionStartPosition.Latest));
+#pragma warning restore CS0618
+
+        Assert.Same(expected, actual);
+        Assert.Same(innerException, actual.InnerException);
     }
 
     private sealed class NullReturningEventHubReceiver : IEventHubReceiver
@@ -320,13 +350,47 @@ public class EventHubCheckpointerTests
     {
         var cache = new TestEventHubQueueCache();
         var receiver = await CreateReceiver(new TestCheckpointer(), cache);
-        var cursor = receiver.GetCacheCursor(StreamId.Create("namespace", Guid.NewGuid()), MakeToken(1));
+        var result = ((IQueueCache)receiver).TryGetCacheCursor(
+            StreamId.Create("namespace", Guid.NewGuid()),
+            MakeToken(1));
+        Assert.Equal(QueueCacheCursorResultKind.Success, result.Kind);
+        var cursor = result.Cursor;
+        Assert.NotNull(cursor);
         var refreshToken = MakeToken(2);
 
         cursor.Refresh(refreshToken);
 
         Assert.Same(cache.Cursor, cache.RefreshedCursor);
         Assert.Same(refreshToken, cache.RefreshToken);
+    }
+
+    [TestSuite("BVT")]
+    [Fact, TestCategory("BVT")]
+    public async Task LegacyReceiverCursorPreservesProviderExceptions()
+    {
+        var acquisitionInnerException = new InvalidOperationException("acquisition inner");
+        var acquisitionException = new QueueCacheMissException("acquisition", acquisitionInnerException);
+        var cache = new TestEventHubQueueCache { CursorException = acquisitionException };
+        var receiver = await CreateReceiver(new TestCheckpointer(), cache);
+        var streamId = StreamId.Create("namespace", Guid.NewGuid());
+
+#pragma warning disable CS0618 // Verify compatibility of the obsolete cursor APIs.
+        var actualAcquisitionException = Assert.Throws<QueueCacheMissException>(
+            () => ((IQueueCache)receiver).GetCacheCursor(streamId, MakeToken(1)));
+#pragma warning restore CS0618
+        Assert.Same(acquisitionException, actualAcquisitionException);
+        Assert.Same(acquisitionInnerException, actualAcquisitionException.InnerException);
+
+        cache.CursorException = null;
+        var movementInnerException = new InvalidOperationException("movement inner");
+        var movementException = new QueueCacheMissException("movement", movementInnerException);
+        cache.MoveNextException = movementException;
+#pragma warning disable CS0618 // Verify compatibility of the obsolete cursor APIs.
+        var cursor = ((IQueueCache)receiver).GetCacheCursor(streamId, MakeToken(1));
+        var actualMovementException = Assert.Throws<QueueCacheMissException>(() => cursor.MoveNext());
+#pragma warning restore CS0618
+        Assert.Same(movementException, actualMovementException);
+        Assert.Same(movementInnerException, actualMovementException.InnerException);
     }
 
     [TestSuite("BVT")]
