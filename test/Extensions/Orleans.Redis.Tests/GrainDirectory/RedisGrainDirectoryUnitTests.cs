@@ -15,6 +15,42 @@ namespace Tester.Redis.GrainDirectory;
 public sealed class RedisGrainDirectoryUnitTests
 {
     [Fact]
+    public void Constructor_NullDirectoryOptions_ThrowsArgumentNullException()
+    {
+        var exception = Assert.Throws<ArgumentNullException>(
+            () => new RedisGrainDirectory(
+                null!,
+                CreateClusterOptions(),
+                NullLogger<RedisGrainDirectory>.Instance));
+
+        Assert.Equal("directoryOptions", exception.ParamName);
+    }
+
+    [Fact]
+    public void Constructor_NullClusterOptions_ThrowsArgumentNullException()
+    {
+        var exception = Assert.Throws<ArgumentNullException>(
+            () => new RedisGrainDirectory(
+                new RedisGrainDirectoryOptions(),
+                null!,
+                NullLogger<RedisGrainDirectory>.Instance));
+
+        Assert.Equal("clusterOptions", exception.ParamName);
+    }
+
+    [Fact]
+    public void Constructor_NullLogger_ThrowsArgumentNullException()
+    {
+        var exception = Assert.Throws<ArgumentNullException>(
+            () => new RedisGrainDirectory(
+                new RedisGrainDirectoryOptions(),
+                CreateClusterOptions(),
+                null!));
+
+        Assert.Equal("logger", exception.ParamName);
+    }
+
+    [Fact]
     public async Task DefaultCreateMultiplexer_NullOptions_ThrowsArgumentNullException()
     {
         var exception = await Assert.ThrowsAsync<ArgumentNullException>(
@@ -69,10 +105,13 @@ public sealed class RedisGrainDirectoryUnitTests
     private static RedisGrainDirectory CreateDirectory(string serviceId = "service") =>
         new(
             new RedisGrainDirectoryOptions(),
-            Options.Create(new ClusterOptions
-            {
-                ServiceId = serviceId,
-                ClusterId = "cluster",
-            }),
+            CreateClusterOptions(serviceId),
             NullLogger<RedisGrainDirectory>.Instance);
+
+    private static IOptions<ClusterOptions> CreateClusterOptions(string serviceId = "service") =>
+        Options.Create(new ClusterOptions
+        {
+            ServiceId = serviceId,
+            ClusterId = "cluster",
+        });
 }

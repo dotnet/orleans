@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Net;
 using System.Text;
@@ -39,12 +38,18 @@ namespace Orleans.GrainDirectory.Redis
         /// <param name="directoryOptions">The Redis grain directory options.</param>
         /// <param name="clusterOptions">The cluster options.</param>
         /// <param name="logger">The logger.</param>
-        [SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "ActivatorUtilities supplies the options and services from dependency injection.")]
+        /// <exception cref="ArgumentNullException">
+        /// <paramref name="directoryOptions"/>, <paramref name="clusterOptions"/>, or <paramref name="logger"/> is <see langword="null"/>.
+        /// </exception>
         public RedisGrainDirectory(
             RedisGrainDirectoryOptions directoryOptions,
             IOptions<ClusterOptions> clusterOptions,
             ILogger<RedisGrainDirectory> logger)
         {
+            ArgumentNullException.ThrowIfNull(directoryOptions);
+            ArgumentNullException.ThrowIfNull(clusterOptions);
+            ArgumentNullException.ThrowIfNull(logger);
+
             _directoryOptions = directoryOptions;
             _logger = logger;
             _clusterOptions = clusterOptions.Value;
