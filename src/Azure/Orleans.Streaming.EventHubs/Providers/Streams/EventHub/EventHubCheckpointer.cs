@@ -25,6 +25,7 @@ public class EventHubCheckpointerFactory : IStreamQueueCheckpointerFactory
         _providerName = providerName;
     }
 
+    [Obsolete("Use the overload which accepts a CancellationToken.")]
     public Task<IStreamQueueCheckpointer<string>> Create(string partition)
         => Create(partition, CancellationToken.None);
 
