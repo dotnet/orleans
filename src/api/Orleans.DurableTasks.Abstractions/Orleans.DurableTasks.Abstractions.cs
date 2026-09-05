@@ -61,6 +61,8 @@ namespace Orleans.DurableTasks
 
     public abstract partial class DurableExecutionContext
     {
+        protected DurableExecutionContext(TaskId taskId, System.Threading.CancellationToken executionAbortToken) { }
+
         protected DurableExecutionContext(TaskId taskId) { }
 
         public System.Threading.CancellationToken CancellationToken { get { throw null; } }
