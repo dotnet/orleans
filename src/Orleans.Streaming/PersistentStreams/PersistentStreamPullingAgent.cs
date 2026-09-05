@@ -1897,6 +1897,7 @@ namespace Orleans.Streams
             }
             catch (Exception ex)
             {
+                StreamingEvents.EmitMessageDeliveryFailed(streamProviderName, consumerData, batch.SequenceToken, Silo, ex);
                 LogWarningFailedToDeliverMessage(consumerData.SubscriptionId, consumerData.StreamId, ex);
                 throw;
             }
@@ -1967,7 +1968,7 @@ namespace Orleans.Streams
             if (exceptionOccured is ClientNotAvailableException)
             {
                 LogWarningConsumerIsDead(consumerData.StreamConsumer, consumerData.StreamId);
-                await pubSub.UnregisterConsumer(consumerData.SubscriptionId, consumerData.StreamId, CancellationToken.None);
+                UnregisterUnavailableConsumer(consumerData, cancellationToken).Ignore();
                 return true;
             }
 
@@ -2009,6 +2010,25 @@ namespace Orleans.Streams
                 return true;
             }
             return false;
+        }
+
+        private async Task UnregisterUnavailableConsumer(StreamConsumerData consumerData, CancellationToken cancellationToken)
+        {
+            StreamingEvents.EmitSubscriptionUnregistration(
+                streamProviderName, consumerData, Silo, StreamingEvents.SubscriptionUnregistrationStage.Requested);
+            try
+            {
+                await pubSub.UnregisterConsumer(consumerData.SubscriptionId, consumerData.StreamId, cancellationToken);
+                StreamingEvents.EmitSubscriptionUnregistration(
+                    streamProviderName, consumerData, Silo, StreamingEvents.SubscriptionUnregistrationStage.Completed);
+            }
+            catch (Exception exception)
+            {
+                StreamingEvents.EmitSubscriptionUnregistration(
+                    streamProviderName, consumerData, Silo, StreamingEvents.SubscriptionUnregistrationStage.Failed, exception);
+                LogWarningUnregisterUnavailableConsumer(consumerData.SubscriptionId, consumerData.StreamId, exception);
+                throw;
+            }
         }
 
         private static async Task<ISet<PubSubSubscriptionState>> PubsubRegisterProducer(
@@ -2239,6 +2259,12 @@ namespace Orleans.Streams
             Message = "Consumer {Consumer} on stream {StreamId} is no longer active - permanently removing Consumer."
         )]
         private partial void LogWarningConsumerIsDead(IStreamConsumerExtension consumer, QualifiedStreamId streamId);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Failed to unregister unavailable consumer subscription {SubscriptionId} for stream {StreamId}."
+        )]
+        private partial void LogWarningUnregisterUnavailableConsumer(GuidId subscriptionId, QualifiedStreamId streamId, Exception exception);
 
         [LoggerMessage(
             Level = LogLevel.Error,
