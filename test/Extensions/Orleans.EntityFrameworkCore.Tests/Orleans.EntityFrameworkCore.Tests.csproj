@@ -5,6 +5,8 @@
     <AssemblyName>Orleans.EntityFrameworkCore.Tests</AssemblyName>
     <RootNamespace>Orleans.EntityFrameworkCore.Tests</RootNamespace>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <!-- The imported provider conformance suite predates xUnit's ambient cancellation-token API. -->
+    <NoWarn>$(NoWarn);xUnit1051</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

@@ -1,0 +1,8 @@
+<Project>
+  <Import Project="..\Directory.Build.props" />
+
+  <PropertyGroup>
+    <!-- These new packages have no published baselines. Enable validation after their first release. -->
+    <EnablePackageValidation>false</EnablePackageValidation>
+  </PropertyGroup>
+</Project>
