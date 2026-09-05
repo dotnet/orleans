@@ -41,7 +41,8 @@ internal sealed class KinesisPooledAdapterReceiver : IQueueAdapterReceiver, IQue
         KinesisShardTopologyMonitor topologyMonitor,
         TimeSpan getRecordsInterval,
         TimeProvider timeProvider,
-        Action<KinesisPooledAdapterReceiver>? onShutdown = null)
+        Action<KinesisPooledAdapterReceiver>? onShutdown = null,
+        long maxCacheSizeBytes = 64 * 1024 * 1024)
     {
         _checkpointerFactory = checkpointerFactory;
         _partition = partition;
@@ -66,6 +67,7 @@ internal sealed class KinesisPooledAdapterReceiver : IQueueAdapterReceiver, IQue
             _dataAdapter,
             evictionStrategy,
             logger,
+            maxCacheSizeBytes: maxCacheSizeBytes,
             maxCacheSize: cacheOptions.CacheSize);
     }
 
