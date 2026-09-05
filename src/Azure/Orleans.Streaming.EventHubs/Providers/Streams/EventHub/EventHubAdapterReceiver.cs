@@ -251,15 +251,43 @@ namespace Orleans.Streaming.EventHubs
             return false;
         }
 
+        [Obsolete("Use IQueueCache.TryGetCacheCursor instead.")]
         public IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken? token)
         {
             return new Cursor(this.cache!, streamId, token);
         }
 
-        public IQueueCacheCursor GetCacheCursorAtPosition(StreamId streamId, StreamSubscriptionStartPosition startPosition)
+        /// <inheritdoc />
+        [Obsolete("Use IQueueCache.TryGetCacheCursorAtPosition instead.")]
+        IQueueCacheCursor IQueueCache.GetCacheCursorAtPosition(
+            StreamId streamId,
+            StreamSubscriptionStartPosition startPosition)
         {
             return new Cursor(this.cache!, streamId, startPosition);
         }
+
+        QueueCacheCursorResult<IQueueCacheCursor> IQueueCache.TryGetCacheCursor(
+            StreamId streamId,
+            StreamSequenceToken? token)
+        {
+            return WrapCursorResult(this.cache!.TryGetCursor(streamId, token));
+        }
+
+        QueueCacheCursorResult<IQueueCacheCursor> IQueueCache.TryGetCacheCursorAtPosition(
+            StreamId streamId,
+            StreamSubscriptionStartPosition startPosition)
+        {
+            return WrapCursorResult(this.cache!.TryGetCursorAtPosition(streamId, startPosition));
+        }
+
+        private QueueCacheCursorResult<IQueueCacheCursor> WrapCursorResult(QueueCacheCursorResult<object> result)
+            => result.Kind switch
+            {
+                QueueCacheCursorResultKind.Success => QueueCacheCursorResult<IQueueCacheCursor>.FromCursor(new Cursor(this.cache!, result.Cursor!)),
+                QueueCacheCursorResultKind.CacheMiss => QueueCacheCursorResult<IQueueCacheCursor>.FromCacheMiss(result.CacheMiss!.Value),
+                QueueCacheCursorResultKind.NotSupported => QueueCacheCursorResult<IQueueCacheCursor>.NotSupported,
+                _ => throw new InvalidOperationException("The cursor result is not initialized."),
+            };
 
         public bool IsUnderPressure()
         {
@@ -423,13 +451,23 @@ namespace Orleans.Streaming.EventHubs
             public Cursor(IEventHubQueueCache cache, StreamId streamId, StreamSequenceToken? token)
             {
                 this.cache = cache;
+#pragma warning disable CS0618 // Preserve the exact legacy exception and cursor behavior.
                 this.cursor = cache.GetCursor(streamId, token);
+#pragma warning restore CS0618
             }
 
             public Cursor(IEventHubQueueCache cache, StreamId streamId, StreamSubscriptionStartPosition startPosition)
             {
                 this.cache = cache;
+#pragma warning disable CS0618 // Preserve the exact legacy exception and cursor behavior.
                 this.cursor = cache.GetCursorAtPosition(streamId, startPosition);
+#pragma warning restore CS0618
+            }
+
+            public Cursor(IEventHubQueueCache cache, object cursor)
+            {
+                this.cache = cache;
+                this.cursor = cursor;
             }
 
             public void Dispose()
@@ -442,16 +480,26 @@ namespace Orleans.Streaming.EventHubs
                 return this.current;
             }
 
+            [Obsolete("Use MoveNextWithResult instead.")]
             public bool MoveNext()
             {
-                IBatchContainer? next;
-                if (!this.cache.TryGetNextMessage(this.cursor, out next))
+#pragma warning disable CS0618 // Preserve the exact legacy exception and cursor behavior.
+                if (!this.cache.TryGetNextMessage(this.cursor, out var next))
+#pragma warning restore CS0618
                 {
+                    this.current = null;
                     return false;
                 }
 
                 this.current = next;
                 return true;
+            }
+
+            public QueueCacheCursorMoveResult MoveNextWithResult()
+            {
+                var result = this.cache.TryGetNextMessageWithResult(this.cursor, out var next);
+                this.current = result.Kind == QueueCacheCursorMoveResultKind.Success ? next : null;
+                return result;
             }
 
             public void Refresh(StreamSequenceToken? token)

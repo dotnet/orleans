@@ -136,14 +136,42 @@ namespace Orleans.Streaming.EventHubs
         /// <param name="streamId">The stream identifier.</param>
         /// <param name="sequenceToken">The position from which to begin reading.</param>
         /// <returns>A cache cursor.</returns>
+        [Obsolete("Use TryGetCursor instead.")]
         public object GetCursor(StreamId streamId, StreamSequenceToken? sequenceToken)
         {
-            return cache.GetCursor(streamId, sequenceToken);
+            var result = cache.TryGetCursor(streamId, sequenceToken);
+            return result.Kind switch
+            {
+                QueueCacheCursorResultKind.Success => result.Cursor!,
+                QueueCacheCursorResultKind.CacheMiss => throw result.CacheMiss!.Value.ToException(),
+                _ => throw new InvalidOperationException($"Unexpected cursor result: {result.Kind}."),
+            };
         }
 
-        object IEventHubQueueCache.GetCursorAtPosition(StreamId streamId, StreamSubscriptionStartPosition startPosition)
+        /// <inheritdoc />
+        public QueueCacheCursorResult<object> TryGetCursor(StreamId streamId, StreamSequenceToken? sequenceToken)
+            => cache.TryGetCursor(streamId, sequenceToken);
+
+        /// <inheritdoc />
+        public QueueCacheCursorResult<object> TryGetCursorAtPosition(
+            StreamId streamId,
+            StreamSubscriptionStartPosition startPosition)
+            => cache.TryGetCursorAtPosition(streamId, startPosition);
+
+        [Obsolete("Use TryGetCursorAtPosition instead.")]
+        object IEventHubQueueCache.GetCursorAtPosition(
+            StreamId streamId,
+            StreamSubscriptionStartPosition startPosition)
         {
-            return cache.GetCursorAtPosition(streamId, startPosition);
+            var result = cache.TryGetCursorAtPosition(streamId, startPosition);
+            return result.Kind switch
+            {
+                QueueCacheCursorResultKind.Success => result.Cursor!,
+                QueueCacheCursorResultKind.CacheMiss => throw result.CacheMiss!.Value.ToException(),
+                QueueCacheCursorResultKind.NotSupported => throw new NotSupportedException(
+                    $"{GetType().FullName} does not support {startPosition} cursor positioning."),
+                _ => throw new InvalidOperationException("The cursor result is not initialized."),
+            };
         }
 
         /// <inheritdoc />
@@ -158,16 +186,42 @@ namespace Orleans.Streaming.EventHubs
         /// <param name="cursorObj">The cache cursor.</param>
         /// <param name="message">The next message when one is available.</param>
         /// <returns><see langword="true"/> when a message was returned; otherwise, <see langword="false"/>.</returns>
+        [Obsolete("Use TryGetNextMessageWithResult instead.")]
         public bool TryGetNextMessage(object cursorObj, [NotNullWhen(true)] out IBatchContainer? message)
         {
-            if (!cache.TryGetNextMessage(cursorObj, out message))
-                return false;
+            var result = TryGetNextMessageWithResult(cursorObj, out message);
+            if (result.CacheMiss is { } cacheMiss)
+            {
+                throw cacheMiss.ToException();
+            }
+
+            return result.Kind switch
+            {
+                QueueCacheCursorMoveResultKind.Success => true,
+                QueueCacheCursorMoveResultKind.NoData => false,
+                _ => throw new InvalidOperationException("The cursor move result is not initialized."),
+            };
+        }
+
+        /// <inheritdoc />
+        public QueueCacheCursorMoveResult TryGetNextMessageWithResult(object cursorObj, out IBatchContainer? message)
+        {
+            var result = cache.TryGetNextMessageWithResult(cursorObj, out message);
+            if (result.Kind == QueueCacheCursorMoveResultKind.Success)
+            {
+                RecordCachePressure(message!);
+            }
+
+            return result;
+        }
+
+        private void RecordCachePressure(IBatchContainer message)
+        {
             double cachePressureContribution;
             cachePressureMonitor.RecordCachePressureContribution(
                 TryCalculateCachePressureContribution(message.SequenceToken, out cachePressureContribution)
                     ? cachePressureContribution
                     : 0.0);
-            return true;
         }
 
         /// <summary>

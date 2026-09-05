@@ -142,20 +142,96 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <inheritdoc />
+        /// <exception cref="QueueCacheMissException">
+        /// The requested token is older than the messages retained by the cache.
+        /// </exception>
+        [Obsolete("Use IQueueCache.TryGetCacheCursor instead.")]
         public virtual IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken? token)
         {
+            if (TryGetCacheMiss(token, out var cacheMiss))
+            {
+                throw cacheMiss.ToException();
+            }
+
             var cursor = new SimpleQueueCacheCursor(this, streamId, logger);
-            InitializeCursor(cursor, token);
+            if (InitializeCursor(cursor, token) is { } racedCacheMiss)
+            {
+                throw racedCacheMiss.ToException();
+            }
+
             return cursor;
         }
 
-        IQueueCacheCursor IQueueCache.GetCacheCursorAtPosition(StreamId streamId, StreamSubscriptionStartPosition startPosition)
+        QueueCacheCursorResult<IQueueCacheCursor> IQueueCache.TryGetCacheCursor(
+            StreamId streamId,
+            StreamSequenceToken? token)
+        {
+            if (GetType() != typeof(SimpleQueueCache))
+            {
+                try
+                {
+#pragma warning disable CS0618 // Required for compatibility with derived caches which override the legacy method.
+                    return QueueCacheCursorResult<IQueueCacheCursor>.FromCursor(GetCacheCursor(streamId, token));
+#pragma warning restore CS0618
+                }
+                catch (QueueCacheMissException exception)
+                {
+                    return QueueCacheCursorResult<IQueueCacheCursor>.FromCacheMiss(
+                        new(exception.Requested, exception.Low, exception.High));
+                }
+            }
+
+            if (TryGetCacheMiss(token, out var cacheMiss))
+            {
+                return QueueCacheCursorResult<IQueueCacheCursor>.FromCacheMiss(cacheMiss);
+            }
+
+            var cursor = new SimpleQueueCacheCursor(this, streamId, logger);
+            if (InitializeCursor(cursor, token) is { } racedCacheMiss)
+            {
+                return QueueCacheCursorResult<IQueueCacheCursor>.FromCacheMiss(racedCacheMiss);
+            }
+
+            return QueueCacheCursorResult<IQueueCacheCursor>.FromCursor(cursor);
+        }
+
+        QueueCacheCursorResult<IQueueCacheCursor> IQueueCache.TryGetCacheCursorAtPosition(
+            StreamId streamId,
+            StreamSubscriptionStartPosition startPosition)
         {
             if (startPosition == StreamSubscriptionStartPosition.Latest)
             {
-                var latestCursor = GetCacheCursor(streamId, null);
-                latestCursor.MoveNext();
-                return latestCursor;
+                var result = ((IQueueCache)this).TryGetCacheCursor(streamId, null);
+                if (result.Kind != QueueCacheCursorResultKind.Success)
+                {
+                    return result;
+                }
+
+                var latestCursor = result.Cursor!;
+                var retainCursor = false;
+                try
+                {
+                    var moveResult = latestCursor.MoveNextWithResult();
+                    if (moveResult.CacheMiss is { } cacheMiss)
+                    {
+                        return QueueCacheCursorResult<IQueueCacheCursor>.FromCacheMiss(cacheMiss);
+                    }
+
+                    if (moveResult.Kind is not QueueCacheCursorMoveResultKind.Success and not QueueCacheCursorMoveResultKind.NoData)
+                    {
+                        throw new InvalidOperationException("The cursor move result is not initialized.");
+                    }
+
+                    retainCursor = true;
+                    return result;
+                }
+                finally
+                {
+                    if (!retainCursor)
+                    {
+                        latestCursor.Dispose();
+                    }
+                }
             }
 
             if (startPosition != StreamSubscriptionStartPosition.EarliestAvailable)
@@ -163,9 +239,53 @@ namespace Orleans.Providers.Streams.Common
                 throw new ArgumentOutOfRangeException(nameof(startPosition), startPosition, "The subscription start position is not defined.");
             }
 
+            if (GetType() != typeof(SimpleQueueCache))
+            {
+                return QueueCacheCursorResult<IQueueCacheCursor>.NotSupported;
+            }
+
             var cursor = new SimpleQueueCacheCursor(this, streamId, logger);
             InitializeCursorAtEarliestAvailable(cursor);
-            return cursor;
+            return QueueCacheCursorResult<IQueueCacheCursor>.FromCursor(cursor);
+        }
+
+        /// <inheritdoc />
+        [Obsolete("Use IQueueCache.TryGetCacheCursorAtPosition instead.")]
+        IQueueCacheCursor IQueueCache.GetCacheCursorAtPosition(
+            StreamId streamId,
+            StreamSubscriptionStartPosition startPosition)
+        {
+            if (startPosition == StreamSubscriptionStartPosition.Latest)
+            {
+#pragma warning disable CS0618 // Preserve the exact legacy exception and cursor behavior.
+                var cursor = GetCacheCursor(streamId, null);
+#pragma warning restore CS0618
+                var retainCursor = false;
+                try
+                {
+#pragma warning disable CS0618 // Preserve the exact legacy exception and cursor behavior.
+                    cursor.MoveNext();
+#pragma warning restore CS0618
+                    retainCursor = true;
+                    return cursor;
+                }
+                finally
+                {
+                    if (!retainCursor)
+                    {
+                        cursor.Dispose();
+                    }
+                }
+            }
+
+            if (startPosition != StreamSubscriptionStartPosition.EarliestAvailable)
+            {
+                throw new ArgumentOutOfRangeException(nameof(startPosition), startPosition, "The subscription start position is not defined.");
+            }
+
+            var earliestCursor = new SimpleQueueCacheCursor(this, streamId, logger);
+            InitializeCursorAtEarliestAvailable(earliestCursor);
+            return earliestCursor;
         }
 
         private void InitializeCursorAtEarliestAvailable(SimpleQueueCacheCursor cursor)
@@ -184,7 +304,7 @@ namespace Orleans.Providers.Streams.Common
             cursor.WaitingForEarliestAvailable = true;
         }
 
-        internal void InitializeCursor(SimpleQueueCacheCursor cursor, StreamSequenceToken? sequenceToken)
+        internal QueueCacheMissInfo? InitializeCursor(SimpleQueueCacheCursor cursor, StreamSequenceToken? sequenceToken)
         {
             LogDebugInitializeCursor(cursor, sequenceToken);
 
@@ -192,7 +312,7 @@ namespace Orleans.Providers.Streams.Common
             if (cachedMessages.Count == 0)
             {
                 UnsetCursor(cursor, sequenceToken);
-                return;
+                return null;
             }
 
             // if no token is provided, set token to item at end of cache
@@ -202,14 +322,14 @@ namespace Orleans.Providers.Streams.Common
             if (sequenceToken.Newer(cachedMessages.First!.Value.SequenceToken)) // cachedMessages.Count > 0 here (checked above), so First is guaranteed non-null.
             {
                 UnsetCursor(cursor, sequenceToken);
-                return;
+                return null;
             }
 
             LinkedListNode<SimpleQueueCacheItem> lastMessage = cachedMessages.Last!; // cachedMessages.Count > 0 here (checked above), so Last is guaranteed non-null.
             // Check to see if offset is too old to be in cache
             if (sequenceToken.Older(lastMessage.Value.SequenceToken))
             {
-                throw new QueueCacheMissException(sequenceToken, cachedMessages.Last!.Value.SequenceToken, cachedMessages.First.Value.SequenceToken);
+                return CreateCacheMissInfo(sequenceToken);
             }
 
             // Now the requested sequenceToken is set and is also within the limits of the cache.
@@ -232,6 +352,7 @@ namespace Orleans.Providers.Streams.Common
 
             // return cursor from start.
             SetCursor(cursor, node!); // Guaranteed non-null: node starts as First (non-null since Count > 0) and is only ever reassigned to node.Next after a non-null check.
+            return null;
         }
 
         internal void RefreshCursor(SimpleQueueCacheCursor cursor, StreamSequenceToken? sequenceToken)
@@ -247,9 +368,30 @@ namespace Orleans.Providers.Streams.Common
                     return;
                 }
 
-                InitializeCursor(cursor, cursor.SequenceToken ?? sequenceToken);
+                var token = cursor.SequenceToken ?? sequenceToken;
+                if (InitializeCursor(cursor, token) is { } cacheMiss)
+                {
+                    throw cacheMiss.ToException();
+                }
             }
         }
+
+        private bool TryGetCacheMiss(StreamSequenceToken? sequenceToken, out QueueCacheMissInfo cacheMiss)
+        {
+            if (sequenceToken is null
+                || cachedMessages.Count == 0
+                || !sequenceToken.Older(cachedMessages.Last!.Value.SequenceToken))
+            {
+                cacheMiss = default;
+                return false;
+            }
+
+            cacheMiss = CreateCacheMissInfo(sequenceToken);
+            return true;
+        }
+
+        private QueueCacheMissInfo CreateCacheMissInfo(StreamSequenceToken requestedToken)
+            => new(requestedToken, cachedMessages.Last!.Value.SequenceToken, cachedMessages.First!.Value.SequenceToken);
 
         /// <summary>
         /// Acquires the next message in the cache at the provided cursor
