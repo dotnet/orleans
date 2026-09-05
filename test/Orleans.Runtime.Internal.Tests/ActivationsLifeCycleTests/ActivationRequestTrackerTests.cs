@@ -17,7 +17,7 @@ public sealed class ActivationRequestTrackerTests
         var tracker = LeaseTracker(activation);
         var message = CreateMessage(1);
 
-        lock (activation)
+        lock (GetActivationLock(activation))
         {
             tracker.AddWaiting(message);
             UpdateRequestStatus(activation, tracker);
@@ -28,7 +28,7 @@ public sealed class ActivationRequestTrackerTests
         Assert.False(activation.IsCurrentlyExecuting);
         Assert.False(activation.IsInactive);
 
-        lock (activation)
+        lock (GetActivationLock(activation))
         {
             tracker.RemoveWaitingAt(0);
             tracker.AddRunning(message, CoarseStopwatch.StartNew());
@@ -40,7 +40,7 @@ public sealed class ActivationRequestTrackerTests
         Assert.True(activation.IsCurrentlyExecuting);
         Assert.False(activation.IsInactive);
 
-        lock (activation)
+        lock (GetActivationLock(activation))
         {
             Assert.True(tracker.RemoveRunning(message));
             ReturnRequestTrackerIfEmpty(activation);
@@ -62,7 +62,7 @@ public sealed class ActivationRequestTrackerTests
             var activation = CreateActivation();
             var tracker = LeaseTracker(activation);
             var message = CreateMessage(i);
-            lock (activation)
+            lock (GetActivationLock(activation))
             {
                 tracker.AddWaiting(message);
                 tracker.RemoveWaitingAt(0);
@@ -76,7 +76,7 @@ public sealed class ActivationRequestTrackerTests
             var cancellation = Task.Run(() =>
             {
                 SignalAndWait(start, cancellationToken);
-                lock (activation)
+                lock (GetActivationLock(activation))
                 {
                     GetRequestTracker(activation)?.TryFindRunningRequest(message.SendingGrain, message.Id, out cancellationTarget);
                 }
@@ -85,7 +85,7 @@ public sealed class ActivationRequestTrackerTests
             var completion = Task.Run(() =>
             {
                 SignalAndWait(start, cancellationToken);
-                lock (activation)
+                lock (GetActivationLock(activation))
                 {
                     Assert.True(tracker.RemoveRunning(message));
                     ReturnRequestTrackerIfEmpty(activation);
@@ -109,7 +109,7 @@ public sealed class ActivationRequestTrackerTests
         var first = CreateMessage(1);
         var second = CreateMessage(2);
 
-        lock (activation)
+        lock (GetActivationLock(activation))
         {
             tracker.AddWaiting(first);
             tracker.AddWaiting(second);
@@ -118,7 +118,7 @@ public sealed class ActivationRequestTrackerTests
 
         Assert.Equal(2, activation.GetRequestCount());
 
-        lock (activation)
+        lock (GetActivationLock(activation))
         {
             tracker.RemoveWaitingAt(0);
             tracker.AddRunning(first, CoarseStopwatch.StartNew());
@@ -129,7 +129,7 @@ public sealed class ActivationRequestTrackerTests
         Assert.Equal(1, activation.WaitingCount);
         Assert.True(activation.IsCurrentlyExecuting);
 
-        lock (activation)
+        lock (GetActivationLock(activation))
         {
             Assert.True(tracker.RemoveRunning(first));
             UpdateRequestStatus(activation, tracker);
@@ -138,7 +138,7 @@ public sealed class ActivationRequestTrackerTests
         Assert.Equal(1, activation.GetRequestCount());
         Assert.False(activation.IsCurrentlyExecuting);
 
-        lock (activation)
+        lock (GetActivationLock(activation))
         {
             tracker.RemoveWaitingAt(0);
             ReturnRequestTrackerIfEmpty(activation);
@@ -156,7 +156,7 @@ public sealed class ActivationRequestTrackerTests
         var running = CreateMessage(1);
         var queued = CreateMessage(2);
         var local = CreateMessage(3, isLocalOnly: true);
-        lock (activation)
+        lock (GetActivationLock(activation))
         {
             tracker.AddWaiting(running);
             tracker.RemoveWaitingAt(0);
@@ -174,7 +174,7 @@ public sealed class ActivationRequestTrackerTests
         Assert.Equal(1, activation.GetRequestCount());
         Assert.True(activation.IsCurrentlyExecuting);
 
-        lock (activation)
+        lock (GetActivationLock(activation))
         {
             Assert.True(tracker.RemoveRunning(running));
             ReturnRequestTrackerIfEmpty(activation);
@@ -238,11 +238,15 @@ public sealed class ActivationRequestTrackerTests
     public void RecurringActivation_RetainsTrackerAfterThirdCycleUntilDeactivatingRequestCompletes()
     {
         var activation = CreateActivation();
-        SetState(activation, ActivationState.Valid);
+        lock (GetActivationLock(activation))
+        {
+            SetState(activation, ActivationState.Valid);
+        }
+
         var message = CreateMessage(1);
 
         ActivationRequestTracker firstTracker;
-        lock (activation)
+        lock (GetActivationLock(activation))
         {
             firstTracker = GetRequestTracker(activation) = ActivationRequestTracker.Rent();
             firstTracker.AddWaiting(message);
@@ -256,7 +260,7 @@ public sealed class ActivationRequestTrackerTests
         Assert.True(activation.IsInactive);
 
         ActivationRequestTracker recurringTracker;
-        lock (activation)
+        lock (GetActivationLock(activation))
         {
             recurringTracker = GetRequestTracker(activation) = ActivationRequestTracker.Rent();
             recurringTracker.AddWaiting(message);
@@ -269,7 +273,7 @@ public sealed class ActivationRequestTrackerTests
         Assert.Null(GetRequestTracker(activation));
         Assert.True(activation.IsInactive);
 
-        lock (activation)
+        lock (GetActivationLock(activation))
         {
             recurringTracker = GetRequestTracker(activation) = ActivationRequestTracker.Rent();
             recurringTracker.AddWaiting(message);
@@ -283,7 +287,7 @@ public sealed class ActivationRequestTrackerTests
         Assert.True(recurringTracker.IsEmpty);
         Assert.True(activation.IsInactive);
 
-        lock (activation)
+        lock (GetActivationLock(activation))
         {
             recurringTracker.AddWaiting(message);
             UpdateRequestStatus(activation, recurringTracker);
@@ -296,7 +300,7 @@ public sealed class ActivationRequestTrackerTests
         }
 
         Assert.Same(recurringTracker, GetRequestTracker(activation));
-        lock (activation)
+        lock (GetActivationLock(activation))
         {
             Assert.True(recurringTracker.RemoveRunning(message));
             ReturnRequestTrackerIfEmpty(activation);
@@ -324,7 +328,7 @@ public sealed class ActivationRequestTrackerTests
         async Task RunProducer(int index)
         {
             await start.Task;
-            lock (activation)
+            lock (GetActivationLock(activation))
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var tracker = GetRequestTracker(activation) ??= ActivationRequestTracker.Rent();
@@ -339,7 +343,7 @@ public sealed class ActivationRequestTrackerTests
         Assert.Equal(ProducerCount, tracker.WaitingCount);
         Assert.True(messages.ToHashSet().SetEquals(tracker.WaitingRequests!.Select(entry => entry.Message)));
 
-        lock (activation)
+        lock (GetActivationLock(activation))
         {
             foreach (var message in messages)
             {
@@ -368,7 +372,7 @@ public sealed class ActivationRequestTrackerTests
             var activationIndex = random.Next(ActivationCount);
             var activation = activations[activationIndex];
             var model = models[activationIndex];
-            lock (activation)
+            lock (GetActivationLock(activation))
             {
                 var tracker = GetRequestTracker(activation);
                 switch (random.Next(5))
@@ -433,7 +437,7 @@ public sealed class ActivationRequestTrackerTests
         {
             var activation = activations[i];
             var model = models[i];
-            lock (activation)
+            lock (GetActivationLock(activation))
             {
                 var tracker = GetRequestTracker(activation);
                 if (tracker is null)
@@ -519,7 +523,7 @@ public sealed class ActivationRequestTrackerTests
             {
                 for (var i = 0; i < Iterations; i++)
                 {
-                    lock (activation)
+                    lock (GetActivationLock(activation))
                     {
                         tracker.AddWaiting(message);
                         UpdateRequestStatus(activation, tracker);
@@ -528,7 +532,7 @@ public sealed class ActivationRequestTrackerTests
                     SignalAndWait(phase, cancellation.Token);
                     SignalAndWait(phase, cancellation.Token);
 
-                    lock (activation)
+                    lock (GetActivationLock(activation))
                     {
                         tracker.RemoveWaitingAt(0);
                         tracker.AddRunning(message, CoarseStopwatch.StartNew());
@@ -538,7 +542,7 @@ public sealed class ActivationRequestTrackerTests
                     SignalAndWait(phase, cancellation.Token);
                     SignalAndWait(phase, cancellation.Token);
 
-                    lock (activation)
+                    lock (GetActivationLock(activation))
                     {
                         Assert.True(tracker.RemoveRunning(message));
                         UpdateRequestStatus(activation, tracker);
@@ -557,7 +561,7 @@ public sealed class ActivationRequestTrackerTests
 
         await Task.WhenAll([.. readers, writer]);
 
-        lock (activation)
+        lock (GetActivationLock(activation))
         {
             ReturnRequestTrackerIfEmpty(activation);
         }
@@ -566,11 +570,15 @@ public sealed class ActivationRequestTrackerTests
     }
 
     private static ActivationData CreateActivation()
-        => (ActivationData)RuntimeHelpers.GetUninitializedObject(typeof(ActivationData));
+    {
+        var activation = (ActivationData)RuntimeHelpers.GetUninitializedObject(typeof(ActivationData));
+        GetActivationLock(activation) = new();
+        return activation;
+    }
 
     private static ActivationRequestTracker LeaseTracker(ActivationData activation)
     {
-        lock (activation)
+        lock (GetActivationLock(activation))
         {
             var tracker = new ActivationRequestTracker();
             tracker.OnRent();
@@ -607,7 +615,7 @@ public sealed class ActivationRequestTrackerTests
         var callback = new object();
         var message = CreateMessage(1);
         message.BodyObject = callback;
-        lock (activation)
+        lock (GetActivationLock(activation))
         {
             var tracker = GetRequestTracker(activation) = ActivationRequestTracker.Rent();
             tracker.AddWaiting(message);
@@ -637,6 +645,14 @@ public sealed class ActivationRequestTrackerTests
 
     [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "_requestTracker")]
     private static extern ref ActivationRequestTracker? GetRequestTracker(ActivationData activation);
+
+#if NET10_0_OR_GREATER
+    [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "_lock")]
+    private static extern ref Lock GetActivationLock(ActivationData activation);
+#else
+    [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "_lock")]
+    private static extern ref object GetActivationLock(ActivationData activation);
+#endif
 
     [UnsafeAccessor(UnsafeAccessorKind.Method, Name = "ReturnRequestTrackerIfEmpty")]
     private static extern void ReturnRequestTrackerIfEmpty(ActivationData activation);
