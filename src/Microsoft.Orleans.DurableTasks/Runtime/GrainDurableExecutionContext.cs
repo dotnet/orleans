@@ -12,6 +12,7 @@ internal sealed class GrainDurableExecutionContext : DurableExecutionContext
 {
     private readonly IDurableTaskGrainRuntime _runtime;
     private readonly TaskScheduler _scheduler;
+    private readonly DateTimeOffset _utcNow;
     private readonly CancellationToken _shutdownToken;
     private readonly CancellationTokenSource _executionAbortSource;
     private HashSet<string>? _childNames;
@@ -25,8 +26,9 @@ internal sealed class GrainDurableExecutionContext : DurableExecutionContext
         TaskId taskId,
         IDurableTaskGrainRuntime runtime,
         TaskScheduler scheduler,
-        CancellationToken shutdownToken)
-        : this(taskId, runtime, scheduler, shutdownToken, new CancellationTokenSource())
+        CancellationToken shutdownToken,
+        DateTimeOffset? utcNow = null)
+        : this(taskId, runtime, scheduler, shutdownToken, utcNow ?? runtime.UtcNow, new CancellationTokenSource())
     {
     }
 
@@ -35,16 +37,18 @@ internal sealed class GrainDurableExecutionContext : DurableExecutionContext
         IDurableTaskGrainRuntime runtime,
         TaskScheduler scheduler,
         CancellationToken shutdownToken,
+        DateTimeOffset utcNow,
         CancellationTokenSource executionAbortSource)
         : base(taskId, executionAbortSource.Token)
     {
         _runtime = runtime;
         _scheduler = scheduler;
+        _utcNow = utcNow;
         _shutdownToken = shutdownToken;
         _executionAbortSource = executionAbortSource;
     }
 
-    public override DateTimeOffset UtcNow => _runtime.UtcNow;
+    public override DateTimeOffset UtcNow => _utcNow;
 
     protected internal override ValueTask<IScheduledTaskHandle> ScheduleChildTaskAsync(
         TaskId taskId,
