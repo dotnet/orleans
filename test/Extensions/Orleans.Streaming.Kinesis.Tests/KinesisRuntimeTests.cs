@@ -165,6 +165,25 @@ public sealed class KinesisRuntimeTests
     }
 
     [Fact]
+    public async Task ReceiverAndCacheCreationRemainUnavailableDuringAdapterInitialization()
+    {
+        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        using var factory = new BlockingKinesisAdapterFactory(
+            services.GetRequiredService<Serializer<KinesisBatchContainer.Body>>(),
+            Substitute.For<IStreamQueueCheckpointerFactory>());
+        var initialization = factory.CreateAdapter(TestContext.Current.CancellationToken);
+        await factory.PartitionDiscoveryStarted.WaitAsync(TestContext.Current.CancellationToken);
+        var queueId = QueueId.GetQueueId("queue", 0, 0);
+
+        Assert.Throws<InvalidOperationException>(() => factory.CreateReceiver(queueId));
+        Assert.Throws<InvalidOperationException>(() => factory.CreateQueueCache(queueId));
+
+        factory.CompletePartitionDiscovery();
+        Assert.Same(factory, await initialization);
+        Assert.NotNull(factory.GetStreamQueueMapper());
+    }
+
+    [Fact]
     public async Task PooledReceiver_ReadsAndDisposesLifecycleCancellationOnShutdown()
     {
         var client = Substitute.For<IAmazonKinesis>();
@@ -217,7 +236,9 @@ public sealed class KinesisRuntimeTests
         Assert.Throws<ObjectDisposedException>(() => _ = receiver.LifecycleCancellationToken);
     }
 
-    private sealed class BlockingKinesisAdapterFactory(Serializer<KinesisBatchContainer.Body> serializer)
+    private sealed class BlockingKinesisAdapterFactory(
+        Serializer<KinesisBatchContainer.Body> serializer,
+        IStreamQueueCheckpointerFactory? checkpointerFactory = null)
         : KinesisAdapterFactory(
             "Kinesis",
             new KinesisStreamOptions
@@ -229,20 +250,25 @@ public sealed class KinesisRuntimeTests
             },
             new SimpleQueueCacheOptions(),
             serializer,
-            checkpointerFactory: null,
+            checkpointerFactory,
             NullLoggerFactory.Instance)
     {
         private readonly TaskCompletionSource _partitionDiscovery =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _partitionDiscoveryStarted =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
         private int _partitionDiscoveryCount;
 
         public int PartitionDiscoveryCount => Volatile.Read(ref _partitionDiscoveryCount);
+
+        public Task PartitionDiscoveryStarted => _partitionDiscoveryStarted.Task;
 
         public void CompletePartitionDiscovery() => _partitionDiscovery.SetResult();
 
         internal override async Task<string[]> GetPartitionIdsAsync(CancellationToken cancellationToken)
         {
             Interlocked.Increment(ref _partitionDiscoveryCount);
+            _partitionDiscoveryStarted.TrySetResult();
             await _partitionDiscovery.Task.WaitAsync(cancellationToken);
             return ["shard-1"];
         }
