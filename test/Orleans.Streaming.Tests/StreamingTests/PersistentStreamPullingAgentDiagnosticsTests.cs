@@ -49,28 +49,6 @@ public partial class PersistentStreamPullingAgentTests
                 {
                     outcome.TrySetResult(registration);
                 }
-
-                private sealed class UnavailableConsumer(ClientNotAvailableException exception) : IStreamConsumerExtension
-                {
-                    public Task<StreamHandshakeToken?> DeliverImmutable(GuidId subscriptionId, QualifiedStreamId streamId, object item,
-                        StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken, CancellationToken cancellationToken)
-                        => throw new NotSupportedException();
-
-                    public Task<StreamHandshakeToken?> DeliverMutable(GuidId subscriptionId, QualifiedStreamId streamId, object item,
-                        StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken, CancellationToken cancellationToken)
-                        => throw new NotSupportedException();
-
-                    public Task<StreamHandshakeToken?> DeliverBatch(GuidId subscriptionId, QualifiedStreamId streamId, IBatchContainer item,
-                        StreamHandshakeToken? handshakeToken, CancellationToken cancellationToken)
-                        => Task.FromException<StreamHandshakeToken?>(exception);
-
-                    public Task CompleteStream(GuidId subscriptionId, CancellationToken cancellationToken) => Task.CompletedTask;
-
-                    public Task ErrorInStream(GuidId subscriptionId, Exception error, CancellationToken cancellationToken) => Task.CompletedTask;
-
-                    public Task<StreamHandshakeToken?> GetSequenceToken(GuidId subscriptionId, CancellationToken cancellationToken)
-                        => Task.FromResult<StreamHandshakeToken?>(null);
-                }
             }
         });
 
@@ -111,5 +89,27 @@ public partial class PersistentStreamPullingAgentTests
             unregister.TrySetResult();
             await accessor.Shutdown();
         }
+    }
+
+    private sealed class UnavailableConsumer(ClientNotAvailableException exception) : IStreamConsumerExtension
+    {
+        public Task<StreamHandshakeToken?> DeliverImmutable(GuidId subscriptionId, QualifiedStreamId streamId, object item,
+            StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken, CancellationToken cancellationToken)
+            => throw new NotSupportedException();
+
+        public Task<StreamHandshakeToken?> DeliverMutable(GuidId subscriptionId, QualifiedStreamId streamId, object item,
+            StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken, CancellationToken cancellationToken)
+            => throw new NotSupportedException();
+
+        public Task<StreamHandshakeToken?> DeliverBatch(GuidId subscriptionId, QualifiedStreamId streamId, IBatchContainer item,
+            StreamHandshakeToken? handshakeToken, CancellationToken cancellationToken)
+            => Task.FromException<StreamHandshakeToken?>(exception);
+
+        public Task CompleteStream(GuidId subscriptionId, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task ErrorInStream(GuidId subscriptionId, Exception error, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task<StreamHandshakeToken?> GetSequenceToken(GuidId subscriptionId, CancellationToken cancellationToken)
+            => Task.FromResult<StreamHandshakeToken?>(null);
     }
 }

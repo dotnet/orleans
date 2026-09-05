@@ -439,10 +439,12 @@ public sealed class KinesisPooledRuntimeTests
         fixture.Time.Advance(TimeSpan.FromMinutes(1));
         using var readCancellation = CancellationTokenSource.CreateLinkedTokenSource(TestCancellation);
         var read = receiver.GetQueueMessagesAsync(1, readCancellation.Token);
-        Assert.Equal(readCancellation.Token, await started.Task.WaitAsync(TestCancellation));
+        var discoveryCancellation = await started.Task.WaitAsync(TestCancellation);
+        Assert.True(discoveryCancellation.CanBeCanceled);
 
         // The pulling agent owns read cancellation and settles reads before receiver shutdown.
         readCancellation.Cancel();
+        Assert.True(discoveryCancellation.IsCancellationRequested);
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => read);
         await receiver.Shutdown(TimeSpan.FromSeconds(5));
 
@@ -598,6 +600,7 @@ public sealed class KinesisPooledRuntimeTests
             Assert.Equal("partition-key", first.PartitionKey);
             Assert.Equal(fixture.Time.GetUtcNow().UtcDateTime, first.ApproximateArrivalTimestamp);
             var body = fixture.Serializer.Deserialize(records[0].RawPayload);
+            Assert.NotNull(body);
             Assert.Equal(fixture.StreamId, body.StreamId);
             Assert.Equal(new object[] { 10, "eleven" }, body.Events);
             Assert.Equal("trace-42", body.RequestContext!["trace-id"]);

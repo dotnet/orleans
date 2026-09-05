@@ -244,7 +244,7 @@ public partial class PersistentStreamPullingAgentTests
     }
 
     private sealed class RecoveryConsumer(
-        StreamHandshakeToken startToken,
+        StreamHandshakeToken? startToken,
         Func<IBatchContainer, Task<StreamHandshakeToken?>> deliverBatch) : IStreamConsumerExtension
     {
         public List<Exception> Errors { get; } = [];
