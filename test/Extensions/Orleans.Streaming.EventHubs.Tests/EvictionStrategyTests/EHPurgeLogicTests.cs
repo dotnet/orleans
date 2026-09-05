@@ -161,43 +161,34 @@ namespace ServiceBus.Tests.EvictionStrategyTests
 
             //perform purge
 
-            //after purge, inUseBuffers should be purged and return to the pool, except for the current buffer
+            // After an empty-cache purge, every payload buffer returns to the pool.
             var expectedPurgedBuffers = new List<FixedSizeBuffer>();
             this.evictionStrategyList.ForEach(strategy =>
             {
-                var purgedBufferList = strategy.InUseBuffers.ToArray<FixedSizeBuffer>();
-                //last one in purgedBufferList should be current buffer, which shouldn't be purged
-                for (int i = 0; i < purgedBufferList.Count() - 1; i++)
-                    expectedPurgedBuffers.Add(purgedBufferList[i]);
+                expectedPurgedBuffers.AddRange(strategy.InUseBuffers);
             });
 
             IList<IBatchContainer>? ignore;
             this.receiver1.TryPurgeFromCache(out ignore);
             this.receiver2.TryPurgeFromCache(out ignore);
 
-            //Each cache should have all buffers purged, except for current buffer
-            this.evictionStrategyList.ForEach(strategy => Assert.Single(strategy.InUseBuffers));
-            var oldBuffersInCaches = new List<FixedSizeBuffer>();
-            this.evictionStrategyList.ForEach(strategy =>
-            {
-                foreach (var inUseBuffer in strategy.InUseBuffers)
-                    oldBuffersInCaches.Add(inUseBuffer);
-            });
+            this.evictionStrategyList.ForEach(strategy => Assert.Empty(strategy.InUseBuffers));
+
             //add items into cache again
             itemAddToCache = 100;
+            tasks.Clear();
             foreach (var cache in this.cacheList)
                 tasks.Add(AddDataIntoCache(cache, itemAddToCache, TestContext.Current.CancellationToken));
             await Task.WhenAll(tasks);
-            //block pool should have purged buffers returned by now, and used those to allocate buffer for new item
+
+            // The next fill reacquires the released buffers.
             var newBufferAllocated = new List<FixedSizeBuffer>();
             this.evictionStrategyList.ForEach(strategy =>
             {
                 foreach (var inUseBuffer in strategy.InUseBuffers)
                     newBufferAllocated.Add(inUseBuffer);
             });
-            //remove old buffer in cache, to get newly allocated buffers after purge
-            newBufferAllocated.RemoveAll(buffer => oldBuffersInCaches.Contains(buffer));
-            //purged buffer should return to the pool after purge, and used to allocate new buffer
+
             expectedPurgedBuffers.ForEach(buffer => Assert.Contains(buffer, newBufferAllocated));
         }
 

@@ -243,10 +243,10 @@ namespace Orleans.Streaming.EventHubs
         {
             purgedItems = null;
 
-            //if not under pressure, signal the cache to do a time based purge
-            //if under pressure, which means consuming speed is less than producing speed, then shouldn't purge, and don't read more message into the cache
-            if (!this.IsUnderPressure())
+            if (!this.IsUnderPressure() || this.cache is EventHubQueueCache { IsUnderMemoryPressure: true })
+            {
                 this.cache!.SignalPurge();
+            }
 
             return false;
         }
@@ -264,6 +264,14 @@ namespace Orleans.Streaming.EventHubs
         public bool IsUnderPressure()
         {
             return this.GetMaxAddCount() <= 0;
+        }
+
+        public void UpdatePurgeProtection(bool hasActiveSubscriptions)
+        {
+            if (this.cache is EventHubQueueCache eventHubQueueCache)
+            {
+                eventHubQueueCache.UpdatePurgeProtection(hasActiveSubscriptions);
+            }
         }
 
         public Task MessagesDeliveredAsync(IList<IBatchContainer> messages)

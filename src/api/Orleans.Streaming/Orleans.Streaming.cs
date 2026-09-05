@@ -506,7 +506,11 @@ namespace Orleans.Providers.Streams.Common
 
     public partial class CachedMessageBlock : PooledResource<CachedMessageBlock>
     {
+        public CachedMessageBlock(int initialBlockSize, int maxBlockSize) { }
+
         public CachedMessageBlock(int blockSize = 16384) { }
+
+        public int AllocatedSizeInBytes { get { throw null; } }
 
         public bool HasCapacity { get { throw null; } }
 
@@ -559,7 +563,7 @@ namespace Orleans.Providers.Streams.Common
         public string BlockPoolId { get { throw null; } set { } }
     }
 
-    public partial class ChronologicalEvictionStrategy : IEvictionStrategy
+    public partial class ChronologicalEvictionStrategy : IEvictionStrategy, System.IDisposable
     {
         protected readonly System.Collections.Generic.Queue<FixedSizeBuffer> inUseBuffers;
         public ChronologicalEvictionStrategy(Microsoft.Extensions.Logging.ILogger logger, TimePurgePredicate timePurage, ICacheMonitor? cacheMonitor, System.TimeSpan? monitorWriteInterval) { }
@@ -567,6 +571,8 @@ namespace Orleans.Providers.Streams.Common
         public System.Action<CachedMessage?, CachedMessage?>? OnPurged { get { throw null; } set { } }
 
         public IPurgeObservable PurgeObservable { set { } }
+
+        public void Dispose() { }
 
         public void OnBlockAllocated(FixedSizeBuffer newBlock) { }
 
@@ -782,6 +788,8 @@ namespace Orleans.Providers.Streams.Common
     {
         public ObjectPool(System.Func<T> factoryFunc, IObjectPoolMonitor? monitor = null, System.TimeSpan? monitorWriteInterval = null) { }
 
+        public ObjectPool(System.Func<T> factoryFunc, int maxRetainedObjects, IObjectPoolMonitor? monitor = null, System.TimeSpan? monitorWriteInterval = null) { }
+
         public virtual T Allocate() { throw null; }
 
         public virtual void Free(T resource) { }
@@ -822,9 +830,13 @@ namespace Orleans.Providers.Streams.Common
         AdapterFactoryCommandEndRange = 29999
     }
 
-    public partial class PooledQueueCache : IPurgeObservable
+    public partial class PooledQueueCache : IPurgeObservable, System.IDisposable
     {
+        public PooledQueueCache(ICacheDataAdapter cacheDataAdapter, Microsoft.Extensions.Logging.ILogger logger, ICacheMonitor? cacheMonitor, System.TimeSpan? cacheMonitorWriteInterval, System.TimeSpan? purgeMetadataInterval, int initialMessageBlockSize, int maxMessageBlockSize, int maxRetainedMessageBlocks) { }
+
         public PooledQueueCache(ICacheDataAdapter cacheDataAdapter, Microsoft.Extensions.Logging.ILogger logger, ICacheMonitor? cacheMonitor, System.TimeSpan? cacheMonitorWriteInterval, System.TimeSpan? purgeMetadataInterval = null) { }
+
+        public long AllocatedSizeInBytes { get { throw null; } }
 
         public bool IsEmpty { get { throw null; } }
 
@@ -835,6 +847,8 @@ namespace Orleans.Providers.Streams.Common
         public CachedMessage? Oldest { get { throw null; } }
 
         public void Add(System.Collections.Generic.List<CachedMessage> messages, System.DateTime dequeueTime) { }
+
+        public void Dispose() { }
 
         public object GetCursor(Runtime.StreamId streamId, Orleans.Streams.StreamSequenceToken? sequenceToken) { throw null; }
 
@@ -1676,6 +1690,7 @@ namespace Orleans.Streams
         bool IsUnderPressure();
         bool TryPurgeFromCache(out System.Collections.Generic.IList<IBatchContainer> purgedItems);
         void UpdateDeliveryProgress(StreamSequenceToken? earliestSubscriptionToken, System.DateTime utcNow);
+        void UpdatePurgeProtection(bool hasActiveSubscriptions);
     }
 
     public partial interface IQueueCacheCursor : System.IDisposable

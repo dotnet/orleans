@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Reflection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
@@ -431,6 +432,106 @@ namespace UnitTests.OrleansRuntime.Streams
                 PurgeObservable = cache,
             };
             return (cache, new CachedMessageConverter(bufferPool, evictionStrategy));
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public void AdaptiveCacheReleasesPartialBlockWhenDrained()
+        {
+            var dataAdapter = new TestCacheDataAdapter();
+            var cache = new PooledQueueCache(dataAdapter, NullLogger.Instance, null, null, null, 2, 8, 1);
+            var streamId = StreamId.Create("test", "stream");
+            cache.Add(
+                [
+                    new CachedMessage
+                    {
+                        StreamId = streamId,
+                        SequenceNumber = 1,
+                        EnqueueTimeUtc = DateTime.UtcNow,
+                        DequeueTimeUtc = DateTime.UtcNow,
+                    }
+                ],
+                DateTime.UtcNow);
+
+            Assert.True(cache.AllocatedSizeInBytes > 0);
+            cache.RemoveOldestMessage();
+
+            Assert.True(cache.IsEmpty);
+            Assert.Equal(0, cache.AllocatedSizeInBytes);
+            var cursor = cache.GetCursor(streamId, null);
+            Assert.False(cache.TryGetNextMessage(cursor, out _));
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public void RemoveOldestMessageDetachesBlockBeforeConcurrentPoolReuse()
+        {
+            var cache = new PooledQueueCache(new TestCacheDataAdapter(), NullLogger.Instance, null, null, null, 1, 1, 1);
+            var now = DateTime.UtcNow;
+            cache.Add([new CachedMessage { StreamId = StreamId.Create("test", "stream"), DequeueTimeUtc = now }], now);
+            var messageBlocks = GetMessageBlocks(cache);
+            var block = Assert.Single(messageBlocks);
+            var reusePool = new ConcurrentReusePool();
+            block.Pool = reusePool;
+
+            cache.RemoveOldestMessage();
+
+            Assert.Empty(messageBlocks);
+            Assert.Same(block, Assert.Single(reusePool.ReusedBlocks));
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public void DisposeDetachesBlocksBeforeConcurrentPoolReuse()
+        {
+            var cache = new PooledQueueCache(new TestCacheDataAdapter(), NullLogger.Instance, null, null, null, 1, 1, 2);
+            var now = DateTime.UtcNow;
+            cache.Add(
+                [
+                    new CachedMessage { StreamId = StreamId.Create("test", "stream-1"), DequeueTimeUtc = now },
+                    new CachedMessage { StreamId = StreamId.Create("test", "stream-2"), DequeueTimeUtc = now },
+                ],
+                now);
+            var messageBlocks = GetMessageBlocks(cache);
+            var blocks = messageBlocks.ToArray();
+            var reusePool = new ConcurrentReusePool();
+            foreach (var block in blocks)
+            {
+                block.Pool = reusePool;
+            }
+
+            cache.Dispose();
+
+            Assert.Empty(messageBlocks);
+            Assert.Equal(blocks.Length, reusePool.ReusedBlocks.Count);
+            Assert.All(blocks, block => Assert.Contains(block, reusePool.ReusedBlocks));
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public void ActiveCursorReportsCacheMissWhenAdaptiveCacheIsDrained()
+        {
+            var bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(PooledBufferSize));
+            var dataAdapter = new TestCacheDataAdapter();
+            var cache = new PooledQueueCache(dataAdapter, NullLogger.Instance, null, null, null, 2, 8, 1);
+            var evictionStrategy = new ChronologicalEvictionStrategy(
+                NullLogger.Instance,
+                new TimePurgePredicate(TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(10)),
+                null,
+                null);
+            evictionStrategy.PurgeObservable = cache;
+            var converter = new CachedMessageConverter(bufferPool, evictionStrategy);
+            var streamId = StreamId.Create("test", "stream");
+            var now = DateTime.UtcNow;
+            cache.Add(
+                [
+                    converter.ToCachedMessage(new TestQueueMessage { StreamId = streamId, SequenceNumber = 1 }, now),
+                    converter.ToCachedMessage(new TestQueueMessage { StreamId = streamId, SequenceNumber = 2 }, now),
+                ],
+                now);
+            var cursor = cache.GetCursor(streamId, new EventSequenceTokenV2(1));
+            Assert.True(cache.TryGetNextMessage(cursor, out _));
+
+            cache.RemoveOldestMessage();
+            cache.RemoveOldestMessage();
+
+            Assert.Throws<QueueCacheMissException>(() => cache.TryGetNextMessage(cursor, out _));
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
@@ -933,6 +1034,24 @@ namespace UnitTests.OrleansRuntime.Streams
                 Assert.Equal((sequenceNumber - startOfCache) / 2, stream2EventCount);
             }
             return sequenceNumber;
+        }
+
+        private static LinkedList<CachedMessageBlock> GetMessageBlocks(PooledQueueCache cache)
+        {
+            var field = typeof(PooledQueueCache).GetField("messageBlocks", BindingFlags.Instance | BindingFlags.NonPublic);
+            return Assert.IsType<LinkedList<CachedMessageBlock>>(field?.GetValue(cache));
+        }
+
+        private sealed class ConcurrentReusePool : IObjectPool<CachedMessageBlock>
+        {
+            public LinkedList<CachedMessageBlock> ReusedBlocks { get; } = new();
+
+            public CachedMessageBlock Allocate() => throw new NotSupportedException();
+
+            public void Free(CachedMessageBlock resource)
+            {
+                Task.Run(() => ReusedBlocks.AddFirst(resource.Node)).GetAwaiter().GetResult();
+            }
         }
     }
 }

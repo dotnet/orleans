@@ -14,6 +14,10 @@ namespace Orleans.Streaming.EventHubs
     /// </summary>
     public partial class EventHubQueueCache : IEventHubQueueCache
     {
+        private const int InitialMessageBlockSize = 256;
+        private const int MaxMessageBlockSize = 16 * 1024;
+        private const int MaxRetainedMessageBlocks = 1;
+
         /// <summary>
         /// Gets the Event Hub partition cached by this instance.
         /// </summary>
@@ -34,8 +38,13 @@ namespace Orleans.Streaming.EventHubs
         private readonly IStreamQueueCheckpointer<string> checkpointer;
         private readonly ILogger logger;
         private readonly AggregatedCachePressureMonitor cachePressureMonitor;
-        private readonly ICacheMonitor cacheMonitor;
-        private FixedSizeBuffer currentBuffer = null!;
+        private readonly ICacheMonitor? cacheMonitor;
+        private FixedSizeBuffer? currentBuffer;
+        private readonly EventHubCacheMemoryController? memoryController;
+        private int preferredBufferSize = EventHubCacheBufferPool.MinBufferSize;
+        private bool hasActiveSubscriptions;
+
+        internal bool IsUnderMemoryPressure => memoryController?.IsUnderPressure == true;
 
         /// <summary>
         /// EventHub queue cache.
@@ -58,16 +67,54 @@ namespace Orleans.Streaming.EventHubs
             IEvictionStrategy evictionStrategy,
             IStreamQueueCheckpointer<string> checkpointer,
             ILogger logger,
-            ICacheMonitor cacheMonitor,
+            ICacheMonitor? cacheMonitor,
             TimeSpan? cacheMonitorWriteInterval,
             TimeSpan? metadataMinTimeInCache)
+            : this(
+                partition,
+                defaultMaxAddCount,
+                bufferPool,
+                dataAdapter,
+                evictionStrategy,
+                checkpointer,
+                logger,
+                cacheMonitor,
+                cacheMonitorWriteInterval,
+                metadataMinTimeInCache,
+                null)
+        {
+        }
+
+        internal EventHubQueueCache(
+            string partition,
+            int defaultMaxAddCount,
+            IObjectPool<FixedSizeBuffer> bufferPool,
+            IEventHubDataAdapter dataAdapter,
+            IEvictionStrategy evictionStrategy,
+            IStreamQueueCheckpointer<string> checkpointer,
+            ILogger logger,
+            ICacheMonitor? cacheMonitor,
+            TimeSpan? cacheMonitorWriteInterval,
+            TimeSpan? metadataMinTimeInCache,
+            EventHubCacheMemoryController? memoryController)
         {
             this.Partition = partition;
             this.defaultMaxAddCount = defaultMaxAddCount;
             this.bufferPool = bufferPool;
             this.dataAdapter = dataAdapter;
             this.checkpointer = checkpointer;
-            this.cache = new PooledQueueCache(dataAdapter, logger, cacheMonitor, cacheMonitorWriteInterval, metadataMinTimeInCache);
+            this.memoryController = memoryController;
+            this.cache = memoryController is null
+                ? new PooledQueueCache(dataAdapter, logger, cacheMonitor, cacheMonitorWriteInterval, metadataMinTimeInCache)
+                : new PooledQueueCache(
+                    dataAdapter,
+                    logger,
+                    cacheMonitor,
+                    cacheMonitorWriteInterval,
+                    metadataMinTimeInCache,
+                    InitialMessageBlockSize,
+                    MaxMessageBlockSize,
+                    MaxRetainedMessageBlocks);
             this.cacheMonitor = cacheMonitor;
             this.evictionStrategy = evictionStrategy;
             this.evictionStrategy.OnPurged = this.OnPurge;
@@ -79,7 +126,31 @@ namespace Orleans.Streaming.EventHubs
         /// <inheritdoc />
         public void SignalPurge()
         {
-            this.evictionStrategy.PerformPurge(DateTime.UtcNow);
+            var previousMetadataSize = cache.AllocatedSizeInBytes;
+            var nowUtc = DateTime.UtcNow;
+            if (!hasActiveSubscriptions
+                && memoryController?.IsUnderPressure == true
+                && evictionStrategy is IMemoryPressureEvictionStrategy memoryPressureEvictionStrategy)
+            {
+                memoryPressureEvictionStrategy.PerformMemoryPressurePurge(nowUtc);
+            }
+            else
+            {
+                if (this.cachePressureMonitor.IsUnderPressure(nowUtc))
+                {
+                    return;
+                }
+
+                this.evictionStrategy.PerformPurge(nowUtc);
+            }
+
+            UpdateMetadataMemory(previousMetadataSize);
+            if (cache.IsEmpty && this.evictionStrategy is ChronologicalEvictionStrategy)
+            {
+                currentBuffer = null;
+                preferredBufferSize = EventHubCacheBufferPool.MinBufferSize;
+            }
+
         }
 
         /// <summary>
@@ -99,6 +170,17 @@ namespace Orleans.Streaming.EventHubs
         public void Dispose()
         {
             this.evictionStrategy.OnPurged = null;
+            currentBuffer = null;
+            if (memoryController is not null)
+            {
+                memoryController.AdjustActiveMetadataMemory(-cache.AllocatedSizeInBytes);
+            }
+
+            cache.Dispose();
+            if (this.evictionStrategy is IDisposable disposableEvictionStrategy)
+            {
+                disposableEvictionStrategy.Dispose();
+            }
         }
 
         /// <summary>
@@ -107,7 +189,27 @@ namespace Orleans.Streaming.EventHubs
         /// <returns>The maximum number of items which can currently be added.</returns>
         public int GetMaxAddCount()
         {
-            return cachePressureMonitor.IsUnderPressure(DateTime.UtcNow) ? 0 : defaultMaxAddCount;
+            if (!hasActiveSubscriptions)
+            {
+                if (memoryController?.IsUnderPressure == true)
+                {
+                    SignalPurge();
+                }
+
+                return memoryController?.IsUnderPressure == true ? 0 : defaultMaxAddCount;
+            }
+
+            if (cachePressureMonitor.IsUnderPressure(DateTime.UtcNow))
+            {
+                return 0;
+            }
+
+            if (memoryController?.IsUnderPressure == true)
+            {
+                SignalPurge();
+            }
+
+            return memoryController?.IsUnderPressure == true ? 0 : defaultMaxAddCount;
         }
 
         /// <summary>
@@ -118,16 +220,91 @@ namespace Orleans.Streaming.EventHubs
         /// <returns>The stream positions of the cached messages.</returns>
         public List<StreamPosition> Add(List<EventData> messages, DateTime dequeueTimeUtc)
         {
-            List<StreamPosition> positions = new List<StreamPosition>();
-            List<CachedMessage> cachedMessages = new List<CachedMessage>();
-            foreach (EventData message in messages)
+            ArgumentNullException.ThrowIfNull(messages);
+
+            var positions = new List<StreamPosition>(messages.Count);
+            var cachedMessages = new List<CachedMessage>(messages.Count);
+            var startingBuffer = currentBuffer;
+            var startingBufferPosition = startingBuffer?.Position ?? 0;
+            var startingPreferredBufferSize = preferredBufferSize;
+            List<FixedSizeBuffer>? allocatedBuffers = null;
+            FixedSizeBuffer? batchBuffer = startingBuffer;
+            try
             {
-                StreamPosition position = this.dataAdapter.GetStreamPosition(this.Partition, message);
-                cachedMessages.Add(this.dataAdapter.FromQueueMessage(position, message, dequeueTimeUtc, this.GetSegment));
-                positions.Add(position);
+                foreach (EventData message in messages)
+                {
+                    StreamPosition position = this.dataAdapter.GetStreamPosition(this.Partition, message);
+                    cachedMessages.Add(this.dataAdapter.FromQueueMessage(position, message, dequeueTimeUtc, GetBatchSegment));
+                    positions.Add(position);
+                }
             }
+            catch
+            {
+                startingBuffer?.ResetTo(startingBufferPosition);
+                if (allocatedBuffers is not null)
+                {
+                    foreach (var buffer in allocatedBuffers)
+                    {
+                        buffer.Dispose();
+                    }
+                }
+
+                currentBuffer = startingBuffer;
+                preferredBufferSize = startingPreferredBufferSize;
+                throw;
+            }
+
+            var previousMetadataSize = cache.AllocatedSizeInBytes;
             cache.Add(cachedMessages, dequeueTimeUtc);
+            if (allocatedBuffers is not null)
+            {
+                foreach (var buffer in allocatedBuffers)
+                {
+                    evictionStrategy.OnBlockAllocated(buffer);
+                }
+            }
+
+            currentBuffer = batchBuffer;
+            UpdateMetadataMemory(previousMetadataSize);
             return positions;
+
+            ArraySegment<byte> GetBatchSegment(int size)
+            {
+                if (batchBuffer is not null && batchBuffer.TryGetSegment(size, out var segment))
+                {
+                    return segment;
+                }
+
+                FixedSizeBuffer buffer;
+                if (bufferPool is IEventHubCacheBufferPool eventHubBufferPool)
+                {
+                    if (size > EventHubCacheBufferPool.MaxBufferSize)
+                    {
+                        throw new ArgumentOutOfRangeException(nameof(size), $"Message size is too big. MessageSize: {size}");
+                    }
+
+                    buffer = eventHubBufferPool.Allocate(Math.Max(size, preferredBufferSize));
+                }
+                else
+                {
+                    buffer = bufferPool.Allocate();
+                }
+
+                if (!buffer.TryGetSegment(size, out segment))
+                {
+                    buffer.Dispose();
+                    throw new ArgumentOutOfRangeException(nameof(size), $"Message size is too big. MessageSize: {size}");
+                }
+
+                (allocatedBuffers ??= new()).Add(buffer);
+                batchBuffer = buffer;
+                if (bufferPool is IEventHubCacheBufferPool)
+                {
+                    preferredBufferSize = Math.Min(buffer.SizeInByte * 2, EventHubCacheBufferPool.MaxBufferSize);
+                }
+
+                return segment;
+            }
         }
 
         /// <summary>
@@ -150,6 +327,11 @@ namespace Orleans.Streaming.EventHubs
         public void Refresh(object cursor, StreamSequenceToken? sequenceToken)
         {
             cache.Refresh(cursor, sequenceToken);
+        }
+
+        internal void UpdatePurgeProtection(bool hasActiveSubscriptions)
+        {
+            this.hasActiveSubscriptions = hasActiveSubscriptions;
         }
 
         /// <summary>
@@ -220,28 +402,9 @@ namespace Orleans.Streaming.EventHubs
             return true;
         }
 
-        private ArraySegment<byte> GetSegment(int size)
+        private void UpdateMetadataMemory(long previousSize)
         {
-            // get segment from current block
-            ArraySegment<byte> segment;
-            if (currentBuffer == null || !currentBuffer.TryGetSegment(size, out segment))
-            {
-                // no block or block full, get new block and try again
-                var newBuffer = bufferPool.Allocate();
-                // if this fails with a clean block, then requested size is too big; return the
-                // unused block to the pool and fail. Registering it with the eviction strategy
-                // before confirming the segment fits would leak it, because a batch that never
-                // commits is never reclaimed by the purge-time logic.
-                if (!newBuffer.TryGetSegment(size, out segment))
-                {
-                    newBuffer.Dispose();
-                    throw new ArgumentOutOfRangeException(nameof(size), $"Message size is too big. MessageSize: {size}");
-                }
-                currentBuffer = newBuffer;
-                //call EvictionStrategy's OnBlockAllocated method
-                this.evictionStrategy.OnBlockAllocated(currentBuffer);
-            }
-            return segment;
+            memoryController?.AdjustActiveMetadataMemory(cache.AllocatedSizeInBytes - previousSize);
         }
 
         private readonly struct DateTimeLogRecord(DateTime ts)
@@ -258,5 +421,10 @@ namespace Orleans.Streaming.EventHubs
             DateTimeLogRecord newestEnqueueTimeUtc,
             DateTimeLogRecord oldestDequeueTimeUtc,
             DateTimeLogRecord newestDequeueTimeUtc);
+    }
+
+    internal interface IMemoryPressureEvictionStrategy
+    {
+        void PerformMemoryPressurePurge(DateTime nowUtc);
     }
 }

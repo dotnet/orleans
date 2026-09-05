@@ -13,18 +13,17 @@ namespace Orleans.Providers.Streams.Common
     /// The PooledQueueCache is a cache that is intended to serve as a message cache in an IQueueCache.
     /// It is capable of storing large numbers of messages (gigs worth of messages) for extended periods
     ///   of time (minutes to indefinite), while incurring a minimal performance hit due to garbage collection.
-    /// This pooled cache allocates memory and never releases it. It keeps freed resources available in pools 
-    ///   that remain in application use through the life of the service. This means these objects go to gen2,
-    ///   are compacted, and then stay there. This is relatively cheap, as the only cost they now incur is
-    ///   the cost of checking to see if they should be freed in each collection cycle. Since this cache uses
-    ///   small numbers of large objects with relatively simple object graphs, they are less costly to check
-    ///   then large numbers of smaller objects with more complex object graphs.
+    /// By default, this pooled cache retains freed resources for reuse through the life of the service. Its
+    /// adaptive constructor can instead bound retained cached-message blocks and return excess storage.
+    /// Long-lived pooled objects reach generation 2 and remain inexpensive to scan because the cache uses
+    /// small numbers of arrays with relatively simple object graphs.
     /// For performance reasons this cache is designed to more closely align with queue specific data.  This is,
     ///   in part, why, unlike the SimpleQueueCache, this cache does not implement IQueueCache.  It is intended
     ///   to be used in queue specific implementations of IQueueCache.
     /// </summary>
-    public class PooledQueueCache : IPurgeObservable
+    public class PooledQueueCache : IPurgeObservable, IDisposable
     {
+        private const int DefaultMessageBlockSize = 16 * 1024;
         // linked list of message bocks.  First is newest.
         private readonly LinkedList<CachedMessageBlock> messageBlocks;
         private readonly CachedMessagePool pool;
@@ -69,6 +68,11 @@ namespace Orleans.Providers.Streams.Common
         public int ItemCount { get; private set; }
 
         /// <summary>
+        /// Gets the number of bytes allocated by active cached-message blocks.
+        /// </summary>
+        public long AllocatedSizeInBytes { get; private set; }
+
+        /// <summary>
         /// Pooled queue cache is a cache of message that obtains resource from a pool
         /// </summary>
         /// <param name="cacheDataAdapter">The cache data adapter.</param>
@@ -82,11 +86,43 @@ namespace Orleans.Providers.Streams.Common
             ICacheMonitor? cacheMonitor,
             TimeSpan? cacheMonitorWriteInterval,
             TimeSpan? purgeMetadataInterval = null)
+            : this(
+                cacheDataAdapter,
+                logger,
+                cacheMonitor,
+                cacheMonitorWriteInterval,
+                purgeMetadataInterval,
+                DefaultMessageBlockSize,
+                DefaultMessageBlockSize,
+                int.MaxValue)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a pooled queue cache with adaptive cached-message blocks.
+        /// </summary>
+        /// <param name="cacheDataAdapter">The cache data adapter.</param>
+        /// <param name="logger">The logger.</param>
+        /// <param name="cacheMonitor">The cache monitor.</param>
+        /// <param name="cacheMonitorWriteInterval">The cache monitor write interval. Only triggered for active caches.</param>
+        /// <param name="purgeMetadataInterval">The interval after which to purge cache metadata.</param>
+        /// <param name="initialMessageBlockSize">The initial number of cached messages in a block.</param>
+        /// <param name="maxMessageBlockSize">The maximum number of cached messages in a block.</param>
+        /// <param name="maxRetainedMessageBlocks">The maximum number of available message blocks retained for reuse.</param>
+        public PooledQueueCache(
+            ICacheDataAdapter cacheDataAdapter,
+            ILogger logger,
+            ICacheMonitor? cacheMonitor,
+            TimeSpan? cacheMonitorWriteInterval,
+            TimeSpan? purgeMetadataInterval,
+            int initialMessageBlockSize,
+            int maxMessageBlockSize,
+            int maxRetainedMessageBlocks)
         {
             this.cacheDataAdapter = cacheDataAdapter ?? throw new ArgumentNullException(nameof(cacheDataAdapter));
             this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
             this.ItemCount = 0;
-            pool = new CachedMessagePool(cacheDataAdapter);
+            pool = new CachedMessagePool(cacheDataAdapter, initialMessageBlockSize, maxMessageBlockSize, maxRetainedMessageBlocks);
             messageBlocks = new LinkedList<CachedMessageBlock>();
             this.cacheMonitor = cacheMonitor;
             if (this.cacheMonitor != null && cacheMonitorWriteInterval.HasValue)
@@ -450,6 +486,11 @@ namespace Orleans.Providers.Streams.Common
                 }
             }
 
+            if (messageBlocks.Count == 0)
+            {
+                throw new QueueCacheMissException();
+            }
+
             // has this message been purged
             CachedMessage oldestMessage = messageBlocks.Last!.Value.OldestMessage; // Cursor is Set, so the cache is non-empty.
             if (cursor.State == CursorStates.Set
@@ -534,10 +575,11 @@ namespace Orleans.Providers.Streams.Common
         private void Add(CachedMessage message)
         {
             // allocate message from pool
-            CachedMessageBlock block = pool.AllocateMessage(message);
+            CachedMessageBlock block = pool.AllocateMessage(message, out var allocatedSizeDelta);
+            this.AllocatedSizeInBytes += allocatedSizeDelta;
 
             // If new block, add message block to linked list
-            if (block != messageBlocks.FirstOrDefault())
+            if (!ReferenceEquals(block, messageBlocks.First?.Value))
                 messageBlocks.AddFirst(block.Node);
             ItemCount++;
         }
@@ -555,9 +597,30 @@ namespace Orleans.Providers.Streams.Common
             // if block is currently empty, but all capacity has been exausted, remove
             if (lastCachedMessageBlock.IsEmpty && !lastCachedMessageBlock.HasCapacity)
             {
-                lastCachedMessageBlock.Dispose();
+                this.AllocatedSizeInBytes -= lastCachedMessageBlock.AllocatedSizeInBytes;
                 this.messageBlocks.RemoveLast();
+                lastCachedMessageBlock.Dispose();
             }
+            else if (lastCachedMessageBlock.IsEmpty)
+            {
+                this.AllocatedSizeInBytes -= lastCachedMessageBlock.AllocatedSizeInBytes;
+                messageBlocks.RemoveLast();
+                pool.ReleaseCurrentBlock(lastCachedMessageBlock);
+            }
+        }
+
+        /// <inheritdoc />
+        public void Dispose()
+        {
+            while (messageBlocks.Count > 0)
+            {
+                var block = messageBlocks.First!.Value;
+                messageBlocks.RemoveFirst();
+                block.Dispose();
+            }
+
+            ItemCount = 0;
+            AllocatedSizeInBytes = 0;
         }
 
         private enum CursorStates

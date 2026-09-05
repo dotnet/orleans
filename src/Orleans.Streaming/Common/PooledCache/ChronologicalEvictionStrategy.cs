@@ -7,7 +7,7 @@ namespace Orleans.Providers.Streams.Common
     /// <summary>
     /// Eviction strategy that evicts data based off of age.
     /// </summary>
-    public partial class ChronologicalEvictionStrategy : IEvictionStrategy
+    public partial class ChronologicalEvictionStrategy : IEvictionStrategy, IDisposable
     {
         private readonly ILogger logger;
         private readonly TimePurgePredicate timePurge;
@@ -19,6 +19,7 @@ namespace Orleans.Providers.Streams.Common
         protected readonly Queue<FixedSizeBuffer> inUseBuffers;
         private readonly ICacheMonitor? cacheMonitor;
         private readonly PeriodicAction? periodicMonitoring;
+        private IPurgeObservable? purgeObservable;
         private long cacheSizeInByte;
 
         /// <summary>
@@ -52,7 +53,11 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <inheritdoc />
-        public IPurgeObservable PurgeObservable { private get; set; } = null!; // Set once by the owning cache immediately after construction.
+        public IPurgeObservable PurgeObservable
+        {
+            private get => purgeObservable!; // Set by the owning cache before purge operations.
+            set => purgeObservable = value;
+        }
 
         /// <inheritdoc />
         public Action<CachedMessage?, CachedMessage?>? OnPurged { get; set; }
@@ -127,22 +132,61 @@ namespace Orleans.Providers.Streams.Common
             object? IdOfLastPurgedBufferId = lastMessagePurged?.Segment.Array;
             // IdOfLastBufferInCache will be null if cache is empty after purge
             object? IdOfLastBufferInCacheId = oldestMessageInCache?.Segment.Array;
-            //all buffers older than LastPurgedBuffer should be purged
-            while (this.inUseBuffers.Peek().Id != IdOfLastPurgedBufferId)
+            if (IdOfLastBufferInCacheId is null)
             {
-                var purgedBuffer = this.inUseBuffers.Dequeue();
-                memoryReleasedInByte += purgedBuffer.SizeInByte;
-                purgedBuffer.Dispose();
+                while (this.inUseBuffers.Count > 0)
+                {
+                    var purgedBuffer = this.inUseBuffers.Dequeue();
+                    memoryReleasedInByte += purgedBuffer.SizeInByte;
+                    purgedBuffer.Dispose();
+                }
             }
-            // if last purged message does not share buffer with remaining messages in cache and cache is not empty
-            //then last purged buffer should be purged too
-            if (IdOfLastBufferInCacheId != null && IdOfLastPurgedBufferId != IdOfLastBufferInCacheId)
+            else
             {
-                var purgedBuffer = this.inUseBuffers.Dequeue();
-                memoryReleasedInByte += purgedBuffer.SizeInByte;
-                purgedBuffer.Dispose();
+                // All buffers older than the last purged buffer can be returned.
+                while (this.inUseBuffers.Peek().Id != IdOfLastPurgedBufferId)
+                {
+                    var purgedBuffer = this.inUseBuffers.Dequeue();
+                    memoryReleasedInByte += purgedBuffer.SizeInByte;
+                    purgedBuffer.Dispose();
+                }
+
+                // If the last purged message does not share a buffer with the oldest remaining message,
+                // the last purged buffer can also be returned.
+                if (IdOfLastPurgedBufferId != IdOfLastBufferInCacheId)
+                {
+                    var purgedBuffer = this.inUseBuffers.Dequeue();
+                    memoryReleasedInByte += purgedBuffer.SizeInByte;
+                    purgedBuffer.Dispose();
+                }
             }
             //report metrics
+            if (memoryReleasedInByte > 0)
+            {
+                this.cacheSizeInByte -= memoryReleasedInByte;
+                this.cacheMonitor?.TrackMemoryReleased(memoryReleasedInByte);
+            }
+        }
+
+        /// <inheritdoc />
+        public void Dispose()
+        {
+            if (purgeObservable?.IsEmpty == true)
+            {
+                ReleaseBuffers();
+            }
+        }
+
+        private void ReleaseBuffers()
+        {
+            var memoryReleasedInByte = 0;
+            while (this.inUseBuffers.Count > 0)
+            {
+                var buffer = this.inUseBuffers.Dequeue();
+                memoryReleasedInByte += buffer.SizeInByte;
+                buffer.Dispose();
+            }
+
             if (memoryReleasedInByte > 0)
             {
                 this.cacheSizeInByte -= memoryReleasedInByte;
