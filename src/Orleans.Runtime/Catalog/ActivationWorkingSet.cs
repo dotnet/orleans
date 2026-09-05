@@ -243,8 +243,8 @@ internal sealed partial class ActivationWorkingSet : IActivationWorkingSet, ILif
 
         void VisitCore()
         {
-        // Enumeration can retain a member across removal and re-addition. CLOCK state is advisory, so visit the
-        // member's current state instead of adding a dictionary validation to every scan.
+            // Enumeration can retain a member across removal and re-addition. CLOCK state is advisory, so visit the
+            // member's current state instead of adding a dictionary validation to every scan.
             var status = member as IActivationWorkingSetMemberStatus;
             byte dictionaryState = 0;
             if ((status is null && !_members.TryGetValue(member, out dictionaryState))
