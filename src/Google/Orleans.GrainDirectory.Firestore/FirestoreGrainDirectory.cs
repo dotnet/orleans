@@ -85,6 +85,9 @@ public partial class FirestoreGrainDirectory : IGrainDirectory, ILifecyclePartic
     Task<GrainAddress?> IGrainDirectory.Register(GrainAddress address, CancellationToken cancellationToken) =>
         Register(address, previousAddress: null, cancellationToken: cancellationToken);
 
+    Task<GrainAddress?> IGrainDirectory.Register(GrainAddress address, GrainAddress? previousAddress) =>
+        Register(address, previousAddress, CancellationToken.None);
+
     Task<GrainAddress?> IGrainDirectory.Register(
         GrainAddress address,
         GrainAddress? previousAddress,
