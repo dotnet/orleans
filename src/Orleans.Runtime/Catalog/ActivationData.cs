@@ -30,7 +30,7 @@ internal sealed partial class ActivationData :
     IGrainContext,
     ICollectibleGrainContext,
     IGrainExtensionBinder,
-    IActivationWorkingSetMember,
+    IActivationWorkingSetMemberStatus,
     IGrainTimerRegistry,
     IGrainManagementExtension,
     IGrainCallCancellationExtension,
@@ -44,6 +44,11 @@ internal sealed partial class ActivationData :
 #else
     private readonly object _lock = new();
 #endif
+    // Activation lifecycle and working-set CLOCK state share one atomic status word.
+    private const int ActivationStateMask = 0b0000_0111;
+    private const int IsInWorkingSetMask = 0b0000_1000;
+    private const int IsIdleInWorkingSetMask = 0b0001_0000;
+    private const int WasRemovedByCollectionMask = 0b0010_0000;
     private readonly GrainTypeSharedContext _shared;
     private readonly IServiceScope _serviceScope;
     private readonly WorkItemGroup _workItemGroup;
@@ -53,7 +58,7 @@ internal sealed partial class ActivationData :
     private GrainLifecycle? _lifecycle;
     private Queue<object>? _pendingOperations;
     private Message? _blockingRequest;
-    private bool _isInWorkingSet = true;
+    private int _status = IsInWorkingSetMask;
     private CoarseStopwatch _busyDuration;
     private CoarseStopwatch _idleDuration;
     private GrainReference? _selfReference;
@@ -149,7 +154,7 @@ internal sealed partial class ActivationData :
     public object? GrainInstance { get; private set; }
     public GrainAddress Address { get; private set; }
     public GrainReference GrainReference => _selfReference ??= _shared.GrainReferenceActivator.CreateReference(GrainId, default);
-    public ActivationState State { get; private set; } = ActivationState.Creating;
+    public ActivationState State => (ActivationState)(Volatile.Read(ref _status) & ActivationStateMask);
     public PlacementStrategy PlacementStrategy => _shared.PlacementStrategy;
 
     public IServiceProvider ActivationServices => _serviceScope.ServiceProvider;
@@ -175,6 +180,24 @@ internal sealed partial class ActivationData :
     {
         ArgumentNullException.ThrowIfNull(registration);
         return Interlocked.CompareExchange(ref _collectionRegistration, registration, null) ?? registration;
+    }
+
+    private bool IsInWorkingSet
+    {
+        get => (Volatile.Read(ref _status) & IsInWorkingSetMask) != 0;
+        set => SetStatusFlag(IsInWorkingSetMask, value);
+    }
+
+    private bool IsIdleInWorkingSet
+    {
+        get => (Volatile.Read(ref _status) & IsIdleInWorkingSetMask) != 0;
+        set => SetStatusFlag(IsIdleInWorkingSetMask, value);
+    }
+
+    private bool WasRemovedByCollection
+    {
+        get => (Volatile.Read(ref _status) & WasRemovedByCollectionMask) != 0;
+        set => SetStatusFlag(WasRemovedByCollectionMask, value);
     }
 
     // Currently, the only supported multi-activation grain is one using the StatelessWorkerPlacement strategy.
@@ -464,7 +487,7 @@ internal sealed partial class ActivationData :
 #else
         Debug.Assert(Monitor.IsEntered(_lock));
 #endif
-        State = state;
+        SetStatus(ActivationStateMask, (int)state);
         if (state is ActivationState.Valid or ActivationState.Invalid)
         {
             var activationReady = _extras?.ActivationReady;
@@ -475,6 +498,20 @@ internal sealed partial class ActivationData :
 
             activationReady?.TrySetResult();
         }
+    }
+
+    private void SetStatusFlag(int mask, bool value) => SetStatus(mask, value ? mask : 0);
+
+    private void SetStatus(int mask, int value)
+    {
+        int current;
+        int updated;
+        do
+        {
+            current = Volatile.Read(ref _status);
+            updated = (current & ~mask) | value;
+        }
+        while (Interlocked.CompareExchange(ref _status, updated, current) != current);
     }
 
     /// <summary>
@@ -1086,10 +1123,33 @@ internal sealed partial class ActivationData :
         {
             var inactive = IsInactive && _idleDuration.ElapsedMilliseconds > IdlenessLowerBound;
 
-            // This instance will remain in the working set if it is either not pending removal or if it is currently active.
-            _isInWorkingSet = !wouldRemove || !inactive;
             return inactive;
         }
+    }
+
+    bool IActivationWorkingSetMemberStatus.IsInWorkingSet
+    {
+        get => IsInWorkingSet;
+        set
+        {
+            IsInWorkingSet = value;
+            if (value)
+            {
+                WasRemovedByCollection = false;
+            }
+        }
+    }
+
+    bool IActivationWorkingSetMemberStatus.IsIdle
+    {
+        get => IsIdleInWorkingSet;
+        set => IsIdleInWorkingSet = value;
+    }
+
+    bool IActivationWorkingSetMemberStatus.WasRemovedByCollection
+    {
+        get => WasRemovedByCollection;
+        set => WasRemovedByCollection = value;
     }
 
     private async Task RunMessageLoop()
@@ -1597,13 +1657,14 @@ internal sealed partial class ActivationData :
 
             // If the message is meant to keep the activation active, reset the idle timer and ensure the activation
             // is in the activation working set.
-            if (message.IsKeepAlive)
+            if (message.IsKeepAlive && State is ActivationState.Valid)
             {
                 _idleDuration = CoarseStopwatch.StartNew();
+                IsIdleInWorkingSet = false;
 
-                if (!_isInWorkingSet)
+                if (!IsInWorkingSet)
                 {
-                    _isInWorkingSet = true;
+                    IsInWorkingSet = true;
                     _shared.InternalRuntime.ActivationWorkingSet.OnActive(this);
                 }
             }
@@ -2149,7 +2210,7 @@ internal sealed partial class ActivationData :
                 deactivationMetrics = deactivationMetrics.Migration();
                 _shared.CatalogInstruments.ActivationShutdownViaMigration();
             }
-            else if (_isInWorkingSet)
+            else if (!WasRemovedByCollection)
             {
                 deactivationMetrics = deactivationMetrics.DeactivateOnIdle();
                 _shared.CatalogInstruments.ActivationShutdownViaDeactivateOnIdle();
