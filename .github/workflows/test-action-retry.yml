@@ -1,0 +1,104 @@
+name: Test action retry
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/actions/run-tests/**
+      - .github/actions/dotnet-test/**
+      - .github/workflows/test-action-retry.yml
+  push:
+    branches:
+      - main
+    paths:
+      - .github/actions/run-tests/**
+      - .github/actions/dotnet-test/**
+      - .github/workflows/test-action-retry.yml
+permissions:
+  contents: read
+jobs:
+  retry-contract:
+    name: Retry contract (${{ matrix.scenario }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - scenario: first attempt succeeds
+            retry: 'true'
+            failure-mode: none
+            outcome: success
+            attempts: 1
+            result-ids: retry-contract-attempt1
+            retention: 1
+          - scenario: second attempt succeeds
+            retry: 'true'
+            failure-mode: first
+            outcome: success
+            attempts: 2
+            result-ids: retry-contract-attempt1,retry-contract-attempt2
+            retention: 1
+          - scenario: both attempts fail
+            retry: 'true'
+            failure-mode: always
+            outcome: failure
+            attempts: 2
+            result-ids: retry-contract-attempt1,retry-contract-attempt2
+            retention: 14
+          - scenario: succeeds with retry disabled
+            retry: 'false'
+            failure-mode: none
+            outcome: success
+            attempts: 1
+            result-ids: retry-contract
+            retention: 1
+          - scenario: fails with retry disabled
+            retry: 'false'
+            failure-mode: always
+            outcome: failure
+            attempts: 1
+            result-ids: retry-contract
+            retention: 14
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - name: Replace test infrastructure with recording fixtures
+        shell: pwsh
+        run: |
+          foreach ($action in 'setup-test-environment', 'dotnet-test', 'archive-test-results') {
+            Copy-Item .github/actions/run-tests/test-fixture/action.yml ".github/actions/$action/action.yml"
+          }
+      - name: Run test partition
+        id: partition
+        continue-on-error: true
+        uses: ./.github/actions/run-tests
+        with:
+          artifact-name: retry-contract
+          framework: net10.0
+          provider: Cosmos
+          retry: ${{ matrix.retry }}
+        env:
+          TEST_RETRY_FAILURE_MODE: ${{ matrix.failure-mode }}
+      - name: Assert retry outcome and diagnostics
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          $expected = @{
+            Outcome = '${{ matrix.outcome }}'
+            Attempts = '${{ matrix.attempts }}'
+            ResultIds = '${{ matrix.result-ids }}'
+            Retention = '${{ matrix.retention }}'
+          }
+          $actual = @{
+            Outcome = '${{ steps.partition.outcome }}'
+            Attempts = $env:TEST_RETRY_ATTEMPTS
+            ResultIds = $env:TEST_RETRY_RESULT_IDS
+            Retention = $env:TEST_RETRY_RETENTION
+          }
+          foreach ($key in $expected.Keys) {
+            if ($actual[$key] -cne $expected[$key]) {
+              throw "$key expected '$($expected[$key])', actual '$($actual[$key])'."
+            }
+          }
+          Write-Output 'PASS ${{ matrix.scenario }}'

@@ -1,0 +1,50 @@
+name: Test retry fixture
+description: Record test attempts and artifact retention for the run-tests retry contract.
+
+inputs:
+  coverage:
+    description: Coverage selection forwarded by run-tests.
+  coverage-id:
+    description: Coverage report identifier forwarded by run-tests.
+  filter-query:
+    description: Test filter forwarded by run-tests.
+  framework:
+    description: Target framework forwarded by run-tests.
+  result-id:
+    description: Test result identifier for this attempt.
+  name:
+    description: Test result artifact name.
+  retention-days:
+    description: Test result artifact retention.
+
+runs:
+  using: composite
+  steps:
+  - shell: pwsh
+    run: |
+      $action = Split-Path '${{ github.action_path }}' -Leaf
+      switch ($action) {
+        'setup-test-environment' {
+          'TEST_RETRY_ATTEMPTS=0' >> $env:GITHUB_ENV
+          'TEST_RETRY_RESULT_IDS=' >> $env:GITHUB_ENV
+        }
+        'dotnet-test' {
+          $attempt = [int] $env:TEST_RETRY_ATTEMPTS + 1
+          "TEST_RETRY_ATTEMPTS=$attempt" >> $env:GITHUB_ENV
+          $resultIds = @($env:TEST_RETRY_RESULT_IDS, '${{ inputs.result-id }}') |
+            Where-Object { $_ }
+          "TEST_RETRY_RESULT_IDS=$($resultIds -join ',')" >> $env:GITHUB_ENV
+          Write-Output "Test attempt $attempt (${{ inputs.result-id }})"
+          if ($env:TEST_RETRY_FAILURE_MODE -eq 'always' -or
+              ($env:TEST_RETRY_FAILURE_MODE -eq 'first' -and $attempt -eq 1)) {
+            Write-Output 'Simulating a failed test partition.'
+            exit 1
+          }
+        }
+        'archive-test-results' {
+          'TEST_RETRY_RETENTION=${{ inputs.retention-days }}' >> $env:GITHUB_ENV
+        }
+        default {
+          throw "Unexpected fixture action: $action"
+        }
+      }
