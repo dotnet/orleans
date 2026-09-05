@@ -42,6 +42,13 @@ public sealed class InvokablePool<T> : IDisposable where T : class, IInvokable
 
             if (Interlocked.Exchange(ref _items[index], null) is { } candidate)
             {
+                if (Volatile.Read(ref _disposed) != 0)
+                {
+                    candidate.Dispose();
+                    item = null;
+                    return false;
+                }
+
                 item = candidate;
                 return true;
             }
