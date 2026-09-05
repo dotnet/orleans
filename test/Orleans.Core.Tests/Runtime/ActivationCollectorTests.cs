@@ -224,6 +224,76 @@ namespace UnitTests.Runtime
             Assert.Equal(default, collector.GetCollectionTicketForTesting(activation));
         }
 
+        [Fact, TestCategory("Activation")]
+        public void OnDeactivating_RemovesCollectionRegistration()
+        {
+            var activation = PrepareActivation(1, collector);
+            var observer = (IActivationWorkingSetObserver)collector;
+
+            observer.OnAdded(activation);
+            Assert.True(collector.HasActiveCollectionRegistrationForTesting((ICollectibleGrainContext)activation));
+
+            observer.OnDeactivating(activation);
+
+            Assert.False(collector.HasActiveCollectionRegistrationForTesting((ICollectibleGrainContext)activation));
+            Assert.False(collector.TryRescheduleCollection((ICollectibleGrainContext)activation));
+        }
+
+        [Fact, TestCategory("Activation")]
+        public async Task OnDeactivating_PreventsInFlightReschedule()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var ageLimit = TimeSpan.FromMinutes(1);
+            var activation = PrepareActivation(ageLimit, collector);
+            var collectible = (ICollectibleGrainContext)activation;
+            var observer = (IActivationWorkingSetObserver)collector;
+            observer.OnAdded(activation);
+
+            var metadataRequested = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var releaseMetadata = new ManualResetEventSlim();
+            collectible.CollectionAgeLimit.Returns(_ =>
+            {
+                metadataRequested.TrySetResult();
+                if (!releaseMetadata.Wait(TimeSpan.FromSeconds(10), cancellationToken))
+                {
+                    throw new TimeoutException("Timed out waiting to release collection metadata access.");
+                }
+
+                return ageLimit;
+            });
+
+            var reschedule = Task.Run(() => collector.TryRescheduleCollection(collectible), cancellationToken);
+            await metadataRequested.Task.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+            try
+            {
+                observer.OnDeactivating(activation);
+            }
+            finally
+            {
+                releaseMetadata.Set();
+            }
+
+            Assert.False(await reschedule.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken));
+            Assert.False(collector.HasActiveCollectionRegistrationForTesting(collectible));
+            Assert.Equal(default, collector.GetCollectionTicketForTesting(collectible));
+        }
+
+        [Fact, TestCategory("Activation")]
+        public void OnEvicted_DoesNotRecreateRetiredCollectionRegistration()
+        {
+            var activation = PrepareActivation(1, collector);
+            var collectible = (ICollectibleGrainContext)activation;
+            var observer = (IActivationWorkingSetObserver)collector;
+            observer.OnAdded(activation);
+
+            observer.OnDeactivating(activation);
+            observer.OnDeactivated(activation);
+            observer.OnEvicted(activation);
+
+            Assert.False(collector.HasActiveCollectionRegistrationForTesting(collectible));
+            Assert.Equal(default, collector.GetCollectionTicketForTesting(collectible));
+        }
+
         [Theory, TestCategory("MemoryBasedDeactivations")]
         [InlineData(80.0, 70.0, 1000, 150, 100, true, 82)] // Over threshold, need to deactivate
         [InlineData(80.0, 70.0, 1000, 250, 100, false, 0)] // Below threshold, no deactivation
