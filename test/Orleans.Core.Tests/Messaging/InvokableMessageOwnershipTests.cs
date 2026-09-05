@@ -49,12 +49,14 @@ public class InvokableMessageOwnershipTests
         var message = _messageFactory.CreateMessage(request, InvokeMethodOptions.OneWay);
         Assert.Same(request, message.BodyObject);
         Assert.True(message.OwnsBodyObject);
+        var description = message.ToString();
 
         message.DisposeOwnedBody();
         message.DisposeOwnedBody();
 
         Assert.Equal(1, request.DisposeCount);
         Assert.Null(message.BodyObject);
+        Assert.Equal(description, message.ToString());
     }
 
     [TestSuite("BVT")]
