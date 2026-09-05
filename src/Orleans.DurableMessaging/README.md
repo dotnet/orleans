@@ -39,3 +39,9 @@ enforce their own sequence numbers.
 Durable Messaging requires a Journaling state manager with rollback support and Durable
 Jobs storage appropriate for the deployment. In-memory storage is for development and
 tests only.
+
+Inbox and outbox dead letters are retained for 30 days by default, with up to 1,000
+records retained in each collection. Configure `DeadLetterRetentionPeriod` and
+`MaxRetainedDeadLetters` through `DurableInboxOptions` to match operational retention
+requirements. Expired and excess records are compacted when dead letters are added and
+when an activation starts.

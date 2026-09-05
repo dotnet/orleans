@@ -59,8 +59,11 @@ internal sealed partial class DurableInboxExtension :
     private readonly int _maxProcessingAttempts;
     private readonly int _batchSize;
     private readonly TimeSpan _retryDelay;
+    private readonly TimeSpan _deadLetterRetentionPeriod;
+    private readonly int _maxRetainedDeadLetters;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly CancellationTokenSource _shutdownCts = new();
+    private int _handlerWriteRejected;
     private int _metricsActive;
     private int _reportedDepth;
     private int _handlerExecutionDepth;
@@ -154,12 +157,63 @@ internal sealed partial class DurableInboxExtension :
         _maxProcessingAttempts = options.MaxProcessingAttempts;
         _batchSize = options.InboxBatchSize;
         _retryDelay = options.BackpressureRetryDelay;
+        _deadLetterRetentionPeriod = options.DeadLetterRetentionPeriod;
+        _maxRetainedDeadLetters = options.MaxRetainedDeadLetters;
         DurableMessagingStateManagerCapabilities.RegisterObserver(stateManager, this);
         jobHandlers.Register(this);
         grainContext.ObservableLifecycle.Subscribe(
             RuntimeTypeNameFormatter.Format(GetType()),
             GrainLifecycleStage.Activate,
             this);
+    }
+
+    private bool TryFindHandlerWithinMutationBoundary(
+        IInboxHandlerContext context,
+        [MaybeNullWhen(false)] out IInboxHandler handler)
+    {
+        Volatile.Write(ref _handlerWriteRejected, 0);
+        Interlocked.Increment(ref _handlerExecutionDepth);
+        bool result;
+        try
+        {
+            result = _durableInbox.TryFindHandler(context, out handler);
+        }
+        finally
+        {
+            Interlocked.Decrement(ref _handlerExecutionDepth);
+        }
+
+        ThrowIfHandlerMutationWasRejected();
+        return result;
+    }
+
+    private async ValueTask InvokeHandlerWithinMutationBoundaryAsync(
+        IInboxHandler handler,
+        IInboxHandlerContext context,
+        CancellationToken cancellationToken)
+    {
+        Volatile.Write(ref _handlerWriteRejected, 0);
+        Interlocked.Increment(ref _handlerExecutionDepth);
+        try
+        {
+            await handler.HandleAsync(context, cancellationToken).ConfigureAwait(true);
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+        finally
+        {
+            Interlocked.Decrement(ref _handlerExecutionDepth);
+        }
+
+        ThrowIfHandlerMutationWasRejected();
+    }
+
+    private void ThrowIfHandlerMutationWasRejected()
+    {
+        if (Interlocked.Exchange(ref _handlerWriteRejected, 0) != 0)
+        {
+            throw new InvalidOperationException(
+                "A durable inbox handler attempted to mutate journaled state directly. The handler effects were reverted so Durable Messaging can preserve its atomic completion boundary.");
+        }
     }
 
     /// <summary>
@@ -281,7 +335,18 @@ internal sealed partial class DurableInboxExtension :
                 }
 
                 var selectionContext = new InboxHandlerSelectionContext(envelope, _grainContext.GrainId);
-                if (!_durableInbox.TryFindHandler(selectionContext, out _))
+                bool handlerFound;
+                try
+                {
+                    handlerFound = TryFindHandlerWithinMutationBoundary(selectionContext, out _);
+                }
+                catch
+                {
+                    await _stateManager.RevertPendingChangesAsync(CancellationToken.None).ConfigureAwait(true);
+                    throw;
+                }
+
+                if (!handlerFound)
                 {
                     LogRouteNotFound(
                         _logger,
@@ -457,11 +522,15 @@ internal sealed partial class DurableInboxExtension :
     {
         if (Volatile.Read(ref _handlerExecutionDepth) != 0)
         {
-            throw new InvalidOperationException(
-                "Journaled state cannot be committed or deleted from inside a durable inbox handler. "
-                + "Handler effects, outgoing messages, and inbox completion are committed atomically after the handler returns.");
+            Volatile.Write(ref _handlerWriteRejected, 1);
+            throw CreateHandlerWriteException();
         }
     }
+
+    private static InvalidOperationException CreateHandlerWriteException() =>
+        new(
+            "Journaled state cannot be committed or deleted from inside a durable inbox handler. "
+            + "Handler effects, outgoing messages, and inbox completion are committed atomically after the handler returns.");
 
     public void OnWriteCompleted()
     {
@@ -778,7 +847,7 @@ internal sealed partial class DurableInboxExtension :
         Exception? handlerException = null;
         try
         {
-            _durableInbox.TryFindHandler(selectionContext, out handler);
+            TryFindHandlerWithinMutationBoundary(selectionContext, out handler);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -810,11 +879,12 @@ internal sealed partial class DurableInboxExtension :
         if (handlerException is null)
         {
             var context = new InboxHandlerContext(envelope, _grainContext.GrainId, _outbox, _sessionPool);
-            Interlocked.Increment(ref _handlerExecutionDepth);
             try
             {
-                await handler!.HandleAsync(context, cancellationToken).ConfigureAwait(true);
-                cancellationToken.ThrowIfCancellationRequested();
+                await InvokeHandlerWithinMutationBoundaryAsync(
+                    handler!,
+                    context,
+                    cancellationToken).ConfigureAwait(true);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -824,10 +894,6 @@ internal sealed partial class DurableInboxExtension :
             catch (Exception exception)
             {
                 handlerException = exception;
-            }
-            finally
-            {
-                Interlocked.Decrement(ref _handlerExecutionDepth);
             }
         }
 
@@ -993,16 +1059,24 @@ internal sealed partial class DurableInboxExtension :
         string reason,
         int attemptCount)
     {
+        var now = _timeProvider.GetUtcNow();
+        DurableDeadLetterRetention.Compact(
+            _deadLetters,
+            now,
+            _deadLetterRetentionPeriod,
+            _maxRetainedDeadLetters,
+            static entry => entry.DeadLetteredAt,
+            reservedCapacity: _deadLetters.ContainsKey(key) ? 0 : 1);
         _deadLetters[key] = new InboxDeadLetter
         {
             Envelope = envelope,
-            DeadLetteredAt = _timeProvider.GetUtcNow(),
+            DeadLetteredAt = now,
             Reason = reason,
             AttemptCount = attemptCount
         };
         RemoveMessage(key);
         _messageStates.Remove(key);
-        _processed[key] = _timeProvider.GetUtcNow();
+        _processed[key] = now;
         await _stateManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
     }
 
@@ -1023,11 +1097,29 @@ internal sealed partial class DurableInboxExtension :
         }
     }
 
-    public Task OnStart(CancellationToken cancellationToken)
+    public async Task OnStart(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         DurableMessagingActivationValidator.Validate(_grainContext);
-        return ResumeProcessingAsync(replaceExisting: true, cancellationToken);
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(true);
+        try
+        {
+            if (DurableDeadLetterRetention.Compact(
+                    _deadLetters,
+                    _timeProvider.GetUtcNow(),
+                    _deadLetterRetentionPeriod,
+                    _maxRetainedDeadLetters,
+                    static entry => entry.DeadLetteredAt))
+            {
+                await _stateManager.WriteStateAsync(cancellationToken).ConfigureAwait(true);
+            }
+        }
+        finally
+        {
+            _gate.Release();
+        }
+
+        await ResumeProcessingAsync(replaceExisting: true, cancellationToken).ConfigureAwait(true);
     }
 
     public Task OnStop(CancellationToken cancellationToken)
