@@ -30,20 +30,26 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
 
     public async ValueTask<DirectoryMembershipSnapshot> RefreshViewAsync(MembershipVersion version, CancellationToken cancellationToken)
     {
-        if (version == default || CurrentView.Version < version)
+        if (version != default && CurrentView.Version >= version)
         {
-            await ClusterMembershipService.Refresh(version, cancellationToken);
+            return CurrentView;
         }
 
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _shutdownCts.Token);
+        await _membership.RefreshViewAsync(version, linkedCts.Token);
         if (CurrentView.Version < version)
         {
-            await foreach (var view in _viewUpdates.WithCancellation(cancellationToken))
+            await foreach (var view in _viewUpdates.WithCancellation(linkedCts.Token))
             {
                 if (view.Version >= version)
                 {
-                    break;
+                    return view;
                 }
             }
+
+            throw new OperationCanceledException(
+                "Directory membership updates completed before the requested view was published.",
+                linkedCts.Token);
         }
 
         return CurrentView;
@@ -100,6 +106,7 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
         }
         finally
         {
+            _shutdownCts.Cancel();
             _viewUpdates.Dispose();
         }
     }
