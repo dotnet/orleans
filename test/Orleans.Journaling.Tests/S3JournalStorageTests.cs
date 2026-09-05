@@ -105,6 +105,19 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
         }
 
         [Fact]
+        public async Task InitializeAsync_WhenClientFactoryReturnsNull_ThrowsDescriptiveException()
+        {
+            var options = CreateOptions();
+            options.ConfigureS3Client(_ => Task.FromResult<IAmazonS3>(null!));
+            var provider = CreateProvider(options);
+
+            var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+                () => provider.InitializeAsync(CancellationToken.None));
+
+            Assert.Equal("The configured S3 client factory returned null.", exception.Message);
+        }
+
+        [Fact]
         public async Task InitializeAsync_WhenBucketCreationRaces_RechecksBucket()
         {
             var client = CreateTrackingClient();

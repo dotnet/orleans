@@ -110,7 +110,7 @@ internal sealed class S3JournalStorageProvider : ILifecycleParticipant<ISiloLife
     internal async Task InitializeAsync(CancellationToken cancellationToken)
     {
         var client = await _options.GetCreateClient()(cancellationToken).ConfigureAwait(false)
-            ?? throw new InvalidOperationException($"{nameof(S3JournalStorageOptions.GetCreateClient)} returned null.");
+            ?? throw new InvalidOperationException("The configured S3 client factory returned null.");
         try
         {
             await EnsureBucketAsync(client, GetBucketName(), _options.CreateBucketIfNotExists, cancellationToken).ConfigureAwait(false);
