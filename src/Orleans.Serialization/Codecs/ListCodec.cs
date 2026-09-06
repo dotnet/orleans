@@ -183,13 +183,13 @@ namespace Orleans.Serialization.Codecs
         public List<T> DeepCopy(List<T> input, CopyContext context)
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
-            if (input is null) return null!;
 
             if (context.TryGetCopy<List<T>>(input, out var result))
             {
                 return result!;
             }
 
+            System.Diagnostics.Debug.Assert(input is not null);
             if (input.GetType() != typeof(List<T>))
             {
                 return context.DeepCopy(input)!;

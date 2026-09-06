@@ -132,13 +132,13 @@ namespace Orleans.Serialization.Codecs
         public Queue<T> DeepCopy(Queue<T> input, CopyContext context)
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
-            if (input is null) return null!;
 
             if (context.TryGetCopy<Queue<T>>(input, out var result))
             {
                 return result!;
             }
 
+            System.Diagnostics.Debug.Assert(input is not null);
             if (input.GetType() as object != _fieldType as object)
             {
                 return context.DeepCopy(input)!;

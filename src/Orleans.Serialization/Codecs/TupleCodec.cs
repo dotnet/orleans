@@ -106,11 +106,11 @@ namespace Orleans.Serialization.Codecs
         public Tuple<T> DeepCopy(Tuple<T> input, CopyContext context)
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
-            if (input is null) return null!;
 
             if (context.TryGetCopy(input, out Tuple<T>? existing))
                 return existing!;
 
+            System.Diagnostics.Debug.Assert(input is not null);
             if (input.GetType() as object != _fieldType as object)
                 return context.DeepCopy(input)!;
 
@@ -243,11 +243,11 @@ namespace Orleans.Serialization.Codecs
         public Tuple<T1, T2> DeepCopy(Tuple<T1, T2> input, CopyContext context)
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
-            if (input is null) return null!;
 
             if (context.TryGetCopy(input, out Tuple<T1, T2>? existing))
                 return existing!;
 
+            System.Diagnostics.Debug.Assert(input is not null);
             if (input.GetType() as object != _fieldType as object)
                 return context.DeepCopy(input)!;
 
@@ -402,11 +402,11 @@ namespace Orleans.Serialization.Codecs
         public Tuple<T1, T2, T3> DeepCopy(Tuple<T1, T2, T3> input, CopyContext context)
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
-            if (input is null) return null!;
 
             if (context.TryGetCopy(input, out Tuple<T1, T2, T3>? existing))
                 return existing!;
 
+            System.Diagnostics.Debug.Assert(input is not null);
             if (input.GetType() as object != _fieldType as object)
                 return context.DeepCopy(input)!;
 
@@ -578,11 +578,11 @@ namespace Orleans.Serialization.Codecs
         public Tuple<T1, T2, T3, T4> DeepCopy(Tuple<T1, T2, T3, T4> input, CopyContext context)
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
-            if (input is null) return null!;
 
             if (context.TryGetCopy(input, out Tuple<T1, T2, T3, T4>? existing))
                 return existing!;
 
+            System.Diagnostics.Debug.Assert(input is not null);
             if (input.GetType() as object != _fieldType as object)
                 return context.DeepCopy(input)!;
 
@@ -774,11 +774,11 @@ namespace Orleans.Serialization.Codecs
         public Tuple<T1, T2, T3, T4, T5> DeepCopy(Tuple<T1, T2, T3, T4, T5> input, CopyContext context)
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
-            if (input is null) return null!;
 
             if (context.TryGetCopy(input, out Tuple<T1, T2, T3, T4, T5>? existing))
                 return existing!;
 
+            System.Diagnostics.Debug.Assert(input is not null);
             if (input.GetType() as object != _fieldType as object)
                 return context.DeepCopy(input)!;
 
@@ -987,11 +987,11 @@ namespace Orleans.Serialization.Codecs
         public Tuple<T1, T2, T3, T4, T5, T6> DeepCopy(Tuple<T1, T2, T3, T4, T5, T6> input, CopyContext context)
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
-            if (input is null) return null!;
 
             if (context.TryGetCopy(input, out Tuple<T1, T2, T3, T4, T5, T6>? existing))
                 return existing!;
 
+            System.Diagnostics.Debug.Assert(input is not null);
             if (input.GetType() as object != _fieldType as object)
                 return context.DeepCopy(input)!;
 
@@ -1218,11 +1218,11 @@ namespace Orleans.Serialization.Codecs
         public Tuple<T1, T2, T3, T4, T5, T6, T7> DeepCopy(Tuple<T1, T2, T3, T4, T5, T6, T7> input, CopyContext context)
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
-            if (input is null) return null!;
 
             if (context.TryGetCopy(input, out Tuple<T1, T2, T3, T4, T5, T6, T7>? existing))
                 return existing!;
 
+            System.Diagnostics.Debug.Assert(input is not null);
             if (input.GetType() as object != _fieldType as object)
                 return context.DeepCopy(input)!;
 
@@ -1465,11 +1465,11 @@ namespace Orleans.Serialization.Codecs
         public Tuple<T1, T2, T3, T4, T5, T6, T7, T8> DeepCopy(Tuple<T1, T2, T3, T4, T5, T6, T7, T8> input, CopyContext context)
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
-            if (input is null) return null!;
 
             if (context.TryGetCopy(input, out Tuple<T1, T2, T3, T4, T5, T6, T7, T8>? existing))
                 return existing!;
 
+            System.Diagnostics.Debug.Assert(input is not null);
             if (input.GetType() as object != _fieldType as object)
                 return context.DeepCopy(input)!;
 

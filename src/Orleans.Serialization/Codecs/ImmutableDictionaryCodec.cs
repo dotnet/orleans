@@ -88,11 +88,11 @@ namespace Orleans.Serialization.Codecs
         public ImmutableDictionary<TKey, TValue> DeepCopy(ImmutableDictionary<TKey, TValue> input, CopyContext context)
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
-            if (input is null) return null!;
 
             if (context.TryGetCopy<ImmutableDictionary<TKey, TValue>>(input, out var result))
                 return result!;
 
+            System.Diagnostics.Debug.Assert(input is not null);
             if (input.IsEmpty || _keyCopier is null && _valueCopier is null)
                 return input;
 

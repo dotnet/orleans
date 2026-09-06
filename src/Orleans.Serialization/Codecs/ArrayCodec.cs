@@ -143,13 +143,13 @@ namespace Orleans.Serialization.Codecs
         public T[] DeepCopy(T[] input, CopyContext context)
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
-            if (input is null) return null!;
 
             if (context.TryGetCopy<T[]>(input, out var result))
             {
                 return result!;
             }
 
+            System.Diagnostics.Debug.Assert(input is not null);
             result = new T[input.Length];
             context.RecordCopy(input, result);
             for (var i = 0; i < input.Length; i++)

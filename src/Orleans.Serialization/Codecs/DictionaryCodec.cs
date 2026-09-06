@@ -173,13 +173,13 @@ namespace Orleans.Serialization.Codecs
         public Dictionary<TKey, TValue> DeepCopy(Dictionary<TKey, TValue> input, CopyContext context)
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
-            if (input is null) return null!;
 
             if (context.TryGetCopy<Dictionary<TKey, TValue>>(input, out var result))
             {
                 return result!;
             }
 
+            System.Diagnostics.Debug.Assert(input is not null);
             if (input.GetType() != typeof(Dictionary<TKey, TValue>))
             {
                 return context.DeepCopy(input)!;

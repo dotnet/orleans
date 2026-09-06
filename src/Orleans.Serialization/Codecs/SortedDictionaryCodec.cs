@@ -91,13 +91,13 @@ namespace Orleans.Serialization.Codecs
         public SortedDictionary<TKey, TValue> DeepCopy(SortedDictionary<TKey, TValue> input, CopyContext context)
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
-            if (input is null) return null!;
 
             if (context.TryGetCopy<SortedDictionary<TKey, TValue>>(input, out var result))
             {
                 return result!;
             }
 
+            System.Diagnostics.Debug.Assert(input is not null);
             if (input.GetType() as object != _fieldType as object)
             {
                 return context.DeepCopy(input)!;

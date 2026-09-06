@@ -181,13 +181,13 @@ public sealed class CollectionCopier<T> : IDeepCopier<Collection<T>>, IBaseCopie
     public Collection<T> DeepCopy(Collection<T> input, CopyContext context)
     {
         ArgumentNullExceptionPolyfill.ThrowIfNull(context);
-        if (input is null) return null!;
 
         if (context.TryGetCopy<Collection<T>>(input, out var result))
         {
             return result!;
         }
 
+        System.Diagnostics.Debug.Assert(input is not null);
         if (input.GetType() != typeof(Collection<T>))
         {
             return context.DeepCopy(input)!;

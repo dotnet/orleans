@@ -76,13 +76,13 @@ namespace Orleans.Serialization.Codecs
         public SortedSet<T> DeepCopy(SortedSet<T> input, CopyContext context)
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
-            if (input is null) return null!;
 
             if (context.TryGetCopy<SortedSet<T>>(input, out var result))
             {
                 return result!;
             }
 
+            System.Diagnostics.Debug.Assert(input is not null);
             if (input.GetType() as object != _fieldType as object)
             {
                 return context.DeepCopy(input)!;

@@ -99,13 +99,13 @@ namespace Orleans.Serialization.Codecs
         public NameValueCollection DeepCopy(NameValueCollection input, CopyContext context)
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
-            if (input is null) return null!;
 
             if (context.TryGetCopy<NameValueCollection>(input, out var result))
             {
                 return result!;
             }
 
+            System.Diagnostics.Debug.Assert(input is not null);
             if (input.GetType() != typeof(NameValueCollection))
             {
                 return context.DeepCopy(input)!;

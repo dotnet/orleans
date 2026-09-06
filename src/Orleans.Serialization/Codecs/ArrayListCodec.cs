@@ -51,13 +51,13 @@ namespace Orleans.Serialization.Codecs
         public ArrayList DeepCopy(ArrayList input, CopyContext context)
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
-            if (input is null) return null!;
 
             if (context.TryGetCopy<ArrayList>(input, out var result))
             {
                 return result!;
             }
 
+            System.Diagnostics.Debug.Assert(input is not null);
             if (input.GetType() != typeof(ArrayList))
             {
                 return context.DeepCopy(input)!;

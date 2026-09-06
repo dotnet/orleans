@@ -43,13 +43,14 @@ namespace Orleans.Serialization.Codecs
         {
             if (context.TryGetCopy<object>(input!, out var result))
             {
-                return result;
+                return result!;
             }
 
             ThrowNotNullException(input);
             return null;
         }
 
+        [DoesNotReturn]
         private static void ThrowNotNullException(object? value) => throw new InvalidOperationException($"Expected a value of null, but encountered a value of type '{value!.GetType()}'.");
     }
 }

@@ -87,11 +87,11 @@ namespace Orleans.Serialization.Codecs
         public FrozenDictionary<TKey, TValue> DeepCopy(FrozenDictionary<TKey, TValue> input, CopyContext context)
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
-            if (input is null) return null!;
 
             if (context.TryGetCopy<FrozenDictionary<TKey, TValue>>(input, out var result))
                 return result!;
 
+            System.Diagnostics.Debug.Assert(input is not null);
             if (input.Count == 0 || _keyCopier is null && _valueCopier is null)
                 return input;
 

@@ -134,13 +134,13 @@ public sealed class StackCopier<T> : IDeepCopier<Stack<T>>, IBaseCopier<Stack<T>
     public Stack<T> DeepCopy(Stack<T> input, CopyContext context)
     {
         ArgumentNullExceptionPolyfill.ThrowIfNull(context);
-        if (input is null) return null!;
 
         if (context.TryGetCopy<Stack<T>>(input, out var result))
         {
             return result!;
         }
 
+        System.Diagnostics.Debug.Assert(input is not null);
         if (input.GetType() != _fieldType)
         {
             return context.DeepCopy(input)!;

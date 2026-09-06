@@ -78,11 +78,11 @@ namespace Orleans.Serialization.Codecs
         public FrozenSet<T> DeepCopy(FrozenSet<T> input, CopyContext context)
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
-            if (input is null) return null!;
 
             if (context.TryGetCopy<FrozenSet<T>>(input, out var result))
                 return result!;
 
+            System.Diagnostics.Debug.Assert(input is not null);
             if (input.Count == 0 || _copier is null)
                 return input;
 
