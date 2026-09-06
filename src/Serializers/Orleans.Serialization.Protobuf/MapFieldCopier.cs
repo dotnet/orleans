@@ -29,7 +29,7 @@ public sealed class MapFieldCopier<TKey, TValue> : IDeepCopier<MapField<TKey, TV
     /// <inheritdoc/>
     public MapField<TKey, TValue> DeepCopy(MapField<TKey, TValue> input, CopyContext context)
     {
-        ArgumentNullException.ThrowIfNull(context);
+        if (context is null) throw new ArgumentNullException(nameof(context));
 
         if (input is null)
         {
@@ -59,9 +59,9 @@ public sealed class MapFieldCopier<TKey, TValue> : IDeepCopier<MapField<TKey, TV
     /// <inheritdoc/>
     public void DeepCopy(MapField<TKey, TValue> input, MapField<TKey, TValue> output, CopyContext context)
     {
-        ArgumentNullException.ThrowIfNull(input);
-        ArgumentNullException.ThrowIfNull(output);
-        ArgumentNullException.ThrowIfNull(context);
+        if (input is null) throw new ArgumentNullException(nameof(input));
+        if (output is null) throw new ArgumentNullException(nameof(output));
+        if (context is null) throw new ArgumentNullException(nameof(context));
 
         foreach (var pair in input)
         {

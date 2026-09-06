@@ -13,7 +13,7 @@ public sealed class ByteStringCopier : IDeepCopier<ByteString>
     /// <inheritdoc/>
     public ByteString DeepCopy(ByteString input, CopyContext context)
     {
-        ArgumentNullException.ThrowIfNull(context);
+        if (context is null) throw new ArgumentNullException(nameof(context));
 
         if (input is null)
         {

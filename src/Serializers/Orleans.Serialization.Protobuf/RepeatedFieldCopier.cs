@@ -25,7 +25,7 @@ public sealed class RepeatedFieldCopier<T> : IDeepCopier<RepeatedField<T>>, IBas
     /// <inheritdoc/>
     public RepeatedField<T> DeepCopy(RepeatedField<T> input, CopyContext context)
     {
-        ArgumentNullException.ThrowIfNull(context);
+        if (context is null) throw new ArgumentNullException(nameof(context));
 
         if (input is null)
         {
@@ -55,9 +55,9 @@ public sealed class RepeatedFieldCopier<T> : IDeepCopier<RepeatedField<T>>, IBas
     /// <inheritdoc/>
     public void DeepCopy(RepeatedField<T> input, RepeatedField<T> output, CopyContext context)
     {
-        ArgumentNullException.ThrowIfNull(input);
-        ArgumentNullException.ThrowIfNull(output);
-        ArgumentNullException.ThrowIfNull(context);
+        if (input is null) throw new ArgumentNullException(nameof(input));
+        if (output is null) throw new ArgumentNullException(nameof(output));
+        if (context is null) throw new ArgumentNullException(nameof(context));
 
         foreach (var item in input)
         {

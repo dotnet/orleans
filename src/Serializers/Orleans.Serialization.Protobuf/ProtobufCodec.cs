@@ -43,8 +43,8 @@ public sealed class ProtobufCodec : IGeneralizedCodec, IGeneralizedCopier, IType
         IEnumerable<ICodecSelector> serializableTypeSelectors,
         IEnumerable<ICopierSelector> copyableTypeSelectors)
     {
-        ArgumentNullException.ThrowIfNull(serializableTypeSelectors);
-        ArgumentNullException.ThrowIfNull(copyableTypeSelectors);
+        if (serializableTypeSelectors is null) throw new ArgumentNullException(nameof(serializableTypeSelectors));
+        if (copyableTypeSelectors is null) throw new ArgumentNullException(nameof(copyableTypeSelectors));
 
         _serializableTypeSelectors = serializableTypeSelectors.Where(t => string.Equals(t.CodecName, WellKnownAlias, StringComparison.Ordinal)).ToArray();
         _copyableTypeSelectors = copyableTypeSelectors.Where(t => string.Equals(t.CopierName, WellKnownAlias, StringComparison.Ordinal)).ToArray();
@@ -54,7 +54,7 @@ public sealed class ProtobufCodec : IGeneralizedCodec, IGeneralizedCopier, IType
     [return: NotNullIfNotNull(nameof(input))]
     public object? DeepCopy(object? input, CopyContext context)
     {
-        ArgumentNullException.ThrowIfNull(context);
+        if (context is null) throw new ArgumentNullException(nameof(context));
 
         if (!context.TryGetCopy(input!, out object? result))
         {

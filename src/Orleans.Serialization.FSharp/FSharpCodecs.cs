@@ -135,7 +135,7 @@ namespace Orleans.Serialization
         [return: NotNullIfNotNull(nameof(input))]
         public FSharpOption<T>? DeepCopy([AllowNull] FSharpOption<T> input, CopyContext context)
         {
-            ArgumentNullException.ThrowIfNull(context);
+            if (context is null) throw new ArgumentNullException(nameof(context));
 
             if (input is null || FSharpOption<T>.get_IsNone(input))
             {
@@ -354,7 +354,7 @@ namespace Orleans.Serialization
         /// <inheritdoc/>
         public FSharpChoice<T1, T2> DeepCopy(FSharpChoice<T1, T2> input, CopyContext context)
         {
-            ArgumentNullException.ThrowIfNull(context);
+            if (context is null) throw new ArgumentNullException(nameof(context));
 
             if (context.TryGetCopy(input, out FSharpChoice<T1, T2>? result))
             {
@@ -495,7 +495,7 @@ namespace Orleans.Serialization
         /// <inheritdoc/>
         public FSharpChoice<T1, T2, T3> DeepCopy(FSharpChoice<T1, T2, T3> input, CopyContext context)
         {
-            ArgumentNullException.ThrowIfNull(context);
+            if (context is null) throw new ArgumentNullException(nameof(context));
 
             if (context.TryGetCopy(input, out FSharpChoice<T1, T2, T3>? result))
             {
@@ -650,7 +650,7 @@ namespace Orleans.Serialization
         /// <inheritdoc/>
         public FSharpChoice<T1, T2, T3, T4> DeepCopy(FSharpChoice<T1, T2, T3, T4> input, CopyContext context)
         {
-            ArgumentNullException.ThrowIfNull(context);
+            if (context is null) throw new ArgumentNullException(nameof(context));
 
             if (context.TryGetCopy(input, out FSharpChoice<T1, T2, T3, T4>? result))
             {
@@ -819,7 +819,7 @@ namespace Orleans.Serialization
         /// <inheritdoc/>
         public FSharpChoice<T1, T2, T3, T4, T5> DeepCopy(FSharpChoice<T1, T2, T3, T4, T5> input, CopyContext context)
         {
-            ArgumentNullException.ThrowIfNull(context);
+            if (context is null) throw new ArgumentNullException(nameof(context));
 
             if (context.TryGetCopy(input, out FSharpChoice<T1, T2, T3, T4, T5>? result))
             {
@@ -1002,7 +1002,7 @@ namespace Orleans.Serialization
         /// <inheritdoc/>
         public FSharpChoice<T1, T2, T3, T4, T5, T6> DeepCopy(FSharpChoice<T1, T2, T3, T4, T5, T6> input, CopyContext context)
         {
-            ArgumentNullException.ThrowIfNull(context);
+            if (context is null) throw new ArgumentNullException(nameof(context));
 
             if (context.TryGetCopy(input, out FSharpChoice<T1, T2, T3, T4, T5, T6>? result))
             {
@@ -1085,7 +1085,7 @@ namespace Orleans.Serialization
         /// <inheritdoc/>
         public FSharpRef<T> DeepCopy(FSharpRef<T> input, CopyContext context)
         {
-            ArgumentNullException.ThrowIfNull(context);
+            if (context is null) throw new ArgumentNullException(nameof(context));
 
             if (context.TryGetCopy<FSharpRef<T>>(input, out var result))
             {
@@ -1168,7 +1168,7 @@ namespace Orleans.Serialization
         /// <inheritdoc/>
         public FSharpList<T> DeepCopy(FSharpList<T> input, CopyContext context)
         {
-            ArgumentNullException.ThrowIfNull(context);
+            if (context is null) throw new ArgumentNullException(nameof(context));
 
             if (input is null)
             {
@@ -1257,7 +1257,7 @@ namespace Orleans.Serialization
         /// <inheritdoc/>
         public FSharpSet<T> DeepCopy(FSharpSet<T> input, CopyContext context)
         {
-            ArgumentNullException.ThrowIfNull(context);
+            if (context is null) throw new ArgumentNullException(nameof(context));
 
             if (input is null)
             {
@@ -1358,7 +1358,7 @@ namespace Orleans.Serialization
         /// <inheritdoc/>
         public FSharpMap<TKey, TValue> DeepCopy(FSharpMap<TKey, TValue> input, CopyContext context)
         {
-            ArgumentNullException.ThrowIfNull(context);
+            if (context is null) throw new ArgumentNullException(nameof(context));
 
             if (input is null)
             {
