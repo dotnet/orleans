@@ -103,7 +103,8 @@ namespace Orleans.Serialization.Cloning
         public bool IsShallowCopyable() => true;
 
         /// <summary>Returns the input value.</summary>
-        public T DeepCopy(T input, CopyContext _) => input;
+        [return: MaybeNull, NotNullIfNotNull(nameof(input))]
+        public T DeepCopy([AllowNull] T input, CopyContext _) => input;
 
         /// <summary>Returns the input value.</summary>
         [return: NotNullIfNotNull(nameof(input))]
@@ -122,9 +123,11 @@ namespace Orleans.Serialization.Cloning
         /// </summary>
         /// <param name="input">The input.</param>
         /// <param name="context">The context.</param>
-        /// <returns>A copy of <paramref name="input"/>.</returns>
-        [return: NotNullIfNotNull(nameof(input))]
-        T DeepCopy(T input, CopyContext context);
+        /// <returns>
+        /// A copy of <paramref name="input"/>, or <see langword="null"/> if <paramref name="input"/> is <see langword="null"/>.
+        /// </returns>
+        [return: MaybeNull, NotNullIfNotNull(nameof(input))]
+        T DeepCopy([AllowNull] T input, CopyContext context);
 
         [return: NotNullIfNotNull(nameof(input))]
         object? IDeepCopier.DeepCopy(object? input, CopyContext context) => input is null ? null : DeepCopy((T)input, context);
@@ -254,6 +257,7 @@ namespace Orleans.Serialization.Cloning
         /// <typeparam name="T">The value type.</typeparam>
         /// <param name="value">The value.</param>
         /// <returns>A copy of the provided value.</returns>
+        [return: NotNullIfNotNull(nameof(value))]
         public T? DeepCopy<T>(T? value)
         {
             if (!typeof(T).IsValueType)
@@ -262,7 +266,7 @@ namespace Orleans.Serialization.Cloning
             }
 
             var copier = _copierProvider.GetDeepCopier(value!.GetType());
-            return (T?)copier.DeepCopy(value, this);
+            return (T?)copier.DeepCopy(value, this)!;
         }
 
         /// <inheritdoc/>
@@ -369,7 +373,8 @@ namespace Orleans.Serialization.Cloning
     {
         private readonly IDeepCopier _copier = copier;
 
-        public T DeepCopy(T original, CopyContext context) => (T)_copier.DeepCopy(original, context)!;
+        [return: MaybeNull, NotNullIfNotNull(nameof(original))]
+        public T DeepCopy([AllowNull] T original, CopyContext context) => (T)_copier.DeepCopy(original, context)!;
 
         [return: NotNullIfNotNull(nameof(original))]
         public object? DeepCopy(object? original, CopyContext context) => _copier.DeepCopy(original, context);

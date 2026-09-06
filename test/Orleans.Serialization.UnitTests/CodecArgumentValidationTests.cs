@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Collections.ObjectModel;
+using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
@@ -73,11 +75,30 @@ public sealed class CodecArgumentValidationTests : IDisposable
     {
         public int InvocationCount { get; private set; }
 
-        public T DeepCopy(T input, CopyContext context)
+        [return: MaybeNull, NotNullIfNotNull(nameof(input))]
+        public T DeepCopy([AllowNull] T input, CopyContext context)
         {
             InvocationCount++;
-            return transform(input);
+            return input is null ? default! : transform(input);
         }
+    }
+
+    [Fact]
+    public void DeepCopierContract_DeclaresCorrelatedNullability()
+    {
+        var method = typeof(IDeepCopier<>).GetMethods()
+            .Single(method => method.Name == nameof(IDeepCopier<object>.DeepCopy) && method.ReturnType.IsGenericParameter);
+        var input = method.GetParameters()[0];
+
+        Assert.Contains(input.GetCustomAttributesData(), attribute => attribute.AttributeType == typeof(AllowNullAttribute));
+        Assert.Contains(method.ReturnParameter.GetCustomAttributesData(), attribute => attribute.AttributeType == typeof(MaybeNullAttribute));
+        var correlatedReturn = Assert.Single(
+            method.ReturnParameter.GetCustomAttributesData(),
+            attribute => attribute.AttributeType == typeof(NotNullIfNotNullAttribute));
+        Assert.Equal("input", correlatedReturn.ConstructorArguments[0].Value);
+
+        var valueTypeMethod = typeof(IDeepCopier<int>).GetMethod(nameof(IDeepCopier<int>.DeepCopy));
+        Assert.Equal(typeof(int), valueTypeMethod!.ReturnType);
     }
 
     // ------------------------------------------------------------------------------------

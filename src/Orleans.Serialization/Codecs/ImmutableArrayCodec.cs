@@ -79,7 +79,7 @@ namespace Orleans.Serialization.Codecs
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
 
-            return _copier is null || input.IsDefaultOrEmpty ? input : ImmutableArray.CreateRange(input, (i, s) => s._copier!.DeepCopy(i, s.context), (_copier, context));
+            return _copier is null || input.IsDefaultOrEmpty ? input : ImmutableArray.CreateRange(input, (i, s) => s._copier!.DeepCopy(i, s.context)!, (_copier, context));
         }
     }
 }

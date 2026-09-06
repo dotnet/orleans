@@ -104,7 +104,8 @@ namespace Orleans.Serialization.Codecs
     public sealed class BitArrayCopier : IDeepCopier<BitArray>
     {
         /// <inheritdoc/>
-        BitArray IDeepCopier<BitArray>.DeepCopy(BitArray input, CopyContext context) => DeepCopy(input, context);
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull, System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        BitArray IDeepCopier<BitArray>.DeepCopy([System.Diagnostics.CodeAnalysis.AllowNull] BitArray input, CopyContext context) => DeepCopy(input, context);
 
         /// <summary>
         /// Creates a deep copy of the provided input.
@@ -112,7 +113,8 @@ namespace Orleans.Serialization.Codecs
         /// <param name="input">The input.</param>
         /// <param name="context">The context.</param>
         /// <returns>A copy of <paramref name="input" />.</returns>
-        public static BitArray DeepCopy(BitArray input, CopyContext context)
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull, System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public static BitArray DeepCopy([System.Diagnostics.CodeAnalysis.AllowNull] BitArray input, CopyContext context)
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
 
@@ -199,7 +201,8 @@ namespace Orleans.Serialization.Codecs
     public sealed class ByteArrayCopier : IDeepCopier<byte[]>
     {
         /// <inheritdoc/>
-        byte[] IDeepCopier<byte[]>.DeepCopy(byte[] input, CopyContext context) => DeepCopy(input, context);
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull, System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        byte[] IDeepCopier<byte[]>.DeepCopy([System.Diagnostics.CodeAnalysis.AllowNull] byte[] input, CopyContext context) => DeepCopy(input, context);
 
         /// <summary>
         /// Creates a deep copy of the provided input.
@@ -207,7 +210,8 @@ namespace Orleans.Serialization.Codecs
         /// <param name="input">The input.</param>
         /// <param name="context">The context.</param>
         /// <returns>A copy of <paramref name="input" />.</returns>
-        public static byte[] DeepCopy(byte[] input, CopyContext context)
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull, System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public static byte[] DeepCopy([System.Diagnostics.CodeAnalysis.AllowNull] byte[] input, CopyContext context)
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
 

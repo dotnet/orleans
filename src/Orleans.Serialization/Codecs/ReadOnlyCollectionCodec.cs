@@ -63,7 +63,8 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc />
-        public ReadOnlyCollection<T> DeepCopy(ReadOnlyCollection<T> input, CopyContext context)
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull, System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public ReadOnlyCollection<T> DeepCopy([System.Diagnostics.CodeAnalysis.AllowNull] ReadOnlyCollection<T> input, CopyContext context)
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
 
@@ -85,7 +86,7 @@ namespace Orleans.Serialization.Codecs
             var tempResult = new T[input.Count];
             for (var i = 0; i < tempResult.Length; i++)
             {
-                tempResult[i] = _elementCopier.DeepCopy(input[i], context);
+                tempResult[i] = _elementCopier.DeepCopy(input[i], context)!;
             }
 
             result = new ReadOnlyCollection<T>(tempResult);

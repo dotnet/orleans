@@ -140,7 +140,8 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
-        public T[] DeepCopy(T[] input, CopyContext context)
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull, System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public T[] DeepCopy([System.Diagnostics.CodeAnalysis.AllowNull] T[] input, CopyContext context)
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
 
@@ -154,7 +155,7 @@ namespace Orleans.Serialization.Codecs
             context.RecordCopy(input, result);
             for (var i = 0; i < input.Length; i++)
             {
-                result[i] = _elementCopier.DeepCopy(input[i], context);
+                result[i] = _elementCopier.DeepCopy(input[i], context)!;
             }
 
             return result;
@@ -314,7 +315,7 @@ namespace Orleans.Serialization.Codecs
 
             for (var i = 0; i < inputSpan.Length; i++)
             {
-                result[i] = _elementCopier.DeepCopy(inputSpan[i], context);
+                result[i] = _elementCopier.DeepCopy(inputSpan[i], context)!;
             }
 
             return result;
@@ -474,7 +475,7 @@ namespace Orleans.Serialization.Codecs
 
             for (var i = 0; i < inputSpan.Length; i++)
             {
-                result[i] = _elementCopier.DeepCopy(inputSpan[i], context);
+                result[i] = _elementCopier.DeepCopy(inputSpan[i], context)!;
             }
 
             return result;
@@ -626,7 +627,7 @@ namespace Orleans.Serialization.Codecs
             context.RecordCopy(input.Array, result);
             for (var i = 0; i < inputSpan.Length; i++)
             {
-                result[i] = _elementCopier.DeepCopy(inputSpan[i], context);
+                result[i] = _elementCopier.DeepCopy(inputSpan[i], context)!;
             }
 
             return new ArraySegment<T>(result);

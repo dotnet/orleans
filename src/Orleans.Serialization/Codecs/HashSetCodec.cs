@@ -201,7 +201,8 @@ namespace Orleans.Serialization.Codecs
         private readonly ConstructorInfo _baseConstructor = typeof(HashSet<T>).GetConstructor([typeof(int), typeof(IEqualityComparer<T>)])!;
 
         /// <inheritdoc/>
-        public HashSet<T> DeepCopy(HashSet<T> input, CopyContext context)
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull, System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public HashSet<T> DeepCopy([System.Diagnostics.CodeAnalysis.AllowNull] HashSet<T> input, CopyContext context)
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
 
@@ -220,7 +221,7 @@ namespace Orleans.Serialization.Codecs
             context.RecordCopy(input, result);
             foreach (var item in input)
             {
-                result.Add(_copier.DeepCopy(item, context));
+                result.Add(_copier.DeepCopy(item, context)!);
             }
 
             return result;
@@ -247,7 +248,7 @@ namespace Orleans.Serialization.Codecs
 
             foreach (var item in input)
             {
-                output.Add(_copier.DeepCopy(item, context));
+                output.Add(_copier.DeepCopy(item, context)!);
             }
         }
     }

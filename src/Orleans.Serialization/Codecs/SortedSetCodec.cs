@@ -73,7 +73,8 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc />
-        public SortedSet<T> DeepCopy(SortedSet<T> input, CopyContext context)
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull, System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public SortedSet<T> DeepCopy([System.Diagnostics.CodeAnalysis.AllowNull] SortedSet<T> input, CopyContext context)
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
 
@@ -92,7 +93,7 @@ namespace Orleans.Serialization.Codecs
             context.RecordCopy(input, result);
             foreach (var element in input)
             {
-                result.Add(_elementCopier.DeepCopy(element, context));
+                result.Add(_elementCopier.DeepCopy(element, context)!);
             }
 
             return result;
@@ -106,7 +107,7 @@ namespace Orleans.Serialization.Codecs
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
             foreach (var element in input)
             {
-                output.Add(_elementCopier.DeepCopy(element, context));
+                output.Add(_elementCopier.DeepCopy(element, context)!);
             }
         }
     }

@@ -170,7 +170,8 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
-        public Dictionary<TKey, TValue> DeepCopy(Dictionary<TKey, TValue> input, CopyContext context)
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull, System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public Dictionary<TKey, TValue> DeepCopy([System.Diagnostics.CodeAnalysis.AllowNull] Dictionary<TKey, TValue> input, CopyContext context)
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
 
@@ -189,7 +190,7 @@ namespace Orleans.Serialization.Codecs
             context.RecordCopy(input, result);
             foreach (var pair in input)
             {
-                result[_keyCopier.DeepCopy(pair.Key, context)] = _valueCopier.DeepCopy(pair.Value, context);
+                result[_keyCopier.DeepCopy(pair.Key, context)!] = _valueCopier.DeepCopy(pair.Value, context)!;
             }
 
             return result;
@@ -214,7 +215,7 @@ namespace Orleans.Serialization.Codecs
 
             foreach (var pair in input)
             {
-                output[_keyCopier.DeepCopy(pair.Key, context)] = _valueCopier.DeepCopy(pair.Value, context);
+                output[_keyCopier.DeepCopy(pair.Key, context)!] = _valueCopier.DeepCopy(pair.Value, context)!;
             }
         }
     }

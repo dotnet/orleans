@@ -129,7 +129,8 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
-        public Queue<T> DeepCopy(Queue<T> input, CopyContext context)
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull, System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public Queue<T> DeepCopy([System.Diagnostics.CodeAnalysis.AllowNull] Queue<T> input, CopyContext context)
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
 
@@ -148,7 +149,7 @@ namespace Orleans.Serialization.Codecs
             context.RecordCopy(input, result);
             foreach (var item in input)
             {
-                result.Enqueue(_copier.DeepCopy(item, context));
+                result.Enqueue(_copier.DeepCopy(item, context)!);
             }
 
             return result;
@@ -163,7 +164,7 @@ namespace Orleans.Serialization.Codecs
 
             foreach (var item in input)
             {
-                output.Enqueue(_copier.DeepCopy(item, context));
+                output.Enqueue(_copier.DeepCopy(item, context)!);
             }
         }
     }

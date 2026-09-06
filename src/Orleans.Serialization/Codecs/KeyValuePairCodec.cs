@@ -115,8 +115,8 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public KeyValuePair<TKey, TValue> DeepCopy(KeyValuePair<TKey, TValue> input, CopyContext context)
         {
-            return new(_keyCopier is null ? input.Key : _keyCopier.DeepCopy(input.Key, context),
-                _valueCopier is null ? input.Value : _valueCopier.DeepCopy(input.Value, context));
+            return new(_keyCopier is null ? input.Key : _keyCopier.DeepCopy(input.Key, context)!,
+                _valueCopier is null ? input.Value : _valueCopier.DeepCopy(input.Value, context)!);
         }
     }
 }

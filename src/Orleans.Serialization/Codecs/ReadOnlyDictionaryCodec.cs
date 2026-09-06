@@ -68,7 +68,8 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc />
-        public ReadOnlyDictionary<TKey, TValue> DeepCopy(ReadOnlyDictionary<TKey, TValue> input, CopyContext context)
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull, System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public ReadOnlyDictionary<TKey, TValue> DeepCopy([System.Diagnostics.CodeAnalysis.AllowNull] ReadOnlyDictionary<TKey, TValue> input, CopyContext context)
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
 
@@ -90,7 +91,7 @@ namespace Orleans.Serialization.Codecs
             var temp = new Dictionary<TKey, TValue>(input.Count);
             foreach (var pair in input)
             {
-                temp[_keyCopier.DeepCopy(pair.Key, context)] = _valueCopier.DeepCopy(pair.Value, context);
+                temp[_keyCopier.DeepCopy(pair.Key, context)!] = _valueCopier.DeepCopy(pair.Value, context)!;
             }
 
             result = new ReadOnlyDictionary<TKey, TValue>(temp);

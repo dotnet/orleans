@@ -178,7 +178,8 @@ public sealed class CollectionCopier<T> : IDeepCopier<Collection<T>>, IBaseCopie
     }
 
     /// <inheritdoc/>
-    public Collection<T> DeepCopy(Collection<T> input, CopyContext context)
+    [return: System.Diagnostics.CodeAnalysis.MaybeNull, System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+    public Collection<T> DeepCopy([System.Diagnostics.CodeAnalysis.AllowNull] Collection<T> input, CopyContext context)
     {
         ArgumentNullExceptionPolyfill.ThrowIfNull(context);
 
@@ -197,7 +198,7 @@ public sealed class CollectionCopier<T> : IDeepCopier<Collection<T>>, IBaseCopie
         context.RecordCopy(input, result);
         foreach (var item in input)
         {
-            result.Add(_copier.DeepCopy(item, context));
+            result.Add(_copier.DeepCopy(item, context)!);
         }
 
         return result;
@@ -214,7 +215,7 @@ public sealed class CollectionCopier<T> : IDeepCopier<Collection<T>>, IBaseCopie
 
         foreach (var item in input)
         {
-            output.Add(_copier.DeepCopy(item, context));
+            output.Add(_copier.DeepCopy(item, context)!);
         }
     }
 }

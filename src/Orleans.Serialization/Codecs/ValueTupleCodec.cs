@@ -144,7 +144,7 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public ValueTuple<T> DeepCopy(ValueTuple<T> input, CopyContext context)
         {
-            if (_copier != null) input.Item1 = _copier.DeepCopy(input.Item1, context);
+            if (_copier != null) input.Item1 = _copier.DeepCopy(input.Item1, context)!;
             return input;
         }
     }
@@ -252,8 +252,8 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public ValueTuple<T1, T2> DeepCopy(ValueTuple<T1, T2> input, CopyContext context)
         {
-            if (_copier1 != null) input.Item1 = _copier1.DeepCopy(input.Item1, context);
-            if (_copier2 != null) input.Item2 = _copier2.DeepCopy(input.Item2, context);
+            if (_copier1 != null) input.Item1 = _copier1.DeepCopy(input.Item1, context)!;
+            if (_copier2 != null) input.Item2 = _copier2.DeepCopy(input.Item2, context)!;
             return input;
         }
     }
@@ -378,9 +378,9 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public ValueTuple<T1, T2, T3> DeepCopy(ValueTuple<T1, T2, T3> input, CopyContext context)
         {
-            if (_copier1 != null) input.Item1 = _copier1.DeepCopy(input.Item1, context);
-            if (_copier2 != null) input.Item2 = _copier2.DeepCopy(input.Item2, context);
-            if (_copier3 != null) input.Item3 = _copier3.DeepCopy(input.Item3, context);
+            if (_copier1 != null) input.Item1 = _copier1.DeepCopy(input.Item1, context)!;
+            if (_copier2 != null) input.Item2 = _copier2.DeepCopy(input.Item2, context)!;
+            if (_copier3 != null) input.Item3 = _copier3.DeepCopy(input.Item3, context)!;
             return input;
         }
     }
@@ -518,10 +518,10 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public ValueTuple<T1, T2, T3, T4> DeepCopy(ValueTuple<T1, T2, T3, T4> input, CopyContext context)
         {
-            if (_copier1 != null) input.Item1 = _copier1.DeepCopy(input.Item1, context);
-            if (_copier2 != null) input.Item2 = _copier2.DeepCopy(input.Item2, context);
-            if (_copier3 != null) input.Item3 = _copier3.DeepCopy(input.Item3, context);
-            if (_copier4 != null) input.Item4 = _copier4.DeepCopy(input.Item4, context);
+            if (_copier1 != null) input.Item1 = _copier1.DeepCopy(input.Item1, context)!;
+            if (_copier2 != null) input.Item2 = _copier2.DeepCopy(input.Item2, context)!;
+            if (_copier3 != null) input.Item3 = _copier3.DeepCopy(input.Item3, context)!;
+            if (_copier4 != null) input.Item4 = _copier4.DeepCopy(input.Item4, context)!;
             return input;
         }
     }
@@ -671,11 +671,11 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public ValueTuple<T1, T2, T3, T4, T5> DeepCopy(ValueTuple<T1, T2, T3, T4, T5> input, CopyContext context)
         {
-            if (_copier1 != null) input.Item1 = _copier1.DeepCopy(input.Item1, context);
-            if (_copier2 != null) input.Item2 = _copier2.DeepCopy(input.Item2, context);
-            if (_copier3 != null) input.Item3 = _copier3.DeepCopy(input.Item3, context);
-            if (_copier4 != null) input.Item4 = _copier4.DeepCopy(input.Item4, context);
-            if (_copier5 != null) input.Item5 = _copier5.DeepCopy(input.Item5, context);
+            if (_copier1 != null) input.Item1 = _copier1.DeepCopy(input.Item1, context)!;
+            if (_copier2 != null) input.Item2 = _copier2.DeepCopy(input.Item2, context)!;
+            if (_copier3 != null) input.Item3 = _copier3.DeepCopy(input.Item3, context)!;
+            if (_copier4 != null) input.Item4 = _copier4.DeepCopy(input.Item4, context)!;
+            if (_copier5 != null) input.Item5 = _copier5.DeepCopy(input.Item5, context)!;
             return input;
         }
     }
@@ -839,12 +839,12 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public ValueTuple<T1, T2, T3, T4, T5, T6> DeepCopy(ValueTuple<T1, T2, T3, T4, T5, T6> input, CopyContext context)
         {
-            if (_copier1 != null) input.Item1 = _copier1.DeepCopy(input.Item1, context);
-            if (_copier2 != null) input.Item2 = _copier2.DeepCopy(input.Item2, context);
-            if (_copier3 != null) input.Item3 = _copier3.DeepCopy(input.Item3, context);
-            if (_copier4 != null) input.Item4 = _copier4.DeepCopy(input.Item4, context);
-            if (_copier5 != null) input.Item5 = _copier5.DeepCopy(input.Item5, context);
-            if (_copier6 != null) input.Item6 = _copier6.DeepCopy(input.Item6, context);
+            if (_copier1 != null) input.Item1 = _copier1.DeepCopy(input.Item1, context)!;
+            if (_copier2 != null) input.Item2 = _copier2.DeepCopy(input.Item2, context)!;
+            if (_copier3 != null) input.Item3 = _copier3.DeepCopy(input.Item3, context)!;
+            if (_copier4 != null) input.Item4 = _copier4.DeepCopy(input.Item4, context)!;
+            if (_copier5 != null) input.Item5 = _copier5.DeepCopy(input.Item5, context)!;
+            if (_copier6 != null) input.Item6 = _copier6.DeepCopy(input.Item6, context)!;
             return input;
         }
     }
@@ -1022,13 +1022,13 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public ValueTuple<T1, T2, T3, T4, T5, T6, T7> DeepCopy(ValueTuple<T1, T2, T3, T4, T5, T6, T7> input, CopyContext context)
         {
-            if (_copier1 != null) input.Item1 = _copier1.DeepCopy(input.Item1, context);
-            if (_copier2 != null) input.Item2 = _copier2.DeepCopy(input.Item2, context);
-            if (_copier3 != null) input.Item3 = _copier3.DeepCopy(input.Item3, context);
-            if (_copier4 != null) input.Item4 = _copier4.DeepCopy(input.Item4, context);
-            if (_copier5 != null) input.Item5 = _copier5.DeepCopy(input.Item5, context);
-            if (_copier6 != null) input.Item6 = _copier6.DeepCopy(input.Item6, context);
-            if (_copier7 != null) input.Item7 = _copier7.DeepCopy(input.Item7, context);
+            if (_copier1 != null) input.Item1 = _copier1.DeepCopy(input.Item1, context)!;
+            if (_copier2 != null) input.Item2 = _copier2.DeepCopy(input.Item2, context)!;
+            if (_copier3 != null) input.Item3 = _copier3.DeepCopy(input.Item3, context)!;
+            if (_copier4 != null) input.Item4 = _copier4.DeepCopy(input.Item4, context)!;
+            if (_copier5 != null) input.Item5 = _copier5.DeepCopy(input.Item5, context)!;
+            if (_copier6 != null) input.Item6 = _copier6.DeepCopy(input.Item6, context)!;
+            if (_copier7 != null) input.Item7 = _copier7.DeepCopy(input.Item7, context)!;
             return input;
         }
     }
@@ -1219,13 +1219,13 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public ValueTuple<T1, T2, T3, T4, T5, T6, T7, T8> DeepCopy(ValueTuple<T1, T2, T3, T4, T5, T6, T7, T8> input, CopyContext context)
         {
-            if (_copier1 != null) input.Item1 = _copier1.DeepCopy(input.Item1, context);
-            if (_copier2 != null) input.Item2 = _copier2.DeepCopy(input.Item2, context);
-            if (_copier3 != null) input.Item3 = _copier3.DeepCopy(input.Item3, context);
-            if (_copier4 != null) input.Item4 = _copier4.DeepCopy(input.Item4, context);
-            if (_copier5 != null) input.Item5 = _copier5.DeepCopy(input.Item5, context);
-            if (_copier6 != null) input.Item6 = _copier6.DeepCopy(input.Item6, context);
-            if (_copier7 != null) input.Item7 = _copier7.DeepCopy(input.Item7, context);
+            if (_copier1 != null) input.Item1 = _copier1.DeepCopy(input.Item1, context)!;
+            if (_copier2 != null) input.Item2 = _copier2.DeepCopy(input.Item2, context)!;
+            if (_copier3 != null) input.Item3 = _copier3.DeepCopy(input.Item3, context)!;
+            if (_copier4 != null) input.Item4 = _copier4.DeepCopy(input.Item4, context)!;
+            if (_copier5 != null) input.Item5 = _copier5.DeepCopy(input.Item5, context)!;
+            if (_copier6 != null) input.Item6 = _copier6.DeepCopy(input.Item6, context)!;
+            if (_copier7 != null) input.Item7 = _copier7.DeepCopy(input.Item7, context)!;
             if (_copier8 != null) input.Rest = _copier8.DeepCopy(input.Rest, context);
             return input;
         }

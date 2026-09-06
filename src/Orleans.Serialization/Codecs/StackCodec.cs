@@ -131,7 +131,8 @@ public sealed class StackCopier<T> : IDeepCopier<Stack<T>>, IBaseCopier<Stack<T>
     }
 
     /// <inheritdoc/>
-    public Stack<T> DeepCopy(Stack<T> input, CopyContext context)
+    [return: System.Diagnostics.CodeAnalysis.MaybeNull, System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+    public Stack<T> DeepCopy([System.Diagnostics.CodeAnalysis.AllowNull] Stack<T> input, CopyContext context)
     {
         ArgumentNullExceptionPolyfill.ThrowIfNull(context);
 
@@ -152,7 +153,7 @@ public sealed class StackCopier<T> : IDeepCopier<Stack<T>>, IBaseCopier<Stack<T>
         input.CopyTo(array, 0);
         for (var i = array.Length - 1; i >= 0; --i)
         {
-            result.Push(_copier.DeepCopy(array[i], context));
+            result.Push(_copier.DeepCopy(array[i], context)!);
         }
 
         return result;
@@ -169,7 +170,7 @@ public sealed class StackCopier<T> : IDeepCopier<Stack<T>>, IBaseCopier<Stack<T>
         input.CopyTo(array, 0);
         for (var i = array.Length - 1; i >= 0; --i)
         {
-            output.Push(_copier.DeepCopy(array[i], context));
+            output.Push(_copier.DeepCopy(array[i], context)!);
         }
     }
 }

@@ -1846,7 +1846,7 @@ namespace Orleans.Serialization
         /// <typeparam name="T">The type of the value to copy.</typeparam>
         /// <param name="value">The value to copy.</param>
         /// <returns>A copy of the provided value.</returns>
-        [return: MaybeNull]
+        [return: MaybeNull, NotNullIfNotNull(nameof(value))]
         public T Copy<T>([AllowNull] T value)
         {
             using var context = _contextPool.GetContext();
@@ -1878,11 +1878,11 @@ namespace Orleans.Serialization
         /// </summary>
         /// <param name="value">The value to copy.</param>
         /// <returns>A copy of the provided value.</returns>
-        [return: MaybeNull]
+        [return: MaybeNull, NotNullIfNotNull(nameof(value))]
         public T Copy([AllowNull] T value)
         {
             using var context = _contextPool.GetContext();
-            return _copier.DeepCopy(value!, context);
+            return _copier.DeepCopy(value, context);
         }
     }
 }
