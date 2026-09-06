@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Reflection.Emit;
+using Orleans.Serialization.Codecs;
 
 namespace Orleans.Serialization.Utilities
 {
@@ -43,7 +44,10 @@ namespace Orleans.Serialization.Utilities
 #endif
             Type declaringType,
             string fieldName)
-            => GetGetter(declaringType, fieldName, false);
+        {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(declaringType);
+            return GetGetter(declaringType, fieldName, false);
+        }
 
         /// <summary>
         /// Returns a delegate to get the value of a specified field.
@@ -55,7 +59,10 @@ namespace Orleans.Serialization.Utilities
 #endif
             Type declaringType,
             string fieldName)
-            => GetGetter(declaringType, fieldName, true);
+        {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(declaringType);
+            return GetGetter(declaringType, fieldName, true);
+        }
 
         private static Delegate GetGetter(
 #if NET5_0_OR_GREATER
@@ -89,7 +96,10 @@ namespace Orleans.Serialization.Utilities
 #endif
             Type declaringType,
             string fieldName)
-            => GetSetter(declaringType, fieldName, false);
+        {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(declaringType);
+            return GetSetter(declaringType, fieldName, false);
+        }
 
         /// <summary>
         /// Returns a delegate to set the value of this field for an instance.
@@ -101,7 +111,10 @@ namespace Orleans.Serialization.Utilities
 #endif
             Type declaringType,
             string fieldName)
-            => GetSetter(declaringType, fieldName, true);
+        {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(declaringType);
+            return GetSetter(declaringType, fieldName, true);
+        }
 
         private static Delegate GetSetter(
 #if NET5_0_OR_GREATER

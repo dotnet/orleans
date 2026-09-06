@@ -107,6 +107,7 @@ namespace Orleans.Serialization.Utilities
         /// <param name="result">The destination string builder.</param>
         public static void Format<TInput>(ref Reader<TInput> reader, StringBuilder result)
         {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(result);
             var (field, type) = reader.ReadFieldHeaderForAnalysis();
             FormatField(ref reader, field, type, field.FieldIdDelta, result, indentation: 0);
         }
@@ -323,4 +324,3 @@ namespace Orleans.Serialization.Utilities
         }
     }
 }
-

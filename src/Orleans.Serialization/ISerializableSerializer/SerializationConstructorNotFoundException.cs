@@ -1,6 +1,7 @@
 using System;
 using System.Runtime.Serialization;
 using System.Security;
+using Orleans.Serialization.Codecs;
 
 namespace Orleans.Serialization
 {
@@ -15,8 +16,7 @@ namespace Orleans.Serialization
         /// </summary>
         /// <param name="type">The type.</param>
         [SecurityCritical]
-        public SerializationConstructorNotFoundException(Type type) : base(
-            (string)$"Could not find a suitable serialization constructor on type {type.FullName}")
+        public SerializationConstructorNotFoundException(Type type) : base(GetMessage(type))
         {
         }
 
@@ -31,6 +31,12 @@ namespace Orleans.Serialization
 #endif
         protected SerializationConstructorNotFoundException(SerializationInfo info, StreamingContext context) : base(info, context)
         {
+        }
+
+        private static string GetMessage(Type type)
+        {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(type);
+            return $"Could not find a suitable serialization constructor on type {type.FullName}";
         }
     }
 }
