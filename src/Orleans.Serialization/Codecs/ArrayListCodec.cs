@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Serializers;
@@ -49,6 +50,9 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public ArrayList DeepCopy(ArrayList input, CopyContext context)
         {
+            if (context is null) throw new ArgumentNullException(nameof(context));
+            if (input is null) return null!;
+
             if (context.TryGetCopy<ArrayList>(input, out var result))
             {
                 return result!;
@@ -72,6 +76,10 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public void DeepCopy(ArrayList input, ArrayList output, CopyContext context)
         {
+            if (input is null) throw new ArgumentNullException(nameof(input));
+            if (output is null) throw new ArgumentNullException(nameof(output));
+            if (context is null) throw new ArgumentNullException(nameof(context));
+
             foreach (var item in input)
             {
                 output.Add(ObjectCopier.DeepCopy(item, context));

@@ -114,6 +114,8 @@ namespace Orleans.Serialization.Codecs
         /// <returns>A copy of <paramref name="input" />.</returns>
         public static BitArray DeepCopy(BitArray input, CopyContext context)
         {
+            if (context is null) throw new ArgumentNullException(nameof(context));
+
             if (context.TryGetCopy<BitArray>(input, out var result))
             {
                 return result!;
@@ -176,6 +178,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="fieldIdDelta">The field identifier delta.</param>
         /// <param name="value">The value.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "ReferenceCodec handles null serialized values before the byte array is accessed.")]
         public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, byte[] value) where TBufferWriter : IBufferWriter<byte>
         {
             if (ReferenceCodec.TryWriteReferenceFieldExpected(ref writer, fieldIdDelta, value))
@@ -206,6 +209,9 @@ namespace Orleans.Serialization.Codecs
         /// <returns>A copy of <paramref name="input" />.</returns>
         public static byte[] DeepCopy(byte[] input, CopyContext context)
         {
+            if (context is null) throw new ArgumentNullException(nameof(context));
+            if (input is null) return null!;
+
             if (context.TryGetCopy<byte[]>(input, out var result))
             {
                 return result!;

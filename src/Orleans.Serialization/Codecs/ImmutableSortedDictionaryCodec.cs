@@ -92,6 +92,9 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public ImmutableSortedDictionary<TKey, TValue> DeepCopy(ImmutableSortedDictionary<TKey, TValue> input, CopyContext context)
         {
+            if (context is null) throw new ArgumentNullException(nameof(context));
+            if (input is null) return null!;
+
             if (context.TryGetCopy<ImmutableSortedDictionary<TKey, TValue>>(input, out var result))
                 return result!;
 

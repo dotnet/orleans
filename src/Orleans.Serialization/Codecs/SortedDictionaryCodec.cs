@@ -90,6 +90,9 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public SortedDictionary<TKey, TValue> DeepCopy(SortedDictionary<TKey, TValue> input, CopyContext context)
         {
+            if (context is null) throw new ArgumentNullException(nameof(context));
+            if (input is null) return null!;
+
             if (context.TryGetCopy<SortedDictionary<TKey, TValue>>(input, out var result))
             {
                 return result!;
@@ -113,6 +116,10 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public void DeepCopy(SortedDictionary<TKey, TValue> input, SortedDictionary<TKey, TValue> output, CopyContext context)
         {
+            if (input is null) throw new ArgumentNullException(nameof(input));
+            if (output is null) throw new ArgumentNullException(nameof(output));
+            if (context is null) throw new ArgumentNullException(nameof(context));
+
             foreach (var pair in input)
             {
                 output[_keyCopier.DeepCopy(pair.Key, context)] = _valueCopier.DeepCopy(pair.Value, context);

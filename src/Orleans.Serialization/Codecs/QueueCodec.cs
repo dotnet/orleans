@@ -28,6 +28,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "ReferenceCodec handles null serialized values before the queue is accessed.")]
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] Queue<T> value) where TBufferWriter : IBufferWriter<byte>
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
@@ -130,6 +131,9 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public Queue<T> DeepCopy(Queue<T> input, CopyContext context)
         {
+            if (context is null) throw new ArgumentNullException(nameof(context));
+            if (input is null) return null!;
+
             if (context.TryGetCopy<Queue<T>>(input, out var result))
             {
                 return result!;
@@ -153,6 +157,10 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public void DeepCopy(Queue<T> input, Queue<T> output, CopyContext context)
         {
+            if (input is null) throw new ArgumentNullException(nameof(input));
+            if (output is null) throw new ArgumentNullException(nameof(output));
+            if (context is null) throw new ArgumentNullException(nameof(context));
+
             foreach (var item in input)
             {
                 output.Enqueue(_copier.DeepCopy(item, context));

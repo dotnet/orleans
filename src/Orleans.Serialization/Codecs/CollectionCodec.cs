@@ -33,6 +33,7 @@ public sealed class CollectionCodec<T> : IFieldCodec<Collection<T>>, IBaseCodec<
 
     /// <inheritdoc/>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "ReferenceCodec handles null serialized values before the collection is accessed.")]
     public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] Collection<T> value) where TBufferWriter : IBufferWriter<byte>
     {
         if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
@@ -107,6 +108,8 @@ public sealed class CollectionCodec<T> : IFieldCodec<Collection<T>>, IBaseCodec<
     /// <inheritdoc />
     public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, Collection<T> value) where TBufferWriter : IBufferWriter<byte>
     {
+        if (value is null) throw new ArgumentNullException(nameof(value));
+
         if (value.Count > 0)
         {
             UInt32Codec.WriteField(ref writer, 0, (uint)value.Count);
@@ -122,6 +125,8 @@ public sealed class CollectionCodec<T> : IFieldCodec<Collection<T>>, IBaseCodec<
     /// <inheritdoc />
     public void Deserialize<TInput>(ref Reader<TInput> reader, Collection<T> value)
     {
+        if (value is null) throw new ArgumentNullException(nameof(value));
+
         // If the value has some values added by the constructor, clear them.
         // If those values are in the serialized payload, they will be added below.
         value.Clear();
@@ -175,6 +180,9 @@ public sealed class CollectionCopier<T> : IDeepCopier<Collection<T>>, IBaseCopie
     /// <inheritdoc/>
     public Collection<T> DeepCopy(Collection<T> input, CopyContext context)
     {
+        if (context is null) throw new ArgumentNullException(nameof(context));
+        if (input is null) return null!;
+
         if (context.TryGetCopy<Collection<T>>(input, out var result))
         {
             return result!;
@@ -198,6 +206,10 @@ public sealed class CollectionCopier<T> : IDeepCopier<Collection<T>>, IBaseCopie
     /// <inheritdoc/>
     public void DeepCopy(Collection<T> input, Collection<T> output, CopyContext context)
     {
+        if (input is null) throw new ArgumentNullException(nameof(input));
+        if (output is null) throw new ArgumentNullException(nameof(output));
+        if (context is null) throw new ArgumentNullException(nameof(context));
+
         output.Clear();
 
         foreach (var item in input)

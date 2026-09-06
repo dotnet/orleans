@@ -39,6 +39,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "ReferenceCodec handles null serialized values before the hash set is accessed.")]
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] HashSet<T> value) where TBufferWriter : IBufferWriter<byte>
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
@@ -116,6 +117,8 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, HashSet<T> value) where TBufferWriter : IBufferWriter<byte>
         {
+            if (value is null) throw new ArgumentNullException(nameof(value));
+
             if (value.Comparer != EqualityComparer<T>.Default)
             {
                 _comparerCodec.WriteField(ref writer, 0, _comparerType, value.Comparer);
@@ -200,6 +203,9 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public HashSet<T> DeepCopy(HashSet<T> input, CopyContext context)
         {
+            if (context is null) throw new ArgumentNullException(nameof(context));
+            if (input is null) return null!;
+
             if (context.TryGetCopy<HashSet<T>>(input, out var result))
             {
                 return result!;
@@ -223,6 +229,10 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public void DeepCopy(HashSet<T> input, HashSet<T> output, CopyContext context)
         {
+            if (input is null) throw new ArgumentNullException(nameof(input));
+            if (output is null) throw new ArgumentNullException(nameof(output));
+            if (context is null) throw new ArgumentNullException(nameof(context));
+
             // If the value has some values added by the constructor, clear them.
             // If those values are in the serialized payload, they will be added below.
             output.Clear();

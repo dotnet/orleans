@@ -76,6 +76,10 @@ namespace Orleans.Serialization.Codecs
 
         /// <inheritdoc/>
         public ImmutableArray<T> DeepCopy(ImmutableArray<T> input, CopyContext context)
-            => _copier is null || input.IsDefaultOrEmpty ? input : ImmutableArray.CreateRange(input, (i, s) => s._copier!.DeepCopy(i, s.context), (_copier, context));
+        {
+            if (context is null) throw new ArgumentNullException(nameof(context));
+
+            return _copier is null || input.IsDefaultOrEmpty ? input : ImmutableArray.CreateRange(input, (i, s) => s._copier!.DeepCopy(i, s.context), (_copier, context));
+        }
     }
 }

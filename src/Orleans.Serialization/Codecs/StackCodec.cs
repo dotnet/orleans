@@ -31,6 +31,7 @@ public sealed class StackCodec<T> : IFieldCodec<Stack<T>>
 
     /// <inheritdoc/>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "ReferenceCodec handles null serialized values before the stack is accessed.")]
     public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] Stack<T> value) where TBufferWriter : IBufferWriter<byte>
     {
         if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
@@ -132,6 +133,9 @@ public sealed class StackCopier<T> : IDeepCopier<Stack<T>>, IBaseCopier<Stack<T>
     /// <inheritdoc/>
     public Stack<T> DeepCopy(Stack<T> input, CopyContext context)
     {
+        if (context is null) throw new ArgumentNullException(nameof(context));
+        if (input is null) return null!;
+
         if (context.TryGetCopy<Stack<T>>(input, out var result))
         {
             return result!;
@@ -157,6 +161,10 @@ public sealed class StackCopier<T> : IDeepCopier<Stack<T>>, IBaseCopier<Stack<T>
     /// <inheritdoc/>
     public void DeepCopy(Stack<T> input, Stack<T> output, CopyContext context)
     {
+        if (input is null) throw new ArgumentNullException(nameof(input));
+        if (output is null) throw new ArgumentNullException(nameof(output));
+        if (context is null) throw new ArgumentNullException(nameof(context));
+
         var array = new T[input.Count];
         input.CopyTo(array, 0);
         for (var i = array.Length - 1; i >= 0; --i)

@@ -32,6 +32,7 @@ namespace Orleans.Serialization.Codecs
 
         /// <inheritdoc/>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "ReferenceCodec handles null serialized values before the list is accessed.")]
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] List<T> value) where TBufferWriter : IBufferWriter<byte>
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
@@ -106,6 +107,8 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, List<T> value) where TBufferWriter : IBufferWriter<byte>
         {
+            if (value is null) throw new ArgumentNullException(nameof(value));
+
             if (value.Count > 0)
             {
                 UInt32Codec.WriteField(ref writer, 0, (uint)value.Count);
@@ -121,6 +124,8 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public void Deserialize<TInput>(ref Reader<TInput> reader, List<T> value)
         {
+            if (value is null) throw new ArgumentNullException(nameof(value));
+
             // If the value has some values added by the constructor, clear them.
             // If those values are in the serialized payload, they will be added below.
             value.Clear();
@@ -177,6 +182,9 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public List<T> DeepCopy(List<T> input, CopyContext context)
         {
+            if (context is null) throw new ArgumentNullException(nameof(context));
+            if (input is null) return null!;
+
             if (context.TryGetCopy<List<T>>(input, out var result))
             {
                 return result!;
@@ -200,6 +208,10 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public void DeepCopy(List<T> input, List<T> output, CopyContext context)
         {
+            if (input is null) throw new ArgumentNullException(nameof(input));
+            if (output is null) throw new ArgumentNullException(nameof(output));
+            if (context is null) throw new ArgumentNullException(nameof(context));
+
             output.Clear();
 
 #if NET6_0_OR_GREATER

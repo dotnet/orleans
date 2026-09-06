@@ -28,6 +28,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "ReferenceCodec handles null serialized values before the array is accessed.")]
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] T[] value) where TBufferWriter : IBufferWriter<byte>
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
@@ -141,6 +142,9 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public T[] DeepCopy(T[] input, CopyContext context)
         {
+            if (context is null) throw new ArgumentNullException(nameof(context));
+            if (input is null) return null!;
+
             if (context.TryGetCopy<T[]>(input, out var result))
             {
                 return result!;
@@ -287,6 +291,8 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public ReadOnlyMemory<T> DeepCopy(ReadOnlyMemory<T> input, CopyContext context)
         {
+            if (context is null) throw new ArgumentNullException(nameof(context));
+
             if (input.IsEmpty)
             {
                 return input;
@@ -445,6 +451,8 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public Memory<T> DeepCopy(Memory<T> input, CopyContext context)
         {
+            if (context is null) throw new ArgumentNullException(nameof(context));
+
             if (input.IsEmpty)
             {
                 return input;
@@ -606,6 +614,8 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public ArraySegment<T> DeepCopy(ArraySegment<T> input, CopyContext context)
         {
+            if (context is null) throw new ArgumentNullException(nameof(context));
+
             if (input.Array is null)
             {
                 return input;
