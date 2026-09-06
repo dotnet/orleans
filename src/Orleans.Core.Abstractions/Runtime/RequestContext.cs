@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
 using Orleans.Core.Internal;
@@ -183,6 +184,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Represents a scoped change to call-chain reentrancy.
         /// </summary>
+        [SuppressMessage("Performance", "CA1815:Override equals and operator equals on value types", Justification = "This disposable scope token controls runtime reentrancy state and does not represent a comparable value.")]
         public readonly struct ReentrancySection : IDisposable
         {
             private readonly Guid _originalReentrancyId;

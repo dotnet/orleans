@@ -8,7 +8,7 @@
 //------------------------------------------------------------------------------
 namespace Orleans
 {
-    public readonly partial struct DeactivationReason
+    public readonly partial struct DeactivationReason : System.IEquatable<DeactivationReason>
     {
         private readonly object _dummy;
         private readonly int _dummyPrimitive;
@@ -21,6 +21,16 @@ namespace Orleans
         public System.Exception? Exception { get { throw null; } }
 
         public DeactivationReasonCode ReasonCode { get { throw null; } }
+
+        public readonly bool Equals(DeactivationReason other) { throw null; }
+
+        public override readonly bool Equals(object? obj) { throw null; }
+
+        public override readonly int GetHashCode() { throw null; }
+
+        public static bool operator ==(DeactivationReason left, DeactivationReason right) { throw null; }
+
+        public static bool operator !=(DeactivationReason left, DeactivationReason right) { throw null; }
 
         public override readonly string ToString() { throw null; }
     }
@@ -1431,11 +1441,21 @@ namespace Orleans.Concurrency
 
     [GenerateSerializer]
     [Immutable]
-    public readonly partial struct Immutable<T>
+    public readonly partial struct Immutable<T> : System.IEquatable<Immutable<T>>
     {
         [Id(0)]
         public readonly T Value;
         public Immutable(T value) { }
+
+        public readonly bool Equals(Immutable<T> other) { throw null; }
+
+        public override readonly bool Equals(object? obj) { throw null; }
+
+        public override readonly int GetHashCode() { throw null; }
+
+        public static bool operator ==(Immutable<T> left, Immutable<T> right) { throw null; }
+
+        public static bool operator !=(Immutable<T> left, Immutable<T> right) { throw null; }
     }
 
     [System.AttributeUsage(System.AttributeTargets.Class)]
@@ -2325,7 +2345,7 @@ namespace Orleans.Runtime
         public System.IServiceProvider ServiceProvider { get { throw null; } }
     }
 
-    public readonly partial struct GrainTimerCreationOptions
+    public readonly partial struct GrainTimerCreationOptions : System.IEquatable<GrainTimerCreationOptions>
     {
         private readonly int _dummyPrimitive;
         public GrainTimerCreationOptions() { }
@@ -2340,6 +2360,16 @@ namespace Orleans.Runtime
         public bool KeepAlive { get { throw null; } init { } }
 
         public required System.TimeSpan Period { get { throw null; } init { } }
+
+        public readonly bool Equals(GrainTimerCreationOptions other) { throw null; }
+
+        public override readonly bool Equals(object? obj) { throw null; }
+
+        public override readonly int GetHashCode() { throw null; }
+
+        public static bool operator ==(GrainTimerCreationOptions left, GrainTimerCreationOptions right) { throw null; }
+
+        public static bool operator !=(GrainTimerCreationOptions left, GrainTimerCreationOptions right) { throw null; }
     }
 
     [GenerateSerializer]
@@ -3325,7 +3355,7 @@ namespace Orleans.Statistics
     [GenerateSerializer]
     [Alias("Orleans.Statistics.EnvironmentStatistics")]
     [System.Diagnostics.DebuggerDisplay("{ToString(),nq}")]
-    public readonly partial struct EnvironmentStatistics
+    public readonly partial struct EnvironmentStatistics : System.IEquatable<EnvironmentStatistics>
     {
         [Id(2)]
         public readonly long FilteredAvailableMemoryBytes;
@@ -3352,6 +3382,16 @@ namespace Orleans.Statistics
         public float NormalizedFilteredMemoryUsage { get { throw null; } }
 
         public float NormalizedMemoryUsage { get { throw null; } }
+
+        public readonly bool Equals(EnvironmentStatistics other) { throw null; }
+
+        public override readonly bool Equals(object? obj) { throw null; }
+
+        public override readonly int GetHashCode() { throw null; }
+
+        public static bool operator ==(EnvironmentStatistics left, EnvironmentStatistics right) { throw null; }
+
+        public static bool operator !=(EnvironmentStatistics left, EnvironmentStatistics right) { throw null; }
 
         public override readonly string ToString() { throw null; }
     }

@@ -397,7 +397,7 @@ namespace Orleans.Transactions
 
     [GenerateSerializer]
     [Immutable]
-    public readonly partial struct ParticipantId
+    public readonly partial struct ParticipantId : System.IEquatable<ParticipantId>
     {
         private readonly object _dummy;
         private readonly int _dummyPrimitive;
@@ -412,6 +412,16 @@ namespace Orleans.Transactions
 
         [Id(2)]
         public Role SupportedRoles { get { throw null; } }
+
+        public readonly bool Equals(ParticipantId other) { throw null; }
+
+        public override readonly bool Equals(object? obj) { throw null; }
+
+        public override readonly int GetHashCode() { throw null; }
+
+        public static bool operator ==(ParticipantId left, ParticipantId right) { throw null; }
+
+        public static bool operator !=(ParticipantId left, ParticipantId right) { throw null; }
 
         public override readonly string ToString() { throw null; }
 
@@ -702,13 +712,23 @@ namespace Orleans.Transactions
 namespace Orleans.Transactions.Abstractions
 {
     [GenerateSerializer]
-    public partial struct AccessCounter
+    public partial struct AccessCounter : System.IEquatable<AccessCounter>
     {
         [Id(0)]
         public int Reads;
         [Id(1)]
         public int Writes;
+        public readonly bool Equals(AccessCounter other) { throw null; }
+
+        public override readonly bool Equals(object? obj) { throw null; }
+
+        public override readonly int GetHashCode() { throw null; }
+
         public static AccessCounter operator +(AccessCounter c1, AccessCounter c2) { throw null; }
+
+        public static bool operator ==(AccessCounter left, AccessCounter right) { throw null; }
+
+        public static bool operator !=(AccessCounter left, AccessCounter right) { throw null; }
     }
 
     [GenerateSerializer]

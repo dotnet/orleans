@@ -91,7 +91,7 @@ namespace Orleans.Transactions.Abstractions
     /// </summary>
     [GenerateSerializer]
     [Serializable]
-    public struct AccessCounter
+    public struct AccessCounter : IEquatable<AccessCounter>
     {
         /// <summary>
         /// The number of read accesses.
@@ -105,6 +105,25 @@ namespace Orleans.Transactions.Abstractions
         [Id(1)]
         public int Writes;
 
+        /// <inheritdoc/>
+        public readonly bool Equals(AccessCounter other) => Reads == other.Reads && Writes == other.Writes;
+
+        /// <inheritdoc/>
+        public override readonly bool Equals(object? obj) => obj is AccessCounter other && Equals(other);
+
+        /// <inheritdoc/>
+        public override readonly int GetHashCode() => HashCode.Combine(Reads, Writes);
+
+        /// <summary>
+        /// Determines whether two access counters are equal.
+        /// </summary>
+        public static bool operator ==(AccessCounter left, AccessCounter right) => left.Equals(right);
+
+        /// <summary>
+        /// Determines whether two access counters are unequal.
+        /// </summary>
+        public static bool operator !=(AccessCounter left, AccessCounter right) => !left.Equals(right);
+
         /// <summary>
         /// Adds the read and write counts from two values.
         /// </summary>
@@ -117,6 +136,5 @@ namespace Orleans.Transactions.Abstractions
         }
     }
 }
-
 
 

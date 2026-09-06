@@ -10,6 +10,7 @@ namespace Orleans.Serialization.TestKit
     /// Provides a fixed-capacity buffer writer for serialization tests.
     /// </summary>
     [ExcludeFromCodeCoverage]
+    [SuppressMessage("Performance", "CA1815:Override equals and operator equals on value types", Justification = "This mutable writer owns an aliased buffer and cursor position rather than representing a comparable value.")]
     public struct TestBufferWriterStruct : IBufferWriter<byte>, IOutputBuffer
     {
         private readonly byte[] _buffer;

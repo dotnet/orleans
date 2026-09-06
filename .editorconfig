@@ -700,6 +700,10 @@ dotnet_diagnostic.CA1062.severity = warning
 [src/Redis/**/*.cs]
 dotnet_diagnostic.CA1062.severity = warning
 
+# CA1815: Override equals and operator equals on value types
+[src/{Orleans.Core.Abstractions,Orleans.EventSourcing,Orleans.Reminders,Orleans.Serialization.FSharp,Orleans.Serialization.TestKit,Orleans.Streaming,Orleans.Transactions,Orleans.Transactions.TestKit.Base}/**.cs]
+dotnet_diagnostic.CA1815.severity = warning
+
 # Production source enforces the correctness baseline. Tests, samples, documentation,
 # playgrounds, templates, and tools retain advisory diagnostics during this rollout.
 [src/**/*.{cs,vb}]

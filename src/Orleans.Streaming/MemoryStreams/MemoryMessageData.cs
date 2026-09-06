@@ -1,5 +1,6 @@
 
 using System;
+using System.Diagnostics.CodeAnalysis;
 using Orleans.Runtime;
 
 namespace Orleans.Providers
@@ -9,6 +10,7 @@ namespace Orleans.Providers
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [SuppressMessage("Performance", "CA1815:Override equals and operator equals on value types", Justification = "This mutable transport envelope carries aliased payload storage rather than representing a comparable value.")]
     public struct MemoryMessageData
     {
         /// <summary>

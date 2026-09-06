@@ -9,7 +9,7 @@ namespace Orleans.Providers.Streams.Common
     /// This is a tightly packed cached structure containing a queue message.
     /// It should only contain value types.
     /// </summary>
-    public struct CachedMessage
+    public struct CachedMessage : IEquatable<CachedMessage>
     {
         /// <summary>
         /// Identity of the stream this message is a part of.
@@ -40,6 +40,32 @@ namespace Orleans.Providers.Streams.Common
         /// Segment containing the serialized event data.
         /// </summary>
         public ArraySegment<byte> Segment;
+
+        /// <inheritdoc/>
+        public readonly bool Equals(CachedMessage other) =>
+            StreamId.Equals(other.StreamId)
+            && SequenceNumber == other.SequenceNumber
+            && EventIndex == other.EventIndex
+            && EnqueueTimeUtc == other.EnqueueTimeUtc
+            && DequeueTimeUtc == other.DequeueTimeUtc
+            && Segment.Equals(other.Segment);
+
+        /// <inheritdoc/>
+        public override readonly bool Equals(object? obj) => obj is CachedMessage other && Equals(other);
+
+        /// <inheritdoc/>
+        public override readonly int GetHashCode() =>
+            HashCode.Combine(StreamId, SequenceNumber, EventIndex, EnqueueTimeUtc, DequeueTimeUtc, Segment);
+
+        /// <summary>
+        /// Determines whether two cached messages are equal.
+        /// </summary>
+        public static bool operator ==(CachedMessage left, CachedMessage right) => left.Equals(right);
+
+        /// <summary>
+        /// Determines whether two cached messages are unequal.
+        /// </summary>
+        public static bool operator !=(CachedMessage left, CachedMessage right) => !left.Equals(right);
     }
 
     /// <summary>

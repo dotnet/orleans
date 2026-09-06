@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 
 namespace Orleans.EventSourcing.Common
@@ -7,6 +8,7 @@ namespace Orleans.EventSourcing.Common
     /// Utility class for recording connection issues.
     /// It is public, not internal, because it is a useful building block for implementing other consistency providers.
     /// </summary>
+    [SuppressMessage("Performance", "CA1815:Override equals and operator equals on value types", Justification = "This mutable coordinator tracks connection state and notifications rather than representing a comparable value.")]
     public struct RecordedConnectionIssue
     {
         /// <summary>

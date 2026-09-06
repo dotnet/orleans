@@ -53,7 +53,7 @@ namespace Orleans
         /// Thereafter, the app can set count = curCount
         /// </summary>
         [Serializable, GenerateSerializer, Immutable]
-        public readonly struct TickStatus
+        public readonly struct TickStatus : IEquatable<TickStatus>
         {
             /// <summary>
             /// Gets the time at which the first tick of this reminder is due, or was triggered.
@@ -86,6 +86,28 @@ namespace Orleans
                 Period = period;
                 CurrentTickTime = timeStamp;
             }
+
+            /// <inheritdoc/>
+            public bool Equals(TickStatus other) =>
+                FirstTickTime == other.FirstTickTime
+                && Period == other.Period
+                && CurrentTickTime == other.CurrentTickTime;
+
+            /// <inheritdoc/>
+            public override bool Equals(object? obj) => obj is TickStatus other && Equals(other);
+
+            /// <inheritdoc/>
+            public override int GetHashCode() => HashCode.Combine(FirstTickTime, Period, CurrentTickTime);
+
+            /// <summary>
+            /// Determines whether two reminder tick statuses are equal.
+            /// </summary>
+            public static bool operator ==(TickStatus left, TickStatus right) => left.Equals(right);
+
+            /// <summary>
+            /// Determines whether two reminder tick statuses are unequal.
+            /// </summary>
+            public static bool operator !=(TickStatus left, TickStatus right) => !left.Equals(right);
 
             /// <inheritdoc/>
             public override string ToString() => $"<{FirstTickTime}, {Period}, {CurrentTickTime}>";
