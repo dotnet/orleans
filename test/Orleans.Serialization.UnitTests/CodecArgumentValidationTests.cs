@@ -4,6 +4,7 @@ using System.Collections.Immutable;
 using System.Collections.ObjectModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
@@ -75,23 +76,23 @@ public sealed class CodecArgumentValidationTests : IDisposable
     {
         public int InvocationCount { get; private set; }
 
-        [return: MaybeNull, NotNullIfNotNull(nameof(input))]
-        public T DeepCopy([AllowNull] T input, CopyContext context)
+        [return: NotNullIfNotNull(nameof(input))]
+        public T? DeepCopy(T? input, CopyContext context)
         {
             InvocationCount++;
-            return input is null ? default! : transform(input);
+            return input is null ? default : transform(input);
         }
     }
 
     [Fact]
     public void DeepCopierContract_DeclaresCorrelatedNullability()
     {
-        var method = typeof(IDeepCopier<>).GetMethods()
-            .Single(method => method.Name == nameof(IDeepCopier<object>.DeepCopy) && method.ReturnType.IsGenericParameter);
+        var method = typeof(IDeepCopier<string>).GetMethod(nameof(IDeepCopier<string>.DeepCopy))!;
         var input = method.GetParameters()[0];
+        var nullability = new NullabilityInfoContext();
 
-        Assert.Contains(input.GetCustomAttributesData(), attribute => attribute.AttributeType == typeof(AllowNullAttribute));
-        Assert.Contains(method.ReturnParameter.GetCustomAttributesData(), attribute => attribute.AttributeType == typeof(MaybeNullAttribute));
+        Assert.Equal(NullabilityState.Nullable, nullability.Create(input).ReadState);
+        Assert.Equal(NullabilityState.Nullable, nullability.Create(method.ReturnParameter).ReadState);
         var correlatedReturn = Assert.Single(
             method.ReturnParameter.GetCustomAttributesData(),
             attribute => attribute.AttributeType == typeof(NotNullIfNotNullAttribute));

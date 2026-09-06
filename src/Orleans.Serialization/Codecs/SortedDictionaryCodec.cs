@@ -88,8 +88,8 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc />
-        [return: System.Diagnostics.CodeAnalysis.MaybeNull, System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
-        public SortedDictionary<TKey, TValue> DeepCopy([System.Diagnostics.CodeAnalysis.AllowNull] SortedDictionary<TKey, TValue> input, CopyContext context)
+        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public SortedDictionary<TKey, TValue>? DeepCopy(SortedDictionary<TKey, TValue>? input, CopyContext context)
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
 

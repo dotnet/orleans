@@ -415,11 +415,11 @@ public sealed class ProtobufNullAndCopierContractTests : IDisposable
     {
         public int InvocationCount { get; private set; }
 
-        [return: System.Diagnostics.CodeAnalysis.MaybeNull, System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
-        public string DeepCopy([System.Diagnostics.CodeAnalysis.AllowNull] string input, CopyContext context)
+        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public string? DeepCopy(string? input, CopyContext context)
         {
             InvocationCount++;
-            return input is null ? null! : prefix + input;
+            return input is null ? null : prefix + input;
         }
     }
 }

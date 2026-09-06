@@ -131,8 +131,8 @@ public sealed class StackCopier<T> : IDeepCopier<Stack<T>>, IBaseCopier<Stack<T>
     }
 
     /// <inheritdoc/>
-    [return: System.Diagnostics.CodeAnalysis.MaybeNull, System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
-    public Stack<T> DeepCopy([System.Diagnostics.CodeAnalysis.AllowNull] Stack<T> input, CopyContext context)
+    [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+    public Stack<T>? DeepCopy(Stack<T>? input, CopyContext context)
     {
         ArgumentNullExceptionPolyfill.ThrowIfNull(context);
 

@@ -24,8 +24,8 @@ public sealed class RepeatedFieldCopier<T> : IDeepCopier<RepeatedField<T>>, IBas
     }
 
     /// <inheritdoc/>
-    [return: MaybeNull, NotNullIfNotNull(nameof(input))]
-    public RepeatedField<T> DeepCopy([AllowNull] RepeatedField<T> input, CopyContext context)
+    [return: NotNullIfNotNull(nameof(input))]
+    public RepeatedField<T>? DeepCopy(RepeatedField<T>? input, CopyContext context)
     {
         if (context is null) throw new ArgumentNullException(nameof(context));
 

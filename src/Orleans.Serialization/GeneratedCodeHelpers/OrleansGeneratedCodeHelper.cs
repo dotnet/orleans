@@ -334,8 +334,8 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
             }
 
             /// <inheritdoc/>
-            [return: MaybeNull, NotNullIfNotNull(nameof(original))]
-            public T? DeepCopy([AllowNull] T original, CopyContext context)
+            [return: NotNullIfNotNull(nameof(original))]
+            public T? DeepCopy(T? original, CopyContext context)
             {
                 if (original is null)
                 {

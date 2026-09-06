@@ -132,8 +132,8 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc/>
-        [return: MaybeNull, NotNullIfNotNull(nameof(input))]
-        public FSharpOption<T>? DeepCopy([AllowNull] FSharpOption<T> input, CopyContext context)
+        [return: NotNullIfNotNull(nameof(input))]
+        public FSharpOption<T>? DeepCopy(FSharpOption<T>? input, CopyContext context)
         {
             if (context is null) throw new ArgumentNullException(nameof(context));
 
@@ -352,8 +352,8 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc/>
-        [return: MaybeNull, NotNullIfNotNull(nameof(input))]
-        public FSharpChoice<T1, T2> DeepCopy([AllowNull] FSharpChoice<T1, T2> input, CopyContext context)
+        [return: NotNullIfNotNull(nameof(input))]
+        public FSharpChoice<T1, T2>? DeepCopy(FSharpChoice<T1, T2>? input, CopyContext context)
         {
             if (context is null) throw new ArgumentNullException(nameof(context));
 
@@ -495,8 +495,8 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc/>
-        [return: MaybeNull, NotNullIfNotNull(nameof(input))]
-        public FSharpChoice<T1, T2, T3> DeepCopy([AllowNull] FSharpChoice<T1, T2, T3> input, CopyContext context)
+        [return: NotNullIfNotNull(nameof(input))]
+        public FSharpChoice<T1, T2, T3>? DeepCopy(FSharpChoice<T1, T2, T3>? input, CopyContext context)
         {
             if (context is null) throw new ArgumentNullException(nameof(context));
 
@@ -652,8 +652,8 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc/>
-        [return: MaybeNull, NotNullIfNotNull(nameof(input))]
-        public FSharpChoice<T1, T2, T3, T4> DeepCopy([AllowNull] FSharpChoice<T1, T2, T3, T4> input, CopyContext context)
+        [return: NotNullIfNotNull(nameof(input))]
+        public FSharpChoice<T1, T2, T3, T4>? DeepCopy(FSharpChoice<T1, T2, T3, T4>? input, CopyContext context)
         {
             if (context is null) throw new ArgumentNullException(nameof(context));
 
@@ -823,8 +823,8 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc/>
-        [return: MaybeNull, NotNullIfNotNull(nameof(input))]
-        public FSharpChoice<T1, T2, T3, T4, T5> DeepCopy([AllowNull] FSharpChoice<T1, T2, T3, T4, T5> input, CopyContext context)
+        [return: NotNullIfNotNull(nameof(input))]
+        public FSharpChoice<T1, T2, T3, T4, T5>? DeepCopy(FSharpChoice<T1, T2, T3, T4, T5>? input, CopyContext context)
         {
             if (context is null) throw new ArgumentNullException(nameof(context));
 
@@ -1008,8 +1008,8 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc/>
-        [return: MaybeNull, NotNullIfNotNull(nameof(input))]
-        public FSharpChoice<T1, T2, T3, T4, T5, T6> DeepCopy([AllowNull] FSharpChoice<T1, T2, T3, T4, T5, T6> input, CopyContext context)
+        [return: NotNullIfNotNull(nameof(input))]
+        public FSharpChoice<T1, T2, T3, T4, T5, T6>? DeepCopy(FSharpChoice<T1, T2, T3, T4, T5, T6>? input, CopyContext context)
         {
             if (context is null) throw new ArgumentNullException(nameof(context));
 
@@ -1094,8 +1094,8 @@ namespace Orleans.Serialization
         public FSharpRefCopier(IDeepCopier<T> copier) => _copier = copier;
 
         /// <inheritdoc/>
-        [return: MaybeNull, NotNullIfNotNull(nameof(input))]
-        public FSharpRef<T> DeepCopy([AllowNull] FSharpRef<T> input, CopyContext context)
+        [return: NotNullIfNotNull(nameof(input))]
+        public FSharpRef<T>? DeepCopy(FSharpRef<T>? input, CopyContext context)
         {
             if (context is null) throw new ArgumentNullException(nameof(context));
 
@@ -1175,8 +1175,8 @@ namespace Orleans.Serialization
         public FSharpListCopier(IDeepCopier<T> copier) => _copier = copier;
 
         /// <inheritdoc/>
-        [return: MaybeNull, NotNullIfNotNull(nameof(input))]
-        public FSharpList<T> DeepCopy([AllowNull] FSharpList<T> input, CopyContext context)
+        [return: NotNullIfNotNull(nameof(input))]
+        public FSharpList<T>? DeepCopy(FSharpList<T>? input, CopyContext context)
         {
             if (context is null) throw new ArgumentNullException(nameof(context));
 
@@ -1262,8 +1262,8 @@ namespace Orleans.Serialization
         public FSharpSetCopier(IDeepCopier<T> copier) => _copier = copier;
 
         /// <inheritdoc/>
-        [return: MaybeNull, NotNullIfNotNull(nameof(input))]
-        public FSharpSet<T> DeepCopy([AllowNull] FSharpSet<T> input, CopyContext context)
+        [return: NotNullIfNotNull(nameof(input))]
+        public FSharpSet<T>? DeepCopy(FSharpSet<T>? input, CopyContext context)
         {
             if (context is null) throw new ArgumentNullException(nameof(context));
 
@@ -1361,8 +1361,8 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc/>
-        [return: MaybeNull, NotNullIfNotNull(nameof(input))]
-        public FSharpMap<TKey, TValue> DeepCopy([AllowNull] FSharpMap<TKey, TValue> input, CopyContext context)
+        [return: NotNullIfNotNull(nameof(input))]
+        public FSharpMap<TKey, TValue>? DeepCopy(FSharpMap<TKey, TValue>? input, CopyContext context)
         {
             if (context is null) throw new ArgumentNullException(nameof(context));
 

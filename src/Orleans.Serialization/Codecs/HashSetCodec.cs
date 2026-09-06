@@ -201,8 +201,8 @@ namespace Orleans.Serialization.Codecs
         private readonly ConstructorInfo _baseConstructor = typeof(HashSet<T>).GetConstructor([typeof(int), typeof(IEqualityComparer<T>)])!;
 
         /// <inheritdoc/>
-        [return: System.Diagnostics.CodeAnalysis.MaybeNull, System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
-        public HashSet<T> DeepCopy([System.Diagnostics.CodeAnalysis.AllowNull] HashSet<T> input, CopyContext context)
+        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public HashSet<T>? DeepCopy(HashSet<T>? input, CopyContext context)
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
 

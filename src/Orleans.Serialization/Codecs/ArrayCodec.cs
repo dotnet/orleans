@@ -140,8 +140,8 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
-        [return: System.Diagnostics.CodeAnalysis.MaybeNull, System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
-        public T[] DeepCopy([System.Diagnostics.CodeAnalysis.AllowNull] T[] input, CopyContext context)
+        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public T[]? DeepCopy(T[]? input, CopyContext context)
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
 

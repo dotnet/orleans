@@ -84,8 +84,8 @@ namespace Orleans.Serialization.Codecs
         public bool IsShallowCopyable() => _keyCopier is null && _valueCopier is null;
 
         /// <inheritdoc/>
-        [return: System.Diagnostics.CodeAnalysis.MaybeNull, System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
-        public FrozenDictionary<TKey, TValue> DeepCopy([System.Diagnostics.CodeAnalysis.AllowNull] FrozenDictionary<TKey, TValue> input, CopyContext context)
+        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public FrozenDictionary<TKey, TValue>? DeepCopy(FrozenDictionary<TKey, TValue>? input, CopyContext context)
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
 

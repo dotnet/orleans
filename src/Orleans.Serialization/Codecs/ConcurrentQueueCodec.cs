@@ -63,8 +63,8 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
-        [return: System.Diagnostics.CodeAnalysis.MaybeNull, System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
-        public ConcurrentQueue<T> DeepCopy([System.Diagnostics.CodeAnalysis.AllowNull] ConcurrentQueue<T> input, CopyContext context)
+        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public ConcurrentQueue<T>? DeepCopy(ConcurrentQueue<T>? input, CopyContext context)
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
 

@@ -62,8 +62,8 @@ namespace Orleans.Serialization.Codecs
         public bool IsShallowCopyable() => _copier is null;
 
         /// <inheritdoc/>
-        [return: System.Diagnostics.CodeAnalysis.MaybeNull, System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
-        public ImmutableList<T> DeepCopy([System.Diagnostics.CodeAnalysis.AllowNull] ImmutableList<T> input, CopyContext context)
+        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public ImmutableList<T>? DeepCopy(ImmutableList<T>? input, CopyContext context)
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
 

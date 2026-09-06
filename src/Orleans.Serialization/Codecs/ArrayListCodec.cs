@@ -48,8 +48,8 @@ namespace Orleans.Serialization.Codecs
     public sealed class ArrayListCopier : IDeepCopier<ArrayList>, IBaseCopier<ArrayList>
     {
         /// <inheritdoc/>
-        [return: System.Diagnostics.CodeAnalysis.MaybeNull, System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
-        public ArrayList DeepCopy([System.Diagnostics.CodeAnalysis.AllowNull] ArrayList input, CopyContext context)
+        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public ArrayList? DeepCopy(ArrayList? input, CopyContext context)
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
 

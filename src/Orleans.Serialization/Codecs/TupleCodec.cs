@@ -103,8 +103,8 @@ namespace Orleans.Serialization.Codecs
         public bool IsShallowCopyable() => _copier is null;
 
         /// <inheritdoc />
-        [return: System.Diagnostics.CodeAnalysis.MaybeNull, System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
-        public Tuple<T> DeepCopy([System.Diagnostics.CodeAnalysis.AllowNull] Tuple<T> input, CopyContext context)
+        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public Tuple<T>? DeepCopy(Tuple<T>? input, CopyContext context)
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
 
@@ -241,8 +241,8 @@ namespace Orleans.Serialization.Codecs
         public bool IsShallowCopyable() => _copier1 is null && _copier2 is null;
 
         /// <inheritdoc />
-        [return: System.Diagnostics.CodeAnalysis.MaybeNull, System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
-        public Tuple<T1, T2> DeepCopy([System.Diagnostics.CodeAnalysis.AllowNull] Tuple<T1, T2> input, CopyContext context)
+        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public Tuple<T1, T2>? DeepCopy(Tuple<T1, T2>? input, CopyContext context)
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
 
@@ -401,8 +401,8 @@ namespace Orleans.Serialization.Codecs
         public bool IsShallowCopyable() => _copier1 is null && _copier2 is null && _copier3 is null;
 
         /// <inheritdoc />
-        [return: System.Diagnostics.CodeAnalysis.MaybeNull, System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
-        public Tuple<T1, T2, T3> DeepCopy([System.Diagnostics.CodeAnalysis.AllowNull] Tuple<T1, T2, T3> input, CopyContext context)
+        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public Tuple<T1, T2, T3>? DeepCopy(Tuple<T1, T2, T3>? input, CopyContext context)
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
 
@@ -578,8 +578,8 @@ namespace Orleans.Serialization.Codecs
         public bool IsShallowCopyable() => _copier1 is null && _copier2 is null && _copier3 is null && _copier4 is null;
 
         /// <inheritdoc />
-        [return: System.Diagnostics.CodeAnalysis.MaybeNull, System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
-        public Tuple<T1, T2, T3, T4> DeepCopy([System.Diagnostics.CodeAnalysis.AllowNull] Tuple<T1, T2, T3, T4> input, CopyContext context)
+        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public Tuple<T1, T2, T3, T4>? DeepCopy(Tuple<T1, T2, T3, T4>? input, CopyContext context)
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
 
@@ -775,8 +775,8 @@ namespace Orleans.Serialization.Codecs
         public bool IsShallowCopyable() => _copier1 is null && _copier2 is null && _copier3 is null && _copier4 is null && _copier5 is null;
 
         /// <inheritdoc />
-        [return: System.Diagnostics.CodeAnalysis.MaybeNull, System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
-        public Tuple<T1, T2, T3, T4, T5> DeepCopy([System.Diagnostics.CodeAnalysis.AllowNull] Tuple<T1, T2, T3, T4, T5> input, CopyContext context)
+        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public Tuple<T1, T2, T3, T4, T5>? DeepCopy(Tuple<T1, T2, T3, T4, T5>? input, CopyContext context)
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
 
@@ -989,8 +989,8 @@ namespace Orleans.Serialization.Codecs
         public bool IsShallowCopyable() => _copier1 is null && _copier2 is null && _copier3 is null && _copier4 is null && _copier5 is null && _copier6 is null;
 
         /// <inheritdoc />
-        [return: System.Diagnostics.CodeAnalysis.MaybeNull, System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
-        public Tuple<T1, T2, T3, T4, T5, T6> DeepCopy([System.Diagnostics.CodeAnalysis.AllowNull] Tuple<T1, T2, T3, T4, T5, T6> input, CopyContext context)
+        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public Tuple<T1, T2, T3, T4, T5, T6>? DeepCopy(Tuple<T1, T2, T3, T4, T5, T6>? input, CopyContext context)
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
 
@@ -1221,8 +1221,8 @@ namespace Orleans.Serialization.Codecs
         public bool IsShallowCopyable() => _copier1 is null && _copier2 is null && _copier3 is null && _copier4 is null && _copier5 is null && _copier6 is null && _copier7 is null;
 
         /// <inheritdoc />
-        [return: System.Diagnostics.CodeAnalysis.MaybeNull, System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
-        public Tuple<T1, T2, T3, T4, T5, T6, T7> DeepCopy([System.Diagnostics.CodeAnalysis.AllowNull] Tuple<T1, T2, T3, T4, T5, T6, T7> input, CopyContext context)
+        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public Tuple<T1, T2, T3, T4, T5, T6, T7>? DeepCopy(Tuple<T1, T2, T3, T4, T5, T6, T7>? input, CopyContext context)
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
 
@@ -1469,8 +1469,8 @@ namespace Orleans.Serialization.Codecs
         public bool IsShallowCopyable() => _copier1 is null && _copier2 is null && _copier3 is null && _copier4 is null && _copier5 is null && _copier6 is null && _copier7 is null && _copier8 is null;
 
         /// <inheritdoc />
-        [return: System.Diagnostics.CodeAnalysis.MaybeNull, System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
-        public Tuple<T1, T2, T3, T4, T5, T6, T7, T8> DeepCopy([System.Diagnostics.CodeAnalysis.AllowNull] Tuple<T1, T2, T3, T4, T5, T6, T7, T8> input, CopyContext context)
+        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public Tuple<T1, T2, T3, T4, T5, T6, T7, T8>? DeepCopy(Tuple<T1, T2, T3, T4, T5, T6, T7, T8>? input, CopyContext context)
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
 

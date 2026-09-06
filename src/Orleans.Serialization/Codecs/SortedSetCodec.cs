@@ -73,8 +73,8 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc />
-        [return: System.Diagnostics.CodeAnalysis.MaybeNull, System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
-        public SortedSet<T> DeepCopy([System.Diagnostics.CodeAnalysis.AllowNull] SortedSet<T> input, CopyContext context)
+        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public SortedSet<T>? DeepCopy(SortedSet<T>? input, CopyContext context)
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
 

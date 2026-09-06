@@ -170,7 +170,7 @@ Use the registration APIs exposed by <xref:Orleans.Serialization.ISerializerBuil
 
 Keep codec and copier behavior paired. A custom serializer which preserves a graph while its copier loses reference identity can produce different local and remote call behavior.
 
-A custom <xref:Orleans.Serialization.Cloning.IDeepCopier`1> accepts null input for reference types. It returns null for null input and a non-null copy for non-null input. Hand-written implementations with nullable analysis enabled must annotate the input with <xref:System.Diagnostics.CodeAnalysis.AllowNullAttribute> and the return with <xref:System.Diagnostics.CodeAnalysis.MaybeNullAttribute> and <xref:System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute>. Existing implementations without the input annotation report CS8767 for implicit implementations or CS8769 for explicit implementations, which becomes a build error when nullable warnings are treated as errors.
+A custom <xref:Orleans.Serialization.Cloning.IDeepCopier`1> accepts null input for reference types. It returns null for null input and a non-null copy for non-null input. Hand-written implementations with nullable analysis enabled must use nullable input and return types and annotate the return with <xref:System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute>. Existing implementations with non-nullable input report CS8767 for implicit implementations or CS8769 for explicit implementations, which becomes a build error when nullable warnings are treated as errors.
 
 RPC code-generation extensions can register custom invokable bases and caller-facing return adapters. See [customize Orleans serialization code generation](../grains/code-generation-customization.md).
 

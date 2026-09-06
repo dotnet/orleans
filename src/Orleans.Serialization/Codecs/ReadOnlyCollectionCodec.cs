@@ -63,8 +63,8 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc />
-        [return: System.Diagnostics.CodeAnalysis.MaybeNull, System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
-        public ReadOnlyCollection<T> DeepCopy([System.Diagnostics.CodeAnalysis.AllowNull] ReadOnlyCollection<T> input, CopyContext context)
+        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public ReadOnlyCollection<T>? DeepCopy(ReadOnlyCollection<T>? input, CopyContext context)
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
 

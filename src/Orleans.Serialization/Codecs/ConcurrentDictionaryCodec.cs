@@ -75,8 +75,8 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
-        [return: System.Diagnostics.CodeAnalysis.MaybeNull, System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
-        public ConcurrentDictionary<TKey, TValue> DeepCopy([System.Diagnostics.CodeAnalysis.AllowNull] ConcurrentDictionary<TKey, TValue> input, CopyContext context)
+        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public ConcurrentDictionary<TKey, TValue>? DeepCopy(ConcurrentDictionary<TKey, TValue>? input, CopyContext context)
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
 

@@ -28,8 +28,8 @@ public sealed class MapFieldCopier<TKey, TValue> : IDeepCopier<MapField<TKey, TV
     }
 
     /// <inheritdoc/>
-    [return: MaybeNull, NotNullIfNotNull(nameof(input))]
-    public MapField<TKey, TValue> DeepCopy([AllowNull] MapField<TKey, TValue> input, CopyContext context)
+    [return: NotNullIfNotNull(nameof(input))]
+    public MapField<TKey, TValue>? DeepCopy(MapField<TKey, TValue>? input, CopyContext context)
     {
         if (context is null) throw new ArgumentNullException(nameof(context));
 

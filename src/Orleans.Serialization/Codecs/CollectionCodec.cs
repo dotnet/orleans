@@ -178,8 +178,8 @@ public sealed class CollectionCopier<T> : IDeepCopier<Collection<T>>, IBaseCopie
     }
 
     /// <inheritdoc/>
-    [return: System.Diagnostics.CodeAnalysis.MaybeNull, System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
-    public Collection<T> DeepCopy([System.Diagnostics.CodeAnalysis.AllowNull] Collection<T> input, CopyContext context)
+    [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+    public Collection<T>? DeepCopy(Collection<T>? input, CopyContext context)
     {
         ArgumentNullExceptionPolyfill.ThrowIfNull(context);
 

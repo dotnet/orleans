@@ -599,8 +599,8 @@ internal abstract class DictionaryInterfaceCodec<TInterface, TKey, TValue> : IFi
 internal abstract class ListInterfaceCopier<TInterface, T>(IDeepCopierProvider copierProvider, IDeepCopier<T> elementCopier)
     : IDeepCopier<TInterface> where TInterface : class, IEnumerable<T>
 {
-    [return: System.Diagnostics.CodeAnalysis.MaybeNull, System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
-    public TInterface DeepCopy([System.Diagnostics.CodeAnalysis.AllowNull] TInterface input, CopyContext context)
+    [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+    public TInterface? DeepCopy(TInterface? input, CopyContext context)
     {
         if (InterfaceCollectionCodecHelpers.TryCopyRuntime(copierProvider, input, context, out var runtimeResult))
         {
@@ -627,8 +627,8 @@ internal abstract class ListInterfaceCopier<TInterface, T>(IDeepCopierProvider c
 
 internal abstract class SetInterfaceCopier<TInterface, T>(IDeepCopierProvider copierProvider, IDeepCopier<T> elementCopier) : IDeepCopier<TInterface> where TInterface : class, IEnumerable<T>
 {
-    [return: System.Diagnostics.CodeAnalysis.MaybeNull, System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
-    public TInterface DeepCopy([System.Diagnostics.CodeAnalysis.AllowNull] TInterface input, CopyContext context)
+    [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+    public TInterface? DeepCopy(TInterface? input, CopyContext context)
     {
         if (InterfaceCollectionCodecHelpers.TryCopyRuntime(copierProvider, input, context, out var runtimeResult))
         {
@@ -660,8 +660,8 @@ internal abstract class DictionaryInterfaceCopier<TInterface, TKey, TValue>(
     where TInterface : class, IEnumerable<KeyValuePair<TKey, TValue>>
     where TKey : notnull
 {
-    [return: System.Diagnostics.CodeAnalysis.MaybeNull, System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
-    public TInterface DeepCopy([System.Diagnostics.CodeAnalysis.AllowNull] TInterface input, CopyContext context)
+    [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+    public TInterface? DeepCopy(TInterface? input, CopyContext context)
     {
         if (InterfaceCollectionCodecHelpers.TryCopyRuntime(copierProvider, input, context, out var runtimeResult))
         {
