@@ -672,6 +672,14 @@ dotnet_diagnostic.CA1873.severity = warning
 dotnet_diagnostic.CA1001.severity = warning
 dotnet_diagnostic.CA2213.severity = warning
 
+[src/{Google,Redis}/**.cs]
+dotnet_diagnostic.CA1001.severity = warning
+dotnet_diagnostic.CA2213.severity = warning
+
+[src/{Dashboard/Orleans.Dashboard,Orleans.Persistence.Memory,Orleans.Serialization.TestKit,Orleans.Transactions,Orleans.Transactions.TestKit.Base}/**.cs]
+dotnet_diagnostic.CA1001.severity = warning
+dotnet_diagnostic.CA2213.severity = warning
+
 [src/Orleans.Runtime/Networking/**.cs]
 dotnet_diagnostic.CA1848.severity = warning
 dotnet_diagnostic.CA1849.severity = warning

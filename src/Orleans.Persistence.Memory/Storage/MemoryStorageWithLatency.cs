@@ -43,7 +43,7 @@ namespace Orleans.Storage
     ///  or long-term persistence capabilities.
     /// </remarks>
     [DebuggerDisplay("MemoryStore:{Name},WithLatency:{latency}")]
-    public class MemoryGrainStorageWithLatency : IGrainStorage
+    public class MemoryGrainStorageWithLatency : IGrainStorage, IDisposable
     {
         private readonly MemoryGrainStorage baseGranStorage;
         private readonly MemoryStorageWithLatencyOptions options;
@@ -85,6 +85,29 @@ namespace Orleans.Storage
         public Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
             return MakeFixedLatencyCall(() => baseGranStorage.ClearStateAsync(grainType, grainId, grainState));
+        }
+
+        /// <summary>
+        /// Releases the resources owned by this storage provider.
+        /// </summary>
+        public void Dispose()
+        {
+            Dispose(disposing: true);
+            GC.SuppressFinalize(this);
+        }
+
+        /// <summary>
+        /// Releases the resources owned by this storage provider.
+        /// </summary>
+        /// <param name="disposing">
+        /// <see langword="true" /> to release managed resources; otherwise, <see langword="false" />.
+        /// </param>
+        protected virtual void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                baseGranStorage.Dispose();
+            }
         }
 
         private async Task MakeFixedLatencyCall(Func<Task> action)

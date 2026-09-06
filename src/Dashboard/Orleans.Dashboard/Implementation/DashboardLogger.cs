@@ -2,13 +2,11 @@ using System;
 using System.Collections.Immutable;
 using Microsoft.Extensions.Logging;
 
-#pragma warning disable IDE0069 // Disposable fields should be disposed
-
 namespace Orleans.Dashboard.Implementation;
 
 internal sealed class DashboardLogger : ILoggerProvider, ILogger
 {
-    private readonly NoopDisposable _scope = new();
+    private static readonly NoopDisposable Scope = new();
     private ImmutableArray<Action<EventId, LogLevel, string>> _actions = [];
 
     public void Add(Action<EventId, LogLevel, string> action) => _actions = _actions.Add(action);
@@ -40,7 +38,7 @@ internal sealed class DashboardLogger : ILoggerProvider, ILogger
 
     public bool IsEnabled(LogLevel logLevel) => true;
 
-    public IDisposable? BeginScope<TState>(TState state) where TState : notnull => _scope;
+    public IDisposable? BeginScope<TState>(TState state) where TState : notnull => Scope;
 
     private sealed class NoopDisposable : IDisposable
     {

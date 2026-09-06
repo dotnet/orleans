@@ -5,6 +5,7 @@ using Orleans.Dashboard.Model;
 using Orleans.Dashboard.Metrics.TypeFormatting;
 using System;
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -19,9 +20,13 @@ internal sealed partial class GrainProfiler(
     IGrainFactory grainFactory,
     ILogger<GrainProfiler> logger,
     ILocalSiloDetails localSiloDetails,
-    IOptions<GrainProfilerOptions> options) : IGrainProfiler, ILifecycleParticipant<ISiloLifecycle>
+    IOptions<GrainProfilerOptions> options) : IGrainProfiler, ILifecycleParticipant<ISiloLifecycle>, IDisposable
 {
     private ConcurrentDictionary<string, SiloGrainTraceEntry> _grainTrace = new();
+    [SuppressMessage(
+        "Usage",
+        "CA2213:Disposable fields should be disposed",
+        Justification = "Lifecycle shutdown and dependency-injection disposal both atomically exchange and dispose the timer.")]
     private Timer? _timer;
     private string? _siloAddress;
     private bool _isEnabled;
@@ -47,9 +52,11 @@ internal sealed partial class GrainProfiler(
 
     private Task OnStop(CancellationToken _)
     {
-        _timer?.Dispose();
+        Interlocked.Exchange(ref _timer, null)?.Dispose();
         return Task.CompletedTask;
     }
+
+    public void Dispose() => Interlocked.Exchange(ref _timer, null)?.Dispose();
 
     public void Track(double elapsedMs, Type grainType, [CallerMemberName] string? methodName = null, bool failed = false)
     {
