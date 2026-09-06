@@ -71,6 +71,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
     private readonly DirectoryInstruments _directoryInstruments;
     private readonly TimeSpan _deadSiloLeaseDuration;
     private readonly TimeProvider _timeProvider;
+    private readonly bool _enablePreviousViewRequests;
 
     internal CancellationToken OnStoppedToken => _stoppedCts.Token;
     internal DirectoryInstruments DirectoryInstruments => _directoryInstruments;
@@ -112,6 +113,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         _directoryInstruments = directoryInstruments;
         _clusterMemberCancellationTokens = new(_stoppedCts.Token);
         _timeProvider = timeProvider;
+        _enablePreviousViewRequests = directoryOptions.Value.EnablePreviousViewRequests;
 
         var rangeLeaseDuration = directoryOptions.Value.RangeLeaseDuration;
         if (rangeLeaseDuration < TimeSpan.Zero)
@@ -201,21 +203,23 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
 
     internal Task<GrainAddress?> LookupAsync(GrainId grainId, CancellationToken cancellationToken) => InvokeAsync(
         grainId,
-        static (partition, version, grainId, cancellationToken) => partition.LookupAsync(version, grainId, cancellationToken),
+        static (partition, version, allowPreviousVersion, grainId, cancellationToken) => partition.LookupAsync(version, grainId, cancellationToken, allowPreviousVersion),
         grainId,
         cancellationToken);
 
     internal async Task<GrainAddress?> RegisterAsync(GrainAddress address, GrainAddress? previousAddress, CancellationToken cancellationToken) => await InvokeAsync(
         address.GrainId,
-        static (partition, version, state, cancellationToken) => partition.RegisterAsync(version, state.Address, state.PreviousAddress, cancellationToken),
+        static (partition, version, allowPreviousVersion, state, cancellationToken) => partition.RegisterAsync(version, state.Address, state.PreviousAddress, cancellationToken, allowPreviousVersion),
         (Address: address, PreviousAddress: previousAddress),
-        cancellationToken);
+        cancellationToken,
+        activation: address);
 
     internal Task UnregisterAsync(GrainAddress address, CancellationToken cancellationToken) => InvokeAsync(
         address.GrainId,
-        static (partition, version, address, cancellationToken) => partition.DeregisterAsync(version, address, cancellationToken),
+        static (partition, version, allowPreviousVersion, address, cancellationToken) => partition.DeregisterAsync(version, address, cancellationToken, allowPreviousVersion),
         address,
-        cancellationToken);
+        cancellationToken,
+        activation: address);
 
     private CancellationTokenSource? LinkWithStoppedToken(
         CancellationToken cancellationToken,
@@ -234,29 +238,47 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
 
     private async Task<TResult?> InvokeAsync<TState, TResult>(
         GrainId grainId,
-        Func<IGrainDirectoryPartition, MembershipVersion, TState, CancellationToken, ValueTask<DirectoryResult<TResult>>> func,
+        Func<IGrainDirectoryPartition, MembershipVersion, bool, TState, CancellationToken, ValueTask<DirectoryResult<TResult>>> func,
         TState state,
         CancellationToken cancellationToken,
+        GrainAddress? activation = null,
         [CallerMemberName] string operation = "")
     {
         DirectoryResult<TResult> invokeResult;
         var view = _membershipService.CurrentView;
+        var minimumExecutionVersion = long.MinValue;
         var attempts = 0;
         const int MaxAttempts = 10;
         var delay = TimeSpan.FromMilliseconds(10);
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var initialRecoveryMembershipVersion = _recoveryMembershipVersion;
-            var resolved = await GetViewWithOwnerAsync(grainId, view, initialRecoveryMembershipVersion, cancellationToken);
+            var initialRecoveryMembershipVersion = RecoveryMembershipVersion;
+            var requiredVersion = Math.Max(initialRecoveryMembershipVersion, minimumExecutionVersion);
+            var resolved = await GetViewWithOwnerAsync(grainId, view, requiredVersion, cancellationToken);
             if (resolved is not { } ownerView)
             {
                 return default;
             }
 
             view = ownerView.View;
+            if (_enablePreviousViewRequests && activation?.SiloAddress is { } activationHost)
+            {
+                var latestMembership = LatestClusterMembershipSnapshot;
+                if (latestMembership.Version > view.Version
+                    && latestMembership.GetSiloStatus(activationHost) != view.ClusterMembershipSnapshot.GetSiloStatus(activationHost))
+                {
+                    view = await _membershipService.RefreshViewAsync(latestMembership.Version, cancellationToken);
+                    continue;
+                }
+            }
+
             var owner = ownerView.Owner;
             var partitionReference = ownerView.PartitionReference;
+            var allowPreviousVersion = _enablePreviousViewRequests
+                && requiredVersion < view.Version.Value
+                && (activation is null || activation.SiloAddress is { } host
+                    && view.ClusterMembershipSnapshot.GetSiloStatus(host) == SiloStatus.Active);
 
 #if false
             if (logger.IsEnabled(LogLevel.Trace))
@@ -271,7 +293,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
                 using var requestCts = CancellationTokenSource.CreateLinkedTokenSource(
                     cancellationToken,
                     GetClusterMemberCancellationToken(owner));
-                invokeResult = await func(partitionReference, view.Version, state, requestCts.Token);
+                invokeResult = await func(partitionReference, view.Version, allowPreviousVersion, state, requestCts.Token);
             }
             catch (Exception exception) when (
                 exception is OrleansMessageRejectionException or OperationCanceledException
@@ -302,7 +324,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
                 continue;
             }
 
-            if (initialRecoveryMembershipVersion != _recoveryMembershipVersion)
+            if (initialRecoveryMembershipVersion != RecoveryMembershipVersion)
             {
                 // If the recovery version changed, perform a view refresh and re-issue the operation.
                 // See the comment on the declaration of '_recoveryMembershipVersionValue' for more details.
@@ -315,6 +337,19 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
                 // Refresh membership and re-evaluate.
                 view = await _membershipService.RefreshViewAsync(invokeResult.Version, cancellationToken);
                 continue;
+            }
+
+            // A lagging owner can return an activation whose death the caller has already observed.
+            // Revisit that registration after the owner has installed the corresponding lease/cleanup state.
+            if (allowPreviousVersion && result is GrainAddress { SiloAddress: { } resultHost } address)
+            {
+                var latestMembership = LatestClusterMembershipSnapshot;
+                if (latestMembership.GetSiloStatus(resultHost, address.MembershipVersion) == SiloStatus.Dead)
+                {
+                    minimumExecutionVersion = Math.Max(view.Version.Value, latestMembership.Version.Value);
+                    view = await _membershipService.RefreshViewAsync(new(minimumExecutionVersion), cancellationToken);
+                    continue;
+                }
             }
 
             LogTraceInvokedOperation(_logger, operation, owner, grainId, result);
@@ -692,7 +727,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         Level = LogLevel.Trace,
         Message = "Invoked '{Operation}' on '{Owner}' for grain '{GrainId}' and received result '{Result}'."
     )]
-    private static partial void LogTraceInvokedOperation(ILogger logger, string operation, SiloAddress owner, GrainId grainId, object result);
+    private static partial void LogTraceInvokedOperation(ILogger logger, string operation, SiloAddress owner, GrainId grainId, object? result);
 
     [LoggerMessage(
         Level = LogLevel.Debug,
