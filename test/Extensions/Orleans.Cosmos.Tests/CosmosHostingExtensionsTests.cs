@@ -128,6 +128,116 @@ public class CosmosHostingExtensionsTests
 
 #pragma warning restore CS0618 // Type or member is obsolete
 
+    [Fact]
+    public void AddCosmosGrainStorage_GenericConfigureOptions_NullBuilder_ThrowsArgumentNullException()
+    {
+        ISiloBuilder builder = null!;
+        var configureInvoked = false;
+
+        var exception = Assert.Throws<ArgumentNullException>(() =>
+            builder.AddCosmosGrainStorage<FirstDocumentIdProvider>(
+                "storage",
+                (Action<CosmosGrainStorageOptions>)(_ => configureInvoked = true)));
+
+        Assert.Equal("builder", exception.ParamName);
+        Assert.False(configureInvoked);
+    }
+
+    [Fact]
+    public void AddCosmosGrainStorage_TypeConfigureOptions_NullBuilder_ThrowsArgumentNullException()
+    {
+        ISiloBuilder builder = null!;
+        var configureInvoked = false;
+
+        var exception = Assert.Throws<ArgumentNullException>(() =>
+            builder.AddCosmosGrainStorage(
+                "storage",
+                (Action<CosmosGrainStorageOptions>)(_ => configureInvoked = true),
+                typeof(FirstDocumentIdProvider)));
+
+        Assert.Equal("builder", exception.ParamName);
+        Assert.False(configureInvoked);
+    }
+
+    [Fact]
+    public void AddCosmosGrainStorage_PlainConfigureOptions_NullBuilder_ThrowsArgumentNullException()
+    {
+        ISiloBuilder builder = null!;
+        var configureInvoked = false;
+
+        var exception = Assert.Throws<ArgumentNullException>(() =>
+            builder.AddCosmosGrainStorage(
+                "storage",
+                (Action<CosmosGrainStorageOptions>)(_ => configureInvoked = true)));
+
+        Assert.Equal("builder", exception.ParamName);
+        Assert.False(configureInvoked);
+    }
+
+    [Fact]
+    public void AddCosmosGrainStorage_GenericOptionsBuilder_NullBuilder_ThrowsArgumentNullException()
+    {
+        ISiloBuilder builder = null!;
+        var configureInvoked = false;
+
+        var exception = Assert.Throws<ArgumentNullException>(() =>
+            builder.AddCosmosGrainStorage<FirstDocumentIdProvider>(
+                "storage",
+                (Action<OptionsBuilder<CosmosGrainStorageOptions>>)(_ => configureInvoked = true)));
+
+        Assert.Equal("builder", exception.ParamName);
+        Assert.False(configureInvoked);
+    }
+
+    [Fact]
+    public void AddCosmosGrainStorage_TypeOptionsBuilder_NullBuilder_ThrowsArgumentNullException()
+    {
+        ISiloBuilder builder = null!;
+        var configureInvoked = false;
+
+        var exception = Assert.Throws<ArgumentNullException>(() =>
+            builder.AddCosmosGrainStorage(
+                "storage",
+                typeof(FirstDocumentIdProvider),
+                (Action<OptionsBuilder<CosmosGrainStorageOptions>>)(_ => configureInvoked = true)));
+
+        Assert.Equal("builder", exception.ParamName);
+        Assert.False(configureInvoked);
+    }
+
+    [Fact]
+    public void AddCosmosGrainStorage_PlainOptionsBuilder_NullBuilder_ThrowsArgumentNullException()
+    {
+        ISiloBuilder builder = null!;
+        var configureInvoked = false;
+
+        var exception = Assert.Throws<ArgumentNullException>(() =>
+            builder.AddCosmosGrainStorage(
+                "storage",
+                (Action<OptionsBuilder<CosmosGrainStorageOptions>>)(_ => configureInvoked = true)));
+
+        Assert.Equal("builder", exception.ParamName);
+        Assert.False(configureInvoked);
+    }
+
+    [Fact]
+    public void AddCosmosGrainStorage_PlainNamedRegistration_ConfiguresNamedOptions()
+    {
+        const string storageName = "plain-named-storage";
+        const string databaseName = "phase-two-database";
+        var builder = new TestSiloBuilder();
+
+        var result = builder.AddCosmosGrainStorage(
+            storageName,
+            (Action<CosmosGrainStorageOptions>)(options => options.DatabaseName = databaseName));
+        using var services = builder.Services.BuildServiceProvider();
+
+        var options = services.GetRequiredService<IOptionsMonitor<CosmosGrainStorageOptions>>().Get(storageName);
+
+        Assert.Same(builder, result);
+        Assert.Equal(databaseName, options.DatabaseName);
+    }
+
     private sealed class FirstDocumentIdProvider : IDocumentIdProvider
     {
         public ValueTask<(string DocumentId, string PartitionKey)> GetDocumentIdentifiers(string grainType, GrainId grainId) => default;
@@ -147,6 +257,13 @@ public class CosmosHostingExtensionsTests
 
     private sealed class DocumentIdProviderDependency
     {
+    }
+
+    private sealed class TestSiloBuilder : ISiloBuilder
+    {
+        public IServiceCollection Services { get; } = new ServiceCollection();
+
+        public IConfiguration Configuration { get; } = new ConfigurationBuilder().Build();
     }
 
 #pragma warning disable CS0618 // Type or member is obsolete

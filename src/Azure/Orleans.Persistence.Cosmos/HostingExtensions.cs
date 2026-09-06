@@ -39,6 +39,8 @@ public static class HostingExtensions
         string name,
         Action<CosmosGrainStorageOptions> configureOptions) where TProvider : class
     {
+        ArgumentNullException.ThrowIfNull(builder);
+
         AddIdentifierProvider(builder.Services, name, typeof(TProvider));
         builder.Services.AddCosmosGrainStorage(name, configureOptions);
         return builder;
@@ -73,6 +75,8 @@ public static class HostingExtensions
         Action<CosmosGrainStorageOptions> configureOptions,
         Type customPartitionKeyProviderType)
     {
+        ArgumentNullException.ThrowIfNull(builder);
+
         if (customPartitionKeyProviderType != null)
         {
             AddIdentifierProvider(builder.Services, name, customPartitionKeyProviderType, registerUnkeyedPartitionProvider: true);
@@ -105,6 +109,8 @@ public static class HostingExtensions
         string name,
         Action<CosmosGrainStorageOptions> configureOptions)
     {
+        ArgumentNullException.ThrowIfNull(builder);
+
         builder.Services.AddCosmosGrainStorage(name, configureOptions);
         return builder;
     }
@@ -136,6 +142,8 @@ public static class HostingExtensions
         string name,
         Action<OptionsBuilder<CosmosGrainStorageOptions>>? configureOptions = null) where TProvider : class
     {
+        ArgumentNullException.ThrowIfNull(builder);
+
         AddIdentifierProvider(builder.Services, name, typeof(TProvider));
         builder.Services.AddCosmosGrainStorage(name, configureOptions);
         return builder;
@@ -170,6 +178,8 @@ public static class HostingExtensions
         Type customPartitionKeyProviderType,
         Action<OptionsBuilder<CosmosGrainStorageOptions>>? configureOptions = null)
     {
+        ArgumentNullException.ThrowIfNull(builder);
+
         if (customPartitionKeyProviderType != null)
         {
             AddIdentifierProvider(builder.Services, name, customPartitionKeyProviderType);
@@ -202,6 +212,8 @@ public static class HostingExtensions
         string name,
         Action<OptionsBuilder<CosmosGrainStorageOptions>>? configureOptions = null)
     {
+        ArgumentNullException.ThrowIfNull(builder);
+
         builder.Services.AddCosmosGrainStorage(name, configureOptions);
         return builder;
     }

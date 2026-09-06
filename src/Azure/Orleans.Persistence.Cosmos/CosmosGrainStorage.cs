@@ -36,6 +36,9 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
     /// <param name="clusterOptions">The cluster options.</param>
     /// <param name="documentIdProvider">The provider used to create Cosmos DB document identifiers.</param>
     /// <param name="activatorProvider">The provider used to create grain state instances.</param>
+    /// <exception cref="ArgumentNullException">
+    /// <paramref name="options"/> or <paramref name="clusterOptions"/> is <see langword="null"/>.
+    /// </exception>
     public CosmosGrainStorage(
         string name,
         CosmosGrainStorageOptions options,
@@ -45,6 +48,9 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
         IDocumentIdProvider documentIdProvider,
         IActivatorProvider activatorProvider)
     {
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(clusterOptions);
+
         _logger = loggerFactory.CreateLogger<CosmosGrainStorage>();
         _options = options;
         _name = name;
@@ -59,6 +65,8 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
     /// <inheritdoc/>
     public async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
     {
+        ArgumentNullException.ThrowIfNull(grainState);
+
         var (id, partitionKey) = await _documentIdProvider.GetDocumentIdentifiers(grainType, grainId);
 
         LogTraceReadingState(grainType, id, grainId, _options.ContainerName, partitionKey);
@@ -110,6 +118,8 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
     /// <inheritdoc/>
     public async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
     {
+        ArgumentNullException.ThrowIfNull(grainState);
+
         var (id, partitionKey) = await _documentIdProvider.GetDocumentIdentifiers(grainType, grainId);
 
         LogTraceWritingState(grainType, id, grainId, grainState.ETag, _options.ContainerName, partitionKey);
@@ -179,6 +189,8 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
     /// <inheritdoc/>
     public async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
     {
+        ArgumentNullException.ThrowIfNull(grainState);
+
         var (id, partitionKey) = await _documentIdProvider.GetDocumentIdentifiers(grainType, grainId);
 
         LogTraceClearingState(grainType, id, grainId, grainState.ETag, _options.DeleteStateOnClear, _options.ContainerName, partitionKey);
@@ -252,7 +264,7 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
         }
         catch (CosmosException ex) when (ex.StatusCode is HttpStatusCode.PreconditionFailed or HttpStatusCode.Conflict or HttpStatusCode.NotFound)
         {
-            throw new CosmosConditionNotSatisfiedException(grainType, grainId, _options.ContainerName, "Unknown", grainState?.ETag ?? "Unknown");
+            throw new CosmosConditionNotSatisfiedException(grainType, grainId, _options.ContainerName, "Unknown", grainState.ETag ?? "Unknown");
         }
         catch (Exception exc)
         {

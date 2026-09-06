@@ -23,8 +23,13 @@ public static class S3JournalStorageHostingExtensions
     /// <param name="builder">The silo builder.</param>
     /// <param name="configure">The Amazon S3 journal storage configuration delegate.</param>
     /// <returns>The silo builder.</returns>
+    /// <exception cref="ArgumentNullException">
+    /// <paramref name="builder"/> is <see langword="null"/>.
+    /// </exception>
     public static ISiloBuilder AddS3JournalStorage(this ISiloBuilder builder, Action<S3JournalStorageOptions>? configure)
     {
+        ArgumentNullException.ThrowIfNull(builder);
+
         builder.AddJournalStorage();
 
         var services = builder.Services;
