@@ -74,7 +74,13 @@ public static class Program
                         options.ServiceId = serviceId;
                     })
                     .Configure<SiloOptions>(options => options.SiloName = siloName)
-                    .Configure<GrainDirectoryOptions>(options => options.PartitionsPerSilo = 4)
+                    .Configure<GrainDirectoryOptions>(options =>
+                    {
+                        options.PartitionsPerSilo = 4;
+#if ORLEANS_CURRENT_HOST
+                        options.EnablePreviousViewRequests = true;
+#endif
+                    })
                     .Configure<EndpointOptions>(options =>
                     {
                         options.AdvertisedIPAddress = IPAddress.Loopback;

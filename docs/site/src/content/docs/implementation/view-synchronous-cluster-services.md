@@ -1,7 +1,7 @@
 ---
 title: View-synchronous cluster services
 description: Internal ownership, transition, recovery, and fencing contracts for membership-derived cluster services.
-ms.date: 09/05/2026
+ms.date: 09/06/2026
 ms.topic: concept-article
 ---
 
@@ -129,13 +129,54 @@ Each directory partition is a system target. Its scheduler serializes synchronou
 
 The partition **installs the range gate synchronously, before the transition's first `await`**. A caller can already see the new owner in its routing snapshot while that owner is still acquiring the range. The gate keeps the request waiting until the range is ready.
 
-A transition blocks an intersecting request when its target view ID is less than or equal to the ID that the request must wait for. Both the provider epoch and revision participate in this comparison. The directory maps wire membership versions into epoch-zero IDs; lookup, registration, and deregistration wait for the maximum of the caller's version and the partition's current version. After the wait, they re-read the view and establish ownership before accessing the map.
+A transition blocks an intersecting request when its target view ID is less than or equal to the ID that the request must wait for. Both the provider epoch and revision participate in this comparison. The directory maps wire membership versions into epoch-zero IDs. Strict lookup, registration, and deregistration wait for the maximum of the caller's version and the partition's current version. An opted-in request can also use the immediately preceding membership view when the partition proves continued ownership. Both paths pass the local range gate, re-read the view after waiting, and establish ownership before accessing the map.
 
 Acquisition, release, and recovery wait for preceding local transitions using the predecessor version. For example, releasing a range in view `v3` waits for its acquisition in `v2`, while the `v3` release gate remains installed. The earlier acquisition can then finish without waiting on the later release. Snapshot reads instead wait on the target version: `GetSnapshotAsync(v3, v2, range)` waits for the `v3` release gate before reading the retained `v2` snapshot.
 
 Once a directory request has passed its gate, its map operation runs synchronously within the turn. Together with the predecessor gates, this gives the directory a clear draining boundary. A service which awaits external work inside an admitted operation needs to drain or fence that work before handoff.
 
 Canceling one caller cancels its wait, while the shared transition continues. Transition completions run continuations asynchronously, keeping waiter code outside the coordinator's collection lock.
+
+## Serving requests one view behind
+
+During a rolling upgrade, hosts usually leave and join while the cluster remains approximately the same size. Each membership revision can change the ring, but most keys keep the same owner. A caller which has learned the newest view can therefore get ahead of a still-correct owner. Requiring that owner to catch up to the caller's exact revision introduces a barrier even for those unchanged keys.
+
+The caller sends its routing snapshot's version and an `allowPreviousVersion` permission bit. A partition at `v` receiving an opted-in request for `v+1` has a simple proof of continuous ownership: the caller routed to this partition in `v+1`, and the partition verifies its own ownership in `v`. Canonical membership versions are consecutive, so these two views cover the entire interval. Identity includes both the silo incarnation and the partition index.
+
+For example, a caller at `v21` routes key K to partition A. A is ready at `v20` and owns K there, so it can serve the request immediately. This works even if the caller learned `v21` after skipping `v20`: the receiver supplies the predecessor's ownership check. A partition which gains K in `v21` first refreshes and completes its acquisition.
+
+A receiver more than one view behind refreshes to the requested view. With A in `v20`, B in `v21`, and A again in `v22`, checking only the endpoint owners would miss the intervening transfer. The one-successor rule gives a bounded proof using the two participants' existing snapshots. Routing continues to use the canonical topology lookup.
+
+The directory uses this arithmetic proof within its epoch-zero membership authority. A provider with sparse revisions would establish adjacency through authoritative predecessor identities. Provider changes establish their authority boundary as part of the service's migration protocol.
+
+### Readiness and operation requirements
+
+| Condition | Admission |
+| --- | --- |
+| Exactly one view behind, same owner, operation permits the previous view | Pass the current range gate, recheck the view, and execute. |
+| More than one view behind, or a lagging receiver lacking ownership or active membership for the mutation host | Refresh to the requested view and establish readiness there. |
+| Receiver at or ahead of the requested view | Pass the current range gate and serve if this partition still owns the key; otherwise return its view for rerouting. |
+| Strict request | Apply the existing minimum-view and range-gate requirements. |
+
+A ready current owner can be arbitrarily far ahead of the caller; the one-revision limit applies to receivers which are behind.
+
+An acquisition still holds requests until state installation and fencing complete. If an await allows the partition view to change, admission runs again. Accepted map operations execute synchronously on the partition scheduler. Normal membership propagation continues bringing an owner toward the newest view while already-valid requests use its installed state.
+
+Ownership is one part of validity. The caller permits the previous view only when it satisfies the captured recovery watermark and any minimum established by an earlier attempt. If recovery advances during the RPC, the existing recovery-driven retry applies before caller completion.
+
+Registration and deregistration additionally require their activation host to be active in the caller's routing snapshot and the receiver's admitted snapshot before using the fast path. A registration on a newly joined host therefore waits for a view which includes that host. A deregistration for a host whose death the caller has observed uses strict admission, incorporating the corresponding safety lease.
+
+Opted-in operations evaluate activation liveness using the admitted partition membership. This aligns the decision with installed lease and cleanup state: a newer directory projection can learn about a death before the partition has processed it. If lookup or registration returns an activation whose death the caller knows about, the caller retries with a strict minimum covering that death observation. The owner can then apply the appropriate lease or cleanup action.
+
+### Replies and deployment
+
+The existing `DirectoryResult<T>` contract applies to both paths: success echoes the request version, an ownership redirect reports the receiver's view, and a lease hold supplies a retry delay. The receiver stamps a newly stored registration with its execution version. A valid predecessor-view response completes immediately. The requested version remains a minimum-view requirement with a narrowly permitted relaxation; a ready owner in a newer view can serve the operation using the established directory behavior.
+
+<xref:Orleans.Configuration.GrainDirectoryOptions.EnablePreviousViewRequests?displayProperty=nameWithType> defaults to `false`. Receiver support can be deployed first, followed by controlled enablement of the fast path. Turning the option off returns callers to strict admission while normal ownership transitions continue.
+
+Lookup, registration, and deregistration append the permission bit after the existing cancellation-token parameter. Existing aliases, argument field IDs, and cancellation-token positions remain stable. The absent bit defaults to `false`, preserving older callers' minimum-version guarantee. Older receivers ignore the added field and enforce the supplied version. Both versions use the same response fields and interpretation.
+
+Snapshot, acknowledgement, and recovery RPCs continue to carry their exact protocol-dependency versions.
 
 ## Transition state machine
 
@@ -252,7 +293,7 @@ The safety window depends on the membership detector's timing bounds and the old
 
 Reasons such as wrong view, partition readiness, safety delay, or member unavailability explain the next action. A timed-out call has an unknown outcome: it may have started or completed before the response was lost. See [messaging and delivery semantics](messaging-delivery-guarantees.md) for the call contract.
 
-The directory records `ClusterServiceFence` locally during acquisition. Its RPCs use `DirectoryResult<T>`, `MembershipVersion`, and the existing snapshot payloads. `ClusterServiceOperationResult<T>` is available to internal service integrations; the directory's RPC path still uses its existing result contract. Successful directory responses echo the request version; ownership redirects report the partition's current version, and lease responses carry a retry delay.
+The directory records `ClusterServiceFence` locally during acquisition. Its RPCs use `DirectoryResult<T>`, `MembershipVersion`, and the existing snapshot payloads. `ClusterServiceOperationResult<T>` is available to internal service integrations. Successful directory responses echo the request version; ownership redirects report the partition's current version, and lease responses carry a retry delay.
 
 ## Failure handling and observability
 
@@ -268,6 +309,8 @@ The directory records `ClusterServiceFence` locally during acquisition. Its RPCs
 For a stalled transition, correlate the latest cluster view, projected directory view, partition view, blocking range/version, and transfer partner status. Progress after stabilization depends on delivery to eligible peers and availability of the required membership/recovery inputs.
 
 `GrainDirectoryEvents` exposes membership observations, range-operation start/completion, lease holds, and registration delays. `IntegrityViolation` supplies explicit evidence from integrity probes, including the grain, silo, partition, view, range, and original exception.
+
+`PreviousViewAdmission` records the requested view, the receiver's installed view, and its decision: refresh, local range-gate evaluation, or admission. Correlate range-gate events with the existing range-operation events to identify pending acquisition or fencing.
 
 `RangeOperationCompleted` describes the end of an operation. Interpret it alongside failure diagnostics and the actual readiness gate: its `Canceled` field records shutdown cancellation, and a failed transition retains its gate. Correlation by silo incarnation, partition, version, and range is essential when operations overlap.
 

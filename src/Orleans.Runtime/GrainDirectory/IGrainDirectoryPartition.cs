@@ -13,19 +13,22 @@ internal interface IGrainDirectoryPartition : ISystemTarget
         MembershipVersion version,
         GrainAddress address,
         GrainAddress? currentRegistration,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        bool allowPreviousVersion = false);
 
     [Alias("LookupAsync")]
     ValueTask<DirectoryResult<GrainAddress?>> LookupAsync(
         MembershipVersion version,
         GrainId grainId,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        bool allowPreviousVersion = false);
 
     [Alias("DeregisterAsync")]
     ValueTask<DirectoryResult<bool>> DeregisterAsync(
         MembershipVersion version,
         GrainAddress address,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        bool allowPreviousVersion = false);
 
     [Alias("GetSnapshotAsync")]
     ValueTask<GrainDirectoryPartitionSnapshot?> GetSnapshotAsync(

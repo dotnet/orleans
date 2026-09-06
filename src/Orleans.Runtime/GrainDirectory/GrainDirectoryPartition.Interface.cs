@@ -11,13 +11,14 @@ internal sealed partial class GrainDirectoryPartition
         MembershipVersion version,
         GrainAddress address,
         GrainAddress? currentRegistration,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool allowPreviousVersion)
     {
         cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(address);
         LogRegisterAsync(version, address, currentRegistration);
 
-        var currentView = await WaitForOwnershipViewAsync(address.GrainId, version, cancellationToken);
+        var currentView = await WaitForOwnershipViewAsync(address.GrainId, version, cancellationToken, allowPreviousVersion, address);
         if (!IsOwner(currentView, address.GrainId))
         {
             return DirectoryResult.RefreshRequired<GrainAddress>(currentView.Version);
@@ -70,46 +71,54 @@ internal sealed partial class GrainDirectoryPartition
             }
         }
 
-        return DirectoryResult.FromResult(RegisterCore(address, currentRegistration, currentView.Version), version);
+        var result = RegisterCore(address, currentRegistration, currentView.Version,
+            allowPreviousVersion ? currentView.ClusterMembershipSnapshot : _owner.ClusterMembershipSnapshot);
+        return DirectoryResult.FromResult(result, version);
     }
 
     async ValueTask<DirectoryResult<GrainAddress?>> IGrainDirectoryPartition.LookupAsync(
         MembershipVersion version,
         GrainId grainId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool allowPreviousVersion)
     {
         cancellationToken.ThrowIfCancellationRequested();
         LogLookupAsync(version, grainId);
 
-        var currentView = await WaitForOwnershipViewAsync(grainId, version, cancellationToken);
+        var currentView = await WaitForOwnershipViewAsync(grainId, version, cancellationToken, allowPreviousVersion);
         if (!IsOwner(currentView, grainId))
         {
             return DirectoryResult.RefreshRequired<GrainAddress?>(currentView.Version);
         }
 
-        return DirectoryResult.FromResult(LookupCore(grainId), version);
+        var result = LookupCore(grainId,
+            allowPreviousVersion ? currentView.ClusterMembershipSnapshot : _owner.ClusterMembershipSnapshot);
+        return DirectoryResult.FromResult(result, version);
     }
 
     async ValueTask<DirectoryResult<bool>> IGrainDirectoryPartition.DeregisterAsync(
         MembershipVersion version,
         GrainAddress address,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool allowPreviousVersion)
     {
         cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(address);
         LogDeregisterAsync(version, address);
 
-        var currentView = await WaitForOwnershipViewAsync(address.GrainId, version, cancellationToken);
+        var currentView = await WaitForOwnershipViewAsync(address.GrainId, version, cancellationToken, allowPreviousVersion, address);
         if (!IsOwner(currentView, address.GrainId))
         {
             return DirectoryResult.RefreshRequired<bool>(currentView.Version);
         }
 
         DebugAssertOwnership(currentView, address.GrainId);
-        return DirectoryResult.FromResult(DeregisterCore(address), version);
+        var result = DeregisterCore(address,
+            allowPreviousVersion ? currentView.ClusterMembershipSnapshot : _owner.ClusterMembershipSnapshot);
+        return DirectoryResult.FromResult(result, version);
     }
 
-    private bool DeregisterCore(GrainAddress address)
+    private bool DeregisterCore(GrainAddress address, ClusterMembershipSnapshot membership)
     {
         if (!_directory.TryGetValue(address.GrainId, out var existing))
         {
@@ -124,7 +133,7 @@ internal sealed partial class GrainDirectoryPartition
             return false;
         }
 
-        if (existing.Matches(address) || IsSiloDead(existing))
+        if (existing.Matches(address) || IsSiloDead(existing, membership))
         {
             return _directory.Remove(address.GrainId);
         }
@@ -132,9 +141,11 @@ internal sealed partial class GrainDirectoryPartition
         return false;
     }
 
-    internal GrainAddress? LookupCore(GrainId grainId)
+    internal GrainAddress? LookupCore(GrainId grainId) => LookupCore(grainId, _owner.ClusterMembershipSnapshot);
+
+    private GrainAddress? LookupCore(GrainId grainId, ClusterMembershipSnapshot membership)
     {
-        if (_directory.TryGetValue(grainId, out var existing) && !IsSiloDead(existing))
+        if (_directory.TryGetValue(grainId, out var existing) && !IsSiloDead(existing, membership))
         {
             return existing;
         }
@@ -145,7 +156,9 @@ internal sealed partial class GrainDirectoryPartition
     private async ValueTask<DirectoryMembershipSnapshot> WaitForOwnershipViewAsync(
         GrainId grainId,
         MembershipVersion version,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool allowPreviousVersion = false,
+        GrainAddress? activation = null)
     {
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, ShutdownToken);
         while (true)
@@ -153,21 +166,46 @@ internal sealed partial class GrainDirectoryPartition
             // Requests which arrive with a stale membership version must still wait for any in-flight ownership
             // transition in the current view before deciding whether this partition can serve them.
             var currentView = CurrentView;
-            var waitVersion = currentView.Version > version ? currentView.Version : version;
+            // Routing proves ownership in the requested view; local ownership proves its immediate predecessor.
+            // A larger gap could conceal an intervening owner.
+            var canUsePreviousView = allowPreviousVersion
+                && version.Value > long.MinValue
+                && currentView.Version.Value == version.Value - 1
+                && IsOwner(currentView, grainId)
+                && (activation is null || activation.SiloAddress is { } host
+                    && currentView.ClusterMembershipSnapshot.GetSiloStatus(host) == SiloStatus.Active);
+            var requiredVersion = canUsePreviousView ? currentView.Version : version;
+            var waitVersion = currentView.Version > requiredVersion ? currentView.Version : requiredVersion;
+            if (allowPreviousVersion)
+            {
+                GrainDirectoryEvents.EmitPreviousViewAdmission(_id, _partitionIndex, grainId, version,
+                    currentView.Version, currentView.Version < requiredVersion ? "refresh-required" : "range-gate");
+            }
+
             await WaitForRange(grainId, waitVersion, linkedCts.Token);
             linkedCts.Token.ThrowIfCancellationRequested();
             if (ReferenceEquals(currentView, CurrentView))
             {
+                if (allowPreviousVersion)
+                {
+                    GrainDirectoryEvents.EmitPreviousViewAdmission(_id, _partitionIndex, grainId, version,
+                        currentView.Version, "admitted");
+                }
+
                 return currentView;
             }
         }
     }
 
-    private GrainAddress RegisterCore(GrainAddress newAddress, GrainAddress? existingAddress, MembershipVersion currentVersion)
+    private GrainAddress RegisterCore(
+        GrainAddress newAddress,
+        GrainAddress? existingAddress,
+        MembershipVersion currentVersion,
+        ClusterMembershipSnapshot membership)
     {
         ref var existing = ref CollectionsMarshal.GetValueRefOrAddDefault(_directory, newAddress.GrainId, out _);
 
-        if (existing is null || existing.Matches(existingAddress) || IsSiloDead(existing))
+        if (existing is null || existing.Matches(existingAddress) || IsSiloDead(existing, membership))
         {
             if (newAddress.MembershipVersion != currentVersion)
             {
@@ -187,8 +225,8 @@ internal sealed partial class GrainDirectoryPartition
         return existing;
     }
 
-    private bool IsSiloDead(GrainAddress existing)
-        => existing.SiloAddress is null || _owner.ClusterMembershipSnapshot.GetSiloStatus(existing.SiloAddress, existing.MembershipVersion) == SiloStatus.Dead;
+    private static bool IsSiloDead(GrainAddress existing, ClusterMembershipSnapshot membership)
+        => existing.SiloAddress is null || membership.GetSiloStatus(existing.SiloAddress, existing.MembershipVersion) == SiloStatus.Dead;
 
     [LoggerMessage(
         Level = LogLevel.Trace,
