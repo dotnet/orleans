@@ -353,7 +353,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
 
                 foreach (var grainAddress in toRemove)
                 {
-                    DeregisterCore(grainAddress);
+                    DeregisterCore(grainAddress, _owner.ClusterMembershipSnapshot);
                 }
             }
         }

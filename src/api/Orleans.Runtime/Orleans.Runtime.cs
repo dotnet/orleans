@@ -185,6 +185,8 @@ namespace Orleans.Configuration
 
         public CachingStrategyType CachingStrategy { get { throw null; } set { } }
 
+        public bool EnablePreviousViewRequests { get { throw null; } set { } }
+
         [System.Obsolete("InitialCacheTTL is deprecated and will be removed in a future version.")]
         public System.TimeSpan InitialCacheTTL { get { throw null; } set { } }
 

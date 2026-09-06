@@ -4,6 +4,7 @@
     <OutputType>Exe</OutputType>
     <Nullable>enable</Nullable>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <DefineConstants>$(DefineConstants);ORLEANS_CURRENT_HOST</DefineConstants>
     <AssemblyName>Orleans.GrainDirectory.Compatibility.CurrentHost</AssemblyName>
   </PropertyGroup>
 
