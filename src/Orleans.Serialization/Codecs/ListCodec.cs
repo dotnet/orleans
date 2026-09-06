@@ -107,7 +107,7 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, List<T> value) where TBufferWriter : IBufferWriter<byte>
         {
-            if (value is null) throw new ArgumentNullException(nameof(value));
+            ArgumentNullExceptionPolyfill.ThrowIfNull(value);
 
             if (value.Count > 0)
             {
@@ -124,7 +124,7 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public void Deserialize<TInput>(ref Reader<TInput> reader, List<T> value)
         {
-            if (value is null) throw new ArgumentNullException(nameof(value));
+            ArgumentNullExceptionPolyfill.ThrowIfNull(value);
 
             // If the value has some values added by the constructor, clear them.
             // If those values are in the serialized payload, they will be added below.
@@ -182,7 +182,7 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public List<T> DeepCopy(List<T> input, CopyContext context)
         {
-            if (context is null) throw new ArgumentNullException(nameof(context));
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
             if (input is null) return null!;
 
             if (context.TryGetCopy<List<T>>(input, out var result))
@@ -208,9 +208,9 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public void DeepCopy(List<T> input, List<T> output, CopyContext context)
         {
-            if (input is null) throw new ArgumentNullException(nameof(input));
-            if (output is null) throw new ArgumentNullException(nameof(output));
-            if (context is null) throw new ArgumentNullException(nameof(context));
+            ArgumentNullExceptionPolyfill.ThrowIfNull(input);
+            ArgumentNullExceptionPolyfill.ThrowIfNull(output);
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
 
             output.Clear();
 

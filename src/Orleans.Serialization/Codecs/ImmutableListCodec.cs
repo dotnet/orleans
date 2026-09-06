@@ -64,7 +64,7 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public ImmutableList<T> DeepCopy(ImmutableList<T> input, CopyContext context)
         {
-            if (context is null) throw new ArgumentNullException(nameof(context));
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
             if (input is null) return null!;
 
             if (context.TryGetCopy<ImmutableList<T>>(input, out var result))

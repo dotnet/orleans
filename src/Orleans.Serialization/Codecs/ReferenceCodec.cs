@@ -20,7 +20,7 @@ namespace Orleans.Serialization.Codecs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void MarkValueField(SerializerSession session)
         {
-            if (session is null) throw new ArgumentNullException(nameof(session));
+            ArgumentNullExceptionPolyfill.ThrowIfNull(session);
             session.ReferencedObjects.MarkValueField();
         }
 
@@ -203,7 +203,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="value">The value.</param>
         public static void RecordObject(SerializerSession session, object value)
         {
-            if (session is null) throw new ArgumentNullException(nameof(session));
+            ArgumentNullExceptionPolyfill.ThrowIfNull(session);
             session.ReferencedObjects.RecordReferenceField(value);
         }
 
@@ -215,7 +215,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="referenceId">The reference identifier.</param>
         public static void RecordObject(SerializerSession session, object? value, uint referenceId)
         {
-            if (session is null) throw new ArgumentNullException(nameof(session));
+            ArgumentNullExceptionPolyfill.ThrowIfNull(session);
             session.ReferencedObjects.RecordReferenceField(value, referenceId);
         }
 
@@ -226,7 +226,7 @@ namespace Orleans.Serialization.Codecs
         /// <returns>The placeholder reference id.</returns>
         public static uint CreateRecordPlaceholder(SerializerSession session)
         {
-            if (session is null) throw new ArgumentNullException(nameof(session));
+            ArgumentNullExceptionPolyfill.ThrowIfNull(session);
             return session.ReferencedObjects.CreateRecordPlaceholder();
         }
     }

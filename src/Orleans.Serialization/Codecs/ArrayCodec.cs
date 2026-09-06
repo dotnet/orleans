@@ -142,7 +142,7 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public T[] DeepCopy(T[] input, CopyContext context)
         {
-            if (context is null) throw new ArgumentNullException(nameof(context));
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
             if (input is null) return null!;
 
             if (context.TryGetCopy<T[]>(input, out var result))
@@ -291,7 +291,7 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public ReadOnlyMemory<T> DeepCopy(ReadOnlyMemory<T> input, CopyContext context)
         {
-            if (context is null) throw new ArgumentNullException(nameof(context));
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
 
             if (input.IsEmpty)
             {
@@ -451,7 +451,7 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public Memory<T> DeepCopy(Memory<T> input, CopyContext context)
         {
-            if (context is null) throw new ArgumentNullException(nameof(context));
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
 
             if (input.IsEmpty)
             {
@@ -614,7 +614,7 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public ArraySegment<T> DeepCopy(ArraySegment<T> input, CopyContext context)
         {
-            if (context is null) throw new ArgumentNullException(nameof(context));
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
 
             if (input.Array is null)
             {

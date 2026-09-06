@@ -108,7 +108,7 @@ public sealed class CollectionCodec<T> : IFieldCodec<Collection<T>>, IBaseCodec<
     /// <inheritdoc />
     public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, Collection<T> value) where TBufferWriter : IBufferWriter<byte>
     {
-        if (value is null) throw new ArgumentNullException(nameof(value));
+        ArgumentNullExceptionPolyfill.ThrowIfNull(value);
 
         if (value.Count > 0)
         {
@@ -125,7 +125,7 @@ public sealed class CollectionCodec<T> : IFieldCodec<Collection<T>>, IBaseCodec<
     /// <inheritdoc />
     public void Deserialize<TInput>(ref Reader<TInput> reader, Collection<T> value)
     {
-        if (value is null) throw new ArgumentNullException(nameof(value));
+        ArgumentNullExceptionPolyfill.ThrowIfNull(value);
 
         // If the value has some values added by the constructor, clear them.
         // If those values are in the serialized payload, they will be added below.
@@ -180,7 +180,7 @@ public sealed class CollectionCopier<T> : IDeepCopier<Collection<T>>, IBaseCopie
     /// <inheritdoc/>
     public Collection<T> DeepCopy(Collection<T> input, CopyContext context)
     {
-        if (context is null) throw new ArgumentNullException(nameof(context));
+        ArgumentNullExceptionPolyfill.ThrowIfNull(context);
         if (input is null) return null!;
 
         if (context.TryGetCopy<Collection<T>>(input, out var result))
@@ -206,9 +206,9 @@ public sealed class CollectionCopier<T> : IDeepCopier<Collection<T>>, IBaseCopie
     /// <inheritdoc/>
     public void DeepCopy(Collection<T> input, Collection<T> output, CopyContext context)
     {
-        if (input is null) throw new ArgumentNullException(nameof(input));
-        if (output is null) throw new ArgumentNullException(nameof(output));
-        if (context is null) throw new ArgumentNullException(nameof(context));
+        ArgumentNullExceptionPolyfill.ThrowIfNull(input);
+        ArgumentNullExceptionPolyfill.ThrowIfNull(output);
+        ArgumentNullExceptionPolyfill.ThrowIfNull(context);
 
         output.Clear();
 

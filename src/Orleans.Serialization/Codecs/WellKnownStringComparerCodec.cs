@@ -54,7 +54,7 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public bool IsSupportedType(Type type)
         {
-            if (type is null) throw new ArgumentNullException(nameof(type));
+            ArgumentNullExceptionPolyfill.ThrowIfNull(type);
 
             return type == CodecType
                 || type == _ordinalType

@@ -65,7 +65,7 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public ConcurrentQueue<T> DeepCopy(ConcurrentQueue<T> input, CopyContext context)
         {
-            if (context is null) throw new ArgumentNullException(nameof(context));
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
             if (input is null) return null!;
 
             if (context.TryGetCopy<ConcurrentQueue<T>>(input, out var result))
@@ -91,9 +91,9 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public void DeepCopy(ConcurrentQueue<T> input, ConcurrentQueue<T> output, CopyContext context)
         {
-            if (input is null) throw new ArgumentNullException(nameof(input));
-            if (output is null) throw new ArgumentNullException(nameof(output));
-            if (context is null) throw new ArgumentNullException(nameof(context));
+            ArgumentNullExceptionPolyfill.ThrowIfNull(input);
+            ArgumentNullExceptionPolyfill.ThrowIfNull(output);
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
 
             foreach (var item in input)
             {

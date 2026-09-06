@@ -117,7 +117,7 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, HashSet<T> value) where TBufferWriter : IBufferWriter<byte>
         {
-            if (value is null) throw new ArgumentNullException(nameof(value));
+            ArgumentNullExceptionPolyfill.ThrowIfNull(value);
 
             if (value.Comparer != EqualityComparer<T>.Default)
             {
@@ -203,7 +203,7 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public HashSet<T> DeepCopy(HashSet<T> input, CopyContext context)
         {
-            if (context is null) throw new ArgumentNullException(nameof(context));
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
             if (input is null) return null!;
 
             if (context.TryGetCopy<HashSet<T>>(input, out var result))
@@ -229,9 +229,9 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public void DeepCopy(HashSet<T> input, HashSet<T> output, CopyContext context)
         {
-            if (input is null) throw new ArgumentNullException(nameof(input));
-            if (output is null) throw new ArgumentNullException(nameof(output));
-            if (context is null) throw new ArgumentNullException(nameof(context));
+            ArgumentNullExceptionPolyfill.ThrowIfNull(input);
+            ArgumentNullExceptionPolyfill.ThrowIfNull(output);
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
 
             // If the value has some values added by the constructor, clear them.
             // If those values are in the serialized payload, they will be added below.

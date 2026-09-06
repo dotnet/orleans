@@ -98,7 +98,7 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public NameValueCollection DeepCopy(NameValueCollection input, CopyContext context)
         {
-            if (context is null) throw new ArgumentNullException(nameof(context));
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
             if (input is null) return null!;
 
             if (context.TryGetCopy<NameValueCollection>(input, out var result))

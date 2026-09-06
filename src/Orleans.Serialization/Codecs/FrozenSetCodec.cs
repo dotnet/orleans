@@ -77,7 +77,7 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public FrozenSet<T> DeepCopy(FrozenSet<T> input, CopyContext context)
         {
-            if (context is null) throw new ArgumentNullException(nameof(context));
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
             if (input is null) return null!;
 
             if (context.TryGetCopy<FrozenSet<T>>(input, out var result))

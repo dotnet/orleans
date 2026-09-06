@@ -19,7 +19,7 @@ public class CommonCodecTypeFilter
     /// <returns><see langword="true"/> if the type is a framework or abstract type, otherwise <see langword="false"/>.</returns>
     public static bool IsAbstractOrFrameworkType(Type type)
     {
-        if (type is null) throw new ArgumentNullException(nameof(type));
+        ArgumentNullExceptionPolyfill.ThrowIfNull(type);
 
         if (type.IsAbstract
             || type.GetCustomAttributes<GeneratedCodeAttribute>().Any(a => a.Tool!.Equals("OrleansCodeGen", StringComparison.Ordinal))

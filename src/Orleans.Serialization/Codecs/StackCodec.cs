@@ -133,7 +133,7 @@ public sealed class StackCopier<T> : IDeepCopier<Stack<T>>, IBaseCopier<Stack<T>
     /// <inheritdoc/>
     public Stack<T> DeepCopy(Stack<T> input, CopyContext context)
     {
-        if (context is null) throw new ArgumentNullException(nameof(context));
+        ArgumentNullExceptionPolyfill.ThrowIfNull(context);
         if (input is null) return null!;
 
         if (context.TryGetCopy<Stack<T>>(input, out var result))
@@ -161,9 +161,9 @@ public sealed class StackCopier<T> : IDeepCopier<Stack<T>>, IBaseCopier<Stack<T>
     /// <inheritdoc/>
     public void DeepCopy(Stack<T> input, Stack<T> output, CopyContext context)
     {
-        if (input is null) throw new ArgumentNullException(nameof(input));
-        if (output is null) throw new ArgumentNullException(nameof(output));
-        if (context is null) throw new ArgumentNullException(nameof(context));
+        ArgumentNullExceptionPolyfill.ThrowIfNull(input);
+        ArgumentNullExceptionPolyfill.ThrowIfNull(output);
+        ArgumentNullExceptionPolyfill.ThrowIfNull(context);
 
         var array = new T[input.Count];
         input.CopyTo(array, 0);

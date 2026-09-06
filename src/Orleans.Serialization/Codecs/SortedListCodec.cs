@@ -98,7 +98,7 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public SortedList<TKey, TValue> DeepCopy(SortedList<TKey, TValue> input, CopyContext context)
         {
-            if (context is null) throw new ArgumentNullException(nameof(context));
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
             if (input is null) return null!;
 
             if (context.TryGetCopy<SortedList<TKey, TValue>>(input, out var result))
@@ -124,9 +124,9 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public void DeepCopy(SortedList<TKey, TValue> input, SortedList<TKey, TValue> output, CopyContext context)
         {
-            if (input is null) throw new ArgumentNullException(nameof(input));
-            if (output is null) throw new ArgumentNullException(nameof(output));
-            if (context is null) throw new ArgumentNullException(nameof(context));
+            ArgumentNullExceptionPolyfill.ThrowIfNull(input);
+            ArgumentNullExceptionPolyfill.ThrowIfNull(output);
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
 
             foreach (var pair in input)
             {

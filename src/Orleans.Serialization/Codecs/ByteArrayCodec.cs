@@ -114,7 +114,7 @@ namespace Orleans.Serialization.Codecs
         /// <returns>A copy of <paramref name="input" />.</returns>
         public static BitArray DeepCopy(BitArray input, CopyContext context)
         {
-            if (context is null) throw new ArgumentNullException(nameof(context));
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
 
             if (context.TryGetCopy<BitArray>(input, out var result))
             {
@@ -209,7 +209,7 @@ namespace Orleans.Serialization.Codecs
         /// <returns>A copy of <paramref name="input" />.</returns>
         public static byte[] DeepCopy(byte[] input, CopyContext context)
         {
-            if (context is null) throw new ArgumentNullException(nameof(context));
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
             if (input is null) return null!;
 
             if (context.TryGetCopy<byte[]>(input, out var result))

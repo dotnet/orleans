@@ -105,7 +105,7 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public Tuple<T> DeepCopy(Tuple<T> input, CopyContext context)
         {
-            if (context is null) throw new ArgumentNullException(nameof(context));
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
             if (input is null) return null!;
 
             if (context.TryGetCopy(input, out Tuple<T>? existing))
@@ -242,7 +242,7 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public Tuple<T1, T2> DeepCopy(Tuple<T1, T2> input, CopyContext context)
         {
-            if (context is null) throw new ArgumentNullException(nameof(context));
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
             if (input is null) return null!;
 
             if (context.TryGetCopy(input, out Tuple<T1, T2>? existing))
@@ -401,7 +401,7 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public Tuple<T1, T2, T3> DeepCopy(Tuple<T1, T2, T3> input, CopyContext context)
         {
-            if (context is null) throw new ArgumentNullException(nameof(context));
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
             if (input is null) return null!;
 
             if (context.TryGetCopy(input, out Tuple<T1, T2, T3>? existing))
@@ -577,7 +577,7 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public Tuple<T1, T2, T3, T4> DeepCopy(Tuple<T1, T2, T3, T4> input, CopyContext context)
         {
-            if (context is null) throw new ArgumentNullException(nameof(context));
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
             if (input is null) return null!;
 
             if (context.TryGetCopy(input, out Tuple<T1, T2, T3, T4>? existing))
@@ -773,7 +773,7 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public Tuple<T1, T2, T3, T4, T5> DeepCopy(Tuple<T1, T2, T3, T4, T5> input, CopyContext context)
         {
-            if (context is null) throw new ArgumentNullException(nameof(context));
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
             if (input is null) return null!;
 
             if (context.TryGetCopy(input, out Tuple<T1, T2, T3, T4, T5>? existing))
@@ -986,7 +986,7 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public Tuple<T1, T2, T3, T4, T5, T6> DeepCopy(Tuple<T1, T2, T3, T4, T5, T6> input, CopyContext context)
         {
-            if (context is null) throw new ArgumentNullException(nameof(context));
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
             if (input is null) return null!;
 
             if (context.TryGetCopy(input, out Tuple<T1, T2, T3, T4, T5, T6>? existing))
@@ -1217,7 +1217,7 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public Tuple<T1, T2, T3, T4, T5, T6, T7> DeepCopy(Tuple<T1, T2, T3, T4, T5, T6, T7> input, CopyContext context)
         {
-            if (context is null) throw new ArgumentNullException(nameof(context));
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
             if (input is null) return null!;
 
             if (context.TryGetCopy(input, out Tuple<T1, T2, T3, T4, T5, T6, T7>? existing))
@@ -1464,7 +1464,7 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public Tuple<T1, T2, T3, T4, T5, T6, T7, T8> DeepCopy(Tuple<T1, T2, T3, T4, T5, T6, T7, T8> input, CopyContext context)
         {
-            if (context is null) throw new ArgumentNullException(nameof(context));
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
             if (input is null) return null!;
 
             if (context.TryGetCopy(input, out Tuple<T1, T2, T3, T4, T5, T6, T7, T8>? existing))

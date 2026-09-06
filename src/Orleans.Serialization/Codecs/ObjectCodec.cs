@@ -123,7 +123,7 @@ namespace Orleans.Serialization.Codecs
         [return: NotNullIfNotNull(nameof(input))]
         public static object? DeepCopy(object? input, CopyContext context)
         {
-            if (context is null) throw new ArgumentNullException(nameof(context));
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
             if (input is null) return input;
 
             return context.TryGetCopy<object>(input, out var result) ? result!

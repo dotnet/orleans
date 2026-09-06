@@ -76,7 +76,7 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public ImmutableSortedSet<T> DeepCopy(ImmutableSortedSet<T> input, CopyContext context)
         {
-            if (context is null) throw new ArgumentNullException(nameof(context));
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
             if (input is null) return null!;
 
             if (context.TryGetCopy<ImmutableSortedSet<T>>(input, out var result))

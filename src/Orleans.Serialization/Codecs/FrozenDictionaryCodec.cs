@@ -86,7 +86,7 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public FrozenDictionary<TKey, TValue> DeepCopy(FrozenDictionary<TKey, TValue> input, CopyContext context)
         {
-            if (context is null) throw new ArgumentNullException(nameof(context));
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
             if (input is null) return null!;
 
             if (context.TryGetCopy<FrozenDictionary<TKey, TValue>>(input, out var result))

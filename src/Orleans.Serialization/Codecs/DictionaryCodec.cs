@@ -172,7 +172,7 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public Dictionary<TKey, TValue> DeepCopy(Dictionary<TKey, TValue> input, CopyContext context)
         {
-            if (context is null) throw new ArgumentNullException(nameof(context));
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
             if (input is null) return null!;
 
             if (context.TryGetCopy<Dictionary<TKey, TValue>>(input, out var result))
@@ -198,9 +198,9 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public void DeepCopy(Dictionary<TKey, TValue> input, Dictionary<TKey, TValue> output, CopyContext context)
         {
-            if (input is null) throw new ArgumentNullException(nameof(input));
-            if (output is null) throw new ArgumentNullException(nameof(output));
-            if (context is null) throw new ArgumentNullException(nameof(context));
+            ArgumentNullExceptionPolyfill.ThrowIfNull(input);
+            ArgumentNullExceptionPolyfill.ThrowIfNull(output);
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
 
             output.Clear();
             if (input.Comparer != EqualityComparer<TKey>.Default)

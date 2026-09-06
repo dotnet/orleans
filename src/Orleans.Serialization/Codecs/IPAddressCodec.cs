@@ -87,7 +87,7 @@ namespace Orleans.Serialization.Codecs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void WriteRaw<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, IPAddress value) where TBufferWriter : IBufferWriter<byte>
         {
-            if (value is null) throw new ArgumentNullException(nameof(value));
+            ArgumentNullExceptionPolyfill.ThrowIfNull(value);
 
             writer.EnsureContiguous(1 + 16);
             var span = writer.WritableSpan;
