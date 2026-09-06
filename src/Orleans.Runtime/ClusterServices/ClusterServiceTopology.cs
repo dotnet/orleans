@@ -15,39 +15,31 @@ internal sealed class ClusterServiceTopology
     private readonly ImmutableArray<ImmutableArray<RingRange>> _rangesByMemberPartition;
 
     public ClusterServiceTopology(
-        ClusterMembershipSnapshot snapshot,
-        ClusterServiceConfiguration configuration,
+        ImmutableArray<SiloAddress> members,
+        int partitionsPerSilo,
         Func<SiloAddress, int, uint[]> getRingBoundaries)
     {
-        ArgumentNullException.ThrowIfNull(snapshot);
-        ArgumentNullException.ThrowIfNull(configuration);
+        if (members.IsDefault)
+        {
+            throw new ArgumentException("The member set must be initialized.", nameof(members));
+        }
+
+        ArgumentOutOfRangeException.ThrowIfLessThan(partitionsPerSilo, 1);
         ArgumentNullException.ThrowIfNull(getRingBoundaries);
 
-        Configuration = configuration;
-        ClusterMembershipSnapshot = snapshot;
-        ViewId = new(snapshot.Version, configuration.ProtocolVersion, configuration.Fingerprint);
-
-        var sortedActiveMembers = ImmutableArray.CreateBuilder<SiloAddress>(
-            snapshot.Members.Count(static member => member.Value.Status == SiloStatus.Active));
-        foreach (var member in snapshot.Members)
-        {
-            if (member.Value.Status == SiloStatus.Active)
-            {
-                sortedActiveMembers.Add(member.Key);
-            }
-        }
+        PartitionCount = partitionsPerSilo;
+        var sortedActiveMembers = members.ToBuilder();
 
         sortedActiveMembers.Sort(static (left, right) => left.CompareTo(right));
         var boundaries = ImmutableArray.CreateBuilder<(uint Hash, int MemberIndex, int PartitionIndex)>(
-            configuration.PartitionsPerSilo * sortedActiveMembers.Count);
+            partitionsPerSilo * sortedActiveMembers.Count);
         for (var memberIndex = 0; memberIndex < sortedActiveMembers.Count; memberIndex++)
         {
-            var hashCodes = getRingBoundaries(sortedActiveMembers[memberIndex], configuration.PartitionsPerSilo);
-            if (hashCodes.Length != configuration.PartitionsPerSilo)
+            var hashCodes = getRingBoundaries(sortedActiveMembers[memberIndex], partitionsPerSilo);
+            if (hashCodes.Length != partitionsPerSilo)
             {
                 throw new InvalidOperationException(
-                    $"Assignment strategy '{configuration.AssignmentStrategy}' returned {hashCodes.Length} boundaries for "
-                    + $"{configuration.PartitionsPerSilo} partitions.");
+                    $"The ring assignment returned {hashCodes.Length} boundaries for {partitionsPerSilo} partitions.");
             }
 
             for (var partitionIndex = 0; partitionIndex < hashCodes.Length; partitionIndex++)
@@ -88,7 +80,7 @@ internal sealed class ClusterServiceTopology
         var rangesByMemberPartition = new RingRange[Members.Length][];
         for (var memberIndex = 0; memberIndex < Members.Length; memberIndex++)
         {
-            rangesByMemberPartition[memberIndex] = new RingRange[configuration.PartitionsPerSilo];
+            rangesByMemberPartition[memberIndex] = new RingRange[partitionsPerSilo];
         }
 
         for (var index = 0; index < _ringBoundaries.Length; index++)
@@ -110,15 +102,9 @@ internal sealed class ClusterServiceTopology
         _rangesByMember = new RingRangeCollection[Members.Length];
     }
 
-    public ClusterServiceConfiguration Configuration { get; }
-
-    public ClusterServiceViewId ViewId { get; }
-
-    public ClusterMembershipSnapshot ClusterMembershipSnapshot { get; }
-
     public ImmutableArray<SiloAddress> Members { get; }
 
-    public int PartitionCount => Configuration.PartitionsPerSilo;
+    public int PartitionCount { get; }
 
     public RangeCollection RangeOwners => new(this);
 

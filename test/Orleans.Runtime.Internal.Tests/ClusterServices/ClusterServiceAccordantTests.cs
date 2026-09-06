@@ -187,12 +187,12 @@ public sealed class ClusterServiceAccordantTests
             var stage = active ? _transition!.Stage : _lastStage;
             return new(
                 active,
-                active && _coordinator.IsBlocked(Range, new MembershipVersion(_version)),
+                active && _coordinator.IsBlocked(Range, CreateView(_version)),
                 (int)stage,
                 _version);
         }
 
-        private static ClusterServiceViewId CreateView(long version) => new(new(version), 1, "config");
+        private static ClusterServiceViewId CreateView(long version) => new(0, new(version));
     }
 
     private static TransitionResponse Predict(TransitionRequest request, TransitionModelState state)
@@ -420,8 +420,8 @@ internal sealed class RejectionTransitionHarness
 {
     private static readonly RingRange TransitionRange = RingRange.Create(100, 200);
     private static readonly RingRange DisjointRange = RingRange.Create(300, 400);
-    private static readonly ClusterServiceViewId PreviousView = new(new(1), 1, "config");
-    private static readonly ClusterServiceViewId TargetView = new(new(2), 1, "config");
+    private static readonly ClusterServiceViewId PreviousView = new(0, new(1));
+    private static readonly ClusterServiceViewId TargetView = new(0, new(2));
     private readonly PartitionTransitionCoordinator _coordinator = new();
     private PartitionTransition? _transition;
 
@@ -461,16 +461,16 @@ internal sealed class RejectionTransitionHarness
                     GetTransition().Abort();
                     break;
                 case RejectionTransitionOperationKind.ProbeOlderOverlap:
-                    probeBlocked = _coordinator.IsBlocked(TransitionRange, PreviousView.MembershipVersion);
+                    probeBlocked = _coordinator.IsBlocked(TransitionRange, PreviousView);
                     break;
                 case RejectionTransitionOperationKind.ProbeEqualOverlap:
-                    probeBlocked = _coordinator.IsBlocked(TransitionRange, TargetView.MembershipVersion);
+                    probeBlocked = _coordinator.IsBlocked(TransitionRange, TargetView);
                     break;
                 case RejectionTransitionOperationKind.ProbeNewerOverlap:
-                    probeBlocked = _coordinator.IsBlocked(TransitionRange, new(3));
+                    probeBlocked = _coordinator.IsBlocked(TransitionRange, new(0, new(3)));
                     break;
                 case RejectionTransitionOperationKind.ProbeNewerDisjoint:
-                    probeBlocked = _coordinator.IsBlocked(DisjointRange, new(3));
+                    probeBlocked = _coordinator.IsBlocked(DisjointRange, new(0, new(3)));
                     break;
             }
         }
@@ -488,7 +488,7 @@ internal sealed class RejectionTransitionHarness
         return new(
             accepted,
             active,
-            active && _coordinator.IsBlocked(TransitionRange, TargetView.MembershipVersion),
+            active && _coordinator.IsBlocked(TransitionRange, TargetView),
             probeBlocked,
             (int)(_transition?.Direction ?? PartitionTransitionDirection.Barrier),
             (int)(_transition?.Stage ?? PartitionTransitionStage.Completed),

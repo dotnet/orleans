@@ -25,23 +25,26 @@ These papers explain the models behind the implementation:
 | --- | --- | --- |
 | [Exploiting Virtual Synchrony in Distributed Systems](https://doi.org/10.1145/41457.37515) (SOSP 1987; [publication listing](https://www.cs.cornell.edu/projects/quicksilver/pubs.html)) | The foundational virtual-synchrony model coordinates process-group membership changes with message delivery, providing consistent observations across group views. | A view change coordinates the completion of old-view work with ownership and state transfer. |
 | [Virtually Synchronous Methodology for Dynamic Service Replication](https://www.microsoft.com/en-us/research/publication/virtually-synchronous-methodology-for-dynamic-service-replication/) (2010) | Integrating normal operation with reconfiguration; establishing boundaries, or wedges, around an old configuration before carrying its state forward. | Versioned range gates prevent a successor from serving partially transferred state. Overlapping transitions wait for preceding work on the same range. |
-| [Vertical Paxos and Primary-Backup Replication](https://www.microsoft.com/en-us/research/publication/vertical-paxos-and-primary-backup-replication/) (2009) | Separating configuration authority from the protocol which preserves state across configurations. | Cluster membership supplies the ordered configuration input. Directory partitions perform the state transfer or recovery needed to activate that configuration locally. |
+| [Vertical Paxos and Primary-Backup Replication](https://www.microsoft.com/en-us/research/publication/vertical-paxos-and-primary-backup-replication/) (2009) | Separating configuration authority from the protocol which preserves state across configurations. | A service's view provider supplies ordered views. Partitions transfer or recover the state needed to serve each view. |
 | [Dynamo: Amazon's Highly Available Key-value Store](https://www.allthingsdistributed.com/files/amazon-dynamo-sosp2007.pdf) (SOSP 2007; [Dynamo background and HTML version](https://www.allthingsdistributed.com/2007/10/amazons_dynamo.html)) | Consistent hashing and virtual nodes for incremental partition assignment. | Orleans uses a hash ring with configurable virtual nodes per silo. Each virtual node owns a range, which grows or shrinks as membership changes. |
 | [The Chubby Lock Service for Loosely-Coupled Distributed Systems](https://research.google/pubs/the-chubby-lock-service-for-loosely-coupled-distributed-systems/) (OSDI 2006) | Advisory ownership, leases, and sequencers used by recipients to reject stale holders. | Fencing is an explicit responsibility at ownership activation. An integration with external state must establish authority at the component which accepts its writes or effects. |
 
-## Membership views
+## Service views and their authority
 
-`ClusterServiceViewId` combines:
+`ClusterServiceViewId` has two parts:
 
-- the cluster `MembershipVersion`;
-- the protocol version; and
-- the configuration fingerprint.
+- `ProviderEpoch` identifies a coordinated generation of the service's view authority.
+- `Version`, a `ClusterServiceViewVersion`, is the ordered revision supplied by that authority.
 
-`ClusterServiceConfiguration` contains the logical service identifier, protocol version, partitions per silo, and assignment-strategy identifier. It computes a SHA-256 fingerprint over a deterministic encoding of those values. The strategy identifier names the boundary-generation algorithm, so it needs to mean the same thing on every silo.
+IDs are compared by provider epoch first, then revision. For example, `(epoch 2, revision 1)` follows `(epoch 1, revision 500)`. The counters belong to different authorities, so the second provider can start with a smaller revision.
 
-Within a service and cluster, a membership version identifies one canonical snapshot. The projection ignores repeated and older versions, relying on the membership layer to give each version a consistent meaning.
+This gives a future rolling provider change a distinct identity. Activating a new epoch is a coordinated operation: participants must agree on the new authority and fence the old one. Epochs are scoped to a logical service and cluster, and are separate from software versions or local configuration fingerprints.
 
-A direct successor has the next membership version and the same protocol and configuration fingerprint. Gaps or configuration changes take the recovery path. A silo which skips a view may have missed an owner, so the last owner it saw may be the wrong source for a handoff.
+`ClusterServiceView` holds the ID, topology, and an optional `PreviousViewId`. Derived views carry their service-specific configuration and metadata. One ID identifies one canonical view, including that payload. Configuration changes are represented by publishing a new view, rather than by independently changing fields in its identity.
+
+`PreviousViewId` identifies the authoritative predecessor, not the last view a particular reader happened to observe. A view is a direct successor when that ID matches the installed view. This can express continuity across nonconsecutive revisions or a coordinated provider change. Missing or skipped continuity selects recovery.
+
+The implemented `MembershipBasedClusterServiceViewProvider` uses cluster membership revisions within its configured epoch. Its `MembershipBasedClusterServiceView` carries the cluster membership snapshot and fixed `ClusterServiceConfiguration`. Membership revisions are consecutive, so this provider identifies the predecessor as the preceding membership revision. It ignores repeated and older snapshots and relies on the membership layer to give each revision a canonical meaning.
 
 Silo identity includes its endpoint and generation. A restart at the same endpoint gets a new generation. Messages and snapshot acknowledgements from the previous process still refer to its old identity.
 
@@ -57,27 +60,46 @@ An early lookup during step 2 could report G as missing and lead to a second act
 
 ### Hash-ring partitioning
 
-Orleans currently computes responsibility as a pure function of service configuration and membership:
+The simple membership-derived provider computes responsibility as a pure function of service configuration and membership:
 
 `assignment = F(configuration, membership snapshot)`
 
-Given the same inputs, every silo computes the same assignment.
+Given the same inputs, every silo computes the same assignment. `ClusterServiceConfiguration` supplies the service identifier, virtual-node count, and assignment-strategy identifier. Hosts must agree on these inputs and on the algorithm named by that identifier. This is an operational requirement of the simple provider; a local fingerprint would not establish agreement between hosts.
 
-`ClusterServiceTopology` builds the ring from `Active` silos. Each silo contributes the configured number of virtual nodes, each with a position on the ring. A virtual node owns the clockwise interval `(start, nextStart]`, including wraparound through zero. If there is just one virtual node, it owns the full ring.
+The membership-derived view selects `Active` silos, then builds `ClusterServiceTopology` from that participant set. Each silo contributes the configured number of virtual nodes, each with a position on the ring. A virtual node owns the clockwise interval `(start, nextStart]`, including wraparound through zero. If there is just one virtual node, it owns the full ring.
 
 Ring positions are sorted by hash, then partition index, then sorted member index. Hash collisions are resolved deterministically; losing partitions have empty ranges. The directory creates one `GrainDirectoryPartition` system target per configured virtual node, identified by silo identity and partition index.
 
 Owner lookup uses binary search over the sorted boundaries. Per-member range collections are derived from the same assignment. <xref:Orleans.Configuration.GrainDirectoryOptions.PartitionsPerSilo?displayProperty=nameWithType> controls directory partition granularity and defaults to one.
 
-Membership-derived assignment is a design choice. A future implementation could read a mapping and its monotonic revision from a shared consistent register, as outlined in the [register-backed assignment proposal](https://github.com/dotnet/orleans/issues/11156). Draining, state transfer or recovery, and fencing would still govern ownership changes.
+Membership-derived assignment is a design choice. The [register-backed configuration proposal](https://github.com/dotnet/orleans/issues/11156) would publish assignment, service configuration, and metadata atomically in a shared consistent register. Its revision would identify that whole record, and its views could carry typed configuration alongside topology. Draining, state transfer or recovery, and fencing would still govern ownership changes.
+
+### Selecting a provider per service
+
+`IClusterServiceViewProvider` supplies the current view, an asynchronous stream of newer views, and minimum-view refresh. Providers are keyed singleton services, using the logical service identifier as the key. Different services can select different providers without changing each other's assignment policy or authority.
+
+<xref:Orleans.Hosting.CoreHostingExtensions.AddDistributedGrainDirectory*?displayProperty=nameWithType> registers the membership-derived provider under `orleans-grain-directory` when that key has no provider registration. A service-specific registration can replace that selection. The DI container owns the provider's lifetime; the directory adapter owns its local projection. Direct construction of the directory adapter creates and owns a private provider.
+
+The directory's existing RPCs carry `MembershipVersion`. Its adapter therefore requires the membership-derived provider in epoch zero and explicitly converts between wire membership versions and service-view IDs. Using a different authority for the directory also requires a coordinated wire/protocol migration. The current increment supplies per-service selection and the simple provider; register-backed configuration and live authority migration remain follow-up work.
+
+The simple provider rejects a refresh request for an epoch it does not serve. A host can then report an authority mismatch explicitly instead of trying to repair it by refreshing an unrelated membership counter.
+
+### Configuration changes within a view stream
+
+A service view can carry more than an assignment. A derived view can include operating settings, state-format information, or administrative metadata, all identified by the same view ID.
+
+The service decides what a new payload requires. A metadata-only change can leave topology unchanged. A change to execution or state semantics may need a barrier even when ownership stays the same. The provider publishes the authoritative view; the service and transition coordinator establish readiness to use it.
 
 ## Components
 
 | Component | Responsibility |
 | --- | --- |
-| `ClusterServiceConfiguration` and `ClusterServiceViewId` | Configuration identity and view succession. |
+| `ClusterServiceViewId` and `ClusterServiceViewVersion` | Provider-scoped identity and consistent ordering for comparisons and gates. |
+| `ClusterServiceView` | Canonical topology and source-backed predecessor identity; derived views carry typed configuration and metadata. |
+| `ClusterServiceConfiguration` | Fixed assignment inputs for the simple membership-derived provider. |
 | `ClusterServiceTopology` | Deterministic range assignment and owner lookup. |
-| `ClusterServiceMembership` | Project cluster snapshots into service views; publish increasing views; refresh to a minimum version; coordinate cancellation and disposal. |
+| `IClusterServiceViewProvider` | Per-service contract for current views, view updates, refresh, and lifecycle. |
+| `MembershipBasedClusterServiceViewProvider` | Project membership into service views within a configured provider epoch. |
 | `PartitionTransitionCoordinator` and `PartitionTransition` | Track versioned range gates and enforce legal local transition stages. |
 | `ClusterServiceOperationResult<T>` | Describe execution certainty and whether retry requires deduplication. |
 | `DirectoryMembershipService` and `DirectoryMembershipSnapshot` | Adapt service views into directory routing snapshots and partition references. |
@@ -86,9 +108,10 @@ Membership-derived assignment is a design choice. A future implementation could 
 
 ```mermaid
 flowchart TD
-    Membership[IClusterMembershipService] --> Projection[ClusterServiceMembership]
-    Projection --> Topology[ClusterServiceTopology]
-    Topology --> Adapter[DirectoryMembershipService]
+    Membership[IClusterMembershipService] --> Projection[MembershipBasedClusterServiceViewProvider]
+    Projection --> View[MembershipBasedClusterServiceView]
+    View --> Topology[ClusterServiceTopology]
+    View --> Adapter[DirectoryMembershipService]
     Adapter --> Routing[DirectoryMembershipSnapshot and RPC references]
     Routing --> Directory[DistributedGrainDirectory]
     Directory --> Partition[GrainDirectoryPartition]
@@ -98,7 +121,7 @@ flowchart TD
 
 Membership projection and partition updates run asynchronously. A routing snapshot can therefore be ahead of a partition's local view. Request processing waits for the view and range it needs before using local state.
 
-`RefreshViewAsync` returns immediately when the local view is recent enough. Otherwise it awaits the underlying membership refresh and the local projection. Refresh errors propagate to the caller. If shutdown or stream termination interrupts the wait, the caller receives cancellation.
+`RefreshViewAsync` returns immediately when the local view satisfies the requested ID in the provider's epoch. A null minimum forces a refresh. The simple provider awaits membership refresh and then its local projection. Refresh errors propagate to the caller. If shutdown or stream termination interrupts the wait, the caller receives cancellation.
 
 ## Scheduling, admission, and versioned gates
 
@@ -106,7 +129,7 @@ Each directory partition is a system target. Its scheduler serializes synchronou
 
 The partition **installs the range gate synchronously, before the transition's first `await`**. A caller can already see the new owner in its routing snapshot while that owner is still acquiring the range. The gate keeps the request waiting until the range is ready.
 
-A transition blocks an intersecting request when its target membership version is less than or equal to the version that the request must wait for. Ordinary lookup, registration, and deregistration wait for the maximum of the caller's version and the partition's current version. After the wait, they re-read the view and establish ownership before accessing the map.
+A transition blocks an intersecting request when its target view ID is less than or equal to the ID that the request must wait for. Both the provider epoch and revision participate in this comparison. The directory maps wire membership versions into epoch-zero IDs; lookup, registration, and deregistration wait for the maximum of the caller's version and the partition's current version. After the wait, they re-read the view and establish ownership before accessing the map.
 
 Acquisition, release, and recovery wait for preceding local transitions using the predecessor version. For example, releasing a range in view `v3` waits for its acquisition in `v2`, while the `v3` release gate remains installed. The earlier acquisition can then finish without waiting on the later release. Snapshot reads instead wait on the target version: `GetSnapshotAsync(v3, v2, range)` waits for the `v3` release gate before reading the retained `v2` snapshot.
 
@@ -261,15 +284,18 @@ These helpers are internal runtime code. Another service using them needs to def
 - Execution certainty, retry/deduplication behavior, cancellation, and shutdown ordering.
 - The relationship between observable transition completion and actual readiness to serve.
 
-The implemented provider derives assignment from fixed configuration and cluster membership. [The extensible view-source proposal](https://github.com/dotnet/orleans/issues/11156) discusses service-specific participant groups and consistent-register mappings as a separate evolution of that authority contract.
+The provider interface and per-service selection are implemented. [The register-backed configuration proposal](https://github.com/dotnet/orleans/issues/11156) covers shared configuration records, service-specific participant groups, and coordinated authority migration.
 
 ## Source map and executable protocol scenarios
 
-The following links pin the implementation revision described by this page:
+The provider contract and directory integration are developed in [the cluster-service implementation PR](https://github.com/dotnet/orleans/pull/10969/files). Start with these files:
 
-- [Cluster-service primitives](https://github.com/dotnet/orleans/tree/19c8de3ebbdf599de84f177887ccfd671ed0cfd8/src/Orleans.Runtime/ClusterServices): view identity, topology projection, transition stages, and execution dispositions.
-- [`DistributedGrainDirectory`](https://github.com/dotnet/orleans/blob/19c8de3ebbdf599de84f177887ccfd671ed0cfd8/src/Orleans.Runtime/GrainDirectory/DistributedGrainDirectory.cs): membership dispatch, recovery watermark, routing, and fatal-error observation.
-- [`GrainDirectoryPartition`](https://github.com/dotnet/orleans/blob/19c8de3ebbdf599de84f177887ccfd671ed0cfd8/src/Orleans.Runtime/GrainDirectory/GrainDirectoryPartition.cs) and [request admission](https://github.com/dotnet/orleans/blob/19c8de3ebbdf599de84f177887ccfd671ed0cfd8/src/Orleans.Runtime/GrainDirectory/GrainDirectoryPartition.Interface.cs): gates, snapshots, recovery, and lease enforcement.
+- `ClusterServices\IClusterServiceViewProvider.cs`, `ClusterServiceView.cs`, `ClusterServiceViewId.cs`, and `MembershipBasedClusterServiceViewProvider.cs`: provider selection, canonical view payload, identity, and the simple provider.
+- `ClusterServices\ClusterServiceTopology.cs` and `PartitionTransitionCoordinator.cs`: assignment lookup, transition stages, and versioned gates.
+- `GrainDirectory\DirectoryMembershipService.cs` and `DirectoryMembershipSnapshot.cs`: the membership-version wire adapter and provider lifetime boundary.
+- `GrainDirectory\DistributedGrainDirectory.cs`, `GrainDirectoryPartition.cs`, and `GrainDirectoryPartition.Interface.cs`: invocation, recovery watermark, state transfer, admission, and fencing.
+
+The following links retain the original protocol-scenario baseline:
 - [Controlled protocol scenarios](https://github.com/dotnet/orleans/blob/19c8de3ebbdf599de84f177887ccfd671ed0cfd8/test/Orleans.Runtime.Internal.Tests/ClusterServices/ControlledGrainDirectoryProtocolTests.cs): real partition schedulers, delayed replies, overlapping views, cancellation, incarnation changes, and independent registration/ownership oracles.
 - [Real-process version and pause scenarios](https://github.com/dotnet/orleans/blob/19c8de3ebbdf599de84f177887ccfd671ed0cfd8/test/Orleans.GrainDirectory.Tests/Compatibility/GrainDirectoryProcessCompatibilityTests.cs): cross-version handoff, authoritative activation identity, and resumed-owner self-fencing.
 - [Suite guide and mutation guardrails](https://github.com/dotnet/orleans/blob/19c8de3ebbdf599de84f177887ccfd671ed0cfd8/test/Orleans.GrainDirectory.Tests/README.md): commands, evidence boundaries, failure attribution, and the assertions protecting key protocol dependencies.
