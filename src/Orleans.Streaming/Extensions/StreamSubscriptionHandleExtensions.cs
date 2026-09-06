@@ -34,6 +34,8 @@ namespace Orleans.Streams
                                                                            StreamSequenceToken? token = null)
         {
             var genericObserver = new GenericAsyncObserver<T>(onNextAsync, onErrorAsync, onCompletedAsync);
+            ArgumentNullException.ThrowIfNull(handle);
+
             return handle.ResumeAsync(genericObserver, token);
         }
 
@@ -122,6 +124,8 @@ namespace Orleans.Streams
                                                                            StreamSequenceToken? token = null)
         {
             var genericObserver = new GenericAsyncBatchObserver<T>(onNextAsync, onErrorAsync, onCompletedAsync);
+            ArgumentNullException.ThrowIfNull(handle);
+
             return handle.ResumeAsync(genericObserver, token);
         }
 

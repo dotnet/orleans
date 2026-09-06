@@ -12,6 +12,8 @@ namespace Orleans.Streams
         /// <inheritdoc/>
         public bool TryGetPredicate(string predicatePattern, [MaybeNullWhen(false)] out IStreamNamespacePredicate predicate)
         {
+            ArgumentNullException.ThrowIfNull(predicatePattern);
+
             switch (predicatePattern)
             {
                 case "*":
@@ -56,6 +58,8 @@ namespace Orleans.Streams
         /// <inheritdoc/>
         public bool TryGetPredicate(string predicatePattern, [MaybeNullWhen(false)] out IStreamNamespacePredicate predicate)
         {
+            ArgumentNullException.ThrowIfNull(predicatePattern);
+
             if (!predicatePattern.StartsWith(Prefix, StringComparison.Ordinal))
             {
                 predicate = null;
