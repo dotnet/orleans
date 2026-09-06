@@ -104,8 +104,7 @@ namespace Orleans.Serialization.Codecs
     public sealed class BitArrayCopier : IDeepCopier<BitArray>
     {
         /// <inheritdoc/>
-        [return: System.Diagnostics.CodeAnalysis.MaybeNull, System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
-        BitArray IDeepCopier<BitArray>.DeepCopy([System.Diagnostics.CodeAnalysis.AllowNull] BitArray input, CopyContext context) => DeepCopy(input, context);
+        BitArray IDeepCopier<BitArray>.DeepCopy([System.Diagnostics.CodeAnalysis.AllowNull] BitArray input, CopyContext context) => DeepCopy(input, context)!;
 
         /// <summary>
         /// Creates a deep copy of the provided input.
@@ -201,8 +200,7 @@ namespace Orleans.Serialization.Codecs
     public sealed class ByteArrayCopier : IDeepCopier<byte[]>
     {
         /// <inheritdoc/>
-        [return: System.Diagnostics.CodeAnalysis.MaybeNull, System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
-        byte[] IDeepCopier<byte[]>.DeepCopy([System.Diagnostics.CodeAnalysis.AllowNull] byte[] input, CopyContext context) => DeepCopy(input, context);
+        byte[] IDeepCopier<byte[]>.DeepCopy([System.Diagnostics.CodeAnalysis.AllowNull] byte[] input, CopyContext context) => DeepCopy(input, context)!;
 
         /// <summary>
         /// Creates a deep copy of the provided input.

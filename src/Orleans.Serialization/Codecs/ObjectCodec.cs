@@ -130,7 +130,6 @@ namespace Orleans.Serialization.Codecs
                 : input.GetType() == typeof(object) ? input : context.DeepCopy(input)!;
         }
 
-        [return: MaybeNull, NotNullIfNotNull(nameof(input))]
         object IDeepCopier<object>.DeepCopy([AllowNull] object input, CopyContext context)
             => DeepCopy(input, context)!;
 
