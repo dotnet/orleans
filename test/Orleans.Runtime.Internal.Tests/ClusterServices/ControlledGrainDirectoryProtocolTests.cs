@@ -27,7 +27,7 @@ namespace UnitTests.ClusterServices;
 [TestArea("GrainDirectory")]
 [TestCategory("BVT")]
 [Collection(ControlledGrainDirectoryProtocolCollection.Name)]
-public sealed class ControlledGrainDirectoryProtocolTests
+public sealed partial class ControlledGrainDirectoryProtocolTests
 {
     [Fact]
     public async Task LifecycleStartup_PublishedMembershipRoutesProtocolOnDestinationScheduler()
@@ -2519,14 +2519,28 @@ public sealed class ControlledGrainDirectoryProtocolTests
         private bool _disposed;
 
         public ControlledProtocolFixture()
+            : this(false)
+        {
+        }
+
+        public ControlledProtocolFixture(bool enablePreviousViewRequests)
             : this(
+                enablePreviousViewRequests,
+                TimeSpan.Zero,
                 (SiloAddress.FromParsableString("127.0.0.1:11111@101"), 0x4000_0000u),
                 (SiloAddress.FromParsableString("127.0.0.1:11112@102"), 0xC000_0000u))
         {
         }
 
         public ControlledProtocolFixture(params (SiloAddress Silo, uint Boundary)[] boundaries)
+            : this(false, TimeSpan.Zero, boundaries)
         {
+        }
+
+        public ControlledProtocolFixture(bool enablePreviousViewRequests, TimeSpan rangeLeaseDuration, params (SiloAddress Silo, uint Boundary)[] boundaries)
+        {
+            EnablePreviousViewRequests = enablePreviousViewRequests;
+            RangeLeaseDuration = rangeLeaseDuration;
             TimeProvider = new FakeTimeProvider(new DateTimeOffset(2025, 1, 2, 3, 4, 5, TimeSpan.Zero));
             DirectoryEvents = new DiagnosticEventCollector(GrainDirectoryEvents.ListenerName);
             Ownership = new OwnershipOracle(boundaries);
@@ -2578,6 +2592,8 @@ public sealed class ControlledGrainDirectoryProtocolTests
                 cancellationToken);
 
         public FakeTimeProvider TimeProvider { get; }
+        public bool EnablePreviousViewRequests { get; }
+        public TimeSpan RangeLeaseDuration { get; }
         public DiagnosticEventCollector DirectoryEvents { get; }
         public ControlledDirectoryTransport Transport { get; }
         public OwnershipOracle Ownership { get; }
@@ -3001,7 +3017,12 @@ public sealed class ControlledGrainDirectoryProtocolTests
                 _services,
                 GrainFactory,
                 _services.GetRequiredService<DirectoryInstruments>(),
-                Options.Create(new GrainDirectoryOptions { PartitionsPerSilo = 1, RangeLeaseDuration = TimeSpan.Zero }),
+                Options.Create(new GrainDirectoryOptions
+                {
+                    PartitionsPerSilo = 1,
+                    RangeLeaseDuration = fixture.RangeLeaseDuration,
+                    EnablePreviousViewRequests = fixture.EnablePreviousViewRequests
+                }),
                 Options.Create(new ClusterMembershipOptions()),
                 TimeProvider,
                 Shared);
@@ -3091,6 +3112,7 @@ public sealed class ControlledGrainDirectoryProtocolTests
         private TaskCompletionSource<MembershipVersion> _refreshObserved =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
         private ClusterMembershipSnapshot _current = ClusterMembershipSnapshot.Default;
+        private ClusterMembershipSnapshot? _heldPublication;
 
         public ControlledClusterMembershipService(ControlledProtocolFixture fixture, SiloAddress address)
         {
@@ -3100,6 +3122,21 @@ public sealed class ControlledGrainDirectoryProtocolTests
 
         public ClusterMembershipSnapshot CurrentSnapshot => Volatile.Read(ref _current);
         public IAsyncEnumerable<ClusterMembershipSnapshot> MembershipUpdates => _updates.Reader.ReadAllAsync();
+
+        public void HoldPublication(ClusterMembershipSnapshot snapshot)
+        {
+            Assert.Null(_heldPublication);
+            Assert.True(snapshot.Version > CurrentSnapshot.Version);
+            _heldPublication = snapshot;
+            Volatile.Write(ref _current, snapshot);
+        }
+
+        public void ReleasePublication()
+        {
+            var snapshot = Assert.IsType<ClusterMembershipSnapshot>(_heldPublication);
+            _heldPublication = null;
+            Assert.True(_updates.Writer.TryWrite(snapshot));
+        }
 
         public ValueTask PublishAsync(ClusterMembershipSnapshot snapshot)
         {
@@ -3509,7 +3546,8 @@ public sealed class ControlledGrainDirectoryProtocolTests
                 MembershipVersion version,
                 GrainAddress address,
                 GrainAddress? currentRegistration,
-                CancellationToken cancellationToken = default)
+                CancellationToken cancellationToken = default,
+                bool allowPreviousVersion = false)
             {
                 return new(transport.Enqueue(
                     source,
@@ -3527,13 +3565,15 @@ public sealed class ControlledGrainDirectoryProtocolTests
                             version,
                             address,
                             currentRegistration,
-                            cancellationToken).AsTask())));
+                            cancellationToken,
+                            allowPreviousVersion).AsTask())));
             }
 
             public ValueTask<DirectoryResult<GrainAddress?>> LookupAsync(
                 MembershipVersion version,
                 GrainId grainId,
-                CancellationToken cancellationToken = default)
+                CancellationToken cancellationToken = default,
+                bool allowPreviousVersion = false)
             {
                 return new(transport.Enqueue(
                     source,
@@ -3550,13 +3590,15 @@ public sealed class ControlledGrainDirectoryProtocolTests
                         () => ((IGrainDirectoryPartition)destination.Partition).LookupAsync(
                             version,
                             grainId,
-                            cancellationToken).AsTask())));
+                            cancellationToken,
+                            allowPreviousVersion).AsTask())));
             }
 
             public ValueTask<DirectoryResult<bool>> DeregisterAsync(
                 MembershipVersion version,
                 GrainAddress address,
-                CancellationToken cancellationToken = default)
+                CancellationToken cancellationToken = default,
+                bool allowPreviousVersion = false)
             {
                 return new(transport.Enqueue(
                     source,
@@ -3573,7 +3615,8 @@ public sealed class ControlledGrainDirectoryProtocolTests
                         () => ((IGrainDirectoryPartition)destination.Partition).DeregisterAsync(
                             version,
                             address,
-                            cancellationToken).AsTask())));
+                            cancellationToken,
+                            allowPreviousVersion).AsTask())));
             }
 
             public ValueTask<GrainDirectoryPartitionSnapshot?> GetSnapshotAsync(

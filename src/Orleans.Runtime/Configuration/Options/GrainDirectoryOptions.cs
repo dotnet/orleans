@@ -61,6 +61,16 @@ public class GrainDirectoryOptions
     public const int DEFAULT_PARTITIONS_PER_SILO = 1;
 
     /// <summary>
+    /// Gets or sets whether distributed directory requests can execute in the immediately preceding membership view.
+    /// </summary>
+    /// <remarks>
+    /// When enabled, a ready partition which owns the key in both consecutive views can serve it using its installed view.
+    /// Recovery, activation-host membership, and lease requirements determine when the requested view is required.
+    /// The default is <see langword="false"/>, allowing receiver support to be deployed before enabling the fast path.
+    /// </remarks>
+    public bool EnablePreviousViewRequests { get; set; }
+
+    /// <summary>
     /// Gets or sets the initial (minimum) time, in seconds, to keep a cache entry before revalidating.
     /// </summary>
     [Obsolete("InitialCacheTTL is deprecated and will be removed in a future version.")]
