@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace Orleans.Streams;
 
@@ -57,7 +58,7 @@ public enum QueueCacheCursorMoveResultKind
 /// <summary>
 /// Describes a queue cache miss.
 /// </summary>
-public readonly struct QueueCacheMissInfo
+public readonly struct QueueCacheMissInfo : IEquatable<QueueCacheMissInfo>
 {
     private readonly object? _requested;
     private readonly object? _low;
@@ -122,6 +123,28 @@ public readonly struct QueueCacheMissInfo
     /// </summary>
     public StreamSequenceToken? HighToken => _high as StreamSequenceToken;
 
+    /// <inheritdoc/>
+    public bool Equals(QueueCacheMissInfo other) =>
+        Equals(_requested, other._requested)
+        && Equals(_low, other._low)
+        && Equals(_high, other._high);
+
+    /// <inheritdoc/>
+    public override bool Equals(object? obj) => obj is QueueCacheMissInfo other && Equals(other);
+
+    /// <inheritdoc/>
+    public override int GetHashCode() => HashCode.Combine(_requested, _low, _high);
+
+    /// <summary>
+    /// Determines whether two cache-miss descriptions are equal.
+    /// </summary>
+    public static bool operator ==(QueueCacheMissInfo left, QueueCacheMissInfo right) => left.Equals(right);
+
+    /// <summary>
+    /// Determines whether two cache-miss descriptions are unequal.
+    /// </summary>
+    public static bool operator !=(QueueCacheMissInfo left, QueueCacheMissInfo right) => !left.Equals(right);
+
     /// <summary>
     /// Creates an exception representing this cache miss.
     /// </summary>
@@ -138,7 +161,7 @@ public readonly struct QueueCacheMissInfo
 /// All other results contain no cursor. A <see cref="QueueCacheCursorResultKind.CacheMiss"/> result
 /// contains <see cref="CacheMiss"/> details, while other results contain no cache-miss details.
 /// </remarks>
-public readonly struct QueueCacheCursorResult<TCursor> where TCursor : class
+public readonly struct QueueCacheCursorResult<TCursor> : IEquatable<QueueCacheCursorResult<TCursor>> where TCursor : class
 {
     private readonly TCursor? _cursor;
     private readonly QueueCacheMissInfo _cacheMiss;
@@ -167,6 +190,28 @@ public readonly struct QueueCacheCursorResult<TCursor> where TCursor : class
     /// Gets the cache miss details when <see cref="Kind"/> is <see cref="QueueCacheCursorResultKind.CacheMiss"/>.
     /// </summary>
     public QueueCacheMissInfo? CacheMiss => Kind == QueueCacheCursorResultKind.CacheMiss ? _cacheMiss : null;
+
+    /// <inheritdoc/>
+    public bool Equals(QueueCacheCursorResult<TCursor> other) =>
+        Kind == other.Kind
+        && EqualityComparer<TCursor?>.Default.Equals(_cursor, other._cursor)
+        && _cacheMiss.Equals(other._cacheMiss);
+
+    /// <inheritdoc/>
+    public override bool Equals(object? obj) => obj is QueueCacheCursorResult<TCursor> other && Equals(other);
+
+    /// <inheritdoc/>
+    public override int GetHashCode() => HashCode.Combine(Kind, _cursor, _cacheMiss);
+
+    /// <summary>
+    /// Determines whether two cursor acquisition results are equal.
+    /// </summary>
+    public static bool operator ==(QueueCacheCursorResult<TCursor> left, QueueCacheCursorResult<TCursor> right) => left.Equals(right);
+
+    /// <summary>
+    /// Determines whether two cursor acquisition results are unequal.
+    /// </summary>
+    public static bool operator !=(QueueCacheCursorResult<TCursor> left, QueueCacheCursorResult<TCursor> right) => !left.Equals(right);
 
     /// <summary>
     /// Creates a successful result.
@@ -202,7 +247,7 @@ public readonly struct QueueCacheCursorResult<TCursor> where TCursor : class
 /// current item. All other results indicate that no current item was produced. A
 /// <see cref="QueueCacheCursorMoveResultKind.CacheMiss"/> result contains <see cref="CacheMiss"/> details.
 /// </remarks>
-public readonly struct QueueCacheCursorMoveResult
+public readonly struct QueueCacheCursorMoveResult : IEquatable<QueueCacheCursorMoveResult>
 {
     private readonly QueueCacheMissInfo _cacheMiss;
 
@@ -223,6 +268,26 @@ public readonly struct QueueCacheCursorMoveResult
     /// Gets the cache miss details when <see cref="Kind"/> is <see cref="QueueCacheCursorMoveResultKind.CacheMiss"/>.
     /// </summary>
     public QueueCacheMissInfo? CacheMiss => Kind == QueueCacheCursorMoveResultKind.CacheMiss ? _cacheMiss : null;
+
+    /// <inheritdoc/>
+    public bool Equals(QueueCacheCursorMoveResult other) =>
+        Kind == other.Kind && _cacheMiss.Equals(other._cacheMiss);
+
+    /// <inheritdoc/>
+    public override bool Equals(object? obj) => obj is QueueCacheCursorMoveResult other && Equals(other);
+
+    /// <inheritdoc/>
+    public override int GetHashCode() => HashCode.Combine(Kind, _cacheMiss);
+
+    /// <summary>
+    /// Determines whether two cursor movement results are equal.
+    /// </summary>
+    public static bool operator ==(QueueCacheCursorMoveResult left, QueueCacheCursorMoveResult right) => left.Equals(right);
+
+    /// <summary>
+    /// Determines whether two cursor movement results are unequal.
+    /// </summary>
+    public static bool operator !=(QueueCacheCursorMoveResult left, QueueCacheCursorMoveResult right) => !left.Equals(right);
 
     /// <summary>
     /// Gets a successful cursor advancement result.

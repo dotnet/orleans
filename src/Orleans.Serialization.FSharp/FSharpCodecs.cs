@@ -1058,6 +1058,7 @@ namespace Orleans.Serialization
     /// </summary>
     /// <typeparam name="T">The referenced value type.</typeparam>
     [GenerateSerializer]
+    [SuppressMessage("Performance", "CA1815:Override equals and operator equals on value types", Justification = "This mutable surrogate is a transient serialization carrier rather than a domain value.")]
     public struct FSharpRefSurrogate<T>
     {
         /// <summary>
@@ -1141,6 +1142,7 @@ namespace Orleans.Serialization
     /// </summary>
     /// <typeparam name="T">The list element type.</typeparam>
     [GenerateSerializer]
+    [SuppressMessage("Performance", "CA1815:Override equals and operator equals on value types", Justification = "This mutable surrogate carries a reference-backed collection during serialization and has no independent value contract.")]
     public struct FSharpListSurrogate<T>
     {
         /// <summary>
@@ -1230,6 +1232,7 @@ namespace Orleans.Serialization
     /// </summary>
     /// <typeparam name="T">The set element type.</typeparam>
     [GenerateSerializer]
+    [SuppressMessage("Performance", "CA1815:Override equals and operator equals on value types", Justification = "This mutable surrogate carries a reference-backed collection during serialization and has no independent value contract.")]
     public struct FSharpSetSurrogate<T>
     {
         /// <summary>
@@ -1324,6 +1327,7 @@ namespace Orleans.Serialization
     /// <typeparam name="TKey">The map key type.</typeparam>
     /// <typeparam name="TValue">The map value type.</typeparam>
     [GenerateSerializer]
+    [SuppressMessage("Performance", "CA1815:Override equals and operator equals on value types", Justification = "This mutable surrogate carries a reference-backed collection during serialization and has no independent value contract.")]
     public struct FSharpMapSurrogate<TKey, TValue>
     {
         /// <summary>

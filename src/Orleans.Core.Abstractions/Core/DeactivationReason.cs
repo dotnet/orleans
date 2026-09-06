@@ -1,11 +1,12 @@
 using System;
+using System.Collections.Generic;
 
 namespace Orleans
 {
     /// <summary>
     /// Represents a reason for initiating grain deactivation.
     /// </summary>
-    public readonly struct DeactivationReason
+    public readonly struct DeactivationReason : IEquatable<DeactivationReason>
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="DeactivationReason"/> struct.
@@ -56,6 +57,28 @@ namespace Orleans
         /// Gets the exception which resulted in deactivation.
         /// </summary>
         public Exception? Exception { get; }
+
+        /// <inheritdoc/>
+        public bool Equals(DeactivationReason other) =>
+            ReasonCode == other.ReasonCode
+            && Description == other.Description
+            && EqualityComparer<Exception?>.Default.Equals(Exception, other.Exception);
+
+        /// <inheritdoc/>
+        public override bool Equals(object? obj) => obj is DeactivationReason other && Equals(other);
+
+        /// <inheritdoc/>
+        public override int GetHashCode() => HashCode.Combine(ReasonCode, Description, Exception);
+
+        /// <summary>
+        /// Determines whether two deactivation reasons are equal.
+        /// </summary>
+        public static bool operator ==(DeactivationReason left, DeactivationReason right) => left.Equals(right);
+
+        /// <summary>
+        /// Determines whether two deactivation reasons are unequal.
+        /// </summary>
+        public static bool operator !=(DeactivationReason left, DeactivationReason right) => !left.Equals(right);
 
         /// <inheritdoc/>
         public override string ToString()

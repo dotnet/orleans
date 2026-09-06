@@ -27,7 +27,7 @@ public interface IEnvironmentStatisticsProvider
 [StructLayout(LayoutKind.Sequential, Pack = 1)]
 [Alias("Orleans.Statistics.EnvironmentStatistics")]
 [DebuggerDisplay("{ToString(),nq}")]
-public readonly struct EnvironmentStatistics
+public readonly struct EnvironmentStatistics : IEquatable<EnvironmentStatistics>
 {
     /// <summary>
     /// The system CPU usage.
@@ -180,6 +180,40 @@ public readonly struct EnvironmentStatistics
             return (float)Math.Clamp(fraction, 0.0, 1.0);
         }
     }
+
+    /// <inheritdoc/>
+    public bool Equals(EnvironmentStatistics other) =>
+        FilteredCpuUsagePercentage.Equals(other.FilteredCpuUsagePercentage)
+        && FilteredMemoryUsageBytes == other.FilteredMemoryUsageBytes
+        && FilteredAvailableMemoryBytes == other.FilteredAvailableMemoryBytes
+        && MaximumAvailableMemoryBytes == other.MaximumAvailableMemoryBytes
+        && RawCpuUsagePercentage.Equals(other.RawCpuUsagePercentage)
+        && RawMemoryUsageBytes == other.RawMemoryUsageBytes
+        && RawAvailableMemoryBytes == other.RawAvailableMemoryBytes;
+
+    /// <inheritdoc/>
+    public override bool Equals(object? obj) => obj is EnvironmentStatistics other && Equals(other);
+
+    /// <inheritdoc/>
+    public override int GetHashCode() =>
+        HashCode.Combine(
+            FilteredCpuUsagePercentage,
+            FilteredMemoryUsageBytes,
+            FilteredAvailableMemoryBytes,
+            MaximumAvailableMemoryBytes,
+            RawCpuUsagePercentage,
+            RawMemoryUsageBytes,
+            RawAvailableMemoryBytes);
+
+    /// <summary>
+    /// Determines whether two environment statistics snapshots are equal.
+    /// </summary>
+    public static bool operator ==(EnvironmentStatistics left, EnvironmentStatistics right) => left.Equals(right);
+
+    /// <summary>
+    /// Determines whether two environment statistics snapshots are unequal.
+    /// </summary>
+    public static bool operator !=(EnvironmentStatistics left, EnvironmentStatistics right) => !left.Equals(right);
 
     private static string FormatBytes(long bytes)
     {

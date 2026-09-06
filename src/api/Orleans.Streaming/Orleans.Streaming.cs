@@ -497,7 +497,7 @@ namespace Orleans.Providers.Streams.Common
         public string BlockPoolId { get { throw null; } set { } }
     }
 
-    public partial struct CachedMessage
+    public partial struct CachedMessage : System.IEquatable<CachedMessage>
     {
         public System.DateTime DequeueTimeUtc;
         public System.DateTime EnqueueTimeUtc;
@@ -505,6 +505,15 @@ namespace Orleans.Providers.Streams.Common
         public System.ArraySegment<byte> Segment;
         public long SequenceNumber;
         public Runtime.StreamId StreamId;
+        public readonly bool Equals(CachedMessage other) { throw null; }
+
+        public override readonly bool Equals(object? obj) { throw null; }
+
+        public override readonly int GetHashCode() { throw null; }
+
+        public static bool operator ==(CachedMessage left, CachedMessage right) { throw null; }
+
+        public static bool operator !=(CachedMessage left, CachedMessage right) { throw null; }
     }
 
     public partial class CachedMessageBlock : PooledResource<CachedMessageBlock>
@@ -1982,7 +1991,7 @@ namespace Orleans.Streams
         public bool UnSubscribeFromQueueDistributionChangeEvents(IStreamQueueBalanceListener observer) { throw null; }
     }
 
-    public readonly partial struct QueueCacheCursorMoveResult
+    public readonly partial struct QueueCacheCursorMoveResult : System.IEquatable<QueueCacheCursorMoveResult>
     {
         private readonly int _dummyPrimitive;
         public QueueCacheMissInfo? CacheMiss { get { throw null; } }
@@ -1993,7 +2002,17 @@ namespace Orleans.Streams
 
         public static QueueCacheCursorMoveResult Success { get { throw null; } }
 
+        public readonly bool Equals(QueueCacheCursorMoveResult other) { throw null; }
+
+        public override readonly bool Equals(object? obj) { throw null; }
+
         public static QueueCacheCursorMoveResult FromCacheMiss(QueueCacheMissInfo cacheMiss) { throw null; }
+
+        public override readonly int GetHashCode() { throw null; }
+
+        public static bool operator ==(QueueCacheCursorMoveResult left, QueueCacheCursorMoveResult right) { throw null; }
+
+        public static bool operator !=(QueueCacheCursorMoveResult left, QueueCacheCursorMoveResult right) { throw null; }
     }
 
     public enum QueueCacheCursorMoveResultKind
@@ -2012,8 +2031,7 @@ namespace Orleans.Streams
         NotSupported = 3
     }
 
-    public readonly partial struct QueueCacheCursorResult<TCursor>
-        where TCursor : class
+    public readonly partial struct QueueCacheCursorResult<TCursor> : System.IEquatable<QueueCacheCursorResult<TCursor>> where TCursor : class
     {
         private readonly TCursor? _cursor;
         private readonly object _dummy;
@@ -2026,9 +2044,19 @@ namespace Orleans.Streams
 
         public static QueueCacheCursorResult<TCursor> NotSupported { get { throw null; } }
 
+        public readonly bool Equals(QueueCacheCursorResult<TCursor> other) { throw null; }
+
+        public override readonly bool Equals(object? obj) { throw null; }
+
         public static QueueCacheCursorResult<TCursor> FromCacheMiss(QueueCacheMissInfo cacheMiss) { throw null; }
 
         public static QueueCacheCursorResult<TCursor> FromCursor(TCursor cursor) { throw null; }
+
+        public override readonly int GetHashCode() { throw null; }
+
+        public static bool operator ==(QueueCacheCursorResult<TCursor> left, QueueCacheCursorResult<TCursor> right) { throw null; }
+
+        public static bool operator !=(QueueCacheCursorResult<TCursor> left, QueueCacheCursorResult<TCursor> right) { throw null; }
     }
 
     [GenerateSerializer]
@@ -2057,7 +2085,7 @@ namespace Orleans.Streams
         public override void GetObjectData(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) { }
     }
 
-    public readonly partial struct QueueCacheMissInfo
+    public readonly partial struct QueueCacheMissInfo : System.IEquatable<QueueCacheMissInfo>
     {
         private readonly object _dummy;
         private readonly int _dummyPrimitive;
@@ -2076,6 +2104,16 @@ namespace Orleans.Streams
         public string? Requested { get { throw null; } }
 
         public StreamSequenceToken? RequestedToken { get { throw null; } }
+
+        public readonly bool Equals(QueueCacheMissInfo other) { throw null; }
+
+        public override readonly bool Equals(object? obj) { throw null; }
+
+        public override readonly int GetHashCode() { throw null; }
+
+        public static bool operator ==(QueueCacheMissInfo left, QueueCacheMissInfo right) { throw null; }
+
+        public static bool operator !=(QueueCacheMissInfo left, QueueCacheMissInfo right) { throw null; }
 
         public readonly QueueCacheMissException ToException() { throw null; }
     }

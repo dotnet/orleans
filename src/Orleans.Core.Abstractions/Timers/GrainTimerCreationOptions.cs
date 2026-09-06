@@ -8,7 +8,7 @@ namespace Orleans.Runtime;
 /// <summary>
 /// Options for creating grain timers.
 /// </summary>
-public readonly struct GrainTimerCreationOptions()
+public readonly struct GrainTimerCreationOptions() : IEquatable<GrainTimerCreationOptions>
 {
     /// <summary>
     /// Initializes a new <see cref="GrainTimerCreationOptions"/> instance.
@@ -65,4 +65,27 @@ public readonly struct GrainTimerCreationOptions()
     /// If the timer period is shorter than the grain's idle collection period, the grain will not be collected due to idleness.
     /// </remarks>
     public bool KeepAlive { get; init; }
+
+    /// <inheritdoc/>
+    public bool Equals(GrainTimerCreationOptions other) =>
+        DueTime == other.DueTime
+        && Period == other.Period
+        && Interleave == other.Interleave
+        && KeepAlive == other.KeepAlive;
+
+    /// <inheritdoc/>
+    public override bool Equals(object? obj) => obj is GrainTimerCreationOptions other && Equals(other);
+
+    /// <inheritdoc/>
+    public override int GetHashCode() => HashCode.Combine(DueTime, Period, Interleave, KeepAlive);
+
+    /// <summary>
+    /// Determines whether two timer creation options are equal.
+    /// </summary>
+    public static bool operator ==(GrainTimerCreationOptions left, GrainTimerCreationOptions right) => left.Equals(right);
+
+    /// <summary>
+    /// Determines whether two timer creation options are unequal.
+    /// </summary>
+    public static bool operator !=(GrainTimerCreationOptions left, GrainTimerCreationOptions right) => !left.Equals(right);
 }

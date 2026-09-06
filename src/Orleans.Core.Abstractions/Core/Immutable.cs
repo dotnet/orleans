@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+
 namespace Orleans.Concurrency
 {
     /// <summary>
@@ -13,7 +16,7 @@ namespace Orleans.Concurrency
     /// </remarks>
     /// <typeparam name="T">Type of data to be wrapped by this Immutable</typeparam>
     [GenerateSerializer, Immutable]
-    public readonly struct Immutable<T>
+    public readonly struct Immutable<T> : IEquatable<Immutable<T>>
     {
         /// <summary> Return reference to the original value stored in this Immutable wrapper. </summary>
         [Id(0)]
@@ -24,6 +27,25 @@ namespace Orleans.Concurrency
         /// </summary>
         /// <param name="value">Value to be wrapped and marked as immutable.</param>
         public Immutable(T value) => Value = value;
+
+        /// <inheritdoc/>
+        public bool Equals(Immutable<T> other) => EqualityComparer<T>.Default.Equals(Value, other.Value);
+
+        /// <inheritdoc/>
+        public override bool Equals(object? obj) => obj is Immutable<T> other && Equals(other);
+
+        /// <inheritdoc/>
+        public override int GetHashCode() => EqualityComparer<T>.Default.GetHashCode(Value!);
+
+        /// <summary>
+        /// Determines whether two immutable wrappers contain equal values.
+        /// </summary>
+        public static bool operator ==(Immutable<T> left, Immutable<T> right) => left.Equals(right);
+
+        /// <summary>
+        /// Determines whether two immutable wrappers contain unequal values.
+        /// </summary>
+        public static bool operator !=(Immutable<T> left, Immutable<T> right) => !left.Equals(right);
     }
 
     /// <summary>

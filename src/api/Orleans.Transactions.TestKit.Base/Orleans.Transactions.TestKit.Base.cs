@@ -944,7 +944,7 @@ namespace Orleans.Transactions.TestKit.Consistency
     }
 
     [GenerateSerializer]
-    public partial struct Observation
+    public partial struct Observation : System.IEquatable<Observation>
     {
         private object _dummy;
         private int _dummyPrimitive;
@@ -959,6 +959,16 @@ namespace Orleans.Transactions.TestKit.Consistency
 
         [Id(2)]
         public string WriterTx { get { throw null; } set { } }
+
+        public readonly bool Equals(Observation other) { throw null; }
+
+        public override readonly bool Equals(object? obj) { throw null; }
+
+        public override readonly int GetHashCode() { throw null; }
+
+        public static bool operator ==(Observation left, Observation right) { throw null; }
+
+        public static bool operator !=(Observation left, Observation right) { throw null; }
     }
 
     public enum ReadWriteDetermination

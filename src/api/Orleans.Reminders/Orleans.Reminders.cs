@@ -324,7 +324,7 @@ namespace Orleans.Runtime
 
     [GenerateSerializer]
     [Immutable]
-    public readonly partial struct TickStatus
+    public readonly partial struct TickStatus : System.IEquatable<TickStatus>
     {
         private readonly int _dummyPrimitive;
         public TickStatus(System.DateTime firstTickTime, System.TimeSpan period, System.DateTime timeStamp) { }
@@ -337,6 +337,16 @@ namespace Orleans.Runtime
 
         [Id(1)]
         public System.TimeSpan Period { get { throw null; } }
+
+        public readonly bool Equals(TickStatus other) { throw null; }
+
+        public override readonly bool Equals(object? obj) { throw null; }
+
+        public override readonly int GetHashCode() { throw null; }
+
+        public static bool operator ==(TickStatus left, TickStatus right) { throw null; }
+
+        public static bool operator !=(TickStatus left, TickStatus right) { throw null; }
 
         public override readonly string ToString() { throw null; }
     }

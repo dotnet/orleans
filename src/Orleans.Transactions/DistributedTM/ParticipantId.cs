@@ -10,7 +10,7 @@ namespace Orleans.Transactions
     /// Identifies a transaction participant and the protocol roles which it supports.
     /// </summary>
     [Serializable, GenerateSerializer, Immutable]
-    public readonly struct ParticipantId
+    public readonly struct ParticipantId : IEquatable<ParticipantId>
     {
         /// <summary>
         /// Gets a comparer which identifies participants by <see cref="Name"/> and <see cref="Reference"/>,
@@ -71,6 +71,28 @@ namespace Orleans.Transactions
             this.Reference = reference;
             this.SupportedRoles = supportedRoles;
         }
+
+        /// <inheritdoc/>
+        public bool Equals(ParticipantId other) =>
+            Name == other.Name
+            && EqualityComparer<GrainReference>.Default.Equals(Reference, other.Reference)
+            && SupportedRoles == other.SupportedRoles;
+
+        /// <inheritdoc/>
+        public override bool Equals(object? obj) => obj is ParticipantId other && Equals(other);
+
+        /// <inheritdoc/>
+        public override int GetHashCode() => HashCode.Combine(Name, Reference, SupportedRoles);
+
+        /// <summary>
+        /// Determines whether two transaction participant identifiers and their supported roles are equal.
+        /// </summary>
+        public static bool operator ==(ParticipantId left, ParticipantId right) => left.Equals(right);
+
+        /// <summary>
+        /// Determines whether two transaction participant identifiers or their supported roles are unequal.
+        /// </summary>
+        public static bool operator !=(ParticipantId left, ParticipantId right) => !left.Equals(right);
 
         /// <summary>
         /// Returns a diagnostic representation of this participant.

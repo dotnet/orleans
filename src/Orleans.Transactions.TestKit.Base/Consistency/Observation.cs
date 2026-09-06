@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace Orleans.Transactions.TestKit.Consistency
 {
@@ -7,7 +8,7 @@ namespace Orleans.Transactions.TestKit.Consistency
     /// </summary>
     [Serializable]
     [GenerateSerializer]
-    public struct Observation
+    public struct Observation : IEquatable<Observation>
     {
         /// <summary>
         /// Gets or sets the logical number of the observed grain.
@@ -32,5 +33,28 @@ namespace Orleans.Transactions.TestKit.Consistency
         /// </summary>
         [Id(3)]
         public string ExecutingTx { get; set; }
+
+        /// <inheritdoc/>
+        public readonly bool Equals(Observation other) =>
+            Grain == other.Grain
+            && SeqNo == other.SeqNo
+            && EqualityComparer<string>.Default.Equals(WriterTx, other.WriterTx)
+            && EqualityComparer<string>.Default.Equals(ExecutingTx, other.ExecutingTx);
+
+        /// <inheritdoc/>
+        public override readonly bool Equals(object? obj) => obj is Observation other && Equals(other);
+
+        /// <inheritdoc/>
+        public override readonly int GetHashCode() => HashCode.Combine(Grain, SeqNo, WriterTx, ExecutingTx);
+
+        /// <summary>
+        /// Determines whether two observations are equal.
+        /// </summary>
+        public static bool operator ==(Observation left, Observation right) => left.Equals(right);
+
+        /// <summary>
+        /// Determines whether two observations are unequal.
+        /// </summary>
+        public static bool operator !=(Observation left, Observation right) => !left.Equals(right);
     }
 }
