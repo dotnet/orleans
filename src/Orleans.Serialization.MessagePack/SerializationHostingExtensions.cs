@@ -54,6 +54,8 @@ public static class SerializationHostingExtensions
         Func<Type, bool>? isCopyable,
         Action<OptionsBuilder<MessagePackCodecOptions>>? configureOptions = null)
     {
+        if (serializerBuilder is null) throw new ArgumentNullException(nameof(serializerBuilder));
+
         var services = serializerBuilder.Services;
         if (configureOptions != null)
         {

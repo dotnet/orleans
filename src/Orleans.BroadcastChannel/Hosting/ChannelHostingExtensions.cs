@@ -21,6 +21,10 @@ namespace Orleans.Hosting
         /// <returns>The silo builder.</returns>
         public static ISiloBuilder AddBroadcastChannel(this ISiloBuilder @this, string name, Action<BroadcastChannelOptions> configureOptions)
         {
+            ArgumentNullException.ThrowIfNull(@this, nameof(@this));
+            ArgumentNullException.ThrowIfNull(name);
+            ArgumentNullException.ThrowIfNull(configureOptions);
+
             @this.Services.AddBroadcastChannel(name, ob => ob.Configure(configureOptions));
             @this.AddGrainExtension<IBroadcastChannelConsumerExtension, BroadcastChannelConsumerExtension>();
             return @this;
@@ -35,6 +39,9 @@ namespace Orleans.Hosting
         /// <returns>The silo builder.</returns>
         public static ISiloBuilder AddBroadcastChannel(this ISiloBuilder @this, string name, Action<OptionsBuilder<BroadcastChannelOptions>>? configureOptions = null)
         {
+            ArgumentNullException.ThrowIfNull(@this, nameof(@this));
+            ArgumentNullException.ThrowIfNull(name);
+
             @this.Services.AddBroadcastChannel(name, configureOptions);
             @this.AddGrainExtension<IBroadcastChannelConsumerExtension, BroadcastChannelConsumerExtension>();
             return @this;
@@ -49,6 +56,10 @@ namespace Orleans.Hosting
         /// <returns>The client builder.</returns>
         public static IClientBuilder AddBroadcastChannel(this IClientBuilder @this, string name, Action<BroadcastChannelOptions> configureOptions)
         {
+            ArgumentNullException.ThrowIfNull(@this, nameof(@this));
+            ArgumentNullException.ThrowIfNull(name);
+            ArgumentNullException.ThrowIfNull(configureOptions);
+
             @this.Services.AddBroadcastChannel(name, ob => ob.Configure(configureOptions));
             return @this;
         }
@@ -62,6 +73,9 @@ namespace Orleans.Hosting
         /// <returns>The client builder.</returns>
         public static IClientBuilder AddBroadcastChannel(this IClientBuilder @this, string name, Action<OptionsBuilder<BroadcastChannelOptions>>? configureOptions = null)
         {
+            ArgumentNullException.ThrowIfNull(@this, nameof(@this));
+            ArgumentNullException.ThrowIfNull(name);
+
             @this.Services.AddBroadcastChannel(name, configureOptions);
             return @this;
         }
@@ -73,7 +87,12 @@ namespace Orleans.Hosting
         /// <param name="name">The name of the provider</param>
         /// <returns>The named broadcast channel provider.</returns>
         public static IBroadcastChannelProvider GetBroadcastChannelProvider(this IClusterClient @this, string name)
-            => @this.ServiceProvider.GetRequiredKeyedService<IBroadcastChannelProvider>(name);
+        {
+            ArgumentNullException.ThrowIfNull(@this, nameof(@this));
+            ArgumentNullException.ThrowIfNull(name);
+
+            return @this.ServiceProvider.GetRequiredKeyedService<IBroadcastChannelProvider>(name);
+        }
 
         private static void AddBroadcastChannel(this IServiceCollection services, string name, Action<OptionsBuilder<BroadcastChannelOptions>>? configureOptions)
         {

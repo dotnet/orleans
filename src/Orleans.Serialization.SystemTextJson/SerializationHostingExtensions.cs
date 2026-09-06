@@ -49,6 +49,8 @@ public static class SerializationHostingExtensions
         Func<Type, bool>? isCopyable,
         Action<OptionsBuilder<JsonCodecOptions>>? configureOptions = null)
     {
+        if (serializerBuilder is null) throw new ArgumentNullException(nameof(serializerBuilder));
+
         var services = serializerBuilder.Services;
         if (configureOptions != null)
         {
