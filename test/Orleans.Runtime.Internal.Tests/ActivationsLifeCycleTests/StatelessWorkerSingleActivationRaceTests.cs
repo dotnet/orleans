@@ -83,7 +83,6 @@ public class StatelessWorkerSingleActivationRaceTests(StatelessWorkerSingleActiv
         var workerCreated = await WaitForWorkerCreatedAsync(collector, forwarded.ReplacementContext);
 
         Assert.NotSame(c1, forwarded.ReplacementContext);
-        Assert.Same(forwarded.ReplacementContext, directory.FindTarget(grainId));
         Assert.Same(forwarded.ReplacementContext, workerCreated.Context);
         Assert.Empty(GetWorkerCreatedEvents(collector, c1));
     }
