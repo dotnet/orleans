@@ -320,14 +320,36 @@ public sealed class RecoverableStreamQueueCache<TQueueMessage> : IRecoverableStr
     }
 
     /// <inheritdoc />
+    [Obsolete("Use TryGetCacheCursor instead.")]
     public IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken? token)
-        => new Cursor(_cache, streamId, token);
+    {
+        var result = TryGetCacheCursor(streamId, token);
+        return result.Kind switch
+        {
+            QueueCacheCursorResultKind.Success => result.Cursor!,
+            QueueCacheCursorResultKind.CacheMiss => throw result.CacheMiss!.Value.ToException(),
+            _ => throw new InvalidOperationException($"Unexpected cursor result: {result.Kind}."),
+        };
+    }
 
     /// <inheritdoc />
-    public IQueueCacheCursor GetCacheCursorAtPosition(
+    public QueueCacheCursorResult<IQueueCacheCursor> TryGetCacheCursor(StreamId streamId, StreamSequenceToken? token)
+        => WrapCursorResult(_cache.TryGetCursor(streamId, token));
+
+    /// <inheritdoc />
+    public QueueCacheCursorResult<IQueueCacheCursor> TryGetCacheCursorAtPosition(
         StreamId streamId,
         StreamSubscriptionStartPosition startPosition)
-        => new Cursor(_cache, streamId, startPosition);
+        => WrapCursorResult(_cache.TryGetCursorAtPosition(streamId, startPosition));
+
+    private QueueCacheCursorResult<IQueueCacheCursor> WrapCursorResult(QueueCacheCursorResult<object> result)
+        => result.Kind switch
+        {
+            QueueCacheCursorResultKind.Success => QueueCacheCursorResult<IQueueCacheCursor>.FromCursor(new Cursor(_cache, result.Cursor!)),
+            QueueCacheCursorResultKind.CacheMiss => QueueCacheCursorResult<IQueueCacheCursor>.FromCacheMiss(result.CacheMiss!.Value),
+            QueueCacheCursorResultKind.NotSupported => QueueCacheCursorResult<IQueueCacheCursor>.NotSupported,
+            _ => throw new InvalidOperationException("The cursor result is not initialized."),
+        };
 
     /// <inheritdoc />
     public bool IsUnderPressure() => GetMaxAddCount() <= 0;
@@ -406,19 +428,10 @@ public sealed class RecoverableStreamQueueCache<TQueueMessage> : IRecoverableStr
         private readonly object _cursor;
         private IBatchContainer? _current;
 
-        public Cursor(PooledQueueCache cache, StreamId streamId, StreamSequenceToken? token)
+        public Cursor(PooledQueueCache cache, object cursor)
         {
             _cache = cache;
-            _cursor = cache.GetCursor(streamId, token);
-        }
-
-        public Cursor(
-            PooledQueueCache cache,
-            StreamId streamId,
-            StreamSubscriptionStartPosition startPosition)
-        {
-            _cache = cache;
-            _cursor = cache.GetCursorAtPosition(streamId, startPosition);
+            _cursor = cursor;
         }
 
         public void Dispose()
@@ -436,15 +449,24 @@ public sealed class RecoverableStreamQueueCache<TQueueMessage> : IRecoverableStr
             return _current;
         }
 
+        [Obsolete("Use MoveNextWithResult instead.")]
         public bool MoveNext()
         {
-            if (!_cache.TryGetNextMessage(_cursor, out var next))
+            var result = MoveNextWithResult();
+            return result.Kind switch
             {
-                return false;
-            }
+                QueueCacheCursorMoveResultKind.Success => true,
+                QueueCacheCursorMoveResultKind.NoData => false,
+                QueueCacheCursorMoveResultKind.CacheMiss => throw result.CacheMiss!.Value.ToException(),
+                _ => throw new InvalidOperationException("The cursor move result is not initialized."),
+            };
+        }
 
-            _current = next;
-            return true;
+        public QueueCacheCursorMoveResult MoveNextWithResult()
+        {
+            var result = _cache.TryGetNextMessageWithResult(_cursor, out var next);
+            _current = result.Kind == QueueCacheCursorMoveResultKind.Success ? next : null;
+            return result;
         }
 
         public void Refresh(StreamSequenceToken token) => _cache.Refresh(_cursor, token);

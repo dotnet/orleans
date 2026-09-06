@@ -371,7 +371,10 @@ namespace UnitTests.OrleansRuntime.Streams
                 Assert.Equal(0, cache.ItemCount);
                 Assert.Null(cache.Oldest);
                 Assert.Null(cache.Newest);
-                var cursor = cache.GetCursorAtPosition(targetStream, StreamSubscriptionStartPosition.EarliestAvailable);
+                var result = cache.TryGetCursorAtPosition(targetStream, StreamSubscriptionStartPosition.EarliestAvailable);
+                Assert.Equal(QueueCacheCursorResultKind.Success, result.Kind);
+                Assert.NotNull(result.Cursor);
+                var cursor = result.Cursor;
                 Assert.False(cache.TryGetNextMessage(cursor, out _));
 
                 cache.Add(

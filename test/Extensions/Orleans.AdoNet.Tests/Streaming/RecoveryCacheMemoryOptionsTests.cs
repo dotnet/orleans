@@ -145,8 +145,8 @@ public sealed class RecoveryCacheMemoryOptionsTests
 
     private static void AssertEvent(IQueueCache receiver, IBatchContainer notification, string expected)
     {
-        using var cursor = receiver.GetCacheCursor(notification.StreamId, notification.SequenceToken);
-        Assert.True(cursor.MoveNext());
+        using var cursor = Assert.IsAssignableFrom<IQueueCacheCursor>(receiver.TryGetCacheCursor(notification.StreamId, notification.SequenceToken).Cursor);
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
         var batch = cursor.GetCurrent(out var exception);
         Assert.Null(exception);
         var item = Assert.Single(Assert.IsType<AdoNetBatchContainer>(batch).GetEvents<string>());

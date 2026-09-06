@@ -494,7 +494,9 @@ namespace Orleans.Streams
                                 requestedToken,
                                 cacheToken,
                                 out consumerData.PendingBatch,
+                                out var effectiveStartToken,
                                 cursorStartToken);
+                            cursorStartToken = effectiveStartToken;
                             cursorRepositioned = true;
                         }
                         else
@@ -729,15 +731,27 @@ namespace Orleans.Streams
             StreamSequenceToken token,
             StreamSequenceToken? fallbackToken,
             out IBatchContainer? pendingBatch,
+            out StreamSequenceToken? effectiveStartToken,
             StreamSequenceToken? startToken = null)
         {
             pendingBatch = null;
+            effectiveStartToken = startToken ?? token;
             var acquisitionResult = queueCache!.TryGetCacheCursor(streamId, startToken ?? token);
             if (acquisitionResult.Kind == QueueCacheCursorResultKind.CacheMiss)
             {
-                return fallbackToken is not null
-                    ? GetCacheCursorOrThrow(streamId, fallbackToken)
-                    : throw acquisitionResult.CacheMiss!.Value.ToException();
+                if (fallbackToken is null)
+                {
+                    throw acquisitionResult.CacheMiss!.Value.ToException();
+                }
+
+                effectiveStartToken = fallbackToken;
+                var fallbackCursor = GetCacheCursorOrThrow(streamId, fallbackToken);
+                if (fallbackCursor is IQueueCacheCursorProgress fallbackProgress)
+                {
+                    fallbackProgress.SetDeliveredThrough(token);
+                }
+
+                return fallbackCursor;
             }
 
             if (acquisitionResult.Kind != QueueCacheCursorResultKind.Success)
@@ -755,7 +769,7 @@ namespace Orleans.Streams
             if (startToken is not null && !Equals(startToken, token))
             {
                 cursor.Dispose();
-                return GetAdvancedCursorOrFallback(streamId, token, fallbackToken, out pendingBatch);
+                return GetAdvancedCursorOrFallback(streamId, token, fallbackToken, out pendingBatch, out effectiveStartToken);
             }
 
             var retainCursor = false;
@@ -764,6 +778,7 @@ namespace Orleans.Streams
                 var moveResult = AdvanceCursorPastToken(cursor, token, out pendingBatch);
                 if (moveResult.Kind == QueueCacheCursorMoveResultKind.CacheMiss)
                 {
+                    effectiveStartToken = fallbackToken;
                     return fallbackToken is not null
                         ? GetCacheCursorOrThrow(streamId, fallbackToken)
                         : throw moveResult.CacheMiss!.Value.ToException();
@@ -791,6 +806,13 @@ namespace Orleans.Streams
             StreamSequenceToken token,
             out IBatchContainer? pendingBatch)
         {
+            pendingBatch = null;
+            if (cursor is IQueueCacheCursorProgress progressCursor)
+            {
+                progressCursor.SetDeliveredThrough(token);
+                return true;
+            }
+
             var retainCursor = false;
             try
             {
@@ -822,38 +844,32 @@ namespace Orleans.Streams
             StreamSequenceToken processedToken)
         {
             var restartToken = consumerData.LastSafePartitionToken ?? processedToken;
-            IQueueCacheCursor cursor;
-            try
+            var result = queueCache!.TryGetCacheCursor(consumerData.StreamId, restartToken);
+            if (result.Kind == QueueCacheCursorResultKind.CacheMiss)
             {
-                cursor = queueCache!.GetCacheCursor(consumerData.StreamId, restartToken);
-            }
-            catch (QueueCacheMissException)
-            {
-                try
+                result = queueCache.TryGetCacheCursorAtPosition(
+                    consumerData.StreamId,
+                    StreamSubscriptionStartPosition.EarliestAvailable);
+                if (result.Kind == QueueCacheCursorResultKind.NotSupported)
                 {
-                    cursor = queueCache!.GetCacheCursorAtPosition(
-                        consumerData.StreamId,
-                        StreamSubscriptionStartPosition.EarliestAvailable);
-                }
-                catch (NotSupportedException)
-                {
-                    cursor = queueCache!.GetCacheCursor(consumerData.StreamId, null);
+                    result = queueCache.TryGetCacheCursor(consumerData.StreamId, null);
                 }
             }
 
-            if (cursor is IQueueCacheCursorProgress progressCursor)
+            if (result.Kind == QueueCacheCursorResultKind.CacheMiss)
             {
-                progressCursor.SetDeliveredThrough(processedToken);
+                throw result.CacheMiss!.Value.ToException();
             }
-            else
-            {
-                if (!Equals(restartToken, processedToken))
-                {
-                    cursor.Dispose();
-                    cursor = queueCache.GetCacheCursor(consumerData.StreamId, processedToken);
-                }
 
-                cursor.MoveNext();
+            if (result.Kind != QueueCacheCursorResultKind.Success)
+            {
+                throw new InvalidOperationException($"Unexpected cursor result: {result.Kind}.");
+            }
+
+            var cursor = result.Cursor!;
+            if (!TryAdvanceRecoveryCursor(cursor, processedToken, out consumerData.PendingBatch))
+            {
+                return GetCacheCursorOrThrow(consumerData.StreamId, null);
             }
 
             return cursor;
@@ -1518,7 +1534,7 @@ namespace Orleans.Streams
                                 consumerData.LastToken = newToken;
                                 IQueueCacheCursor newCursor;
                                 IBatchContainer? pendingBatch = null;
-                                var resumedFromFallback = false;
+                                StreamSequenceToken? cursorStartToken = newToken.Token;
                                 if (newToken is StartPositionToken startPositionToken)
                                 {
                                     consumerData.LastProcessedToken = null;
@@ -1548,7 +1564,8 @@ namespace Orleans.Streams
                                             consumerData.StreamId,
                                             sequenceToken,
                                             batch.SequenceToken,
-                                            out pendingBatch);
+                                            out pendingBatch,
+                                            out cursorStartToken);
                                     }
                                     else
                                     {
@@ -1568,6 +1585,7 @@ namespace Orleans.Streams
                                         sequenceToken,
                                         batch.SequenceToken,
                                         out pendingBatch,
+                                        out cursorStartToken,
                                         previousSafePartitionToken);
                                 }
                                 else
@@ -1579,7 +1597,7 @@ namespace Orleans.Streams
                                 consumerData.SafeDisposeCursor(logger);
                                 consumerData.Cursor = newCursor;
                                 consumerData.PendingBatch = pendingBatch;
-                                consumerData.CursorStartToken = resumedFromFallback ? batch.SequenceToken : newToken.Token;
+                                consumerData.CursorStartToken = cursorStartToken;
                                 if (newToken is DeliveryToken deliveryToken)
                                 {
                                     consumerData.LastProcessedToken = deliveryToken.Token;
