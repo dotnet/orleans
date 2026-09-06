@@ -680,6 +680,15 @@ dotnet_diagnostic.CA2213.severity = warning
 dotnet_diagnostic.CA1001.severity = warning
 dotnet_diagnostic.CA2213.severity = warning
 
+# Generic dependency-injection registrations preserve public constructors through trimming.
+[src/{Orleans.Core,Orleans.Runtime}/**.cs]
+dotnet_analyzer_diagnostic.category-Trimming.severity = suggestion
+dotnet_diagnostic.IL2087.severity = warning
+dotnet_diagnostic.IL2091.severity = warning
+
+[src/Orleans.Core/**.cs]
+dotnet_diagnostic.IL2072.severity = warning
+
 [src/Orleans.Runtime/Networking/**.cs]
 dotnet_diagnostic.CA1848.severity = warning
 dotnet_diagnostic.CA1849.severity = warning

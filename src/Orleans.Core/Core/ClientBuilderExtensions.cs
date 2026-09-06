@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Net;
 using System.Diagnostics;
@@ -46,7 +47,10 @@ namespace Orleans.Hosting
         /// </summary>
         /// <param name="builder">The host builder.</param>
         /// <returns>The same instance of the <see cref="IClientBuilder"/> for chaining.</returns>
-        public static IClientBuilder UseConnectionRetryFilter<TConnectionRetryFilter>(this IClientBuilder builder) where TConnectionRetryFilter : class, IClientConnectionRetryFilter
+        public static IClientBuilder UseConnectionRetryFilter<
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TConnectionRetryFilter>(
+            this IClientBuilder builder)
+            where TConnectionRetryFilter : class, IClientConnectionRetryFilter
         {
             return builder.ConfigureServices(collection => collection.AddSingleton<IClientConnectionRetryFilter, TConnectionRetryFilter>());
         }
@@ -126,7 +130,9 @@ namespace Orleans.Hosting
         /// <summary>
         /// Registers a cluster connection status observer.
         /// </summary>
-        public static IClientBuilder AddClusterConnectionStatusObserver<TObserver>(this IClientBuilder builder)
+        public static IClientBuilder AddClusterConnectionStatusObserver<
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TObserver>(
+            this IClientBuilder builder)
             where TObserver : class, IClusterConnectionStatusObserver
         {
             builder.Services.AddSingleton<IClusterConnectionStatusObserver, TObserver>();

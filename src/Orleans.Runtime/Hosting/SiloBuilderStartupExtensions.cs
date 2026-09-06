@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -23,12 +24,13 @@ namespace Orleans.Hosting
         /// The stage to execute the startup task, see values in <see cref="ServiceLifecycleStage"/>.
         /// </param>
         /// <typeparam name="TStartup">
-        /// The startup task type.
+        /// The startup task type, including the public constructors used for dependency injection.
         /// </typeparam>
         /// <returns>
         /// The provided <see cref="ISiloBuilder"/>.
         /// </returns>
-        public static ISiloBuilder AddStartupTask<TStartup>(
+        public static ISiloBuilder AddStartupTask<
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TStartup>(
             this ISiloBuilder builder,
             int stage = ServiceLifecycleStage.Active)
             where TStartup : class, IStartupTask
