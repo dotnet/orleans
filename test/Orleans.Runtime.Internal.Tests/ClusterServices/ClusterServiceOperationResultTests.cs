@@ -16,7 +16,7 @@ namespace UnitTests.ClusterServices;
 [TestProvider("None")]
 public sealed class ClusterServiceOperationResultTests
 {
-    private static readonly ClusterServiceViewId View = new(new MembershipVersion(3), 1, "config");
+    private static readonly ClusterServiceViewId View = new(0, new(3));
 
     [Fact]
     public void DefaultResult_RequiresDeduplicationBeforeRetry()

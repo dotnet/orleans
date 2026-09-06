@@ -53,22 +53,22 @@ internal sealed class PartitionTransitionCoordinator
     public PartitionTransition BeginBarrier(RingRange range, ClusterServiceViewId view) =>
         Begin(range, view, view, PartitionTransitionDirection.Barrier);
 
-    public bool IsBlocked(RingRange range, MembershipVersion requestVersion)
+    public bool IsBlocked(RingRange range, ClusterServiceViewId requestView)
     {
         lock (_lock)
         {
-            return TryGetBlockingTransitionCore(range, requestVersion, out _);
+            return TryGetBlockingTransitionCore(range, requestView, out _);
         }
     }
 
     public bool TryGetBlockingTransition(
         RingRange range,
-        MembershipVersion requestVersion,
+        ClusterServiceViewId requestView,
         out Task completion)
     {
         lock (_lock)
         {
-            if (TryGetBlockingTransitionCore(range, requestVersion, out var transition))
+            if (TryGetBlockingTransitionCore(range, requestView, out var transition))
             {
                 completion = transition.Completion;
                 return true;
@@ -91,7 +91,7 @@ internal sealed class PartitionTransitionCoordinator
         }
 
         if (direction is not PartitionTransitionDirection.Barrier
-            && targetView.MembershipVersion <= previousView.MembershipVersion)
+            && targetView <= previousView)
         {
             throw new ArgumentException("The target view must be newer than the previous view.", nameof(targetView));
         }
@@ -115,12 +115,12 @@ internal sealed class PartitionTransitionCoordinator
 
     private bool TryGetBlockingTransitionCore(
         RingRange range,
-        MembershipVersion requestVersion,
+        ClusterServiceViewId requestView,
         out PartitionTransition transition)
     {
         foreach (var candidate in _transitions)
         {
-            if (candidate.TargetView.MembershipVersion <= requestVersion
+            if (candidate.TargetView <= requestView
                 && candidate.Range.Intersects(range)
                 && candidate.Stage is not (PartitionTransitionStage.Completed or PartitionTransitionStage.Aborted))
             {

@@ -28,10 +28,10 @@ public sealed class ClusterServiceMembershipTests
 
         Assert.Same(fixture.Service, fixture.Membership.ClusterMembershipService);
         Assert.Same(fixture.Configuration, view.Configuration);
-        Assert.Equal(new MembershipVersion(41), view.ViewId.MembershipVersion);
+        Assert.Equal(new MembershipVersion(41), view.ClusterMembershipSnapshot.Version);
         Assert.Same(underlyingSnapshot, view.ClusterMembershipSnapshot);
-        Assert.Equal([CreateSilo(1)], view.Members);
-        Assert.Equal(2, view.RangeOwners.Count);
+        Assert.Equal([CreateSilo(1)], view.Topology.Members);
+        Assert.Equal(2, view.Topology.RangeOwners.Count);
     }
 
     [Fact]
@@ -178,23 +178,23 @@ public sealed class ClusterServiceMembershipTests
         var versions = new List<MembershipVersion>();
 
         Assert.True(await updates.MoveNextAsync());
-        versions.Add(updates.Current.ViewId.MembershipVersion);
+        versions.Add(updates.Current.ClusterMembershipSnapshot.Version);
 
         var firstSnapshot = CreateSnapshot(2, CreateSilo(2));
         var first = await PublishAndReadNext(fixture, updates, firstSnapshot);
-        versions.Add(first.ViewId.MembershipVersion);
+        versions.Add(first.ClusterMembershipSnapshot.Version);
 
         var secondSnapshot = CreateSnapshot(4, CreateSilo(2), CreateSilo(1));
         var second = await PublishAndReadNext(fixture, updates, secondSnapshot);
-        versions.Add(second.ViewId.MembershipVersion);
+        versions.Add(second.ClusterMembershipSnapshot.Version);
 
         Assert.Equal([MembershipVersion.MinValue, new(2), new(4)], versions);
         Assert.Same(firstSnapshot, first.ClusterMembershipSnapshot);
         Assert.Same(secondSnapshot, second.ClusterMembershipSnapshot);
         Assert.Same(fixture.Configuration, second.Configuration);
-        Assert.Equal(2, second.PartitionCount);
-        Assert.Equal([CreateSilo(1), CreateSilo(2)], second.Members);
-        Assert.Equal(4, second.RangeOwners.Count);
+        Assert.Equal(2, second.Topology.PartitionCount);
+        Assert.Equal([CreateSilo(1), CreateSilo(2)], second.Topology.Members);
+        Assert.Equal(4, second.Topology.RangeOwners.Count);
         Assert.Same(second, fixture.Membership.CurrentView);
     }
 
@@ -207,11 +207,11 @@ public sealed class ClusterServiceMembershipTests
         var versions = new List<MembershipVersion>();
 
         Assert.True(await updates.MoveNextAsync());
-        versions.Add(updates.Current.ViewId.MembershipVersion);
+        versions.Add(updates.Current.ClusterMembershipSnapshot.Version);
 
         var versionThreeSnapshot = CreateSnapshot(3, CreateSilo(1));
         var versionThree = await PublishAndReadNext(fixture, updates, versionThreeSnapshot);
-        versions.Add(versionThree.ViewId.MembershipVersion);
+        versions.Add(versionThree.ClusterMembershipSnapshot.Version);
 
         var nextUpdate = updates.MoveNextAsync().AsTask();
         var duplicateVersionSnapshot = CreateSnapshot(3, CreateSilo(1), CreateSilo(2));
@@ -219,13 +219,13 @@ public sealed class ClusterServiceMembershipTests
         var versionFourSnapshot = CreateSnapshot(4, CreateSilo(4));
         fixture.Service.Publish(versionFourSnapshot);
         Assert.True(await nextUpdate);
-        versions.Add(updates.Current.ViewId.MembershipVersion);
+        versions.Add(updates.Current.ClusterMembershipSnapshot.Version);
 
         Assert.Equal([MembershipVersion.MinValue, new(3), new(4)], versions);
         Assert.Same(versionThreeSnapshot, versionThree.ClusterMembershipSnapshot);
         Assert.NotSame(duplicateVersionSnapshot, updates.Current.ClusterMembershipSnapshot);
         Assert.Same(versionFourSnapshot, updates.Current.ClusterMembershipSnapshot);
-        Assert.Equal([CreateSilo(4)], updates.Current.Members);
+        Assert.Equal([CreateSilo(4)], updates.Current.Topology.Members);
         Assert.Same(updates.Current, fixture.Membership.CurrentView);
     }
 
@@ -237,7 +237,7 @@ public sealed class ClusterServiceMembershipTests
         var current = await PublishAndObserve(fixture, CreateSnapshot(7, CreateSilo(1)));
         using var cancellation = new CancellationTokenSource();
 
-        var result = await fixture.Membership.RefreshViewAsync(new(6), cancellation.Token);
+        var result = await fixture.Membership.RefreshViewAsync(new(0, new(6)), cancellation.Token);
 
         Assert.Empty(fixture.Service.RefreshCalls);
         Assert.Same(current, result);
@@ -253,7 +253,7 @@ public sealed class ClusterServiceMembershipTests
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
 
-        var refresh = fixture.Membership.RefreshViewAsync(new(7), cancellation.Token).AsTask();
+        var refresh = fixture.Membership.RefreshViewAsync(new(0, new(7)), cancellation.Token).AsTask();
 
         Assert.True(refresh.IsCompleted);
         Assert.Same(current, await refresh);
@@ -271,19 +271,19 @@ public sealed class ClusterServiceMembershipTests
         Assert.True(await observer.MoveNextAsync());
         fixture.Service.RefreshCompletion.SetResult();
 
-        var refresh = fixture.Membership.RefreshViewAsync(new(4), CancellationToken.None).AsTask();
+        var refresh = fixture.Membership.RefreshViewAsync(new(0, new(4)), CancellationToken.None).AsTask();
         Assert.False(refresh.IsCompleted);
 
         var versionThree = await PublishAndReadNext(fixture, observer, CreateSnapshot(3, CreateSilo(2)));
-        Assert.Equal(new MembershipVersion(3), versionThree.ViewId.MembershipVersion);
+        Assert.Equal(new MembershipVersion(3), versionThree.ClusterMembershipSnapshot.Version);
         Assert.False(refresh.IsCompleted);
 
         var versionFour = await PublishAndReadNext(fixture, observer, CreateSnapshot(4, CreateSilo(3)));
         var result = await refresh;
 
         Assert.Same(versionFour, result);
-        Assert.Equal(new MembershipVersion(4), result.ViewId.MembershipVersion);
-        Assert.Equal([CreateSilo(3)], result.Members);
+        Assert.Equal(new MembershipVersion(4), result.ClusterMembershipSnapshot.Version);
+        Assert.Equal([CreateSilo(3)], result.Topology.Members);
         Assert.Equal(new MembershipVersion(4), Assert.Single(fixture.Service.RefreshCalls).MinimumVersion);
     }
 
@@ -296,7 +296,7 @@ public sealed class ClusterServiceMembershipTests
         cancellation.Cancel();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => fixture.Membership.RefreshViewAsync(new(5), cancellation.Token).AsTask());
+            () => fixture.Membership.RefreshViewAsync(new(0, new(5)), cancellation.Token).AsTask());
 
         var call = Assert.Single(fixture.Service.RefreshCalls);
         Assert.Equal(new MembershipVersion(5), call.MinimumVersion);
@@ -304,7 +304,7 @@ public sealed class ClusterServiceMembershipTests
 
         var published = await PublishAndObserve(fixture, CreateSnapshot(6, CreateSilo(2)));
         Assert.Same(published, fixture.Membership.CurrentView);
-        Assert.Equal(new MembershipVersion(6), published.ViewId.MembershipVersion);
+        Assert.Equal(new MembershipVersion(6), published.ClusterMembershipSnapshot.Version);
     }
 
     [Fact]
@@ -332,7 +332,7 @@ public sealed class ClusterServiceMembershipTests
         var fixture = new ClusterServiceMembershipFixture();
         await fixture.Service.EnumeratorStarted;
         var lastView = fixture.Membership.CurrentView;
-        var refresh = fixture.Membership.RefreshViewAsync(new(5), CancellationToken.None).AsTask();
+        var refresh = fixture.Membership.RefreshViewAsync(new(0, new(5)), CancellationToken.None).AsTask();
         Assert.False(refresh.IsCompleted);
 
         await fixture.DisposeMembershipAsync();
@@ -349,7 +349,7 @@ public sealed class ClusterServiceMembershipTests
     {
         await using var fixture = new ClusterServiceMembershipFixture();
         var failure = new InvalidOperationException("Membership refresh failed.");
-        var refresh = fixture.Membership.RefreshViewAsync(new(5), TestContext.Current.CancellationToken).AsTask();
+        var refresh = fixture.Membership.RefreshViewAsync(new(0, new(5)), TestContext.Current.CancellationToken).AsTask();
 
         fixture.Service.RefreshCompletion.SetException(failure);
 
@@ -360,7 +360,7 @@ public sealed class ClusterServiceMembershipTests
     public async Task RefreshViewAsync_WaitsForUnderlyingRefreshAfterProjectionAdvances()
     {
         await using var fixture = new ClusterServiceMembershipFixture();
-        var refresh = fixture.Membership.RefreshViewAsync(new(5), TestContext.Current.CancellationToken).AsTask();
+        var refresh = fixture.Membership.RefreshViewAsync(new(0, new(5)), TestContext.Current.CancellationToken).AsTask();
         var view = await PublishAndObserve(fixture, CreateSnapshot(5, CreateSilo(1)));
 
         Assert.False(refresh.IsCompleted);
@@ -387,7 +387,7 @@ public sealed class ClusterServiceMembershipTests
     {
         await using var fixture = new ClusterServiceMembershipFixture();
         using var cancellation = new CancellationTokenSource();
-        var refresh = fixture.Membership.RefreshViewAsync(new(5), cancellation.Token).AsTask();
+        var refresh = fixture.Membership.RefreshViewAsync(new(0, new(5)), cancellation.Token).AsTask();
 
         cancellation.Cancel();
 
@@ -409,12 +409,12 @@ public sealed class ClusterServiceMembershipTests
             fixture.Service.RefreshCompletion.SetResult();
         }
 
-        var refresh = fixture.Membership.RefreshViewAsync(new(5), TestContext.Current.CancellationToken).AsTask();
+        var refresh = fixture.Membership.RefreshViewAsync(new(0, new(5)), TestContext.Current.CancellationToken).AsTask();
         fixture.Service.Complete();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
             () => refresh.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
-        Assert.Equal(MembershipVersion.MinValue, fixture.Membership.CurrentView.ViewId.MembershipVersion);
+        Assert.Equal(MembershipVersion.MinValue, fixture.Membership.CurrentView.ClusterMembershipSnapshot.Version);
         Assert.True(Assert.Single(fixture.Service.RefreshCalls).CancellationToken.IsCancellationRequested);
     }
 
@@ -467,7 +467,7 @@ public sealed class ClusterServiceMembershipTests
             () => fixture.Membership.DisposeAsync().AsTask());
     }
 
-    private static async Task<ClusterServiceTopology> PublishAndObserve(
+    private static async Task<MembershipBasedClusterServiceView> PublishAndObserve(
         ClusterServiceMembershipFixture fixture,
         ClusterMembershipSnapshot snapshot)
     {
@@ -476,9 +476,9 @@ public sealed class ClusterServiceMembershipTests
         return await PublishAndReadNext(fixture, updates, snapshot);
     }
 
-    private static async Task<ClusterServiceTopology> PublishAndReadNext(
+    private static async Task<MembershipBasedClusterServiceView> PublishAndReadNext(
         ClusterServiceMembershipFixture fixture,
-        IAsyncEnumerator<ClusterServiceTopology> updates,
+        IAsyncEnumerator<MembershipBasedClusterServiceView> updates,
         ClusterMembershipSnapshot snapshot)
     {
         var nextUpdate = updates.MoveNextAsync().AsTask();
@@ -512,7 +512,6 @@ public sealed class ClusterServiceMembershipTests
             Service = new(initialSnapshot ?? ClusterMembershipSnapshot.Default);
             Configuration = new(
                 serviceId: "test-cluster-service",
-                protocolVersion: 3,
                 partitionsPerSilo: 2,
                 assignmentStrategy: "uniform-hash-ring/v1");
             Membership = new(Service, Configuration, GetBoundaries, NullLogger.Instance);
@@ -522,7 +521,7 @@ public sealed class ClusterServiceMembershipTests
 
         public ClusterServiceConfiguration Configuration { get; }
 
-        public ClusterServiceMembership Membership { get; }
+        public MembershipBasedClusterServiceViewProvider Membership { get; }
 
         public async ValueTask DisposeMembershipAsync()
         {
@@ -617,10 +616,9 @@ public sealed class ClusterServiceMembershipTests
         var service = new TestClusterMembershipService(underlyingSnapshot);
         var configuration = new ClusterServiceConfiguration(
             serviceId: "explicit-initial-snapshot",
-            protocolVersion: 3,
             partitionsPerSilo: 2,
             assignmentStrategy: "uniform-hash-ring/v1");
-        await using var membership = new ClusterServiceMembership(
+        await using var membership = new MembershipBasedClusterServiceViewProvider(
             service,
             configuration,
             GetBoundaries,
@@ -633,8 +631,8 @@ public sealed class ClusterServiceMembershipTests
         Assert.Same(underlyingSnapshot, service.CurrentSnapshot);
         Assert.NotSame(underlyingSnapshot, view.ClusterMembershipSnapshot);
         Assert.Same(explicitInitialSnapshot, view.ClusterMembershipSnapshot);
-        Assert.Equal(new MembershipVersion(8), view.ViewId.MembershipVersion);
-        Assert.Equal([CreateSilo(2), CreateSilo(3)], view.Members);
+        Assert.Equal(new MembershipVersion(8), view.ClusterMembershipSnapshot.Version);
+        Assert.Equal([CreateSilo(2), CreateSilo(3)], view.Topology.Members);
         Assert.Same(configuration, view.Configuration);
     }
 
@@ -665,8 +663,8 @@ public sealed class ClusterServiceMembershipTests
         Assert.False(await firstCompletion);
         Assert.False(await secondCompletion);
         Assert.Same(lastView, fixture.Membership.CurrentView);
-        Assert.Equal(new MembershipVersion(6), fixture.Membership.CurrentView.ViewId.MembershipVersion);
-        Assert.Equal([CreateSilo(2), CreateSilo(4)], fixture.Membership.CurrentView.Members);
+        Assert.Equal(new MembershipVersion(6), fixture.Membership.CurrentView.ClusterMembershipSnapshot.Version);
+        Assert.Equal([CreateSilo(2), CreateSilo(4)], fixture.Membership.CurrentView.Topology.Members);
         await using var lateSubscriber = fixture.Membership.ViewUpdates.GetAsyncEnumerator(TestContext.Current.CancellationToken);
         Assert.False(await lateSubscriber.MoveNextAsync());
     }
@@ -680,23 +678,23 @@ public sealed class ClusterServiceMembershipTests
         var observedVersions = new List<MembershipVersion>();
 
         Assert.True(await updates.MoveNextAsync());
-        observedVersions.Add(updates.Current.ViewId.MembershipVersion);
+        observedVersions.Add(updates.Current.ClusterMembershipSnapshot.Version);
 
         var versionFour = await PublishAndReadNext(fixture, updates, CreateSnapshot(4, CreateSilo(4)));
-        observedVersions.Add(versionFour.ViewId.MembershipVersion);
-        Assert.Equal([CreateSilo(4)], versionFour.Members);
+        observedVersions.Add(versionFour.ClusterMembershipSnapshot.Version);
+        Assert.Equal([CreateSilo(4)], versionFour.Topology.Members);
 
         var nextUpdate = updates.MoveNextAsync().AsTask();
         fixture.Service.Publish(CreateSnapshot(3, CreateSilo(3)));
         var versionFiveSnapshot = CreateSnapshot(5, CreateSilo(1), CreateSilo(5));
         fixture.Service.Publish(versionFiveSnapshot);
         Assert.True(await nextUpdate);
-        observedVersions.Add(updates.Current.ViewId.MembershipVersion);
+        observedVersions.Add(updates.Current.ClusterMembershipSnapshot.Version);
 
         Assert.Equal([MembershipVersion.MinValue, new(4), new(5)], observedVersions);
-        Assert.Equal(new MembershipVersion(5), updates.Current.ViewId.MembershipVersion);
+        Assert.Equal(new MembershipVersion(5), updates.Current.ClusterMembershipSnapshot.Version);
         Assert.Same(versionFiveSnapshot, updates.Current.ClusterMembershipSnapshot);
-        Assert.Equal([CreateSilo(1), CreateSilo(5)], updates.Current.Members);
+        Assert.Equal([CreateSilo(1), CreateSilo(5)], updates.Current.Topology.Members);
         Assert.Same(updates.Current, fixture.Membership.CurrentView);
     }
 }

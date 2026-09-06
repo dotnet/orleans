@@ -8,9 +8,9 @@ namespace Orleans.Runtime.GrainDirectory;
 
 internal sealed class DirectoryMembershipSnapshot
 {
-    private const string ServiceId = "orleans-grain-directory";
+    internal const string ServiceId = "orleans-grain-directory";
+    internal const long ProviderEpoch = 0;
     private const string AssignmentStrategy = "uniform-hash-ring/v1";
-    private const int ProtocolVersion = 1;
 
     internal static readonly Func<SiloAddress, int, uint[]> DefaultGetRingBoundaries = static (silo, count) =>
     {
@@ -23,6 +23,7 @@ internal sealed class DirectoryMembershipSnapshot
     };
 
     private readonly ClusterServiceTopology _topology;
+    private readonly MembershipBasedClusterServiceView _view;
     private readonly ImmutableArray<ImmutableArray<IGrainDirectoryPartition>> _partitionsByMember;
 
     internal DirectoryMembershipSnapshot(
@@ -31,7 +32,7 @@ internal sealed class DirectoryMembershipSnapshot
         int partitionCount,
         Func<SiloAddress, int, uint[]> getRingBoundaries)
         : this(
-            new ClusterServiceTopology(
+            new MembershipBasedClusterServiceView(
                 snapshot,
                 CreateConfiguration(partitionCount),
                 getRingBoundaries),
@@ -40,9 +41,18 @@ internal sealed class DirectoryMembershipSnapshot
     }
 
     internal DirectoryMembershipSnapshot(
-        ClusterServiceTopology topology,
+        MembershipBasedClusterServiceView view,
         IInternalGrainFactory grainFactory)
     {
+        if (view.Id.ProviderEpoch != ProviderEpoch)
+        {
+            throw new ArgumentException(
+                "The distributed directory's membership-version wire contract requires provider epoch zero.",
+                nameof(view));
+        }
+
+        _view = view;
+        var topology = view.Topology;
         _topology = topology;
 
         var memberPartitions = ImmutableArray.CreateBuilder<ImmutableArray<IGrainDirectoryPartition>>(topology.Members.Length);
@@ -68,15 +78,19 @@ internal sealed class DirectoryMembershipSnapshot
         partitionCount: 1,
         DefaultGetRingBoundaries);
 
-    public MembershipVersion Version => ViewId.MembershipVersion;
+    public MembershipVersion Version => ClusterMembershipSnapshot.Version;
 
-    internal ClusterServiceViewId ViewId => _topology.ViewId;
+    internal ClusterServiceViewId ViewId => _view.Id;
+
+    internal bool IsDirectSuccessorOf(DirectoryMembershipSnapshot previous) => _view.IsDirectSuccessorOf(previous._view);
+
+    internal static ClusterServiceViewId GetViewId(MembershipVersion version) => new(ProviderEpoch, new(version.Value));
 
     internal int PartitionCount => _topology.PartitionCount;
 
     public ImmutableArray<SiloAddress> Members => _topology.Members;
 
-    public ClusterMembershipSnapshot ClusterMembershipSnapshot => _topology.ClusterMembershipSnapshot;
+    public ClusterMembershipSnapshot ClusterMembershipSnapshot => _view.ClusterMembershipSnapshot;
 
     public RingRange GetRange(SiloAddress address, int partitionIndex) =>
         _topology.GetRange(address, partitionIndex);
@@ -115,7 +129,7 @@ internal sealed class DirectoryMembershipSnapshot
     }
 
     internal static ClusterServiceConfiguration CreateConfiguration(int partitionCount) =>
-        new(ServiceId, ProtocolVersion, partitionCount, AssignmentStrategy);
+        new(ServiceId, partitionCount, AssignmentStrategy);
 
     public readonly struct RangeCollection(DirectoryMembershipSnapshot snapshot)
         : IReadOnlyList<(RingRange Range, int MemberIndex, int PartitionIndex)>
