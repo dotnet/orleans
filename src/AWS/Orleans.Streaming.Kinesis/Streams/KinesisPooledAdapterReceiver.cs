@@ -189,13 +189,19 @@ internal sealed class KinesisPooledAdapterReceiver : IQueueAdapterReceiver, IQue
     public bool TryPurgeFromCache([MaybeNullWhen(false)] out IList<IBatchContainer> purgedItems)
         => _cache.TryPurgeFromCache(out purgedItems);
 
+    [Obsolete("Use TryGetCacheCursor instead.")]
     public IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken? token)
         => _cache.GetCacheCursor(streamId, token);
 
-    public IQueueCacheCursor GetCacheCursorAtPosition(
+    /// <inheritdoc />
+    public QueueCacheCursorResult<IQueueCacheCursor> TryGetCacheCursor(StreamId streamId, StreamSequenceToken? token)
+        => _cache.TryGetCacheCursor(streamId, token);
+
+    /// <inheritdoc />
+    public QueueCacheCursorResult<IQueueCacheCursor> TryGetCacheCursorAtPosition(
         StreamId streamId,
         StreamSubscriptionStartPosition startPosition)
-        => _cache.GetCacheCursorAtPosition(streamId, startPosition);
+        => _cache.TryGetCacheCursorAtPosition(streamId, startPosition);
 
     public bool IsUnderPressure() => _cache.IsUnderPressure();
 

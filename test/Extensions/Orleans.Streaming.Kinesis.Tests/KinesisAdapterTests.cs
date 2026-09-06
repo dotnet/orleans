@@ -125,10 +125,10 @@ namespace Orleans.Streaming.Kinesis.Tests
                     var messages = (await receiver.GetQueueMessagesAsync(10, cancellationToken)).ToArray();
                     foreach (var notification in messages)
                     {
-                        using var cursor = caches[queueId].GetCacheCursor(
+                        using var cursor = Assert.IsAssignableFrom<IQueueCacheCursor>(caches[queueId].TryGetCacheCursor(
                             notification.StreamId,
-                            notification.SequenceToken);
-                        Assert.True(cursor.MoveNext());
+                            notification.SequenceToken).Cursor);
+                        Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
                         var message = Assert.IsType<KinesisBatchContainer>(cursor.GetCurrent(out var exception));
                         Assert.Null(exception);
                         output.WriteLine($"Queue {queueId} received message on stream {message.StreamId}");

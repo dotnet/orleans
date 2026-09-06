@@ -1,9 +1,11 @@
+using System;
+
 namespace Orleans.Providers.Streams.Common;
 
 /// <summary>
 /// Describes where a recoverable stream source begins reading.
 /// </summary>
-public readonly struct RecoverableStreamStartPosition
+public readonly struct RecoverableStreamStartPosition : IEquatable<RecoverableStreamStartPosition>
 {
     /// <summary>
     /// Initializes a new instance of the <see cref="RecoverableStreamStartPosition"/> struct.
@@ -25,4 +27,21 @@ public readonly struct RecoverableStreamStartPosition
     /// Gets a value indicating whether a source without a checkpoint starts at its current tail.
     /// </summary>
     public bool StartFromNow { get; }
+
+    /// <inheritdoc />
+    public bool Equals(RecoverableStreamStartPosition other)
+        => string.Equals(Checkpoint, other.Checkpoint, StringComparison.Ordinal)
+            && StartFromNow == other.StartFromNow;
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is RecoverableStreamStartPosition other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => HashCode.Combine(Checkpoint, StartFromNow);
+
+    /// <summary>Determines whether two recovery start positions are equal.</summary>
+    public static bool operator ==(RecoverableStreamStartPosition left, RecoverableStreamStartPosition right) => left.Equals(right);
+
+    /// <summary>Determines whether two recovery start positions differ.</summary>
+    public static bool operator !=(RecoverableStreamStartPosition left, RecoverableStreamStartPosition right) => !left.Equals(right);
 }

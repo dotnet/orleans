@@ -40,9 +40,10 @@ public sealed class KinesisPooledRuntimeTests
         var notifications = await receiver.GetQueueMessagesAsync(1, TestCancellation);
 
         Assert.Equal(fixture.StreamId, Assert.Single(notifications).StreamId);
-        using var cursor = receiver.GetCacheCursorAtPosition(fixture.StreamId, StreamSubscriptionStartPosition.EarliestAvailable);
+        using var cursor = Assert.IsAssignableFrom<IQueueCacheCursor>(
+            receiver.TryGetCacheCursorAtPosition(fixture.StreamId, StreamSubscriptionStartPosition.EarliestAvailable).Cursor);
         Assert.Equal(["next"], ReadBatch(cursor).GetEvents<string>().Select(item => item.Item1));
-        Assert.False(cursor.MoveNext());
+        Assert.Equal(QueueCacheCursorMoveResultKind.NoData, cursor.MoveNextWithResult().Kind);
         await client.Received(1).GetShardIteratorAsync(
             Arg.Is<GetShardIteratorRequest>(request =>
                 request.StreamName == "stream"
@@ -75,10 +76,11 @@ public sealed class KinesisPooledRuntimeTests
         Assert.Equal("9", fixture.Store.Checkpoint);
         await receiver.GetQueueMessagesAsync(1, TestCancellation);
 
-        using var cursor = receiver.GetCacheCursorAtPosition(fixture.StreamId, StreamSubscriptionStartPosition.EarliestAvailable);
+        using var cursor = Assert.IsAssignableFrom<IQueueCacheCursor>(
+            receiver.TryGetCacheCursorAtPosition(fixture.StreamId, StreamSubscriptionStartPosition.EarliestAvailable).Cursor);
         AssertBatch(ReadBatch(cursor), "10", 0, "first");
         AssertBatch(ReadBatch(cursor), "11", 1, "second");
-        Assert.False(cursor.MoveNext());
+        Assert.Equal(QueueCacheCursorMoveResultKind.NoData, cursor.MoveNextWithResult().Kind);
         Assert.Equal(["initial", "expired", "renewed"], fixture.ReadRequests.Select(request => request.Iterator));
         Assert.Equal(1, fixture.Store.LoadCount);
         Assert.Empty(fixture.Store.Writes);
@@ -119,7 +121,8 @@ public sealed class KinesisPooledRuntimeTests
         Assert.Empty(fixture.Store.Writes);
         await receiver.GetQueueMessagesAsync(2, TestCancellation);
 
-        using var cursor = receiver.GetCacheCursorAtPosition(fixture.StreamId, StreamSubscriptionStartPosition.EarliestAvailable);
+        using var cursor = Assert.IsAssignableFrom<IQueueCacheCursor>(
+            receiver.TryGetCacheCursorAtPosition(fixture.StreamId, StreamSubscriptionStartPosition.EarliestAvailable).Cursor);
         if (admitPrefix)
         {
             AssertBatch(ReadBatch(cursor), "9", 0, "prefix");
@@ -127,7 +130,7 @@ public sealed class KinesisPooledRuntimeTests
 
         AssertBatch(ReadBatch(cursor), "10", admitPrefix ? 1 : 0, "first");
         AssertBatch(ReadBatch(cursor), "11", admitPrefix ? 2 : 1, "second");
-        Assert.False(cursor.MoveNext());
+        Assert.Equal(QueueCacheCursorMoveResultKind.NoData, cursor.MoveNextWithResult().Kind);
         await client.Received(admitPrefix ? 1 : 2).GetShardIteratorAsync(
             Arg.Is<GetShardIteratorRequest>(request =>
                 request.ShardIteratorType == (admitPrefix ? ShardIteratorType.AFTER_SEQUENCE_NUMBER : ShardIteratorType.TRIM_HORIZON)
@@ -168,10 +171,11 @@ public sealed class KinesisPooledRuntimeTests
 
         Assert.Equal(["iterator", "after-first", "after-first", "after-first", "after-first"],
             fixture.ReadRequests.Select(request => request.Iterator));
-        using var cursor = receiver.GetCacheCursorAtPosition(fixture.StreamId, StreamSubscriptionStartPosition.EarliestAvailable);
+        using var cursor = Assert.IsAssignableFrom<IQueueCacheCursor>(
+            receiver.TryGetCacheCursorAtPosition(fixture.StreamId, StreamSubscriptionStartPosition.EarliestAvailable).Cursor);
         AssertBatch(ReadBatch(cursor), "10", 0, "first");
         AssertBatch(ReadBatch(cursor), "11", 1, "second");
-        Assert.False(cursor.MoveNext());
+        Assert.Equal(QueueCacheCursorMoveResultKind.NoData, cursor.MoveNextWithResult().Kind);
         Assert.Empty(fixture.Store.Writes);
         await client.Received(1).GetShardIteratorAsync(Arg.Any<GetShardIteratorRequest>(), Arg.Any<CancellationToken>());
     }
@@ -203,7 +207,8 @@ public sealed class KinesisPooledRuntimeTests
                 request.ShardIteratorType == ShardIteratorType.AFTER_SEQUENCE_NUMBER
                 && request.StartingSequenceNumber == "9"),
             Arg.Any<CancellationToken>());
-        using var cursor = receiver.GetCacheCursorAtPosition(fixture.StreamId, StreamSubscriptionStartPosition.EarliestAvailable);
+        using var cursor = Assert.IsAssignableFrom<IQueueCacheCursor>(
+            receiver.TryGetCacheCursorAtPosition(fixture.StreamId, StreamSubscriptionStartPosition.EarliestAvailable).Cursor);
         AssertBatch(ReadBatch(cursor), "10", 0, "recovered");
     }
 
@@ -241,7 +246,8 @@ public sealed class KinesisPooledRuntimeTests
         Assert.Equal(2, calls);
         Assert.Single(fixture.ReadRequests);
         Assert.Equal(1, fixture.Store.LoadCount);
-        using var cursor = receiver.GetCacheCursorAtPosition(fixture.StreamId, StreamSubscriptionStartPosition.EarliestAvailable);
+        using var cursor = Assert.IsAssignableFrom<IQueueCacheCursor>(
+            receiver.TryGetCacheCursorAtPosition(fixture.StreamId, StreamSubscriptionStartPosition.EarliestAvailable).Cursor);
         AssertBatch(ReadBatch(cursor), "10", 0, "recovered");
     }
 
@@ -324,10 +330,11 @@ public sealed class KinesisPooledRuntimeTests
         Assert.Equal("10", Assert.IsType<KinesisSequenceToken>(firstNotification.SequenceToken).ShardSequence);
         Assert.True(receiver.IsUnderPressure());
         Assert.Equal(0, receiver.GetMaxAddCount());
-        using (var cursor = receiver.GetCacheCursorAtPosition(fixture.StreamId, StreamSubscriptionStartPosition.EarliestAvailable))
+        using (var cursor = Assert.IsAssignableFrom<IQueueCacheCursor>(
+            receiver.TryGetCacheCursorAtPosition(fixture.StreamId, StreamSubscriptionStartPosition.EarliestAvailable).Cursor))
         {
             AssertBatch(ReadBatch(cursor), "10", 0, "first");
-            Assert.False(cursor.MoveNext());
+            Assert.Equal(QueueCacheCursorMoveResultKind.NoData, cursor.MoveNextWithResult().Kind);
             var progress = Assert.IsAssignableFrom<IQueueCacheCursorProgress>(cursor);
             progress.RecordDeliverySuccess();
             receiver.UpdateDeliveryProgress(
@@ -341,9 +348,10 @@ public sealed class KinesisPooledRuntimeTests
 
         Assert.Equal("11", Assert.IsType<KinesisSequenceToken>(secondNotification.SequenceToken).ShardSequence);
         Assert.Single(fixture.ReadRequests);
-        using var nextCursor = receiver.GetCacheCursorAtPosition(fixture.StreamId, StreamSubscriptionStartPosition.EarliestAvailable);
+        using var nextCursor = Assert.IsAssignableFrom<IQueueCacheCursor>(
+            receiver.TryGetCacheCursorAtPosition(fixture.StreamId, StreamSubscriptionStartPosition.EarliestAvailable).Cursor);
         AssertBatch(ReadBatch(nextCursor), "11", 1, "second");
-        Assert.False(nextCursor.MoveNext());
+        Assert.Equal(QueueCacheCursorMoveResultKind.NoData, nextCursor.MoveNextWithResult().Kind);
         Assert.Equal("10", fixture.Store.Checkpoint);
     }
 
@@ -475,7 +483,8 @@ public sealed class KinesisPooledRuntimeTests
             () => Response("mixed-record", fixture.Record(previousOffset, "prefix")),
             () => Response("tail", record));
         await receiver.GetQueueMessagesAsync(1, TestCancellation);
-        using (var prefixCursor = receiver.GetCacheCursorAtPosition(fixture.StreamId, StreamSubscriptionStartPosition.EarliestAvailable))
+        using (var prefixCursor = Assert.IsAssignableFrom<IQueueCacheCursor>(
+            receiver.TryGetCacheCursorAtPosition(fixture.StreamId, StreamSubscriptionStartPosition.EarliestAvailable).Cursor))
         {
             AssertBatch(ReadBatch(prefixCursor), previousOffset, 0, "prefix");
             var prefixProgress = Assert.IsAssignableFrom<IQueueCacheCursorProgress>(prefixCursor);
@@ -487,7 +496,8 @@ public sealed class KinesisPooledRuntimeTests
 
         Assert.Equal([previousOffset], fixture.Store.Writes);
         var notification = Assert.Single(await receiver.GetQueueMessagesAsync(1, TestCancellation));
-        using var cursor = receiver.GetCacheCursorAtPosition(fixture.StreamId, StreamSubscriptionStartPosition.EarliestAvailable);
+        using var cursor = Assert.IsAssignableFrom<IQueueCacheCursor>(
+            receiver.TryGetCacheCursorAtPosition(fixture.StreamId, StreamSubscriptionStartPosition.EarliestAvailable).Cursor);
         var batch = ReadBatch(cursor);
         var progress = Assert.IsAssignableFrom<IQueueCacheCursorProgress>(cursor);
 
@@ -543,9 +553,10 @@ public sealed class KinesisPooledRuntimeTests
         var replacementClient = fixture.ReceiverClients.Last();
         fixture.SetReads(replacementClient, () => Response("tail", fixture.Record(nextOffset, "next-record")));
         await replacement.GetQueueMessagesAsync(1, TestCancellation);
-        using var restartedCursor = replacement.GetCacheCursorAtPosition(fixture.StreamId, StreamSubscriptionStartPosition.EarliestAvailable);
+        using var restartedCursor = Assert.IsAssignableFrom<IQueueCacheCursor>(
+            replacement.TryGetCacheCursorAtPosition(fixture.StreamId, StreamSubscriptionStartPosition.EarliestAvailable).Cursor);
         AssertBatch(ReadBatch(restartedCursor), nextOffset, 0, "next-record");
-        Assert.False(restartedCursor.MoveNext());
+        Assert.Equal(QueueCacheCursorMoveResultKind.NoData, restartedCursor.MoveNextWithResult().Kind);
         await replacementClient.Received(1).GetShardIteratorAsync(
             Arg.Is<GetShardIteratorRequest>(request =>
                 request.ShardIteratorType == ShardIteratorType.AFTER_SEQUENCE_NUMBER
@@ -619,7 +630,7 @@ public sealed class KinesisPooledRuntimeTests
 
     private static KinesisBatchContainer ReadBatch(IQueueCacheCursor cursor)
     {
-        Assert.True(cursor.MoveNext());
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
         var batch = Assert.IsType<KinesisBatchContainer>(cursor.GetCurrent(out var exception));
         Assert.Null(exception);
         return batch;
