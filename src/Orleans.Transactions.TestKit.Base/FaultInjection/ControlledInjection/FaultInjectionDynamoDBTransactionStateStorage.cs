@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -55,6 +56,8 @@ public class FaultInjectionDynamoDBTransactionStateStorage<TState> : ITransactio
         long? abortAfter
     )
     {
+        ArgumentNullException.ThrowIfNull(metadata);
+
         var transactionIds = ControlledTransactionFaultInjectorExtensions.GetTransactionIds(
             metadata,
             statesToPrepare);
@@ -97,6 +100,7 @@ public class FaultInjectionDynamoDBTransactionStateStorageFactory : ITransaction
     }
 
     /// <inheritdoc />
+    [SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "Orleans invokes transactional state storage factories with the current non-null grain context.")]
     public ITransactionalStateStorage<TState> Create<TState>(string stateName, IGrainContext context) where TState : class, new()
     {
         var dynamodbStateStorage = this.factory.Create<TState>(stateName, context);

@@ -25,6 +25,7 @@ namespace Orleans.Transactions.TestKit.Correctnesss
         /// <returns><see langword="true"/> when the packed values are equal; otherwise, <see langword="false"/>.</returns>
         protected bool Equals(BitArrayState other)
         {
+            ArgumentNullException.ThrowIfNull(other);
             if (ReferenceEquals(null, this.value)) return false;
             if (ReferenceEquals(null, other.value)) return false;
             if (this.value.Length != other.value.Length) return false;
@@ -82,6 +83,7 @@ namespace Orleans.Transactions.TestKit.Correctnesss
         /// <param name="other">The state to copy.</param>
         public BitArrayState(BitArrayState other)
         {
+            ArgumentNullException.ThrowIfNull(other);
             this.value = new int[other.value.Length];
             for (var i = 0; i < other.value.Length; i++)
             {
@@ -219,6 +221,10 @@ namespace Orleans.Transactions.TestKit.Correctnesss
         /// <returns>A new state containing the operation results.</returns>
         public static BitArrayState Apply(BitArrayState left, BitArrayState right, Func<int, int, int> op)
         {
+            ArgumentNullException.ThrowIfNull(left);
+            ArgumentNullException.ThrowIfNull(right);
+            ArgumentNullException.ThrowIfNull(op);
+
             var result = new BitArrayState(left.value.Length > right.value.Length ? left : right);
             var overlappingLength = Math.Min(left.value.Length, right.value.Length);
             var i = 0;

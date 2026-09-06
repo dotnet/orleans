@@ -161,6 +161,9 @@ namespace Orleans.Transactions.TestKit.Consistency
         /// <returns>A task which represents the transaction sequence.</returns>
         public async Task RunRandomTransactionSequence(int partition, int count, IGrainFactory grainFactory, Action<string> output)
         {
+            ArgumentNullException.ThrowIfNull(grainFactory);
+            ArgumentNullException.ThrowIfNull(output);
+
             this.output = output;
             var localRandom = new Random(options.RandomSeed + partition);
 

@@ -127,6 +127,7 @@ namespace Orleans.Transactions.TestKit
         /// <returns><see langword="true"/> when the remote commit succeeds.</returns>
         public async Task<bool> Commit(Guid transactionId, IRemoteCommitService service)
         {
+            ArgumentNullException.ThrowIfNull(service);
             return await service.Pass(transactionId, this.Data);
         }
     }
@@ -161,6 +162,7 @@ namespace Orleans.Transactions.TestKit
         /// <returns><see langword="false"/> to reject the remote commit.</returns>
         public async Task<bool> Commit(Guid transactionId, IRemoteCommitService service)
         {
+            ArgumentNullException.ThrowIfNull(service);
             return await service.Fail(transactionId, this.Data);
         }
     }
@@ -195,6 +197,7 @@ namespace Orleans.Transactions.TestKit
         /// <returns>A task which always faults.</returns>
         public async Task<bool> Commit(Guid transactionId, IRemoteCommitService service)
         {
+            ArgumentNullException.ThrowIfNull(service);
             return await service.Throw(transactionId, this.Data);
         }
     }

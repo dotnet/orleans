@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
@@ -53,6 +54,8 @@ namespace Orleans.Transactions.TestKit
             long? abortAfter
         )
         {
+            ArgumentNullException.ThrowIfNull(metadata);
+
             var transactionIds = ControlledTransactionFaultInjectorExtensions.GetTransactionIds(
                 metadata,
                 statesToPrepare);
@@ -95,6 +98,7 @@ namespace Orleans.Transactions.TestKit
         }
 
         /// <inheritdoc />
+        [SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "Orleans invokes transactional state storage factories with the current non-null grain context.")]
         public ITransactionalStateStorage<TState> Create<TState>(string stateName, IGrainContext context) where TState : class, new()
         {
             var azureStateStorage = this.factory.Create<TState>(stateName, context);

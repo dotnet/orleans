@@ -43,6 +43,7 @@ namespace Orleans.Transactions.TestKit
         /// <inheritdoc/>
         public async Task AddAndThrow(ITransactionTestGrain grain, int numberToAdd)
         {
+            ArgumentNullException.ThrowIfNull(grain);
             await grain.Add(numberToAdd);
             throw new Exception("This should abort the transaction");
         }
@@ -63,6 +64,7 @@ namespace Orleans.Transactions.TestKit
         /// <inheritdoc/>
         public Task MultiGrainAdd(ITransactionCommitterTestGrain committer, ITransactionCommitOperation<IRemoteCommitService> operation, List<ITransactionTestGrain> grains, int numberToAdd)
         {
+            ArgumentNullException.ThrowIfNull(committer);
             List<Task> tasks = new List<Task>();
             tasks.AddRange(grains.Select(g => g.Add(numberToAdd)));
             tasks.Add(committer.Commit(operation));
@@ -72,6 +74,7 @@ namespace Orleans.Transactions.TestKit
         /// <inheritdoc/>
         public Task UpdateViolated(ITransactionTestGrain grain, int numberToAdd)
         {
+            ArgumentNullException.ThrowIfNull(grain);
             return grain.Add(numberToAdd);
         }
 
