@@ -254,7 +254,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         return ValueTask.CompletedTask;
 
         bool TryGetIntersectingLock(RingRange range, MembershipVersion version, [NotNullWhen(true)] out Task? completion) =>
-            _transitionCoordinator.TryGetBlockingTransition(range, version, out completion);
+            _transitionCoordinator.TryGetBlockingTransition(range, DirectoryMembershipSnapshot.GetViewId(version), out completion);
 
         async ValueTask WaitForRangeCore(
             RingRange range,
@@ -492,7 +492,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
                 _directory.Remove(address.GrainId);
             }
 
-            var isContiguous = current.ViewId.IsDirectSuccessorOf(previous.ViewId);
+            var isContiguous = current.IsDirectSuccessorOf(previous);
             if (!isContiguous)
             {
                 LogDebugEncounteredNonContiguousUpdate(_logger, previous.Version, current.Version, removedRange);
@@ -545,7 +545,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
 
             // The view change is contiguous if the new version is exactly one greater than the previous version.
             // If not, we have missed some updates, so we must declare a potential data loss event.
-            var isContiguous = current.ViewId.IsDirectSuccessorOf(previous.ViewId);
+            var isContiguous = current.IsDirectSuccessorOf(previous);
             bool success;
             if (isContiguous)
             {

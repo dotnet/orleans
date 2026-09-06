@@ -18,11 +18,12 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
     private readonly CancellationTokenSource _shutdownCts = new();
     private readonly Task _runTask;
     private readonly AsyncEnumerable<DirectoryMembershipSnapshot> _viewUpdates;
-    private readonly ClusterServiceMembership _membership;
+    private readonly MembershipBasedClusterServiceViewProvider _membership;
+    private readonly bool _ownsViewProvider;
 
     public DirectoryMembershipSnapshot CurrentView { get; private set; } = DirectoryMembershipSnapshot.Default;
 
-    public int PartitionsPerSilo => _membership.CurrentView.PartitionCount;
+    public int PartitionsPerSilo => _membership.CurrentView.Topology.PartitionCount;
 
     public IAsyncEnumerable<DirectoryMembershipSnapshot> ViewUpdates => _viewUpdates;
 
@@ -36,7 +37,9 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
         }
 
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _shutdownCts.Token);
-        await _membership.RefreshViewAsync(version, linkedCts.Token);
+        await _membership.RefreshViewAsync(
+            version == default ? null : DirectoryMembershipSnapshot.GetViewId(version),
+            linkedCts.Token);
         if (CurrentView.Version < version)
         {
             await foreach (var view in _viewUpdates.WithCancellation(linkedCts.Token))
@@ -61,14 +64,39 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
         ILogger<DirectoryMembershipService> logger,
         int partitionsPerSilo,
         Func<SiloAddress, int, uint[]> getRingBoundaries)
-    {
-        ArgumentOutOfRangeException.ThrowIfLessThan(partitionsPerSilo, 1);
-        _membership = new(
-            clusterMembershipService,
-            DirectoryMembershipSnapshot.CreateConfiguration(partitionsPerSilo),
-            getRingBoundaries,
+        : this(
+            new MembershipBasedClusterServiceViewProvider(
+                clusterMembershipService,
+                DirectoryMembershipSnapshot.CreateConfiguration(partitionsPerSilo),
+                getRingBoundaries,
+                logger,
+                ClusterMembershipSnapshot.Default),
+            grainFactory,
             logger,
-            ClusterMembershipSnapshot.Default);
+            ownsViewProvider: true)
+    {
+    }
+
+    public DirectoryMembershipService(
+        IClusterServiceViewProvider viewProvider,
+        IInternalGrainFactory grainFactory,
+        ILogger<DirectoryMembershipService> logger)
+        : this(viewProvider, grainFactory, logger, ownsViewProvider: false)
+    {
+    }
+
+    private DirectoryMembershipService(
+        IClusterServiceViewProvider viewProvider,
+        IInternalGrainFactory grainFactory,
+        ILogger<DirectoryMembershipService> logger,
+        bool ownsViewProvider)
+    {
+        ArgumentNullException.ThrowIfNull(viewProvider);
+        _membership = viewProvider as MembershipBasedClusterServiceViewProvider
+            ?? throw new ArgumentException(
+                "The distributed directory requires a membership-derived view provider for its membership-version wire contract.",
+                nameof(viewProvider));
+        _ownsViewProvider = ownsViewProvider;
         CurrentView = new(_membership.CurrentView, grainFactory);
         _viewUpdates = new(
             CurrentView,
@@ -115,7 +143,10 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
     {
         _shutdownCts.Cancel();
         await _runTask.SuppressThrowing();
-        await _membership.DisposeAsync();
+        if (_ownsViewProvider)
+        {
+            await _membership.DisposeAsync();
+        }
         _shutdownCts.Dispose();
     }
 

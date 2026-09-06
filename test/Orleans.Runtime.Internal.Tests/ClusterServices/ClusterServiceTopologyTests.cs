@@ -18,30 +18,6 @@ public sealed class ClusterServiceTopologyTests
     private const string AssignmentStrategy = "uniform-hash-ring/v1";
 
     [Fact]
-    public void ConfigurationFingerprint_ChangesWithEveryCompatibilityInput()
-    {
-        var baseline = CreateConfiguration();
-
-        Assert.NotEqual(baseline.Fingerprint, CreateConfiguration(serviceId: "other-service").Fingerprint);
-        Assert.NotEqual(baseline.Fingerprint, CreateConfiguration(protocolVersion: 2).Fingerprint);
-        Assert.NotEqual(baseline.Fingerprint, CreateConfiguration(partitionsPerSilo: 2).Fingerprint);
-        Assert.NotEqual(baseline.Fingerprint, CreateConfiguration(assignmentStrategy: "uniform-hash-ring/v2").Fingerprint);
-        Assert.Equal(baseline.Fingerprint, CreateConfiguration().Fingerprint);
-    }
-
-    [Fact]
-    public void ViewId_DirectSuccessorRequiresContiguousMembershipAndMatchingConfiguration()
-    {
-        var configuration = CreateConfiguration();
-        var previous = new ClusterServiceViewId(new(10), configuration.ProtocolVersion, configuration.Fingerprint);
-
-        Assert.True(new ClusterServiceViewId(new(11), configuration.ProtocolVersion, configuration.Fingerprint).IsDirectSuccessorOf(previous));
-        Assert.False(new ClusterServiceViewId(new(12), configuration.ProtocolVersion, configuration.Fingerprint).IsDirectSuccessorOf(previous));
-        Assert.False(new ClusterServiceViewId(new(11), configuration.ProtocolVersion + 1, configuration.Fingerprint).IsDirectSuccessorOf(previous));
-        Assert.False(new ClusterServiceViewId(new(11), configuration.ProtocolVersion, "different").IsDirectSuccessorOf(previous));
-    }
-
-    [Fact]
     public void CsCheck_TopologyProjection_IsDeterministicAndEveryPointHasOneActiveOwner()
     {
         Gen.Int.Array[24].Sample(
@@ -64,10 +40,12 @@ public sealed class ClusterServiceTopologyTests
         var firstSnapshot = CreateSnapshot(members, order);
         var secondSnapshot = CreateSnapshot(members, order.AsEnumerable().Reverse());
         var configuration = CreateConfiguration(partitionsPerSilo: partitionsPerSilo);
-        var first = new ClusterServiceTopology(firstSnapshot, configuration, GetBoundaries);
-        var second = new ClusterServiceTopology(secondSnapshot, configuration, GetBoundaries);
+        var firstView = new MembershipBasedClusterServiceView(firstSnapshot, configuration, GetBoundaries);
+        var secondView = new MembershipBasedClusterServiceView(secondSnapshot, configuration, GetBoundaries);
+        var first = firstView.Topology;
+        var second = secondView.Topology;
 
-        Assert.Equal(first.ViewId, second.ViewId);
+        Assert.Equal(firstView.Id, secondView.Id);
         Assert.Equal(first.Members, second.Members);
         Assert.Equal(first.RangeOwners.ToArray(), second.RangeOwners.ToArray());
         Assert.Equal(memberCount * partitionsPerSilo, first.RangeOwners.Count);
@@ -86,10 +64,9 @@ public sealed class ClusterServiceTopologyTests
 
     private static ClusterServiceConfiguration CreateConfiguration(
         string serviceId = "test-service",
-        int protocolVersion = 1,
         int partitionsPerSilo = 1,
         string assignmentStrategy = AssignmentStrategy) =>
-        new(serviceId, protocolVersion, partitionsPerSilo, assignmentStrategy);
+        new(serviceId, partitionsPerSilo, assignmentStrategy);
 
     private static SiloAddress[] CreateMembers(int count) =>
         Enumerable.Range(0, count)

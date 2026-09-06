@@ -14,8 +14,8 @@ namespace UnitTests.ClusterServices;
 public sealed class PartitionTransitionCoordinatorTests
 {
     private static readonly RingRange Range = RingRange.Create(100, 200);
-    private static readonly ClusterServiceViewId View1 = new(new(1), 1, "config");
-    private static readonly ClusterServiceViewId View2 = new(new(2), 1, "config");
+    private static readonly ClusterServiceViewId View1 = new(0, new(1));
+    private static readonly ClusterServiceViewId View2 = new(0, new(2));
 
     [Fact]
     public async Task InboundTransition_BlocksTargetViewUntilStateAndFenceAreInstalled()
@@ -23,8 +23,8 @@ public sealed class PartitionTransitionCoordinatorTests
         var coordinator = new PartitionTransitionCoordinator();
         var transition = coordinator.BeginInbound(Range, View1, View2);
 
-        Assert.False(coordinator.IsBlocked(Range, View1.MembershipVersion));
-        Assert.True(coordinator.TryGetBlockingTransition(Range, View2.MembershipVersion, out var wait));
+        Assert.False(coordinator.IsBlocked(Range, View1));
+        Assert.True(coordinator.TryGetBlockingTransition(Range, View2, out var wait));
         Assert.False(wait.IsCompleted);
         Assert.Throws<InvalidOperationException>(transition.Complete);
 
@@ -35,7 +35,7 @@ public sealed class PartitionTransitionCoordinatorTests
         await wait;
         Assert.Equal(PartitionTransitionStage.Completed, transition.Stage);
         Assert.Equal(new ClusterServiceFence(ClusterServiceFencingMode.External, 42), transition.Fence);
-        Assert.False(coordinator.IsBlocked(Range, View2.MembershipVersion));
+        Assert.False(coordinator.IsBlocked(Range, View2));
     }
 
     [Fact]
@@ -43,14 +43,14 @@ public sealed class PartitionTransitionCoordinatorTests
     {
         var coordinator = new PartitionTransitionCoordinator();
         var transition = coordinator.BeginOutbound(Range, View1, View2);
-        Assert.True(coordinator.TryGetBlockingTransition(Range, View2.MembershipVersion, out var wait));
+        Assert.True(coordinator.TryGetBlockingTransition(Range, View2, out var wait));
         Assert.Same(transition.Completion, wait);
 
         transition.MarkDrained();
 
         Assert.Equal(PartitionTransitionStage.Drained, transition.Stage);
-        Assert.True(coordinator.IsBlocked(Range, View2.MembershipVersion));
-        Assert.True(coordinator.TryGetBlockingTransition(Range, View2.MembershipVersion, out var drainedWait));
+        Assert.True(coordinator.IsBlocked(Range, View2));
+        Assert.True(coordinator.TryGetBlockingTransition(Range, View2, out var drainedWait));
         Assert.Same(transition.Completion, drainedWait);
         Assert.False(wait.IsCompleted);
         Assert.False(transition.Completion.IsCompleted);
@@ -58,8 +58,8 @@ public sealed class PartitionTransitionCoordinatorTests
         transition.MarkStateRetained();
 
         Assert.Equal(PartitionTransitionStage.StateRetained, transition.Stage);
-        Assert.True(coordinator.IsBlocked(Range, View2.MembershipVersion));
-        Assert.True(coordinator.TryGetBlockingTransition(Range, View2.MembershipVersion, out var retainedWait));
+        Assert.True(coordinator.IsBlocked(Range, View2));
+        Assert.True(coordinator.TryGetBlockingTransition(Range, View2, out var retainedWait));
         Assert.Same(transition.Completion, retainedWait);
         Assert.False(wait.IsCompleted);
         Assert.False(transition.Completion.IsCompleted);
@@ -68,7 +68,7 @@ public sealed class PartitionTransitionCoordinatorTests
 
         await wait;
         Assert.Equal(PartitionTransitionStage.Completed, transition.Stage);
-        Assert.False(coordinator.IsBlocked(Range, View2.MembershipVersion));
+        Assert.False(coordinator.IsBlocked(Range, View2));
     }
 
     [Fact]
@@ -76,13 +76,13 @@ public sealed class PartitionTransitionCoordinatorTests
     {
         var coordinator = new PartitionTransitionCoordinator();
         var transition = coordinator.BeginInbound(Range, View1, View2);
-        Assert.True(coordinator.TryGetBlockingTransition(Range, View2.MembershipVersion, out var wait));
+        Assert.True(coordinator.TryGetBlockingTransition(Range, View2, out var wait));
 
         transition.Abort(TestContext.Current.CancellationToken);
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => wait);
         Assert.Equal(PartitionTransitionStage.Aborted, transition.Stage);
-        Assert.False(coordinator.IsBlocked(Range, View2.MembershipVersion));
+        Assert.False(coordinator.IsBlocked(Range, View2));
     }
 
     [Fact]
@@ -96,7 +96,7 @@ public sealed class PartitionTransitionCoordinatorTests
 
         Assert.Equal(PartitionTransitionStage.Blocking, original.Stage);
         Assert.False(original.Completion.IsCompleted);
-        Assert.True(coordinator.TryGetBlockingTransition(Range, View2.MembershipVersion, out var completion));
+        Assert.True(coordinator.TryGetBlockingTransition(Range, View2, out var completion));
         Assert.Same(original.Completion, completion);
     }
 
@@ -117,8 +117,8 @@ public sealed class PartitionTransitionCoordinatorTests
         var version = 1L;
         foreach (var choice in choices)
         {
-            var previous = new ClusterServiceViewId(new(version), 1, "config");
-            var current = new ClusterServiceViewId(new(++version), 1, "config");
+            var previous = new ClusterServiceViewId(0, new(version));
+            var current = new ClusterServiceViewId(0, new(++version));
             PartitionTransition transition;
             if ((choice & 1) == 0)
             {
@@ -136,10 +136,10 @@ public sealed class PartitionTransitionCoordinatorTests
                 }
             }
 
-            Assert.True(coordinator.IsBlocked(Range, current.MembershipVersion));
+            Assert.True(coordinator.IsBlocked(Range, current));
             transition.Complete();
             Assert.Equal(PartitionTransitionStage.Completed, transition.Stage);
-            Assert.False(coordinator.IsBlocked(Range, current.MembershipVersion));
+            Assert.False(coordinator.IsBlocked(Range, current));
         }
     }
 
@@ -152,12 +152,12 @@ public sealed class PartitionTransitionCoordinatorTests
         var coordinatorB = new PartitionTransitionCoordinator();
         var transitionA = coordinatorA.BeginInbound(rangeA, View1, View2);
         var transitionB = coordinatorB.BeginOutbound(rangeB, View1, View2);
-        Assert.True(coordinatorA.TryGetBlockingTransition(rangeA, View2.MembershipVersion, out var waitA));
-        Assert.True(coordinatorB.TryGetBlockingTransition(rangeB, View2.MembershipVersion, out var waitB));
+        Assert.True(coordinatorA.TryGetBlockingTransition(rangeA, View2, out var waitA));
+        Assert.True(coordinatorB.TryGetBlockingTransition(rangeB, View2, out var waitB));
 
         transitionA.MarkStateInstalled();
         Assert.Equal(PartitionTransitionStage.Blocking, transitionB.Stage);
-        Assert.True(coordinatorB.IsBlocked(rangeB, View2.MembershipVersion));
+        Assert.True(coordinatorB.IsBlocked(rangeB, View2));
         Assert.False(waitB.IsCompleted);
 
         transitionA.MarkFenced(new(ClusterServiceFencingMode.External, 101));
@@ -165,23 +165,23 @@ public sealed class PartitionTransitionCoordinatorTests
         await waitA;
         Assert.Equal(PartitionTransitionStage.Completed, transitionA.Stage);
         Assert.Equal(PartitionTransitionStage.Blocking, transitionB.Stage);
-        Assert.True(coordinatorB.IsBlocked(rangeB, View2.MembershipVersion));
+        Assert.True(coordinatorB.IsBlocked(rangeB, View2));
         Assert.False(waitB.IsCompleted);
 
         var abortedA = coordinatorA.BeginOutbound(rangeA, View1, View2);
-        Assert.True(coordinatorA.IsBlocked(rangeA, View2.MembershipVersion));
+        Assert.True(coordinatorA.IsBlocked(rangeA, View2));
         abortedA.Abort(TestContext.Current.CancellationToken);
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => abortedA.Completion);
         Assert.Equal(PartitionTransitionStage.Aborted, abortedA.Stage);
         Assert.Equal(PartitionTransitionStage.Blocking, transitionB.Stage);
-        Assert.True(coordinatorB.IsBlocked(rangeB, View2.MembershipVersion));
+        Assert.True(coordinatorB.IsBlocked(rangeB, View2));
         Assert.False(waitB.IsCompleted);
 
         transitionB.MarkDrained();
         transitionB.Complete();
         await waitB;
         Assert.Equal(PartitionTransitionStage.Completed, transitionB.Stage);
-        Assert.False(coordinatorB.IsBlocked(rangeB, View2.MembershipVersion));
+        Assert.False(coordinatorB.IsBlocked(rangeB, View2));
     }
 
     [Fact]
@@ -244,16 +244,16 @@ public sealed class PartitionTransitionCoordinatorTests
     public void Begin_RejectsEmptyAndNonIncreasingViewsWithoutInstallingGate()
     {
         var coordinator = new PartitionTransitionCoordinator();
-        var equalVersion = new ClusterServiceViewId(View1.MembershipVersion, 2, "other");
-        var olderVersion = new ClusterServiceViewId(new(0), 1, "config");
+        var equalVersion = View1;
+        var olderVersion = new ClusterServiceViewId(0, new(0));
 
         Assert.Throws<ArgumentException>(() => coordinator.BeginInbound(RingRange.Empty, View1, View2));
         Assert.Throws<ArgumentException>(() => coordinator.BeginInbound(Range, View1, equalVersion));
         Assert.Throws<ArgumentException>(() => coordinator.BeginOutbound(Range, View1, olderVersion));
 
-        Assert.False(coordinator.IsBlocked(Range, View1.MembershipVersion));
-        Assert.False(coordinator.IsBlocked(Range, View2.MembershipVersion));
-        Assert.False(coordinator.TryGetBlockingTransition(Range, View2.MembershipVersion, out var completion));
+        Assert.False(coordinator.IsBlocked(Range, View1));
+        Assert.False(coordinator.IsBlocked(Range, View2));
+        Assert.False(coordinator.TryGetBlockingTransition(Range, View2, out var completion));
         Assert.Same(Task.CompletedTask, completion);
     }
 
@@ -267,19 +267,19 @@ public sealed class PartitionTransitionCoordinatorTests
         var disjoint = RingRange.Create(150, 250);
         var transition = coordinator.BeginInbound(wrapped, View1, View2);
 
-        Assert.False(coordinator.IsBlocked(highOverlap, View1.MembershipVersion));
-        Assert.True(coordinator.IsBlocked(highOverlap, View2.MembershipVersion));
-        Assert.True(coordinator.IsBlocked(lowOverlap, new(3)));
-        Assert.False(coordinator.IsBlocked(disjoint, new(3)));
-        Assert.False(coordinator.TryGetBlockingTransition(disjoint, new(3), out var completed));
+        Assert.False(coordinator.IsBlocked(highOverlap, View1));
+        Assert.True(coordinator.IsBlocked(highOverlap, View2));
+        Assert.True(coordinator.IsBlocked(lowOverlap, new(0, new(3))));
+        Assert.False(coordinator.IsBlocked(disjoint, new(0, new(3))));
+        Assert.False(coordinator.TryGetBlockingTransition(disjoint, new(0, new(3)), out var completed));
         Assert.Same(Task.CompletedTask, completed);
-        Assert.True(coordinator.TryGetBlockingTransition(lowOverlap, View2.MembershipVersion, out var blocking));
+        Assert.True(coordinator.TryGetBlockingTransition(lowOverlap, View2, out var blocking));
         Assert.Same(transition.Completion, blocking);
         Assert.False(blocking.IsCompleted);
 
         transition.Abort(TestContext.Current.CancellationToken);
 
-        Assert.False(coordinator.IsBlocked(highOverlap, View2.MembershipVersion));
+        Assert.False(coordinator.IsBlocked(highOverlap, View2));
         Assert.True(transition.Completion.IsCanceled);
     }
 
@@ -304,7 +304,7 @@ public sealed class PartitionTransitionCoordinatorTests
         var expectedFailure = transition.Failure;
         Assert.True(coordinator.TryGetBlockingTransition(
             transition.Range,
-            transition.TargetView.MembershipVersion,
+            transition.TargetView,
             out var expectedCompletion));
         Assert.Same(transition.Completion, expectedCompletion);
 
@@ -315,7 +315,7 @@ public sealed class PartitionTransitionCoordinatorTests
         Assert.Same(expectedFailure, transition.Failure);
         Assert.True(coordinator.TryGetBlockingTransition(
             transition.Range,
-            transition.TargetView.MembershipVersion,
+            transition.TargetView,
             out var actualCompletion));
         Assert.Same(expectedCompletion, actualCompletion);
         Assert.False(actualCompletion.IsCompleted);
@@ -379,12 +379,12 @@ public sealed class PartitionTransitionCoordinatorTests
                 raw * 2_654_435_761u,
                 System.Numerics.BitOperations.RotateLeft(raw ^ 0xA5A5_A5A5u, 13));
             var query = RingRange.Create(queryInput.Start, queryInput.End);
-            var requestVersion = new MembershipVersion(raw % 10);
+            var requestVersion = new ClusterServiceViewId(0, new(raw % 10));
             var expectedA = IsActive(transitionA.Stage)
-                && requestVersion.Value >= 5
+                && requestVersion.Version.Value >= 5
                 && RingRangeIntersectionOracle(inputA, queryInput);
             var expectedB = IsActive(transitionB.Stage)
-                && requestVersion.Value >= 7
+                && requestVersion.Version.Value >= 7
                 && RingRangeIntersectionOracle(inputB, queryInput);
 
             Assert.Equal(expectedA, coordinatorA.IsBlocked(query, requestVersion));
@@ -458,7 +458,7 @@ public sealed class PartitionTransitionCoordinatorTests
                 return $"op={raw % 6},query=({queryStart},{queryEnd}],version={raw % 10}";
             }))}]";
 
-    private static ClusterServiceViewId CreateView(long version) => new(new(version), 1, "config");
+    private static ClusterServiceViewId CreateView(long version) => new(0, new(version));
 
     private readonly record struct RangeInput(uint Start, uint End);
 
@@ -479,7 +479,7 @@ public sealed class PartitionTransitionCoordinatorTests
         Assert.Same(completion, transition.Completion);
         Assert.True(completion.IsCanceled);
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => completion);
-        Assert.True(coordinator.TryGetBlockingTransition(Range, View2.MembershipVersion, out var blocked));
+        Assert.True(coordinator.TryGetBlockingTransition(Range, View2, out var blocked));
         Assert.Same(completion, blocked);
 
         var repeatedFailure = new ArgumentException("must not replace the first failure");
@@ -490,7 +490,7 @@ public sealed class PartitionTransitionCoordinatorTests
         Assert.Equal(PartitionTransitionStage.Failed, transition.Stage);
         Assert.Same(completion, transition.Completion);
         Assert.True(completion.IsCanceled);
-        Assert.True(coordinator.TryGetBlockingTransition(Range, View2.MembershipVersion, out blocked));
+        Assert.True(coordinator.TryGetBlockingTransition(Range, View2, out blocked));
         Assert.Same(completion, blocked);
 
         var completionRejection = Assert.Throws<InvalidOperationException>(transition.Complete);
@@ -498,7 +498,7 @@ public sealed class PartitionTransitionCoordinatorTests
         Assert.Equal("A barrier transition must remain blocked until completion.", completionRejection.Message);
         Assert.Same(failure, transition.Failure);
         Assert.Equal(PartitionTransitionStage.Failed, transition.Stage);
-        Assert.True(coordinator.IsBlocked(Range, View2.MembershipVersion));
+        Assert.True(coordinator.IsBlocked(Range, View2));
 
         transition.Abort(TestContext.Current.CancellationToken);
 
@@ -506,8 +506,8 @@ public sealed class PartitionTransitionCoordinatorTests
         Assert.Same(failure, transition.Failure);
         Assert.Same(completion, transition.Completion);
         Assert.True(completion.IsCanceled);
-        Assert.False(coordinator.IsBlocked(Range, View2.MembershipVersion));
-        Assert.False(coordinator.TryGetBlockingTransition(Range, View2.MembershipVersion, out var released));
+        Assert.False(coordinator.IsBlocked(Range, View2));
+        Assert.False(coordinator.TryGetBlockingTransition(Range, View2, out var released));
         Assert.Same(Task.CompletedTask, released);
     }
 
@@ -536,11 +536,11 @@ public sealed class PartitionTransitionCoordinatorTests
         Assert.Same(failure, transition.Failure);
         Assert.Equal(PartitionTransitionStage.Failed, transition.Stage);
         Assert.True(transition.Completion.IsCanceled);
-        Assert.True(coordinator.TryGetBlockingTransition(Range, View2.MembershipVersion, out var blocked));
+        Assert.True(coordinator.TryGetBlockingTransition(Range, View2, out var blocked));
         Assert.Same(transition.Completion, blocked);
 
         transition.Abort(TestContext.Current.CancellationToken);
-        Assert.False(coordinator.IsBlocked(Range, View2.MembershipVersion));
+        Assert.False(coordinator.IsBlocked(Range, View2));
     }
 
     [Fact]
@@ -561,11 +561,11 @@ public sealed class PartitionTransitionCoordinatorTests
         Assert.NotSame(first.Completion, sameTargetDisjoint.Completion);
         Assert.NotSame(first.Completion, differentTargetOverlapping.Completion);
         Assert.NotSame(sameTargetDisjoint.Completion, differentTargetOverlapping.Completion);
-        Assert.True(coordinator.TryGetBlockingTransition(firstOnlyRange, View2.MembershipVersion, out var firstGate));
+        Assert.True(coordinator.TryGetBlockingTransition(firstOnlyRange, View2, out var firstGate));
         Assert.Same(first.Completion, firstGate);
-        Assert.True(coordinator.TryGetBlockingTransition(disjointRange, View2.MembershipVersion, out var disjointGate));
+        Assert.True(coordinator.TryGetBlockingTransition(disjointRange, View2, out var disjointGate));
         Assert.Same(sameTargetDisjoint.Completion, disjointGate);
-        Assert.True(coordinator.TryGetBlockingTransition(overlapOnlyRange, view3.MembershipVersion, out var overlappingGate));
+        Assert.True(coordinator.TryGetBlockingTransition(overlapOnlyRange, view3, out var overlappingGate));
         Assert.Same(differentTargetOverlapping.Completion, overlappingGate);
 
         first.Complete();
@@ -574,23 +574,23 @@ public sealed class PartitionTransitionCoordinatorTests
         Assert.True(first.Completion.IsCompletedSuccessfully);
         Assert.False(sameTargetDisjoint.Completion.IsCompleted);
         Assert.False(differentTargetOverlapping.Completion.IsCompleted);
-        Assert.False(coordinator.IsBlocked(firstOnlyRange, View2.MembershipVersion));
-        Assert.True(coordinator.IsBlocked(disjointRange, View2.MembershipVersion));
-        Assert.True(coordinator.IsBlocked(overlapOnlyRange, view3.MembershipVersion));
+        Assert.False(coordinator.IsBlocked(firstOnlyRange, View2));
+        Assert.True(coordinator.IsBlocked(disjointRange, View2));
+        Assert.True(coordinator.IsBlocked(overlapOnlyRange, view3));
 
         sameTargetDisjoint.Complete();
         await disjointGate;
 
         Assert.True(sameTargetDisjoint.Completion.IsCompletedSuccessfully);
         Assert.False(differentTargetOverlapping.Completion.IsCompleted);
-        Assert.False(coordinator.IsBlocked(disjointRange, View2.MembershipVersion));
-        Assert.True(coordinator.IsBlocked(overlapOnlyRange, view3.MembershipVersion));
+        Assert.False(coordinator.IsBlocked(disjointRange, View2));
+        Assert.True(coordinator.IsBlocked(overlapOnlyRange, view3));
 
         differentTargetOverlapping.Complete();
         await overlappingGate;
 
         Assert.True(differentTargetOverlapping.Completion.IsCompletedSuccessfully);
-        Assert.False(coordinator.IsBlocked(overlapOnlyRange, view3.MembershipVersion));
+        Assert.False(coordinator.IsBlocked(overlapOnlyRange, view3));
     }
 
     [Fact]
@@ -609,7 +609,7 @@ public sealed class PartitionTransitionCoordinatorTests
         Assert.Equal(canceledToken, preserved.CancellationToken);
         Assert.True(preserved.CancellationToken.IsCancellationRequested);
         Assert.Equal(PartitionTransitionStage.Aborted, canceledTransition.Stage);
-        Assert.False(coordinator.IsBlocked(Range, View1.MembershipVersion));
+        Assert.False(coordinator.IsBlocked(Range, View1));
 
         using var activeSource = new CancellationTokenSource();
         var activeToken = activeSource.Token;
@@ -623,7 +623,7 @@ public sealed class PartitionTransitionCoordinatorTests
         Assert.True(synthesized.CancellationToken.IsCancellationRequested);
         Assert.NotEqual(activeToken, synthesized.CancellationToken);
         Assert.Equal(PartitionTransitionStage.Aborted, synthesizedTransition.Stage);
-        Assert.False(coordinator.IsBlocked(Range, View2.MembershipVersion));
+        Assert.False(coordinator.IsBlocked(Range, View2));
     }
 
     [Fact]
@@ -631,13 +631,13 @@ public sealed class PartitionTransitionCoordinatorTests
     {
         var coordinator = new PartitionTransitionCoordinator();
         var barrier = coordinator.BeginBarrier(Range, View2);
-        var newerVersion = new MembershipVersion(3);
+        var newerVersion = new ClusterServiceViewId(0, new(3));
 
-        Assert.False(coordinator.IsBlocked(Range, View1.MembershipVersion));
-        Assert.False(coordinator.TryGetBlockingTransition(Range, View1.MembershipVersion, out var precedingGate));
+        Assert.False(coordinator.IsBlocked(Range, View1));
+        Assert.False(coordinator.TryGetBlockingTransition(Range, View1, out var precedingGate));
         Assert.Same(Task.CompletedTask, precedingGate);
-        Assert.True(coordinator.IsBlocked(Range, View2.MembershipVersion));
-        Assert.True(coordinator.TryGetBlockingTransition(Range, View2.MembershipVersion, out var exactGate));
+        Assert.True(coordinator.IsBlocked(Range, View2));
+        Assert.True(coordinator.TryGetBlockingTransition(Range, View2, out var exactGate));
         Assert.Same(barrier.Completion, exactGate);
         Assert.True(coordinator.IsBlocked(Range, newerVersion));
         Assert.True(coordinator.TryGetBlockingTransition(Range, newerVersion, out var newerGate));
@@ -649,8 +649,8 @@ public sealed class PartitionTransitionCoordinatorTests
 
         Assert.True(barrier.Completion.IsCompletedSuccessfully);
         Assert.Equal(PartitionTransitionStage.Completed, barrier.Stage);
-        Assert.False(coordinator.IsBlocked(Range, View1.MembershipVersion));
-        Assert.False(coordinator.IsBlocked(Range, View2.MembershipVersion));
+        Assert.False(coordinator.IsBlocked(Range, View1));
+        Assert.False(coordinator.IsBlocked(Range, View2));
         Assert.False(coordinator.IsBlocked(Range, newerVersion));
         Assert.False(coordinator.TryGetBlockingTransition(Range, newerVersion, out var releasedGate));
         Assert.Same(Task.CompletedTask, releasedGate);
