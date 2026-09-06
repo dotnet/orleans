@@ -327,14 +327,19 @@ public sealed class RecoverableStreamReceiver<TQueueMessage> : IQueueAdapterRece
         => _cache.TryPurgeFromCache(out purgedItems);
 
     /// <inheritdoc />
+    [Obsolete("Use TryGetCacheCursor instead.")]
     public IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken? token)
         => _cache.GetCacheCursor(streamId, token);
 
     /// <inheritdoc />
-    public IQueueCacheCursor GetCacheCursorAtPosition(
+    public QueueCacheCursorResult<IQueueCacheCursor> TryGetCacheCursor(StreamId streamId, StreamSequenceToken? token)
+        => _cache.TryGetCacheCursor(streamId, token);
+
+    /// <inheritdoc />
+    public QueueCacheCursorResult<IQueueCacheCursor> TryGetCacheCursorAtPosition(
         StreamId streamId,
         StreamSubscriptionStartPosition startPosition)
-        => _cache.GetCacheCursorAtPosition(streamId, startPosition);
+        => _cache.TryGetCacheCursorAtPosition(streamId, startPosition);
 
     /// <inheritdoc />
     public bool IsUnderPressure() => _cache.IsUnderPressure();

@@ -257,8 +257,8 @@ public sealed class RecoveryCacheMemoryTests
             var second = Record(cycle * 2 + 2, 24);
             _ = cache.Add([first, second], DateTime.UnixEpoch);
             Assert.Equal(40, cache.SizeInBytes);
-            using var cursor = cache.GetCacheCursor(first.StreamId, new EventSequenceTokenV2(first.Sequence));
-            Assert.True(cursor.MoveNext());
+            using var cursor = Assert.IsAssignableFrom<IQueueCacheCursor>(cache.TryGetCacheCursor(first.StreamId, new EventSequenceTokenV2(first.Sequence)).Cursor);
+            Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
             snapshots.Add((first, Assert.IsType<Batch>(cursor.GetCurrent(out _)).Payload));
 
             cache.UpdateDeliveryProgress(new EventSequenceTokenV2(second.Sequence), DateTime.UnixEpoch);
@@ -466,8 +466,8 @@ public sealed class RecoveryCacheMemoryTests
 
     private static void AssertPayload(RecoverableStreamQueueCache<TestRecord> cache, TestRecord record)
     {
-        using var cursor = cache.GetCacheCursor(record.StreamId, new EventSequenceTokenV2(record.Sequence));
-        Assert.True(cursor.MoveNext());
+        using var cursor = Assert.IsAssignableFrom<IQueueCacheCursor>(cache.TryGetCacheCursor(record.StreamId, new EventSequenceTokenV2(record.Sequence)).Cursor);
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
         var batch = Assert.IsType<Batch>(cursor.GetCurrent(out var exception));
         Assert.Null(exception);
         Assert.Equal(record.StreamId, batch.StreamId);

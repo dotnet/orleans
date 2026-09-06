@@ -483,12 +483,13 @@ namespace UnitTests.StreamingTests
                 return new ScriptedQueueCursor(messages, streamId, token);
             }
 
-            public IQueueCacheCursor GetCacheCursorAtPosition(
+            public QueueCacheCursorResult<IQueueCacheCursor> TryGetCacheCursorAtPosition(
                 StreamId streamId,
                 StreamSubscriptionStartPosition startPosition)
             {
                 Assert.Equal(StreamSubscriptionStartPosition.EarliestAvailable, startPosition);
-                return new ScriptedQueueCursor(messages, streamId, token: null);
+                return QueueCacheCursorResult<IQueueCacheCursor>.FromCursor(
+                    new ScriptedQueueCursor(messages, streamId, token: null));
             }
 
             public bool IsUnderPressure() => false;
