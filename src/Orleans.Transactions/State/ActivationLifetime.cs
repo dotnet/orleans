@@ -1,10 +1,15 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
 namespace Orleans.Transactions.State
 {
+    [SuppressMessage(
+        "Design",
+        "CA1001:Types that own disposable fields should be disposable",
+        Justification = "The cancellation source remains valid for all deactivation observers and is reclaimed with the grain activation.")]
     internal class ActivationLifetime : IActivationLifetime, ILifecycleObserver
     {
         private readonly CancellationTokenSource onDeactivating = new CancellationTokenSource();

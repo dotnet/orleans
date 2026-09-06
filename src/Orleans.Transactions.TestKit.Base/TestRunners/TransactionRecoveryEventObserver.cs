@@ -18,6 +18,7 @@ internal sealed class TransactionRecoveryEventObserver : IObserver<TransactionDi
     private readonly long startedAt = Stopwatch.GetTimestamp();
     private readonly List<RecoveryTransition> timeline = [];
     private readonly List<Waiter> waiters = [];
+    private readonly HashSet<PhaseGate> reachedPhaseGates = [];
     private HashSet<GrainId>? relevantGrains;
     private PhaseGate? phaseGate;
     private long nextSequence;
@@ -228,6 +229,7 @@ internal sealed class TransactionRecoveryEventObserver : IObserver<TransactionDi
     {
         List<Waiter> waiters;
         PhaseGate? phaseGate;
+        PhaseGate[] reachedPhaseGates;
         lock (this.lockObj)
         {
             if (this.disposed)
@@ -240,10 +242,17 @@ internal sealed class TransactionRecoveryEventObserver : IObserver<TransactionDi
             this.waiters.Clear();
             phaseGate = this.phaseGate;
             this.phaseGate = null;
+            reachedPhaseGates = [.. this.reachedPhaseGates];
+            this.reachedPhaseGates.Clear();
         }
 
         this.subscription.Dispose();
-        phaseGate?.Release();
+        phaseGate?.Dispose();
+        foreach (var reachedPhaseGate in reachedPhaseGates)
+        {
+            reachedPhaseGate.Dispose();
+        }
+
         foreach (var waiter in waiters)
         {
             waiter.Completion.TrySetException(new ObjectDisposedException(nameof(TransactionRecoveryEventObserver)));
@@ -284,6 +293,7 @@ internal sealed class TransactionRecoveryEventObserver : IObserver<TransactionDi
                 && phaseGate.TryReach(transition))
             {
                 this.phaseGate = null;
+                this.reachedPhaseGates.Add(phaseGate);
                 reachedGate = phaseGate;
             }
 
@@ -309,7 +319,11 @@ internal sealed class TransactionRecoveryEventObserver : IObserver<TransactionDi
             }
         }
 
-        reachedGate?.Block();
+        if (reachedGate is not null)
+        {
+            reachedGate.Block();
+            this.ReleaseGate(reachedGate);
+        }
     }
 
     private static Func<ParticipantId, bool> CreateCandidateFilter(IEnumerable<GrainId> candidateGrains)
@@ -514,6 +528,8 @@ internal sealed class TransactionRecoveryEventObserver : IObserver<TransactionDi
             {
                 this.phaseGate = null;
             }
+
+            this.reachedPhaseGates.Remove(gate);
         }
     }
 

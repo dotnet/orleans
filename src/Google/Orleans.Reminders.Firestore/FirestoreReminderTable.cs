@@ -12,6 +12,10 @@ using Orleans.Configuration;
 
 namespace Orleans.Reminders.Firestore;
 
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+    "Design",
+    "CA1001:Types that own disposable fields should be disposable",
+    Justification = "The lifecycle semaphore remains valid for all concurrent reminder-table operations and is reclaimed with the singleton reminder table.")]
 internal partial class FirestoreReminderTable : IReminderTable
 {
     private const string PERSISTENCE_GROUP = "Reminders";

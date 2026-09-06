@@ -69,11 +69,15 @@ namespace Orleans.Storage
     }
 
     [System.Diagnostics.DebuggerDisplay("MemoryStore:{Name},WithLatency:{latency}")]
-    public partial class MemoryGrainStorageWithLatency : IGrainStorage
+    public partial class MemoryGrainStorageWithLatency : IGrainStorage, System.IDisposable
     {
         public MemoryGrainStorageWithLatency(string name, MemoryStorageWithLatencyOptions options, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory, IGrainFactory grainFactory, Serialization.Serializers.IActivatorProvider activatorProvider, IGrainStorageSerializer defaultGrainStorageSerializer) { }
 
         public System.Threading.Tasks.Task ClearStateAsync<T>(string grainType, Runtime.GrainId grainId, IGrainState<T> grainState) { throw null; }
+
+        public void Dispose() { }
+
+        protected virtual void Dispose(bool disposing) { }
 
         public System.Threading.Tasks.Task ReadStateAsync<T>(string grainType, Runtime.GrainId grainId, IGrainState<T> grainState) { throw null; }
 

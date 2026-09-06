@@ -27,6 +27,10 @@ namespace Orleans.Serialization.TestKit
     [ExcludeFromCodeCoverage]
     public abstract class FieldCodecTester<TValue, TCodec> : SerializationTester where TCodec : class, IFieldCodec<TValue>
     {
+        [SuppressMessage(
+            "Usage",
+            "CA2213:Disposable fields should be disposed",
+            Justification = "SerializationTester or its shared fixture owns and disposes the service provider which owns this session pool.")]
         private readonly SerializerSessionPool _sessionPool;
 
         /// <summary>

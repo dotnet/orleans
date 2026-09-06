@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Configuration;
@@ -10,6 +11,10 @@ using Orleans.Streams;
 
 namespace Orleans.Streaming.Redis;
 
+[SuppressMessage(
+    "Design",
+    "CA1001:Types that own disposable fields should be disposable",
+    Justification = "The semaphore remains valid for every producer which shares this queue adapter and is reclaimed with the adapter.")]
 internal sealed class RedisStreamAdapter : IQueueAdapter
 {
     private readonly Serializer<RedisStreamBatchContainer> _serializer;
