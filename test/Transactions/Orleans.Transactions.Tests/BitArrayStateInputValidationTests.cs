@@ -144,6 +144,17 @@ public class BitArrayStateInputValidationTests
         Assert.True(source.Equals((object)copy));
         Assert.NotSame(source.Value, copy.Value);
 
+        copy.Set(2, false);
+
+        Assert.False(source.TypedEquals(copy));
+        Assert.False(source.Equals((object)copy));
+        Assert.Equal(originalSource, source.Value);
+
+        copy.Set(2, true);
+
+        Assert.True(source.TypedEquals(copy));
+        Assert.True(source.Equals((object)copy));
+
         copy.Set(64, true);
 
         Assert.Equal(originalSource, source.Value);
@@ -153,20 +164,26 @@ public class BitArrayStateInputValidationTests
     }
 
     [Theory]
-    [InlineData("^", 0b0110, 0b0101)]
-    [InlineData("|", 0b1110, 0b0101)]
-    [InlineData("&", 0b1000, 0)]
-    public void Apply_UnequalLengths_UsesMissingWordsAsZero(
+    [InlineData("^", false, 0b0110, 0b0101)]
+    [InlineData("|", false, 0b1110, 0b0101)]
+    [InlineData("&", false, 0b1000, 0)]
+    [InlineData("^", true, 0b0110, 0b0101)]
+    [InlineData("|", true, 0b1110, 0b0101)]
+    [InlineData("&", true, 0b1000, 0)]
+    public void Apply_UnequalLengthsInEitherOperand_UsesMissingWordsAsZero(
         string operation,
+        bool longerOnLeft,
         int expectedOverlappingWord,
         int expectedTrailingWord)
     {
-        var left = new BitArrayState();
-        left[0] = 0b1010;
-        var right = new BitArrayState();
-        right[0] = 0b1100;
-        right.Set(32, true);
-        right.Set(34, true);
+        var shorter = new BitArrayState();
+        shorter[0] = longerOnLeft ? 0b1100 : 0b1010;
+        var longer = new BitArrayState();
+        longer[0] = longerOnLeft ? 0b1010 : 0b1100;
+        longer.Set(32, true);
+        longer.Set(34, true);
+        var left = longerOnLeft ? longer : shorter;
+        var right = longerOnLeft ? shorter : longer;
         var originalLeft = left.Value.ToArray();
         var originalRight = right.Value.ToArray();
 
