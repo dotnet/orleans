@@ -12,6 +12,7 @@ namespace Orleans.Transactions.TestKit
         /// <inheritdoc/>
         public async Task ReadThenWrite(ITransactionTestGrain grain, int value)
         {
+            ArgumentNullException.ThrowIfNull(grain);
             await grain.Get();
             await Task.Delay(TimeSpan.FromMilliseconds(100)); // add some delay to make concurrent txs interleave each other
             await grain.Add(value);
@@ -20,6 +21,7 @@ namespace Orleans.Transactions.TestKit
         /// <inheritdoc/>
         public async Task ReadThenWriteWithExclusiveLock(IExclusiveLockTransactionTestGrain grain, int value)
         {
+            ArgumentNullException.ThrowIfNull(grain);
             await grain.Get();
             await Task.Delay(TimeSpan.FromMilliseconds(100)); // add some delay to make concurrent txs interleave each other
             await grain.Add(value);

@@ -13,6 +13,7 @@ namespace Orleans.Transactions.TestKit
         /// <inheritdoc/>
         public Task<List<string?>?[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers)
         {
+            ArgumentNullException.ThrowIfNull(tiers);
             return AttributionGrain.GetNestedTransactionIds(tier, tiers);
         }
     }
@@ -25,6 +26,7 @@ namespace Orleans.Transactions.TestKit
         /// <inheritdoc/>
         public Task<List<string?>?[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers)
         {
+            ArgumentNullException.ThrowIfNull(tiers);
             return AttributionGrain.GetNestedTransactionIds(tier, tiers);
         }
     }
@@ -37,6 +39,7 @@ namespace Orleans.Transactions.TestKit
         /// <inheritdoc/>
         public Task<List<string?>?[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers)
         {
+            ArgumentNullException.ThrowIfNull(tiers);
             return AttributionGrain.GetNestedTransactionIds(tier, tiers);
         }
     }
@@ -49,6 +52,7 @@ namespace Orleans.Transactions.TestKit
         /// <inheritdoc/>
         public Task<List<string?>?[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers)
         {
+            ArgumentNullException.ThrowIfNull(tiers);
             return AttributionGrain.GetNestedTransactionIds(tier, tiers);
         }
     }
@@ -61,6 +65,7 @@ namespace Orleans.Transactions.TestKit
         /// <inheritdoc/>
         public Task<List<string?>?[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers)
         {
+            ArgumentNullException.ThrowIfNull(tiers);
             return AttributionGrain.GetNestedTransactionIds(tier, tiers);
         }
     }
@@ -73,6 +78,7 @@ namespace Orleans.Transactions.TestKit
         /// <inheritdoc/>
         public Task<List<string?>?[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers)
         {
+            ArgumentNullException.ThrowIfNull(tiers);
             return AttributionGrain.GetNestedTransactionIds(tier, tiers);
         }
     }
@@ -85,6 +91,7 @@ namespace Orleans.Transactions.TestKit
         /// <inheritdoc/>
         public Task<List<string?>?[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers)
         {
+            ArgumentNullException.ThrowIfNull(tiers);
             return AttributionGrain.GetNestedTransactionIds(tier, tiers);
         }
     }

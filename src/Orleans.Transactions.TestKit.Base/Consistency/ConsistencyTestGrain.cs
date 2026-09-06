@@ -53,6 +53,7 @@ namespace Orleans.Transactions.TestKit.Consistency
             ILoggerFactory loggerFactory
             )
         {
+            ArgumentNullException.ThrowIfNull(loggerFactory);
             this.data = data;
             this.logger = loggerFactory.CreateLogger(nameof(ConsistencyTestGrain) + ".graincall");
         }
@@ -64,6 +65,9 @@ namespace Orleans.Transactions.TestKit.Consistency
         /// <inheritdoc />
         public async Task<Observation[]> Run(ConsistencyTestOptions options, int depth, string stack, int maxgrain, DateTime stopAfter)
         {
+            ArgumentNullException.ThrowIfNull(options);
+            ArgumentNullException.ThrowIfNull(stack);
+
             if (random == null)
                 random = new Random(options.RandomSeed * options.NumGrains + MyNumber);
 

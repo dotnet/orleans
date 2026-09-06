@@ -92,6 +92,7 @@ namespace Orleans.Transactions.TestKit
         /// <inheritdoc />
         public Factory<IGrainContext, object> GetFactory(ParameterInfo parameter, FaultInjectionTransactionalStateAttribute attribute)
         {
+            ArgumentNullException.ThrowIfNull(parameter);
             IFaultInjectionTransactionalStateConfiguration config = attribute;
             // use generic type args to define collection type.
             MethodInfo genericCreate = create.MakeGenericMethod(parameter.ParameterType.GetGenericArguments());

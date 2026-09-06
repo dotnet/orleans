@@ -108,7 +108,7 @@ namespace Orleans.Transactions.TestKit
         /// <param name="testCluster">The test cluster whose silos and grains are used by recovery scenarios.</param>
         /// <param name="testOutput">The callback used to write test output.</param>
         public TransactionRecoveryTestsRunner(TestCluster testCluster, Action<string> testOutput)
-            : base(testCluster.GrainFactory!, testOutput) // Transaction test clusters initialize a client.
+            : base(GetGrainFactory(testCluster), testOutput)
         {
             this.testCluster = testCluster;
             this.logger = this.testCluster.ServiceProvider.GetService<ILogger<TransactionRecoveryTestsRunner>>()!;
@@ -122,6 +122,12 @@ namespace Orleans.Transactions.TestKit
                 FailureDetectionSchedulingMargin).MaximumDuration;
             this.recoveryTimeout =
                 this.failureDetectionTimeout + TransactionalStateOptions.DefaultRemoteTransactionPingFrequency;
+        }
+
+        private static IGrainFactory GetGrainFactory(TestCluster testCluster)
+        {
+            ArgumentNullException.ThrowIfNull(testCluster);
+            return testCluster.GrainFactory!; // Transaction test clusters initialize a client.
         }
 
         /// <summary>
