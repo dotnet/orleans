@@ -124,13 +124,19 @@ internal sealed class AdoNetQueueAdapterReceiver : IQueueAdapterReceiver, IQueue
     public bool TryPurgeFromCache([MaybeNullWhen(false)] out IList<IBatchContainer> purgedItems)
         => _inner.TryPurgeFromCache(out purgedItems);
 
+    [Obsolete("Use TryGetCacheCursor instead.")]
     public IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken? token)
         => _inner.GetCacheCursor(streamId, token);
 
-    public IQueueCacheCursor GetCacheCursorAtPosition(
+    /// <inheritdoc />
+    public QueueCacheCursorResult<IQueueCacheCursor> TryGetCacheCursor(StreamId streamId, StreamSequenceToken? token)
+        => _inner.TryGetCacheCursor(streamId, token);
+
+    /// <inheritdoc />
+    public QueueCacheCursorResult<IQueueCacheCursor> TryGetCacheCursorAtPosition(
         StreamId streamId,
         StreamSubscriptionStartPosition startPosition)
-        => _inner.GetCacheCursorAtPosition(streamId, startPosition);
+        => _inner.TryGetCacheCursorAtPosition(streamId, startPosition);
 
     public bool IsUnderPressure() => _inner.IsUnderPressure();
 
