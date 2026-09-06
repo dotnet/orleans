@@ -37,11 +37,17 @@ public static class ActivationRepartitioningExtensions
     /// <param name="builder">The silo builder.</param>
     /// <returns>The provided silo builder.</returns>
     [Experimental("ORLEANSEXP001")]
-    public static ISiloBuilder AddActivationRepartitioner<TRule>(this ISiloBuilder builder) where TRule : class, IImbalanceToleranceRule
+    public static ISiloBuilder AddActivationRepartitioner<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TRule>(
+        this ISiloBuilder builder)
+        where TRule : class, IImbalanceToleranceRule
         => builder
             .ConfigureServices(services => services.AddActivationRepartitioner<TRule>());
 
-    private static IServiceCollection AddActivationRepartitioner<TRule>(this IServiceCollection services) where TRule : class, IImbalanceToleranceRule
+    private static IServiceCollection AddActivationRepartitioner<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TRule>(
+        this IServiceCollection services)
+        where TRule : class, IImbalanceToleranceRule
     {
         services.AddSingleton<ActivationRepartitioner>();
         services.AddSingleton<IRepartitionerMessageFilter, RepartitionerMessageFilter>();

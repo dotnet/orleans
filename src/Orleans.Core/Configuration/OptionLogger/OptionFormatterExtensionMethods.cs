@@ -1,4 +1,5 @@
 using System.Linq;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration.Internal;
 
@@ -19,12 +20,15 @@ namespace Orleans.Configuration
         /// The options type.
         /// </typeparam>
         /// <typeparam name="TOptionFormatter">
-        /// The option formatter type.
+        /// The option formatter type, including the public constructors used for dependency injection.
         /// </typeparam>
         /// <returns>
         /// The <see cref="IServiceCollection"/>, for chaining with other calls.
         /// </returns>
-        public static IServiceCollection ConfigureFormatter<TOptions, TOptionFormatter>(this IServiceCollection services)
+        public static IServiceCollection ConfigureFormatter<
+            TOptions,
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TOptionFormatter>(
+            this IServiceCollection services)
             where TOptions : class
             where TOptionFormatter : class, IOptionFormatter<TOptions>
         {
@@ -73,12 +77,15 @@ namespace Orleans.Configuration
         /// The options type.
         /// </typeparam>
         /// <typeparam name="TOptionFormatter">
-        /// The option formatter type.
+        /// The option formatter type, including the public constructors used for dependency injection.
         /// </typeparam>
         /// <returns>
         /// The <see cref="IServiceCollection"/>, for chaining with other calls.
         /// </returns>
-        public static IServiceCollection TryConfigureFormatter<TOptions, TOptionFormatter>(this IServiceCollection services)
+        public static IServiceCollection TryConfigureFormatter<
+            TOptions,
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TOptionFormatter>(
+            this IServiceCollection services)
             where TOptions : class
             where TOptionFormatter : class, IOptionFormatter<TOptions>
         {
@@ -100,12 +107,15 @@ namespace Orleans.Configuration
         /// The options type.
         /// </typeparam>
         /// <typeparam name="TOptionFormatterResolver">
-        /// The option formatter resolver type.
+        /// The option formatter resolver type, including the public constructors used for dependency injection.
         /// </typeparam>
         /// <returns>
         /// The <see cref="IServiceCollection"/>, for chaining with other calls.
         /// </returns>
-        public static IServiceCollection ConfigureFormatterResolver<TOptions, TOptionFormatterResolver>(this IServiceCollection services)
+        public static IServiceCollection ConfigureFormatterResolver<
+            TOptions,
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TOptionFormatterResolver>(
+            this IServiceCollection services)
             where TOptions : class
             where TOptionFormatterResolver : class, IOptionFormatterResolver<TOptions>
         {
@@ -115,7 +125,10 @@ namespace Orleans.Configuration
         /// <summary>
         /// Configure option formatter resolver for named option TOptions, if none is configured
         /// </summary>
-        public static IServiceCollection TryConfigureFormatterResolver<TOptions, TOptionFormatterResolver>(this IServiceCollection services)
+        public static IServiceCollection TryConfigureFormatterResolver<
+            TOptions,
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TOptionFormatterResolver>(
+            this IServiceCollection services)
             where TOptions : class
             where TOptionFormatterResolver : class, IOptionFormatterResolver<TOptions>
         {

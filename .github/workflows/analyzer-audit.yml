@@ -193,3 +193,25 @@ jobs:
             --self-contained true `
             --output $output
           & (Join-Path $output 'Orleans.Serialization.TrimmedSmoke')
+
+  dependency-injection-trimmed-smoke:
+    name: Orleans.DependencyInjection trimmed smoke for selected generic DI constructor flows (net10.0)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - name: Setup .NET
+        uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
+        with:
+          global-json-file: global.json
+      - name: Publish and run selected generic DI constructor flows trimmed smoke
+        shell: pwsh
+        run: |
+          $output = Join-Path $env:RUNNER_TEMP 'orleans-dependency-injection-trimmed-smoke'
+          dotnet publish test/Orleans.DependencyInjection.TrimmedSmoke/Orleans.DependencyInjection.TrimmedSmoke.csproj `
+            --framework net10.0 `
+            --configuration Release `
+            --runtime linux-x64 `
+            --self-contained true `
+            --output $output
+          & (Join-Path $output 'Orleans.DependencyInjection.TrimmedSmoke')

@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Placement;
@@ -10,12 +11,16 @@ public static class PlacementFilterExtensions
     /// <summary>
     /// Registers a placement filter strategy and its director for filtering candidate grain placements.
     /// </summary>
-    /// <typeparam name="TFilter">The placement filter strategy type.</typeparam>
-    /// <typeparam name="TDirector">The director which applies <typeparamref name="TFilter"/>.</typeparam>
+    /// <typeparam name="TFilter">The placement filter strategy type, including the public constructors used for dependency injection.</typeparam>
+    /// <typeparam name="TDirector">The director which applies <typeparamref name="TFilter"/>, including the public constructors used for dependency injection.</typeparam>
     /// <param name="services">The service collection.</param>
     /// <param name="strategyLifetime">The service lifetime of the placement filter strategy.</param>
     /// <returns>The provided service collection.</returns>
-    public static IServiceCollection AddPlacementFilter<TFilter, TDirector>(this IServiceCollection services, ServiceLifetime strategyLifetime)
+    public static IServiceCollection AddPlacementFilter<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TFilter,
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TDirector>(
+        this IServiceCollection services,
+        ServiceLifetime strategyLifetime)
         where TFilter : PlacementFilterStrategy, new()
         where TDirector : class, IPlacementFilterDirector
     {

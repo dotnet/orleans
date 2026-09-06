@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Orleans.Hosting
 {
     /// <summary>
@@ -22,7 +24,9 @@ namespace Orleans.Hosting
         /// <typeparam name="TImplementation">The filter implementation type.</typeparam>
         /// <param name="builder">The builder.</param>
         /// <returns>The builder.</returns>
-        public static ISiloBuilder AddIncomingGrainCallFilter<TImplementation>(this ISiloBuilder builder)
+        public static ISiloBuilder AddIncomingGrainCallFilter<
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TImplementation>(
+            this ISiloBuilder builder)
             where TImplementation : class, IIncomingGrainCallFilter
         {
             return builder.ConfigureServices(services => services.AddIncomingGrainCallFilter<TImplementation>());
@@ -56,7 +60,9 @@ namespace Orleans.Hosting
         /// <typeparam name="TImplementation">The filter implementation type.</typeparam>
         /// <param name="builder">The builder.</param>
         /// <returns>The builder.</returns>
-        public static ISiloBuilder AddOutgoingGrainCallFilter<TImplementation>(this ISiloBuilder builder)
+        public static ISiloBuilder AddOutgoingGrainCallFilter<
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TImplementation>(
+            this ISiloBuilder builder)
             where TImplementation : class, IOutgoingGrainCallFilter
         {
             return builder.ConfigureServices(services => services.AddOutgoingGrainCallFilter<TImplementation>());

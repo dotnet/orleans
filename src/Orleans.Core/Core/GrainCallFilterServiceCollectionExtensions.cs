@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -63,7 +64,9 @@ namespace Orleans.Hosting
         /// <typeparam name="TImplementation">The filter implementation type.</typeparam>
         /// <param name="services">The service collection.</param>
         /// <returns>The service collection.</returns>
-        internal static IServiceCollection AddIncomingGrainCallFilter<TImplementation>(this IServiceCollection services)
+        internal static IServiceCollection AddIncomingGrainCallFilter<
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TImplementation>(
+            this IServiceCollection services)
             where TImplementation : class, IIncomingGrainCallFilter
         {
             return services.AddSingleton<IIncomingGrainCallFilter, TImplementation>();
@@ -97,7 +100,9 @@ namespace Orleans.Hosting
         /// <typeparam name="TImplementation">The filter implementation type.</typeparam>
         /// <param name="services">The service collection.</param>
         /// <returns>The service collection.</returns>
-        internal static IServiceCollection AddOutgoingGrainCallFilter<TImplementation>(this IServiceCollection services)
+        internal static IServiceCollection AddOutgoingGrainCallFilter<
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TImplementation>(
+            this IServiceCollection services)
             where TImplementation : class, IOutgoingGrainCallFilter
         {
             return services.AddSingleton<IOutgoingGrainCallFilter, TImplementation>();

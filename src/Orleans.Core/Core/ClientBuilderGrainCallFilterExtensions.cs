@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Orleans.Hosting;
 
 /// <summary>
@@ -22,7 +24,9 @@ public static class ClientBuilderGrainCallFilterExtensions
     /// <typeparam name="TImplementation">The filter implementation type.</typeparam>
     /// <param name="builder">The builder.</param>
     /// <returns>The builder.</returns>
-    public static IClientBuilder AddIncomingGrainCallFilter<TImplementation>(this IClientBuilder builder)
+    public static IClientBuilder AddIncomingGrainCallFilter<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TImplementation>(
+        this IClientBuilder builder)
         where TImplementation : class, IIncomingGrainCallFilter
     {
         return builder.ConfigureServices(services => services.AddIncomingGrainCallFilter<TImplementation>());
@@ -56,7 +60,9 @@ public static class ClientBuilderGrainCallFilterExtensions
     /// <typeparam name="TImplementation">The filter implementation type.</typeparam>
     /// <param name="builder">The builder.</param>
     /// <returns>The <see cref="IClientBuilder"/>.</returns>
-    public static IClientBuilder AddOutgoingGrainCallFilter<TImplementation>(this IClientBuilder builder)
+    public static IClientBuilder AddOutgoingGrainCallFilter<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TImplementation>(
+        this IClientBuilder builder)
         where TImplementation : class, IOutgoingGrainCallFilter
     {
         return builder.ConfigureServices(services => services.AddOutgoingGrainCallFilter<TImplementation>());
