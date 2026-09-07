@@ -14,19 +14,23 @@ public interface ICancellationTestSystemTarget : ISystemTarget
     /// <summary>
     /// Performs a long wait that can be cancelled via the provided cancellation token.
     /// </summary>
-    /// <param name="cancellationToken">The cancellation token.</param>
     /// <param name="delay">The delay to wait.</param>
     /// <param name="callId">A unique identifier for this call, used to track cancellations.</param>
-    Task LongWait(CancellationToken cancellationToken, TimeSpan delay, Guid callId);
+    /// <param name="cancellationToken">The cancellation token.</param>
+    Task LongWait(TimeSpan delay, Guid callId, CancellationToken cancellationToken);
 
     /// <summary>
     /// Calls another system target's LongWait method, passing through the cancellation token.
     /// </summary>
     /// <param name="target">The target system target to call.</param>
-    /// <param name="cancellationToken">The cancellation token.</param>
     /// <param name="delay">The delay to wait.</param>
     /// <param name="callId">A unique identifier for this call, used to track cancellations.</param>
-    Task CallOtherLongRunningTask(ICancellationTestSystemTarget target, CancellationToken cancellationToken, TimeSpan delay, Guid callId);
+    /// <param name="cancellationToken">The cancellation token.</param>
+    Task CallOtherLongRunningTask(
+        ICancellationTestSystemTarget target,
+        TimeSpan delay,
+        Guid callId,
+        CancellationToken cancellationToken);
 
     /// <summary>
     /// Calls another system target's LongWait method with a locally created cancellation token
@@ -42,9 +46,9 @@ public interface ICancellationTestSystemTarget : ISystemTarget
     /// Tests that cancellation token callbacks execute in the correct execution context.
     /// Returns true if the callback ran on the correct TaskScheduler.
     /// </summary>
-    /// <param name="cancellationToken">The cancellation token.</param>
     /// <param name="callId">A unique identifier for this call, used to track cancellations.</param>
-    Task<bool> CancellationTokenCallbackResolve(CancellationToken cancellationToken, Guid callId);
+    /// <param name="cancellationToken">The cancellation token.</param>
+    Task<bool> CancellationTokenCallbackResolve(Guid callId, CancellationToken cancellationToken);
 
     /// <summary>
     /// Calls another system target's CancellationTokenCallbackResolve method with a locally created
@@ -57,9 +61,9 @@ public interface ICancellationTestSystemTarget : ISystemTarget
     /// <summary>
     /// Tests that exceptions thrown in cancellation callbacks do not propagate.
     /// </summary>
-    /// <param name="cancellationToken">The cancellation token.</param>
     /// <param name="callId">A unique identifier for this call, used to track cancellations.</param>
-    Task CancellationTokenCallbackThrow(CancellationToken cancellationToken, Guid callId);
+    /// <param name="cancellationToken">The cancellation token.</param>
+    Task CancellationTokenCallbackThrow(Guid callId, CancellationToken cancellationToken);
 
     /// <summary>
     /// Checks if a specific call was cancelled.

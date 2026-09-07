@@ -651,7 +651,7 @@ namespace UnitTests.Grains
             await Task.Delay(TimeSpan.FromSeconds(10), ct.CancellationToken);
         }
 
-        public async Task CancellationTokenCallbackThrow(CancellationToken ct, Guid callId)
+        public async Task CancellationTokenCallbackThrow(Guid callId, CancellationToken ct)
         {
             ct.Register(() =>
             {
@@ -670,7 +670,7 @@ namespace UnitTests.Grains
         public async Task<bool> CallOtherCancellationTokenCallbackResolve(ILongRunningTaskGrain<T> target, Guid callId)
         {
             using var cts = new CancellationTokenSource();
-            var grainTask = target.CancellationTokenCallbackResolve(cts.Token, callId);
+            var grainTask = target.CancellationTokenCallbackResolve(callId, cts.Token);
             cts.CancelAfter(300);
             return await grainTask;
         }
@@ -706,7 +706,7 @@ namespace UnitTests.Grains
             return tcs.Task;
         }
 
-        public Task<bool> CancellationTokenCallbackResolve(CancellationToken tc, Guid callId)
+        public Task<bool> CancellationTokenCallbackResolve(Guid callId, CancellationToken tc)
         {
             var tcs = new TaskCompletionSource<bool>();
             var orleansTs = TaskScheduler.Current;
@@ -749,12 +749,12 @@ namespace UnitTests.Grains
             await target.LongWaitGrainCancellation(tc, delay, callId);
         }
 
-        public async Task CallOtherLongRunningTask(ILongRunningTaskGrain<T> target, CancellationToken tc, TimeSpan delay, Guid callId)
+        public async Task CallOtherLongRunningTask(ILongRunningTaskGrain<T> target, TimeSpan delay, Guid callId, CancellationToken tc)
         {
-            await target.LongWait(tc, delay, callId);
+            await target.LongWait(delay, callId, tc);
         }
 
-        public async Task CallOtherLongRunningTaskWithStartNotification(ILongRunningTaskGrain<T> target, ILongRunningTaskObserver observer, CancellationToken tc, TimeSpan delay, Guid callId)
+        public async Task CallOtherLongRunningTaskWithStartNotification(ILongRunningTaskGrain<T> target, ILongRunningTaskObserver observer, TimeSpan delay, Guid callId, CancellationToken tc)
         {
             await target.LongWaitWithStartNotification(delay, callId, observer, tc);
         }
@@ -762,7 +762,7 @@ namespace UnitTests.Grains
         public async Task CallOtherLongRunningTaskWithLocalCancellation(ILongRunningTaskGrain<T> target, TimeSpan delay, TimeSpan delayBeforeCancel, Guid callId)
         {
             using var cts = new CancellationTokenSource();
-            var task = target.LongWait(cts.Token, delay, callId);
+            var task = target.LongWait(delay, callId, cts.Token);
             cts.CancelAfter(delayBeforeCancel);
             await task;
         }
@@ -791,21 +791,21 @@ namespace UnitTests.Grains
             }
         }
 
-        public Task LongWaitInterleaving(CancellationToken ct, TimeSpan delay, Guid callId) => LongWait(ct, delay, callId);
+        public Task LongWaitInterleaving(TimeSpan delay, Guid callId, CancellationToken ct) => LongWait(delay, callId, ct);
 
         public Task LongWaitWithStartNotification(TimeSpan delay, Guid callId, ILongRunningTaskObserver observer, CancellationToken cancellationToken)
         {
             observer.OnCallStarted(callId);
-            return LongWait(cancellationToken, delay, callId);
+            return LongWait(delay, callId, cancellationToken);
         }
 
         public Task LongWaitInterleavingWithStartNotification(TimeSpan delay, Guid callId, ILongRunningTaskObserver observer, CancellationToken cancellationToken)
         {
             observer.OnCallStarted(callId);
-            return LongWait(cancellationToken, delay, callId);
+            return LongWait(delay, callId, cancellationToken);
         }
 
-        public async Task LongWait(CancellationToken ct, TimeSpan delay, Guid callId)
+        public async Task LongWait(TimeSpan delay, Guid callId, CancellationToken ct)
         {
             try
             {

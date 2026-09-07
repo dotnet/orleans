@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Orleans.CodeGenerator.Diagnostics;
 using Orleans.CodeGenerator.Model;
 
 namespace Orleans.CodeGenerator;
@@ -200,6 +201,7 @@ internal static class ProxySourceOutputGenerator
                 resolver,
                 models,
                 cancellationToken);
+            var diagnostics = GetCancellationTokenParameterDiagnostics(proxyContext);
 
             return ProxyOutputPreparationResult.FromModelsAndSources(
                 proxyOutputModels,
@@ -210,7 +212,8 @@ internal static class ProxySourceOutputGenerator
                     resolver,
                     proxyOutputModels,
                     options,
-                    cancellationToken));
+                    cancellationToken),
+                diagnostics);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -263,6 +266,35 @@ internal static class ProxySourceOutputGenerator
         }
 
         return GeneratedSourceOutput.DeduplicateSourceOutputs(sourceOutputs);
+    }
+
+    private static ImmutableArray<Diagnostic> GetCancellationTokenParameterDiagnostics(ProxyGenerationContext proxyContext)
+    {
+        var inspectedMethods = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
+        var parameters = new HashSet<IParameterSymbol>(SymbolEqualityComparer.Default);
+        foreach (var invokable in proxyContext.MetadataModel.GeneratedInvokables.Values)
+        {
+            var method = invokable.MethodDescription.Method.OriginalDefinition;
+            if (!inspectedMethods.Add(method) || method.Parameters.Length < 2)
+            {
+                continue;
+            }
+
+            for (var index = 0; index < method.Parameters.Length - 1; index++)
+            {
+                var parameter = method.Parameters[index];
+                if (parameter.Locations.Any(static location => location.IsInSource)
+                    && SymbolEqualityComparer.Default.Equals(proxyContext.LibraryTypes.CancellationToken, parameter.Type))
+                {
+                    parameters.Add(parameter);
+                }
+            }
+        }
+
+        return [.. parameters
+            .OrderBy(static parameter => parameter.Locations.First().SourceTree?.FilePath, StringComparer.Ordinal)
+            .ThenBy(static parameter => parameter.Locations.First().SourceSpan.Start)
+            .Select(CancellationTokenNotLastDiagnostic.CreateDiagnostic)];
     }
 
     internal static ImmutableArray<ProxyOutputModel> CreateProxyOutputModels(

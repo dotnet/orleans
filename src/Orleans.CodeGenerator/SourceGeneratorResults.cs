@@ -133,24 +133,25 @@ internal readonly struct SerializableTypeResult(
 internal readonly struct ProxyOutputPreparationResult(
     ImmutableArray<ProxyOutputModel> proxyOutputModels,
     ImmutableArray<SourceOutputResult> sourceOutputs,
-    Diagnostic? diagnostic) : IEquatable<ProxyOutputPreparationResult>
+    ImmutableArray<Diagnostic> diagnostics) : IEquatable<ProxyOutputPreparationResult>
 {
     public ImmutableArray<ProxyOutputModel> ProxyOutputModels { get; } = proxyOutputModels;
     public ImmutableArray<SourceOutputResult> SourceOutputs { get; } = sourceOutputs;
-    public Diagnostic? Diagnostic { get; } = diagnostic;
+    public ImmutableArray<Diagnostic> Diagnostics { get; } = diagnostics;
 
     public static ProxyOutputPreparationResult FromModelsAndSources(
         ImmutableArray<ProxyOutputModel> proxyOutputModels,
-        ImmutableArray<SourceOutputResult> sourceOutputs)
-        => new(proxyOutputModels, sourceOutputs, diagnostic: null);
+        ImmutableArray<SourceOutputResult> sourceOutputs,
+        ImmutableArray<Diagnostic> diagnostics = default)
+        => new(proxyOutputModels, sourceOutputs, diagnostics.IsDefault ? [] : diagnostics);
 
     public static ProxyOutputPreparationResult FromDiagnostic(Diagnostic diagnostic)
-        => new([], [], diagnostic);
+        => new([], [], [diagnostic]);
 
     public bool Equals(ProxyOutputPreparationResult other)
         => StructuralEquality.SequenceEqual(ProxyOutputModels, other.ProxyOutputModels)
             && StructuralEquality.SequenceEqual(SourceOutputs, other.SourceOutputs)
-            && SourceGeneratorDiagnosticComparer.AreEqual(Diagnostic, other.Diagnostic);
+            && SourceGeneratorDiagnosticComparer.AreSequencesEqual(Diagnostics, other.Diagnostics);
 
     public override bool Equals(object? obj) => obj is ProxyOutputPreparationResult other && Equals(other);
 
@@ -160,7 +161,7 @@ internal readonly struct ProxyOutputPreparationResult(
         {
             var hash = StructuralEquality.GetSequenceHashCode(ProxyOutputModels);
             hash = hash * 31 + StructuralEquality.GetSequenceHashCode(SourceOutputs);
-            hash = hash * 31 + SourceGeneratorDiagnosticComparer.GetHashCode(Diagnostic);
+            hash = hash * 31 + SourceGeneratorDiagnosticComparer.GetSequenceHashCode(Diagnostics);
             return hash;
         }
     }

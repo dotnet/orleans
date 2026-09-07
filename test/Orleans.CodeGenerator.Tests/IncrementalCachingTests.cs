@@ -314,6 +314,45 @@ public class IncrementalCachingTests
     }
 
     [Fact]
+    public async Task ChangedRpcParameterId_TriggersProxyRegeneration()
+    {
+        const string originalCode = """
+            using Orleans;
+            using System.Threading.Tasks;
+
+            namespace TestProject;
+
+            public interface IMyGrain : IGrainWithIntegerKey
+            {
+                Task<string> SayHello([Id(7)] string name);
+            }
+            """;
+
+        const string modifiedCode = """
+            using Orleans;
+            using System.Threading.Tasks;
+
+            namespace TestProject;
+
+            public interface IMyGrain : IGrainWithIntegerKey
+            {
+                Task<string> SayHello([Id(8)] string name);
+            }
+            """;
+
+        var compilation = await CreateCompilation(originalCode);
+        var newCompilation = ReplaceSource(compilation, modifiedCode);
+        var (result1, result2) = await RunTwice(compilation, newCompilation);
+
+        AssertTrackedStepModifiedOrNew(result2, OrleansSerializationSourceGenerator.PreparedProxyOutputsTrackingName);
+        AssertTrackedStepModifiedOrNew(result2, OrleansSerializationSourceGenerator.ProxyOutputsTrackingName);
+        AssertSourcesChanged(
+            result1,
+            result2,
+            static hint => hint.Contains(".orleans.proxy.", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task UnchangedProxyInterface_ProducesCachedOutput()
     {
         const string code = """

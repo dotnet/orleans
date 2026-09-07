@@ -374,7 +374,8 @@ internal static class ProxyInterfaceModelExtractor
                 param.Name,
                 new TypeRef(param.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)),
                 param.Ordinal,
-                isCancellationToken));
+                isCancellationToken,
+                GeneratedCodeUtilities.GetId(libraryTypes, param)));
         }
 
         return builder.MoveToImmutable();

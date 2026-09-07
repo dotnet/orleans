@@ -256,6 +256,8 @@ namespace Orleans
     /// <remarks>
     /// Every serializable member in a type which has <see cref="GenerateSerializerAttribute"/> applied to it must have one <see cref="IdAttribute"/> attribute applied with a unique <see cref="IdAttribute.Id"/> value.
     /// For positional records, this attribute can be applied directly to a primary constructor parameter instead of its generated property.
+    /// On RPC method parameters, an explicit identifier overrides the parameter's zero-based ordinal among serialized parameters.
+    /// Cancellation token parameters are excluded from serialized parameter ordinals, and all resulting identifiers must be unique.
     /// </remarks>
     /// <seealso cref="System.Attribute" />
     [AttributeUsage(

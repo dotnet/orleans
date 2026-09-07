@@ -122,9 +122,9 @@ public abstract class CancellationTokenTests(CancellationTokenTests.FixtureBase 
                         observerReference,
                         cts.Token)
                     : grain.LongWaitInterleaving(
-                        cts.Token,
                         TimeSpan.FromSeconds(10),
-                        callIds[index]))
+                        callIds[index],
+                        cts.Token))
                 .ToArray();
             if (delay > 0)
             {
@@ -168,9 +168,9 @@ public abstract class CancellationTokenTests(CancellationTokenTests.FixtureBase 
                         observerReference,
                         cancellationSources[index].Token)
                     : grain.LongWaitInterleaving(
-                        cancellationSources[index].Token,
                         TimeSpan.FromSeconds(10),
-                        callId))
+                        callId,
+                        cancellationSources[index].Token))
                 .ToArray();
             if (delay > 0)
             {
@@ -208,7 +208,7 @@ public abstract class CancellationTokenTests(CancellationTokenTests.FixtureBase 
         using var cts = new CancellationTokenSource();
         try
         {
-            await grain.LongWait(cts.Token, TimeSpan.FromMilliseconds(1), Guid.Empty);
+            await grain.LongWait(TimeSpan.FromMilliseconds(1), Guid.Empty, cts.Token);
         }
         catch (Exception ex)
         {
@@ -224,7 +224,7 @@ public abstract class CancellationTokenTests(CancellationTokenTests.FixtureBase 
         await cts.CancelAsync();
 
         // Except a OperationCanceledException to be thrown as the token is already cancelled
-        Assert.Throws<OperationCanceledException>(() => grain.LongWait(cts.Token, TimeSpan.FromSeconds(10), Guid.Empty).Ignore());
+        Assert.Throws<OperationCanceledException>(() => grain.LongWait(TimeSpan.FromSeconds(10), Guid.Empty, cts.Token).Ignore());
     }
 
     [Fact, TestCategory("BVT"), TestCategory("Cancellation")]
@@ -233,7 +233,7 @@ public abstract class CancellationTokenTests(CancellationTokenTests.FixtureBase 
         var grain = fixture.GrainFactory.GetGrain<ILongRunningTaskGrain<bool>>(Guid.NewGuid());
         using var cts = new CancellationTokenSource();
         var callId = Guid.NewGuid();
-        var grainTask = grain.CancellationTokenCallbackResolve(cts.Token, callId);
+        var grainTask = grain.CancellationTokenCallbackResolve(callId, cts.Token);
         cts.CancelAfter(TimeSpan.FromMilliseconds(100));
         if (fixture.WaitForCancellationAcknowledgement)
         {
@@ -274,7 +274,7 @@ public abstract class CancellationTokenTests(CancellationTokenTests.FixtureBase 
         var grain = fixture.GrainFactory.GetGrain<ILongRunningTaskGrain<bool>>(Guid.NewGuid());
         using var cts = new CancellationTokenSource();
         var callId = Guid.NewGuid();
-        grain.CancellationTokenCallbackThrow(cts.Token, callId).Ignore();
+        grain.CancellationTokenCallbackThrow(callId, cts.Token).Ignore();
         // Cancellation is a cooperative mechanism, so we don't expect the exception to propagate
         cts.CancelAfter(100);
         await WaitForCallCancellation(grain, callId);
@@ -325,7 +325,7 @@ public abstract class CancellationTokenTests(CancellationTokenTests.FixtureBase 
         var callId = Guid.NewGuid();
         if (delay == 0)
         {
-            var grainTask = grain.CallOtherLongRunningTask(target, cts.Token, TimeSpan.FromSeconds(10), callId);
+            var grainTask = grain.CallOtherLongRunningTask(target, TimeSpan.FromSeconds(10), callId, cts.Token);
             cts.CancelAfter(delay);
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => grainTask);
             return;
@@ -338,9 +338,9 @@ public abstract class CancellationTokenTests(CancellationTokenTests.FixtureBase 
             var grainTask = grain.CallOtherLongRunningTaskWithStartNotification(
                 target,
                 observerReference,
-                cts.Token,
                 TimeSpan.FromSeconds(10),
-                callId);
+                callId,
+                cts.Token);
             await observer.WaitForCallToStart(callId);
 
             cts.CancelAfter(delay);
@@ -477,7 +477,7 @@ public abstract class CancellationTokenTests(CancellationTokenTests.FixtureBase 
         var callId = Guid.NewGuid();
         if (delay == 0)
         {
-            var grainTask = grain.LongWaitInterleaving(cts.Token, TimeSpan.FromSeconds(10), callId);
+            var grainTask = grain.LongWaitInterleaving(TimeSpan.FromSeconds(10), callId, cts.Token);
             cts.CancelAfter(delay);
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => grainTask);
             return;
@@ -516,7 +516,7 @@ public abstract class CancellationTokenTests(CancellationTokenTests.FixtureBase 
         // Start a regular (non-interleaving) long-running request
         using var regularCts = new CancellationTokenSource();
         var regularCallId = Guid.NewGuid();
-        var regularTask = grain.LongWait(regularCts.Token, TimeSpan.FromSeconds(30), regularCallId);
+        var regularTask = grain.LongWait(TimeSpan.FromSeconds(30), regularCallId, regularCts.Token);
 
         // Wait for the regular request to start
         await Task.Delay(100, TestContext.Current.CancellationToken);
@@ -524,7 +524,7 @@ public abstract class CancellationTokenTests(CancellationTokenTests.FixtureBase 
         // Start an interleaving request (this should run concurrently)
         using var interleavingCts = new CancellationTokenSource();
         var interleavingCallId = Guid.NewGuid();
-        var interleavingTask = grain.LongWaitInterleaving(interleavingCts.Token, TimeSpan.FromSeconds(10), interleavingCallId);
+        var interleavingTask = grain.LongWaitInterleaving(TimeSpan.FromSeconds(10), interleavingCallId, interleavingCts.Token);
 
         // Wait a bit for the interleaving request to start
         await Task.Delay(100, TestContext.Current.CancellationToken);
@@ -556,9 +556,9 @@ public abstract class CancellationTokenTests(CancellationTokenTests.FixtureBase 
         var callId2 = Guid.NewGuid();
         var callId3 = Guid.NewGuid();
 
-        var task1 = grain.LongWaitInterleaving(cts1.Token, TimeSpan.FromSeconds(10), callId1);
-        var task2 = grain.LongWaitInterleaving(cts2.Token, TimeSpan.FromSeconds(10), callId2);
-        var task3 = grain.LongWaitInterleaving(cts3.Token, TimeSpan.FromSeconds(10), callId3);
+        var task1 = grain.LongWaitInterleaving(TimeSpan.FromSeconds(10), callId1, cts1.Token);
+        var task2 = grain.LongWaitInterleaving(TimeSpan.FromSeconds(10), callId2, cts2.Token);
+        var task3 = grain.LongWaitInterleaving(TimeSpan.FromSeconds(10), callId3, cts3.Token);
 
         // Wait for all to be running
         await Task.Delay(100, TestContext.Current.CancellationToken);

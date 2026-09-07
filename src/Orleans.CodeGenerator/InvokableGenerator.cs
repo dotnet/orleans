@@ -841,13 +841,50 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
     private List<InvokerFieldDescription> GetFieldDescriptions(InvokableMethodDescription method)
     {
         var fields = new List<InvokerFieldDescription>();
-        uint fieldId = 0;
+        var assignedFieldIds = new Dictionary<uint, IParameterSymbol>();
+        uint serializedParameterOrdinal = 0;
 
         foreach (var parameter in method.Method.Parameters)
         {
             var isSerializable = !SymbolEqualityComparer.Default.Equals(LibraryTypes.CancellationToken, parameter.Type);
-            fields.Add(new MethodParameterFieldDescription(LibraryTypes, parameter, $"arg{fieldId}", fieldId, method.TypeParameterSubstitutions, isSerializable));
-            fieldId++;
+            var explicitFieldId = GeneratedCodeUtilities.GetId(LibraryTypes, parameter);
+            if (!isSerializable)
+            {
+                if (explicitFieldId.HasValue)
+                {
+                    throw new OrleansGeneratorDiagnosticAnalysisException(
+                        InvalidRpcParameterIdDiagnostic.CreateCancellationTokenDiagnostic(parameter));
+                }
+
+                fields.Add(new MethodParameterFieldDescription(
+                    LibraryTypes,
+                    parameter,
+                    $"arg{parameter.Ordinal}",
+                    serializedParameterOrdinal,
+                    method.TypeParameterSubstitutions,
+                    isSerializable: false));
+                continue;
+            }
+
+            var fieldId = explicitFieldId ?? serializedParameterOrdinal;
+            if (assignedFieldIds.TryGetValue(fieldId, out var conflictingParameter))
+            {
+                throw new OrleansGeneratorDiagnosticAnalysisException(
+                    InvalidRpcParameterIdDiagnostic.CreateDuplicateFieldIdDiagnostic(
+                        parameter,
+                        fieldId,
+                        conflictingParameter));
+            }
+
+            assignedFieldIds.Add(fieldId, parameter);
+            fields.Add(new MethodParameterFieldDescription(
+                LibraryTypes,
+                parameter,
+                $"arg{parameter.Ordinal}",
+                fieldId,
+                method.TypeParameterSubstitutions,
+                isSerializable: true));
+            serializedParameterOrdinal++;
         }
 
         fields.Add(new TargetFieldDescription(method.Method.ContainingType));

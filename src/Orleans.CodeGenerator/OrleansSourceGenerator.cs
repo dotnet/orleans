@@ -141,7 +141,7 @@ public sealed class OrleansSerializationSourceGenerator : IIncrementalGenerator
 
         context.RegisterSourceOutput(preparedProxyOutputs, static (productionContext, input) =>
         {
-            if (input.Diagnostic is { } diagnostic)
+            foreach (var diagnostic in input.Diagnostics)
             {
                 productionContext.ReportDiagnostic(diagnostic);
             }
