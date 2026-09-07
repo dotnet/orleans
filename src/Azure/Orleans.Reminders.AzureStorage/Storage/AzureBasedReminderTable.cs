@@ -16,6 +16,8 @@ namespace Orleans.Runtime.ReminderService
     /// </summary>
     public sealed partial class AzureBasedReminderTable : IReminderTable
     {
+        internal const string ServiceIdValidationExceptionDataKey = "AzureBasedReminderTable.ServiceIdValidationException";
+
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
         private readonly ClusterOptions clusterOptions;
@@ -148,11 +150,12 @@ namespace Orleans.Runtime.ReminderService
             return new ReminderTableData(remEntries);
         }
 
-        private ReminderEntry ConvertFromTableEntry(ReminderTableEntry tableEntry, string eTag)
+        internal ReminderEntry ConvertFromTableEntry(ReminderTableEntry tableEntry, string eTag)
         {
+            ReminderEntry converted;
             try
             {
-                return new ReminderEntry
+                converted = new ReminderEntry
                 {
                     GrainId = GrainId.Parse(tableEntry.GrainReference!),
                     ReminderName = tableEntry.ReminderName!,
@@ -164,16 +167,33 @@ namespace Orleans.Runtime.ReminderService
             catch (Exception exc)
             {
                 LogErrorParsingReminderEntry(exc, tableEntry);
+                try
+                {
+                    ValidateServiceId(tableEntry);
+                }
+                catch (OrleansException serviceIdException)
+                {
+                    exc.Data[ServiceIdValidationExceptionDataKey] = serviceIdException;
+                }
+                catch (NullReferenceException serviceIdException)
+                {
+                    exc.Data[ServiceIdValidationExceptionDataKey] = serviceIdException;
+                }
+
                 throw;
             }
-            finally
+
+            ValidateServiceId(tableEntry);
+            return converted;
+        }
+
+        private void ValidateServiceId(ReminderTableEntry tableEntry)
+        {
+            string serviceIdStr = this.clusterOptions.ServiceId;
+            if (!tableEntry.ServiceId!.Equals(serviceIdStr, StringComparison.Ordinal))
             {
-                string serviceIdStr = this.clusterOptions.ServiceId;
-                if (!tableEntry.ServiceId!.Equals(serviceIdStr, StringComparison.Ordinal))
-                {
-                    LogWarningAzureTable_ReadWrongReminder(tableEntry, serviceIdStr);
-                    throw new OrleansException($"Read a reminder entry for wrong Service id. Read {tableEntry}, but my service id is {serviceIdStr}. Going to discard it.");
-                }
+                LogWarningAzureTable_ReadWrongReminder(tableEntry, serviceIdStr);
+                throw new OrleansException($"Read a reminder entry for wrong Service id. Read {tableEntry}, but my service id is {serviceIdStr}. Going to discard it.");
             }
         }
 

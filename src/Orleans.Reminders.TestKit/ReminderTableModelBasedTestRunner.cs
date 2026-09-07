@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Runtime.ExceptionServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -103,25 +104,21 @@ public sealed class ReminderTableModelBasedTestRunner
     /// <exception cref="ReminderConformanceException">One or more generated test cases failed.</exception>
     public async Task RunGeneratedConformanceTests(CancellationToken cancellationToken)
     {
-        var results = await ReminderTableModelBasedConformance.RunGeneratedTests(
-            _reminderTable,
-            _options,
-            cancellationToken,
-            _output);
-        var failures = results
-            .Where(result => !result.Success)
-            .Select(result => ReminderTableModelBasedConformance.BuildFailureMessage(_options.ProviderName, _options.Seed, result))
-            .ToList();
-
-        if (failures.Count > 0)
-        {
-            throw new ReminderConformanceException(string.Join(Environment.NewLine, failures));
-        }
+        await ReminderTableModelBasedConformance.ExecuteWithCleanup(
+            () => ReminderTableModelBasedConformance.RunGeneratedTests(
+                _reminderTable,
+                _options,
+                cancellationToken,
+                _output),
+            results => ReminderTableModelBasedConformance.CreateFailureException(_options, results),
+            () => ReminderTableModelBasedConformance.Cleanup(_reminderTable, _options),
+            cancellationToken);
     }
 }
 
 internal static class ReminderTableModelBasedConformance
 {
+    internal const string FinalCleanupExceptionDataKey = "ReminderTableModelBasedTestRunner.FinalCleanupException";
 
     public static async Task<IList<TestCaseExecutionResult>> RunGeneratedTests(
         IReminderTable reminderTable,
@@ -151,84 +148,129 @@ internal static class ReminderTableModelBasedConformance
         context.ResponsePrinter = response => response?.ToString() ?? "<null>";
 
         var testIndex = 0;
-        IList<TestCaseExecutionResult>? results = null;
+        return await spec.RunTests(
+            context,
+            initialState,
+            testCases,
+            new TestExecutionOptions
+            {
+                StopOnFirstFailure = true,
+                BeforeEach = info =>
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    reminderTable.TestOnlyClearTable().WaitAsync(cancellationToken).GetAwaiter().GetResult();
+                    var prefix = $"{runId}-{testIndex++:D4}";
+                    info.Context.Register(new ReminderExecutionContext(
+                        reminderTable,
+                        options.ProviderName,
+                        options.GrainType,
+                        prefix,
+                        options.Seed,
+                        cancellationToken));
+                },
+                AfterEach = info =>
+                {
+                    try
+                    {
+                        using var cleanupCancellation = new CancellationTokenSource(TimeSpan.FromMinutes(1));
+                        reminderTable.TestOnlyClearTable()
+                            .WaitAsync(cleanupCancellation.Token)
+                            .GetAwaiter()
+                            .GetResult();
+                    }
+                    catch when (!info.Success || cancellationToken.IsCancellationRequested)
+                    {
+                        // Preserve the generated failure or test cancellation.
+                    }
+
+                    if (!info.Success)
+                    {
+                        output?.Invoke(info.FailureMessage);
+                    }
+                }
+            }).WaitAsync(cancellationToken);
+    }
+
+    internal static async Task<T> ExecuteWithCleanup<T>(
+        Func<Task<T>> execute,
+        Func<T, Exception?> getFailure,
+        Func<Task> cleanup,
+        CancellationToken cancellationToken = default)
+    {
+        T result = default!;
+        Exception? primaryException = null;
         try
         {
-            var executionResults = await spec.RunTests(
-                context,
-                initialState,
-                testCases,
-                new TestExecutionOptions
-                {
-                    StopOnFirstFailure = true,
-                    BeforeEach = info =>
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        reminderTable.TestOnlyClearTable().WaitAsync(cancellationToken).GetAwaiter().GetResult();
-                        var prefix = $"{runId}-{testIndex++:D4}";
-                        info.Context.Register(new ReminderExecutionContext(
-                            reminderTable,
-                            options.ProviderName,
-                            options.GrainType,
-                            prefix,
-                            options.Seed,
-                            cancellationToken));
-                    },
-                    AfterEach = info =>
-                    {
-                        try
-                        {
-                            using var cleanupCancellation = new CancellationTokenSource(TimeSpan.FromMinutes(1));
-                            reminderTable.TestOnlyClearTable()
-                                .WaitAsync(cleanupCancellation.Token)
-                                .GetAwaiter()
-                                .GetResult();
-                        }
-                        catch when (!info.Success || cancellationToken.IsCancellationRequested)
-                        {
-                            // Preserve the generated failure or test cancellation.
-                        }
-
-                        if (!info.Success)
-                        {
-                            output?.Invoke(info.FailureMessage);
-                        }
-                    }
-                }).WaitAsync(cancellationToken);
-            results = executionResults;
-
-            return executionResults;
+            result = await execute();
+            primaryException = getFailure(result);
         }
-        finally
+        catch (Exception exception)
         {
-            try
+            primaryException = exception;
+        }
+
+        try
+        {
+            await cleanup();
+        }
+        catch (Exception cleanupException)
+        {
+            if (primaryException is null && cancellationToken.IsCancellationRequested)
             {
-                using var cleanupCancellation = new CancellationTokenSource(TimeSpan.FromMinutes(1));
-                await reminderTable.TestOnlyClearTable().WaitAsync(cleanupCancellation.Token);
-                var finalRows = await ReminderTableRetryPolicy.ReadUntilAsync(
-                    () => reminderTable.ReadRows(0, 0),
-                    rows => rows is not null && rows.Reminders.Count == 0,
-                    options.ProviderName,
-                    nameof(ReminderTableModelBasedTestRunner),
-                    "FinalCleanup/ReadRows(0, 0)",
-                    "an empty reminder table after final cleanup",
-                    rows => rows is null
-                        ? "null"
-                        : $"{rows.Reminders.Count.ToString(CultureInfo.InvariantCulture)} rows",
-                    cleanupCancellation.Token);
-                if (finalRows is null || finalRows.Reminders.Count != 0)
-                {
-                    throw new ReminderConformanceException(
-                        $"Final reminder table cleanup left {finalRows?.Reminders.Count.ToString(CultureInfo.InvariantCulture) ?? "null"} rows; expected an empty table.");
-                }
+                primaryException = new OperationCanceledException(cancellationToken);
             }
-            catch when (
-                results is null
-                || cancellationToken.IsCancellationRequested
-                || results.Any(result => !result.Success))
+
+            if (primaryException is null)
             {
-                // Preserve the generated failure, test cancellation, or execution exception.
+                throw;
             }
+
+            primaryException.Data[FinalCleanupExceptionDataKey] = cleanupException;
+        }
+
+        if (primaryException is not null)
+        {
+            ExceptionDispatchInfo.Capture(primaryException).Throw();
+        }
+
+        return result;
+    }
+
+    internal static Exception? CreateFailureException(
+        ReminderTableModelBasedConformanceOptions options,
+        IList<TestCaseExecutionResult> results)
+    {
+        var failures = results
+            .Where(result => !result.Success)
+            .Select(result => BuildFailureMessage(options.ProviderName, options.Seed, result))
+            .ToList();
+
+        return failures.Count > 0
+            ? new ReminderConformanceException(string.Join(Environment.NewLine, failures))
+            : null;
+    }
+
+    internal static async Task Cleanup(
+        IReminderTable reminderTable,
+        ReminderTableModelBasedConformanceOptions options)
+    {
+        using var cleanupCancellation = new CancellationTokenSource(TimeSpan.FromMinutes(1));
+        await reminderTable.TestOnlyClearTable().WaitAsync(cleanupCancellation.Token);
+        var finalRows = await ReminderTableRetryPolicy.ReadUntilAsync(
+            () => reminderTable.ReadRows(0, 0),
+            rows => rows is not null && rows.Reminders.Count == 0,
+            options.ProviderName,
+            nameof(ReminderTableModelBasedTestRunner),
+            "FinalCleanup/ReadRows(0, 0)",
+            "an empty reminder table after final cleanup",
+            rows => rows is null
+                ? "null"
+                : $"{rows.Reminders.Count.ToString(CultureInfo.InvariantCulture)} rows",
+            cleanupCancellation.Token);
+        if (finalRows is null || finalRows.Reminders.Count != 0)
+        {
+            throw new ReminderConformanceException(
+                $"Final reminder table cleanup left {finalRows?.Reminders.Count.ToString(CultureInfo.InvariantCulture) ?? "null"} rows; expected an empty table.");
         }
     }
 
