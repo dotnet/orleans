@@ -854,6 +854,12 @@ namespace Orleans.Streaming.EventHubs
                         return;
                     }
 
+                    if (this.cursor is null
+                        && this.pendingMoveResult is { Kind: QueueCacheCursorMoveResultKind.CacheMiss })
+                    {
+                        return;
+                    }
+
                     cache.Refresh(this.cursor!, token);
                 }
             }
