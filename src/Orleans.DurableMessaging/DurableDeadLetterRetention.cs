@@ -16,10 +16,9 @@ internal static class DurableDeadLetterRetention
         where TKey : notnull
     {
         var removed = false;
-        var cutoff = retentionPeriod > now - DateTimeOffset.MinValue
-            ? DateTimeOffset.MinValue
-            : now - retentionPeriod;
-        foreach (var entry in entries.Where(entry => getTimestamp(entry.Value) <= cutoff).ToList())
+        foreach (var entry in entries
+            .Where(entry => DurableMessagingTime.IsExpired(now, getTimestamp(entry.Value), retentionPeriod))
+            .ToList())
         {
             entries.Remove(entry.Key);
             removed = true;
