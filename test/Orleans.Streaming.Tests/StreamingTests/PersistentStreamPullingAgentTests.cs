@@ -501,6 +501,7 @@ namespace UnitTests.StreamingTests
             public List<DateTime> DeliveryProgressUtcTimes { get; } = new();
             public Task DeliveryProgressUpdated => deliveryProgressUpdated.Task;
             public Func<StreamId, StreamSequenceToken?, IQueueCacheCursor>? CursorFactory { get; set; }
+            public Func<StreamId, StreamSequenceToken?, QueueCacheCursorResult<IQueueCacheCursor>>? CursorResultFactory { get; set; }
             public int GetCacheCursorCallCount { get; private set; }
             public bool SupportsRetainedReplay { get; set; }
 
@@ -521,6 +522,27 @@ namespace UnitTests.StreamingTests
                 GetCacheCursorCallCount++;
                 return CursorFactory?.Invoke(streamId, token)
                     ?? new EmptyQueueCacheCursor();
+            }
+
+            public QueueCacheCursorResult<IQueueCacheCursor> TryGetCacheCursor(
+                StreamId streamId,
+                StreamSequenceToken? token)
+            {
+                if (CursorResultFactory is { } resultFactory)
+                {
+                    GetCacheCursorCallCount++;
+                    return resultFactory(streamId, token);
+                }
+
+                try
+                {
+                    return QueueCacheCursorResult<IQueueCacheCursor>.FromCursor(GetCacheCursor(streamId, token));
+                }
+                catch (QueueCacheMissException exception)
+                {
+                    return QueueCacheCursorResult<IQueueCacheCursor>.FromCacheMiss(
+                        new(exception.Requested, exception.Low, exception.High));
+                }
             }
 
             public bool IsUnderPressure() => false;
@@ -3512,6 +3534,56 @@ namespace UnitTests.StreamingTests
             Assert.Null(consumerData.Cursor);
             Assert.True(consumerData.IsReplayUnavailable);
             Assert.IsType<DataNotAvailableException>(Assert.Single(consumer.Errors));
+            Assert.Equal(2, queueCache.GetCacheCursorCallCount);
+            await testAccessor.Shutdown();
+        }
+
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public async Task Handshake_TypedCacheMissForRetainedReplaySurfacesWithoutLiveFallback()
+        {
+            var queueId = QueueId.GetQueueId("queue", 0u, 0u);
+            var streamId = new QualifiedStreamId("provider", StreamId.Create("namespace", Guid.NewGuid()));
+            var requestedToken = new EventSequenceTokenV2(2);
+            var earliestToken = new EventSequenceTokenV2(10);
+            var latestToken = new EventSequenceTokenV2(12);
+            var queueCache = new RecordingQueueCache { SupportsRetainedReplay = true };
+            var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
+            queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
+            var pubSub = Substitute.For<IStreamPubSub>();
+            pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
+                .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
+            var agent = CreateAgent(
+                pubSub,
+                queueId,
+                receiver: null,
+                queueAdapterCache,
+                isRewindable: true);
+            var testAccessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
+            await InitializeAgent(agent);
+            await testAccessor.RegisterStream(streamId, latestToken, DateTime.UtcNow);
+            var streamData = (await testAccessor.GetPubSubCache()).Single().Value;
+            var consumer = new StartingConsumer(StreamHandshakeToken.CreateStartToken(requestedToken));
+            var consumerData = streamData.AddConsumer(
+                GuidId.GetGuidId(Guid.NewGuid()),
+                streamId,
+                consumer,
+                filterData: null,
+                now: DateTime.UtcNow);
+            queueCache.CursorResultFactory = (_, token) => QueueCacheCursorResult<IQueueCacheCursor>.FromCacheMiss(
+                new(token!, earliestToken, latestToken));
+
+            Assert.False(await testAccessor.DoHandshakeWithConsumer(consumerData, cacheToken: latestToken));
+
+            Assert.Null(consumerData.Cursor);
+            Assert.True(consumerData.IsReplayUnavailable);
+            var exception = Assert.IsType<DataNotAvailableException>(Assert.Single(consumer.Errors));
+            var cacheMiss = Assert.IsType<QueueCacheMissException>(exception.InnerException);
+            Assert.Equal(requestedToken.ToString(), cacheMiss.Requested);
+            Assert.Equal(earliestToken.ToString(), cacheMiss.Low);
+            Assert.Equal(latestToken.ToString(), cacheMiss.High);
             Assert.Equal(2, queueCache.GetCacheCursorCallCount);
             await testAccessor.Shutdown();
         }

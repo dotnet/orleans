@@ -49,12 +49,12 @@ public sealed class RecoverableStreamReceiverTests
         Assert.Equal(11, notification.SequenceToken.SequenceNumber);
 
         using var cursor = receiver.GetCacheCursor(streamId, notification.SequenceToken);
-        Assert.True(cursor.MoveNext());
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
         var batch = Assert.IsType<TestBatchContainer>(cursor.GetCurrent(out var exception));
         Assert.Null(exception);
         Assert.Equal("payload", batch.Payload);
         Assert.True(adapter.CompareCallCount > 0);
-        Assert.False(cursor.MoveNext());
+        Assert.Equal(QueueCacheCursorMoveResultKind.NoData, cursor.MoveNextWithResult().Kind);
         Assert.Same(batch, cursor.GetCurrent(out exception));
         Assert.Null(exception);
 
@@ -198,7 +198,7 @@ public sealed class RecoverableStreamReceiverTests
 
         using var cursor = receiver.GetCacheCursor(streamId, new EventSequenceTokenV2(4, 2));
 
-        Assert.True(cursor.MoveNext());
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
         Assert.Equal(4, cursor.GetCurrent(out var exception)!.SequenceToken.SequenceNumber);
         Assert.Null(exception);
         await receiver.Shutdown(TimeSpan.FromSeconds(5));
@@ -601,7 +601,9 @@ public sealed class RecoverableStreamReceiverTests
 
             if (moveResult == QueueCacheCursorMoveNextResult.Completed)
             {
-                if (cursor.MoveNext())
+                var liveResult = cursor.MoveNextWithResult();
+                Assert.Contains(liveResult.Kind, new[] { QueueCacheCursorMoveResultKind.Success, QueueCacheCursorMoveResultKind.NoData });
+                if (liveResult.Kind == QueueCacheCursorMoveResultKind.Success)
                 {
                     moveResult = QueueCacheCursorMoveNextResult.ItemAvailable;
                 }
@@ -722,7 +724,7 @@ public sealed class RecoverableStreamReceiverTests
         var firstNotification = Assert.Single(await firstReceiver.GetQueueMessagesAsync(10, CancellationToken.None));
         using (var cursor = firstReceiver.GetCacheCursor(streamId, firstNotification.SequenceToken))
         {
-            Assert.True(cursor.MoveNext());
+            Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
             Assert.Equal(11, cursor.GetCurrent(out _)!.SequenceToken.SequenceNumber);
             // The inclusive first batch was observed but never confirmed as delivered.
         }
@@ -772,9 +774,9 @@ public sealed class RecoverableStreamReceiverTests
         var notifications = await receiver.GetQueueMessagesAsync(10, CancellationToken.None);
         using var cursor = receiver.GetCacheCursor(quietStream, notifications[0].SequenceToken);
         var progress = Assert.IsAssignableFrom<IQueueCacheCursorProgress>(cursor);
-        Assert.True(cursor.MoveNext());
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
         progress.RecordDeliverySuccess();
-        Assert.False(cursor.MoveNext());
+        Assert.Equal(QueueCacheCursorMoveResultKind.NoData, cursor.MoveNextWithResult().Kind);
         Assert.Equal(3, progress.SafeSequenceToken?.SequenceNumber);
 
         receiver.UpdateDeliveryProgress(progress.SafeSequenceToken, DateTime.UtcNow);
@@ -871,11 +873,11 @@ public sealed class RecoverableStreamReceiverTests
         Assert.Equal(0, cache.ItemCount);
 
         using var cursor = cache.GetCacheCursor(streamId, token: null);
-        Assert.False(cursor.MoveNext());
+        Assert.Equal(QueueCacheCursorMoveResultKind.NoData, cursor.MoveNextWithResult().Kind);
 
         _ = cache.Add([new TestQueueMessage(streamId, 11, "payload")], DateTime.UnixEpoch);
 
-        Assert.True(cursor.MoveNext());
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
         Assert.Equal("payload", Assert.IsType<TestBatchContainer>(cursor.GetCurrent(out _)).Payload);
     }
 
@@ -902,7 +904,7 @@ public sealed class RecoverableStreamReceiverTests
             streamId,
             StreamSubscriptionStartPosition.EarliestAvailable);
 
-        Assert.True(cursor.MoveNext());
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
         Assert.Equal("first", Assert.IsType<TestBatchContainer>(cursor.GetCurrent(out _)).Payload);
         Assert.Equal(1, Assert.IsAssignableFrom<IQueueCacheCursorProgress>(cursor).SafeSequenceToken?.SequenceNumber);
     }
@@ -929,7 +931,7 @@ public sealed class RecoverableStreamReceiverTests
             quietStreamId,
             StreamSubscriptionStartPosition.EarliestAvailable);
 
-        Assert.False(cursor.MoveNext());
+        Assert.Equal(QueueCacheCursorMoveResultKind.NoData, cursor.MoveNextWithResult().Kind);
         Assert.Equal(2, Assert.IsAssignableFrom<IQueueCacheCursorProgress>(cursor).SafeSequenceToken?.SequenceNumber);
     }
 
@@ -1090,13 +1092,13 @@ public sealed class RecoverableStreamReceiverTests
         Assert.Equal(0, adapter.GetBatchContainerCallCount);
 
         using var cursor = cache.GetCacheCursor(streamA, positions[0].SequenceToken);
-        Assert.True(cursor.MoveNext());
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
         Assert.Equal("first", Assert.IsType<TestBatchContainer>(cursor.GetCurrent(out _)).Payload);
         Assert.Equal(1, adapter.GetBatchContainerCallCount);
-        Assert.True(cursor.MoveNext());
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
         Assert.Equal("third", Assert.IsType<TestBatchContainer>(cursor.GetCurrent(out _)).Payload);
         Assert.Equal(2, adapter.GetBatchContainerCallCount);
-        Assert.False(cursor.MoveNext());
+        Assert.Equal(QueueCacheCursorMoveResultKind.NoData, cursor.MoveNextWithResult().Kind);
         Assert.Equal(2, adapter.GetBatchContainerCallCount);
     }
 
@@ -1122,13 +1124,13 @@ public sealed class RecoverableStreamReceiverTests
         using var cursor = cache.GetCacheCursor(streamA, positions[0].SequenceToken);
         var progress = Assert.IsAssignableFrom<IQueueCacheCursorProgress>(cursor);
 
-        Assert.True(cursor.MoveNext());
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
         Assert.Null(progress.SafeSequenceToken);
 
         progress.RecordDeliverySuccess();
         Assert.Equal(1, progress.SafeSequenceToken?.SequenceNumber);
 
-        Assert.True(cursor.MoveNext());
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
         Assert.Equal(3, progress.SafeSequenceToken?.SequenceNumber);
 
         progress.RecordDeliverySuccess();
@@ -1156,8 +1158,8 @@ public sealed class RecoverableStreamReceiverTests
         using var cursor = cache.GetCacheCursor(streamA, positions[0].SequenceToken);
         var progress = Assert.IsAssignableFrom<IQueueCacheCursorProgress>(cursor);
 
-        Assert.True(cursor.MoveNext());
-        Assert.True(cursor.MoveNext());
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
         Assert.Null(progress.SafeSequenceToken);
 
         progress.RecordDeliverySuccess();
@@ -1187,7 +1189,7 @@ public sealed class RecoverableStreamReceiverTests
         var progress = Assert.IsAssignableFrom<IQueueCacheCursorProgress>(cursor);
         progress.SetDeliveredThrough(new EventSequenceTokenV2(10));
 
-        Assert.True(cursor.MoveNext());
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
         Assert.Equal(11, cursor.GetCurrent(out _)!.SequenceToken.SequenceNumber);
         Assert.Equal(10, progress.SafeSequenceToken?.SequenceNumber);
     }
@@ -1212,18 +1214,18 @@ public sealed class RecoverableStreamReceiverTests
             DateTime.UnixEpoch);
         using var cursor = cache.GetCacheCursor(streamA, positions[0].SequenceToken);
         var progress = Assert.IsAssignableFrom<IQueueCacheCursorProgress>(cursor);
-        Assert.True(cursor.MoveNext());
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
         Assert.Equal(1, cursor.GetCurrent(out _)!.SequenceToken.SequenceNumber);
-        Assert.True(cursor.MoveNext());
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
         Assert.Equal(3, cursor.GetCurrent(out _)!.SequenceToken.SequenceNumber);
 
         cursor.RecordDeliveryFailure();
 
         Assert.Null(progress.SafeSequenceToken);
-        Assert.True(cursor.MoveNext());
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
         Assert.Equal(1, cursor.GetCurrent(out _)!.SequenceToken.SequenceNumber);
         progress.RecordDeliverySuccess();
-        Assert.True(cursor.MoveNext());
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
         Assert.Equal(3, cursor.GetCurrent(out _)!.SequenceToken.SequenceNumber);
     }
 
@@ -1289,10 +1291,10 @@ public sealed class RecoverableStreamReceiverTests
             DateTime.UnixEpoch);
         using var cursor = cache.GetCacheCursor(quietStream, positions[0].SequenceToken);
         var progress = Assert.IsAssignableFrom<IQueueCacheCursorProgress>(cursor);
-        Assert.True(cursor.MoveNext());
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
         progress.RecordDeliverySuccess();
 
-        Assert.False(cursor.MoveNext());
+        Assert.Equal(QueueCacheCursorMoveResultKind.NoData, cursor.MoveNextWithResult().Kind);
 
         Assert.Equal(4, progress.SafeSequenceToken?.SequenceNumber);
     }
