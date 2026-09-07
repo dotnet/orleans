@@ -3,6 +3,7 @@ using System.Buffers;
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 using System.Runtime.Serialization;
@@ -51,6 +52,8 @@ namespace Orleans.Serialization
             IDeepCopier<Exception> exceptionCopier,
             IOptions<ExceptionSerializationOptions> exceptionSerializationOptions)
         {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(exceptionSerializationOptions);
+
 #pragma warning disable SYSLIB0050 // Type or member is obsolete
             _streamingContext = new StreamingContext(StreamingContextStates.All);
             _formatterConverter = new FormatterConverter();
@@ -64,6 +67,7 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc />
+        [SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "The serializer dispatches this base codec with an allocated non-null exception instance.")]
         public void Deserialize<TInput>(ref Reader<TInput> reader, Exception value)
         {
             uint fieldId = 0;
@@ -104,7 +108,7 @@ namespace Orleans.Serialization
                 }
             }
 
-            SetBaseProperties(value, message, stackTrace, innerException, hResult, data);
+            SetBasePropertiesCore(value, message, stackTrace, innerException, hResult, data);
         }
 
         /// <summary>
@@ -113,6 +117,12 @@ namespace Orleans.Serialization
         /// <param name="value">The value.</param>
         /// <returns>A populated <see cref="SerializationInfo"/> value.</returns>
         public SerializationInfo GetObjectData(Exception value)
+        {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(value);
+            return GetObjectDataCore(value);
+        }
+
+        internal SerializationInfo GetObjectDataCore(Exception value)
         {
 #pragma warning disable SYSLIB0050 // Type or member is obsolete
             var info = new SerializationInfo(value.GetType(), _formatterConverter);
@@ -133,6 +143,12 @@ namespace Orleans.Serialization
         /// <param name="hResult">The HResult.</param>
         /// <param name="data">The data.</param>
         public void SetBaseProperties(Exception value, string? message, string? stackTrace, Exception? innerException, int hResult, Dictionary<object, object?>? data)
+        {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(value);
+            SetBasePropertiesCore(value, message, stackTrace, innerException, hResult, data);
+        }
+
+        internal void SetBasePropertiesCore(Exception value, string? message, string? stackTrace, Exception? innerException, int hResult, Dictionary<object, object?>? data)
         {
 #pragma warning disable SYSLIB0050 // Type or member is obsolete
             var info = new SerializationInfo(typeof(Exception), _formatterConverter);
@@ -178,6 +194,12 @@ namespace Orleans.Serialization
         /// <returns>The provided exception's <see cref="Exception.Data"/> property.</returns>
         public Dictionary<object, object?>? GetDataProperty(Exception exception)
         {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(exception);
+            return GetDataPropertyCore(exception);
+        }
+
+        internal static Dictionary<object, object?>? GetDataPropertyCore(Exception exception)
+        {
             if (exception.Data is null or { Count: 0 })
             {
                 return null;
@@ -195,19 +217,21 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc />
+        [SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "The serializer dispatches this base codec only after handling null references.")]
         public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, Exception value) where TBufferWriter : IBufferWriter<byte>
         {
             StringCodec.WriteField(ref writer, 0, value.Message);
             StringCodec.WriteField(ref writer, 1, value.StackTrace);
             WriteField(ref writer, 1, typeof(Exception), value.InnerException!);
             Int32Codec.WriteField(ref writer, 1, value.HResult);
-            if (GetDataProperty(value) is { } dataDictionary)
+            if (GetDataPropertyCore(value) is { } dataDictionary)
             {
                 _dictionaryCodec.WriteField(ref writer, 1, typeof(Dictionary<object, object?>), dataDictionary);
             }
         }
 
         /// <inheritdoc />
+        [SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "Exception fields invoke this method only after handling null references.")]
         public void SerializeException<TBufferWriter>(ref Writer<TBufferWriter> writer, Exception value) where TBufferWriter : IBufferWriter<byte>
         {
             StringCodec.WriteField(ref writer, 0, _typeConverter.Format(value.GetType()));
@@ -215,7 +239,7 @@ namespace Orleans.Serialization
             StringCodec.WriteField(ref writer, 1, value.StackTrace);
             WriteField(ref writer, 1, typeof(Exception), value.InnerException!);
             Int32Codec.WriteField(ref writer, 1, value.HResult);
-            if (GetDataProperty(value) is { } dataDictionary)
+            if (GetDataPropertyCore(value) is { } dataDictionary)
             {
                 _dictionaryCodec.WriteField(ref writer, 1, typeof(Dictionary<object, object?>), dataDictionary);
             }
@@ -245,6 +269,7 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc />
+        [SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "Codec selection supplies the non-null candidate type.")]
         public bool IsSupportedType(Type type)
         {
             if (type == typeof(ExceptionCodec))
@@ -419,22 +444,23 @@ namespace Orleans.Serialization
                 throw new NotSupportedException($"Type {type} is not supported");
             }
 
-            SetBaseProperties(result, message, stackTrace, innerException, hResult, data);
+            SetBasePropertiesCore(result, message, stackTrace, innerException, hResult, data);
             return result;
         }
 
         /// <inheritdoc />
+        [SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "The Orleans deep-copy pipeline supplies non-null source, destination, and context instances.")]
         public void DeepCopy(Exception input, Exception output, CopyContext context)
         {
-            var info = GetObjectData(input);
-            SetBaseProperties(
+            var info = GetObjectDataCore(input);
+            SetBasePropertiesCore(
                 output,
                 // Get the message from object data in case the property is overridden as it is with AggregateException
                 info.GetString("Message"),
                 input.StackTrace,
                 _exceptionCopier.DeepCopy(input.InnerException!, context),
                 input.HResult,
-                _dictionaryCopier.DeepCopy(GetDataProperty(input)!, context));
+                _dictionaryCopier.DeepCopy(GetDataPropertyCore(input)!, context));
         }
 
         /// <inheritdoc />
@@ -467,21 +493,21 @@ namespace Orleans.Serialization
         {
             var result = new AggregateException(surrogate.InnerExceptions);
             var innerException = surrogate.InnerExceptions is { Count: > 0 } innerExceptions ? innerExceptions[0] : null;
-            _baseCodec.SetBaseProperties(result, surrogate.Message, surrogate.StackTrace, innerException, surrogate.HResult, surrogate.Data);
+            _baseCodec.SetBasePropertiesCore(result, surrogate.Message, surrogate.StackTrace, innerException, surrogate.HResult, surrogate.Data);
             return result;
         }
 
         /// <inheritdoc/>
         public override void ConvertToSurrogate(AggregateException value, ref AggregateExceptionSurrogate surrogate)
         {
-            var info = _baseCodec.GetObjectData(value);
+            var info = _baseCodec.GetObjectDataCore(value);
             surrogate.Message = info.GetString("Message")!;
             surrogate.StackTrace = value.StackTrace;
             surrogate.HResult = value.HResult;
             var data = info.GetValue("Data", typeof(IDictionary));
             if (data is { })
             {
-                surrogate.Data = _baseCodec.GetDataProperty(value);
+                surrogate.Data = ExceptionCodec.GetDataPropertyCore(value);
             }
 
             surrogate.InnerExceptions = value.InnerExceptions;

@@ -1,5 +1,6 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Serialization.Codecs;
 
 namespace Orleans.Serialization.Utilities.Internal;
 
@@ -27,6 +28,9 @@ public static class InternalServiceCollectionExtensions
     /// <param name="implementation">The implementation of <paramref name="service"/>.</param>
     public static void AddFromExisting(this IServiceCollection services, Type service, Type implementation)
     {
+        ArgumentNullExceptionPolyfill.ThrowIfNull(services);
+        ArgumentNullExceptionPolyfill.ThrowIfNull(implementation);
+
         ServiceDescriptor? registration = null;
         foreach (var descriptor in services)
         {

@@ -62,6 +62,8 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
             object caller,
             ICodecProvider codecProvider)
         {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(codecProvider);
+
             var state = ResolutionState.Value!;
 
             try
@@ -202,6 +204,8 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         [MethodImpl(MethodImplOptions.NoInlining)]
         public static void SerializeUnexpectedType<TBufferWriter>(this ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, object value) where TBufferWriter : IBufferWriter<byte>
         {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(value);
+
             var specificSerializer = writer.Session.CodecProvider.GetCodec(value.GetType());
             specificSerializer.WriteField(ref writer, fieldIdDelta, expectedType, value);
         }
@@ -335,6 +339,7 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
 
             /// <inheritdoc/>
             [return: NotNullIfNotNull(nameof(original))]
+            [SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "The Orleans deep-copy pipeline supplies the active non-null copy context.")]
             public T? DeepCopy(T? original, CopyContext context)
             {
                 if (original is null)

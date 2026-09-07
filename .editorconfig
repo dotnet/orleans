@@ -699,6 +699,9 @@ dotnet_diagnostic.CA2000.severity = warning
 dotnet_diagnostic.CA2000.severity = warning
 
 # CA1062: Validate arguments of public methods
+[src/Orleans.Serialization/{GeneratedCodeHelpers,ISerializableSerializer,Utilities}/**.cs]
+dotnet_diagnostic.CA1062.severity = warning
+
 [src/{Orleans.BroadcastChannel,Orleans.Clustering.ZooKeeper,Orleans.Hosting.Kubernetes,Orleans.Persistence.Memory,Orleans.Persistence.TestKit,Orleans.Reminders.TestKit,Orleans.Serialization.FSharp,Orleans.Serialization.MessagePack,Orleans.Serialization.NewtonsoftJson,Orleans.Serialization.SystemTextJson,Orleans.Serialization.TestKit,Orleans.Transactions.TestKit.Base,Orleans.Transactions.TestKit.xUnit}/**.cs]
 dotnet_diagnostic.CA1062.severity = warning
 
