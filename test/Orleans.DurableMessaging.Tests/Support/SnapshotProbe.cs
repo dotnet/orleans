@@ -76,6 +76,8 @@ public sealed class SnapshotProbe
                     waiter.Completion.TrySetResult(snapshot);
                 }
             }
+
+            RemoveWaiterListIfEmpty(grainId, waiters);
         }
     }
 
