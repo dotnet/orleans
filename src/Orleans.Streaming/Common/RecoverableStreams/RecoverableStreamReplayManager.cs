@@ -105,7 +105,7 @@ internal sealed class RecoverableStreamReplayManager<TQueueMessage>
                 var liveRecordToken = token is null ? null : _dataAdapter.GetRecordToken(token);
                 if (token is null || _liveCache.TryGetOldestPosition(out _, out _))
                 {
-                    return _liveCache.GetCacheCursor(streamId, liveRecordToken);
+                    return GetCacheCursor(_liveCache, streamId, liveRecordToken);
                 }
             }
             catch (QueueCacheMissException) when (token is not null)
@@ -120,7 +120,7 @@ internal sealed class RecoverableStreamReplayManager<TQueueMessage>
 
             if (token is null)
             {
-                return _liveCache.GetCacheCursor(streamId, null);
+                return GetCacheCursor(_liveCache, streamId, null);
             }
 
             if (_shutdown)
@@ -254,7 +254,7 @@ internal sealed class RecoverableStreamReplayManager<TQueueMessage>
 
             try
             {
-                var inner = fragment.Cache.GetCacheCursor(cursor.StreamId, cursor.StartToken);
+                var inner = GetCacheCursor(fragment.Cache, cursor.StreamId, cursor.StartToken);
                 fragment.Cache.RegisterReplayStream(cursor.StreamId);
                 fragment.Cursors.Add(cursor);
                 cursor.Attach(fragment, inner);
@@ -302,7 +302,7 @@ internal sealed class RecoverableStreamReplayManager<TQueueMessage>
                 }
 
                 _liveCache.TryGetOldestPosition(out var liveBoundary, out _);
-                var replayCursor = cache.GetCacheCursor(cursor.StreamId, cursor.StartToken);
+                var replayCursor = GetCacheCursor(cache, cursor.StreamId, cursor.StartToken);
                 if (replayCursor is not IQueueCacheCursorProgress)
                 {
                     replayCursor.Dispose();
@@ -471,7 +471,7 @@ internal sealed class RecoverableStreamReplayManager<TQueueMessage>
                 if (cursor.LiveCursor is { } liveCursor)
                 {
                     cursor.HasPendingLiveHandoff = false;
-                    return liveCursor.MoveNext()
+                    return MoveNext(liveCursor)
                         ? QueueCacheCursorMoveNextResult.ItemAvailable
                         : QueueCacheCursorMoveNextResult.Completed;
                 }
@@ -622,7 +622,7 @@ internal sealed class RecoverableStreamReplayManager<TQueueMessage>
         if (cursor.LiveCursor is { } liveCursor)
         {
             cursor.HasPendingLiveHandoff = false;
-            result = liveCursor.MoveNext()
+            result = MoveNext(liveCursor)
                 ? QueueCacheCursorMoveNextResult.ItemAvailable
                 : QueueCacheCursorMoveNextResult.Completed;
             return true;
@@ -638,7 +638,7 @@ internal sealed class RecoverableStreamReplayManager<TQueueMessage>
 
         fragment.Failure?.Throw();
 
-        if (replayCursor.MoveNext())
+        if (MoveNext(replayCursor))
         {
             var current = replayCursor.GetCurrent(out var exception);
             if (exception is not null)
@@ -696,7 +696,8 @@ internal sealed class RecoverableStreamReplayManager<TQueueMessage>
 
     private void HandoffLocked(ReplayCursor cursor, ReplayFragment fragment)
     {
-        var liveCursor = _liveCache.GetCacheCursor(
+        var liveCursor = GetCacheCursor(
+            _liveCache,
             cursor.StreamId,
             fragment.LiveBoundary ?? cursor.StartToken);
         if (cursor.DeliveredThrough is { } deliveredThrough
@@ -716,6 +717,29 @@ internal sealed class RecoverableStreamReplayManager<TQueueMessage>
         {
             BeginFragmentDisposalLocked(fragment);
         }
+    }
+
+    private static IQueueCacheCursor GetCacheCursor(IQueueCache cache, StreamId streamId, StreamSequenceToken? token)
+    {
+        var result = cache.TryGetCacheCursor(streamId, token);
+        return result.Kind switch
+        {
+            QueueCacheCursorResultKind.Success => result.Cursor!,
+            QueueCacheCursorResultKind.CacheMiss => throw result.CacheMiss!.Value.ToException(),
+            _ => throw new QueueCacheCursorContractException($"Unexpected cursor result: {result.Kind}."),
+        };
+    }
+
+    private static bool MoveNext(IQueueCacheCursor cursor)
+    {
+        var result = cursor.MoveNextWithResult();
+        return result.Kind switch
+        {
+            QueueCacheCursorMoveResultKind.Success => true,
+            QueueCacheCursorMoveResultKind.NoData => false,
+            QueueCacheCursorMoveResultKind.CacheMiss => throw result.CacheMiss!.Value.ToException(),
+            _ => throw new QueueCacheCursorContractException("The cursor move result is not initialized."),
+        };
     }
 
     private void ReclaimFragmentLocked(ReplayFragment fragment)

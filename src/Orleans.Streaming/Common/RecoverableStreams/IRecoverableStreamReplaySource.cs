@@ -79,7 +79,7 @@ public interface IRecoverableStreamReplaySource<TQueueMessage> : IAsyncDisposabl
 /// Represents one retained-history read.
 /// </summary>
 /// <typeparam name="TQueueMessage">The immutable source record type.</typeparam>
-public readonly struct RecoverableStreamReplayReadResult<TQueueMessage>
+public readonly struct RecoverableStreamReplayReadResult<TQueueMessage> : IEquatable<RecoverableStreamReplayReadResult<TQueueMessage>>
 {
     /// <summary>
     /// Initializes a new instance of the <see cref="RecoverableStreamReplayReadResult{TQueueMessage}"/> struct.
@@ -103,4 +103,25 @@ public readonly struct RecoverableStreamReplayReadResult<TQueueMessage>
     /// Gets a value indicating whether this read reached the provider tail.
     /// </summary>
     public bool IsAtTail { get; }
+
+    /// <inheritdoc />
+    public bool Equals(RecoverableStreamReplayReadResult<TQueueMessage> other)
+        => EqualityComparer<IReadOnlyList<TQueueMessage>>.Default.Equals(Messages, other.Messages)
+            && IsAtTail == other.IsAtTail;
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is RecoverableStreamReplayReadResult<TQueueMessage> other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => HashCode.Combine(Messages, IsAtTail);
+
+    /// <summary>
+    /// Determines whether two read results have equal message collections and tail states.
+    /// </summary>
+    public static bool operator ==(RecoverableStreamReplayReadResult<TQueueMessage> left, RecoverableStreamReplayReadResult<TQueueMessage> right) => left.Equals(right);
+
+    /// <summary>
+    /// Determines whether two read results have different message collections or tail states.
+    /// </summary>
+    public static bool operator !=(RecoverableStreamReplayReadResult<TQueueMessage> left, RecoverableStreamReplayReadResult<TQueueMessage> right) => !left.Equals(right);
 }

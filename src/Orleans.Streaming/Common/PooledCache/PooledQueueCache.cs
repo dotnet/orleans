@@ -396,14 +396,14 @@ namespace Orleans.Providers.Streams.Common
 
             var newestBlock = messageBlocks.First!;
             var newestMessage = newestBlock.Value.NewestMessage;
-            if (newestMessage.Compare(sequenceToken) < 0)
+            if (cacheDataAdapter.Compare(ref newestMessage, sequenceToken) < 0)
             {
                 cacheMiss = default;
                 return false;
             }
 
             var oldestMessage = messageBlocks.Last!.Value.OldestMessage;
-            if (oldestMessage.Compare(sequenceToken) <= 0
+            if (cacheDataAdapter.Compare(ref oldestMessage, sequenceToken) <= 0
                 || lastPurgedToken.TryGetValue(streamId, out var entry)
                     && EventSequenceTokenCompatibility.Compare(sequenceToken, entry.Token) >= 0)
             {

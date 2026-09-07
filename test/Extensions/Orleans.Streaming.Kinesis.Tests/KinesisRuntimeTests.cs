@@ -513,7 +513,9 @@ public sealed class KinesisRuntimeTests
             var moveResult = await cursor.MoveNextAsync(TestContext.Current.CancellationToken);
             if (moveResult == QueueCacheCursorMoveNextResult.Completed)
             {
-                if (cursor.MoveNext())
+                var liveResult = cursor.MoveNextWithResult();
+                Assert.Contains(liveResult.Kind, new[] { QueueCacheCursorMoveResultKind.Success, QueueCacheCursorMoveResultKind.NoData });
+                if (liveResult.Kind == QueueCacheCursorMoveResultKind.Success)
                 {
                     moveResult = QueueCacheCursorMoveNextResult.ItemAvailable;
                 }

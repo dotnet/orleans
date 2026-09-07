@@ -418,11 +418,16 @@ namespace Orleans.Providers.Streams.Common
 
         /// <inheritdoc />
         public IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken? token)
+            => GetCursorOrThrow(TryGetCacheCursor(streamId, token));
+
+        /// <inheritdoc />
+        public QueueCacheCursorResult<IQueueCacheCursor> TryGetCacheCursor(StreamId streamId, StreamSequenceToken? token)
         {
             lock (_cacheLock)
             {
-                return _replayManager?.GetCursor(streamId, token)
-                    ?? _cache.GetCacheCursor(streamId, token);
+                return _replayManager is { } replayManager
+                    ? QueueCacheCursorResult<IQueueCacheCursor>.FromCursor(replayManager.GetCursor(streamId, token))
+                    : _cache.TryGetCacheCursor(streamId, token);
             }
         }
 
@@ -430,12 +435,27 @@ namespace Orleans.Providers.Streams.Common
         public IQueueCacheCursor GetCacheCursorAtPosition(
             StreamId streamId,
             StreamSubscriptionStartPosition startPosition)
+            => GetCursorOrThrow(TryGetCacheCursorAtPosition(streamId, startPosition));
+
+        /// <inheritdoc />
+        public QueueCacheCursorResult<IQueueCacheCursor> TryGetCacheCursorAtPosition(
+            StreamId streamId,
+            StreamSubscriptionStartPosition startPosition)
         {
             lock (_cacheLock)
             {
-                return _cache.GetCacheCursorAtPosition(streamId, startPosition);
+                return _cache.TryGetCacheCursorAtPosition(streamId, startPosition);
             }
         }
+
+        private static IQueueCacheCursor GetCursorOrThrow(QueueCacheCursorResult<IQueueCacheCursor> result)
+            => result.Kind switch
+            {
+                QueueCacheCursorResultKind.Success => result.Cursor!,
+                QueueCacheCursorResultKind.CacheMiss => throw result.CacheMiss!.Value.ToException(),
+                QueueCacheCursorResultKind.NotSupported => throw new NotSupportedException("The cache does not support the requested start position."),
+                _ => throw new QueueCacheCursorContractException("The cursor result is not initialized."),
+            };
 
         /// <inheritdoc />
         public bool IsUnderPressure()
