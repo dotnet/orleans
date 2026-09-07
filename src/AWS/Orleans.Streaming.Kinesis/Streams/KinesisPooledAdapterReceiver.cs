@@ -247,6 +247,14 @@ internal sealed class KinesisPooledAdapterReceiver : IQueueAdapterReceiver, IQue
         StreamSubscriptionStartPosition startPosition)
         => _cache.GetCacheCursorAtPosition(streamId, startPosition);
 
+    public QueueCacheCursorResult<IQueueCacheCursor> TryGetCacheCursor(StreamId streamId, StreamSequenceToken? token)
+        => _inner?.TryGetCacheCursor(streamId, token) ?? _cache.TryGetCacheCursor(streamId, token);
+
+    public QueueCacheCursorResult<IQueueCacheCursor> TryGetCacheCursorAtPosition(
+        StreamId streamId,
+        StreamSubscriptionStartPosition startPosition)
+        => _cache.TryGetCacheCursorAtPosition(streamId, startPosition);
+
     public bool IsUnderPressure() => _inner?.IsUnderPressure() ?? _cache.IsUnderPressure();
 
     public void UpdateDeliveryProgress(StreamSequenceToken? earliestSubscriptionToken, DateTime utcNow)
