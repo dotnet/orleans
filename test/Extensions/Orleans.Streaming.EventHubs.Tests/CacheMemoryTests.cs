@@ -130,13 +130,13 @@ public sealed class CacheMemoryTests : IDisposable
 
         Assert.Equal(0, cache.GetMaxAddCount());
         Assert.Null(checkpointer.LastOffset);
-        var nextCursor = cache.GetCursor(positions[0].StreamId, positions[0].SequenceToken);
+        var nextCursor = GetCursor(cache, positions[0].StreamId, positions[0].SequenceToken);
         for (var i = 0; i < positions.Count; i++)
         {
-            Assert.True(cache.TryGetNextMessage(nextCursor, out var next));
+            var next = GetNextMessage(cache, nextCursor);
             Assert.Equal(positions[i].SequenceToken, next.SequenceToken);
         }
-        Assert.False(cache.TryGetNextMessage(nextCursor, out _));
+        AssertNoNextMessage(cache, nextCursor);
 
         cache.AddCachePressureMonitor(new AlwaysPressureMonitor());
         cache.UpdatePurgeProtection(hasActiveSubscriptions: false);
@@ -230,8 +230,8 @@ public sealed class CacheMemoryTests : IDisposable
         Assert.Equal(1, pool.FreeCount);
         var positions = cache.Add([MakeEventData(2)], DateTime.UtcNow);
         Assert.Equal(2, pool.AllocateCount);
-        var cursor = cache.GetCursor(positions[0].StreamId, positions[0].SequenceToken);
-        Assert.True(cache.TryGetNextMessage(cursor, out var message));
+        var cursor = GetCursor(cache, positions[0].StreamId, positions[0].SequenceToken);
+        var message = GetNextMessage(cache, cursor);
         Assert.Equal(positions[0].SequenceToken, message.SequenceToken);
 
         cache.Dispose();
@@ -260,12 +260,12 @@ public sealed class CacheMemoryTests : IDisposable
 
         var lastPosition = Assert.Single(cache.Add([MakeEventData(2, 8 * 1024)], DateTime.UtcNow));
         Assert.Equal(activeMemory, controller.ActiveCacheMemory);
-        var cursor = cache.GetCursor(firstPosition.StreamId, firstPosition.SequenceToken);
-        Assert.True(cache.TryGetNextMessage(cursor, out var first));
+        var cursor = GetCursor(cache, firstPosition.StreamId, firstPosition.SequenceToken);
+        var first = GetNextMessage(cache, cursor);
         Assert.Equal(firstPosition.SequenceToken, first.SequenceToken);
-        Assert.True(cache.TryGetNextMessage(cursor, out var last));
+        var last = GetNextMessage(cache, cursor);
         Assert.Equal(lastPosition.SequenceToken, last.SequenceToken);
-        Assert.False(cache.TryGetNextMessage(cursor, out _));
+        AssertNoNextMessage(cache, cursor);
     }
 
     [Fact, TestCategory("BVT")]
@@ -301,12 +301,12 @@ public sealed class CacheMemoryTests : IDisposable
         Assert.Equal(2, pool.AllocateCount);
         Assert.Equal(1, pool.FreeCount);
 
-        var cursor = cache.GetCursor(firstPosition.StreamId, firstPosition.SequenceToken);
-        Assert.True(cache.TryGetNextMessage(cursor, out var first));
+        var cursor = GetCursor(cache, firstPosition.StreamId, firstPosition.SequenceToken);
+        var first = GetNextMessage(cache, cursor);
         Assert.Equal(firstPosition.SequenceToken, first.SequenceToken);
-        Assert.True(cache.TryGetNextMessage(cursor, out var last));
+        var last = GetNextMessage(cache, cursor);
         Assert.Equal(lastPosition.SequenceToken, last.SequenceToken);
-        Assert.False(cache.TryGetNextMessage(cursor, out _));
+        AssertNoNextMessage(cache, cursor);
 
         cache.Dispose();
         Assert.Equal(2, pool.FreeCount);
@@ -340,6 +340,32 @@ public sealed class CacheMemoryTests : IDisposable
     }
 
     public void Dispose() => serviceProvider.Dispose();
+
+    private static object GetCursor(
+        EventHubQueueCache cache,
+        StreamId streamId,
+        StreamSequenceToken? sequenceToken)
+    {
+        var result = cache.TryGetCursor(streamId, sequenceToken);
+        Assert.Equal(QueueCacheCursorResultKind.Success, result.Kind);
+        Assert.NotNull(result.Cursor);
+        return result.Cursor;
+    }
+
+    private static IBatchContainer GetNextMessage(EventHubQueueCache cache, object cursor)
+    {
+        var result = cache.TryGetNextMessageWithResult(cursor, out var message);
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, result.Kind);
+        Assert.NotNull(message);
+        return message;
+    }
+
+    private static void AssertNoNextMessage(EventHubQueueCache cache, object cursor)
+    {
+        var result = cache.TryGetNextMessageWithResult(cursor, out var message);
+        Assert.Equal(QueueCacheCursorMoveResultKind.NoData, result.Kind);
+        Assert.Null(message);
+    }
 
     private EventHubQueueCache CreateCache(
         string partition,

@@ -1266,13 +1266,17 @@ namespace UnitTests.StreamingTests
             }
         }
 
-        private sealed class PurgeablePooledQueueCache(bool purgeFromGetMaxAddCount = false) : IQueueCache
+        private sealed class PurgeablePooledQueueCache : IQueueCache
         {
             private readonly PooledQueueCache cache;
             public List<StreamSequenceToken?> DeliveryProgressTokens { get; } = [];
+            private readonly bool _purgeFromGetMaxAddCount;
 
-            public PurgeablePooledQueueCache(bool retainPurgeMetadata = false)
+            public PurgeablePooledQueueCache(
+                bool purgeFromGetMaxAddCount = false,
+                bool retainPurgeMetadata = false)
             {
+                _purgeFromGetMaxAddCount = purgeFromGetMaxAddCount;
                 cache = new(
                     new CacheDataAdapter(),
                     NullLogger.Instance,
@@ -1290,7 +1294,7 @@ namespace UnitTests.StreamingTests
             public int GetMaxAddCount()
             {
                 GetMaxAddCountCallCount++;
-                if (purgeFromGetMaxAddCount && !HasActiveSubscriptions && !cache.IsEmpty)
+                if (_purgeFromGetMaxAddCount && !HasActiveSubscriptions && !cache.IsEmpty)
                 {
                     Purge();
                 }
