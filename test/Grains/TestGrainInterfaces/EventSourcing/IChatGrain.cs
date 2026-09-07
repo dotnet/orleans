@@ -36,7 +36,8 @@ namespace TestGrainInterfaces
 
         public override XDocument ConvertFromSurrogate(ref XDocumentSurrogate surrogate) => XDocument.Load(new StringReader(surrogate.Value));
         public override void ConvertToSurrogate(XDocument value, ref XDocumentSurrogate surrogate) => surrogate.Value = value.ToString();
-        public XDocument DeepCopy(XDocument input, CopyContext context) => new(input);
+        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public XDocument? DeepCopy(XDocument? input, CopyContext context) => input is null ? null : new(input);
     }
 
     [GenerateSerializer]

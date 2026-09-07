@@ -88,23 +88,27 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc />
-        public SortedDictionary<TKey, TValue> DeepCopy(SortedDictionary<TKey, TValue> input, CopyContext context)
+        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public SortedDictionary<TKey, TValue>? DeepCopy(SortedDictionary<TKey, TValue>? input, CopyContext context)
         {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
+
             if (context.TryGetCopy<SortedDictionary<TKey, TValue>>(input, out var result))
             {
                 return result!;
             }
 
+            System.Diagnostics.Debug.Assert(input is not null);
             if (input.GetType() as object != _fieldType as object)
             {
-                return context.DeepCopy(input)!;
+                return context.DeepCopy(input);
             }
 
             result = new SortedDictionary<TKey, TValue>(input.Comparer);
             context.RecordCopy(input, result);
             foreach (var pair in input)
             {
-                result[_keyCopier.DeepCopy(pair.Key, context)] = _valueCopier.DeepCopy(pair.Value, context);
+                result[_keyCopier.DeepCopy(pair.Key, context)!] = _valueCopier.DeepCopy(pair.Value, context)!;
             }
 
             return result;
@@ -113,9 +117,13 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public void DeepCopy(SortedDictionary<TKey, TValue> input, SortedDictionary<TKey, TValue> output, CopyContext context)
         {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(input);
+            ArgumentNullExceptionPolyfill.ThrowIfNull(output);
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
+
             foreach (var pair in input)
             {
-                output[_keyCopier.DeepCopy(pair.Key, context)] = _valueCopier.DeepCopy(pair.Value, context);
+                output[_keyCopier.DeepCopy(pair.Key, context)!] = _valueCopier.DeepCopy(pair.Value, context)!;
             }
         }
     }

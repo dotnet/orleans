@@ -68,16 +68,20 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc />
-        public ReadOnlyDictionary<TKey, TValue> DeepCopy(ReadOnlyDictionary<TKey, TValue> input, CopyContext context)
+        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public ReadOnlyDictionary<TKey, TValue>? DeepCopy(ReadOnlyDictionary<TKey, TValue>? input, CopyContext context)
         {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
+
             if (context.TryGetCopy<ReadOnlyDictionary<TKey, TValue>>(input, out var result))
             {
                 return result!;
             }
 
+            System.Diagnostics.Debug.Assert(input is not null);
             if (input.GetType() as object != _fieldType as object)
             {
-                return context.DeepCopy(input)!;
+                return context.DeepCopy(input);
             }
 
             // There is a possibility for infinite recursion here if any value in the input collection is able to take part in a cyclic reference.
@@ -87,7 +91,7 @@ namespace Orleans.Serialization.Codecs
             var temp = new Dictionary<TKey, TValue>(input.Count);
             foreach (var pair in input)
             {
-                temp[_keyCopier.DeepCopy(pair.Key, context)] = _valueCopier.DeepCopy(pair.Value, context);
+                temp[_keyCopier.DeepCopy(pair.Key, context)!] = _valueCopier.DeepCopy(pair.Value, context)!;
             }
 
             result = new ReadOnlyDictionary<TKey, TValue>(temp);

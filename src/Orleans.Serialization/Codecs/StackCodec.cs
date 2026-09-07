@@ -38,6 +38,7 @@ public sealed class StackCodec<T> : IFieldCodec<Stack<T>>
             return;
         }
 
+        System.Diagnostics.Debug.Assert(value is not null);
         writer.WriteFieldHeader(fieldIdDelta, expectedType, value.GetType(), WireType.TagDelimited);
 
         if (value.Count > 0)
@@ -130,16 +131,20 @@ public sealed class StackCopier<T> : IDeepCopier<Stack<T>>, IBaseCopier<Stack<T>
     }
 
     /// <inheritdoc/>
-    public Stack<T> DeepCopy(Stack<T> input, CopyContext context)
+    [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+    public Stack<T>? DeepCopy(Stack<T>? input, CopyContext context)
     {
+        ArgumentNullExceptionPolyfill.ThrowIfNull(context);
+
         if (context.TryGetCopy<Stack<T>>(input, out var result))
         {
             return result!;
         }
 
+        System.Diagnostics.Debug.Assert(input is not null);
         if (input.GetType() != _fieldType)
         {
-            return context.DeepCopy(input)!;
+            return context.DeepCopy(input);
         }
 
         result = new Stack<T>(input.Count);
@@ -148,7 +153,7 @@ public sealed class StackCopier<T> : IDeepCopier<Stack<T>>, IBaseCopier<Stack<T>
         input.CopyTo(array, 0);
         for (var i = array.Length - 1; i >= 0; --i)
         {
-            result.Push(_copier.DeepCopy(array[i], context));
+            result.Push(_copier.DeepCopy(array[i], context)!);
         }
 
         return result;
@@ -157,11 +162,15 @@ public sealed class StackCopier<T> : IDeepCopier<Stack<T>>, IBaseCopier<Stack<T>
     /// <inheritdoc/>
     public void DeepCopy(Stack<T> input, Stack<T> output, CopyContext context)
     {
+        ArgumentNullExceptionPolyfill.ThrowIfNull(input);
+        ArgumentNullExceptionPolyfill.ThrowIfNull(output);
+        ArgumentNullExceptionPolyfill.ThrowIfNull(context);
+
         var array = new T[input.Count];
         input.CopyTo(array, 0);
         for (var i = array.Length - 1; i >= 0; --i)
         {
-            output.Push(_copier.DeepCopy(array[i], context));
+            output.Push(_copier.DeepCopy(array[i], context)!);
         }
     }
 }

@@ -63,7 +63,7 @@ namespace Orleans.Serialization
     {
         public FSharpChoiceCopier(Cloning.IDeepCopier<T1> copier1, Cloning.IDeepCopier<T2> copier2) { }
 
-        public Microsoft.FSharp.Core.FSharpChoice<T1, T2> DeepCopy(Microsoft.FSharp.Core.FSharpChoice<T1, T2> input, Cloning.CopyContext context) { throw null; }
+        public Microsoft.FSharp.Core.FSharpChoice<T1, T2>? DeepCopy(Microsoft.FSharp.Core.FSharpChoice<T1, T2>? input, Cloning.CopyContext context) { throw null; }
     }
 
     [RegisterCopier]
@@ -71,7 +71,7 @@ namespace Orleans.Serialization
     {
         public FSharpChoiceCopier(Cloning.IDeepCopier<T1> copier1, Cloning.IDeepCopier<T2> copier2, Cloning.IDeepCopier<T3> copier3) { }
 
-        public Microsoft.FSharp.Core.FSharpChoice<T1, T2, T3> DeepCopy(Microsoft.FSharp.Core.FSharpChoice<T1, T2, T3> input, Cloning.CopyContext context) { throw null; }
+        public Microsoft.FSharp.Core.FSharpChoice<T1, T2, T3>? DeepCopy(Microsoft.FSharp.Core.FSharpChoice<T1, T2, T3>? input, Cloning.CopyContext context) { throw null; }
     }
 
     [RegisterCopier]
@@ -79,7 +79,7 @@ namespace Orleans.Serialization
     {
         public FSharpChoiceCopier(Cloning.IDeepCopier<T1> copier1, Cloning.IDeepCopier<T2> copier2, Cloning.IDeepCopier<T3> copier3, Cloning.IDeepCopier<T4> copier4) { }
 
-        public Microsoft.FSharp.Core.FSharpChoice<T1, T2, T3, T4> DeepCopy(Microsoft.FSharp.Core.FSharpChoice<T1, T2, T3, T4> input, Cloning.CopyContext context) { throw null; }
+        public Microsoft.FSharp.Core.FSharpChoice<T1, T2, T3, T4>? DeepCopy(Microsoft.FSharp.Core.FSharpChoice<T1, T2, T3, T4>? input, Cloning.CopyContext context) { throw null; }
     }
 
     [RegisterCopier]
@@ -87,7 +87,7 @@ namespace Orleans.Serialization
     {
         public FSharpChoiceCopier(Cloning.IDeepCopier<T1> copier1, Cloning.IDeepCopier<T2> copier2, Cloning.IDeepCopier<T3> copier3, Cloning.IDeepCopier<T4> copier4, Cloning.IDeepCopier<T5> copier5) { }
 
-        public Microsoft.FSharp.Core.FSharpChoice<T1, T2, T3, T4, T5> DeepCopy(Microsoft.FSharp.Core.FSharpChoice<T1, T2, T3, T4, T5> input, Cloning.CopyContext context) { throw null; }
+        public Microsoft.FSharp.Core.FSharpChoice<T1, T2, T3, T4, T5>? DeepCopy(Microsoft.FSharp.Core.FSharpChoice<T1, T2, T3, T4, T5>? input, Cloning.CopyContext context) { throw null; }
     }
 
     [RegisterCopier]
@@ -95,7 +95,7 @@ namespace Orleans.Serialization
     {
         public FSharpChoiceCopier(Cloning.IDeepCopier<T1> copier1, Cloning.IDeepCopier<T2> copier2, Cloning.IDeepCopier<T3> copier3, Cloning.IDeepCopier<T4> copier4, Cloning.IDeepCopier<T5> copier5, Cloning.IDeepCopier<T6> copier6) { }
 
-        public Microsoft.FSharp.Core.FSharpChoice<T1, T2, T3, T4, T5, T6> DeepCopy(Microsoft.FSharp.Core.FSharpChoice<T1, T2, T3, T4, T5, T6> input, Cloning.CopyContext context) { throw null; }
+        public Microsoft.FSharp.Core.FSharpChoice<T1, T2, T3, T4, T5, T6>? DeepCopy(Microsoft.FSharp.Core.FSharpChoice<T1, T2, T3, T4, T5, T6>? input, Cloning.CopyContext context) { throw null; }
     }
 
     [RegisterSerializer]
@@ -113,7 +113,7 @@ namespace Orleans.Serialization
     {
         public FSharpListCopier(Cloning.IDeepCopier<T> copier) { }
 
-        public Microsoft.FSharp.Collections.FSharpList<T> DeepCopy(Microsoft.FSharp.Collections.FSharpList<T> input, Cloning.CopyContext context) { throw null; }
+        public Microsoft.FSharp.Collections.FSharpList<T>? DeepCopy(Microsoft.FSharp.Collections.FSharpList<T>? input, Cloning.CopyContext context) { throw null; }
     }
 
     [GenerateSerializer]
@@ -141,7 +141,7 @@ namespace Orleans.Serialization
     {
         public FSharpMapCopier(Cloning.IDeepCopier<TKey> keyCopier, Cloning.IDeepCopier<TValue> valueCopier) { }
 
-        public Microsoft.FSharp.Collections.FSharpMap<TKey, TValue> DeepCopy(Microsoft.FSharp.Collections.FSharpMap<TKey, TValue> input, Cloning.CopyContext context) { throw null; }
+        public Microsoft.FSharp.Collections.FSharpMap<TKey, TValue>? DeepCopy(Microsoft.FSharp.Collections.FSharpMap<TKey, TValue>? input, Cloning.CopyContext context) { throw null; }
     }
 
     [GenerateSerializer]
@@ -170,7 +170,7 @@ namespace Orleans.Serialization
     {
         public FSharpOptionCopier(Cloning.IDeepCopier<T> valueCopier) { }
 
-        public Microsoft.FSharp.Core.FSharpOption<T>? DeepCopy(Microsoft.FSharp.Core.FSharpOption<T> input, Cloning.CopyContext context) { throw null; }
+        public Microsoft.FSharp.Core.FSharpOption<T>? DeepCopy(Microsoft.FSharp.Core.FSharpOption<T>? input, Cloning.CopyContext context) { throw null; }
     }
 
     [RegisterSerializer]
@@ -188,7 +188,7 @@ namespace Orleans.Serialization
     {
         public FSharpRefCopier(Cloning.IDeepCopier<T> copier) { }
 
-        public Microsoft.FSharp.Core.FSharpRef<T> DeepCopy(Microsoft.FSharp.Core.FSharpRef<T> input, Cloning.CopyContext context) { throw null; }
+        public Microsoft.FSharp.Core.FSharpRef<T>? DeepCopy(Microsoft.FSharp.Core.FSharpRef<T>? input, Cloning.CopyContext context) { throw null; }
     }
 
     [GenerateSerializer]
@@ -232,7 +232,7 @@ namespace Orleans.Serialization
     {
         public FSharpSetCopier(Cloning.IDeepCopier<T> copier) { }
 
-        public Microsoft.FSharp.Collections.FSharpSet<T> DeepCopy(Microsoft.FSharp.Collections.FSharpSet<T> input, Cloning.CopyContext context) { throw null; }
+        public Microsoft.FSharp.Collections.FSharpSet<T>? DeepCopy(Microsoft.FSharp.Collections.FSharpSet<T>? input, Cloning.CopyContext context) { throw null; }
     }
 
     [GenerateSerializer]

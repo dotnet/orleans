@@ -74,11 +74,15 @@ namespace Orleans.Serialization.Codecs
         public bool IsShallowCopyable() => _copier is null;
 
         /// <inheritdoc/>
-        public ImmutableSortedSet<T> DeepCopy(ImmutableSortedSet<T> input, CopyContext context)
+        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public ImmutableSortedSet<T>? DeepCopy(ImmutableSortedSet<T>? input, CopyContext context)
         {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
+
             if (context.TryGetCopy<ImmutableSortedSet<T>>(input, out var result))
                 return result!;
 
+            System.Diagnostics.Debug.Assert(input is not null);
             if (input.IsEmpty || _copier is null)
                 return input;
 
@@ -88,7 +92,7 @@ namespace Orleans.Serialization.Codecs
 
             var items = new List<T>(input.Count);
             foreach (var item in input)
-                items.Add(_copier!.DeepCopy(item, context));
+                items.Add(_copier!.DeepCopy(item, context)!);
 
             var res = ImmutableSortedSet.CreateRange(input.KeyComparer, items);
             context.RecordCopy(input, res);

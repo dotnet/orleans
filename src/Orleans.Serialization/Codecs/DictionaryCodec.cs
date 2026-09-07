@@ -50,6 +50,7 @@ namespace Orleans.Serialization.Codecs
                 return;
             }
 
+            System.Diagnostics.Debug.Assert(value is not null);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, value.GetType(), WireType.TagDelimited);
 
             if (value.Comparer is var comparer && comparer != EqualityComparer<TKey>.Default)
@@ -169,23 +170,27 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
-        public Dictionary<TKey, TValue> DeepCopy(Dictionary<TKey, TValue> input, CopyContext context)
+        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public Dictionary<TKey, TValue>? DeepCopy(Dictionary<TKey, TValue>? input, CopyContext context)
         {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
+
             if (context.TryGetCopy<Dictionary<TKey, TValue>>(input, out var result))
             {
                 return result!;
             }
 
+            System.Diagnostics.Debug.Assert(input is not null);
             if (input.GetType() != typeof(Dictionary<TKey, TValue>))
             {
-                return context.DeepCopy(input)!;
+                return context.DeepCopy(input);
             }
 
             result = new Dictionary<TKey, TValue>(input.Count, input.Comparer);
             context.RecordCopy(input, result);
             foreach (var pair in input)
             {
-                result[_keyCopier.DeepCopy(pair.Key, context)] = _valueCopier.DeepCopy(pair.Value, context);
+                result[_keyCopier.DeepCopy(pair.Key, context)!] = _valueCopier.DeepCopy(pair.Value, context)!;
             }
 
             return result;
@@ -194,6 +199,10 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public void DeepCopy(Dictionary<TKey, TValue> input, Dictionary<TKey, TValue> output, CopyContext context)
         {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(input);
+            ArgumentNullExceptionPolyfill.ThrowIfNull(output);
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
+
             output.Clear();
             if (input.Comparer != EqualityComparer<TKey>.Default)
             {
@@ -206,7 +215,7 @@ namespace Orleans.Serialization.Codecs
 
             foreach (var pair in input)
             {
-                output[_keyCopier.DeepCopy(pair.Key, context)] = _valueCopier.DeepCopy(pair.Value, context);
+                output[_keyCopier.DeepCopy(pair.Key, context)!] = _valueCopier.DeepCopy(pair.Value, context)!;
             }
         }
     }

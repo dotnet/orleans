@@ -45,13 +45,15 @@ public sealed class SurrogateCodec<TField, TSurrogate, TConverter>
     }
 
     /// <inheritdoc/>
-    public TField DeepCopy(TField input, CopyContext context)
+    [return: NotNullIfNotNull(nameof(input))]
+    public TField? DeepCopy(TField? input, CopyContext context)
     {
         if (context.TryGetCopy<TField>(input, out var result))
         {
             return result!;
         }
 
+        System.Diagnostics.Debug.Assert(input is not null);
         var surrogate = _converter.ConvertToSurrogate(in input);
         var copy = _surrogateCopier.DeepCopy(surrogate, context);
         result = _converter.ConvertFromSurrogate(in copy);

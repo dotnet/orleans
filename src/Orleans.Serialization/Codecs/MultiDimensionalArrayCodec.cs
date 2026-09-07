@@ -215,12 +215,12 @@ namespace Orleans.Serialization.Codecs
         [return: NotNullIfNotNull(nameof(original))]
         public object? DeepCopy(object? original, CopyContext context)
         {
-            if (context.TryGetCopy<Array>(original!, out var result))
+            if (context.TryGetCopy<Array>(original, out var result))
             {
                 return result;
             }
 
-            var type = original!.GetType();
+            var type = original.GetType();
             var originalArray = (Array)original;
             var elementType = type.GetElementType();
             if (ShallowCopyableTypes.Contains(elementType!))

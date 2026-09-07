@@ -35,6 +35,7 @@ namespace Orleans.Serialization.Codecs
                 return;
             }
 
+            System.Diagnostics.Debug.Assert(value is not null);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, value.GetType(), WireType.TagDelimited);
 
             _valueCodec.WriteField(ref writer, 1, CodecElementType, value.Item1);
@@ -102,13 +103,17 @@ namespace Orleans.Serialization.Codecs
         public bool IsShallowCopyable() => _copier is null;
 
         /// <inheritdoc />
-        public Tuple<T> DeepCopy(Tuple<T> input, CopyContext context)
+        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public Tuple<T>? DeepCopy(Tuple<T>? input, CopyContext context)
         {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
+
             if (context.TryGetCopy(input, out Tuple<T>? existing))
                 return existing!;
 
+            System.Diagnostics.Debug.Assert(input is not null);
             if (input.GetType() as object != _fieldType as object)
-                return context.DeepCopy(input)!;
+                return context.DeepCopy(input);
 
             if (IsShallowCopyable())
                 return input;
@@ -117,7 +122,7 @@ namespace Orleans.Serialization.Codecs
             // Mitigate that by returning a shallow-copy in such a case.
             context.RecordCopy(input, input);
 
-            var result = Tuple.Create(_copier is null ? input.Item1 : _copier.DeepCopy(input.Item1, context));
+            var result = Tuple.Create(_copier is null ? input.Item1 : _copier.DeepCopy(input.Item1, context)!);
             context.RecordCopy(input, result);
             return result;
         }
@@ -156,6 +161,7 @@ namespace Orleans.Serialization.Codecs
                 return;
             }
 
+            System.Diagnostics.Debug.Assert(value is not null);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, value.GetType(), WireType.TagDelimited);
 
             _item1Codec.WriteField(ref writer, 1, ElementType1, value.Item1);
@@ -235,13 +241,17 @@ namespace Orleans.Serialization.Codecs
         public bool IsShallowCopyable() => _copier1 is null && _copier2 is null;
 
         /// <inheritdoc />
-        public Tuple<T1, T2> DeepCopy(Tuple<T1, T2> input, CopyContext context)
+        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public Tuple<T1, T2>? DeepCopy(Tuple<T1, T2>? input, CopyContext context)
         {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
+
             if (context.TryGetCopy(input, out Tuple<T1, T2>? existing))
                 return existing!;
 
+            System.Diagnostics.Debug.Assert(input is not null);
             if (input.GetType() as object != _fieldType as object)
-                return context.DeepCopy(input)!;
+                return context.DeepCopy(input);
 
             if (IsShallowCopyable())
                 return input;
@@ -251,8 +261,8 @@ namespace Orleans.Serialization.Codecs
             context.RecordCopy(input, input);
 
             var result = Tuple.Create(
-                _copier1 is null ? input.Item1 : _copier1.DeepCopy(input.Item1, context),
-                _copier2 is null ? input.Item2 : _copier2.DeepCopy(input.Item2, context));
+                _copier1 is null ? input.Item1 : _copier1.DeepCopy(input.Item1, context)!,
+                _copier2 is null ? input.Item2 : _copier2.DeepCopy(input.Item2, context)!);
             context.RecordCopy(input, result);
             return result;
         }
@@ -299,6 +309,7 @@ namespace Orleans.Serialization.Codecs
                 return;
             }
 
+            System.Diagnostics.Debug.Assert(value is not null);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, value.GetType(), WireType.TagDelimited);
 
             _item1Codec.WriteField(ref writer, 1, ElementType1, value.Item1);
@@ -390,13 +401,17 @@ namespace Orleans.Serialization.Codecs
         public bool IsShallowCopyable() => _copier1 is null && _copier2 is null && _copier3 is null;
 
         /// <inheritdoc />
-        public Tuple<T1, T2, T3> DeepCopy(Tuple<T1, T2, T3> input, CopyContext context)
+        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public Tuple<T1, T2, T3>? DeepCopy(Tuple<T1, T2, T3>? input, CopyContext context)
         {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
+
             if (context.TryGetCopy(input, out Tuple<T1, T2, T3>? existing))
                 return existing!;
 
+            System.Diagnostics.Debug.Assert(input is not null);
             if (input.GetType() as object != _fieldType as object)
-                return context.DeepCopy(input)!;
+                return context.DeepCopy(input);
 
             if (IsShallowCopyable())
                 return input;
@@ -406,9 +421,9 @@ namespace Orleans.Serialization.Codecs
             context.RecordCopy(input, input);
 
             var result = Tuple.Create(
-                _copier1 is null ? input.Item1 : _copier1.DeepCopy(input.Item1, context),
-                _copier2 is null ? input.Item2 : _copier2.DeepCopy(input.Item2, context),
-                _copier3 is null ? input.Item3 : _copier3.DeepCopy(input.Item3, context));
+                _copier1 is null ? input.Item1 : _copier1.DeepCopy(input.Item1, context)!,
+                _copier2 is null ? input.Item2 : _copier2.DeepCopy(input.Item2, context)!,
+                _copier3 is null ? input.Item3 : _copier3.DeepCopy(input.Item3, context)!);
             context.RecordCopy(input, result);
             return result;
         }
@@ -461,6 +476,7 @@ namespace Orleans.Serialization.Codecs
                 return;
             }
 
+            System.Diagnostics.Debug.Assert(value is not null);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, value.GetType(), WireType.TagDelimited);
 
             _item1Codec.WriteField(ref writer, 1, ElementType1, value.Item1);
@@ -562,13 +578,17 @@ namespace Orleans.Serialization.Codecs
         public bool IsShallowCopyable() => _copier1 is null && _copier2 is null && _copier3 is null && _copier4 is null;
 
         /// <inheritdoc />
-        public Tuple<T1, T2, T3, T4> DeepCopy(Tuple<T1, T2, T3, T4> input, CopyContext context)
+        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public Tuple<T1, T2, T3, T4>? DeepCopy(Tuple<T1, T2, T3, T4>? input, CopyContext context)
         {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
+
             if (context.TryGetCopy(input, out Tuple<T1, T2, T3, T4>? existing))
                 return existing!;
 
+            System.Diagnostics.Debug.Assert(input is not null);
             if (input.GetType() as object != _fieldType as object)
-                return context.DeepCopy(input)!;
+                return context.DeepCopy(input);
 
             if (IsShallowCopyable())
                 return input;
@@ -578,10 +598,10 @@ namespace Orleans.Serialization.Codecs
             context.RecordCopy(input, input);
 
             var result = Tuple.Create(
-                _copier1 is null ? input.Item1 : _copier1.DeepCopy(input.Item1, context),
-                _copier2 is null ? input.Item2 : _copier2.DeepCopy(input.Item2, context),
-                _copier3 is null ? input.Item3 : _copier3.DeepCopy(input.Item3, context),
-                _copier4 is null ? input.Item4 : _copier4.DeepCopy(input.Item4, context));
+                _copier1 is null ? input.Item1 : _copier1.DeepCopy(input.Item1, context)!,
+                _copier2 is null ? input.Item2 : _copier2.DeepCopy(input.Item2, context)!,
+                _copier3 is null ? input.Item3 : _copier3.DeepCopy(input.Item3, context)!,
+                _copier4 is null ? input.Item4 : _copier4.DeepCopy(input.Item4, context)!);
             context.RecordCopy(input, result);
             return result;
         }
@@ -643,6 +663,7 @@ namespace Orleans.Serialization.Codecs
                 return;
             }
 
+            System.Diagnostics.Debug.Assert(value is not null);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, value.GetType(), WireType.TagDelimited);
 
             _item1Codec.WriteField(ref writer, 1, ElementType1, value.Item1);
@@ -754,13 +775,17 @@ namespace Orleans.Serialization.Codecs
         public bool IsShallowCopyable() => _copier1 is null && _copier2 is null && _copier3 is null && _copier4 is null && _copier5 is null;
 
         /// <inheritdoc />
-        public Tuple<T1, T2, T3, T4, T5> DeepCopy(Tuple<T1, T2, T3, T4, T5> input, CopyContext context)
+        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public Tuple<T1, T2, T3, T4, T5>? DeepCopy(Tuple<T1, T2, T3, T4, T5>? input, CopyContext context)
         {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
+
             if (context.TryGetCopy(input, out Tuple<T1, T2, T3, T4, T5>? existing))
                 return existing!;
 
+            System.Diagnostics.Debug.Assert(input is not null);
             if (input.GetType() as object != _fieldType as object)
-                return context.DeepCopy(input)!;
+                return context.DeepCopy(input);
 
             if (IsShallowCopyable())
                 return input;
@@ -770,11 +795,11 @@ namespace Orleans.Serialization.Codecs
             context.RecordCopy(input, input);
 
             var result = Tuple.Create(
-                _copier1 is null ? input.Item1 : _copier1.DeepCopy(input.Item1, context),
-                _copier2 is null ? input.Item2 : _copier2.DeepCopy(input.Item2, context),
-                _copier3 is null ? input.Item3 : _copier3.DeepCopy(input.Item3, context),
-                _copier4 is null ? input.Item4 : _copier4.DeepCopy(input.Item4, context),
-                _copier5 is null ? input.Item5 : _copier5.DeepCopy(input.Item5, context));
+                _copier1 is null ? input.Item1 : _copier1.DeepCopy(input.Item1, context)!,
+                _copier2 is null ? input.Item2 : _copier2.DeepCopy(input.Item2, context)!,
+                _copier3 is null ? input.Item3 : _copier3.DeepCopy(input.Item3, context)!,
+                _copier4 is null ? input.Item4 : _copier4.DeepCopy(input.Item4, context)!,
+                _copier5 is null ? input.Item5 : _copier5.DeepCopy(input.Item5, context)!);
             context.RecordCopy(input, result);
             return result;
         }
@@ -842,6 +867,7 @@ namespace Orleans.Serialization.Codecs
                 return;
             }
 
+            System.Diagnostics.Debug.Assert(value is not null);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, value.GetType(), WireType.TagDelimited);
 
             _item1Codec.WriteField(ref writer, 1, ElementType1, value.Item1);
@@ -963,13 +989,17 @@ namespace Orleans.Serialization.Codecs
         public bool IsShallowCopyable() => _copier1 is null && _copier2 is null && _copier3 is null && _copier4 is null && _copier5 is null && _copier6 is null;
 
         /// <inheritdoc />
-        public Tuple<T1, T2, T3, T4, T5, T6> DeepCopy(Tuple<T1, T2, T3, T4, T5, T6> input, CopyContext context)
+        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public Tuple<T1, T2, T3, T4, T5, T6>? DeepCopy(Tuple<T1, T2, T3, T4, T5, T6>? input, CopyContext context)
         {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
+
             if (context.TryGetCopy(input, out Tuple<T1, T2, T3, T4, T5, T6>? existing))
                 return existing!;
 
+            System.Diagnostics.Debug.Assert(input is not null);
             if (input.GetType() as object != _fieldType as object)
-                return context.DeepCopy(input)!;
+                return context.DeepCopy(input);
 
             if (IsShallowCopyable())
                 return input;
@@ -979,12 +1009,12 @@ namespace Orleans.Serialization.Codecs
             context.RecordCopy(input, input);
 
             var result = Tuple.Create(
-                _copier1 is null ? input.Item1 : _copier1.DeepCopy(input.Item1, context),
-                _copier2 is null ? input.Item2 : _copier2.DeepCopy(input.Item2, context),
-                _copier3 is null ? input.Item3 : _copier3.DeepCopy(input.Item3, context),
-                _copier4 is null ? input.Item4 : _copier4.DeepCopy(input.Item4, context),
-                _copier5 is null ? input.Item5 : _copier5.DeepCopy(input.Item5, context),
-                _copier6 is null ? input.Item6 : _copier6.DeepCopy(input.Item6, context));
+                _copier1 is null ? input.Item1 : _copier1.DeepCopy(input.Item1, context)!,
+                _copier2 is null ? input.Item2 : _copier2.DeepCopy(input.Item2, context)!,
+                _copier3 is null ? input.Item3 : _copier3.DeepCopy(input.Item3, context)!,
+                _copier4 is null ? input.Item4 : _copier4.DeepCopy(input.Item4, context)!,
+                _copier5 is null ? input.Item5 : _copier5.DeepCopy(input.Item5, context)!,
+                _copier6 is null ? input.Item6 : _copier6.DeepCopy(input.Item6, context)!);
             context.RecordCopy(input, result);
             return result;
         }
@@ -1058,6 +1088,7 @@ namespace Orleans.Serialization.Codecs
                 return;
             }
 
+            System.Diagnostics.Debug.Assert(value is not null);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, value.GetType(), WireType.TagDelimited);
 
             _item1Codec.WriteField(ref writer, 1, ElementType1, value.Item1);
@@ -1190,13 +1221,17 @@ namespace Orleans.Serialization.Codecs
         public bool IsShallowCopyable() => _copier1 is null && _copier2 is null && _copier3 is null && _copier4 is null && _copier5 is null && _copier6 is null && _copier7 is null;
 
         /// <inheritdoc />
-        public Tuple<T1, T2, T3, T4, T5, T6, T7> DeepCopy(Tuple<T1, T2, T3, T4, T5, T6, T7> input, CopyContext context)
+        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public Tuple<T1, T2, T3, T4, T5, T6, T7>? DeepCopy(Tuple<T1, T2, T3, T4, T5, T6, T7>? input, CopyContext context)
         {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
+
             if (context.TryGetCopy(input, out Tuple<T1, T2, T3, T4, T5, T6, T7>? existing))
                 return existing!;
 
+            System.Diagnostics.Debug.Assert(input is not null);
             if (input.GetType() as object != _fieldType as object)
-                return context.DeepCopy(input)!;
+                return context.DeepCopy(input);
 
             if (IsShallowCopyable())
                 return input;
@@ -1206,13 +1241,13 @@ namespace Orleans.Serialization.Codecs
             context.RecordCopy(input, input);
 
             var result = Tuple.Create(
-                _copier1 is null ? input.Item1 : _copier1.DeepCopy(input.Item1, context),
-                _copier2 is null ? input.Item2 : _copier2.DeepCopy(input.Item2, context),
-                _copier3 is null ? input.Item3 : _copier3.DeepCopy(input.Item3, context),
-                _copier4 is null ? input.Item4 : _copier4.DeepCopy(input.Item4, context),
-                _copier5 is null ? input.Item5 : _copier5.DeepCopy(input.Item5, context),
-                _copier6 is null ? input.Item6 : _copier6.DeepCopy(input.Item6, context),
-                _copier7 is null ? input.Item7 : _copier7.DeepCopy(input.Item7, context));
+                _copier1 is null ? input.Item1 : _copier1.DeepCopy(input.Item1, context)!,
+                _copier2 is null ? input.Item2 : _copier2.DeepCopy(input.Item2, context)!,
+                _copier3 is null ? input.Item3 : _copier3.DeepCopy(input.Item3, context)!,
+                _copier4 is null ? input.Item4 : _copier4.DeepCopy(input.Item4, context)!,
+                _copier5 is null ? input.Item5 : _copier5.DeepCopy(input.Item5, context)!,
+                _copier6 is null ? input.Item6 : _copier6.DeepCopy(input.Item6, context)!,
+                _copier7 is null ? input.Item7 : _copier7.DeepCopy(input.Item7, context)!);
             context.RecordCopy(input, result);
             return result;
         }
@@ -1292,6 +1327,7 @@ namespace Orleans.Serialization.Codecs
                 return;
             }
 
+            System.Diagnostics.Debug.Assert(value is not null);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, value.GetType(), WireType.TagDelimited);
 
             _item1Codec.WriteField(ref writer, 1, ElementType1, value.Item1);
@@ -1433,13 +1469,17 @@ namespace Orleans.Serialization.Codecs
         public bool IsShallowCopyable() => _copier1 is null && _copier2 is null && _copier3 is null && _copier4 is null && _copier5 is null && _copier6 is null && _copier7 is null && _copier8 is null;
 
         /// <inheritdoc />
-        public Tuple<T1, T2, T3, T4, T5, T6, T7, T8> DeepCopy(Tuple<T1, T2, T3, T4, T5, T6, T7, T8> input, CopyContext context)
+        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public Tuple<T1, T2, T3, T4, T5, T6, T7, T8>? DeepCopy(Tuple<T1, T2, T3, T4, T5, T6, T7, T8>? input, CopyContext context)
         {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
+
             if (context.TryGetCopy(input, out Tuple<T1, T2, T3, T4, T5, T6, T7, T8>? existing))
                 return existing!;
 
+            System.Diagnostics.Debug.Assert(input is not null);
             if (input.GetType() as object != _fieldType as object)
-                return context.DeepCopy(input)!;
+                return context.DeepCopy(input);
 
             if (IsShallowCopyable())
                 return input;
@@ -1449,14 +1489,14 @@ namespace Orleans.Serialization.Codecs
             context.RecordCopy(input, input);
 
             var result = new Tuple<T1, T2, T3, T4, T5, T6, T7, T8>(
-                _copier1 is null ? input.Item1 : _copier1.DeepCopy(input.Item1, context),
-                _copier2 is null ? input.Item2 : _copier2.DeepCopy(input.Item2, context),
-                _copier3 is null ? input.Item3 : _copier3.DeepCopy(input.Item3, context),
-                _copier4 is null ? input.Item4 : _copier4.DeepCopy(input.Item4, context),
-                _copier5 is null ? input.Item5 : _copier5.DeepCopy(input.Item5, context),
-                _copier6 is null ? input.Item6 : _copier6.DeepCopy(input.Item6, context),
-                _copier7 is null ? input.Item7 : _copier7.DeepCopy(input.Item7, context),
-                _copier8 is null ? input.Rest : _copier8.DeepCopy(input.Rest, context));
+                _copier1 is null ? input.Item1 : _copier1.DeepCopy(input.Item1, context)!,
+                _copier2 is null ? input.Item2 : _copier2.DeepCopy(input.Item2, context)!,
+                _copier3 is null ? input.Item3 : _copier3.DeepCopy(input.Item3, context)!,
+                _copier4 is null ? input.Item4 : _copier4.DeepCopy(input.Item4, context)!,
+                _copier5 is null ? input.Item5 : _copier5.DeepCopy(input.Item5, context)!,
+                _copier6 is null ? input.Item6 : _copier6.DeepCopy(input.Item6, context)!,
+                _copier7 is null ? input.Item7 : _copier7.DeepCopy(input.Item7, context)!,
+                _copier8 is null ? input.Rest : _copier8.DeepCopy(input.Rest, context)!);
             context.RecordCopy(input, result);
             return result;
         }

@@ -27,7 +27,7 @@ namespace Orleans.Serialization
     {
         public DeepCopier(Serializers.CodecProvider codecProvider, Cloning.CopyContextPool contextPool) { }
 
-        public T Copy<T>(T value) { throw null; }
+        public T? Copy<T>(T? value) { throw null; }
 
         public DeepCopier<T> GetCopier<T>() { throw null; }
     }
@@ -36,7 +36,7 @@ namespace Orleans.Serialization
     {
         public DeepCopier(Cloning.IDeepCopier<T> copier, Cloning.CopyContextPool contextPool) { }
 
-        public T Copy(T value) { throw null; }
+        public T? Copy(T? value) { throw null; }
     }
 
     [Alias("ISerializable")]
@@ -1369,7 +1369,7 @@ namespace Orleans.Serialization.Cloning
 
     public partial interface IDeepCopier<T> : IDeepCopier
     {
-        T DeepCopy(T input, CopyContext context);
+        T? DeepCopy(T? input, CopyContext context);
         object? IDeepCopier.DeepCopy(object? input, CopyContext context);
     }
 
@@ -1395,7 +1395,7 @@ namespace Orleans.Serialization.Cloning
 
     public partial class ShallowCopier<T> : IOptionalDeepCopier, IDeepCopier, IDeepCopier<T>
     {
-        public T DeepCopy(T input, CopyContext _) { throw null; }
+        public T? DeepCopy(T? input, CopyContext _) { throw null; }
 
         public object? DeepCopy(object? input, CopyContext _) { throw null; }
 
@@ -1421,7 +1421,7 @@ namespace Orleans.Serialization.Codecs
     {
         public ArrayCopier(Cloning.IDeepCopier<T> elementCopier) { }
 
-        public T[] DeepCopy(T[] input, Cloning.CopyContext context) { throw null; }
+        public T[]? DeepCopy(T[]? input, Cloning.CopyContext context) { throw null; }
     }
 
     [RegisterSerializer]
@@ -1437,7 +1437,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed partial class ArrayListCopier : Cloning.IDeepCopier<System.Collections.ArrayList>, Cloning.IDeepCopier, Cloning.IBaseCopier<System.Collections.ArrayList>, Cloning.IBaseCopier
     {
-        public System.Collections.ArrayList DeepCopy(System.Collections.ArrayList input, Cloning.CopyContext context) { throw null; }
+        public System.Collections.ArrayList? DeepCopy(System.Collections.ArrayList? input, Cloning.CopyContext context) { throw null; }
 
         public void DeepCopy(System.Collections.ArrayList input, System.Collections.ArrayList output, Cloning.CopyContext context) { }
     }
@@ -1502,9 +1502,9 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed partial class BitArrayCopier : Cloning.IDeepCopier<System.Collections.BitArray>, Cloning.IDeepCopier
     {
-        public static System.Collections.BitArray DeepCopy(System.Collections.BitArray input, Cloning.CopyContext context) { throw null; }
+        public static System.Collections.BitArray? DeepCopy(System.Collections.BitArray? input, Cloning.CopyContext context) { throw null; }
 
-        System.Collections.BitArray Cloning.IDeepCopier<System.Collections.BitArray>.DeepCopy(System.Collections.BitArray input, Cloning.CopyContext context) { throw null; }
+        System.Collections.BitArray? Cloning.IDeepCopier<System.Collections.BitArray>.DeepCopy(System.Collections.BitArray? input, Cloning.CopyContext context) { throw null; }
     }
 
     [RegisterSerializer]
@@ -1545,9 +1545,9 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed partial class ByteArrayCopier : Cloning.IDeepCopier<byte[]>, Cloning.IDeepCopier
     {
-        public static byte[] DeepCopy(byte[] input, Cloning.CopyContext context) { throw null; }
+        public static byte[]? DeepCopy(byte[]? input, Cloning.CopyContext context) { throw null; }
 
-        byte[] Cloning.IDeepCopier<byte[]>.DeepCopy(byte[] input, Cloning.CopyContext context) { throw null; }
+        byte[]? Cloning.IDeepCopier<byte[]>.DeepCopy(byte[]? input, Cloning.CopyContext context) { throw null; }
     }
 
     [RegisterSerializer]
@@ -1600,7 +1600,7 @@ namespace Orleans.Serialization.Codecs
     {
         public CollectionCopier(Cloning.IDeepCopier<T> valueCopier) { }
 
-        public System.Collections.ObjectModel.Collection<T> DeepCopy(System.Collections.ObjectModel.Collection<T> input, Cloning.CopyContext context) { throw null; }
+        public System.Collections.ObjectModel.Collection<T>? DeepCopy(System.Collections.ObjectModel.Collection<T>? input, Cloning.CopyContext context) { throw null; }
 
         public void DeepCopy(System.Collections.ObjectModel.Collection<T> input, System.Collections.ObjectModel.Collection<T> output, Cloning.CopyContext context) { }
     }
@@ -1634,7 +1634,7 @@ namespace Orleans.Serialization.Codecs
     {
         public ConcurrentDictionaryCopier(Cloning.IDeepCopier<TKey> keyCopier, Cloning.IDeepCopier<TValue> valueCopier) { }
 
-        public System.Collections.Concurrent.ConcurrentDictionary<TKey, TValue> DeepCopy(System.Collections.Concurrent.ConcurrentDictionary<TKey, TValue> input, Cloning.CopyContext context) { throw null; }
+        public System.Collections.Concurrent.ConcurrentDictionary<TKey, TValue>? DeepCopy(System.Collections.Concurrent.ConcurrentDictionary<TKey, TValue>? input, Cloning.CopyContext context) { throw null; }
 
         public void DeepCopy(System.Collections.Concurrent.ConcurrentDictionary<TKey, TValue> input, System.Collections.Concurrent.ConcurrentDictionary<TKey, TValue> output, Cloning.CopyContext context) { }
     }
@@ -1661,7 +1661,7 @@ namespace Orleans.Serialization.Codecs
     {
         public ConcurrentQueueCopier(Cloning.IDeepCopier<T> valueCopier) { }
 
-        public System.Collections.Concurrent.ConcurrentQueue<T> DeepCopy(System.Collections.Concurrent.ConcurrentQueue<T> input, Cloning.CopyContext context) { throw null; }
+        public System.Collections.Concurrent.ConcurrentQueue<T>? DeepCopy(System.Collections.Concurrent.ConcurrentQueue<T>? input, Cloning.CopyContext context) { throw null; }
 
         public void DeepCopy(System.Collections.Concurrent.ConcurrentQueue<T> input, System.Collections.Concurrent.ConcurrentQueue<T> output, Cloning.CopyContext context) { }
     }
@@ -1777,7 +1777,7 @@ namespace Orleans.Serialization.Codecs
     {
         public DictionaryCopier(Cloning.IDeepCopier<TKey> keyCopier, Cloning.IDeepCopier<TValue> valueCopier) { }
 
-        public System.Collections.Generic.Dictionary<TKey, TValue> DeepCopy(System.Collections.Generic.Dictionary<TKey, TValue> input, Cloning.CopyContext context) { throw null; }
+        public System.Collections.Generic.Dictionary<TKey, TValue>? DeepCopy(System.Collections.Generic.Dictionary<TKey, TValue>? input, Cloning.CopyContext context) { throw null; }
 
         public void DeepCopy(System.Collections.Generic.Dictionary<TKey, TValue> input, System.Collections.Generic.Dictionary<TKey, TValue> output, Cloning.CopyContext context) { }
     }
@@ -1844,7 +1844,7 @@ namespace Orleans.Serialization.Codecs
     {
         public FrozenDictionaryCopier(Cloning.IDeepCopier<TKey> keyCopier, Cloning.IDeepCopier<TValue> valueCopier) { }
 
-        public System.Collections.Frozen.FrozenDictionary<TKey, TValue> DeepCopy(System.Collections.Frozen.FrozenDictionary<TKey, TValue> input, Cloning.CopyContext context) { throw null; }
+        public System.Collections.Frozen.FrozenDictionary<TKey, TValue>? DeepCopy(System.Collections.Frozen.FrozenDictionary<TKey, TValue>? input, Cloning.CopyContext context) { throw null; }
 
         public bool IsShallowCopyable() { throw null; }
     }
@@ -1873,7 +1873,7 @@ namespace Orleans.Serialization.Codecs
     {
         public FrozenSetCopier(Cloning.IDeepCopier<T> copier) { }
 
-        public System.Collections.Frozen.FrozenSet<T> DeepCopy(System.Collections.Frozen.FrozenSet<T> input, Cloning.CopyContext context) { throw null; }
+        public System.Collections.Frozen.FrozenSet<T>? DeepCopy(System.Collections.Frozen.FrozenSet<T>? input, Cloning.CopyContext context) { throw null; }
 
         public bool IsShallowCopyable() { throw null; }
     }
@@ -1963,7 +1963,7 @@ namespace Orleans.Serialization.Codecs
     {
         public HashSetCopier(Cloning.IDeepCopier<T> valueCopier) { }
 
-        public System.Collections.Generic.HashSet<T> DeepCopy(System.Collections.Generic.HashSet<T> input, Cloning.CopyContext context) { throw null; }
+        public System.Collections.Generic.HashSet<T>? DeepCopy(System.Collections.Generic.HashSet<T>? input, Cloning.CopyContext context) { throw null; }
 
         public void DeepCopy(System.Collections.Generic.HashSet<T> input, System.Collections.Generic.HashSet<T> output, Cloning.CopyContext context) { }
     }
@@ -2032,7 +2032,7 @@ namespace Orleans.Serialization.Codecs
     {
         public ImmutableDictionaryCopier(Cloning.IDeepCopier<TKey> keyCopier, Cloning.IDeepCopier<TValue> valueCopier) { }
 
-        public System.Collections.Immutable.ImmutableDictionary<TKey, TValue> DeepCopy(System.Collections.Immutable.ImmutableDictionary<TKey, TValue> input, Cloning.CopyContext context) { throw null; }
+        public System.Collections.Immutable.ImmutableDictionary<TKey, TValue>? DeepCopy(System.Collections.Immutable.ImmutableDictionary<TKey, TValue>? input, Cloning.CopyContext context) { throw null; }
 
         public bool IsShallowCopyable() { throw null; }
     }
@@ -2061,7 +2061,7 @@ namespace Orleans.Serialization.Codecs
     {
         public ImmutableHashSetCopier(Cloning.IDeepCopier<T> copier) { }
 
-        public System.Collections.Immutable.ImmutableHashSet<T> DeepCopy(System.Collections.Immutable.ImmutableHashSet<T> input, Cloning.CopyContext context) { throw null; }
+        public System.Collections.Immutable.ImmutableHashSet<T>? DeepCopy(System.Collections.Immutable.ImmutableHashSet<T>? input, Cloning.CopyContext context) { throw null; }
 
         public bool IsShallowCopyable() { throw null; }
     }
@@ -2090,7 +2090,7 @@ namespace Orleans.Serialization.Codecs
     {
         public ImmutableListCopier(Cloning.IDeepCopier<T> copier) { }
 
-        public System.Collections.Immutable.ImmutableList<T> DeepCopy(System.Collections.Immutable.ImmutableList<T> input, Cloning.CopyContext context) { throw null; }
+        public System.Collections.Immutable.ImmutableList<T>? DeepCopy(System.Collections.Immutable.ImmutableList<T>? input, Cloning.CopyContext context) { throw null; }
 
         public bool IsShallowCopyable() { throw null; }
     }
@@ -2117,7 +2117,7 @@ namespace Orleans.Serialization.Codecs
     {
         public ImmutableQueueCopier(Cloning.IDeepCopier<T> copier) { }
 
-        public System.Collections.Immutable.ImmutableQueue<T> DeepCopy(System.Collections.Immutable.ImmutableQueue<T> input, Cloning.CopyContext context) { throw null; }
+        public System.Collections.Immutable.ImmutableQueue<T>? DeepCopy(System.Collections.Immutable.ImmutableQueue<T>? input, Cloning.CopyContext context) { throw null; }
 
         public bool IsShallowCopyable() { throw null; }
     }
@@ -2144,7 +2144,7 @@ namespace Orleans.Serialization.Codecs
     {
         public ImmutableSortedDictionaryCopier(Cloning.IDeepCopier<TKey> keyCopier, Cloning.IDeepCopier<TValue> valueCopier) { }
 
-        public System.Collections.Immutable.ImmutableSortedDictionary<TKey, TValue> DeepCopy(System.Collections.Immutable.ImmutableSortedDictionary<TKey, TValue> input, Cloning.CopyContext context) { throw null; }
+        public System.Collections.Immutable.ImmutableSortedDictionary<TKey, TValue>? DeepCopy(System.Collections.Immutable.ImmutableSortedDictionary<TKey, TValue>? input, Cloning.CopyContext context) { throw null; }
 
         public bool IsShallowCopyable() { throw null; }
     }
@@ -2175,7 +2175,7 @@ namespace Orleans.Serialization.Codecs
     {
         public ImmutableSortedSetCopier(Cloning.IDeepCopier<T> copier) { }
 
-        public System.Collections.Immutable.ImmutableSortedSet<T> DeepCopy(System.Collections.Immutable.ImmutableSortedSet<T> input, Cloning.CopyContext context) { throw null; }
+        public System.Collections.Immutable.ImmutableSortedSet<T>? DeepCopy(System.Collections.Immutable.ImmutableSortedSet<T>? input, Cloning.CopyContext context) { throw null; }
 
         public bool IsShallowCopyable() { throw null; }
     }
@@ -2204,7 +2204,7 @@ namespace Orleans.Serialization.Codecs
     {
         public ImmutableStackCopier(Cloning.IDeepCopier<T> copier) { }
 
-        public System.Collections.Immutable.ImmutableStack<T> DeepCopy(System.Collections.Immutable.ImmutableStack<T> input, Cloning.CopyContext context) { throw null; }
+        public System.Collections.Immutable.ImmutableStack<T>? DeepCopy(System.Collections.Immutable.ImmutableStack<T>? input, Cloning.CopyContext context) { throw null; }
 
         public bool IsShallowCopyable() { throw null; }
     }
@@ -2362,7 +2362,7 @@ namespace Orleans.Serialization.Codecs
     {
         public ListCopier(Cloning.IDeepCopier<T> valueCopier) { }
 
-        public System.Collections.Generic.List<T> DeepCopy(System.Collections.Generic.List<T> input, Cloning.CopyContext context) { throw null; }
+        public System.Collections.Generic.List<T>? DeepCopy(System.Collections.Generic.List<T>? input, Cloning.CopyContext context) { throw null; }
 
         public void DeepCopy(System.Collections.Generic.List<T> input, System.Collections.Generic.List<T> output, Cloning.CopyContext context) { }
     }
@@ -2420,7 +2420,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed partial class NameValueCollectionCopier : Cloning.IDeepCopier<System.Collections.Specialized.NameValueCollection>, Cloning.IDeepCopier
     {
-        public System.Collections.Specialized.NameValueCollection DeepCopy(System.Collections.Specialized.NameValueCollection input, Cloning.CopyContext context) { throw null; }
+        public System.Collections.Specialized.NameValueCollection? DeepCopy(System.Collections.Specialized.NameValueCollection? input, Cloning.CopyContext context) { throw null; }
     }
 
     [GenerateSerializer]
@@ -2480,7 +2480,7 @@ namespace Orleans.Serialization.Codecs
     {
         public static object? DeepCopy(object? input, Cloning.CopyContext context) { throw null; }
 
-        object Cloning.IDeepCopier<object>.DeepCopy(object input, Cloning.CopyContext context) { throw null; }
+        object? Cloning.IDeepCopier<object>.DeepCopy(object? input, Cloning.CopyContext context) { throw null; }
 
         object? Cloning.IDeepCopier.DeepCopy(object? input, Cloning.CopyContext context) { throw null; }
     }
@@ -2518,7 +2518,7 @@ namespace Orleans.Serialization.Codecs
     {
         public QueueCopier(Cloning.IDeepCopier<T> valueCopier) { }
 
-        public System.Collections.Generic.Queue<T> DeepCopy(System.Collections.Generic.Queue<T> input, Cloning.CopyContext context) { throw null; }
+        public System.Collections.Generic.Queue<T>? DeepCopy(System.Collections.Generic.Queue<T>? input, Cloning.CopyContext context) { throw null; }
 
         public void DeepCopy(System.Collections.Generic.Queue<T> input, System.Collections.Generic.Queue<T> output, Cloning.CopyContext context) { }
     }
@@ -2538,7 +2538,7 @@ namespace Orleans.Serialization.Codecs
     {
         public ReadOnlyCollectionCopier(Cloning.IDeepCopier<T> elementCopier) { }
 
-        public System.Collections.ObjectModel.ReadOnlyCollection<T> DeepCopy(System.Collections.ObjectModel.ReadOnlyCollection<T> input, Cloning.CopyContext context) { throw null; }
+        public System.Collections.ObjectModel.ReadOnlyCollection<T>? DeepCopy(System.Collections.ObjectModel.ReadOnlyCollection<T>? input, Cloning.CopyContext context) { throw null; }
     }
 
     [GenerateSerializer]
@@ -2563,7 +2563,7 @@ namespace Orleans.Serialization.Codecs
     {
         public ReadOnlyDictionaryCopier(Cloning.IDeepCopier<TKey> keyCopier, Cloning.IDeepCopier<TValue> valueCopier) { }
 
-        public System.Collections.ObjectModel.ReadOnlyDictionary<TKey, TValue> DeepCopy(System.Collections.ObjectModel.ReadOnlyDictionary<TKey, TValue> input, Cloning.CopyContext context) { throw null; }
+        public System.Collections.ObjectModel.ReadOnlyDictionary<TKey, TValue>? DeepCopy(System.Collections.ObjectModel.ReadOnlyDictionary<TKey, TValue>? input, Cloning.CopyContext context) { throw null; }
     }
 
     [GenerateSerializer]
@@ -2693,7 +2693,7 @@ namespace Orleans.Serialization.Codecs
     {
         public SortedDictionaryCopier(Cloning.IDeepCopier<TKey> keyCopier, Cloning.IDeepCopier<TValue> valueCopier) { }
 
-        public System.Collections.Generic.SortedDictionary<TKey, TValue> DeepCopy(System.Collections.Generic.SortedDictionary<TKey, TValue> input, Cloning.CopyContext context) { throw null; }
+        public System.Collections.Generic.SortedDictionary<TKey, TValue>? DeepCopy(System.Collections.Generic.SortedDictionary<TKey, TValue>? input, Cloning.CopyContext context) { throw null; }
 
         public void DeepCopy(System.Collections.Generic.SortedDictionary<TKey, TValue> input, System.Collections.Generic.SortedDictionary<TKey, TValue> output, Cloning.CopyContext context) { }
     }
@@ -2722,7 +2722,7 @@ namespace Orleans.Serialization.Codecs
     {
         public SortedListCopier(Cloning.IDeepCopier<TKey> keyCopier, Cloning.IDeepCopier<TValue> valueCopier) { }
 
-        public System.Collections.Generic.SortedList<TKey, TValue> DeepCopy(System.Collections.Generic.SortedList<TKey, TValue> input, Cloning.CopyContext context) { throw null; }
+        public System.Collections.Generic.SortedList<TKey, TValue>? DeepCopy(System.Collections.Generic.SortedList<TKey, TValue>? input, Cloning.CopyContext context) { throw null; }
 
         public void DeepCopy(System.Collections.Generic.SortedList<TKey, TValue> input, System.Collections.Generic.SortedList<TKey, TValue> output, Cloning.CopyContext context) { }
     }
@@ -2751,7 +2751,7 @@ namespace Orleans.Serialization.Codecs
     {
         public SortedSetCopier(Cloning.IDeepCopier<T> elementCopier) { }
 
-        public System.Collections.Generic.SortedSet<T> DeepCopy(System.Collections.Generic.SortedSet<T> input, Cloning.CopyContext context) { throw null; }
+        public System.Collections.Generic.SortedSet<T>? DeepCopy(System.Collections.Generic.SortedSet<T>? input, Cloning.CopyContext context) { throw null; }
 
         public void DeepCopy(System.Collections.Generic.SortedSet<T> input, System.Collections.Generic.SortedSet<T> output, Cloning.CopyContext context) { }
     }
@@ -2781,7 +2781,7 @@ namespace Orleans.Serialization.Codecs
     {
         public StackCopier(Cloning.IDeepCopier<T> valueCopier) { }
 
-        public System.Collections.Generic.Stack<T> DeepCopy(System.Collections.Generic.Stack<T> input, Cloning.CopyContext context) { throw null; }
+        public System.Collections.Generic.Stack<T>? DeepCopy(System.Collections.Generic.Stack<T>? input, Cloning.CopyContext context) { throw null; }
 
         public void DeepCopy(System.Collections.Generic.Stack<T> input, System.Collections.Generic.Stack<T> output, Cloning.CopyContext context) { }
     }
@@ -2923,7 +2923,7 @@ namespace Orleans.Serialization.Codecs
     {
         public TupleCopier(Cloning.IDeepCopier<T> copier) { }
 
-        public System.Tuple<T> DeepCopy(System.Tuple<T> input, Cloning.CopyContext context) { throw null; }
+        public System.Tuple<T>? DeepCopy(System.Tuple<T>? input, Cloning.CopyContext context) { throw null; }
 
         public bool IsShallowCopyable() { throw null; }
     }
@@ -2933,7 +2933,7 @@ namespace Orleans.Serialization.Codecs
     {
         public TupleCopier(Cloning.IDeepCopier<T1> copier1, Cloning.IDeepCopier<T2> copier2) { }
 
-        public System.Tuple<T1, T2> DeepCopy(System.Tuple<T1, T2> input, Cloning.CopyContext context) { throw null; }
+        public System.Tuple<T1, T2>? DeepCopy(System.Tuple<T1, T2>? input, Cloning.CopyContext context) { throw null; }
 
         public bool IsShallowCopyable() { throw null; }
     }
@@ -2943,7 +2943,7 @@ namespace Orleans.Serialization.Codecs
     {
         public TupleCopier(Cloning.IDeepCopier<T1> copier1, Cloning.IDeepCopier<T2> copier2, Cloning.IDeepCopier<T3> copier3) { }
 
-        public System.Tuple<T1, T2, T3> DeepCopy(System.Tuple<T1, T2, T3> input, Cloning.CopyContext context) { throw null; }
+        public System.Tuple<T1, T2, T3>? DeepCopy(System.Tuple<T1, T2, T3>? input, Cloning.CopyContext context) { throw null; }
 
         public bool IsShallowCopyable() { throw null; }
     }
@@ -2953,7 +2953,7 @@ namespace Orleans.Serialization.Codecs
     {
         public TupleCopier(Cloning.IDeepCopier<T1> copier1, Cloning.IDeepCopier<T2> copier2, Cloning.IDeepCopier<T3> copier3, Cloning.IDeepCopier<T4> copier4) { }
 
-        public System.Tuple<T1, T2, T3, T4> DeepCopy(System.Tuple<T1, T2, T3, T4> input, Cloning.CopyContext context) { throw null; }
+        public System.Tuple<T1, T2, T3, T4>? DeepCopy(System.Tuple<T1, T2, T3, T4>? input, Cloning.CopyContext context) { throw null; }
 
         public bool IsShallowCopyable() { throw null; }
     }
@@ -2963,7 +2963,7 @@ namespace Orleans.Serialization.Codecs
     {
         public TupleCopier(Cloning.IDeepCopier<T1> copier1, Cloning.IDeepCopier<T2> copier2, Cloning.IDeepCopier<T3> copier3, Cloning.IDeepCopier<T4> copier4, Cloning.IDeepCopier<T5> copier5) { }
 
-        public System.Tuple<T1, T2, T3, T4, T5> DeepCopy(System.Tuple<T1, T2, T3, T4, T5> input, Cloning.CopyContext context) { throw null; }
+        public System.Tuple<T1, T2, T3, T4, T5>? DeepCopy(System.Tuple<T1, T2, T3, T4, T5>? input, Cloning.CopyContext context) { throw null; }
 
         public bool IsShallowCopyable() { throw null; }
     }
@@ -2973,7 +2973,7 @@ namespace Orleans.Serialization.Codecs
     {
         public TupleCopier(Cloning.IDeepCopier<T1> copier1, Cloning.IDeepCopier<T2> copier2, Cloning.IDeepCopier<T3> copier3, Cloning.IDeepCopier<T4> copier4, Cloning.IDeepCopier<T5> copier5, Cloning.IDeepCopier<T6> copier6) { }
 
-        public System.Tuple<T1, T2, T3, T4, T5, T6> DeepCopy(System.Tuple<T1, T2, T3, T4, T5, T6> input, Cloning.CopyContext context) { throw null; }
+        public System.Tuple<T1, T2, T3, T4, T5, T6>? DeepCopy(System.Tuple<T1, T2, T3, T4, T5, T6>? input, Cloning.CopyContext context) { throw null; }
 
         public bool IsShallowCopyable() { throw null; }
     }
@@ -2983,7 +2983,7 @@ namespace Orleans.Serialization.Codecs
     {
         public TupleCopier(Cloning.IDeepCopier<T1> copier1, Cloning.IDeepCopier<T2> copier2, Cloning.IDeepCopier<T3> copier3, Cloning.IDeepCopier<T4> copier4, Cloning.IDeepCopier<T5> copier5, Cloning.IDeepCopier<T6> copier6, Cloning.IDeepCopier<T7> copier7) { }
 
-        public System.Tuple<T1, T2, T3, T4, T5, T6, T7> DeepCopy(System.Tuple<T1, T2, T3, T4, T5, T6, T7> input, Cloning.CopyContext context) { throw null; }
+        public System.Tuple<T1, T2, T3, T4, T5, T6, T7>? DeepCopy(System.Tuple<T1, T2, T3, T4, T5, T6, T7>? input, Cloning.CopyContext context) { throw null; }
 
         public bool IsShallowCopyable() { throw null; }
     }
@@ -2993,7 +2993,7 @@ namespace Orleans.Serialization.Codecs
     {
         public TupleCopier(Cloning.IDeepCopier<T1> copier1, Cloning.IDeepCopier<T2> copier2, Cloning.IDeepCopier<T3> copier3, Cloning.IDeepCopier<T4> copier4, Cloning.IDeepCopier<T5> copier5, Cloning.IDeepCopier<T6> copier6, Cloning.IDeepCopier<T7> copier7, Cloning.IDeepCopier<T8> copier8) { }
 
-        public System.Tuple<T1, T2, T3, T4, T5, T6, T7, T8> DeepCopy(System.Tuple<T1, T2, T3, T4, T5, T6, T7, T8> input, Cloning.CopyContext context) { throw null; }
+        public System.Tuple<T1, T2, T3, T4, T5, T6, T7, T8>? DeepCopy(System.Tuple<T1, T2, T3, T4, T5, T6, T7, T8>? input, Cloning.CopyContext context) { throw null; }
 
         public bool IsShallowCopyable() { throw null; }
     }
@@ -3453,7 +3453,7 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
 
             public virtual void DeepCopy(T input, T output, Cloning.CopyContext context) { }
 
-            public T? DeepCopy(T original, Cloning.CopyContext context) { throw null; }
+            public T? DeepCopy(T? original, Cloning.CopyContext context) { throw null; }
         }
     }
 }
@@ -3859,7 +3859,7 @@ namespace Orleans.Serialization.Serializers
 
         public void DeepCopy(TField input, TField output, Cloning.CopyContext context) { }
 
-        public TField DeepCopy(TField input, Cloning.CopyContext context) { throw null; }
+        public TField? DeepCopy(TField? input, Cloning.CopyContext context) { throw null; }
 
         public void Deserialize<TInput>(ref Buffers.Reader<TInput> reader, TField value) { }
 

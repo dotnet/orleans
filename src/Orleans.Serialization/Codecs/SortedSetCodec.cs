@@ -73,23 +73,27 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc />
-        public SortedSet<T> DeepCopy(SortedSet<T> input, CopyContext context)
+        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public SortedSet<T>? DeepCopy(SortedSet<T>? input, CopyContext context)
         {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
+
             if (context.TryGetCopy<SortedSet<T>>(input, out var result))
             {
                 return result!;
             }
 
+            System.Diagnostics.Debug.Assert(input is not null);
             if (input.GetType() as object != _fieldType as object)
             {
-                return context.DeepCopy(input)!;
+                return context.DeepCopy(input);
             }
 
             result = new SortedSet<T>(input.Comparer);
             context.RecordCopy(input, result);
             foreach (var element in input)
             {
-                result.Add(_elementCopier.DeepCopy(element, context));
+                result.Add(_elementCopier.DeepCopy(element, context)!);
             }
 
             return result;
@@ -98,9 +102,12 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public void DeepCopy(SortedSet<T> input, SortedSet<T> output, CopyContext context)
         {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(input);
+            ArgumentNullExceptionPolyfill.ThrowIfNull(output);
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
             foreach (var element in input)
             {
-                output.Add(_elementCopier.DeepCopy(element, context));
+                output.Add(_elementCopier.DeepCopy(element, context)!);
             }
         }
     }

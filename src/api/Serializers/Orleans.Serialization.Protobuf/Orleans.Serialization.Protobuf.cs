@@ -19,7 +19,7 @@ namespace Orleans.Serialization
     [RegisterCopier]
     public sealed partial class ByteStringCopier : Cloning.IDeepCopier<Google.Protobuf.ByteString>, Cloning.IDeepCopier
     {
-        public Google.Protobuf.ByteString DeepCopy(Google.Protobuf.ByteString input, Cloning.CopyContext context) { throw null; }
+        public Google.Protobuf.ByteString? DeepCopy(Google.Protobuf.ByteString? input, Cloning.CopyContext context) { throw null; }
     }
 
     [RegisterSerializer]
@@ -40,7 +40,7 @@ namespace Orleans.Serialization
 
         public void DeepCopy(Google.Protobuf.Collections.MapField<TKey, TValue> input, Google.Protobuf.Collections.MapField<TKey, TValue> output, Cloning.CopyContext context) { }
 
-        public Google.Protobuf.Collections.MapField<TKey, TValue> DeepCopy(Google.Protobuf.Collections.MapField<TKey, TValue> input, Cloning.CopyContext context) { throw null; }
+        public Google.Protobuf.Collections.MapField<TKey, TValue>? DeepCopy(Google.Protobuf.Collections.MapField<TKey, TValue>? input, Cloning.CopyContext context) { throw null; }
     }
 
     [Alias("protobuf")]
@@ -80,7 +80,7 @@ namespace Orleans.Serialization
 
         public void DeepCopy(Google.Protobuf.Collections.RepeatedField<T> input, Google.Protobuf.Collections.RepeatedField<T> output, Cloning.CopyContext context) { }
 
-        public Google.Protobuf.Collections.RepeatedField<T> DeepCopy(Google.Protobuf.Collections.RepeatedField<T> input, Cloning.CopyContext context) { throw null; }
+        public Google.Protobuf.Collections.RepeatedField<T>? DeepCopy(Google.Protobuf.Collections.RepeatedField<T>? input, Cloning.CopyContext context) { throw null; }
     }
 
     public static partial class SerializationHostingExtensions

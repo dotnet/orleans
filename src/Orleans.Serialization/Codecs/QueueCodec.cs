@@ -35,6 +35,7 @@ namespace Orleans.Serialization.Codecs
                 return;
             }
 
+            System.Diagnostics.Debug.Assert(value is not null);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, value.GetType(), WireType.TagDelimited);
 
             if (value.Count > 0)
@@ -128,23 +129,27 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
-        public Queue<T> DeepCopy(Queue<T> input, CopyContext context)
+        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public Queue<T>? DeepCopy(Queue<T>? input, CopyContext context)
         {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
+
             if (context.TryGetCopy<Queue<T>>(input, out var result))
             {
                 return result!;
             }
 
+            System.Diagnostics.Debug.Assert(input is not null);
             if (input.GetType() as object != _fieldType as object)
             {
-                return context.DeepCopy(input)!;
+                return context.DeepCopy(input);
             }
 
             result = new Queue<T>(input.Count);
             context.RecordCopy(input, result);
             foreach (var item in input)
             {
-                result.Enqueue(_copier.DeepCopy(item, context));
+                result.Enqueue(_copier.DeepCopy(item, context)!);
             }
 
             return result;
@@ -153,9 +158,13 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public void DeepCopy(Queue<T> input, Queue<T> output, CopyContext context)
         {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(input);
+            ArgumentNullExceptionPolyfill.ThrowIfNull(output);
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
+
             foreach (var item in input)
             {
-                output.Enqueue(_copier.DeepCopy(item, context));
+                output.Enqueue(_copier.DeepCopy(item, context)!);
             }
         }
     }

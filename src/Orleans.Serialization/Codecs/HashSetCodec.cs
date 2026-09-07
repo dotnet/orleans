@@ -46,6 +46,7 @@ namespace Orleans.Serialization.Codecs
                 return;
             }
 
+            System.Diagnostics.Debug.Assert(value is not null);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, value.GetType(), WireType.TagDelimited);
 
             Serialize(ref writer, value);
@@ -116,6 +117,8 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, HashSet<T> value) where TBufferWriter : IBufferWriter<byte>
         {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(value);
+
             if (value.Comparer != EqualityComparer<T>.Default)
             {
                 _comparerCodec.WriteField(ref writer, 0, _comparerType, value.Comparer);
@@ -198,23 +201,27 @@ namespace Orleans.Serialization.Codecs
         private readonly ConstructorInfo _baseConstructor = typeof(HashSet<T>).GetConstructor([typeof(int), typeof(IEqualityComparer<T>)])!;
 
         /// <inheritdoc/>
-        public HashSet<T> DeepCopy(HashSet<T> input, CopyContext context)
+        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public HashSet<T>? DeepCopy(HashSet<T>? input, CopyContext context)
         {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
+
             if (context.TryGetCopy<HashSet<T>>(input, out var result))
             {
                 return result!;
             }
 
+            System.Diagnostics.Debug.Assert(input is not null);
             if (input.GetType() as object != _fieldType as object)
             {
-                return context.DeepCopy(input)!;
+                return context.DeepCopy(input);
             }
 
             result = new(input.Count, input.Comparer);
             context.RecordCopy(input, result);
             foreach (var item in input)
             {
-                result.Add(_copier.DeepCopy(item, context));
+                result.Add(_copier.DeepCopy(item, context)!);
             }
 
             return result;
@@ -223,6 +230,10 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public void DeepCopy(HashSet<T> input, HashSet<T> output, CopyContext context)
         {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(input);
+            ArgumentNullExceptionPolyfill.ThrowIfNull(output);
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
+
             // If the value has some values added by the constructor, clear them.
             // If those values are in the serialized payload, they will be added below.
             output.Clear();
@@ -237,7 +248,7 @@ namespace Orleans.Serialization.Codecs
 
             foreach (var item in input)
             {
-                output.Add(_copier.DeepCopy(item, context));
+                output.Add(_copier.DeepCopy(item, context)!);
             }
         }
     }

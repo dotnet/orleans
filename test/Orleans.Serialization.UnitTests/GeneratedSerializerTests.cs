@@ -943,8 +943,9 @@ public sealed class CustomGenericCopier<T> : Orleans.Serialization.Cloning.IDeep
     {
     }
 
-    public CodecProviderCustomTarget<T> DeepCopy(
-        CodecProviderCustomTarget<T> input,
+    [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+    public CodecProviderCustomTarget<T>? DeepCopy(
+        CodecProviderCustomTarget<T>? input,
         Orleans.Serialization.Cloning.CopyContext context) => input;
 }
 

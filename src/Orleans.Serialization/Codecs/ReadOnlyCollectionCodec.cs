@@ -63,16 +63,20 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc />
-        public ReadOnlyCollection<T> DeepCopy(ReadOnlyCollection<T> input, CopyContext context)
+        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public ReadOnlyCollection<T>? DeepCopy(ReadOnlyCollection<T>? input, CopyContext context)
         {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
+
             if (context.TryGetCopy<ReadOnlyCollection<T>>(input, out var result))
             {
                 return result!;
             }
 
+            System.Diagnostics.Debug.Assert(input is not null);
             if (input.GetType() as object != _fieldType as object)
             {
-                return context.DeepCopy(input)!;
+                return context.DeepCopy(input);
             }
 
             // There is a possibility for infinite recursion here if any value in the input collection is able to take part in a cyclic reference.
@@ -82,7 +86,7 @@ namespace Orleans.Serialization.Codecs
             var tempResult = new T[input.Count];
             for (var i = 0; i < tempResult.Length; i++)
             {
-                tempResult[i] = _elementCopier.DeepCopy(input[i], context);
+                tempResult[i] = _elementCopier.DeepCopy(input[i], context)!;
             }
 
             result = new ReadOnlyCollection<T>(tempResult);

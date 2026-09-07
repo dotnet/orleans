@@ -149,7 +149,8 @@ namespace Orleans.Runtime
     internal class TypedGrainReferenceCopier<TInterface> : IDeepCopier<TInterface>
     {
         /// <inheritdoc/>
-        public TInterface DeepCopy(TInterface input, CopyContext context)
+        [return: NotNullIfNotNull(nameof(input))]
+        public TInterface? DeepCopy(TInterface? input, CopyContext context)
         {
             if (input is null) return input;
             if (input is GrainReference) return input;

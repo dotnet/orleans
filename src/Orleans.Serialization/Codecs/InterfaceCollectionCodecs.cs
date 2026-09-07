@@ -62,7 +62,7 @@ internal static class InterfaceCollectionCodecHelpers
 
     public static bool TryCopyRuntime<TField>(
         IDeepCopierProvider copierProvider,
-        TField? input,
+        [System.Diagnostics.CodeAnalysis.NotNullWhen(false)] TField? input,
         CopyContext context,
         out TField? result) where TField : class
     {
@@ -599,7 +599,8 @@ internal abstract class DictionaryInterfaceCodec<TInterface, TKey, TValue> : IFi
 internal abstract class ListInterfaceCopier<TInterface, T>(IDeepCopierProvider copierProvider, IDeepCopier<T> elementCopier)
     : IDeepCopier<TInterface> where TInterface : class, IEnumerable<T>
 {
-    public TInterface DeepCopy(TInterface input, CopyContext context)
+    [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+    public TInterface? DeepCopy(TInterface? input, CopyContext context)
     {
         if (InterfaceCollectionCodecHelpers.TryCopyRuntime(copierProvider, input, context, out var runtimeResult))
         {
@@ -617,7 +618,7 @@ internal abstract class ListInterfaceCopier<TInterface, T>(IDeepCopierProvider c
         context.RecordCopy(input, copy);
         foreach (var element in input)
         {
-            copy.Add(elementCopier.DeepCopy(element, context));
+            copy.Add(elementCopier.DeepCopy(element, context)!);
         }
 
         return (TInterface)(object)copy;
@@ -626,7 +627,8 @@ internal abstract class ListInterfaceCopier<TInterface, T>(IDeepCopierProvider c
 
 internal abstract class SetInterfaceCopier<TInterface, T>(IDeepCopierProvider copierProvider, IDeepCopier<T> elementCopier) : IDeepCopier<TInterface> where TInterface : class, IEnumerable<T>
 {
-    public TInterface DeepCopy(TInterface input, CopyContext context)
+    [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+    public TInterface? DeepCopy(TInterface? input, CopyContext context)
     {
         if (InterfaceCollectionCodecHelpers.TryCopyRuntime(copierProvider, input, context, out var runtimeResult))
         {
@@ -644,7 +646,7 @@ internal abstract class SetInterfaceCopier<TInterface, T>(IDeepCopierProvider co
         context.RecordCopy(input, copy);
         foreach (var element in input)
         {
-            copy.Add(elementCopier.DeepCopy(element, context));
+            copy.Add(elementCopier.DeepCopy(element, context)!);
         }
 
         return (TInterface)(object)copy;
@@ -658,7 +660,8 @@ internal abstract class DictionaryInterfaceCopier<TInterface, TKey, TValue>(
     where TInterface : class, IEnumerable<KeyValuePair<TKey, TValue>>
     where TKey : notnull
 {
-    public TInterface DeepCopy(TInterface input, CopyContext context)
+    [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+    public TInterface? DeepCopy(TInterface? input, CopyContext context)
     {
         if (InterfaceCollectionCodecHelpers.TryCopyRuntime(copierProvider, input, context, out var runtimeResult))
         {
@@ -676,7 +679,7 @@ internal abstract class DictionaryInterfaceCopier<TInterface, TKey, TValue>(
         context.RecordCopy(input, copy);
         foreach (var entry in input)
         {
-            copy[keyCopier.DeepCopy(entry.Key, context)] = valueCopier.DeepCopy(entry.Value, context);
+            copy[keyCopier.DeepCopy(entry.Key, context)!] = valueCopier.DeepCopy(entry.Value, context)!;
         }
 
         return (TInterface)(object)copy;

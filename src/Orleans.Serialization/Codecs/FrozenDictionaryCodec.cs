@@ -84,11 +84,15 @@ namespace Orleans.Serialization.Codecs
         public bool IsShallowCopyable() => _keyCopier is null && _valueCopier is null;
 
         /// <inheritdoc/>
-        public FrozenDictionary<TKey, TValue> DeepCopy(FrozenDictionary<TKey, TValue> input, CopyContext context)
+        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public FrozenDictionary<TKey, TValue>? DeepCopy(FrozenDictionary<TKey, TValue>? input, CopyContext context)
         {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
+
             if (context.TryGetCopy<FrozenDictionary<TKey, TValue>>(input, out var result))
                 return result!;
 
+            System.Diagnostics.Debug.Assert(input is not null);
             if (input.Count == 0 || _keyCopier is null && _valueCopier is null)
                 return input;
 
@@ -98,8 +102,8 @@ namespace Orleans.Serialization.Codecs
 
             var items = new List<KeyValuePair<TKey, TValue>>(input.Count);
             foreach (var item in input)
-                items.Add(new(_keyCopier is null ? item.Key : _keyCopier.DeepCopy(item.Key, context),
-                    _valueCopier is null ? item.Value : _valueCopier.DeepCopy(item.Value, context)));
+                items.Add(new(_keyCopier is null ? item.Key : _keyCopier.DeepCopy(item.Key, context)!,
+                    _valueCopier is null ? item.Value : _valueCopier.DeepCopy(item.Value, context)!));
 
             var res = items.ToFrozenDictionary(input.Comparer);
             context.RecordCopy(input, res);

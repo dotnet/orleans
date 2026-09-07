@@ -96,16 +96,20 @@ namespace Orleans.Serialization.Codecs
     public sealed class NameValueCollectionCopier : IDeepCopier<NameValueCollection>
     {
         /// <inheritdoc/>
-        public NameValueCollection DeepCopy(NameValueCollection input, CopyContext context)
+        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public NameValueCollection? DeepCopy(NameValueCollection? input, CopyContext context)
         {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
+
             if (context.TryGetCopy<NameValueCollection>(input, out var result))
             {
                 return result!;
             }
 
+            System.Diagnostics.Debug.Assert(input is not null);
             if (input.GetType() != typeof(NameValueCollection))
             {
-                return context.DeepCopy(input)!;
+                return context.DeepCopy(input);
             }
 
             result = new NameValueCollection(input.Count);

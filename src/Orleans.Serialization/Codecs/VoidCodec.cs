@@ -41,7 +41,9 @@ namespace Orleans.Serialization.Codecs
         [return: NotNullIfNotNull(nameof(input))]
         public object? DeepCopy(object? input, CopyContext context)
         {
-            if (context.TryGetCopy<object>(input!, out var result))
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
+
+            if (context.TryGetCopy<object>(input, out var result))
             {
                 return result;
             }
@@ -50,6 +52,7 @@ namespace Orleans.Serialization.Codecs
             return null;
         }
 
+        [DoesNotReturn]
         private static void ThrowNotNullException(object? value) => throw new InvalidOperationException($"Expected a value of null, but encountered a value of type '{value!.GetType()}'.");
     }
 }

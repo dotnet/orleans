@@ -306,7 +306,7 @@ namespace Orleans.Serialization.Invocation
             => _copier = OrleansGeneratedCodeHelper.GetService<IDeepCopier<TResult>>(this, codecProvider);
 
         [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
-        public Response<TResult>? DeepCopy(Response<TResult> input, CopyContext context)
+        public Response<TResult>? DeepCopy(Response<TResult>? input, CopyContext context)
         {
             if (input is null)
                 return null;

@@ -82,6 +82,7 @@ namespace Orleans.Serialization.Codecs
                 return;
             }
 
+            System.Diagnostics.Debug.Assert(value is not null);
             writer.WriteFieldHeaderExpected(fieldIdDelta, WireType.TagDelimited);
             IPAddressCodec.WriteField(ref writer, 0, value.Address);
             if (value.Port != 0) UInt16Codec.WriteField(ref writer, 1, (ushort)value.Port);

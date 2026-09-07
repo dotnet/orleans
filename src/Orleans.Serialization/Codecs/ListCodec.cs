@@ -39,6 +39,7 @@ namespace Orleans.Serialization.Codecs
                 return;
             }
 
+            System.Diagnostics.Debug.Assert(value is not null);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, value.GetType(), WireType.TagDelimited);
 
             Serialize(ref writer, value);
@@ -106,6 +107,8 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, List<T> value) where TBufferWriter : IBufferWriter<byte>
         {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(value);
+
             if (value.Count > 0)
             {
                 UInt32Codec.WriteField(ref writer, 0, (uint)value.Count);
@@ -121,6 +124,8 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public void Deserialize<TInput>(ref Reader<TInput> reader, List<T> value)
         {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(value);
+
             // If the value has some values added by the constructor, clear them.
             // If those values are in the serialized payload, they will be added below.
             value.Clear();
@@ -175,23 +180,27 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
-        public List<T> DeepCopy(List<T> input, CopyContext context)
+        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public List<T>? DeepCopy(List<T>? input, CopyContext context)
         {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
+
             if (context.TryGetCopy<List<T>>(input, out var result))
             {
                 return result!;
             }
 
+            System.Diagnostics.Debug.Assert(input is not null);
             if (input.GetType() != typeof(List<T>))
             {
-                return context.DeepCopy(input)!;
+                return context.DeepCopy(input);
             }
 
             result = new List<T>(input.Count);
             context.RecordCopy(input, result);
             foreach (var item in input)
             {
-                result.Add(_copier.DeepCopy(item, context));
+                result.Add(_copier.DeepCopy(item, context)!);
             }
 
             return result;
@@ -200,6 +209,10 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public void DeepCopy(List<T> input, List<T> output, CopyContext context)
         {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(input);
+            ArgumentNullExceptionPolyfill.ThrowIfNull(output);
+            ArgumentNullExceptionPolyfill.ThrowIfNull(context);
+
             output.Clear();
 
 #if NET6_0_OR_GREATER
@@ -207,7 +220,7 @@ namespace Orleans.Serialization.Codecs
 #endif
             foreach (var item in input)
             {
-                output.Add(_copier.DeepCopy(item, context));
+                output.Add(_copier.DeepCopy(item, context)!);
             }
         }
     }

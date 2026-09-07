@@ -40,6 +40,7 @@ public sealed class CollectionCodec<T> : IFieldCodec<Collection<T>>, IBaseCodec<
             return;
         }
 
+        System.Diagnostics.Debug.Assert(value is not null);
         writer.WriteFieldHeader(fieldIdDelta, expectedType, value.GetType(), WireType.TagDelimited);
 
         Serialize(ref writer, value);
@@ -107,6 +108,8 @@ public sealed class CollectionCodec<T> : IFieldCodec<Collection<T>>, IBaseCodec<
     /// <inheritdoc />
     public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, Collection<T> value) where TBufferWriter : IBufferWriter<byte>
     {
+        ArgumentNullExceptionPolyfill.ThrowIfNull(value);
+
         if (value.Count > 0)
         {
             UInt32Codec.WriteField(ref writer, 0, (uint)value.Count);
@@ -122,6 +125,8 @@ public sealed class CollectionCodec<T> : IFieldCodec<Collection<T>>, IBaseCodec<
     /// <inheritdoc />
     public void Deserialize<TInput>(ref Reader<TInput> reader, Collection<T> value)
     {
+        ArgumentNullExceptionPolyfill.ThrowIfNull(value);
+
         // If the value has some values added by the constructor, clear them.
         // If those values are in the serialized payload, they will be added below.
         value.Clear();
@@ -173,23 +178,27 @@ public sealed class CollectionCopier<T> : IDeepCopier<Collection<T>>, IBaseCopie
     }
 
     /// <inheritdoc/>
-    public Collection<T> DeepCopy(Collection<T> input, CopyContext context)
+    [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+    public Collection<T>? DeepCopy(Collection<T>? input, CopyContext context)
     {
+        ArgumentNullExceptionPolyfill.ThrowIfNull(context);
+
         if (context.TryGetCopy<Collection<T>>(input, out var result))
         {
             return result!;
         }
 
+        System.Diagnostics.Debug.Assert(input is not null);
         if (input.GetType() != typeof(Collection<T>))
         {
-            return context.DeepCopy(input)!;
+            return context.DeepCopy(input);
         }
 
         result = new Collection<T>(new List<T>(input.Count));
         context.RecordCopy(input, result);
         foreach (var item in input)
         {
-            result.Add(_copier.DeepCopy(item, context));
+            result.Add(_copier.DeepCopy(item, context)!);
         }
 
         return result;
@@ -198,11 +207,15 @@ public sealed class CollectionCopier<T> : IDeepCopier<Collection<T>>, IBaseCopie
     /// <inheritdoc/>
     public void DeepCopy(Collection<T> input, Collection<T> output, CopyContext context)
     {
+        ArgumentNullExceptionPolyfill.ThrowIfNull(input);
+        ArgumentNullExceptionPolyfill.ThrowIfNull(output);
+        ArgumentNullExceptionPolyfill.ThrowIfNull(context);
+
         output.Clear();
 
         foreach (var item in input)
         {
-            output.Add(_copier.DeepCopy(item, context));
+            output.Add(_copier.DeepCopy(item, context)!);
         }
     }
 }

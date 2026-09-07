@@ -18,7 +18,11 @@ namespace Orleans.Serialization.Codecs
         /// </summary>
         /// <param name="session">The serializer session.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void MarkValueField(SerializerSession session) => session.ReferencedObjects.MarkValueField();
+        public static void MarkValueField(SerializerSession session)
+        {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(session);
+            session.ReferencedObjects.MarkValueField();
+        }
 
         /// <summary>
         /// Write an object reference if <paramref name="value"/> has already been written.
@@ -197,7 +201,11 @@ namespace Orleans.Serialization.Codecs
         /// </summary>
         /// <param name="session">The session.</param>
         /// <param name="value">The value.</param>
-        public static void RecordObject(SerializerSession session, object value) => session.ReferencedObjects.RecordReferenceField(value);
+        public static void RecordObject(SerializerSession session, object value)
+        {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(session);
+            session.ReferencedObjects.RecordReferenceField(value);
+        }
 
         /// <summary>
         /// Records that an object was read or written.
@@ -205,13 +213,21 @@ namespace Orleans.Serialization.Codecs
         /// <param name="session">The session.</param>
         /// <param name="value">The value.</param>
         /// <param name="referenceId">The reference identifier.</param>
-        public static void RecordObject(SerializerSession session, object? value, uint referenceId) => session.ReferencedObjects.RecordReferenceField(value, referenceId);
+        public static void RecordObject(SerializerSession session, object? value, uint referenceId)
+        {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(session);
+            session.ReferencedObjects.RecordReferenceField(value, referenceId);
+        }
 
         /// <summary>
         /// Records and returns a placeholder reference id for objects which cannot be immediately deserialized.
         /// </summary>
         /// <param name="session">The session.</param>
         /// <returns>The placeholder reference id.</returns>
-        public static uint CreateRecordPlaceholder(SerializerSession session) => session.ReferencedObjects.CreateRecordPlaceholder();
+        public static uint CreateRecordPlaceholder(SerializerSession session)
+        {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(session);
+            return session.ReferencedObjects.CreateRecordPlaceholder();
+        }
     }
 }

@@ -199,7 +199,8 @@ namespace Orleans.Serialization
                 _codecProvider = codecProvider;
             }
 
-            public T DeepCopy(T original, CopyContext context) => Value.DeepCopy(original, context);
+            [return: NotNullIfNotNull(nameof(original))]
+            public T? DeepCopy(T? original, CopyContext context) => Value.DeepCopy(original, context);
 
             [return: NotNullIfNotNull(nameof(original))]
             public object? DeepCopy(object? original, CopyContext context) => ((IDeepCopier)Value).DeepCopy(original, context);

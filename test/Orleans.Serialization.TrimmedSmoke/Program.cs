@@ -240,8 +240,9 @@ internal sealed class CustomGenericCopier<T> : Orleans.Serialization.Cloning.IDe
     {
     }
 
-    public CustomTarget<T> DeepCopy(
-        CustomTarget<T> input,
+    [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+    public CustomTarget<T>? DeepCopy(
+        CustomTarget<T>? input,
         Orleans.Serialization.Cloning.CopyContext context) => input;
 }
 

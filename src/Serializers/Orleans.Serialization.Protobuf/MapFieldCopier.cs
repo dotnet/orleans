@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using Google.Protobuf.Collections;
 using Orleans.Serialization.Cloning;
 
@@ -27,13 +28,14 @@ public sealed class MapFieldCopier<TKey, TValue> : IDeepCopier<MapField<TKey, TV
     }
 
     /// <inheritdoc/>
-    public MapField<TKey, TValue> DeepCopy(MapField<TKey, TValue> input, CopyContext context)
+    [return: NotNullIfNotNull(nameof(input))]
+    public MapField<TKey, TValue>? DeepCopy(MapField<TKey, TValue>? input, CopyContext context)
     {
         if (context is null) throw new ArgumentNullException(nameof(context));
 
         if (input is null)
         {
-            return null!;
+            return null;
         }
 
         if (context.TryGetCopy<MapField<TKey, TValue>>(input, out var result))
@@ -43,14 +45,14 @@ public sealed class MapFieldCopier<TKey, TValue> : IDeepCopier<MapField<TKey, TV
 
         if (input.GetType() != typeof(MapField<TKey, TValue>))
         {
-            return context.DeepCopy(input)!;
+            return context.DeepCopy(input);
         }
 
         result = new MapField<TKey, TValue>();
         context.RecordCopy(input, result);
         foreach (var pair in input)
         {
-            result[_keyCopier.DeepCopy(pair.Key, context)] = _valueCopier.DeepCopy(pair.Value, context);
+            result[_keyCopier.DeepCopy(pair.Key, context)!] = _valueCopier.DeepCopy(pair.Value, context)!;
         }
 
         return result;
@@ -65,7 +67,7 @@ public sealed class MapFieldCopier<TKey, TValue> : IDeepCopier<MapField<TKey, TV
 
         foreach (var pair in input)
         {
-            output[_keyCopier.DeepCopy(pair.Key, context)] = _valueCopier.DeepCopy(pair.Value, context);
+            output[_keyCopier.DeepCopy(pair.Key, context)!] = _valueCopier.DeepCopy(pair.Value, context)!;
         }
     }
 }

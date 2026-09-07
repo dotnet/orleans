@@ -52,12 +52,16 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc />
-        public bool IsSupportedType(Type type) =>
-            type == CodecType
-            || type == _ordinalType
-            || type == _ordinalIgnoreCaseType
-            || type == _defaultEqualityType
-            || !type.IsAbstract && typeof(IEqualityComparer<string>).IsAssignableFrom(type) && type.Assembly.Equals(typeof(IEqualityComparer<string>).Assembly);
+        public bool IsSupportedType(Type type)
+        {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(type);
+
+            return type == CodecType
+                || type == _ordinalType
+                || type == _ordinalIgnoreCaseType
+                || type == _defaultEqualityType
+                || !type.IsAbstract && typeof(IEqualityComparer<string>).IsAssignableFrom(type) && type.Assembly.Equals(typeof(IEqualityComparer<string>).Assembly);
+        }
 
         /// <inheritdoc />
         [return: System.Diagnostics.CodeAnalysis.MaybeNull]

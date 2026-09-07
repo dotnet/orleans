@@ -62,12 +62,12 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc/>
-        [SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "ReferenceCodec handles null serialized options before the value is accessed.")]
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [AllowNull] Type expectedType, [AllowNull] FSharpOption<T> value) where TBufferWriter : IBufferWriter<byte>
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
                 return;
 
+            System.Diagnostics.Debug.Assert(value is not null);
             writer.WriteStartObject(fieldIdDelta, expectedType, CodecType);
             if (FSharpOption<T>.get_IsSome(value))
             {
@@ -117,6 +117,10 @@ namespace Orleans.Serialization
     /// Copier implementation for <see cref="FSharpOption{T}"/>.
     /// </summary>
     /// <typeparam name="T">The underlying value type of the option type.</typeparam>
+    /// <remarks>
+    /// F# represents <c>None</c> as <see langword="null"/>. This copier preserves that value and
+    /// preserves <c>Some(null)</c> as a non-null option containing a null value.
+    /// </remarks>
     [RegisterCopier]
     public sealed class FSharpOptionCopier<T> : IDeepCopier<FSharpOption<T>>
     {
@@ -133,11 +137,11 @@ namespace Orleans.Serialization
 
         /// <inheritdoc/>
         [return: NotNullIfNotNull(nameof(input))]
-        public FSharpOption<T>? DeepCopy([AllowNull] FSharpOption<T> input, CopyContext context)
+        public FSharpOption<T>? DeepCopy(FSharpOption<T>? input, CopyContext context)
         {
             if (context is null) throw new ArgumentNullException(nameof(context));
 
-            if (input is null || FSharpOption<T>.get_IsNone(input))
+            if (input is null)
             {
                 return input;
             }
@@ -147,6 +151,7 @@ namespace Orleans.Serialization
                 return result!;
             }
 
+            // The implicit conversion creates Some(value), including the distinct Some(null) case.
             result = _valueCopier.DeepCopy(input.Value, context)!;
             context.RecordCopy(input, result);
             return result!;
@@ -243,7 +248,7 @@ namespace Orleans.Serialization
             }
             else
             {
-                return FSharpValueOption<T>.Some(_valueCopier.DeepCopy(input.Value, context));
+                return FSharpValueOption<T>.Some(_valueCopier.DeepCopy(input.Value, context)!);
             }
         }
     }
@@ -352,7 +357,8 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc/>
-        public FSharpChoice<T1, T2> DeepCopy(FSharpChoice<T1, T2> input, CopyContext context)
+        [return: NotNullIfNotNull(nameof(input))]
+        public FSharpChoice<T1, T2>? DeepCopy(FSharpChoice<T1, T2>? input, CopyContext context)
         {
             if (context is null) throw new ArgumentNullException(nameof(context));
 
@@ -361,10 +367,11 @@ namespace Orleans.Serialization
                 return result!;
             }
 
+            System.Diagnostics.Debug.Assert(input is not null);
             result = input switch
             {
-                FSharpChoice<T1, T2>.Choice1Of2 c1 => FSharpChoice<T1, T2>.NewChoice1Of2(_copier1.DeepCopy(c1.Item, context)),
-                FSharpChoice<T1, T2>.Choice2Of2 c2 => FSharpChoice<T1, T2>.NewChoice2Of2(_copier2.DeepCopy(c2.Item, context)),
+                FSharpChoice<T1, T2>.Choice1Of2 c1 => FSharpChoice<T1, T2>.NewChoice1Of2(_copier1.DeepCopy(c1.Item, context)!),
+                FSharpChoice<T1, T2>.Choice2Of2 c2 => FSharpChoice<T1, T2>.NewChoice2Of2(_copier2.DeepCopy(c2.Item, context)!),
                 _ => throw new NotSupportedException($"Type {input.GetType()} is not supported"),
             };
             context.RecordCopy(input, result);
@@ -493,7 +500,8 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc/>
-        public FSharpChoice<T1, T2, T3> DeepCopy(FSharpChoice<T1, T2, T3> input, CopyContext context)
+        [return: NotNullIfNotNull(nameof(input))]
+        public FSharpChoice<T1, T2, T3>? DeepCopy(FSharpChoice<T1, T2, T3>? input, CopyContext context)
         {
             if (context is null) throw new ArgumentNullException(nameof(context));
 
@@ -502,11 +510,12 @@ namespace Orleans.Serialization
                 return result!;
             }
 
+            System.Diagnostics.Debug.Assert(input is not null);
             result = input switch
             {
-                FSharpChoice<T1, T2, T3>.Choice1Of3 c1 => FSharpChoice<T1, T2, T3>.NewChoice1Of3(_copier1.DeepCopy(c1.Item, context)),
-                FSharpChoice<T1, T2, T3>.Choice2Of3 c2 => FSharpChoice<T1, T2, T3>.NewChoice2Of3(_copier2.DeepCopy(c2.Item, context)),
-                FSharpChoice<T1, T2, T3>.Choice3Of3 c3 => FSharpChoice<T1, T2, T3>.NewChoice3Of3(_copier3.DeepCopy(c3.Item, context)),
+                FSharpChoice<T1, T2, T3>.Choice1Of3 c1 => FSharpChoice<T1, T2, T3>.NewChoice1Of3(_copier1.DeepCopy(c1.Item, context)!),
+                FSharpChoice<T1, T2, T3>.Choice2Of3 c2 => FSharpChoice<T1, T2, T3>.NewChoice2Of3(_copier2.DeepCopy(c2.Item, context)!),
+                FSharpChoice<T1, T2, T3>.Choice3Of3 c3 => FSharpChoice<T1, T2, T3>.NewChoice3Of3(_copier3.DeepCopy(c3.Item, context)!),
                 _ => throw new NotSupportedException($"Type {input.GetType()} is not supported"),
             };
             context.RecordCopy(input, result);
@@ -648,7 +657,8 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc/>
-        public FSharpChoice<T1, T2, T3, T4> DeepCopy(FSharpChoice<T1, T2, T3, T4> input, CopyContext context)
+        [return: NotNullIfNotNull(nameof(input))]
+        public FSharpChoice<T1, T2, T3, T4>? DeepCopy(FSharpChoice<T1, T2, T3, T4>? input, CopyContext context)
         {
             if (context is null) throw new ArgumentNullException(nameof(context));
 
@@ -657,12 +667,13 @@ namespace Orleans.Serialization
                 return result!;
             }
 
+            System.Diagnostics.Debug.Assert(input is not null);
             result = input switch
             {
-                FSharpChoice<T1, T2, T3, T4>.Choice1Of4 c1 => FSharpChoice<T1, T2, T3, T4>.NewChoice1Of4(_copier1.DeepCopy(c1.Item, context)),
-                FSharpChoice<T1, T2, T3, T4>.Choice2Of4 c2 => FSharpChoice<T1, T2, T3, T4>.NewChoice2Of4(_copier2.DeepCopy(c2.Item, context)),
-                FSharpChoice<T1, T2, T3, T4>.Choice3Of4 c3 => FSharpChoice<T1, T2, T3, T4>.NewChoice3Of4(_copier3.DeepCopy(c3.Item, context)),
-                FSharpChoice<T1, T2, T3, T4>.Choice4Of4 c4 => FSharpChoice<T1, T2, T3, T4>.NewChoice4Of4(_copier4.DeepCopy(c4.Item, context)),
+                FSharpChoice<T1, T2, T3, T4>.Choice1Of4 c1 => FSharpChoice<T1, T2, T3, T4>.NewChoice1Of4(_copier1.DeepCopy(c1.Item, context)!),
+                FSharpChoice<T1, T2, T3, T4>.Choice2Of4 c2 => FSharpChoice<T1, T2, T3, T4>.NewChoice2Of4(_copier2.DeepCopy(c2.Item, context)!),
+                FSharpChoice<T1, T2, T3, T4>.Choice3Of4 c3 => FSharpChoice<T1, T2, T3, T4>.NewChoice3Of4(_copier3.DeepCopy(c3.Item, context)!),
+                FSharpChoice<T1, T2, T3, T4>.Choice4Of4 c4 => FSharpChoice<T1, T2, T3, T4>.NewChoice4Of4(_copier4.DeepCopy(c4.Item, context)!),
                 _ => throw new NotSupportedException($"Type {input.GetType()} is not supported"),
             };
             context.RecordCopy(input, result);
@@ -817,7 +828,8 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc/>
-        public FSharpChoice<T1, T2, T3, T4, T5> DeepCopy(FSharpChoice<T1, T2, T3, T4, T5> input, CopyContext context)
+        [return: NotNullIfNotNull(nameof(input))]
+        public FSharpChoice<T1, T2, T3, T4, T5>? DeepCopy(FSharpChoice<T1, T2, T3, T4, T5>? input, CopyContext context)
         {
             if (context is null) throw new ArgumentNullException(nameof(context));
 
@@ -826,13 +838,14 @@ namespace Orleans.Serialization
                 return result!;
             }
 
+            System.Diagnostics.Debug.Assert(input is not null);
             result = input switch
             {
-                FSharpChoice<T1, T2, T3, T4, T5>.Choice1Of5 c1 => FSharpChoice<T1, T2, T3, T4, T5>.NewChoice1Of5(_copier1.DeepCopy(c1.Item, context)),
-                FSharpChoice<T1, T2, T3, T4, T5>.Choice2Of5 c2 => FSharpChoice<T1, T2, T3, T4, T5>.NewChoice2Of5(_copier2.DeepCopy(c2.Item, context)),
-                FSharpChoice<T1, T2, T3, T4, T5>.Choice3Of5 c3 => FSharpChoice<T1, T2, T3, T4, T5>.NewChoice3Of5(_copier3.DeepCopy(c3.Item, context)),
-                FSharpChoice<T1, T2, T3, T4, T5>.Choice4Of5 c4 => FSharpChoice<T1, T2, T3, T4, T5>.NewChoice4Of5(_copier4.DeepCopy(c4.Item, context)),
-                FSharpChoice<T1, T2, T3, T4, T5>.Choice5Of5 c5 => FSharpChoice<T1, T2, T3, T4, T5>.NewChoice5Of5(_copier5.DeepCopy(c5.Item, context)),
+                FSharpChoice<T1, T2, T3, T4, T5>.Choice1Of5 c1 => FSharpChoice<T1, T2, T3, T4, T5>.NewChoice1Of5(_copier1.DeepCopy(c1.Item, context)!),
+                FSharpChoice<T1, T2, T3, T4, T5>.Choice2Of5 c2 => FSharpChoice<T1, T2, T3, T4, T5>.NewChoice2Of5(_copier2.DeepCopy(c2.Item, context)!),
+                FSharpChoice<T1, T2, T3, T4, T5>.Choice3Of5 c3 => FSharpChoice<T1, T2, T3, T4, T5>.NewChoice3Of5(_copier3.DeepCopy(c3.Item, context)!),
+                FSharpChoice<T1, T2, T3, T4, T5>.Choice4Of5 c4 => FSharpChoice<T1, T2, T3, T4, T5>.NewChoice4Of5(_copier4.DeepCopy(c4.Item, context)!),
+                FSharpChoice<T1, T2, T3, T4, T5>.Choice5Of5 c5 => FSharpChoice<T1, T2, T3, T4, T5>.NewChoice5Of5(_copier5.DeepCopy(c5.Item, context)!),
                 _ => throw new NotSupportedException($"Type {input.GetType()} is not supported"),
             };
             context.RecordCopy(input, result);
@@ -1000,7 +1013,8 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc/>
-        public FSharpChoice<T1, T2, T3, T4, T5, T6> DeepCopy(FSharpChoice<T1, T2, T3, T4, T5, T6> input, CopyContext context)
+        [return: NotNullIfNotNull(nameof(input))]
+        public FSharpChoice<T1, T2, T3, T4, T5, T6>? DeepCopy(FSharpChoice<T1, T2, T3, T4, T5, T6>? input, CopyContext context)
         {
             if (context is null) throw new ArgumentNullException(nameof(context));
 
@@ -1009,14 +1023,15 @@ namespace Orleans.Serialization
                 return result!;
             }
 
+            System.Diagnostics.Debug.Assert(input is not null);
             result = input switch
             {
-                FSharpChoice<T1, T2, T3, T4, T5, T6>.Choice1Of6 c1 => FSharpChoice<T1, T2, T3, T4, T5, T6>.NewChoice1Of6(_copier1.DeepCopy(c1.Item, context)),
-                FSharpChoice<T1, T2, T3, T4, T5, T6>.Choice2Of6 c2 => FSharpChoice<T1, T2, T3, T4, T5, T6>.NewChoice2Of6(_copier2.DeepCopy(c2.Item, context)),
-                FSharpChoice<T1, T2, T3, T4, T5, T6>.Choice3Of6 c3 => FSharpChoice<T1, T2, T3, T4, T5, T6>.NewChoice3Of6(_copier3.DeepCopy(c3.Item, context)),
-                FSharpChoice<T1, T2, T3, T4, T5, T6>.Choice4Of6 c4 => FSharpChoice<T1, T2, T3, T4, T5, T6>.NewChoice4Of6(_copier4.DeepCopy(c4.Item, context)),
-                FSharpChoice<T1, T2, T3, T4, T5, T6>.Choice5Of6 c5 => FSharpChoice<T1, T2, T3, T4, T5, T6>.NewChoice5Of6(_copier5.DeepCopy(c5.Item, context)),
-                FSharpChoice<T1, T2, T3, T4, T5, T6>.Choice6Of6 c6 => FSharpChoice<T1, T2, T3, T4, T5, T6>.NewChoice6Of6(_copier6.DeepCopy(c6.Item, context)),
+                FSharpChoice<T1, T2, T3, T4, T5, T6>.Choice1Of6 c1 => FSharpChoice<T1, T2, T3, T4, T5, T6>.NewChoice1Of6(_copier1.DeepCopy(c1.Item, context)!),
+                FSharpChoice<T1, T2, T3, T4, T5, T6>.Choice2Of6 c2 => FSharpChoice<T1, T2, T3, T4, T5, T6>.NewChoice2Of6(_copier2.DeepCopy(c2.Item, context)!),
+                FSharpChoice<T1, T2, T3, T4, T5, T6>.Choice3Of6 c3 => FSharpChoice<T1, T2, T3, T4, T5, T6>.NewChoice3Of6(_copier3.DeepCopy(c3.Item, context)!),
+                FSharpChoice<T1, T2, T3, T4, T5, T6>.Choice4Of6 c4 => FSharpChoice<T1, T2, T3, T4, T5, T6>.NewChoice4Of6(_copier4.DeepCopy(c4.Item, context)!),
+                FSharpChoice<T1, T2, T3, T4, T5, T6>.Choice5Of6 c5 => FSharpChoice<T1, T2, T3, T4, T5, T6>.NewChoice5Of6(_copier5.DeepCopy(c5.Item, context)!),
+                FSharpChoice<T1, T2, T3, T4, T5, T6>.Choice6Of6 c6 => FSharpChoice<T1, T2, T3, T4, T5, T6>.NewChoice6Of6(_copier6.DeepCopy(c6.Item, context)!),
                 _ => throw new NotSupportedException($"Type {input.GetType()} is not supported"),
             };
             context.RecordCopy(input, result);
@@ -1084,7 +1099,8 @@ namespace Orleans.Serialization
         public FSharpRefCopier(IDeepCopier<T> copier) => _copier = copier;
 
         /// <inheritdoc/>
-        public FSharpRef<T> DeepCopy(FSharpRef<T> input, CopyContext context)
+        [return: NotNullIfNotNull(nameof(input))]
+        public FSharpRef<T>? DeepCopy(FSharpRef<T>? input, CopyContext context)
         {
             if (context is null) throw new ArgumentNullException(nameof(context));
 
@@ -1093,13 +1109,9 @@ namespace Orleans.Serialization
                 return result!;
             }
 
-            result = input switch
-            {
-                not null => new FSharpRef<T>(_copier.DeepCopy(input.Value, context)),
-                null => null
-            };
-
-            context.RecordCopy(input!, result!);
+            System.Diagnostics.Debug.Assert(input is not null);
+            result = new FSharpRef<T>(_copier.DeepCopy(input.Value, context)!);
+            context.RecordCopy(input, result);
             return result!;
         }
     }
@@ -1168,20 +1180,17 @@ namespace Orleans.Serialization
         public FSharpListCopier(IDeepCopier<T> copier) => _copier = copier;
 
         /// <inheritdoc/>
-        public FSharpList<T> DeepCopy(FSharpList<T> input, CopyContext context)
+        [return: NotNullIfNotNull(nameof(input))]
+        public FSharpList<T>? DeepCopy(FSharpList<T>? input, CopyContext context)
         {
             if (context is null) throw new ArgumentNullException(nameof(context));
-
-            if (input is null)
-            {
-                return null!;
-            }
 
             if (context.TryGetCopy<FSharpList<T>>(input, out var result))
             {
                 return result!;
             }
 
+            System.Diagnostics.Debug.Assert(input is not null);
             result = ListModule.OfSeq(CopyElements(input, context));
             context.RecordCopy(input, result);
             return result;
@@ -1190,7 +1199,7 @@ namespace Orleans.Serialization
             {
                 foreach (var element in list)
                 {
-                    yield return _copier.DeepCopy(element, context);
+                    yield return _copier.DeepCopy(element, context)!;
                 }
             }
         }
@@ -1258,20 +1267,17 @@ namespace Orleans.Serialization
         public FSharpSetCopier(IDeepCopier<T> copier) => _copier = copier;
 
         /// <inheritdoc/>
-        public FSharpSet<T> DeepCopy(FSharpSet<T> input, CopyContext context)
+        [return: NotNullIfNotNull(nameof(input))]
+        public FSharpSet<T>? DeepCopy(FSharpSet<T>? input, CopyContext context)
         {
             if (context is null) throw new ArgumentNullException(nameof(context));
-
-            if (input is null)
-            {
-                return null!;
-            }
 
             if (context.TryGetCopy<FSharpSet<T>>(input, out var result))
             {
                 return result!;
             }
 
+            System.Diagnostics.Debug.Assert(input is not null);
             result = SetModule.OfSeq(CopyElements(input, context));
             context.RecordCopy(input, result);
             return result;
@@ -1280,7 +1286,7 @@ namespace Orleans.Serialization
             {
                 foreach (var element in vals)
                 {
-                    yield return _copier.DeepCopy(element, context);
+                    yield return _copier.DeepCopy(element, context)!;
                 }
             }
         }
@@ -1360,20 +1366,17 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc/>
-        public FSharpMap<TKey, TValue> DeepCopy(FSharpMap<TKey, TValue> input, CopyContext context)
+        [return: NotNullIfNotNull(nameof(input))]
+        public FSharpMap<TKey, TValue>? DeepCopy(FSharpMap<TKey, TValue>? input, CopyContext context)
         {
             if (context is null) throw new ArgumentNullException(nameof(context));
-
-            if (input is null)
-            {
-                return null!;
-            }
 
             if (context.TryGetCopy<FSharpMap<TKey, TValue>>(input, out var result))
             {
                 return result!;
             }
 
+            System.Diagnostics.Debug.Assert(input is not null);
             result = MapModule.OfSeq(CopyElements(input, context));
             context.RecordCopy(input, result);
             return result;
@@ -1382,7 +1385,7 @@ namespace Orleans.Serialization
             {
                 foreach (var element in vals)
                 {
-                    yield return Tuple.Create(_keyCopier.DeepCopy(element.Key, context), _valueCopier.DeepCopy(element.Value, context));
+                    yield return Tuple.Create(_keyCopier.DeepCopy(element.Key, context)!, _valueCopier.DeepCopy(element.Value, context)!);
                 }
             }
         }
@@ -1487,11 +1490,11 @@ namespace Orleans.Serialization
         {
             if (input.IsError)
             {
-                return FSharpResult<T, TError>.NewError(_copier2.DeepCopy(input.ErrorValue, context));
+                return FSharpResult<T, TError>.NewError(_copier2.DeepCopy(input.ErrorValue, context)!);
             }
             else
             {
-                return FSharpResult<T, TError>.NewOk(_copier1.DeepCopy(input.ResultValue, context));
+                return FSharpResult<T, TError>.NewOk(_copier1.DeepCopy(input.ResultValue, context)!);
             }
         }
     }
