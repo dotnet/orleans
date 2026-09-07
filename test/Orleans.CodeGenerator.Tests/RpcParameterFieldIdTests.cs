@@ -32,16 +32,19 @@ public class RpcParameterFieldIdTests
             result,
             "TokenFirst",
             ["arg0", "arg1", "arg2"],
+            ["global::System.Threading.CancellationToken", "int", "string"],
             [(0, "arg1"), (1, "arg2")]);
         AssertInvokable(
             result,
             "TokenMiddle",
             ["arg0", "arg1", "arg2"],
+            ["int", "global::System.Threading.CancellationToken", "string"],
             [(0, "arg0"), (1, "arg2")]);
         AssertInvokable(
             result,
             "TokenLast",
             ["arg0", "arg1", "arg2"],
+            ["int", "string", "global::System.Threading.CancellationToken"],
             [(0, "arg0"), (1, "arg1")]);
     }
 
@@ -68,6 +71,7 @@ public class RpcParameterFieldIdTests
             result,
             "Call",
             ["arg0", "arg1", "arg2", "arg3"],
+            ["int", "global::System.Threading.CancellationToken", "string", "long"],
             [(1, "arg2"), (7, "arg0"), (12, "arg3")]);
     }
 
@@ -142,6 +146,7 @@ public class RpcParameterFieldIdTests
         GeneratorRunResult result,
         string methodName,
         string[] expectedArgumentFields,
+        string[] expectedReflectionParameterTypes,
         (uint FieldId, string FieldName)[] expectedSerializedFields)
     {
         var invokable = GetGeneratedClasses(result)
@@ -157,6 +162,17 @@ public class RpcParameterFieldIdTests
             .Select(variable => variable.Identifier.ValueText)
             .ToArray();
         Assert.Equal(expectedArgumentFields, argumentFields);
+
+        var methodBackingField = Assert.Single(
+            invokable.Members.OfType<FieldDeclarationSyntax>(),
+            field => field.Declaration.Variables.Any(variable => variable.Identifier.ValueText == "MethodBackingField"));
+        var parameterTypes = Assert.Single(
+                methodBackingField.DescendantNodes().OfType<ImplicitArrayCreationExpressionSyntax>())
+            .Initializer.Expressions
+            .OfType<TypeOfExpressionSyntax>()
+            .Select(static expression => expression.Type.ToString())
+            .ToArray();
+        Assert.Equal(expectedReflectionParameterTypes, parameterTypes);
 
         var getArgument = Assert.Single(
             invokable.Members.OfType<MethodDeclarationSyntax>(),
