@@ -293,7 +293,7 @@ internal sealed class PartitionTransition
 
         Failure = exception;
         Volatile.Write(ref _stage, (int)PartitionTransitionStage.Failed);
-        _completion.TrySetCanceled(new CancellationToken(canceled: true));
+        _completion.TrySetException(exception);
     }
 
     internal void MarkFencedCore(ClusterServiceFence fence)
