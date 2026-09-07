@@ -112,7 +112,12 @@ namespace Orleans
             currentWorkCycle = task;
 
             // chain a continuation that checks for more work, on the same scheduler
-            task.ContinueWith((_, s) => ((BatchWorker)s!).CheckForMoreWork(), this);
+            task.ContinueWith(
+                (_, s) => ((BatchWorker)s!).CheckForMoreWork(),
+                this,
+                CancellationToken.None,
+                TaskContinuationOptions.None,
+                TaskScheduler.Current);
             return task;
         }
 
