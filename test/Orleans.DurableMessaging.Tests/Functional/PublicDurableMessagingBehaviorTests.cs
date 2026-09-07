@@ -1166,6 +1166,34 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
         Assert.Empty(state.Effects);
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" ")]
+    public async Task Deliver_InvalidEnvelopeRoute_IsRejectedWithoutHandlerSelection(string? routeKey)
+    {
+        var receiver = NewGrain();
+        using var template = CreateEnvelope(receiver, NewMessage(72, "invalid-route"));
+        var envelope = new DurableEnvelope
+        {
+            MessageId = template.Value.MessageId,
+            SenderId = template.Value.SenderId,
+            ReceiverId = template.Value.ReceiverId,
+            RouteKey = routeKey!,
+            CorrelationKey = template.Value.CorrelationKey,
+            ReplyTo = template.Value.ReplyTo,
+            Data = template.Value.Data,
+            CreatedAt = template.Value.CreatedAt
+        };
+
+        var result = await DeliverAsync(receiver, envelope);
+
+        Assert.Equal(DeliveryStatus.RouteNotFound, result.Status);
+        var state = await receiver.GetSnapshotAsync();
+        Assert.Equal(0, state.InboxCount);
+        Assert.Empty(state.Effects);
+    }
+
     [Fact]
     public async Task Deliver_RejectsEnvelopeAddressedToAnotherGrain()
     {
