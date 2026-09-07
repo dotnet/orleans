@@ -912,7 +912,7 @@ namespace Orleans.Streaming.EventHubs
 
         [LoggerMessage(
             Level = LogLevel.Warning,
-            EventId = (int)OrleansEventHubErrorCode.RetryReceiverInit,
+            EventId = (int)OrleansEventHubErrorCode.FailedPartitionRecovery,
             Message = "Failed to recover EventHub partition {EventHubName}-{Partition} from an invalid checkpoint. The original read failure will be rethrown."
         )]
         private partial void LogWarningFailedToRecoverFromInvalidCheckpoint(string eventHubName, string partition, Exception exception);
