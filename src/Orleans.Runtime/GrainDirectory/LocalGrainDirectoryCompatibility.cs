@@ -97,8 +97,7 @@ internal sealed class LocalGrainDirectoryPartitionCompatibility : SystemTarget, 
         MembershipVersion version,
         GrainAddress address,
         GrainAddress? currentRegistration,
-        CancellationToken cancellationToken,
-        bool allowPreviousVersion = false)
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var result = _directory.DirectoryPartition.AddSingleActivation(address, currentRegistration);
@@ -108,8 +107,7 @@ internal sealed class LocalGrainDirectoryPartitionCompatibility : SystemTarget, 
     public ValueTask<DirectoryResult<GrainAddress?>> LookupAsync(
         MembershipVersion version,
         GrainId grainId,
-        CancellationToken cancellationToken,
-        bool allowPreviousVersion = false)
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var result = _directory.DirectoryPartition.LookUpActivation(grainId);
@@ -119,8 +117,7 @@ internal sealed class LocalGrainDirectoryPartitionCompatibility : SystemTarget, 
     public ValueTask<DirectoryResult<bool>> DeregisterAsync(
         MembershipVersion version,
         GrainAddress address,
-        CancellationToken cancellationToken,
-        bool allowPreviousVersion = false)
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         _directory.DirectoryPartition.RemoveActivation(address.GrainId, address.ActivationId, UnregistrationCause.Force);
