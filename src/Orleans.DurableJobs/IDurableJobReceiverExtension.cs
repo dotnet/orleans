@@ -30,7 +30,7 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
     private readonly IGrainContext _grain;
     private readonly DurableJobReceiverExtensionShared _shared;
     private readonly IDurableJobHandlerLookup _featureHandlers;
-    private readonly Dictionary<(string JobId, long ExecutionGeneration, int DequeueCount), JobAttemptState> _jobAttempts = [];
+    private readonly Dictionary<(string ShardId, string JobId, long ExecutionGeneration, int DequeueCount), JobAttemptState> _jobAttempts = [];
 
     public DurableJobReceiverExtension(
         IGrainContext grain,
@@ -145,7 +145,7 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
     }
 
     private ValueTask<DurableJobRunResult> GetJobStatusAsync(
-        (string JobId, long ExecutionGeneration, int DequeueCount) key,
+        (string ShardId, string JobId, long ExecutionGeneration, int DequeueCount) key,
         IJobRunContext context,
         JobAttemptState state,
         bool newJob,
@@ -181,7 +181,7 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
         return ValueTask.FromCanceled<DurableJobRunResult>(new CancellationToken(canceled: true));
 
         async ValueTask<DurableJobRunResult> LongPollGetJobStatusAsync(
-            (string JobId, long ExecutionGeneration, int DequeueCount) key,
+            (string ShardId, string JobId, long ExecutionGeneration, int DequeueCount) key,
             IJobRunContext context,
             JobAttemptState state,
             CancellationToken attemptCancellationToken)
@@ -218,7 +218,7 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
     }
 
     private DurableJobRunResult GetSuccessfulResult(
-        (string JobId, long ExecutionGeneration, int DequeueCount) key,
+        (string ShardId, string JobId, long ExecutionGeneration, int DequeueCount) key,
         JobAttemptState state)
     {
         var result = state.Task.Result;
@@ -239,7 +239,7 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
         return result;
     }
 
-    private void RemoveJobAttempt((string JobId, long ExecutionGeneration, int DequeueCount) key, JobAttemptState state)
+    private void RemoveJobAttempt((string ShardId, string JobId, long ExecutionGeneration, int DequeueCount) key, JobAttemptState state)
     {
         if (_jobAttempts.TryGetValue(key, out var current) && ReferenceEquals(current, state))
         {
@@ -247,8 +247,8 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
         }
     }
 
-    private static (string JobId, long ExecutionGeneration, int DequeueCount) GetExecutionKey(IJobRunContext context)
-        => (context.Job.Id, context.Job.ExecutionGeneration, context.DequeueCount);
+    private static (string ShardId, string JobId, long ExecutionGeneration, int DequeueCount) GetExecutionKey(IJobRunContext context)
+        => (context.Job.ShardId, context.Job.Id, context.Job.ExecutionGeneration, context.DequeueCount);
 
     internal sealed class TestAccessor(DurableJobReceiverExtension extension)
     {
