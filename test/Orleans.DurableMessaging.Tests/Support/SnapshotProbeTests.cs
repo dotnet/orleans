@@ -44,8 +44,8 @@ public class SnapshotProbeTests
 
         probe.Publish(grainId, snapshot);
 
-        Assert.Same(snapshot, await wait);
         Assert.Equal(0, probe.WaiterListCount);
+        Assert.Same(snapshot, await wait);
     }
 
     [Fact]
