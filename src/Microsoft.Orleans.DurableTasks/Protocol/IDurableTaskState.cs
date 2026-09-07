@@ -5,13 +5,6 @@ using Orleans.Runtime;
 
 namespace Orleans.DurableTasks.Protocol;
 
-/*
- * Grain activates
- * Grain enumerates stored pending tasks and re-invokes any which are not completed.
- *   * Some tasks will not be directly invokable since they represent local methods on a grain (not remote requests to the grain)
-     * Those tasks do not need to be invoked.
- */
-
 public interface IDurableTaskState
 {
     /// <summary>
