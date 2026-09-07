@@ -9,7 +9,7 @@ ms.topic: how-to
 
 The [`Microsoft.Orleans.Streaming.SQS`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.SQS) package connects Orleans persistent streams to [Amazon Simple Queue Service](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/welcome.html). Orleans maps streams across a configurable set of SQS queues, creates a queue when its mapped partition is first used, receives batches through persistent-stream pulling agents, and deletes messages after successful delivery.
 
-SQS streams provide [at-least-once delivery](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/standard-queues-at-least-once-delivery.html). A message becomes visible again when its [visibility timeout](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-visibility-timeout.html) expires before Orleans acknowledges it, so consumers must handle duplicates. The provider assigns receiver-local sequence tokens as messages arrive and doesn't support rewind to an earlier token.
+SQS streams provide [at-least-once delivery](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/standard-queues-at-least-once-delivery.html). A message becomes visible again when its [visibility timeout](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-visibility-timeout.html) expires before Orleans acknowledges it, so consumers must handle duplicates. The provider assigns receiver-local sequence tokens as messages arrive, and subscriptions consume current SQS deliveries rather than seeking to an earlier token.
 
 ## Configure a standard queue provider
 
