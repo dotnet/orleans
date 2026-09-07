@@ -202,9 +202,10 @@ namespace TestGrains
         public async Task ClearWithCancellation()
         {
             var grainId = this.GetPrimaryKeyLong();
-            using var cancellation = new CancellationTokenSource();
+            var cancellation = new CancellationTokenSource();
             if (!PendingClearCancellations.TryAdd(grainId, cancellation))
             {
+                cancellation.Dispose();
                 throw new InvalidOperationException($"A cancellable clear is already pending for grain '{grainId}'.");
             }
 
@@ -214,17 +215,32 @@ namespace TestGrains
             }
             finally
             {
-                PendingClearCancellations.TryRemove(new(grainId, cancellation));
+                lock (cancellation)
+                {
+                    PendingClearCancellations.TryRemove(new(grainId, cancellation));
+                    cancellation.Dispose();
+                }
             }
         }
 
-        public static bool CancelPendingClear(long grainId) =>
-            PendingClearCancellations.TryGetValue(grainId, out var cancellation) && TryCancel(cancellation);
-
-        private static bool TryCancel(CancellationTokenSource cancellation)
+        public static bool CancelPendingClear(long grainId)
         {
-            cancellation.Cancel();
-            return true;
+            if (!PendingClearCancellations.TryGetValue(grainId, out var cancellation))
+            {
+                return false;
+            }
+
+            lock (cancellation)
+            {
+                if (!PendingClearCancellations.TryGetValue(grainId, out var current)
+                    || !ReferenceEquals(cancellation, current))
+                {
+                    return false;
+                }
+
+                cancellation.Cancel();
+                return true;
+            }
         }
 
         public Task<IReadOnlyList<object>> GetEventLog()

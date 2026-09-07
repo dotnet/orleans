@@ -13,6 +13,7 @@ namespace Orleans.EventSourcing.Common;
 /// is representable by it, preserving rolling-upgrade compatibility. A comma-containing identifier upgrades the
 /// value to the current format.
 /// In legacy values, commas are interpreted as token delimiters because the previous format did not escape them.
+/// Legacy values without an initial comma retain their previous best-effort token behavior.
 /// Malformed or unsupported versioned values throw <see cref="FormatException"/>.
 /// </remarks>
 public static class StringEncodedWriteVector
@@ -29,6 +30,11 @@ public static class StringEncodedWriteVector
     {
         ArgumentNullException.ThrowIfNull(writeVector);
         ArgumentException.ThrowIfNullOrEmpty(Replica);
+        if (IsMalformedLegacy(writeVector))
+        {
+            return TryFindLegacyToken(writeVector, Replica, out _);
+        }
+
         return Decode(writeVector, out _).Contains(Replica);
     }
 
@@ -42,6 +48,18 @@ public static class StringEncodedWriteVector
     {
         ArgumentNullException.ThrowIfNull(writeVector);
         ArgumentException.ThrowIfNullOrEmpty(Replica);
+
+        if (IsMalformedLegacy(writeVector))
+        {
+            if (TryFindLegacyToken(writeVector, Replica, out var position))
+            {
+                writeVector = writeVector.Remove(position, Replica.Length + 1);
+                return false;
+            }
+
+            writeVector = string.Concat(",", Replica, writeVector);
+            return true;
+        }
 
         var replicas = Decode(writeVector, out var isLegacy);
         var removed = false;
@@ -125,6 +143,41 @@ public static class StringEncodedWriteVector
         }
 
         return [.. tokens];
+    }
+
+    private static bool IsMalformedLegacy(string writeVector)
+    {
+        if (writeVector.Length == 0 || writeVector[0] == ',' || writeVector.StartsWith(CurrentFormatPrefix, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (writeVector[0] != 'v')
+        {
+            return true;
+        }
+
+        var separator = writeVector.IndexOf(':', 1);
+        return separator < 0
+            || separator == 1
+            || writeVector.AsSpan(1, separator - 1).ContainsAnyExceptInRange('0', '9');
+    }
+
+    private static bool TryFindLegacyToken(string writeVector, string replica, out int position)
+    {
+        var token = string.Concat(",", replica);
+        for (position = writeVector.IndexOf(token, StringComparison.Ordinal);
+            position >= 0;
+            position = writeVector.IndexOf(token, position + 1, StringComparison.Ordinal))
+        {
+            var end = position + token.Length;
+            if (end == writeVector.Length || writeVector[end] == ',')
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static string EncodeCurrent(List<string> replicas)
