@@ -49,11 +49,7 @@ public static class AzuriteContainerManager
     {
         return new AzuriteBuilder(
             "mcr.microsoft.com/azure-storage/azurite:3.35.0@sha256:647c63a91102a9d8e8000aab803436e1fc85fbb285e7ce830a82ee5d6661cf37")
-            .WithCommand(
-                "--blobHost", "0.0.0.0",
-                "--queueHost", "0.0.0.0",
-                "--tableHost", "0.0.0.0",
-                "--skipApiVersionCheck")
+            .WithCommand("--skipApiVersionCheck")
             .Build();
     }
 }
