@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Orleans.EventSourcing.Common;
 using Orleans.Storage;
 
 namespace Orleans.EventSourcing
@@ -265,6 +266,7 @@ namespace Orleans.EventSourcing
         {
             // call the log consistency provider to construct the adaptor, passing the type argument
             LogViewAdaptor = factory.MakeLogViewAdaptor<TGrainState, TEventBase>(this, (TGrainState)initialState, graintypename, grainStorage, services);
+            (LogViewAdaptor as IInitializableLogViewAdaptor)?.EnsureConfirmedViewInitialized();
         }
 
         /// <summary>

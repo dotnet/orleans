@@ -242,6 +242,7 @@ internal sealed class TestPrimaryBasedLogViewAdaptor
     private int _confirmedVersion;
     private int _activePrimaryOperations;
     private int _maximumConcurrentPrimaryOperations;
+    private bool _constructorCompleted;
 
     public TestPrimaryBasedLogViewAdaptor(
         RecordingLogViewAdaptorHost host,
@@ -249,6 +250,7 @@ internal sealed class TestPrimaryBasedLogViewAdaptor
         RecordingProtocolServices services)
         : base(host, initialState, services)
     {
+        _constructorCompleted = true;
     }
 
     public List<string> OperationLog { get; } = [];
@@ -262,6 +264,8 @@ internal sealed class TestPrimaryBasedLogViewAdaptor
     public int ClearCount { get; private set; }
 
     public int MaximumConcurrentPrimaryOperations => Volatile.Read(ref _maximumConcurrentPrimaryOperations);
+
+    public int InitializationCount { get; private set; }
 
     public ControlledOperation<PrimaryReadResult> QueueRead(TestLogView view, int version)
     {
@@ -286,6 +290,13 @@ internal sealed class TestPrimaryBasedLogViewAdaptor
 
     protected override void InitializeConfirmedView(TestLogView initialstate)
     {
+        if (!_constructorCompleted)
+        {
+            throw new InvalidOperationException("Confirmed view initialization ran before the derived constructor completed.");
+        }
+
+        InitializationCount++;
+
         lock (_stateLock)
         {
             _confirmed = initialstate.Copy();

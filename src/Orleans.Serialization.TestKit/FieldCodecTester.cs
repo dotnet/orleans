@@ -1,8 +1,3 @@
-using Orleans.Serialization.Buffers;
-using Orleans.Serialization.Codecs;
-using Orleans.Serialization.Session;
-using Orleans.Serialization.Utilities;
-using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Buffers;
 using System.Collections.Generic;
@@ -11,9 +6,14 @@ using System.IO;
 using System.IO.Pipelines;
 using System.Linq;
 using System.Text;
-using Xunit;
-using Orleans.Serialization.Serializers;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Codecs;
 using Orleans.Serialization.GeneratedCodeHelpers;
+using Orleans.Serialization.Serializers;
+using Orleans.Serialization.Session;
+using Orleans.Serialization.Utilities;
+using Xunit;
 
 namespace Orleans.Serialization.TestKit
 {
@@ -27,11 +27,7 @@ namespace Orleans.Serialization.TestKit
     [ExcludeFromCodeCoverage]
     public abstract class FieldCodecTester<TValue, TCodec> : SerializationTester where TCodec : class, IFieldCodec<TValue>
     {
-        [SuppressMessage(
-            "Usage",
-            "CA2213:Disposable fields should be disposed",
-            Justification = "SerializationTester or its shared fixture owns and disposes the service provider which owns this session pool.")]
-        private readonly SerializerSessionPool _sessionPool;
+        private SerializerSessionPool _sessionPool => ServiceProvider.GetRequiredService<SerializerSessionPool>();
 
         /// <summary>
         /// Initializes a new instance of the <see cref="FieldCodecTester{TValue, TCodec}"/> class.
@@ -40,7 +36,6 @@ namespace Orleans.Serialization.TestKit
         protected FieldCodecTester(ITestOutputHelper output) : base(output ?? throw new ArgumentNullException(nameof(output)))
         {
             output.WriteLine($"Random seed: {RandomSeed}");
-            _sessionPool = ServiceProvider.GetRequiredService<SerializerSessionPool>();
         }
 
         /// <summary>
@@ -50,7 +45,6 @@ namespace Orleans.Serialization.TestKit
         protected FieldCodecTester(ITestOutputHelper output, SerializationTesterFixture fixture) : base(output ?? throw new ArgumentNullException(nameof(output)), fixture)
         {
             output.WriteLine($"Random seed: {RandomSeed}");
-            _sessionPool = ServiceProvider.GetRequiredService<SerializerSessionPool>();
         }
 
         /// <inheritdoc/>

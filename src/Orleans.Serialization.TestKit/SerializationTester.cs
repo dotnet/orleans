@@ -11,6 +11,7 @@ namespace Orleans.Serialization.TestKit
     public abstract class SerializationTester : IDisposable
     {
         private readonly bool _ownsServiceProvider;
+        private readonly Lazy<IServiceProvider> _serviceProvider;
 
         /// <summary>
         /// Initializes a new <see cref="SerializationTester"/> instance.
@@ -25,7 +26,7 @@ namespace Orleans.Serialization.TestKit
 
             RandomSeed = CreateRandomSeed();
             Random = new(RandomSeed);
-            ServiceProvider = CreateServiceProvider();
+            _serviceProvider = new(CreateServiceProvider);
             _ownsServiceProvider = true;
         }
 
@@ -47,7 +48,7 @@ namespace Orleans.Serialization.TestKit
 
             RandomSeed = CreateRandomSeed();
             Random = new(RandomSeed);
-            ServiceProvider = fixture.GetOrCreateServiceProvider(CreateServiceProvider);
+            _serviceProvider = fixture.GetOrCreateServiceProvider(CreateServiceProvider);
         }
 
         private static int CreateRandomSeed()
@@ -69,7 +70,7 @@ namespace Orleans.Serialization.TestKit
         /// <summary>
         /// Gets the service provider.
         /// </summary>
-        protected IServiceProvider ServiceProvider { get; }
+        protected IServiceProvider ServiceProvider => _serviceProvider.Value;
 
         /// <summary>
         /// Creates the serializer service provider for this test class.
@@ -81,9 +82,9 @@ namespace Orleans.Serialization.TestKit
         /// </summary>
         protected virtual void Dispose(bool disposing)
         {
-            if (disposing && _ownsServiceProvider)
+            if (disposing && _ownsServiceProvider && _serviceProvider.IsValueCreated)
             {
-                (ServiceProvider as IDisposable)?.Dispose();
+                (_serviceProvider.Value as IDisposable)?.Dispose();
             }
         }
 
@@ -102,7 +103,7 @@ namespace Orleans.Serialization.TestKit
     public class SerializationTesterFixture : IDisposable
     {
         private readonly object _lock = new();
-        private IServiceProvider? _serviceProvider;
+        private Lazy<IServiceProvider>? _serviceProvider;
 
         /// <summary>
         /// Initializes a new <see cref="SerializationTesterFixture"/> instance.
@@ -114,9 +115,9 @@ namespace Orleans.Serialization.TestKit
         /// <summary>
         /// Gets the service provider.
         /// </summary>
-        public IServiceProvider ServiceProvider => _serviceProvider ?? throw new InvalidOperationException("The service provider has not been initialized.");
+        public IServiceProvider ServiceProvider => _serviceProvider?.Value ?? throw new InvalidOperationException("The service provider has not been initialized.");
 
-        internal IServiceProvider GetOrCreateServiceProvider(Func<IServiceProvider> factory)
+        internal Lazy<IServiceProvider> GetOrCreateServiceProvider(Func<IServiceProvider> factory)
         {
             if (_serviceProvider is { } serviceProvider)
             {
@@ -125,7 +126,7 @@ namespace Orleans.Serialization.TestKit
 
             lock (_lock)
             {
-                return _serviceProvider ??= factory();
+                return _serviceProvider ??= new(factory);
             }
         }
 
@@ -134,9 +135,9 @@ namespace Orleans.Serialization.TestKit
         /// </summary>
         protected virtual void Dispose(bool disposing)
         {
-            if (disposing)
+            if (disposing && _serviceProvider is { IsValueCreated: true } serviceProvider)
             {
-                (_serviceProvider as IDisposable)?.Dispose();
+                (serviceProvider.Value as IDisposable)?.Dispose();
             }
         }
 

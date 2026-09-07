@@ -42,6 +42,39 @@ public sealed class SerializationTestKitContractTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public void SerializationTester_Constructor_DefersServiceCreationUntilDerivedConstructionCompletes()
+    {
+        var probe = new ConstructionProbe();
+        SerializationTesterHarness.Probe = probe;
+
+        using var tester = new SerializationTesterHarness(output);
+
+        Assert.Equal(0, probe.ServiceProviderFactoryCount);
+
+        var first = tester.GetServiceProvider();
+        var second = tester.GetServiceProvider();
+
+        Assert.Same(first, second);
+        Assert.Equal(1, probe.ServiceProviderFactoryCount);
+    }
+
+    [Fact]
+    public void SerializationTester_FixtureServiceProvider_IsAvailableAfterDerivedConstructionCompletes()
+    {
+        var probe = new ConstructionProbe();
+        SerializationTesterHarness.Probe = probe;
+        using var fixture = new SerializationTesterFixture();
+        using var tester = new SerializationTesterHarness(output, fixture);
+
+        Assert.Equal(0, probe.ServiceProviderFactoryCount);
+
+        var fixtureProvider = fixture.ServiceProvider;
+
+        Assert.Same(fixtureProvider, tester.GetServiceProvider());
+        Assert.Equal(1, probe.ServiceProviderFactoryCount);
+    }
+
+    [Fact]
     public void FieldCodecTester_FirstConstructor_NullOutput_ThrowsWithExactParamNameWithoutInvokingDependencies()
     {
         var probe = new ConstructionProbe();
@@ -190,20 +223,31 @@ public sealed class SerializationTestKitContractTests(ITestOutputHelper output)
 
     private sealed class SerializationTesterHarness : SerializationTester
     {
+        private bool _constructionCompleted;
+
         public SerializationTesterHarness(ITestOutputHelper output)
             : base(output)
         {
+            _constructionCompleted = true;
         }
 
         public SerializationTesterHarness(ITestOutputHelper output, SerializationTesterFixture fixture)
             : base(output, fixture)
         {
+            _constructionCompleted = true;
         }
 
         public static ConstructionProbe Probe { get; set; } = null!;
 
+        public IServiceProvider GetServiceProvider() => ServiceProvider;
+
         protected override IServiceProvider CreateServiceProvider()
         {
+            if (!_constructionCompleted)
+            {
+                throw new InvalidOperationException("Service creation ran before the derived constructor completed.");
+            }
+
             Probe.ServiceProviderFactoryCount++;
             return new EmptyServiceProvider();
         }
