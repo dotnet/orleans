@@ -26,6 +26,7 @@ public class DurableMessagingClusterFixture : IAsyncLifetime
         JobManagerProbe = new DurableJobManagerProbe();
         HandlerProbe = new HandlerProbe();
         SnapshotProbe = new SnapshotProbe();
+        OutboxPumpTimerProbe = new OutboxPumpTimerProbe();
         var clusterId = $"durable-messaging-{Guid.NewGuid():N}";
         var serviceId = $"durable-messaging-service-{Guid.NewGuid():N}";
         var builder = new InProcessTestClusterBuilder((short)initialSilos);
@@ -48,6 +49,7 @@ public class DurableMessagingClusterFixture : IAsyncLifetime
             siloBuilder.Services.AddSingleton(SnapshotProbe);
             siloBuilder.UseInMemoryDurableJobs();
             siloBuilder.AddDurableMessaging(ConfigureOptions);
+            ControlledTimerRegistry.Decorate(siloBuilder.Services, OutboxPumpTimerProbe);
             siloBuilder.ConfigureServices(services =>
                 ControlledDurableJobManager.Decorate(services, JobManagerProbe));
             siloBuilder.Services.RemoveAll<IJournalStorageProvider>();
@@ -72,6 +74,7 @@ public class DurableMessagingClusterFixture : IAsyncLifetime
     public DurableJobManagerProbe JobManagerProbe { get; }
     public HandlerProbe HandlerProbe { get; }
     public SnapshotProbe SnapshotProbe { get; }
+    public OutboxPumpTimerProbe OutboxPumpTimerProbe { get; }
 
     public Task<DurableEndpointSnapshot> WaitForEffectCountAsync(IDurableMessagingTestGrain grain, int expected) =>
         SnapshotProbe.WaitAsync(

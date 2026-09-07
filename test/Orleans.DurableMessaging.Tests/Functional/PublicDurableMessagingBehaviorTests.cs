@@ -695,6 +695,50 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task ReciprocalOutboxPumps_DoNotBlockInboxDelivery()
+    {
+        var first = NewGrain();
+        var second = NewGrain();
+        _ = await first.GetSnapshotAsync();
+        _ = await second.GetSnapshotAsync();
+        using var pumpBarrier = fixture.OutboxPumpTimerProbe.BlockNext();
+
+        var firstSend = first.SendAsync(
+            second.GetGrainId(),
+            "messages/reciprocal",
+            NewMessage(83, "first-to-second"));
+        var secondSend = second.SendAsync(
+            first.GetGrainId(),
+            "messages/reciprocal",
+            NewMessage(84, "second-to-first"));
+        try
+        {
+            await Task.WhenAll(firstSend, secondSend);
+            await pumpBarrier.WaitUntilEnteredAsync();
+        }
+        finally
+        {
+            pumpBarrier.Release();
+        }
+
+        var completed = await Task.WhenAll(
+            fixture.SnapshotProbe.WaitAsync(
+                first.GetGrainId(),
+                static snapshot => snapshot.Effects.Any(effect => effect.Value == "second-to-first"),
+                TimeSpan.FromSeconds(10)),
+            fixture.SnapshotProbe.WaitAsync(
+                second.GetGrainId(),
+                static snapshot => snapshot.Effects.Any(effect => effect.Value == "first-to-second"),
+                TimeSpan.FromSeconds(10)));
+        await Task.WhenAll(
+            fixture.WaitForOutboxCountAsync(first, 0),
+            fixture.WaitForOutboxCountAsync(second, 0));
+
+        Assert.Contains(completed[0].Effects, effect => effect.Value == "second-to-first");
+        Assert.Contains(completed[1].Effects, effect => effect.Value == "first-to-second");
+    }
+
+    [Fact]
     public async Task OutboxSchedulingFailure_AbortsCommitAndRetryUsesStableOwnership()
     {
         var sender = NewGrain();

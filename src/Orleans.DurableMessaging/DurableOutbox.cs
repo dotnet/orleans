@@ -83,6 +83,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     private string? _replacementOwnershipId;
     private string? _scheduledOwnershipId;
     private string? _durableOwnershipId;
+    private PendingDeliveryBatch? _pendingDeliveryBatch;
     private bool _jobScheduleConfirmed;
     private bool _recoveryCompleted;
     private int _ensureJobScheduledQueued;
@@ -357,6 +358,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
 
     public void OnDeleteCompleted()
     {
+        CancelPendingDeliveryBatch();
         Interlocked.Increment(ref _stateGeneration);
         _ownershipEpoch = Guid.NewGuid().ToString("N");
         _pendingMessageIds.Clear();
@@ -404,12 +406,14 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
 
     public void OnRecoveryStarted()
     {
+        CancelPendingDeliveryBatch();
         Interlocked.Increment(ref _stateGeneration);
         _recoveryCompleted = false;
     }
 
     public void OnRecoveryRequested()
     {
+        CancelPendingDeliveryBatch();
         Interlocked.Increment(ref _stateGeneration);
         _recoveryCompleted = false;
     }
@@ -618,6 +622,340 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         return target.DeliverAsync(envelope, cancellationToken);
     }
 
+    private async Task AdvancePendingDeliveriesAsync(CancellationToken cancellationToken)
+    {
+        await _deliveryGate.WaitAsync(cancellationToken).ConfigureAwait(true);
+        var stateGeneration = Volatile.Read(ref _stateGeneration);
+        _activeDeliveryGeneration = stateGeneration;
+        try
+        {
+            if (_pendingDeliveryBatch is { } pendingBatch)
+            {
+                if (pendingBatch.StateGeneration != stateGeneration)
+                {
+                    CancelPendingDeliveryBatch();
+                    return;
+                }
+
+                if (pendingBatch.Attempts.Any(static attempt => !attempt.Task.IsCompleted))
+                {
+                    return;
+                }
+
+                _pendingDeliveryBatch = null;
+                var completedSummary = await ApplyCompletedDeliveryBatchAsync(
+                    pendingBatch,
+                    cancellationToken).ConfigureAwait(true);
+
+                LogDeliveryComplete(
+                    _logger,
+                    completedSummary.DeliveredCount,
+                    completedSummary.BackpressuredCount,
+                    completedSummary.FailedCount,
+                    Count);
+                return;
+            }
+
+            if (Count == 0)
+            {
+                return;
+            }
+
+            var now = _jobTimeProvider.GetUtcNow();
+            var pending = _messages.Values
+                .Where(envelope =>
+                    !_pendingMessageIds.Contains(envelope.MessageId)
+                    && IsReadyForAttempt(envelope, now))
+                .Take(_batchSize)
+                .ToList();
+            if (pending.Count == 0)
+            {
+                LogNoDurableMessages(_logger, Count);
+                return;
+            }
+
+            LogDeliveringMessages(_logger, pending.Count);
+            var summary = new DeliverySummary();
+            var remote = new List<DurableEnvelope>(pending.Count);
+            CancellationTokenSource? batchCancellation = null;
+            List<PendingDeliveryAttempt>? attempts = null;
+            try
+            {
+                foreach (var envelope in pending)
+                {
+                    var stopwatch = Stopwatch.StartNew();
+                    var messageNow = _jobTimeProvider.GetUtcNow();
+                    if (_messageStates.TryGetValue(envelope.MessageId, out var existingState)
+                        && existingState.EnqueuedAt is { } enqueuedAt
+                        && DurableMessagingTime.IsExpired(messageNow, enqueuedAt, _maxRetryAge))
+                    {
+                        summary.BatchDirty = true;
+                        summary.FailedCount++;
+                        DeadLetterExpiredMessage(envelope, existingState, messageNow);
+                        continue;
+                    }
+
+                    if (envelope.ReceiverId == _grainContext.GrainId)
+                    {
+                        try
+                        {
+                            var result = await DeliverToInboxAsync(envelope, cancellationToken).ConfigureAwait(true);
+                            ApplyDeliveryResult(envelope, result, stopwatch, ref summary);
+                        }
+                        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                        {
+                            throw;
+                        }
+                        catch (Exception exception)
+                        {
+                            ApplyDeliveryFailure(envelope, exception, stopwatch, ref summary);
+                        }
+                    }
+                    else
+                    {
+                        remote.Add(envelope);
+                    }
+                }
+
+                if (remote.Count > 0)
+                {
+                    batchCancellation = CancellationTokenSource.CreateLinkedTokenSource(_shutdown.Token);
+                    attempts = new List<PendingDeliveryAttempt>(remote.Count);
+                    foreach (var envelope in remote)
+                    {
+                        var stopwatch = Stopwatch.StartNew();
+                        try
+                        {
+                            attempts.Add(new(
+                                envelope,
+                                DeliverToInboxAsync(envelope, batchCancellation.Token).AsTask(),
+                                stopwatch));
+                        }
+                        catch (Exception exception)
+                        {
+                            ApplyDeliveryFailure(envelope, exception, stopwatch, ref summary);
+                        }
+                    }
+                }
+
+                if (summary.BatchDirty)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    await _stateManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
+                    summary.BatchDirty = false;
+                }
+
+                if (attempts is { Count: > 0 })
+                {
+                    var newBatch = new PendingDeliveryBatch(
+                        stateGeneration,
+                        batchCancellation!,
+                        attempts,
+                        summary);
+                    batchCancellation = null;
+                    if (attempts.All(static attempt => attempt.Task.IsCompleted))
+                    {
+                        var completedSummary = await ApplyCompletedDeliveryBatchAsync(
+                            newBatch,
+                            cancellationToken).ConfigureAwait(true);
+                        LogDeliveryComplete(
+                            _logger,
+                            completedSummary.DeliveredCount,
+                            completedSummary.BackpressuredCount,
+                            completedSummary.FailedCount,
+                            Count);
+                    }
+                    else
+                    {
+                        _pendingDeliveryBatch = newBatch;
+                    }
+                }
+                else
+                {
+                    LogDeliveryComplete(
+                        _logger,
+                        summary.DeliveredCount,
+                        summary.BackpressuredCount,
+                        summary.FailedCount,
+                        Count);
+                }
+            }
+            catch
+            {
+                batchCancellation?.Cancel();
+                if (summary.BatchDirty)
+                {
+                    await _stateManager.RevertPendingChangesAsync(CancellationToken.None).ConfigureAwait(true);
+                }
+
+                throw;
+            }
+            finally
+            {
+                batchCancellation?.Dispose();
+            }
+        }
+        finally
+        {
+            _activeDeliveryGeneration = null;
+            _deliveryGate.Release();
+        }
+    }
+
+    private async Task<DeliverySummary> ApplyCompletedDeliveryBatchAsync(
+        PendingDeliveryBatch pendingBatch,
+        CancellationToken cancellationToken)
+    {
+        var summary = pendingBatch.Summary;
+        try
+        {
+            foreach (var attempt in pendingBatch.Attempts)
+            {
+                if (!_messages.ContainsKey(attempt.Envelope.MessageId))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    ApplyDeliveryResult(
+                        attempt.Envelope,
+                        attempt.Task.GetAwaiter().GetResult(),
+                        attempt.Stopwatch,
+                        ref summary);
+                }
+                catch (Exception exception)
+                {
+                    ApplyDeliveryFailure(attempt.Envelope, exception, attempt.Stopwatch, ref summary);
+                }
+            }
+
+            if (summary.BatchDirty)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                await _stateManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
+                summary.BatchDirty = false;
+            }
+        }
+        catch
+        {
+            if (summary.BatchDirty)
+            {
+                await _stateManager.RevertPendingChangesAsync(CancellationToken.None).ConfigureAwait(true);
+            }
+
+            throw;
+        }
+        finally
+        {
+            pendingBatch.Dispose();
+        }
+
+        return summary;
+    }
+
+    private void ApplyDeliveryResult(
+        DurableEnvelope envelope,
+        DeliveryResult result,
+        Stopwatch stopwatch,
+        ref DeliverySummary summary)
+    {
+        stopwatch.Stop();
+        summary.BatchDirty = true;
+        var grainTypeName = _grainContext.GrainId.Type.ToString();
+        switch (result.Status)
+        {
+            case DeliveryStatus.Accepted:
+            case DeliveryStatus.Duplicate:
+            case DeliveryStatus.DeadLettered:
+                RemoveMessage(envelope.MessageId);
+                summary.DeliveredCount++;
+                LogMessageDelivered(
+                    _logger,
+                    envelope.MessageId,
+                    envelope.SenderId,
+                    envelope.ReceiverId,
+                    envelope.RouteKey,
+                    result.Status,
+                    envelope.CorrelationKey?.ToString());
+                _instruments.OnOutboxMessageDelivered(
+                    grainTypeName,
+                    envelope.RouteKey,
+                    result.Status.ToString().ToLowerInvariant());
+                break;
+            case DeliveryStatus.Backpressured:
+                RecordDeliveryFailure(envelope, "The receiver is backpressured.");
+                summary.BackpressuredCount++;
+                LogDeliveryBackpressured(
+                    _logger,
+                    envelope.MessageId,
+                    envelope.ReceiverId,
+                    envelope.RouteKey,
+                    envelope.CorrelationKey?.ToString());
+                _instruments.OnOutboxMessageDelivered(grainTypeName, envelope.RouteKey, "backpressured");
+                break;
+            case DeliveryStatus.RouteNotFound:
+                RecordDeliveryFailure(envelope, result.Message ?? "The receiver has no compatible route.");
+                summary.FailedCount++;
+                LogDeliveryRouteNotFound(
+                    _logger,
+                    envelope.MessageId,
+                    envelope.SenderId,
+                    envelope.ReceiverId,
+                    envelope.RouteKey,
+                    envelope.CorrelationKey?.ToString(),
+                    result.Message ?? "(no message)");
+                _instruments.OnOutboxMessageDelivered(grainTypeName, envelope.RouteKey, "route_not_found");
+                break;
+            default:
+                RecordDeliveryFailure(envelope, $"Unexpected delivery status '{result.Status}'.");
+                summary.FailedCount++;
+                LogUnexpectedDeliveryStatus(
+                    _logger,
+                    result.Status,
+                    envelope.MessageId,
+                    envelope.RouteKey,
+                    envelope.CorrelationKey?.ToString());
+                break;
+        }
+
+        _instruments.OnOutboxDeliveryDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
+    }
+
+    private void ApplyDeliveryFailure(
+        DurableEnvelope envelope,
+        Exception exception,
+        Stopwatch stopwatch,
+        ref DeliverySummary summary)
+    {
+        stopwatch.Stop();
+        summary.BatchDirty = true;
+        summary.FailedCount++;
+        RecordDeliveryFailure(envelope, exception.ToString());
+        var grainTypeName = _grainContext.GrainId.Type.ToString();
+        LogDeliveryError(
+            _logger,
+            exception,
+            envelope.MessageId,
+            envelope.SenderId,
+            envelope.ReceiverId,
+            envelope.RouteKey,
+            envelope.CorrelationKey?.ToString());
+        _instruments.OnOutboxMessageDelivered(grainTypeName, envelope.RouteKey, "error");
+        _instruments.OnOutboxDeliveryDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
+    }
+
+    private void CancelPendingDeliveryBatch()
+    {
+        if (_pendingDeliveryBatch is not { } pendingBatch)
+        {
+            return;
+        }
+
+        _pendingDeliveryBatch = null;
+        pendingBatch.Cancel();
+    }
+
     private void RecordDeliveryFailure(DurableEnvelope envelope, string error)
     {
         if (!_messageStates.TryGetValue(envelope.MessageId, out var state))
@@ -709,6 +1047,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     public Task OnStop(CancellationToken cancellationToken = default)
     {
         _shutdown.Cancel();
+        CancelPendingDeliveryBatch();
         if (Interlocked.Exchange(ref _metricsActive, 0) != 0)
         {
             _instruments.OnOutboxDepthChanged(-Interlocked.Exchange(ref _reportedDepth, 0));
@@ -1049,7 +1388,11 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
             _gate.Release();
         }
 
-        await DeliverPendingMessagesAsync(cancellationToken).ConfigureAwait(true);
+        await AdvancePendingDeliveriesAsync(cancellationToken).ConfigureAwait(true);
+        if (_pendingDeliveryBatch is not null)
+        {
+            return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
+        }
 
         while (true)
         {
@@ -1232,6 +1575,47 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
                 Handle.Complete();
             }
         }
+    }
+
+    private sealed class PendingDeliveryBatch(
+        long stateGeneration,
+        CancellationTokenSource cancellation,
+        List<PendingDeliveryAttempt> attempts,
+        DeliverySummary summary) : IDisposable
+    {
+        public long StateGeneration { get; } = stateGeneration;
+        public List<PendingDeliveryAttempt> Attempts { get; } = attempts;
+        public DeliverySummary Summary { get; } = summary;
+
+        public void Cancel()
+        {
+            foreach (var attempt in Attempts)
+            {
+                _ = attempt.Task.ContinueWith(
+                    static task => _ = task.Exception,
+                    CancellationToken.None,
+                    TaskContinuationOptions.ExecuteSynchronously | TaskContinuationOptions.OnlyOnFaulted,
+                    TaskScheduler.Default);
+            }
+
+            cancellation.Cancel();
+            Dispose();
+        }
+
+        public void Dispose() => cancellation.Dispose();
+    }
+
+    private sealed record PendingDeliveryAttempt(
+        DurableEnvelope Envelope,
+        Task<DeliveryResult> Task,
+        Stopwatch Stopwatch);
+
+    private struct DeliverySummary
+    {
+        public int DeliveredCount;
+        public int BackpressuredCount;
+        public int FailedCount;
+        public bool BatchDirty;
     }
 
     private sealed class EnsureJobTimerState(DurableOutbox owner, bool replaceExisting)
