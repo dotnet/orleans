@@ -61,28 +61,30 @@ namespace UnitTests.LivenessTests
             var listener = new BlockingRangeListener(replayEntered, releaseReplay, updateEntered);
 
             var subscription = Task.Run(() => listeners.Subscribe(listener), cancellationToken);
-            Assert.True(replayEntered.Wait(TimeSpan.FromSeconds(10), cancellationToken));
-
-            var update = listeners.Publish(
-                initialRange,
-                updatedRange,
-                increased: false,
-                static (_, _) => { });
             try
             {
+                Assert.True(replayEntered.Wait(TimeSpan.FromSeconds(10), cancellationToken));
+
+                var update = listeners.Publish(
+                    initialRange,
+                    updatedRange,
+                    increased: false,
+                    static (_, _) => { });
                 Assert.False(update.IsCompleted);
                 Assert.False(updateEntered.IsSet);
+
+                releaseReplay.Set();
+                listeners.Dispatch(update);
+                await subscription.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+
+                Assert.True(updateEntered.IsSet);
+                Assert.Same(updatedRange, listener.LastRange);
             }
             finally
             {
                 releaseReplay.Set();
+                await subscription.WaitAsync(TimeSpan.FromSeconds(10), CancellationToken.None);
             }
-
-            listeners.Dispatch(update);
-            await subscription.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
-
-            Assert.True(updateEntered.IsSet);
-            Assert.Same(updatedRange, listener.LastRange);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Liveness"), TestCategory("Ring"), TestCategory("RingStandalone")]
@@ -180,7 +182,10 @@ namespace UnitTests.LivenessTests
                 if (Interlocked.Increment(ref _notificationCount) == 1)
                 {
                     replayEntered.Set();
-                    releaseReplay.Wait();
+                    if (!releaseReplay.Wait(TimeSpan.FromSeconds(10)))
+                    {
+                        throw new TimeoutException("Timed out waiting to release the initial ring-range replay notification.");
+                    }
                 }
                 else
                 {

@@ -77,10 +77,6 @@ internal sealed class RingRangeListenerManager(IRingRange initialRange)
         {
             Drain();
         }
-        else if (shouldWait)
-        {
-            notification.Wait();
-        }
 
         if (shouldDispatch || shouldWait)
         {
