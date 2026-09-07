@@ -31,7 +31,6 @@ public sealed class StackCodec<T> : IFieldCodec<Stack<T>>
 
     /// <inheritdoc/>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "ReferenceCodec handles null serialized values before the stack is accessed.")]
     public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] Stack<T> value) where TBufferWriter : IBufferWriter<byte>
     {
         if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
@@ -39,6 +38,7 @@ public sealed class StackCodec<T> : IFieldCodec<Stack<T>>
             return;
         }
 
+        System.Diagnostics.Debug.Assert(value is not null);
         writer.WriteFieldHeader(fieldIdDelta, expectedType, value.GetType(), WireType.TagDelimited);
 
         if (value.Count > 0)
@@ -144,7 +144,7 @@ public sealed class StackCopier<T> : IDeepCopier<Stack<T>>, IBaseCopier<Stack<T>
         System.Diagnostics.Debug.Assert(input is not null);
         if (input.GetType() != _fieldType)
         {
-            return context.DeepCopy(input)!;
+            return context.DeepCopy(input);
         }
 
         result = new Stack<T>(input.Count);

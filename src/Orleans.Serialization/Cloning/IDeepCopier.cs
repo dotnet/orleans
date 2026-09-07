@@ -218,6 +218,13 @@ namespace Orleans.Serialization.Cloning
         /// <param name="original">The original object.</param>
         /// <param name="result">The previously recorded copy of <paramref name="original"/>.</param>
         /// <returns><see langword="true"/> if a copy of <paramref name="original"/> has been recorded, <see langword="false"/> otherwise.</returns>
+        /// <remarks>
+        /// A <see langword="null"/> original is treated as already copied and produces a <see langword="null"/> result.
+        /// For a non-null original, a <see langword="true"/> return guarantees a non-null result.
+        /// </remarks>
+        /// <exception cref="InvalidCastException">
+        /// The recorded copy is not assignable to <typeparamref name="T"/>.
+        /// </exception>
         public bool TryGetCopy<T>([NotNullWhen(false)] object? original, out T? result) where T : class
         {
             if (original is null)
@@ -228,13 +235,19 @@ namespace Orleans.Serialization.Cloning
 
             if (_copies.TryGetValue(original, out var existing))
             {
-                result = existing as T;
+                result = existing as T ?? ThrowInvalidRecordedCopyType<T>(original, existing);
                 return true;
             }
 
             result = null;
             return false;
         }
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static T ThrowInvalidRecordedCopyType<T>(object original, object? value) where T : class
+            => throw new InvalidCastException(
+                $"The copy recorded for an object of type '{original.GetType()}' is of type "
+                + $"'{value?.GetType().ToString() ?? "null"}' and cannot be returned as '{typeof(T)}'.");
 
         /// <summary>
         /// Records a copy of an object.
@@ -260,7 +273,7 @@ namespace Orleans.Serialization.Cloning
         [return: NotNullIfNotNull(nameof(value))]
         public T? DeepCopy<T>(T? value)
         {
-            if (!typeof(T).IsValueType)
+            if (default(T) is null)
             {
                 if (value is null) return default;
             }

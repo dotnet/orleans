@@ -35,7 +35,7 @@ public sealed class MapFieldCopier<TKey, TValue> : IDeepCopier<MapField<TKey, TV
 
         if (input is null)
         {
-            return null!;
+            return null;
         }
 
         if (context.TryGetCopy<MapField<TKey, TValue>>(input, out var result))
@@ -45,7 +45,7 @@ public sealed class MapFieldCopier<TKey, TValue> : IDeepCopier<MapField<TKey, TV
 
         if (input.GetType() != typeof(MapField<TKey, TValue>))
         {
-            return context.DeepCopy(input)!;
+            return context.DeepCopy(input);
         }
 
         result = new MapField<TKey, TValue>();

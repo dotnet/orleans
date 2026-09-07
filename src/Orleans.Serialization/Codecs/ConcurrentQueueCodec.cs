@@ -76,7 +76,7 @@ namespace Orleans.Serialization.Codecs
             System.Diagnostics.Debug.Assert(input is not null);
             if (input.GetType() as object != _fieldType as object)
             {
-                return context.DeepCopy(input)!;
+                return context.DeepCopy(input);
             }
 
             result = new ConcurrentQueue<T>();

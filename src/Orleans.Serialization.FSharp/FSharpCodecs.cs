@@ -62,12 +62,12 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc/>
-        [SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "ReferenceCodec handles null serialized options before the value is accessed.")]
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [AllowNull] Type expectedType, [AllowNull] FSharpOption<T> value) where TBufferWriter : IBufferWriter<byte>
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
                 return;
 
+            System.Diagnostics.Debug.Assert(value is not null);
             writer.WriteStartObject(fieldIdDelta, expectedType, CodecType);
             if (FSharpOption<T>.get_IsSome(value))
             {
@@ -117,6 +117,10 @@ namespace Orleans.Serialization
     /// Copier implementation for <see cref="FSharpOption{T}"/>.
     /// </summary>
     /// <typeparam name="T">The underlying value type of the option type.</typeparam>
+    /// <remarks>
+    /// F# represents <c>None</c> as <see langword="null"/>. This copier preserves that value and
+    /// preserves <c>Some(null)</c> as a non-null option containing a null value.
+    /// </remarks>
     [RegisterCopier]
     public sealed class FSharpOptionCopier<T> : IDeepCopier<FSharpOption<T>>
     {
@@ -137,7 +141,7 @@ namespace Orleans.Serialization
         {
             if (context is null) throw new ArgumentNullException(nameof(context));
 
-            if (input is null || FSharpOption<T>.get_IsNone(input))
+            if (input is null)
             {
                 return input;
             }
@@ -147,6 +151,7 @@ namespace Orleans.Serialization
                 return result!;
             }
 
+            // The implicit conversion creates Some(value), including the distinct Some(null) case.
             result = _valueCopier.DeepCopy(input.Value, context)!;
             context.RecordCopy(input, result);
             return result!;

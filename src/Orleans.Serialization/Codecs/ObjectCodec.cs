@@ -127,7 +127,7 @@ namespace Orleans.Serialization.Codecs
             if (input is null) return input;
 
             return context.TryGetCopy<object>(input, out var result) ? result!
-                : input.GetType() == typeof(object) ? input : context.DeepCopy(input)!;
+                : input.GetType() == typeof(object) ? input : context.DeepCopy(input);
         }
 
         object? IDeepCopier<object>.DeepCopy(object? input, CopyContext context)

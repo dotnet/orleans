@@ -179,7 +179,6 @@ namespace Orleans.Serialization.Codecs
         /// <param name="fieldIdDelta">The field identifier delta.</param>
         /// <param name="value">The value.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "ReferenceCodec handles null serialized values before the byte array is accessed.")]
         public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, byte[] value) where TBufferWriter : IBufferWriter<byte>
         {
             if (ReferenceCodec.TryWriteReferenceFieldExpected(ref writer, fieldIdDelta, value))
@@ -187,6 +186,7 @@ namespace Orleans.Serialization.Codecs
                 return;
             }
 
+            System.Diagnostics.Debug.Assert(value is not null);
             writer.WriteFieldHeaderExpected(fieldIdDelta, WireType.LengthPrefixed);
             writer.WriteVarUInt32((uint)value.Length);
             writer.Write(value);

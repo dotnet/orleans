@@ -6,6 +6,8 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.FSharp.Collections;
+using Microsoft.FSharp.Core;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Codecs;
@@ -100,6 +102,52 @@ public sealed class CodecArgumentValidationTests : IDisposable
 
         var valueTypeMethod = typeof(IDeepCopier<int>).GetMethod(nameof(IDeepCopier<int>.DeepCopy));
         Assert.Equal(typeof(int), valueTypeMethod!.ReturnType);
+    }
+
+    [Fact]
+    public void DeepCopier_PreservesNullableValueSemantics()
+    {
+        var copier = _serviceProvider.GetRequiredService<DeepCopier>();
+
+        Assert.Null(copier.Copy<int?>(null));
+        Assert.Equal(5, copier.Copy<int?>(5));
+        Assert.Equal(0, copier.Copy(0));
+
+        using var context = GetCopyContext();
+        Assert.Null(context.DeepCopy<int?>(null));
+        Assert.Equal(5, context.DeepCopy<int?>(5));
+        Assert.Equal(0, context.DeepCopy(0));
+    }
+
+    [Fact]
+    public void CopyContext_TryGetCopy_EnforcesRecordedCopyTypeInvariant()
+    {
+        using var context = GetCopyContext();
+        var assignableOriginal = new object();
+        var assignableCopy = new List<int> { 1, 2, 3 };
+        context.RecordCopy(assignableOriginal, assignableCopy);
+        Assert.True(context.TryGetCopy<IList<int>>(assignableOriginal, out var retrievedCopy));
+        Assert.Same(assignableCopy, retrievedCopy);
+
+        var incompatibleOriginal = new object();
+        context.RecordCopy(incompatibleOriginal, new object());
+        Assert.Throws<InvalidCastException>(() => context.TryGetCopy<string>(incompatibleOriginal, out _));
+
+        var nullCopyOriginal = new object();
+        context.RecordCopy(nullCopyOriginal, null!);
+        Assert.Throws<InvalidCastException>(() => context.TryGetCopy<object>(nullCopyOriginal, out _));
+    }
+
+    [Fact]
+    public void VoidCopier_PreservesNullAndValidatesContextFirst()
+    {
+        IDeepCopier copier = new VoidCopier();
+        using var context = GetCopyContext();
+
+        Assert.Null(copier.DeepCopy(null, context));
+        var exception = Assert.Throws<ArgumentNullException>(() => copier.DeepCopy(null, null!));
+        Assert.Equal("context", exception.ParamName);
+        Assert.Throws<InvalidOperationException>(() => copier.DeepCopy(new object(), context));
     }
 
     // ------------------------------------------------------------------------------------
@@ -332,6 +380,51 @@ public sealed class CodecArgumentValidationTests : IDisposable
 
         Assert.Equal("context", exception.ParamName);
         Assert.Equal(0, elementCopier.InvocationCount);
+    }
+
+    [Fact]
+    public void FSharpCopiers_PreserveNullInputsAndNonNullWrappers()
+    {
+        var objectCopier = new TrackingCopier<object?>(static value => value);
+        using var context = GetCopyContext();
+
+        var optionCopier = new FSharpOptionCopier<object?>(objectCopier);
+        Assert.Null(optionCopier.DeepCopy(null, context));
+        var optionCopy = optionCopier.DeepCopy(FSharpOption<object?>.Some(null), context);
+        Assert.NotNull(optionCopy);
+        Assert.True(FSharpOption<object?>.get_IsSome(optionCopy));
+        Assert.Null(optionCopy.Value);
+        var option = FSharpOption<object?>.Some(new object());
+        var nonNullOptionCopy = optionCopier.DeepCopy(option, context);
+        Assert.NotNull(nonNullOptionCopy);
+        Assert.NotSame(option, nonNullOptionCopy);
+        Assert.Same(option.Value, nonNullOptionCopy.Value);
+
+        var choiceCopier = new FSharpChoiceCopier<object?, int>(objectCopier, new ShallowCopier<int>());
+        Assert.Null(choiceCopier.DeepCopy(null, context));
+        var choiceCopy = Assert.IsType<FSharpChoice<object?, int>.Choice1Of2>(
+            choiceCopier.DeepCopy(FSharpChoice<object?, int>.NewChoice1Of2(null), context));
+        Assert.Null(choiceCopy.Item);
+
+        var referenceCopier = new FSharpRefCopier<object?>(objectCopier);
+        Assert.Null(referenceCopier.DeepCopy(null, context));
+        var referenceCopy = referenceCopier.DeepCopy(new FSharpRef<object?>(null), context);
+        Assert.NotNull(referenceCopy);
+        Assert.Null(referenceCopy.Value);
+
+        var listCopier = new FSharpListCopier<object?>(objectCopier);
+        Assert.Null(listCopier.DeepCopy(null, context));
+        var listCopy = listCopier.DeepCopy(ListModule.OfSeq<object?>([null]), context);
+        Assert.NotNull(listCopy);
+        Assert.Null(Assert.Single(listCopy));
+        var list = ListModule.OfSeq<object?>([new object()]);
+        var firstListCopy = listCopier.DeepCopy(list, context);
+        var secondListCopy = listCopier.DeepCopy(list, context);
+        Assert.NotNull(firstListCopy);
+        Assert.Same(firstListCopy, secondListCopy);
+
+        Assert.Null(new FSharpSetCopier<string>(new ShallowCopier<string>()).DeepCopy(null, context));
+        Assert.Null(new FSharpMapCopier<string, string>(new ShallowCopier<string>(), new ShallowCopier<string>()).DeepCopy(null, context));
     }
 
     // ------------------------------------------------------------------------------------

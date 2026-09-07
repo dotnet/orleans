@@ -28,7 +28,6 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc />
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "ReferenceCodec handles null serialized values before the tuple is accessed.")]
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] Tuple<T> value) where TBufferWriter : IBufferWriter<byte>
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
@@ -36,6 +35,7 @@ namespace Orleans.Serialization.Codecs
                 return;
             }
 
+            System.Diagnostics.Debug.Assert(value is not null);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, value.GetType(), WireType.TagDelimited);
 
             _valueCodec.WriteField(ref writer, 1, CodecElementType, value.Item1);
@@ -113,7 +113,7 @@ namespace Orleans.Serialization.Codecs
 
             System.Diagnostics.Debug.Assert(input is not null);
             if (input.GetType() as object != _fieldType as object)
-                return context.DeepCopy(input)!;
+                return context.DeepCopy(input);
 
             if (IsShallowCopyable())
                 return input;
@@ -154,7 +154,6 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc />
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "ReferenceCodec handles null serialized values before the tuple is accessed.")]
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] Tuple<T1, T2> value) where TBufferWriter : IBufferWriter<byte>
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
@@ -162,6 +161,7 @@ namespace Orleans.Serialization.Codecs
                 return;
             }
 
+            System.Diagnostics.Debug.Assert(value is not null);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, value.GetType(), WireType.TagDelimited);
 
             _item1Codec.WriteField(ref writer, 1, ElementType1, value.Item1);
@@ -251,7 +251,7 @@ namespace Orleans.Serialization.Codecs
 
             System.Diagnostics.Debug.Assert(input is not null);
             if (input.GetType() as object != _fieldType as object)
-                return context.DeepCopy(input)!;
+                return context.DeepCopy(input);
 
             if (IsShallowCopyable())
                 return input;
@@ -302,7 +302,6 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc />
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "ReferenceCodec handles null serialized values before the tuple is accessed.")]
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] Tuple<T1, T2, T3> value) where TBufferWriter : IBufferWriter<byte>
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
@@ -310,6 +309,7 @@ namespace Orleans.Serialization.Codecs
                 return;
             }
 
+            System.Diagnostics.Debug.Assert(value is not null);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, value.GetType(), WireType.TagDelimited);
 
             _item1Codec.WriteField(ref writer, 1, ElementType1, value.Item1);
@@ -411,7 +411,7 @@ namespace Orleans.Serialization.Codecs
 
             System.Diagnostics.Debug.Assert(input is not null);
             if (input.GetType() as object != _fieldType as object)
-                return context.DeepCopy(input)!;
+                return context.DeepCopy(input);
 
             if (IsShallowCopyable())
                 return input;
@@ -469,7 +469,6 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc />
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "ReferenceCodec handles null serialized values before the tuple is accessed.")]
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] Tuple<T1, T2, T3, T4> value) where TBufferWriter : IBufferWriter<byte>
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
@@ -477,6 +476,7 @@ namespace Orleans.Serialization.Codecs
                 return;
             }
 
+            System.Diagnostics.Debug.Assert(value is not null);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, value.GetType(), WireType.TagDelimited);
 
             _item1Codec.WriteField(ref writer, 1, ElementType1, value.Item1);
@@ -588,7 +588,7 @@ namespace Orleans.Serialization.Codecs
 
             System.Diagnostics.Debug.Assert(input is not null);
             if (input.GetType() as object != _fieldType as object)
-                return context.DeepCopy(input)!;
+                return context.DeepCopy(input);
 
             if (IsShallowCopyable())
                 return input;
@@ -653,7 +653,6 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc />
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "ReferenceCodec handles null serialized values before the tuple is accessed.")]
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer,
             uint fieldIdDelta,
             [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType,
@@ -664,6 +663,7 @@ namespace Orleans.Serialization.Codecs
                 return;
             }
 
+            System.Diagnostics.Debug.Assert(value is not null);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, value.GetType(), WireType.TagDelimited);
 
             _item1Codec.WriteField(ref writer, 1, ElementType1, value.Item1);
@@ -785,7 +785,7 @@ namespace Orleans.Serialization.Codecs
 
             System.Diagnostics.Debug.Assert(input is not null);
             if (input.GetType() as object != _fieldType as object)
-                return context.DeepCopy(input)!;
+                return context.DeepCopy(input);
 
             if (IsShallowCopyable())
                 return input;
@@ -857,7 +857,6 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc />
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "ReferenceCodec handles null serialized values before the tuple is accessed.")]
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer,
             uint fieldIdDelta,
             [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType,
@@ -868,6 +867,7 @@ namespace Orleans.Serialization.Codecs
                 return;
             }
 
+            System.Diagnostics.Debug.Assert(value is not null);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, value.GetType(), WireType.TagDelimited);
 
             _item1Codec.WriteField(ref writer, 1, ElementType1, value.Item1);
@@ -999,7 +999,7 @@ namespace Orleans.Serialization.Codecs
 
             System.Diagnostics.Debug.Assert(input is not null);
             if (input.GetType() as object != _fieldType as object)
-                return context.DeepCopy(input)!;
+                return context.DeepCopy(input);
 
             if (IsShallowCopyable())
                 return input;
@@ -1078,7 +1078,6 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc />
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "ReferenceCodec handles null serialized values before the tuple is accessed.")]
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer,
             uint fieldIdDelta,
             [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType,
@@ -1089,6 +1088,7 @@ namespace Orleans.Serialization.Codecs
                 return;
             }
 
+            System.Diagnostics.Debug.Assert(value is not null);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, value.GetType(), WireType.TagDelimited);
 
             _item1Codec.WriteField(ref writer, 1, ElementType1, value.Item1);
@@ -1231,7 +1231,7 @@ namespace Orleans.Serialization.Codecs
 
             System.Diagnostics.Debug.Assert(input is not null);
             if (input.GetType() as object != _fieldType as object)
-                return context.DeepCopy(input)!;
+                return context.DeepCopy(input);
 
             if (IsShallowCopyable())
                 return input;
@@ -1317,7 +1317,6 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc />
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "ReferenceCodec handles null serialized values before the tuple is accessed.")]
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer,
             uint fieldIdDelta,
             [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType,
@@ -1328,6 +1327,7 @@ namespace Orleans.Serialization.Codecs
                 return;
             }
 
+            System.Diagnostics.Debug.Assert(value is not null);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, value.GetType(), WireType.TagDelimited);
 
             _item1Codec.WriteField(ref writer, 1, ElementType1, value.Item1);
@@ -1479,7 +1479,7 @@ namespace Orleans.Serialization.Codecs
 
             System.Diagnostics.Debug.Assert(input is not null);
             if (input.GetType() as object != _fieldType as object)
-                return context.DeepCopy(input)!;
+                return context.DeepCopy(input);
 
             if (IsShallowCopyable())
                 return input;

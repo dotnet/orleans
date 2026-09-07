@@ -19,7 +19,7 @@ public sealed class ByteStringCopier : IDeepCopier<ByteString>
 
         if (input is null)
         {
-            return null!;
+            return null;
         }
 
         if (context.TryGetCopy<ByteString>(input, out var result))

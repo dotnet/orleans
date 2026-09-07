@@ -81,7 +81,7 @@ namespace Orleans.Serialization.Codecs
             System.Diagnostics.Debug.Assert(input is not null);
             if (input.GetType() as object != _fieldType as object)
             {
-                return context.DeepCopy(input)!;
+                return context.DeepCopy(input);
             }
 
             // There is a possibility for infinite recursion here if any value in the input collection is able to take part in a cyclic reference.

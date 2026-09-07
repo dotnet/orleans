@@ -61,7 +61,7 @@ namespace Orleans.Serialization.Codecs
             System.Diagnostics.Debug.Assert(input is not null);
             if (input.GetType() != typeof(ArrayList))
             {
-                return context.DeepCopy(input)!;
+                return context.DeepCopy(input);
             }
 
             result = new ArrayList(input.Count);

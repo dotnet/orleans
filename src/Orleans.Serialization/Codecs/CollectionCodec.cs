@@ -33,7 +33,6 @@ public sealed class CollectionCodec<T> : IFieldCodec<Collection<T>>, IBaseCodec<
 
     /// <inheritdoc/>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "ReferenceCodec handles null serialized values before the collection is accessed.")]
     public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] Collection<T> value) where TBufferWriter : IBufferWriter<byte>
     {
         if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
@@ -41,6 +40,7 @@ public sealed class CollectionCodec<T> : IFieldCodec<Collection<T>>, IBaseCodec<
             return;
         }
 
+        System.Diagnostics.Debug.Assert(value is not null);
         writer.WriteFieldHeader(fieldIdDelta, expectedType, value.GetType(), WireType.TagDelimited);
 
         Serialize(ref writer, value);
@@ -191,7 +191,7 @@ public sealed class CollectionCopier<T> : IDeepCopier<Collection<T>>, IBaseCopie
         System.Diagnostics.Debug.Assert(input is not null);
         if (input.GetType() != typeof(Collection<T>))
         {
-            return context.DeepCopy(input)!;
+            return context.DeepCopy(input);
         }
 
         result = new Collection<T>(new List<T>(input.Count));
