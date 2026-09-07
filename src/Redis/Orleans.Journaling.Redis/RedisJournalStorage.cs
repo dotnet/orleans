@@ -887,7 +887,7 @@ internal sealed class RedisJournalStorage : IJournalStorage
     private static void ValidateCallerMetadataPropertyName(string key)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
-        if (key.IndexOf('\0') >= 0)
+        if (key.IndexOf('\0', StringComparison.Ordinal) >= 0)
         {
             throw new ArgumentException("Journal metadata property names must not contain null characters.", nameof(key));
         }

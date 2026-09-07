@@ -86,7 +86,7 @@ public sealed class JournalMetadata : IJournalMetadata
     internal static void ValidatePropertyName(string propertyName)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(propertyName);
-        if (propertyName.IndexOf('\0') >= 0)
+        if (propertyName.IndexOf('\0', StringComparison.Ordinal) >= 0)
         {
             throw new ArgumentException("Journal metadata property names must not contain null characters.", nameof(propertyName));
         }
