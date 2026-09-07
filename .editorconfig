@@ -765,6 +765,10 @@ dotnet_diagnostic.CA2246.severity = warning
 dotnet_diagnostic.IDE0035.severity = warning
 dotnet_diagnostic.IDE0043.severity = warning
 
+# Dashboard grain-state serialization reuses one serializer configuration.
+[src/Dashboard/Orleans.Dashboard/**.cs]
+dotnet_diagnostic.CA1869.severity = warning
+
 # Dashboard text handling explicitly distinguishes deterministic identifiers from localized display text.
 [src/Dashboard/Orleans.Dashboard/**/*.cs]
 dotnet_diagnostic.CA1305.severity = warning
