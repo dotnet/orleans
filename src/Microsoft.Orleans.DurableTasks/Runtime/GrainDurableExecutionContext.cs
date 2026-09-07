@@ -39,7 +39,7 @@ internal sealed class GrainDurableExecutionContext : DurableExecutionContext
         CancellationToken shutdownToken,
         DateTimeOffset utcNow,
         CancellationTokenSource executionAbortSource)
-        : base(taskId)
+        : base(taskId, executionAbortSource.Token)
     {
         _runtime = runtime;
         _scheduler = scheduler;
