@@ -68,6 +68,9 @@ namespace Orleans.Runtime
         /// </summary>
         public GenericGrainType Construct(TypeConverter formatter, params Type[] typeArguments)
         {
+            ArgumentNullException.ThrowIfNull(formatter);
+            ArgumentNullException.ThrowIfNull(typeArguments);
+
             if (Arity != typeArguments.Length)
             {
                 ThrowIncorrectArgumentLength(typeArguments);
@@ -82,7 +85,11 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="converter">The type converter</param>
         /// <returns>The type arguments.</returns>
-        public Type[] GetArguments(TypeConverter converter) => converter.GetArguments(this.GrainType.Value);
+        public Type[] GetArguments(TypeConverter converter)
+        {
+            ArgumentNullException.ThrowIfNull(converter);
+            return converter.GetArguments(this.GrainType.Value);
+        }
 
         /// <inheritdoc/>
         public override string ToString() => this.GrainType.ToString();

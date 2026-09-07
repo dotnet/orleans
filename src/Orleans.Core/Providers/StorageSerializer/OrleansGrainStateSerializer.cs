@@ -35,12 +35,14 @@ namespace Orleans.Storage
         /// <inheritdoc/>
         public T? Deserialize<T>(BinaryData input)
         {
+            ArgumentNullException.ThrowIfNull(input);
             return this.serializer.Deserialize<T>(input.ToMemory());
         }
 
         /// <inheritdoc/>
         public ValueTask SerializeAsync<T>(T? value, Stream destination, CancellationToken cancellationToken = default)
         {
+            ArgumentNullException.ThrowIfNull(destination);
             this.serializer.Serialize(value, destination);
             return ValueTask.CompletedTask;
         }
@@ -48,6 +50,8 @@ namespace Orleans.Storage
         /// <inheritdoc/>
         public async ValueTask<T?> DeserializeAsync<T>(Stream input, CancellationToken cancellationToken = default)
         {
+            ArgumentNullException.ThrowIfNull(input);
+
             // Seekable streams (e.g., MemoryStream, FileStream) can be deserialized directly without buffering.
             // Non-seekable streams (e.g., NetworkStream) require buffering to enable efficient multi-pass reading.
             if (input.CanSeek)

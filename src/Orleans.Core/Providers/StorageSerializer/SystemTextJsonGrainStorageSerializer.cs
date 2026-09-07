@@ -14,17 +14,27 @@ namespace Orleans.Storage
     public sealed class SystemTextJsonGrainStorageSerializer(IOptions<SystemTextJsonGrainStorageSerializerOptions> options) : IGrainStorageStreamingSerializer
     {
         /// <inheritdoc/>
-        public T? Deserialize<T>(BinaryData input) => input.ToObjectFromJson<T>(options.Value.JsonSerializerOptions);
+        public T? Deserialize<T>(BinaryData input)
+        {
+            ArgumentNullException.ThrowIfNull(input);
+            return input.ToObjectFromJson<T>(options.Value.JsonSerializerOptions);
+        }
 
         /// <inheritdoc/>
         public BinaryData Serialize<T>(T? input) => BinaryData.FromObjectAsJson(input, options.Value.JsonSerializerOptions);
 
         /// <inheritdoc/>
         public ValueTask SerializeAsync<T>(T? input, Stream destination, CancellationToken cancellationToken = default)
-            => new(JsonSerializer.SerializeAsync(destination, input, options.Value.JsonSerializerOptions, cancellationToken));
+        {
+            ArgumentNullException.ThrowIfNull(destination);
+            return new(JsonSerializer.SerializeAsync(destination, input, options.Value.JsonSerializerOptions, cancellationToken));
+        }
 
         /// <inheritdoc/>
         public async ValueTask<T?> DeserializeAsync<T>(Stream input, CancellationToken cancellationToken = default)
-            => await JsonSerializer.DeserializeAsync<T>(input, options.Value.JsonSerializerOptions, cancellationToken).ConfigureAwait(false);
+        {
+            ArgumentNullException.ThrowIfNull(input);
+            return await JsonSerializer.DeserializeAsync<T>(input, options.Value.JsonSerializerOptions, cancellationToken).ConfigureAwait(false);
+        }
     }
 }

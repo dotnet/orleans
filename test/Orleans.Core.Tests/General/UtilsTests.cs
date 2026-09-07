@@ -1,4 +1,5 @@
 using System.Net;
+using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Runtime;
 using Xunit;
 
@@ -39,6 +40,89 @@ namespace UnitTests.UtilsTests
             var ipv6silo = SiloAddress.New(ipv6, 100);
             uri = ipv6silo.ToGatewayUri();
             Assert.Equal("gwy.tcp://[::]:11111/100", uri.ToString());
+        }
+
+        [Fact]
+        public void GatewayConversions_NullReceiver_ThrowWithExactParameterName()
+        {
+            var endpointException = Assert.Throws<ArgumentNullException>(() => ((Uri)null!).ToIPEndPoint());
+            Assert.Equal("uri", endpointException.ParamName);
+
+            var addressException = Assert.Throws<ArgumentNullException>(() => ((Uri)null!).ToGatewayAddress());
+            Assert.Equal("uri", addressException.ParamName);
+
+            var uriException = Assert.Throws<ArgumentNullException>(() => ((SiloAddress)null!).ToGatewayUri());
+            Assert.Equal("address", uriException.ParamName);
+
+            var endpointUriException = Assert.Throws<ArgumentNullException>(() => ((IPEndPoint)null!).ToGatewayUri());
+            Assert.Equal("ep", endpointUriException.ParamName);
+        }
+
+        [Fact]
+        public void SafeExecute_NullAction_ThrowsWithExactParameterName()
+        {
+            var exception = Assert.Throws<ArgumentNullException>(() => Utils.SafeExecute((Action)null!));
+            Assert.Equal("action", exception.ParamName);
+
+            exception = Assert.Throws<ArgumentNullException>(() => Utils.SafeExecute((Action)null!, NullLogger.Instance));
+            Assert.Equal("action", exception.ParamName);
+        }
+
+        [Fact]
+        public void SafeExecute_ThrowingActions_SuppressExceptions()
+        {
+            var invocationCount = 0;
+
+            Utils.SafeExecute(() =>
+            {
+                invocationCount++;
+                throw new InvalidOperationException("expected");
+            });
+            Utils.SafeExecute(() =>
+            {
+                invocationCount++;
+                throw new InvalidOperationException("expected");
+            }, NullLogger.Instance);
+
+            Assert.Equal(2, invocationCount);
+        }
+
+        [Fact]
+        public void BatchIEnumerable_NullSequence_ThrowsAtCallTime()
+        {
+            IEnumerable<int> sequence = null!;
+
+            var exception = Assert.Throws<ArgumentNullException>(() => sequence.BatchIEnumerable(2));
+
+            Assert.Equal("sequence", exception.ParamName);
+        }
+
+        [Fact]
+        public void BatchIEnumerable_ValidSequence_PreservesBatching()
+        {
+            var batches = Enumerable.Range(1, 5).BatchIEnumerable(2).Select(batch => batch.ToArray()).ToArray();
+
+            Assert.Equal(3, batches.Length);
+            Assert.Equal([1, 2], batches[0]);
+            Assert.Equal([3, 4], batches[1]);
+            Assert.Equal([5], batches[2]);
+        }
+
+        [Fact]
+        public void Ignore_NullTask_ThrowsWithExactParameterName()
+        {
+            var exception = Assert.Throws<ArgumentNullException>(() => ((Task)null!).Ignore());
+
+            Assert.Equal("task", exception.ParamName);
+        }
+
+        [Fact]
+        public async Task SafeExecuteAsync_NullTask_ThrowsWithExactParameterName()
+        {
+            var exception = await Assert.ThrowsAsync<ArgumentNullException>(
+                async () => await Utils.SafeExecuteAsync(null!));
+
+            Assert.Equal("task", exception.ParamName);
         }
     }
 }

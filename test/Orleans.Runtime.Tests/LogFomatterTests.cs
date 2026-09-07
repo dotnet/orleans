@@ -44,6 +44,36 @@ namespace Tester
         }
 
         [Fact]
+        public void LogOption_NullFormatter_ThrowsBeforeLogging()
+        {
+            var loggerFactory = new TestLoggerFactory();
+            var logger = loggerFactory.CreateLogger(nameof(LogOption_NullFormatter_ThrowsBeforeLogging));
+            using var services = new ServiceCollection().BuildServiceProvider();
+            var target = new DirectOptionsLogger(logger, services);
+            var before = loggerFactory.ToString();
+
+            var exception = Assert.Throws<ArgumentNullException>(() => target.LogOption(null!));
+
+            Assert.Equal("formatter", exception.ParamName);
+            Assert.Equal(before, loggerFactory.ToString());
+        }
+
+        [Fact]
+        public void LogOptions_NullFormatters_ThrowsBeforeLogging()
+        {
+            var loggerFactory = new TestLoggerFactory();
+            var logger = loggerFactory.CreateLogger(nameof(LogOptions_NullFormatters_ThrowsBeforeLogging));
+            using var services = new ServiceCollection().BuildServiceProvider();
+            var target = new DirectOptionsLogger(logger, services);
+            var before = loggerFactory.ToString();
+
+            var exception = Assert.Throws<ArgumentNullException>(() => target.LogOptions(null!));
+
+            Assert.Equal("formatters", exception.ParamName);
+            Assert.Equal(before, loggerFactory.ToString());
+        }
+
+        [Fact]
         public void CanResolveGenericFormatter()
         {
             // expected output
@@ -606,6 +636,14 @@ namespace Tester
         private class TestOptionsLogger : OptionsLogger
         {
             public TestOptionsLogger(ILogger<TestOptionsLogger> logger, IServiceProvider services)
+                : base(logger, services)
+            {
+            }
+        }
+
+        private sealed class DirectOptionsLogger : OptionsLogger
+        {
+            public DirectOptionsLogger(ILogger logger, IServiceProvider services)
                 : base(logger, services)
             {
             }

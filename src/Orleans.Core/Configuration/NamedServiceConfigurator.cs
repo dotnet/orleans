@@ -70,6 +70,8 @@ namespace Orleans.Hosting
         public static void Configure<TOptions>(this INamedServiceConfigurator configurator, Action<OptionsBuilder<TOptions>>? configureOptions)
             where TOptions : class, new()
         {
+            ArgumentNullException.ThrowIfNull(configurator);
+
             configurator.ConfigureDelegate(services =>
             {
                 configureOptions?.Invoke(services.AddOptions<TOptions>(configurator.Name));
@@ -89,6 +91,9 @@ namespace Orleans.Hosting
             where TOptions : class, new()
             where TComponent : class
         {
+            ArgumentNullException.ThrowIfNull(configurator);
+            ArgumentNullException.ThrowIfNull(factory);
+
             configurator.Configure(configureOptions);
             configurator.ConfigureComponent(factory);
         }
@@ -102,6 +107,9 @@ namespace Orleans.Hosting
         public static void ConfigureComponent<TComponent>(this INamedServiceConfigurator configurator, Func<IServiceProvider, string, TComponent> factory)
            where TComponent : class
         {
+            ArgumentNullException.ThrowIfNull(configurator);
+            ArgumentNullException.ThrowIfNull(factory);
+
             configurator.ConfigureDelegate(services =>
             {
                 services.AddKeyedSingleton<TComponent>(configurator.Name, (sp, key) => factory(sp, (key as string)!));

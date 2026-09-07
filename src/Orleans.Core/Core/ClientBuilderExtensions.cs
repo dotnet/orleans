@@ -70,6 +70,7 @@ namespace Orleans.Hosting
         /// <returns>The same instance of the <see cref="IClientBuilder"/> for chaining.</returns>
         public static IClientBuilder ConfigureServices(this IClientBuilder builder, Action<IServiceCollection> configureDelegate)
         {
+            ArgumentNullException.ThrowIfNull(builder);
             if (configureDelegate == null) throw new ArgumentNullException(nameof(configureDelegate));
             configureDelegate(builder.Services);
             return builder;
@@ -123,6 +124,8 @@ namespace Orleans.Hosting
         public static IClientBuilder AddClusterConnectionStatusObserver<TObserver>(this IClientBuilder builder, TObserver observer)
             where TObserver : IClusterConnectionStatusObserver
         {
+            ArgumentNullException.ThrowIfNull(builder);
+            ArgumentNullException.ThrowIfNull(observer);
             builder.Services.AddSingleton<IClusterConnectionStatusObserver>(observer);
             return builder;
         }
@@ -135,6 +138,7 @@ namespace Orleans.Hosting
             this IClientBuilder builder)
             where TObserver : class, IClusterConnectionStatusObserver
         {
+            ArgumentNullException.ThrowIfNull(builder);
             builder.Services.AddSingleton<IClusterConnectionStatusObserver, TObserver>();
             return builder;
         }
@@ -171,6 +175,7 @@ namespace Orleans.Hosting
         /// <returns>The builder.</returns>
         public static IClientBuilder AddActivityPropagation(this IClientBuilder builder)
         {
+            ArgumentNullException.ThrowIfNull(builder);
             builder.Services.TryAddSingleton(DistributedContextPropagator.Current);
 
             return builder

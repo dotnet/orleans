@@ -73,6 +73,9 @@ namespace Orleans.Runtime
         /// </summary>
         public GenericGrainInterfaceType Construct(TypeConverter formatter, params Type[] typeArguments)
         {
+            ArgumentNullException.ThrowIfNull(formatter);
+            ArgumentNullException.ThrowIfNull(typeArguments);
+
             if (Arity != typeArguments.Length)
             {
                 ThrowIncorrectArgumentLength(typeArguments);
@@ -85,7 +88,11 @@ namespace Orleans.Runtime
         /// <summary>
         /// Returns the type arguments which this instance was constructed with.
         /// </summary>
-        public Type[] GetArguments(TypeConverter formatter) => formatter.GetArguments(this.Value.Value);
+        public Type[] GetArguments(TypeConverter formatter)
+        {
+            ArgumentNullException.ThrowIfNull(formatter);
+            return formatter.GetArguments(this.Value.Value);
+        }
 
         /// <summary>
         /// Returns a UTF8 interpretation of the current instance.

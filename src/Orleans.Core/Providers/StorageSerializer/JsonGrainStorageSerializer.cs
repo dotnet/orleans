@@ -27,6 +27,7 @@ namespace Orleans.Storage
         /// <inheritdoc/>
         public T? Deserialize<T>(BinaryData input)
         {
+            ArgumentNullException.ThrowIfNull(input);
             return (T?)_orleansJsonSerializer.Deserialize(typeof(T), input.ToString());
         }
 
@@ -34,6 +35,7 @@ namespace Orleans.Storage
         public ValueTask SerializeAsync<T>(T? value, Stream destination, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            ArgumentNullException.ThrowIfNull(destination);
             _orleansJsonSerializer.Serialize(value, typeof(T), destination);
             return ValueTask.CompletedTask;
         }
@@ -42,6 +44,7 @@ namespace Orleans.Storage
         public ValueTask<T?> DeserializeAsync<T>(Stream input, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            ArgumentNullException.ThrowIfNull(input);
             return ValueTask.FromResult((T?)_orleansJsonSerializer.Deserialize(typeof(T), input));
         }
     }
