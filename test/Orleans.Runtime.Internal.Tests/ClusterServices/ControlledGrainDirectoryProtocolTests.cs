@@ -2525,27 +2525,19 @@ public sealed partial class ControlledGrainDirectoryProtocolTests
         private bool _disposed;
 
         public ControlledProtocolFixture()
-            : this(new GrainDirectoryOptions().EnablePreviousViewRequests)
-        {
-        }
-
-        public ControlledProtocolFixture(bool enablePreviousViewRequests)
             : this(
-                enablePreviousViewRequests,
-                TimeSpan.Zero,
                 (SiloAddress.FromParsableString("127.0.0.1:11111@101"), 0x4000_0000u),
                 (SiloAddress.FromParsableString("127.0.0.1:11112@102"), 0xC000_0000u))
         {
         }
 
         public ControlledProtocolFixture(params (SiloAddress Silo, uint Boundary)[] boundaries)
-            : this(new GrainDirectoryOptions().EnablePreviousViewRequests, TimeSpan.Zero, boundaries)
+            : this(TimeSpan.Zero, boundaries)
         {
         }
 
-        public ControlledProtocolFixture(bool enablePreviousViewRequests, TimeSpan rangeLeaseDuration, params (SiloAddress Silo, uint Boundary)[] boundaries)
+        public ControlledProtocolFixture(TimeSpan rangeLeaseDuration, params (SiloAddress Silo, uint Boundary)[] boundaries)
         {
-            EnablePreviousViewRequests = enablePreviousViewRequests;
             RangeLeaseDuration = rangeLeaseDuration;
             TimeProvider = new FakeTimeProvider(new DateTimeOffset(2025, 1, 2, 3, 4, 5, TimeSpan.Zero));
             DirectoryEvents = new DiagnosticEventCollector(GrainDirectoryEvents.ListenerName);
@@ -2598,7 +2590,6 @@ public sealed partial class ControlledGrainDirectoryProtocolTests
                 cancellationToken);
 
         public FakeTimeProvider TimeProvider { get; }
-        public bool EnablePreviousViewRequests { get; }
         public TimeSpan RangeLeaseDuration { get; }
         public DiagnosticEventCollector DirectoryEvents { get; }
         public ControlledDirectoryTransport Transport { get; }
@@ -3026,8 +3017,7 @@ public sealed partial class ControlledGrainDirectoryProtocolTests
                 Options.Create(new GrainDirectoryOptions
                 {
                     PartitionsPerSilo = 1,
-                    RangeLeaseDuration = fixture.RangeLeaseDuration,
-                    EnablePreviousViewRequests = fixture.EnablePreviousViewRequests
+                    RangeLeaseDuration = fixture.RangeLeaseDuration
                 }),
                 Options.Create(new ClusterMembershipOptions()),
                 TimeProvider,
@@ -3552,8 +3542,7 @@ public sealed partial class ControlledGrainDirectoryProtocolTests
                 MembershipVersion version,
                 GrainAddress address,
                 GrainAddress? currentRegistration,
-                CancellationToken cancellationToken = default,
-                bool allowPreviousVersion = false)
+                CancellationToken cancellationToken = default)
             {
                 return new(transport.Enqueue(
                     source,
@@ -3571,15 +3560,13 @@ public sealed partial class ControlledGrainDirectoryProtocolTests
                             version,
                             address,
                             currentRegistration,
-                            cancellationToken,
-                            allowPreviousVersion).AsTask())));
+                            cancellationToken).AsTask())));
             }
 
             public ValueTask<DirectoryResult<GrainAddress?>> LookupAsync(
                 MembershipVersion version,
                 GrainId grainId,
-                CancellationToken cancellationToken = default,
-                bool allowPreviousVersion = false)
+                CancellationToken cancellationToken = default)
             {
                 return new(transport.Enqueue(
                     source,
@@ -3596,15 +3583,13 @@ public sealed partial class ControlledGrainDirectoryProtocolTests
                         () => ((IGrainDirectoryPartition)destination.Partition).LookupAsync(
                             version,
                             grainId,
-                            cancellationToken,
-                            allowPreviousVersion).AsTask())));
+                            cancellationToken).AsTask())));
             }
 
             public ValueTask<DirectoryResult<bool>> DeregisterAsync(
                 MembershipVersion version,
                 GrainAddress address,
-                CancellationToken cancellationToken = default,
-                bool allowPreviousVersion = false)
+                CancellationToken cancellationToken = default)
             {
                 return new(transport.Enqueue(
                     source,
@@ -3621,8 +3606,7 @@ public sealed partial class ControlledGrainDirectoryProtocolTests
                         () => ((IGrainDirectoryPartition)destination.Partition).DeregisterAsync(
                             version,
                             address,
-                            cancellationToken,
-                            allowPreviousVersion).AsTask())));
+                            cancellationToken).AsTask())));
             }
 
             public ValueTask<GrainDirectoryPartitionSnapshot?> GetSnapshotAsync(
