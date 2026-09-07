@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime;
@@ -8,12 +7,14 @@ internal sealed class SharedCallbackData
 {
     public readonly Action<Message> Unregister;
     public readonly ILogger Logger;
+    public readonly TimeProvider TimeProvider;
     private TimeSpan _responseTimeout;
-    public long ResponseTimeoutStopwatchTicks;
+    public long ResponseTimeoutTimestampTicks;
 
     public SharedCallbackData(
         Action<Message> unregister,
         ILogger logger,
+        TimeProvider timeProvider,
         TimeSpan responseTimeout,
         bool cancelOnTimeout,
         bool waitForCancellationAcknowledgement,
@@ -21,6 +22,7 @@ internal sealed class SharedCallbackData
     {
         Unregister = unregister;
         Logger = logger;
+        TimeProvider = timeProvider;
         ResponseTimeout = responseTimeout;
         CancelRequestOnTimeout = cancelOnTimeout;
         WaitForCancellationAcknowledgement = waitForCancellationAcknowledgement;
@@ -33,9 +35,11 @@ internal sealed class SharedCallbackData
         set
         {
             _responseTimeout = value;
-            ResponseTimeoutStopwatchTicks = (long)(value.TotalSeconds * Stopwatch.Frequency);
+            ResponseTimeoutTimestampTicks = GetTimestampTicks(value);
         }
     }
+
+    public long GetTimestampTicks(TimeSpan duration) => (long)(duration.TotalSeconds * TimeProvider.TimestampFrequency);
 
     public IGrainCallCancellationManager? CancellationManager { get; internal set; }
 

@@ -90,6 +90,7 @@ namespace Orleans.Runtime
             this.sharedCallbackData = new SharedCallbackData(
                 msg => this.UnregisterCallback(msg.SendingGrain, msg.Id),
                 callbackDataLogger,
+                timeProvider,
                 this.messagingOptions.ResponseTimeout,
                 this.messagingOptions.CancelRequestOnTimeout,
                 this.messagingOptions.WaitForCancellationAcknowledgement,
@@ -98,6 +99,7 @@ namespace Orleans.Runtime
             this.systemSharedCallbackData = new SharedCallbackData(
                 msg => this.UnregisterCallback(msg.SendingGrain, msg.Id),
                 callbackDataLogger,
+                timeProvider,
                 this.messagingOptions.SystemResponseTimeout,
                 cancelOnTimeout: false,
                 waitForCancellationAcknowledgement: this.messagingOptions.WaitForCancellationAcknowledgement,
@@ -624,7 +626,7 @@ namespace Orleans.Runtime
             {
                 try
                 {
-                    var currentStopwatchTicks = ValueStopwatch.GetTimestamp();
+                    var currentTimestamp = TimeProvider.GetTimestamp();
                     foreach (var (_, callback) in callbacks)
                     {
                         if (callback.IsCompleted)
@@ -632,7 +634,7 @@ namespace Orleans.Runtime
                             continue;
                         }
 
-                        if (callback.IsExpired(currentStopwatchTicks))
+                        if (callback.IsExpired(currentTimestamp))
                         {
                             callback.OnTimeout();
                         }

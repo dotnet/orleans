@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using System.Threading;
 using Microsoft.Extensions.Logging;
 using Orleans.Serialization.Invocation;
@@ -16,6 +15,7 @@ namespace Orleans.Runtime
         private readonly SharedCallbackData shared;
         private readonly IResponseCompletionSource context;
         private readonly ApplicationRequestInstruments _applicationRequestInstruments;
+        private readonly long _startTimestamp;
         private int _state;
         private StatusResponse? lastKnownStatus;
         private ValueStopwatch stopwatch;
@@ -31,6 +31,7 @@ namespace Orleans.Runtime
             this.context = ctx;
             this.Message = msg;
             _applicationRequestInstruments = applicationRequestInstruments;
+            _startTimestamp = shared.TimeProvider.GetTimestamp();
             this.stopwatch = ValueStopwatch.StartNew();
         }
 
@@ -87,19 +88,19 @@ namespace Orleans.Runtime
 
         public bool IsExpired(long currentTimestamp)
         {
-            var duration = currentTimestamp - this.stopwatch.GetRawTimestamp();
-            return duration > GetResponseTimeoutStopwatchTicks();
+            var duration = currentTimestamp - _startTimestamp;
+            return duration > GetResponseTimeoutTimestampTicks();
         }
 
-        private long GetResponseTimeoutStopwatchTicks()
+        private long GetResponseTimeoutTimestampTicks()
         {
             var defaultResponseTimeout = (Message.BodyObject as IInvokable)?.GetDefaultResponseTimeout();
             if (defaultResponseTimeout.HasValue)
             {
-                return (long)(defaultResponseTimeout.Value.TotalSeconds * Stopwatch.Frequency);
+                return shared.GetTimestampTicks(defaultResponseTimeout.Value);
             }
 
-            return shared.ResponseTimeoutStopwatchTicks;
+            return shared.ResponseTimeoutTimestampTicks;
         }
 
         private TimeSpan GetResponseTimeout() => (Message.BodyObject as IInvokable)?.GetDefaultResponseTimeout() ?? shared.ResponseTimeout;

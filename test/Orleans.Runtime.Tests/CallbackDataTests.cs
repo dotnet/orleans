@@ -4,6 +4,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Time.Testing;
 using Orleans.Runtime;
 using Orleans.Serialization.Invocation;
 using Xunit;
@@ -55,6 +56,30 @@ public class CallbackDataTests
         GC.KeepAlive(cancellation);
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
+    public void ExpirationUsesConfiguredTimeProvider()
+    {
+        using var serviceProvider = CreateServiceProvider();
+        var timeProvider = new FakeTimeProvider();
+        var timeout = TimeSpan.FromSeconds(1);
+        var callback = CreateCallback(
+            new TestResponseCompletionSource(),
+            _ => { },
+            CreateInstruments(serviceProvider),
+            timeProvider,
+            timeout);
+
+        Assert.False(callback.IsExpired(timeProvider.GetTimestamp()));
+
+        timeProvider.Advance(timeout);
+        Assert.False(callback.IsExpired(timeProvider.GetTimestamp()));
+
+        timeProvider.Advance(TimeSpan.FromTicks(1));
+        Assert.True(callback.IsExpired(timeProvider.GetTimestamp()));
+    }
+
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static WeakReference CreateCompletedCallback(CancellationToken cancellationToken, ApplicationRequestInstruments instruments)
     {
@@ -69,12 +94,15 @@ public class CallbackDataTests
     private static CallbackData CreateCallback(
         IResponseCompletionSource completion,
         Action<Message> unregister,
-        ApplicationRequestInstruments instruments)
+        ApplicationRequestInstruments instruments,
+        TimeProvider? timeProvider = null,
+        TimeSpan? responseTimeout = null)
     {
         var shared = new SharedCallbackData(
             unregister,
             logger: NullLogger<CallbackData>.Instance,
-            responseTimeout: TimeSpan.FromMinutes(1),
+            timeProvider: timeProvider ?? TimeProvider.System,
+            responseTimeout: responseTimeout ?? TimeSpan.FromMinutes(1),
             cancelOnTimeout: false,
             waitForCancellationAcknowledgement: false,
             cancellationManager: null);
