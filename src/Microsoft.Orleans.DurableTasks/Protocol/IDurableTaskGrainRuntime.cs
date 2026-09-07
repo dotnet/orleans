@@ -58,8 +58,12 @@ public struct DurableTaskDiagnosticState
     [Id(1)]
     public DateTimeOffset? CompletedAt { get; set; }
 
+    /// <summary>
+    /// Gets or sets the diagnostic status, or <see langword="null"/> when the value was default-initialized
+    /// or received from a version which did not provide this member.
+    /// </summary>
     [Id(2)]
-    public string Status { get; set; }
+    public string? Status { get; set; }
 
     [Id(3)]
     public string? Request { get; set; }
@@ -67,8 +71,12 @@ public struct DurableTaskDiagnosticState
     [Id(4)]
     public string? Response { get; set; }
 
+    /// <summary>
+    /// Gets or sets the diagnostic completion waiters, or <see langword="null"/> when the value was
+    /// default-initialized or received from a version which did not provide this member.
+    /// </summary>
     [Id(5)]
-    public List<string> Waiters { get; set; }
+    public List<string>? Waiters { get; set; }
 
     public override readonly string ToString() => $"[{Status}, Created: {CreatedAt}, Completed: {CompletedAt}, Request: {Request}, Response: {Response}, Waiters: {string.Join(", ", Waiters ?? [])}]";
 }
