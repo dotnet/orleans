@@ -1,6 +1,4 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <Sdk Name="Aspire.AppHost.Sdk" Version="13.2.4" />
-
   <PropertyGroup>
     <DefineConstants>$(DefineConstants);AWSUTILS_TESTS</DefineConstants>
     <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
