@@ -768,6 +768,11 @@ dotnet_diagnostic.CA1307.severity = warning
 dotnet_diagnostic.CA1305.severity = warning
 dotnet_diagnostic.CA1307.severity = warning
 
+# Journal identifiers, metadata, and provider storage keys retain their exact persisted representation.
+[src/{Orleans.Journaling,Azure/Orleans.Journaling.AzureStorage,Redis/Orleans.Journaling.Redis,AWS/Orleans.Journaling.S3}/**.cs]
+dotnet_diagnostic.CA1305.severity = warning
+dotnet_diagnostic.CA1307.severity = warning
+
 # Azure Table sources are linked into multiple provider projects, so they share one enforcement policy.
 [src/Azure/Shared/{Storage/{AzureStorageOperationOptions.cs,AzureStoragePolicyOptions.cs,AzureTableDataManager.cs,AzureTableUtils.cs},Utilities/ErrorCode.cs}]
 dotnet_diagnostic.CA1305.severity = warning

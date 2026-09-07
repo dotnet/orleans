@@ -38,7 +38,7 @@ internal sealed class RedisJournalStorageOptionsValidator(RedisJournalStorageOpt
                     $"Invalid configuration for {nameof(RedisJournalStorageProvider)}. {nameof(RedisJournalStorageOptions)}.{nameof(options.KeyPrefix)} must not be empty or whitespace.");
             }
 
-            if (keyPrefix.IndexOf('\0') >= 0)
+            if (keyPrefix.IndexOf('\0', StringComparison.Ordinal) >= 0)
             {
                 throw new OrleansConfigurationException(
                     $"Invalid configuration for {nameof(RedisJournalStorageProvider)}. {nameof(RedisJournalStorageOptions)}.{nameof(options.KeyPrefix)} must not contain null characters.");

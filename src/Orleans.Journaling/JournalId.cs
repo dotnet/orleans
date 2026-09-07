@@ -150,7 +150,7 @@ public readonly struct JournalId : IEquatable<JournalId>
             throw new ArgumentException("Journal id segments must not be '.' or '..'.", parameterName);
         }
 
-        if (segment.IndexOf('\0') >= 0)
+        if (segment.IndexOf('\0', StringComparison.Ordinal) >= 0)
         {
             throw new ArgumentException("Journal id segments must not contain null characters.", parameterName);
         }
