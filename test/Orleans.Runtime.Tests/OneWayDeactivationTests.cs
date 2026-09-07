@@ -54,10 +54,20 @@ namespace UnitTests.General
         [Fact]
         public async Task OneWay_Deactivation_CacheInvalidated()
         {
-            var directoryCache = ((InProcessSiloHandle)_fixture.HostedCluster.Primary!).SiloHost.Services.GetRequiredService<TestDirectoryCache>();
-            var callerSilo = _fixture.HostedCluster.Primary.SiloAddress;
-            var targetSilo = _fixture.HostedCluster.SecondarySilos[0].SiloAddress;
-            var directorySilo = _fixture.HostedCluster.SecondarySilos[1].SiloAddress;
+            var grainToDeactivate = _fixture.Client.GetGrain<IOneWayGrain>(new Guid("00000000-1133-0000-0000-000000000000"));
+            var grainId = grainToDeactivate.GetGrainId();
+            var topologyView = ((InProcessSiloHandle)_fixture.HostedCluster.Primary!).SiloHost.Services.GetRequiredService<ILocalGrainDirectory>();
+            var directorySilo = Assert.IsType<SiloAddress>(topologyView.GetPrimaryForGrain(grainId));
+            var nonDirectorySilos = _fixture.HostedCluster.Silos
+                .Where(silo => !directorySilo.Equals(silo.SiloAddress))
+                .OrderBy(silo => silo.SiloAddress)
+                .ToArray();
+            Assert.Equal(2, nonDirectorySilos.Length);
+
+            var caller = (InProcessSiloHandle)nonDirectorySilos[0];
+            var callerSilo = caller.SiloAddress;
+            var targetSilo = nonDirectorySilos[1].SiloAddress;
+            var directoryCache = caller.SiloHost.Services.GetRequiredService<TestDirectoryCache>();
             var grainToCallFrom = _fixture.Client.GetGrain<IOneWayGrain>(new Guid("9e773e45-24e0-4e99-b630-6523f5f53b68"));
 
             RequestContext.Set(IPlacementDirector.PlacementHintKey, callerSilo);
@@ -72,11 +82,10 @@ namespace UnitTests.General
             }
 
             // Activate the grain & record its address.
-            var grainToDeactivate = await grainToCallFrom.GetOtherGrain(targetSilo, directorySilo);
+            grainToDeactivate = await grainToCallFrom.GetOtherGrain(grainToDeactivate, targetSilo);
             Assert.Equal(targetSilo, await grainToDeactivate.GetSiloAddress());
             Assert.Equal(directorySilo, await grainToDeactivate.GetPrimaryForGrain());
             var initialActivationId = await grainToDeactivate.GetActivationId();
-            var grainId = grainToDeactivate.GetGrainId();
             var activationAddress = directoryCache.Operations
                 .OfType<TestDirectoryCache.CacheOperation.AddOrUpdate>()
                 .Last(op => op.Value.GrainId.Equals(grainId))

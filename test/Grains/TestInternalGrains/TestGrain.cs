@@ -209,7 +209,6 @@ namespace UnitTests.Grains
 
     internal class OneWayGrain : Grain, IOneWayGrain, ISimpleGrainObserver
     {
-        private const int MaxTopologyCandidateCount = 1_000;
         private readonly string _id = Guid.NewGuid().ToString();
         private int count;
         private TaskCompletionSource<int> countChanged = CreateCountChangedSource();
@@ -259,7 +258,7 @@ namespace UnitTests.Grains
             return completedSynchronously;
         }
 
-        public async Task<IOneWayGrain> GetOtherGrain(SiloAddress targetSilo, SiloAddress directorySilo)
+        public async Task<IOneWayGrain> GetOtherGrain(IOneWayGrain candidate, SiloAddress targetSilo)
         {
             if (this.other is not null)
             {
@@ -267,11 +266,14 @@ namespace UnitTests.Grains
             }
 
             var thisSilo = this.LocalSiloDetails.SiloAddress;
+            var grainId = candidate.GetGrainId();
+            var directorySilo = this.LocalGrainDirectory.GetPrimaryForGrain(grainId);
             var activeSilos = ServiceProvider.GetRequiredService<IClusterMembershipService>().CurrentSnapshot.Members
                 .Where(member => member.Value.Status == SiloStatus.Active)
                 .Select(member => member.Key)
                 .ToHashSet();
-            if (targetSilo.Equals(thisSilo)
+            if (directorySilo is null
+                || targetSilo.Equals(thisSilo)
                 || directorySilo.Equals(thisSilo)
                 || targetSilo.Equals(directorySilo)
                 || !activeSilos.Contains(targetSilo)
@@ -283,42 +285,24 @@ namespace UnitTests.Grains
                     + $"active silos: {string.Join(", ", activeSilos.Order())}.");
             }
 
-            for (var candidateIndex = 0; candidateIndex < MaxTopologyCandidateCount; candidateIndex++)
+            RequestContext.Set(IPlacementDirector.PlacementHintKey, targetSilo);
+            try
             {
-                var candidate = this.GrainFactory.GetGrain<IOneWayGrain>(CreateTopologyCandidateKey(candidateIndex));
-                var grainId = ((GrainReference)candidate).GrainId;
-                if (!directorySilo.Equals(this.LocalGrainDirectory.GetPrimaryForGrain(grainId)))
+                var actualTargetSilo = await candidate.GetSiloAddress();
+                if (!targetSilo.Equals(actualTargetSilo))
                 {
-                    continue;
+                    throw new InvalidOperationException(
+                        $"The one-way target grain was placed on {actualTargetSilo} instead of {targetSilo}. "
+                        + $"Caller: {thisSilo}, directory: {directorySilo}, grain: {grainId}.");
                 }
 
-                RequestContext.Set(IPlacementDirector.PlacementHintKey, targetSilo);
-                try
-                {
-                    var actualTargetSilo = await candidate.GetSiloAddress();
-                    if (!targetSilo.Equals(actualTargetSilo))
-                    {
-                        throw new InvalidOperationException(
-                            $"The one-way target grain was placed on {actualTargetSilo} instead of {targetSilo}. "
-                            + $"Caller: {thisSilo}, directory: {directorySilo}, grain: {grainId}.");
-                    }
-
-                    return this.other = candidate;
-                }
-                finally
-                {
-                    RequestContext.Remove(IPlacementDirector.PlacementHintKey);
-                }
+                return this.other = candidate;
             }
-
-            throw new InvalidOperationException(
-                $"Could not select a one-way target grain owned by directory silo {directorySilo} "
-                + $"after checking {MaxTopologyCandidateCount} deterministic grain ids. "
-                + $"Caller: {thisSilo}, target: {targetSilo}.");
+            finally
+            {
+                RequestContext.Remove(IPlacementDirector.PlacementHintKey);
+            }
         }
-
-        private static Guid CreateTopologyCandidateKey(int candidateIndex) =>
-            new(candidateIndex, 0x1133, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
         public Task<string> GetActivationId()
         {
