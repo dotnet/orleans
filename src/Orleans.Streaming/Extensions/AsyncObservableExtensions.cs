@@ -31,6 +31,8 @@ namespace Orleans.Streams
             string? filterData = null)
         {
             startPosition.Validate();
+            ArgumentNullException.ThrowIfNull(obs);
+
             if (obs is StreamImpl<T> stream)
             {
                 return stream.SubscribeAsync(observer, startPosition, filterData);
@@ -64,6 +66,8 @@ namespace Orleans.Streams
                                                                            Func<Task> onCompletedAsync)
         {
             var genericObserver = new GenericAsyncObserver<T>(onNextAsync, onErrorAsync, onCompletedAsync);
+            ArgumentNullException.ThrowIfNull(obs);
+
             return obs.SubscribeAsync(genericObserver);
         }
 
@@ -147,6 +151,8 @@ namespace Orleans.Streams
                                                                            StreamSequenceToken token)
         {
             var genericObserver = new GenericAsyncObserver<T>(onNextAsync, onErrorAsync, onCompletedAsync);
+            ArgumentNullException.ThrowIfNull(obs);
+
             return obs.SubscribeAsync(genericObserver, token);
         }
 

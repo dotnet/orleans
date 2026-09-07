@@ -30,6 +30,8 @@ namespace Orleans.Streams
             StreamSubscriptionStartPosition startPosition)
         {
             startPosition.Validate();
+            ArgumentNullException.ThrowIfNull(obs);
+
             if (obs is StreamImpl<T> stream)
             {
                 return stream.SubscribeAsync(observer, startPosition);
@@ -63,6 +65,8 @@ namespace Orleans.Streams
                                                                            Func<Task> onCompletedAsync)
         {
             var genericObserver = new GenericAsyncBatchObserver<T>(onNextAsync, onErrorAsync, onCompletedAsync);
+            ArgumentNullException.ThrowIfNull(obs);
+
             return obs.SubscribeAsync(genericObserver);
         }
 
