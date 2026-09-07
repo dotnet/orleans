@@ -215,7 +215,7 @@ internal sealed record RuntimeTestComplexArgument
 [RegisterCopier]
 internal sealed class RuntimeTestDurableTaskRequestCopier : IDeepCopier<RuntimeTestDurableTaskRequest>
 {
-    public RuntimeTestDurableTaskRequest DeepCopy(RuntimeTestDurableTaskRequest input, CopyContext context) => input;
+    public RuntimeTestDurableTaskRequest? DeepCopy(RuntimeTestDurableTaskRequest? input, CopyContext context) => input;
 }
 
 /// <summary>

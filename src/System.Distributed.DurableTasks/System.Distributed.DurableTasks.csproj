@@ -9,6 +9,8 @@
     <AnalysisLevel>preview</AnalysisLevel>
     <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
     <OrleansBuildTimeCodeGen>false</OrleansBuildTimeCodeGen>
+    <!-- This new package has no published baseline. Enable validation after its first release. -->
+    <EnablePackageValidation>false</EnablePackageValidation>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 

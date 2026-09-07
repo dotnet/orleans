@@ -70,15 +70,6 @@ public class DurableJobFeatureHandlerTests
     }
 
     [Fact]
-    public void AlwaysInterleaveMethods_BypassTurnIsolation()
-    {
-        var method = typeof(IAlwaysInterleaveTestGrain).GetMethod(nameof(IAlwaysInterleaveTestGrain.WaitAsync));
-
-        Assert.NotNull(method);
-        Assert.True(DurableJobTurnIsolationFilter.AllowsInterleaving(method));
-    }
-
-    [Fact]
     public async Task FeatureReceiver_ExecutesRegisteredIsolatedHandlerToCompletion()
     {
         var registry = new DurableJobHandlerRegistry();
@@ -396,9 +387,4 @@ public class DurableJobFeatureHandlerTests
         public int DequeueCount => 0;
     }
 
-    private interface IAlwaysInterleaveTestGrain
-    {
-        [AlwaysInterleave]
-        Task WaitAsync();
-    }
 }

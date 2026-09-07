@@ -201,7 +201,7 @@ public class InboxHandlerCanHandleTests
 
         public bool CanHandle(IInboxHandlerContext context)
         {
-            return context.Envelope.RouteKey?.StartsWith(_prefix) == true;
+            return context.Envelope.RouteKey?.StartsWith(_prefix, StringComparison.Ordinal) == true;
         }
 
         public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)

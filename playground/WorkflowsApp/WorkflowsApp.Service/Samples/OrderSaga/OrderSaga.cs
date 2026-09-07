@@ -204,7 +204,7 @@ internal static class OrderSaga
         public DurableTask<string> ChargeCustomer(string customerId, decimal amount)
         {
             // Simulate payment processing
-            var confirmationId = $"PAY-{Guid.NewGuid().ToString("N")[..8].ToUpper()}";
+            var confirmationId = $"PAY-{Guid.NewGuid().ToString("N")[..8].ToUpperInvariant()}";
             return DurableTask.FromResult(confirmationId);
         }
     }
@@ -229,7 +229,7 @@ internal static class OrderSaga
         public DurableTask<string> CreateShipment(string customerId, List<string> items)
         {
             // Simulate shipment creation
-            var trackingNumber = $"SHIP-{Guid.NewGuid().ToString("N")[..12].ToUpper()}";
+            var trackingNumber = $"SHIP-{Guid.NewGuid().ToString("N")[..12].ToUpperInvariant()}";
             return DurableTask.FromResult(trackingNumber);
         }
     }

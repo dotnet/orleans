@@ -155,7 +155,7 @@ public class InboxHandlerRegistrationTests
     {
         // Arrange
         var inbox = CreateInbox();
-        var handler1 = new TestHandler(ctx => ctx.Envelope.RouteKey?.StartsWith("api/") == true, name: "Handler1");
+        var handler1 = new TestHandler(ctx => ctx.Envelope.RouteKey?.StartsWith("api/", StringComparison.Ordinal) == true, name: "Handler1");
         var handler2 = new TestHandler(ctx => ctx.Envelope.RouteKey == "api/users", name: "Handler2");
         var handler3 = new TestHandler(_ => true, name: "Handler3"); // Catch-all
 

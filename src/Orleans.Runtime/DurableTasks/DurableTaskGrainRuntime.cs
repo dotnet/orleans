@@ -356,8 +356,14 @@ internal sealed partial class DurableTaskGrainRuntime(
             }
 
             var executionContext = CreateExecutionContext(taskId);
-            var handle = new TaskHandle(taskId, this) { IsRunning = true };
-            _taskHandles[taskId] = handle;
+            if (!_taskHandles.TryGetValue(taskId, out var scheduledHandle)
+                || scheduledHandle is not TaskHandle handle)
+            {
+                handle = new TaskHandle(taskId, this);
+                _taskHandles[taskId] = handle;
+            }
+
+            handle.IsRunning = true;
             state.Request.SetTarget(_shared.GrainContextAccessor.GrainContext);
             TrackInvocation(taskId, Invoke(
                 static request => request.CreateTask(),

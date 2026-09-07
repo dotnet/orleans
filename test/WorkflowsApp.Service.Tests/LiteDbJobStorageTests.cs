@@ -45,4 +45,41 @@ public sealed class LiteDbJobStorageTests
             File.Delete(databasePath);
         }
     }
+
+    [Fact]
+    public async Task FailedDeleteThenReloadAllowsRemovalRetry()
+    {
+        var databasePath = Path.Combine(AppContext.BaseDirectory, $"jobs-{Guid.NewGuid():N}.db");
+        try
+        {
+            using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+            var serializer = services.GetRequiredService<Serializer<JobTaskState>>();
+            var copier = services.GetRequiredService<DeepCopier<JobTaskState>>();
+            var taskId = TaskId.Create("retry-removal");
+
+            using (var storage = new LiteDbJobStorage(serializer, copier, databasePath))
+            {
+                storage.AddOrUpdateTask(taskId, new JobTaskState { Type = "initial" });
+                await storage.WriteAsync(CancellationToken.None);
+                Assert.True(storage.RemoveTask(taskId));
+
+                using var cancellation = new CancellationTokenSource();
+                cancellation.Cancel();
+                await Assert.ThrowsAsync<OperationCanceledException>(
+                    () => storage.WriteAsync(cancellation.Token).AsTask());
+
+                await storage.ReadAsync(CancellationToken.None);
+                Assert.True(storage.RemoveTask(taskId));
+                await storage.WriteAsync(CancellationToken.None);
+            }
+
+            using var reloaded = new LiteDbJobStorage(serializer, copier, databasePath);
+            await reloaded.ReadAsync(CancellationToken.None);
+            Assert.False(reloaded.TryGetTask(taskId, out _));
+        }
+        finally
+        {
+            File.Delete(databasePath);
+        }
+    }
 }

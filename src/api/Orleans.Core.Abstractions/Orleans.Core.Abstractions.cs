@@ -1651,12 +1651,20 @@ namespace Orleans.DurableTasks
         public string? Response { get { throw null; } set { } }
 
         [Id(2)]
-        public string Status { get { throw null; } set { } }
+        public string? Status { get { throw null; } set { } }
 
         [Id(5)]
-        public System.Collections.Generic.List<string> Waiters { get { throw null; } set { } }
+        public System.Collections.Generic.List<string>? Waiters { get { throw null; } set { } }
 
         public override readonly string ToString() { throw null; }
+    }
+
+    public enum DurableTaskKind
+    {
+        Unspecified = 0,
+        Local = 1,
+        Scheduled = 2,
+        Remote = 3
     }
 
     [GenerateSerializer]
@@ -1867,22 +1875,24 @@ namespace Orleans.DurableTasks
         System.Distributed.DurableTasks.DurableTaskResponse? Result { get; }
     }
 
-    public enum DurableTaskKind
-    {
-        Unspecified = 0,
-        Local = 1,
-        Scheduled = 2,
-        Remote = 3,
-    }
-
     [GenerateSerializer]
     [Immutable]
     [Alias("SubscribeOrPollOptions")]
-    public readonly partial struct SubscribeOrPollOptions
+    public readonly partial struct SubscribeOrPollOptions : System.IEquatable<SubscribeOrPollOptions>
     {
         private readonly int _dummyPrimitive;
         [Id(0)]
         public System.TimeSpan PollTimeout { get { throw null; } init { } }
+
+        public readonly bool Equals(SubscribeOrPollOptions other) { throw null; }
+
+        public override readonly bool Equals(object? obj) { throw null; }
+
+        public override readonly int GetHashCode() { throw null; }
+
+        public static bool operator ==(SubscribeOrPollOptions left, SubscribeOrPollOptions right) { throw null; }
+
+        public static bool operator !=(SubscribeOrPollOptions left, SubscribeOrPollOptions right) { throw null; }
     }
 }
 
@@ -4545,7 +4555,6 @@ namespace OrleansCodeGen.Orleans.DurableTasks
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), "Ext", typeof(global::Orleans.DurableTasks.IDurableTaskGrainExtension), typeof(global::Orleans.DurableTasks.IDurableTaskGrainExtension), "GetRunningTasksAsync" })]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), "Ext", typeof(global::Orleans.DurableTasks.IDurableTaskGrainExtension), typeof(global::Orleans.DurableTasks.IDurableTaskGrainExtension), "28018A01" })]
     public sealed partial class Invokable_IDurableTaskGrainExtension_GrainReference_Ext_28018A01 : global::Orleans.Runtime.AsyncEnumerableRequest<System.Distributed.DurableTasks.TaskId>
     {
         public System.Threading.CancellationToken arg0;
@@ -4584,7 +4593,6 @@ namespace OrleansCodeGen.Orleans.DurableTasks
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), "Ext", typeof(global::Orleans.DurableTasks.IDurableTaskGrainExtension), typeof(global::Orleans.DurableTasks.IDurableTaskServer), "SubscribeOrPollAsync" })]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), "Ext", typeof(global::Orleans.DurableTasks.IDurableTaskGrainExtension), typeof(global::Orleans.DurableTasks.IDurableTaskServer), "623DF2E6" })]
     public sealed partial class Invokable_IDurableTaskGrainExtension_GrainReference_Ext_623DF2E6 : global::Orleans.Runtime.Request<System.Distributed.DurableTasks.DurableTaskResponse>
     {
         public System.Distributed.DurableTasks.TaskId arg0;
@@ -4625,7 +4633,6 @@ namespace OrleansCodeGen.Orleans.DurableTasks
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), "Ext", typeof(global::Orleans.DurableTasks.IDurableTaskGrainExtension), typeof(global::Orleans.DurableTasks.IDurableTaskServer), "CancelAsync" })]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), "Ext", typeof(global::Orleans.DurableTasks.IDurableTaskGrainExtension), typeof(global::Orleans.DurableTasks.IDurableTaskServer), "69FFF0DD" })]
     public sealed partial class Invokable_IDurableTaskGrainExtension_GrainReference_Ext_69FFF0DD : global::Orleans.Runtime.Request
     {
         public System.Distributed.DurableTasks.TaskId arg0;
@@ -4665,7 +4672,6 @@ namespace OrleansCodeGen.Orleans.DurableTasks
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), "Ext", typeof(global::Orleans.DurableTasks.IDurableTaskGrainExtension), typeof(global::Orleans.DurableTasks.IDurableTaskGrainExtension), "GetTasksAsync" })]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), "Ext", typeof(global::Orleans.DurableTasks.IDurableTaskGrainExtension), typeof(global::Orleans.DurableTasks.IDurableTaskGrainExtension), "BB23D540" })]
     public sealed partial class Invokable_IDurableTaskGrainExtension_GrainReference_Ext_BB23D540 : global::Orleans.Runtime.AsyncEnumerableRequest<(System.Distributed.DurableTasks.TaskId TaskId, global::Orleans.DurableTasks.DurableTaskDiagnosticState State)>
     {
         public System.Threading.CancellationToken arg0;
@@ -4704,7 +4710,6 @@ namespace OrleansCodeGen.Orleans.DurableTasks
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), "Ext", typeof(global::Orleans.DurableTasks.IDurableTaskGrainExtension), typeof(global::Orleans.DurableTasks.IDurableTaskServer), "ScheduleAsync" })]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), "Ext", typeof(global::Orleans.DurableTasks.IDurableTaskGrainExtension), typeof(global::Orleans.DurableTasks.IDurableTaskServer), "D5751EC2" })]
     public sealed partial class Invokable_IDurableTaskGrainExtension_GrainReference_Ext_D5751EC2 : global::Orleans.Runtime.Request<System.Distributed.DurableTasks.DurableTaskResponse>
     {
         public System.Distributed.DurableTasks.TaskId arg0;
@@ -4745,7 +4750,6 @@ namespace OrleansCodeGen.Orleans.DurableTasks
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), "Ext", typeof(global::Orleans.DurableTasks.IDurableTaskObserver), typeof(global::Orleans.DurableTasks.IDurableTaskObserver), "OnResponse" })]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), "Ext", typeof(global::Orleans.DurableTasks.IDurableTaskObserver), typeof(global::Orleans.DurableTasks.IDurableTaskObserver), "55C201CC" })]
     public sealed partial class Invokable_IDurableTaskObserver_GrainReference_Ext_55C201CC : global::Orleans.Runtime.Request
     {
         public System.Distributed.DurableTasks.TaskId arg0;
@@ -4786,7 +4790,6 @@ namespace OrleansCodeGen.Orleans.DurableTasks
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), "Ext", typeof(global::Orleans.DurableTasks.IDurableTaskServer), typeof(global::Orleans.DurableTasks.IDurableTaskServer), "SubscribeOrPollAsync" })]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), "Ext", typeof(global::Orleans.DurableTasks.IDurableTaskServer), typeof(global::Orleans.DurableTasks.IDurableTaskServer), "623DF2E6" })]
     public sealed partial class Invokable_IDurableTaskServer_GrainReference_Ext_623DF2E6 : global::Orleans.Runtime.Request<System.Distributed.DurableTasks.DurableTaskResponse>
     {
         public System.Distributed.DurableTasks.TaskId arg0;
@@ -4827,7 +4830,6 @@ namespace OrleansCodeGen.Orleans.DurableTasks
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), "Ext", typeof(global::Orleans.DurableTasks.IDurableTaskServer), typeof(global::Orleans.DurableTasks.IDurableTaskServer), "CancelAsync" })]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), "Ext", typeof(global::Orleans.DurableTasks.IDurableTaskServer), typeof(global::Orleans.DurableTasks.IDurableTaskServer), "69FFF0DD" })]
     public sealed partial class Invokable_IDurableTaskServer_GrainReference_Ext_69FFF0DD : global::Orleans.Runtime.Request
     {
         public System.Distributed.DurableTasks.TaskId arg0;
@@ -4867,7 +4869,6 @@ namespace OrleansCodeGen.Orleans.DurableTasks
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), "Ext", typeof(global::Orleans.DurableTasks.IDurableTaskServer), typeof(global::Orleans.DurableTasks.IDurableTaskServer), "ScheduleAsync" })]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), "Ext", typeof(global::Orleans.DurableTasks.IDurableTaskServer), typeof(global::Orleans.DurableTasks.IDurableTaskServer), "D5751EC2" })]
     public sealed partial class Invokable_IDurableTaskServer_GrainReference_Ext_D5751EC2 : global::Orleans.Runtime.Request<System.Distributed.DurableTasks.DurableTaskResponse>
     {
         public System.Distributed.DurableTasks.TaskId arg0;

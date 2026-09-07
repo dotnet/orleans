@@ -690,7 +690,17 @@ public class DurableTaskGrainRuntimeTests
         var childStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var childCompletion = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
         var childInvocationCount = 0;
+        var fallbackInvocationCount = 0;
         var request = new RuntimeTestDurableTaskRequest(Parent)
+        {
+            Context = new DurableTaskRequestContext { TargetId = fixture.GrainId },
+        };
+        var childRequest = new RuntimeTestDurableTaskRequest(() => DurableTask.Run<int>(_ =>
+        {
+            Interlocked.Increment(ref childInvocationCount);
+            childStarted.TrySetResult();
+            return childCompletion.Task;
+        }))
         {
             Context = new DurableTaskRequestContext { TargetId = fixture.GrainId },
         };
@@ -720,7 +730,9 @@ public class DurableTaskGrainRuntimeTests
         var response = await restarted.GetScheduledTaskHandle(parentId).WaitAsync(BoundedWait());
         Assert.Equal(17, response.GetResult<int>());
         Assert.Equal(1, request.CreateTaskCallCount);
+        Assert.Equal(1, childRequest.CreateTaskCallCount);
         Assert.Equal(1, Volatile.Read(ref childInvocationCount));
+        Assert.Equal(0, Volatile.Read(ref fallbackInvocationCount));
 
         void AddParent()
         {
@@ -730,7 +742,7 @@ public class DurableTaskGrainRuntimeTests
 
         void AddChild()
         {
-            var state = fixture.Storage.GetOrCreateTask(childId, request: null);
+            var state = fixture.Storage.GetOrCreateTask(childId, childRequest);
             fixture.Storage.SetTaskKind(childId, state, DurableTaskKind.Local);
         }
 
@@ -738,9 +750,8 @@ public class DurableTaskGrainRuntimeTests
         {
             return await DurableTask.Run<int>(_ =>
             {
-                Interlocked.Increment(ref childInvocationCount);
-                childStarted.TrySetResult();
-                return childCompletion.Task;
+                Interlocked.Increment(ref fallbackInvocationCount);
+                return Task.FromResult(-1);
             }).WithId("child");
         }
     }

@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Distributed.DurableTasks;
 using System.Threading;
 using System.Threading.Tasks;
@@ -35,11 +36,29 @@ public interface IDurableTaskServer : IGrainExtension
 }
 
 [GenerateSerializer, Immutable, Alias(nameof(SubscribeOrPollOptions))]
-public readonly struct SubscribeOrPollOptions
+public readonly struct SubscribeOrPollOptions : IEquatable<SubscribeOrPollOptions>
 {
     [Id(0)]
     public TimeSpan PollTimeout { get; init; }
 
+    /// <inheritdoc/>
+    public bool Equals(SubscribeOrPollOptions other) => PollTimeout == other.PollTimeout;
+
+    /// <inheritdoc/>
+    public override bool Equals(object? obj) => obj is SubscribeOrPollOptions other && Equals(other);
+
+    /// <inheritdoc/>
+    public override int GetHashCode() => PollTimeout.GetHashCode();
+
+    /// <summary>
+    /// Determines whether two options values are equal.
+    /// </summary>
+    public static bool operator ==(SubscribeOrPollOptions left, SubscribeOrPollOptions right) => left.Equals(right);
+
+    /// <summary>
+    /// Determines whether two options values are unequal.
+    /// </summary>
+    public static bool operator !=(SubscribeOrPollOptions left, SubscribeOrPollOptions right) => !left.Equals(right);
 }
 
 [Alias("IDurableTaskGrainExtension")]
@@ -54,6 +73,7 @@ public interface IDurableTaskGrainExtension : IGrainExtension, IDurableTaskServe
 
 [GenerateSerializer]
 [Alias("DurableTaskDiagnosticState")]
+[SuppressMessage("Performance", "CA1815:Override equals and operator equals on value types", Justification = "This mutable diagnostic snapshot carries reference-backed state and does not represent a comparable value.")]
 public struct DurableTaskDiagnosticState
 {
     [Id(0)]
@@ -62,8 +82,12 @@ public struct DurableTaskDiagnosticState
     [Id(1)]
     public DateTimeOffset? CompletedAt { get; set; }
 
+    /// <summary>
+    /// Gets or sets the diagnostic status, or <see langword="null"/> when the value was default-initialized
+    /// or received from a version which did not provide this member.
+    /// </summary>
     [Id(2)]
-    public string Status { get; set; }
+    public string? Status { get; set; }
 
     [Id(3)]
     public string? Request { get; set; }
@@ -71,8 +95,12 @@ public struct DurableTaskDiagnosticState
     [Id(4)]
     public string? Response { get; set; }
 
+    /// <summary>
+    /// Gets or sets the diagnostic completion waiters, or <see langword="null"/> when the value was
+    /// default-initialized or received from a version which did not provide this member.
+    /// </summary>
     [Id(5)]
-    public List<string> Waiters { get; set; }
+    public List<string>? Waiters { get; set; }
 
     public override readonly string ToString() => $"[{Status}, Created: {CreatedAt}, Completed: {CompletedAt}, Request: {Request}, Response: {Response}, Waiters: {string.Join(", ", Waiters ?? [])}]";
 }
