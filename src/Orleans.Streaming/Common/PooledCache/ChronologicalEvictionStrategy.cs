@@ -143,6 +143,12 @@ namespace Orleans.Providers.Streams.Common
             }
             else
             {
+                if (IdOfLastPurgedBufferId is null
+                    || !this.inUseBuffers.Any(buffer => buffer.Id == IdOfLastPurgedBufferId))
+                {
+                    return;
+                }
+
                 // All buffers older than the last purged buffer can be returned.
                 while (this.inUseBuffers.Peek().Id != IdOfLastPurgedBufferId)
                 {
