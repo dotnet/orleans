@@ -46,6 +46,54 @@ public sealed class DeliveryAndOptionsContractTests
     }
 
     [Fact]
+    public void DeadLetterCompaction_SaturatesMaximumRetentionWithoutOverflow()
+    {
+        var retentionType = typeof(IDurableInbox).Assembly.GetType(
+            "Orleans.DurableMessaging.DurableDeadLetterRetention",
+            throwOnError: true)!;
+        var compact = retentionType.GetMethod(
+            "Compact",
+            BindingFlags.Static | BindingFlags.Public)!
+            .MakeGenericMethod(typeof(string), typeof(DateTimeOffset));
+        var entries = new Dictionary<string, DateTimeOffset>
+        {
+            ["oldest"] = DateTimeOffset.MinValue,
+            ["newest"] = DateTimeOffset.MaxValue
+        };
+
+        var removed = (bool)compact.Invoke(
+            null,
+            [
+                entries,
+                DateTimeOffset.MaxValue,
+                TimeSpan.MaxValue,
+                int.MaxValue,
+                (Func<DateTimeOffset, DateTimeOffset>)(static timestamp => timestamp),
+                0
+            ])!;
+
+        Assert.False(removed);
+        Assert.Equal(2, entries.Count);
+
+        var fullDateTimeRange = TimeSpan.FromTicks(
+            DateTimeOffset.MaxValue.UtcTicks - DateTimeOffset.MinValue.UtcTicks);
+        removed = (bool)compact.Invoke(
+            null,
+            [
+                entries,
+                DateTimeOffset.MaxValue,
+                fullDateTimeRange,
+                int.MaxValue,
+                (Func<DateTimeOffset, DateTimeOffset>)(static timestamp => timestamp),
+                0
+            ])!;
+
+        Assert.True(removed);
+        Assert.DoesNotContain("oldest", entries);
+        Assert.Contains("newest", entries);
+    }
+
+    [Fact]
     public void DeliveryResult_EachFactory_PreservesStatusAndPayload()
     {
         var routeMissing = DeliveryResult.RouteNotFound("orders/missing");
