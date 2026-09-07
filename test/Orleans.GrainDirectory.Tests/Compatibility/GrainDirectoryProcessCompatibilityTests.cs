@@ -3,7 +3,6 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Reflection;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
@@ -688,17 +687,18 @@ internal sealed class CompatibilityProcessCluster : IAsyncDisposable
             + string.Join(Environment.NewLine, _processes.Select(static process => process.Describe())),
             exception);
 
-    private static string GetHostPath(HostVersion version, [CallerFilePath] string sourceFile = "")
+    private static string GetHostPath(HostVersion version)
     {
-        var repositoryRoot = new DirectoryInfo(Path.GetDirectoryName(sourceFile)!);
+        var outputDirectory = new DirectoryInfo(AppContext.BaseDirectory);
+        var repositoryRoot = outputDirectory;
         while (!File.Exists(Path.Combine(repositoryRoot.FullName, "Orleans.slnx")))
         {
             repositoryRoot = repositoryRoot.Parent
-                ?? throw new InvalidOperationException($"Could not locate repository root from '{sourceFile}'.");
+                ?? throw new InvalidOperationException($"Could not locate repository root from test output '{outputDirectory.FullName}'.");
         }
 
-        var framework = new DirectoryInfo(AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar)).Name;
-        var configuration = new DirectoryInfo(AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar)).Parent!.Name;
+        var framework = outputDirectory.Name;
+        var configuration = outputDirectory.Parent!.Name;
         var projectName = version switch
         {
             HostVersion.Released => "Orleans.GrainDirectory.Compatibility.ReleaseHost",
