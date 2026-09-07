@@ -16,9 +16,9 @@ namespace Orleans.DurableMessaging;
 /// </para>
 /// <para>
 /// Delivery is driven by the outbox's background pump, which iterates
-/// pending messages and calls <c>IDurableInboxExtension.DeliverAsync()</c> on target grains. On successful
-/// delivery (<c>DeliveryResult.Accepted</c> or <c>DeliveryResult.Duplicate</c>), messages are removed from
-/// the outbox.
+/// pending messages and calls <c>IDurableInboxExtension.DeliverAsync()</c> on target grains. Messages are
+/// removed from the outbox when <see cref="DeliveryResult.Status"/> is
+/// <see cref="DeliveryStatus.Accepted"/> or <see cref="DeliveryStatus.Duplicate"/>.
 /// </para>
 /// <para>
 /// The outbox does NOT guarantee ordering of messages. If ordering is required, it must be implemented at
