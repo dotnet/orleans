@@ -47,6 +47,46 @@ namespace UnitTests.LivenessTests
             }
         }
 
+        [Fact]
+        [TestCategory("Functional"), TestCategory("Liveness"), TestCategory("Ring"), TestCategory("RingStandalone")]
+        public async Task RangeChangeSubscription_ReplayPrecedesConcurrentUpdates()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var initialRange = RangeFactory.CreateFullRange();
+            var updatedRange = RangeFactory.CreateRange(0, 1);
+            var listeners = new RingRangeListenerManager(initialRange);
+            using var replayEntered = new ManualResetEventSlim();
+            using var releaseReplay = new ManualResetEventSlim();
+            using var updateEntered = new ManualResetEventSlim();
+            var listener = new BlockingRangeListener(replayEntered, releaseReplay, updateEntered);
+
+            var subscription = Task.Run(() => listeners.Subscribe(listener), cancellationToken);
+            try
+            {
+                Assert.True(replayEntered.Wait(TimeSpan.FromSeconds(10), cancellationToken));
+
+                var update = listeners.Publish(
+                    initialRange,
+                    updatedRange,
+                    increased: false,
+                    static (_, _) => { });
+                Assert.False(update.IsCompleted);
+                Assert.False(updateEntered.IsSet);
+
+                releaseReplay.Set();
+                listeners.Dispatch(update);
+                await subscription.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+
+                Assert.True(updateEntered.IsSet);
+                Assert.Same(updatedRange, listener.LastRange);
+            }
+            finally
+            {
+                releaseReplay.Set();
+                await subscription.WaitAsync(TimeSpan.FromSeconds(10), CancellationToken.None);
+            }
+        }
+
         [Fact, TestCategory("Functional"), TestCategory("Liveness"), TestCategory("Ring"), TestCategory("RingStandalone")]
         public void ConsistentRingProvider_Test3()
         {
@@ -126,6 +166,34 @@ namespace UnitTests.LivenessTests
             services.AddSingleton<OrleansInstruments>();
             services.AddSingleton<ConsistentRingInstruments>();
             return services.BuildServiceProvider().GetRequiredService<ConsistentRingInstruments>();
+        }
+
+        private sealed class BlockingRangeListener(
+            ManualResetEventSlim replayEntered,
+            ManualResetEventSlim releaseReplay,
+            ManualResetEventSlim updateEntered) : IRingRangeListener
+        {
+            private int _notificationCount;
+
+            public IRingRange? LastRange { get; private set; }
+
+            public void RangeChangeNotification(IRingRange old, IRingRange now, bool increased)
+            {
+                if (Interlocked.Increment(ref _notificationCount) == 1)
+                {
+                    replayEntered.Set();
+                    if (!releaseReplay.Wait(TimeSpan.FromSeconds(10)))
+                    {
+                        throw new TimeoutException("Timed out waiting to release the initial ring-range replay notification.");
+                    }
+                }
+                else
+                {
+                    updateEntered.Set();
+                }
+
+                LastRange = now;
+            }
         }
 
         internal sealed class FakeSiloStatusOracle : ISiloStatusOracle
