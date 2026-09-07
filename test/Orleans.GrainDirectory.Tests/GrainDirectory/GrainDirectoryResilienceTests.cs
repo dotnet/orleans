@@ -121,7 +121,7 @@ public sealed class GrainDirectoryResilienceTests
         }
         finally
         {
-            await CaptureCleanupFailureAsync("canceling scenario workers", _ => cts.CancelAsync());
+            await CaptureCleanupFailureAsync("canceling scenario workers", async _ => await cts.CancelAsync());
             await CaptureCleanupFailureAsync("joining scenario workers", async token =>
             {
                 var workers = Task.WhenAll(deploymentTask, loadTask, chaosTask);
