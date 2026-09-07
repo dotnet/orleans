@@ -65,10 +65,10 @@ namespace Orleans.DurableTasks.Protocol
         public string? Response { get { throw null; } set { } }
 
         [Id(2)]
-        public string Status { get { throw null; } set { } }
+        public string? Status { get { throw null; } set { } }
 
         [Id(5)]
-        public System.Collections.Generic.List<string> Waiters { get { throw null; } set { } }
+        public System.Collections.Generic.List<string>? Waiters { get { throw null; } set { } }
 
         public override readonly string ToString() { throw null; }
     }
