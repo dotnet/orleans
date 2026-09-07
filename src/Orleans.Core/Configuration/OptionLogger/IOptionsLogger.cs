@@ -84,6 +84,8 @@ namespace Orleans
         /// <param name="formatters">The collection of options formatters.</param>
         public void LogOptions(IEnumerable<IOptionFormatter> formatters)
         {
+            ArgumentNullException.ThrowIfNull(formatters);
+
             foreach (var optionFormatter in formatters.OrderBy(f => f.Name))
             {
                 this.LogOption(optionFormatter);
@@ -96,6 +98,8 @@ namespace Orleans
         /// <param name="formatter">The options formatter.</param>
         public void LogOption(IOptionFormatter formatter)
         {
+            ArgumentNullException.ThrowIfNull(formatter);
+
             if (!logger.IsEnabled(LogLevel.Information))
             {
                 return;

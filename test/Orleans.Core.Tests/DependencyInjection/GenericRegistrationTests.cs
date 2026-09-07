@@ -79,6 +79,42 @@ public class CoreGenericRegistrationTests
     }
 
     [Fact]
+    public void ConfigureServices_NullBuilder_ThrowsBeforeDelegateInvocation()
+    {
+        var invoked = false;
+        IClientBuilder builder = null!;
+
+        var exception = Assert.Throws<ArgumentNullException>(
+            () => builder.ConfigureServices(_ => invoked = true));
+
+        Assert.Equal("builder", exception.ParamName);
+        Assert.False(invoked);
+    }
+
+    [Fact]
+    public void AddActivityPropagation_NullBuilder_ThrowsWithExactParameterName()
+    {
+        IClientBuilder builder = null!;
+
+        var exception = Assert.Throws<ArgumentNullException>(() => builder.AddActivityPropagation());
+
+        Assert.Equal("builder", exception.ParamName);
+    }
+
+    [Fact]
+    public void AddClusterConnectionStatusObserver_NullObserver_ThrowsWithoutMutation()
+    {
+        var builder = new TestClientBuilder();
+        var descriptorCount = builder.Services.Count;
+
+        var exception = Assert.Throws<ArgumentNullException>(
+            () => builder.AddClusterConnectionStatusObserver<IClusterConnectionStatusObserver>(null!));
+
+        Assert.Equal("observer", exception.ParamName);
+        Assert.Equal(descriptorCount, builder.Services.Count);
+    }
+
+    [Fact]
     public void GrainCallFilters_ActivateConstructorInjectedImplementations()
     {
         var dependency = new ActivationMarker();

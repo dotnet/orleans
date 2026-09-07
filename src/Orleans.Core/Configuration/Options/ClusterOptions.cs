@@ -54,6 +54,7 @@ namespace Orleans.Configuration
         /// </param>
         public ClusterOptionsValidator(IOptions<ClusterOptions> options)
         {
+            ArgumentNullException.ThrowIfNull(options);
             this.options = options.Value;
         }
 

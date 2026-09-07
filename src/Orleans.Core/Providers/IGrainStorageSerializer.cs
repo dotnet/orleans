@@ -67,7 +67,10 @@ namespace Orleans.Storage
         /// <typeparam name="T">The output type.</typeparam>
         /// <returns>The deserialized object.</returns>
         public static T? Deserialize<T>(this IGrainStorageSerializer serializer, ReadOnlyMemory<byte> input)
-            => serializer.Deserialize<T>(new BinaryData(input));
+        {
+            ArgumentNullException.ThrowIfNull(serializer);
+            return serializer.Deserialize<T>(new BinaryData(input));
+        }
     }
 
     /// <summary>
@@ -101,6 +104,8 @@ namespace Orleans.Storage
         /// <inheritdoc/>
         public void PostConfigure(string? name, TOptions options)
         {
+            ArgumentNullException.ThrowIfNull(options);
+
             if (options.GrainStorageSerializer == default)
             {
                 // First, try to get a IGrainStorageSerializer that was registered with

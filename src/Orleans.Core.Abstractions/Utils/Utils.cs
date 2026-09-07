@@ -143,35 +143,51 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="uri">The input Uri</param>
         /// <returns></returns>
-        public static System.Net.IPEndPoint? ToIPEndPoint(this Uri uri) => uri.Scheme switch
+        public static System.Net.IPEndPoint? ToIPEndPoint(this Uri uri)
         {
-            "gwy.tcp" => new System.Net.IPEndPoint(System.Net.IPAddress.Parse(uri.Host), uri.Port),
-            _ => null,
-        };
+            ArgumentNullException.ThrowIfNull(uri);
+            return uri.Scheme switch
+            {
+                "gwy.tcp" => new System.Net.IPEndPoint(System.Net.IPAddress.Parse(uri.Host), uri.Port),
+                _ => null,
+            };
+        }
 
         /// <summary>
         /// Parse a Uri as a Silo address, excluding the generation identifier.
         /// </summary>
         /// <param name="uri">The input Uri</param>
-        public static SiloAddress? ToGatewayAddress(this Uri uri) => uri.Scheme switch
+        public static SiloAddress? ToGatewayAddress(this Uri uri)
         {
-            "gwy.tcp" => SiloAddress.New(System.Net.IPAddress.Parse(uri.Host), uri.Port, 0),
-            _ => null,
-        };
+            ArgumentNullException.ThrowIfNull(uri);
+            return uri.Scheme switch
+            {
+                "gwy.tcp" => SiloAddress.New(System.Net.IPAddress.Parse(uri.Host), uri.Port, 0),
+                _ => null,
+            };
+        }
 
         /// <summary>
         /// Represent an IP end point in the gateway URI format..
         /// </summary>
         /// <param name="ep">The input IP end point</param>
         /// <returns></returns>
-        public static Uri ToGatewayUri(this System.Net.IPEndPoint ep) => new($"gwy.tcp://{new SpanFormattableIPEndPoint(ep)}/0");
+        public static Uri ToGatewayUri(this System.Net.IPEndPoint ep)
+        {
+            ArgumentNullException.ThrowIfNull(ep);
+            return new($"gwy.tcp://{new SpanFormattableIPEndPoint(ep)}/0");
+        }
 
         /// <summary>
         /// Represent a silo address in the gateway URI format.
         /// </summary>
         /// <param name="address">The input silo address</param>
         /// <returns></returns>
-        public static Uri ToGatewayUri(this SiloAddress address) => new($"gwy.tcp://{new SpanFormattableIPEndPoint(address.Endpoint)}/{address.Generation}");
+        public static Uri ToGatewayUri(this SiloAddress address)
+        {
+            ArgumentNullException.ThrowIfNull(address);
+            return new($"gwy.tcp://{new SpanFormattableIPEndPoint(address.Endpoint)}/{address.Generation}");
+        }
 
         /// <summary>
         /// Executes an action and suppresses any exception it throws.
@@ -179,6 +195,8 @@ namespace Orleans.Runtime
         /// <param name="action">The action to execute.</param>
         public static void SafeExecute(Action action)
         {
+            ArgumentNullException.ThrowIfNull(action);
+
             try
             {
                 action();
@@ -194,6 +212,8 @@ namespace Orleans.Runtime
         /// <param name="caller">The name of the caller to include in the log entry.</param>
         public static void SafeExecute(Action action, ILogger? logger = null, string? caller = null)
         {
+            ArgumentNullException.ThrowIfNull(action);
+
             try
             {
                 action();
@@ -212,6 +232,8 @@ namespace Orleans.Runtime
         /// <returns>A task representing the operation.</returns>
         public static async Task SafeExecuteAsync(Task task)
         {
+            ArgumentNullException.ThrowIfNull(task);
+
             try
             {
                 await task;
@@ -246,20 +268,26 @@ namespace Orleans.Runtime
         /// <returns>A sequence of non-empty batches.</returns>
         public static IEnumerable<List<T>> BatchIEnumerable<T>(this IEnumerable<T> sequence, int batchSize)
         {
-            var batch = new List<T>(batchSize);
-            foreach (var item in sequence)
+            ArgumentNullException.ThrowIfNull(sequence);
+            return Enumerate(sequence, batchSize);
+
+            static IEnumerable<List<T>> Enumerate(IEnumerable<T> sequence, int batchSize)
             {
-                batch.Add(item);
-                // when we've accumulated enough in the batch, send it out  
-                if (batch.Count >= batchSize)
+                var batch = new List<T>(batchSize);
+                foreach (var item in sequence)
                 {
-                    yield return batch; // batch.ToArray();
-                    batch = new List<T>(batchSize);
+                    batch.Add(item);
+                    // when we've accumulated enough in the batch, send it out
+                    if (batch.Count >= batchSize)
+                    {
+                        yield return batch; // batch.ToArray();
+                        batch = new List<T>(batchSize);
+                    }
                 }
-            }
-            if (batch.Count > 0)
-            {
-                yield return batch; //batch.ToArray();
+                if (batch.Count > 0)
+                {
+                    yield return batch; //batch.ToArray();
+                }
             }
         }
 

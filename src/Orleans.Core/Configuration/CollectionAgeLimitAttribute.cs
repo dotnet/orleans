@@ -60,6 +60,8 @@ namespace Orleans
         /// <inheritdoc />
         public void Populate(IServiceProvider services, Type grainClass, GrainType grainType, Dictionary<string, string> properties)
         {
+            ArgumentNullException.ThrowIfNull(properties);
+
             string idleDeactivationPeriod;
 
             if (AlwaysActive)
@@ -94,6 +96,7 @@ namespace Orleans
         /// <inheritdoc />
         public void Populate(IServiceProvider services, Type grainClass, GrainType grainType, Dictionary<string, string> properties)
         {
+            ArgumentNullException.ThrowIfNull(properties);
             properties[WellKnownGrainTypeProperties.IdleDeactivationPeriod] = WellKnownGrainTypeProperties.IndefiniteIdleDeactivationPeriodValue;
         }
     }

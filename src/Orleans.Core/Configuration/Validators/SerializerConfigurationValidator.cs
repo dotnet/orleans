@@ -34,6 +34,10 @@ namespace Orleans
         /// </param>
         public SerializerConfigurationValidator(ICodecProvider codecProvider, IOptions<TypeManifestOptions> options, IServiceProvider serviceProvider)
         {
+            ArgumentNullException.ThrowIfNull(codecProvider);
+            ArgumentNullException.ThrowIfNull(options);
+            ArgumentNullException.ThrowIfNull(serviceProvider);
+
             _codecProvider = codecProvider;
             _options = options.Value;
 

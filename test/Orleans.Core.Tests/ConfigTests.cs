@@ -1,5 +1,9 @@
 using System.Net;
 using System.Net.Sockets;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
+using Orleans.Metadata;
+using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Xunit;
 
@@ -75,6 +79,46 @@ namespace UnitTests
         public void Config_LocalIPAddressFallback_ThrowsForExplicitInterface()
         {
             Assert.Throws<Orleans.Runtime.OrleansException>(() => ConfigUtilities.ResolveLocalIPAddress(Array.Empty<IPAddress>(), AddressFamily.InterNetwork, "en0"));
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Config")]
+        public void CollectionAttributes_NullProperties_ThrowWithExactParameterName()
+        {
+            var collectionAgeLimit = new CollectionAgeLimitAttribute();
+            var collectionException = Assert.Throws<ArgumentNullException>(
+                () => collectionAgeLimit.Populate(null!, null!, default, null!));
+            Assert.Equal("properties", collectionException.ParamName);
+
+            var keepAlive = new KeepAliveAttribute();
+            var keepAliveException = Assert.Throws<ArgumentNullException>(
+                () => keepAlive.Populate(null!, null!, default, null!));
+            Assert.Equal("properties", keepAliveException.ParamName);
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Config")]
+        public void CollectionAttributes_ValidProperties_PreserveIdleDeactivationValues()
+        {
+            var collectionProperties = new Dictionary<string, string>();
+            new CollectionAgeLimitAttribute { Minutes = 5 }.Populate(null!, null!, default, collectionProperties);
+
+            Assert.Equal(
+                TimeSpan.FromMinutes(5).ToString("c"),
+                collectionProperties[WellKnownGrainTypeProperties.IdleDeactivationPeriod]);
+
+            var keepAliveProperties = new Dictionary<string, string>();
+            new KeepAliveAttribute().Populate(null!, null!, default, keepAliveProperties);
+
+            Assert.Equal(
+                WellKnownGrainTypeProperties.IndefiniteIdleDeactivationPeriodValue,
+                keepAliveProperties[WellKnownGrainTypeProperties.IdleDeactivationPeriod]);
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Config")]
+        public void ClusterOptionsValidator_NullOptions_ThrowsWithExactParameterName()
+        {
+            var exception = Assert.Throws<ArgumentNullException>(() => new ClusterOptionsValidator(null!));
+
+            Assert.Equal("options", exception.ParamName);
         }
     }
 }

@@ -708,6 +708,12 @@ dotnet_diagnostic.CA1062.severity = warning
 [src/Orleans.Streaming/{PubSub,Extensions,Providers}/**.cs]
 dotnet_diagnostic.CA1062.severity = warning
 
+[src/Orleans.Core/{Configuration,Providers,Core,IDs}/**.cs]
+dotnet_diagnostic.CA1062.severity = warning
+
+[src/Orleans.Core.Abstractions/{Utils,Lifecycle}/**.cs]
+dotnet_diagnostic.CA1062.severity = warning
+
 [src/Serializers/Orleans.Serialization.Protobuf/**.cs]
 dotnet_diagnostic.CA1062.severity = warning
 

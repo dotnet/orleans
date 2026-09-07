@@ -28,6 +28,10 @@ namespace Orleans.Configuration.Internal
         /// <param name="implementation">The implementation of <paramref name="service"/>.</param>
         public static void AddFromExisting(this IServiceCollection services, Type service, Type implementation)
         {
+            ArgumentNullException.ThrowIfNull(services);
+            ArgumentNullException.ThrowIfNull(service);
+            ArgumentNullException.ThrowIfNull(implementation);
+
             ServiceDescriptor? registration = null;
             foreach (var descriptor in services)
             {

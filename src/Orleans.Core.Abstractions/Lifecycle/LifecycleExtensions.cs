@@ -63,6 +63,8 @@ namespace Orleans
         /// <returns>A <see cref="IDisposable"/> instance which can be disposed to unsubscribe the observer from the lifecycle.</returns>
         public static IDisposable Subscribe<TObserver>(this ILifecycleObservable observable, int stage, ILifecycleObserver observer)
         {
+            ArgumentNullException.ThrowIfNull(observable);
+            ArgumentNullException.ThrowIfNull(observer);
             return observable.Subscribe(GetTypeName(typeof(TObserver)), stage, observer);
         }
 
@@ -106,6 +108,8 @@ namespace Orleans
         /// <returns>A <see cref="IDisposable"/> instance which can be disposed to unsubscribe the observer from the lifecycle.</returns>
         public static IDisposable Subscribe(this ILifecycleObservable observable, int stage, ILifecycleObserver observer)
         {
+            ArgumentNullException.ThrowIfNull(observable);
+            ArgumentNullException.ThrowIfNull(observer);
             return observable.Subscribe(GetTypeName(observer.GetType()), stage, observer);
         }
 

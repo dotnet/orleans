@@ -20,6 +20,8 @@ namespace Orleans
         /// <param name="task">The task to be ignored.</param>
         public static void Ignore(this Task task)
         {
+            ArgumentNullException.ThrowIfNull(task);
+
             if (task.IsCompleted)
             {
                 _ = task.Exception;
