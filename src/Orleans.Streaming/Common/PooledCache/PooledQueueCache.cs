@@ -590,7 +590,8 @@ namespace Orleans.Providers.Streams.Common
 
             if (messageBlocks.Count == 0)
             {
-                throw new QueueCacheMissException();
+                return QueueCacheCursorMoveResult.FromCacheMiss(
+                    new QueueCacheMissInfo(cursor.SequenceToken?.ToString(), null, null));
             }
 
             // has this message been purged
