@@ -1916,7 +1916,7 @@ public sealed class DurableTaskRuntimeInvariantTests
     }
 
     [Fact]
-    public async Task StopWaitsForStagedResponseCommitBeforeCompletingHandles()
+    public async Task StopDrainContinuesAfterCallerCancellationDuringStagedResponseCommit()
     {
         var (runtime, storage, manager, _) = CreateRuntime();
         var taskId = TaskId.Parse("root/remote");
@@ -1926,7 +1926,11 @@ public sealed class DurableTaskRuntimeInvariantTests
         var handle = runtime.GetScheduledTaskHandle(taskId);
         await runtime.AcceptResponseAsync(taskId, DurableTaskResponse.FromResult(42), target, TestContext.Current.CancellationToken, persist: false);
 
-        var stopping = runtime.StopAsync(TestContext.Current.CancellationToken);
+        using var cancellation = new CancellationTokenSource();
+        var stopping = runtime.StopAsync(cancellation.Token);
+        Assert.False(stopping.IsCompleted);
+        cancellation.Cancel();
+        await Task.Yield();
         Assert.False(stopping.IsCompleted);
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
         await stopping.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
