@@ -66,30 +66,6 @@ internal static class GrainDirectoryEvents
         int partitionIndex,
         MembershipVersion version) : GrainDirectoryEvent(siloAddress, partitionIndex, version, RingRange.Empty);
 
-    internal sealed class PreviousViewAdmission(
-        SiloAddress siloAddress,
-        int partitionIndex,
-        GrainId grainId,
-        MembershipVersion requestVersion,
-        MembershipVersion version,
-        string reason) : GrainDirectoryEvent(siloAddress, partitionIndex, version, RingRange.Empty)
-    {
-        public readonly GrainId GrainId = grainId;
-        public readonly MembershipVersion RequestVersion = requestVersion;
-        public readonly string Reason = reason;
-    }
-
-    internal static void EmitPreviousViewAdmission(
-        SiloAddress siloAddress, int partitionIndex, GrainId grainId,
-        MembershipVersion requestVersion, MembershipVersion version, string reason)
-    {
-        if (Listener.IsEnabled(nameof(PreviousViewAdmission)))
-        {
-            Listener.Write(nameof(PreviousViewAdmission),
-                new PreviousViewAdmission(siloAddress, partitionIndex, grainId, requestVersion, version, reason));
-        }
-    }
-
     internal sealed class IntegrityViolation(
         SiloAddress siloAddress,
         int partitionIndex,

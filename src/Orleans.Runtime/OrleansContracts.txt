@@ -39,10 +39,10 @@ interface [GrainInterfaceType("Orleans.Runtime.GrainDirectory.IGrainDirectoryCli
 
 interface [GrainInterfaceType("Orleans.Runtime.GrainDirectory.IGrainDirectoryPartition")] Orleans.Runtime.GrainDirectory.IGrainDirectoryPartition [Version(0)]
   AcknowledgeSnapshotTransferAsync: AcknowledgeSnapshotTransferAsync(Orleans.Runtime.SiloAddress, int, Orleans.Runtime.MembershipVersion, System.Threading.CancellationToken) -> ValueTask<bool>
-  DeregisterAsync: DeregisterAsync(Orleans.Runtime.MembershipVersion, Orleans.Runtime.GrainAddress, System.Threading.CancellationToken, bool) -> ValueTask<DirectoryResult`1<bool>>
+  DeregisterAsync: DeregisterAsync(Orleans.Runtime.MembershipVersion, Orleans.Runtime.GrainAddress, System.Threading.CancellationToken) -> ValueTask<DirectoryResult`1<bool>>
   GetSnapshotAsync: GetSnapshotAsync(Orleans.Runtime.MembershipVersion, Orleans.Runtime.MembershipVersion, RingRange, System.Threading.CancellationToken) -> ValueTask<GrainDirectoryPartitionSnapshot>
-  LookupAsync: LookupAsync(Orleans.Runtime.MembershipVersion, Orleans.Runtime.GrainId, System.Threading.CancellationToken, bool) -> ValueTask<DirectoryResult`1<Orleans.Runtime.GrainAddress?>>
-  RegisterAsync: RegisterAsync(Orleans.Runtime.MembershipVersion, Orleans.Runtime.GrainAddress, Orleans.Runtime.GrainAddress?, System.Threading.CancellationToken, bool) -> ValueTask<DirectoryResult`1<Orleans.Runtime.GrainAddress>>
+  LookupAsync: LookupAsync(Orleans.Runtime.MembershipVersion, Orleans.Runtime.GrainId, System.Threading.CancellationToken) -> ValueTask<DirectoryResult`1<Orleans.Runtime.GrainAddress?>>
+  RegisterAsync: RegisterAsync(Orleans.Runtime.MembershipVersion, Orleans.Runtime.GrainAddress, Orleans.Runtime.GrainAddress?, System.Threading.CancellationToken) -> ValueTask<DirectoryResult`1<Orleans.Runtime.GrainAddress>>
 
 interface [GrainInterfaceType("Orleans.Runtime.GrainDirectory.IGrainDirectoryTestHooks")] Orleans.Runtime.GrainDirectory.IGrainDirectoryTestHooks [Version(0)]
   CheckActivationsAsync: CheckActivationsAsync(Orleans.Concurrency.Immutable<System.Collections.Generic.List<Orleans.Runtime.GrainAddress>>, System.Threading.CancellationToken) -> ValueTask<Orleans.Concurrency.Immutable<System.Collections.Generic.List<Orleans.Runtime.GrainId>>>

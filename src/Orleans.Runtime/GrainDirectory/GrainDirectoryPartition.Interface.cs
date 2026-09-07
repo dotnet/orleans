@@ -11,14 +11,13 @@ internal sealed partial class GrainDirectoryPartition
         MembershipVersion version,
         GrainAddress address,
         GrainAddress? currentRegistration,
-        CancellationToken cancellationToken,
-        bool allowPreviousVersion)
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(address);
         LogRegisterAsync(version, address, currentRegistration);
 
-        var currentView = await WaitForOwnershipViewAsync(address.GrainId, version, cancellationToken, allowPreviousVersion, address);
+        var currentView = await WaitForOwnershipViewAsync(address.GrainId, version, cancellationToken);
         if (!IsOwner(currentView, address.GrainId))
         {
             return DirectoryResult.RefreshRequired<GrainAddress>(currentView.Version);
@@ -72,49 +71,45 @@ internal sealed partial class GrainDirectoryPartition
         }
 
         var result = RegisterCore(address, currentRegistration, currentView.Version,
-            allowPreviousVersion ? currentView.ClusterMembershipSnapshot : _owner.ClusterMembershipSnapshot);
+            currentView.ClusterMembershipSnapshot);
         return DirectoryResult.FromResult(result, version);
     }
 
     async ValueTask<DirectoryResult<GrainAddress?>> IGrainDirectoryPartition.LookupAsync(
         MembershipVersion version,
         GrainId grainId,
-        CancellationToken cancellationToken,
-        bool allowPreviousVersion)
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         LogLookupAsync(version, grainId);
 
-        var currentView = await WaitForOwnershipViewAsync(grainId, version, cancellationToken, allowPreviousVersion);
+        var currentView = await WaitForOwnershipViewAsync(grainId, version, cancellationToken);
         if (!IsOwner(currentView, grainId))
         {
             return DirectoryResult.RefreshRequired<GrainAddress?>(currentView.Version);
         }
 
-        var result = LookupCore(grainId,
-            allowPreviousVersion ? currentView.ClusterMembershipSnapshot : _owner.ClusterMembershipSnapshot);
+        var result = LookupCore(grainId, currentView.ClusterMembershipSnapshot);
         return DirectoryResult.FromResult(result, version);
     }
 
     async ValueTask<DirectoryResult<bool>> IGrainDirectoryPartition.DeregisterAsync(
         MembershipVersion version,
         GrainAddress address,
-        CancellationToken cancellationToken,
-        bool allowPreviousVersion)
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(address);
         LogDeregisterAsync(version, address);
 
-        var currentView = await WaitForOwnershipViewAsync(address.GrainId, version, cancellationToken, allowPreviousVersion, address);
+        var currentView = await WaitForOwnershipViewAsync(address.GrainId, version, cancellationToken);
         if (!IsOwner(currentView, address.GrainId))
         {
             return DirectoryResult.RefreshRequired<bool>(currentView.Version);
         }
 
         DebugAssertOwnership(currentView, address.GrainId);
-        var result = DeregisterCore(address,
-            allowPreviousVersion ? currentView.ClusterMembershipSnapshot : _owner.ClusterMembershipSnapshot);
+        var result = DeregisterCore(address, currentView.ClusterMembershipSnapshot);
         return DirectoryResult.FromResult(result, version);
     }
 
@@ -156,9 +151,7 @@ internal sealed partial class GrainDirectoryPartition
     private async ValueTask<DirectoryMembershipSnapshot> WaitForOwnershipViewAsync(
         GrainId grainId,
         MembershipVersion version,
-        CancellationToken cancellationToken,
-        bool allowPreviousVersion = false,
-        GrainAddress? activation = null)
+        CancellationToken cancellationToken)
     {
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, ShutdownToken);
         while (true)
@@ -166,32 +159,11 @@ internal sealed partial class GrainDirectoryPartition
             // Requests which arrive with a stale membership version must still wait for any in-flight ownership
             // transition in the current view before deciding whether this partition can serve them.
             var currentView = CurrentView;
-            // Routing proves ownership in the requested view; local ownership proves its immediate predecessor.
-            // A larger gap could conceal an intervening owner.
-            var canUsePreviousView = allowPreviousVersion
-                && version.Value > long.MinValue
-                && currentView.Version.Value == version.Value - 1
-                && IsOwner(currentView, grainId)
-                && (activation is null || activation.SiloAddress is { } host
-                    && currentView.ClusterMembershipSnapshot.GetSiloStatus(host) == SiloStatus.Active);
-            var requiredVersion = canUsePreviousView ? currentView.Version : version;
-            var waitVersion = currentView.Version > requiredVersion ? currentView.Version : requiredVersion;
-            if (allowPreviousVersion)
-            {
-                GrainDirectoryEvents.EmitPreviousViewAdmission(_id, _partitionIndex, grainId, version,
-                    currentView.Version, currentView.Version < requiredVersion ? "refresh-required" : "range-gate");
-            }
-
+            var waitVersion = currentView.Version > version ? currentView.Version : version;
             await WaitForRange(grainId, waitVersion, linkedCts.Token);
             linkedCts.Token.ThrowIfCancellationRequested();
             if (ReferenceEquals(currentView, CurrentView))
             {
-                if (allowPreviousVersion)
-                {
-                    GrainDirectoryEvents.EmitPreviousViewAdmission(_id, _partitionIndex, grainId, version,
-                        currentView.Version, "admitted");
-                }
-
                 return currentView;
             }
         }

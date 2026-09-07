@@ -2,7 +2,6 @@ using System.Collections.Immutable;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
-using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.Diagnostics;
 using Orleans.Runtime.GrainDirectory;
@@ -20,12 +19,11 @@ namespace UnitTests.ClusterServices;
 public sealed partial class ControlledGrainDirectoryProtocolTests
 {
     [Theory]
-    [InlineData("RegisterAsync", 4)]
-    [InlineData("LookupAsync", 3)]
-    [InlineData("DeregisterAsync", 3)]
-    public void PreviousViewPermissionPreservesGeneratedArgumentSlots(string method, int permissionSlot)
+    [InlineData("RegisterAsync", 3)]
+    [InlineData("LookupAsync", 2)]
+    [InlineData("DeregisterAsync", 2)]
+    public void DirectoryRequestsPreserveLegacyWireContract(string method, int cancellationSlot)
     {
-        Assert.True(new GrainDirectoryOptions().EnablePreviousViewRequests);
         var requests = typeof(DistributedGrainDirectory).Assembly.GetTypes()
             .Where(t => t.Name.StartsWith("Invokable_IGrainDirectoryPartition_", StringComparison.Ordinal) && typeof(IInvokable).IsAssignableFrom(t))
             .Select(t => (IInvokable)Activator.CreateInstance(t)!).ToArray();
@@ -34,31 +32,27 @@ public sealed partial class ControlledGrainDirectoryProtocolTests
             var request = Assert.Single(requests, r => r.GetMethodName() == method);
             var parameters = request.GetMethod().GetParameters();
             Assert.Equal(method, request.GetMethod().GetCustomAttribute<AliasAttribute>()!.Alias);
-            Assert.Equal(permissionSlot + 1, request.GetArgumentCount());
-            Assert.Equal(typeof(CancellationToken), parameters[permissionSlot - 1].ParameterType);
-            Assert.Equal(typeof(bool), parameters[permissionSlot].ParameterType);
-            Assert.Equal(false, parameters[permissionSlot].DefaultValue);
+            Assert.Equal(cancellationSlot + 1, request.GetArgumentCount());
+            Assert.Equal(typeof(CancellationToken), parameters[cancellationSlot].ParameterType);
+            Assert.True(parameters[cancellationSlot].HasDefaultValue);
             Assert.True(request.IsCancellable);
-            var key = GrainId.Create("previous-view-wire", "key");
-            var address = PreviousViewAddress(key, SiloAddress.FromParsableString("127.0.0.1:11111@101"));
+            var key = GrainId.Create("directory-wire", "key");
+            var address = AdmissionAddress(key, SiloAddress.FromParsableString("127.0.0.1:11111@101"));
             request.SetArgument(0, new MembershipVersion(42));
             request.SetArgument(1, method == "LookupAsync" ? key : address);
-            if (permissionSlot == 4)
+            if (cancellationSlot == 3)
             {
                 request.SetArgument(2, address);
             }
 
             using var cancellation = new CancellationTokenSource();
             cancellation.Cancel();
-            request.SetArgument(permissionSlot - 1, cancellation.Token);
-            request.SetArgument(permissionSlot, true);
-            Assert.Equal(true, request.GetArgument(permissionSlot));
+            request.SetArgument(cancellationSlot, cancellation.Token);
             using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
             var serializer = services.GetRequiredService<Serializer>();
             var bytes = serializer.SerializeToArray(request);
             using var copy = Assert.IsAssignableFrom<IInvokable>(serializer.Deserialize<IInvokable>(bytes));
             Assert.Equal(new MembershipVersion(42), copy.GetArgument(0));
-            Assert.Equal(true, copy.GetArgument(permissionSlot));
             Assert.False(copy.GetCancellationToken().IsCancellationRequested);
             using var session = services.GetRequiredService<SerializerSessionPool>().GetSession();
             var reader = Reader.Create(bytes, session);
@@ -83,7 +77,7 @@ public sealed partial class ControlledGrainDirectoryProtocolTests
                 reader.ConsumeUnknownField(header);
             }
 
-            Assert.Equal(Enumerable.Range(0, permissionSlot - 1).Append(permissionSlot).Select(i => (uint)i), fields);
+            Assert.Equal(Enumerable.Range(0, cancellationSlot).Select(i => (uint)i), fields);
         }
         finally
         {
@@ -95,55 +89,54 @@ public sealed partial class ControlledGrainDirectoryProtocolTests
     }
 
     [Theory]
-    [InlineData("RegisterAsync", true, 1)]
-    [InlineData("LookupAsync", true, 1)]
-    [InlineData("DeregisterAsync", true, 1)]
-    [InlineData("RegisterAsync", false, 1)]
-    [InlineData("LookupAsync", false, 1)]
-    [InlineData("DeregisterAsync", false, 1)]
-    [InlineData("RegisterAsync", true, 2)]
-    [InlineData("LookupAsync", true, 2)]
-    [InlineData("DeregisterAsync", true, 2)]
-    [InlineData("RegisterAsync", true, -2)]
-    [InlineData("LookupAsync", true, -2)]
-    [InlineData("DeregisterAsync", true, -2)]
-    public async Task PreviousViewAdmissionUsesOnlyAnImmediateOwnedPredecessor(string operation, bool enabled, int lag)
+    [InlineData("RegisterAsync", 0)]
+    [InlineData("LookupAsync", 0)]
+    [InlineData("DeregisterAsync", 0)]
+    [InlineData("RegisterAsync", 1)]
+    [InlineData("LookupAsync", 1)]
+    [InlineData("DeregisterAsync", 1)]
+    [InlineData("RegisterAsync", 2)]
+    [InlineData("LookupAsync", 2)]
+    [InlineData("DeregisterAsync", 2)]
+    [InlineData("RegisterAsync", -2)]
+    [InlineData("LookupAsync", -2)]
+    [InlineData("DeregisterAsync", -2)]
+    public async Task DirectoryAdmissionRequiresRequestedViewOrNewer(string operation, int lag)
     {
         var token = TestContext.Current.CancellationToken;
-        await using var fixture = new ControlledProtocolFixture(enabled);
-        await StartPreviousViewFixture(fixture, token);
+        await using var fixture = new ControlledProtocolFixture();
+        await StartAdmissionFixture(fixture, token);
         var owner = fixture.Nodes[0];
         var caller = fixture.Nodes[1];
-        var key = FindGrainIdOwnedBy(fixture, owner.Address, "previous-view");
-        var address = PreviousViewAddress(key, caller.Address);
+        var key = FindGrainIdOwnedBy(fixture, owner.Address, "minimum-view");
+        var address = AdmissionAddress(key, caller.Address);
         if (operation != "RegisterAsync")
         {
             address = (await RegisterRemotelyAsync(fixture, caller, owner, address, null, new(1), "seed", token))!;
         }
 
-        // In the fast case the caller skips v2 entirely, while the receiver installs it.
-        var receiverVersion = lag == 1 ? 2 : lag < 0 ? 3 : 1;
+        var receiverVersion = lag == 0 || lag < 0 ? 3 : lag == 1 ? 2 : 1;
         var requestVersion = lag < 0 ? 1 : 3;
         if (receiverVersion > 1)
         {
-            await PublishPreviousView(fixture, receiverVersion, [owner], fixture.Nodes, token);
+            await PublishAdmissionView(fixture, receiverVersion, [owner], fixture.Nodes, token);
         }
 
         if (requestVersion > 1)
         {
-            await PublishPreviousView(fixture, requestVersion, [caller], fixture.Nodes, token);
+            await PublishAdmissionView(fixture, requestVersion, [caller], fixture.Nodes, token);
         }
 
         var refresh = owner.Membership.WaitForRefreshAsync(token);
-        var invocation = InvokePreviousViewOperation(operation, caller.Directory, address, token);
-        var envelope = await PreviousViewEnvelope(fixture, operation, key, requestVersion, token);
+        var invocation = InvokeDirectoryOperation(operation, caller.Directory, address, token);
+        var envelope = await AdmissionEnvelope(fixture, operation, key, requestVersion, token);
         var delivery = fixture.Transport.DeliverAsync(envelope.Sequence);
-        var mustRefresh = lag > 0 && (!enabled || lag > 1);
+        var mustRefresh = lag > 0;
         if (mustRefresh)
         {
             Assert.Equal(new MembershipVersion(requestVersion), await fixture.GuardAsync(refresh, "required view", token));
             Assert.False(invocation.IsCompleted);
-            await PublishPreviousView(fixture, requestVersion, [owner], fixture.Nodes, token);
+            await PublishAdmissionView(fixture, requestVersion, [owner], fixture.Nodes, token);
         }
 
         await fixture.GuardAsync(delivery, "delivery", token);
@@ -171,28 +164,28 @@ public sealed partial class ControlledGrainDirectoryProtocolTests
     public async Task RecoveryAdvancementRequiresStrictRetryBeforeCompletion()
     {
         var token = TestContext.Current.CancellationToken;
-        await using var fixture = new ControlledProtocolFixture(true);
-        await StartPreviousViewFixture(fixture, token);
+        await using var fixture = new ControlledProtocolFixture();
+        await StartAdmissionFixture(fixture, token);
         var owner = fixture.Nodes[0];
         var caller = fixture.Nodes[1];
-        var address = PreviousViewAddress(FindGrainIdOwnedBy(fixture, owner.Address, "recovery-floor"), caller.Address);
-        await PublishPreviousView(fixture, 2, [caller], fixture.Nodes, token);
+        var address = AdmissionAddress(FindGrainIdOwnedBy(fixture, owner.Address, "recovery-floor"), caller.Address);
         var invocation = caller.Directory.Register(address, token);
-        var first = await PreviousViewEnvelope(fixture, "RegisterAsync", address.GrainId, 2, token);
+        var first = await AdmissionEnvelope(fixture, "RegisterAsync", address.GrainId, 1, token);
         await fixture.GuardAsync(fixture.Transport.CaptureResponseAsync(first.Sequence), "capture older execution", token);
         Assert.False(invocation.IsCompleted);
 
+        await PublishAdmissionView(fixture, 2, [caller], fixture.Nodes, token);
         await caller.Directory.RunOrQueueTask(async () =>
         {
             await caller.Directory.GetRegisteredActivations(new(2), RingRange.Full, false, token);
         });
         var refresh = owner.Membership.WaitForRefreshAsync(token);
         fixture.Transport.ReleaseCapturedResponse(first.Sequence);
-        var retry = await PreviousViewEnvelope(fixture, "RegisterAsync", address.GrainId, 2, token);
+        var retry = await AdmissionEnvelope(fixture, "RegisterAsync", address.GrainId, 2, token);
         var delivery = fixture.Transport.DeliverAsync(retry.Sequence);
         Assert.Equal(new MembershipVersion(2), await fixture.GuardAsync(refresh, "recovery refresh", token));
         Assert.False(invocation.IsCompleted);
-        await PublishPreviousView(fixture, 2, [owner], fixture.Nodes, token);
+        await PublishAdmissionView(fixture, 2, [owner], fixture.Nodes, token);
         await fixture.GuardAsync(delivery, "retry delivery", token);
         Assert.Equal(address.ActivationId, (await fixture.GuardAsync(invocation, "retry completion", token))!.ActivationId);
         Assert.Equal(2, fixture.Transport.Envelopes.Count(e => e.Operation == "RegisterAsync"));
@@ -201,10 +194,10 @@ public sealed partial class ControlledGrainDirectoryProtocolTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task PreviousViewWaitsForAcquisitionAndCancellationPreservesSharedProgress(bool loseOwnershipWhileWaiting)
+    public async Task DirectoryAdmissionWaitsForAcquisitionAndCancellationPreservesSharedProgress(bool loseOwnershipWhileWaiting)
     {
         var token = TestContext.Current.CancellationToken;
-        await using var fixture = new ControlledProtocolFixture(true, TimeSpan.Zero,
+        await using var fixture = new ControlledProtocolFixture(TimeSpan.Zero,
             (SiloAddress.FromParsableString("127.0.0.1:11111@101"), 0x4000_0000u),
             (SiloAddress.FromParsableString("127.0.0.1:11112@102"), 0x4100_0000u));
         var receiver = fixture.Nodes[0];
@@ -215,24 +208,20 @@ public sealed partial class ControlledGrainDirectoryProtocolTests
         await fixture.PublishAndObserveAsync(1, [source], false, token);
         await fixture.GuardAsync(acquired, "initial acquire", token);
         var key = FindGrainIdOwnedBy(fixture, receiver.Address, "acquisition");
-        var address = PreviousViewAddress(key, source.Address);
+        var address = AdmissionAddress(key, source.Address);
         var expected = await RegisterRemotelyAsync(fixture, receiver, source, address, null, new(1), "seed", token);
         await fixture.PublishAndObserveAsync(2, fixture.Nodes, false, token);
         var snapshot = await fixture.Transport.WaitForQueuedAsync(e => e.Operation == "GetSnapshotAsync", "snapshot", token);
         await fixture.GuardAsync(fixture.Transport.CaptureResponseAsync(snapshot.Sequence), "snapshot capture", token);
-        await PublishPreviousView(fixture, 3, [source], fixture.Nodes, token);
+        await PublishAdmissionView(fixture, 3, [source], fixture.Nodes, token);
 
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(token);
-        var firstEntered = fixture.WaitForDirectoryEventAsync(nameof(GrainDirectoryEvents.PreviousViewAdmission),
-            e => e.Payload is GrainDirectoryEvents.PreviousViewAdmission p && p.SiloAddress.Equals(receiver.Address)
-                && p.GrainId == key && p.Reason == "range-gate", "first range gate", token);
-        var canceled = DirectPreviousLookup(receiver, new(3), key, cancellation.Token);
-        var firstEvent = await fixture.GuardAsync(firstEntered, "first waiter entered", token);
-        var secondEntered = fixture.WaitForDirectoryEventAsync(nameof(GrainDirectoryEvents.PreviousViewAdmission),
-            e => e.Payload is GrainDirectoryEvents.PreviousViewAdmission p && p.SiloAddress.Equals(receiver.Address)
-                && p.GrainId == key && p.Reason == "range-gate" && !ReferenceEquals(e.Payload, firstEvent.Payload), "second range gate", token);
-        var surviving = DirectPreviousLookup(receiver, new(3), key, token);
-        await fixture.GuardAsync(secondEntered, "second waiter entered", token);
+        var firstEntered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var secondEntered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var canceled = DirectLookup(receiver, new(2), key, cancellation.Token, firstEntered);
+        Assert.False(await fixture.GuardAsync(firstEntered.Task, "first waiter entered", token));
+        var surviving = DirectLookup(receiver, new(2), key, token, secondEntered);
+        Assert.False(await fixture.GuardAsync(secondEntered.Task, "second waiter entered", token));
         Assert.False(canceled.IsCompleted);
         Assert.False(surviving.IsCompleted);
         cancellation.Cancel();
@@ -247,7 +236,7 @@ public sealed partial class ControlledGrainDirectoryProtocolTests
         var acknowledgement = await fixture.Transport.WaitForQueuedAsync(e => e.Operation == "AcknowledgeSnapshotTransferAsync", "acknowledgement", token);
         await fixture.GuardAsync(fixture.Transport.DeliverAsync(acknowledgement.Sequence), "acknowledgement delivery", token);
         var result = await fixture.GuardAsync(surviving, "acquired lookup", token);
-        Assert.Equal(!loseOwnershipWhileWaiting, result.TryGetResult(new(3), out var actual));
+        Assert.Equal(!loseOwnershipWhileWaiting, result.TryGetResult(new(2), out var actual));
         if (loseOwnershipWhileWaiting)
         {
             Assert.Equal(new MembershipVersion(4), result.Version);
@@ -264,17 +253,17 @@ public sealed partial class ControlledGrainDirectoryProtocolTests
     [InlineData("RegisterAsync")]
     [InlineData("LookupAsync")]
     [InlineData("DeregisterAsync")]
-    public async Task PreviousViewLivenessUsesInstalledMembershipBeforeDeathLease(string operation)
+    public async Task DirectoryLivenessUsesInstalledMembershipBeforeDeathLease(string operation)
     {
         var token = TestContext.Current.CancellationToken;
-        await using var fixture = PreviousViewThreeNodes();
-        await StartPreviousViewFixture(fixture, token);
+        await using var fixture = CreateAdmissionFixture();
+        await StartAdmissionFixture(fixture, token);
         var caller = fixture.Nodes[0];
         var owner = fixture.Nodes[1];
         var host = fixture.Nodes[2];
         var key = FindGrainIdOwnedBy(fixture, owner.Address, "projected-death");
-        var original = (await RegisterRemotelyAsync(fixture, caller, owner, PreviousViewAddress(key, host.Address), null, new(1), "seed", token))!;
-        var proposed = PreviousViewAddress(key, caller.Address);
+        var original = (await RegisterRemotelyAsync(fixture, caller, owner, AdmissionAddress(key, host.Address), null, new(1), "seed", token))!;
+        var proposed = AdmissionAddress(key, caller.Address);
         using var release = new ManualResetEventSlim();
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var inspection = owner.Partition.RunOrQueueTask(() =>
@@ -284,38 +273,38 @@ public sealed partial class ControlledGrainDirectoryProtocolTests
             var partition = (IGrainDirectoryPartition)owner.Partition;
             if (operation == "DeregisterAsync")
             {
-                var response = partition.DeregisterAsync(new(2), proposed, token, true);
+                var response = partition.DeregisterAsync(new(1), proposed, token);
                 Assert.True(response.IsCompletedSuccessfully);
-                Assert.True(response.Result.TryGetResult(new(2), out var removed));
+                Assert.True(response.Result.TryGetResult(new(1), out var removed));
                 Assert.False(removed);
             }
             else
             {
                 var response = operation == "LookupAsync"
-                    ? partition.LookupAsync(new(2), key, token, true)
+                    ? partition.LookupAsync(new(1), key, token)
                     : Register();
                 Assert.True(response.IsCompletedSuccessfully);
-                Assert.True(response.Result.TryGetResult(new(2), out var result));
+                Assert.True(response.Result.TryGetResult(new(1), out var result));
                 AssertAddress(original, result);
             }
 
-            var retained = partition.LookupAsync(new(2), key, token, true);
+            var retained = partition.LookupAsync(new(1), key, token);
             Assert.True(retained.IsCompletedSuccessfully);
-            Assert.True(retained.Result.TryGetResult(new(2), out var retainedAddress));
+            Assert.True(retained.Result.TryGetResult(new(1), out var retainedAddress));
             AssertAddress(original, retainedAddress);
             return Task.CompletedTask;
 
             async ValueTask<DirectoryResult<GrainAddress?>> Register()
             {
-                var response = await partition.RegisterAsync(new(2), proposed, null, token, true);
-                Assert.True(response.TryGetResult(new(2), out var value));
+                var response = await partition.RegisterAsync(new(1), proposed, null, token);
+                Assert.True(response.TryGetResult(new(1), out var value));
                 return DirectoryResult.FromResult<GrainAddress?>(value, response.Version);
             }
         });
         try
         {
             await fixture.GuardAsync(entered.Task, "hold partition turn", token);
-            var snapshot = PreviousViewHostSnapshot(fixture, host, SiloStatus.Dead);
+            var snapshot = HostSnapshot(fixture, host, SiloStatus.Dead);
             await owner.Membership.PublishAsync(snapshot);
             await fixture.GuardAsync(owner.Directory.RefreshViewAsync(new(2), token).AsTask(), "publish directory projection", token);
             Assert.Equal(new MembershipVersion(1), owner.Partition.CurrentView.Version);
@@ -328,7 +317,7 @@ public sealed partial class ControlledGrainDirectoryProtocolTests
         await fixture.GuardAsync(inspection, "admitted-view liveness", token);
     }
 
-    private static async Task StartPreviousViewFixture(ControlledProtocolFixture fixture, CancellationToken token)
+    private static async Task StartAdmissionFixture(ControlledProtocolFixture fixture, CancellationToken token)
     {
         await fixture.StartAsync(token);
         await fixture.PublishAndObserveAsync(0, [], false, token);
@@ -343,7 +332,7 @@ public sealed partial class ControlledGrainDirectoryProtocolTests
     public async Task MutationHostChangeRefreshesLaggingCallerProjection(string operation, SiloStatus status)
     {
         var token = TestContext.Current.CancellationToken;
-        await using var fixture = PreviousViewThreeNodes();
+        await using var fixture = CreateAdmissionFixture();
         var caller = fixture.Nodes[0];
         var owner = fixture.Nodes[1];
         var host = fixture.Nodes[2];
@@ -352,23 +341,23 @@ public sealed partial class ControlledGrainDirectoryProtocolTests
         var oldMembers = status == SiloStatus.Active ? new[] { caller, owner } : fixture.Nodes.ToArray();
         await fixture.PublishAndObserveAsync(1, oldMembers, oldMembers, [], true, token);
         var key = FindGrainIdOwnedBy(fixture, owner.Address, "host-change");
-        var address = PreviousViewAddress(key, host.Address);
+        var address = AdmissionAddress(key, host.Address);
         if (status == SiloStatus.Dead)
         {
             address = (await RegisterRemotelyAsync(fixture, caller, owner, address, null, new(1), "seed", token))!;
         }
 
         var before = fixture.Transport.Envelopes.Count;
-        caller.Membership.HoldPublication(PreviousViewHostSnapshot(fixture, host, status));
+        caller.Membership.HoldPublication(HostSnapshot(fixture, host, status));
         var callerRefresh = caller.Membership.WaitForRefreshAsync(token);
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(token);
-        var invocation = InvokePreviousViewOperation(operation, caller.Directory, address, cancellation.Token);
+        var invocation = InvokeDirectoryOperation(operation, caller.Directory, address, cancellation.Token);
         Assert.Equal(new MembershipVersion(2), await fixture.GuardAsync(callerRefresh, "caller host refresh", token));
         Assert.Equal(before, fixture.Transport.Envelopes.Count);
         Assert.False(invocation.IsCompleted);
 
         caller.Membership.ReleasePublication();
-        var envelope = await PreviousViewEnvelope(fixture, operation, key, 2, token);
+        var envelope = await AdmissionEnvelope(fixture, operation, key, 2, token);
         var receiverRefresh = owner.Membership.WaitForRefreshAsync(token);
         var delivery = fixture.Transport.DeliverAsync(envelope.Sequence);
         Assert.Equal(new MembershipVersion(2), await fixture.GuardAsync(receiverRefresh, "receiver host refresh", token));
@@ -403,51 +392,11 @@ public sealed partial class ControlledGrainDirectoryProtocolTests
         Assert.Single(fixture.Transport.Envelopes.Skip(before), e => e.Operation == operation && e.GrainId == key);
     }
 
-    [Theory]
-    [InlineData("LookupAsync")]
-    [InlineData("RegisterAsync")]
-    public async Task ReturnedDeadActivationRequiresStrictRetry(string operation)
-    {
-        var token = TestContext.Current.CancellationToken;
-        await using var fixture = PreviousViewThreeNodes();
-        await StartPreviousViewFixture(fixture, token);
-        var caller = fixture.Nodes[0];
-        var owner = fixture.Nodes[1];
-        var host = fixture.Nodes[2];
-        var key = FindGrainIdOwnedBy(fixture, owner.Address, "returned-dead-host");
-        var original = (await RegisterRemotelyAsync(fixture, caller, owner, PreviousViewAddress(key, host.Address), null, new(1), "seed", token))!;
-        await fixture.PublishAndObserveAsync(2, [caller], [caller, owner], [host], false, token);
-        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(token);
-        var invocation = InvokePreviousViewOperation(operation, caller.Directory, PreviousViewAddress(key, caller.Address), cancellation.Token);
-        var refresh = owner.Membership.WaitForRefreshAsync(token);
-        var first = await PreviousViewEnvelope(fixture, operation, key, 2, token);
-        await fixture.GuardAsync(fixture.Transport.DeliverAsync(first.Sequence), "older response", token);
-        Assert.False(refresh.IsCompleted);
-        Assert.True(Assert.IsType<DirectoryResult<GrainAddress?>>(first.Response).TryGetResult(new(2), out var stale));
-        AssertAddress(original, stale);
-        var retry = await PreviousViewEnvelope(fixture, operation, key, 2, token);
-        var delivery = fixture.Transport.DeliverAsync(retry.Sequence);
-        Assert.Equal(new MembershipVersion(2), await fixture.GuardAsync(refresh, "death-aware strict retry", token));
-        Assert.False(invocation.IsCompleted);
-        await fixture.PublishAndObserveAsync(2, [owner], [caller, owner], [host], false, token);
-        await fixture.GuardAsync(delivery, "strict delivery", token);
-        if (operation == "RegisterAsync")
-        {
-            Assert.True(Assert.IsType<DirectoryResult<GrainAddress>>(retry.Response).RetryAfterDelay > TimeSpan.Zero);
-            cancellation.Cancel();
-            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => invocation);
-        }
-        else
-        {
-            Assert.Null(await fixture.GuardAsync((Task<GrainAddress?>)invocation, "strict lookup", token));
-        }
-    }
-
     [Fact]
     public async Task NewlyAssignedPartitionRefreshesBeforeServing()
     {
         var token = TestContext.Current.CancellationToken;
-        await using var fixture = new ControlledProtocolFixture(true, TimeSpan.Zero,
+        await using var fixture = new ControlledProtocolFixture(TimeSpan.Zero,
             (SiloAddress.FromParsableString("127.0.0.1:11111@101"), 0x4000_0000u),
             (SiloAddress.FromParsableString("127.0.0.1:11112@102"), 0x4100_0000u));
         var receiver = fixture.Nodes[0];
@@ -457,15 +406,15 @@ public sealed partial class ControlledGrainDirectoryProtocolTests
         var initial = fixture.WaitForRangeOperationAsync(source, 1, RingRange.Full, GrainDirectoryEvents.AcquireOperationName, false, "initial", token);
         await fixture.PublishAndObserveAsync(1, [source], false, token);
         await fixture.GuardAsync(initial, "initial ready", token);
-        await PublishPreviousView(fixture, 2, [source], fixture.Nodes, token);
-        var address = PreviousViewAddress(FindGrainIdOwnedBy(fixture, receiver.Address, "new-owner"), source.Address);
+        await PublishAdmissionView(fixture, 2, [source], fixture.Nodes, token);
+        var address = AdmissionAddress(FindGrainIdOwnedBy(fixture, receiver.Address, "new-owner"), source.Address);
         var refresh = receiver.Membership.WaitForRefreshAsync(token);
         var invocation = source.Directory.Register(address, token);
-        var envelope = await PreviousViewEnvelope(fixture, "RegisterAsync", address.GrainId, 2, token);
+        var envelope = await AdmissionEnvelope(fixture, "RegisterAsync", address.GrainId, 2, token);
         var delivery = fixture.Transport.DeliverAsync(envelope.Sequence);
         Assert.Equal(new MembershipVersion(2), await fixture.GuardAsync(refresh, "new owner refresh", token));
         Assert.False(invocation.IsCompleted);
-        await PublishPreviousView(fixture, 2, [receiver], fixture.Nodes, token);
+        await PublishAdmissionView(fixture, 2, [receiver], fixture.Nodes, token);
         var snapshot = await fixture.Transport.WaitForQueuedAsync(e => e.Operation == "GetSnapshotAsync", "new owner snapshot", token);
         Assert.False(invocation.IsCompleted);
         await fixture.GuardAsync(fixture.Transport.DeliverAsync(snapshot.Sequence), "install snapshot", token);
@@ -477,14 +426,14 @@ public sealed partial class ControlledGrainDirectoryProtocolTests
         Assert.Equal(new MembershipVersion(2), result.MembershipVersion);
     }
 
-    private static Task PublishPreviousView(ControlledProtocolFixture fixture, long version, IReadOnlyCollection<ControlledNode> observers,
+    private static Task PublishAdmissionView(ControlledProtocolFixture fixture, long version, IReadOnlyCollection<ControlledNode> observers,
         IReadOnlyCollection<ControlledNode> active, CancellationToken token) =>
         fixture.PublishAndObserveAsync(version, observers, active, [], false, token);
 
-    private static GrainAddress PreviousViewAddress(GrainId key, SiloAddress host) =>
+    private static GrainAddress AdmissionAddress(GrainId key, SiloAddress host) =>
         new() { GrainId = key, SiloAddress = host, ActivationId = ActivationId.NewId(), MembershipVersion = MembershipVersion.MinValue };
 
-    private static Task InvokePreviousViewOperation(string operation, DistributedGrainDirectory directory, GrainAddress address, CancellationToken token) =>
+    private static Task InvokeDirectoryOperation(string operation, DistributedGrainDirectory directory, GrainAddress address, CancellationToken token) =>
         operation switch
         {
             "RegisterAsync" => directory.Register(address, token),
@@ -493,22 +442,28 @@ public sealed partial class ControlledGrainDirectoryProtocolTests
             _ => throw new ArgumentOutOfRangeException(nameof(operation))
         };
 
-    private static Task<RpcEnvelope> PreviousViewEnvelope(ControlledProtocolFixture fixture, string operation, GrainId key, long version, CancellationToken token) =>
+    private static Task<RpcEnvelope> AdmissionEnvelope(ControlledProtocolFixture fixture, string operation, GrainId key, long version, CancellationToken token) =>
         fixture.Transport.WaitForQueuedAsync(e => e.Operation == operation && e.GrainId == key && e.MembershipVersion == new MembershipVersion(version), operation, token);
 
-    private static async Task<DirectoryResult<GrainAddress?>> DirectPreviousLookup(ControlledNode node, MembershipVersion version, GrainId key, CancellationToken token)
+    private static async Task<DirectoryResult<GrainAddress?>> DirectLookup(
+        ControlledNode node, MembershipVersion version, GrainId key, CancellationToken token, TaskCompletionSource<bool> entered)
     {
         DirectoryResult<GrainAddress?> result = default;
-        await node.Partition.RunOrQueueTask(async () => result = await ((IGrainDirectoryPartition)node.Partition).LookupAsync(version, key, token, true));
+        await node.Partition.RunOrQueueTask(async () =>
+        {
+            var invocation = ((IGrainDirectoryPartition)node.Partition).LookupAsync(version, key, token);
+            entered.SetResult(invocation.IsCompleted);
+            result = await invocation;
+        });
         return result;
     }
 
-    private static ControlledProtocolFixture PreviousViewThreeNodes() => new(true, TimeSpan.FromMinutes(5),
+    private static ControlledProtocolFixture CreateAdmissionFixture() => new(TimeSpan.FromMinutes(5),
         (SiloAddress.FromParsableString("127.0.0.1:24111@201"), 0x1000_0000u),
         (SiloAddress.FromParsableString("127.0.0.1:24112@202"), 0x4000_0000u),
         (SiloAddress.FromParsableString("127.0.0.1:24113@203"), 0x8000_0000u));
 
-    private static ClusterMembershipSnapshot PreviousViewHostSnapshot(ControlledProtocolFixture fixture, ControlledNode host, SiloStatus status) =>
+    private static ClusterMembershipSnapshot HostSnapshot(ControlledProtocolFixture fixture, ControlledNode host, SiloStatus status) =>
         new(fixture.Nodes.ToImmutableDictionary(n => n.Address,
             n => new ClusterMember(n.Address, n == host ? status : SiloStatus.Active, $"controlled-{n.Address.Endpoint.Port}", n == host && status == SiloStatus.Dead)), new(2));
 }
