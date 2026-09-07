@@ -48,10 +48,12 @@ public sealed partial class ControlledGrainDirectoryProtocolTests
                 && fixture.Nodes.Any(node => node.Address.Equals(payload.SiloAddress)));
 
         await fixture.StartAsync(cancellationToken);
+        // Startup can publish the initial empty view before the first membership update.
         Assert.DoesNotContain(
             fixture.DirectoryEvents.GetEvents(nameof(GrainDirectoryEvents.MembershipVersionObserved)),
             diagnostic => diagnostic.Payload is GrainDirectoryEvents.MembershipVersionObserved payload
-                && fixture.Nodes.Any(node => node.Address.Equals(payload.SiloAddress)));
+                && fixture.Nodes.Any(node => node.Address.Equals(payload.SiloAddress))
+                && payload.Version != MembershipVersion.MinValue);
 
         // Version zero gives the lifecycle loop a contiguous empty predecessor for the
         // first active view, avoiding any synthetic/direct membership application.
