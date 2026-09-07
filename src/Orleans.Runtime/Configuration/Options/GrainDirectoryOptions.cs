@@ -66,9 +66,9 @@ public class GrainDirectoryOptions
     /// <remarks>
     /// When enabled, a ready partition which owns the key in both consecutive views can serve it using its installed view.
     /// Recovery, activation-host membership, and lease requirements determine when the requested view is required.
-    /// The default is <see langword="false"/>, allowing receiver support to be deployed before enabling the fast path.
+    /// The default is <see langword="true"/>. Set to <see langword="false"/> to require at least the requested view for every call.
     /// </remarks>
-    public bool EnablePreviousViewRequests { get; set; }
+    public bool EnablePreviousViewRequests { get; set; } = true;
 
     /// <summary>
     /// Gets or sets the initial (minimum) time, in seconds, to keep a cache entry before revalidating.
