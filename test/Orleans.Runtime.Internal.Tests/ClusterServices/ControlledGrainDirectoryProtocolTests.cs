@@ -1387,7 +1387,8 @@ public sealed partial class ControlledGrainDirectoryProtocolTests
                 && envelope.GrainId == grainId,
             "before-retention blocked successor lookup",
             cancellationToken);
-        var blockedLookupDelivery = fixture.Transport.DeliverAsync(blockedLookupEnvelope.Sequence);
+        // Hold the reply until both recovery scans have advanced the caller's watermark.
+        var blockedLookupDelivery = fixture.Transport.CaptureResponseAsync(blockedLookupEnvelope.Sequence);
         Assert.False(blockedLookup.IsCompleted);
         Assert.False(blockedLookupDelivery.IsCompleted);
         AssertRangeCompletionAbsent(
@@ -1424,6 +1425,9 @@ public sealed partial class ControlledGrainDirectoryProtocolTests
         await fixture.GuardAsync(successorAcquire, "successor v3 recovery completion", cancellationToken);
         await fixture.GuardAsync(sourceAcquire, "source v4 recovery completion", cancellationToken);
         await fixture.GuardAsync(blockedLookupDelivery, "before-retention blocked lookup delivery", cancellationToken);
+        Assert.Equal(4, source.Directory.RecoveryMembershipVersion);
+        Assert.False(blockedLookup.IsCompleted);
+        fixture.Transport.ReleaseCapturedResponse(blockedLookupEnvelope.Sequence);
         var retryLookup = await fixture.Transport.WaitForQueuedAsync(
             envelope => envelope.Source.Equals(source.Address)
                 && envelope.Destination.Equals(successor.Address)
