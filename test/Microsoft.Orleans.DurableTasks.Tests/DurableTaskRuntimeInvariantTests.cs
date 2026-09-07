@@ -2364,6 +2364,8 @@ public sealed class DurableTaskRuntimeInvariantTests
         var nestedId = TaskId.Parse("nested/remote");
         var nestedRequest = CreateRemoteRequest(17);
         Task<DurableTaskResponse>? nestedScheduling = null;
+        var startNestedScheduling = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var nestedSchedulingStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var writeEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var releaseWrite = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         manager.AfterWriteStarted = async () =>
@@ -2375,10 +2377,15 @@ public sealed class DurableTaskRuntimeInvariantTests
         var task = new TestSchedulableTask((_, _) =>
         {
             nestedScheduling = Task.Run(
-                () => runtime.ScheduleRemoteAsync(
-                    nestedId,
-                    nestedRequest,
-                    TestContext.Current.CancellationToken).AsTask(),
+                async () =>
+                {
+                    await startNestedScheduling.Task;
+                    nestedSchedulingStarted.TrySetResult();
+                    return await runtime.ScheduleRemoteAsync(
+                        nestedId,
+                        nestedRequest,
+                        TestContext.Current.CancellationToken);
+                },
                 TestContext.Current.CancellationToken);
             return new(DurableTaskResponse.Pending);
         });
@@ -2392,6 +2399,8 @@ public sealed class DurableTaskRuntimeInvariantTests
         try
         {
             Assert.NotNull(nestedScheduling);
+            startNestedScheduling.TrySetResult();
+            await nestedSchedulingStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
             Assert.False(nestedScheduling.IsCompleted);
             Assert.Empty(transport.Invocations);
         }
