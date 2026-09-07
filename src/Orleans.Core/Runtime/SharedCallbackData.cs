@@ -40,7 +40,20 @@ internal sealed class SharedCallbackData
     }
 
     public long GetTimestampTicks(TimeSpan duration)
-        => (long)((Int128)duration.Ticks * TimeProvider.TimestampFrequency / TimeSpan.TicksPerSecond);
+    {
+        var timestampTicks = (Int128)duration.Ticks * TimeProvider.TimestampFrequency / TimeSpan.TicksPerSecond;
+        if (timestampTicks > long.MaxValue)
+        {
+            return long.MaxValue;
+        }
+
+        if (timestampTicks < long.MinValue)
+        {
+            return long.MinValue;
+        }
+
+        return (long)timestampTicks;
+    }
 
     public IGrainCallCancellationManager? CancellationManager { get; internal set; }
 
