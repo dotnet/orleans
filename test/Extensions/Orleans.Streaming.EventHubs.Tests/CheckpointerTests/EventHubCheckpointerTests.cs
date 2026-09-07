@@ -97,6 +97,7 @@ public class EventHubCheckpointerTests
         public object Cursor { get; } = new();
         public object? RefreshedCursor { get; private set; }
         public StreamSequenceToken? RefreshToken { get; private set; }
+        public int RefreshCount { get; private set; }
         public Exception? CursorException { get; set; }
         public Exception? MoveNextException { get; set; }
         public IBatchContainer? NoDataMessage { get; set; }
@@ -125,6 +126,7 @@ public class EventHubCheckpointerTests
 
         public void Refresh(object cursor, StreamSequenceToken? sequenceToken)
         {
+            RefreshCount++;
             RefreshedCursor = cursor;
             RefreshToken = sequenceToken;
         }
@@ -707,6 +709,8 @@ public class EventHubCheckpointerTests
         await Assert.ThrowsAsync<ArgumentException>(
             () => receiver.GetQueueMessagesAsync(10, CancellationToken.None));
         cursor.Refresh(MakeToken(2));
+        cursor.Refresh(MakeToken(3));
+        Assert.Equal(0, replacementCache.RefreshCount);
 
 #pragma warning disable CS0618 // Verify compatibility of the obsolete cursor APIs.
         var exception = Assert.Throws<QueueCacheMissException>(() => cursor.MoveNext());
