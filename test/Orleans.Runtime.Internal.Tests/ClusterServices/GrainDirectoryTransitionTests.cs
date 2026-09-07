@@ -31,7 +31,8 @@ public sealed class GrainDirectoryTransitionTests
 
         await fixture.ApplyViewAsync(3, active: true);
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(fixture.WaitForRangeAsync);
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(fixture.WaitForRangeAsync);
+        Assert.Same(fixture.Logger.Failure, failure);
         Assert.Same(fixture.Logger.Failure, Assert.Single(fixture.FatalErrors));
     }
 
@@ -45,7 +46,8 @@ public sealed class GrainDirectoryTransitionTests
 
         await fixture.ApplyViewAsync(3, active: false);
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(fixture.WaitForRangeAsync);
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(fixture.WaitForRangeAsync);
+        Assert.Same(fixture.Logger.Failure, failure);
         Assert.Same(fixture.Logger.Failure, Assert.Single(fixture.FatalErrors));
     }
 

@@ -1,5 +1,4 @@
 using Microsoft.Accordant;
-using Orleans.Runtime;
 using Orleans.Runtime.ClusterServices;
 using Orleans.Runtime.GrainDirectory;
 using TestExtensions;

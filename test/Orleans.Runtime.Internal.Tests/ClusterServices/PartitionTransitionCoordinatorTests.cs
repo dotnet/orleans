@@ -465,7 +465,7 @@ public sealed class PartitionTransitionCoordinatorTests
     private readonly record struct LinearSegment(uint Start, uint End);
 
     [Fact]
-    public async Task Fail_PreservesExactFailureCancelsCompletionAndKeepsGateUntilAbort()
+    public async Task Fail_PreservesExactFailureFaultsCompletionAndKeepsGateUntilAbort()
     {
         var coordinator = new PartitionTransitionCoordinator();
         var transition = coordinator.BeginBarrier(Range, View2);
@@ -477,8 +477,8 @@ public sealed class PartitionTransitionCoordinatorTests
         Assert.Same(failure, transition.Failure);
         Assert.Equal(PartitionTransitionStage.Failed, transition.Stage);
         Assert.Same(completion, transition.Completion);
-        Assert.True(completion.IsCanceled);
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => completion);
+        Assert.True(completion.IsFaulted);
+        Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() => completion));
         Assert.True(coordinator.TryGetBlockingTransition(Range, View2, out var blocked));
         Assert.Same(completion, blocked);
 
@@ -489,7 +489,7 @@ public sealed class PartitionTransitionCoordinatorTests
         Assert.Same(failure, transition.Failure);
         Assert.Equal(PartitionTransitionStage.Failed, transition.Stage);
         Assert.Same(completion, transition.Completion);
-        Assert.True(completion.IsCanceled);
+        Assert.True(completion.IsFaulted);
         Assert.True(coordinator.TryGetBlockingTransition(Range, View2, out blocked));
         Assert.Same(completion, blocked);
 
@@ -505,7 +505,8 @@ public sealed class PartitionTransitionCoordinatorTests
         Assert.Equal(PartitionTransitionStage.Aborted, transition.Stage);
         Assert.Same(failure, transition.Failure);
         Assert.Same(completion, transition.Completion);
-        Assert.True(completion.IsCanceled);
+        Assert.True(completion.IsFaulted);
+        Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() => completion));
         Assert.False(coordinator.IsBlocked(Range, View2));
         Assert.False(coordinator.TryGetBlockingTransition(Range, View2, out var released));
         Assert.Same(Task.CompletedTask, released);
@@ -535,7 +536,8 @@ public sealed class PartitionTransitionCoordinatorTests
         Assert.Equal(expectedMessage, rejection.Message);
         Assert.Same(failure, transition.Failure);
         Assert.Equal(PartitionTransitionStage.Failed, transition.Stage);
-        Assert.True(transition.Completion.IsCanceled);
+        Assert.True(transition.Completion.IsFaulted);
+        Assert.Same(failure, Assert.Single(transition.Completion.Exception!.InnerExceptions));
         Assert.True(coordinator.TryGetBlockingTransition(Range, View2, out var blocked));
         Assert.Same(transition.Completion, blocked);
 
