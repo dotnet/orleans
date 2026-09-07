@@ -16,10 +16,6 @@ inputs:
   framework:
     description: Target framework.
     required: true
-  max-parallel-test-modules:
-    description: Maximum number of test modules to execute concurrently.
-    required: false
-    default: '1'
   provider:
     description: Provider trait selected by the standard CI filter.
     required: false
@@ -43,7 +39,6 @@ runs:
       coverage-id: ${{ inputs.artifact-name }}
       filter-query: ${{ inputs.filter-query || format('/[(Provider={0})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]', inputs.provider) }}
       framework: ${{ inputs.framework }}
-      max-parallel-test-modules: ${{ inputs.max-parallel-test-modules }}
       result-id: ${{ inputs.retry == 'true' && format('{0}-attempt1', inputs.artifact-name) || inputs.artifact-name }}
       coverage: ${{ runner.os == 'Linux' && inputs.framework == 'net10.0' }}
     env:
@@ -58,7 +53,6 @@ runs:
       coverage-id: ${{ inputs.artifact-name }}
       filter-query: ${{ inputs.filter-query || format('/[(Provider={0})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]', inputs.provider) }}
       framework: ${{ inputs.framework }}
-      max-parallel-test-modules: ${{ inputs.max-parallel-test-modules }}
       result-id: ${{ format('{0}-attempt2', inputs.artifact-name) }}
       coverage: ${{ runner.os == 'Linux' && inputs.framework == 'net10.0' }}
     env:
