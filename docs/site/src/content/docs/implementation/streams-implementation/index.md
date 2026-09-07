@@ -99,6 +99,30 @@ Cache capacity is not durability. The queue remains the durable boundary, subjec
 
 Recoverable partitioned stream providers can compose a stream partition pipeline from <xref:Orleans.Providers.Streams.Common.RecoverableStreamReceiver%601>, a partition source, and a data adapter. The pipeline admits immutable stream records into pooled storage, reconstructs batches lazily, reconciles the earliest safe subscription scan/delivery watermark, and persists a checkpoint which resumes strictly after that position.
 
+## Retained-history replay pipeline
+
+Kinesis and ADO.NET supply an <xref:Orleans.Providers.Streams.Common.IRecoverableStreamReplaySourceFactory%601> to the recoverable receiver. A token outside the live cache creates an asynchronous replay cursor and follows this state machine:
+
+1. Normalize and validate the provider token.
+1. Attach to a compatible existing replay fragment, start an independent reader within `MaxConcurrentReaders`, or enter the bounded pending-admission list.
+1. Read physical partition records into a fragment cache. Multiple compatible subscription cursors can share that cache, and its earliest safe cursor progress controls reclamation.
+1. Record the oldest live-cache position as the handoff boundary and prevent live purge from crossing it.
+1. Scan historical records in partition order. Records for other streams advance safe scan progress without being delivered to the target observer.
+1. Create and seed the live cursor at the boundary before detaching the historical cursor.
+1. Dispose the fragment and provider reader after its final cursor leaves.
+
+`CacheSize` is a raw-record item limit for each fragment. When the cache has no add capacity, the asynchronous cursor returns a temporary-tail transition after the configured delay; the pulling agent keeps the subscription active and retries. Pending admission has no independent timeout: cancellation, cursor disposal, receiver shutdown, available reader capacity, or the configured queue limit resolves the wait.
+
+The replay manager owns per-queue reader admission and fragment record capacity, while the pulling agent owns delivery retries and consumer handshakes. A transient replay failure causes the pulling agent to reconstruct from the last safe partition token. An unavailable or invalid retained position remains a `DataNotAvailableException` until the application selects an available position.
+
+The replay cursor and the live receiver use separate progress:
+
+- replay-fragment safe progress reclaims fragment memory and, for ADO.NET, advances the provider-visible lease watermark;
+- subscription delivery progress controls what one observer has accepted;
+- the earliest safe live subscription progress updates the durable queue checkpoint.
+
+This separation preserves a contiguous replay-to-live scan with at-least-once delivery. See [Replay retained persistent-stream history](../../streaming/retained-history-replay.md) for public behavior and operational sizing.
+
 ## Pub-sub handshake
 
 The agent registers as a producer for each stream and obtains subscription records from stream pub-sub. It holds a pin cursor while subscription handshakes complete so cache cleanup cannot pass the requested start token. New subscription notifications update the agent's local pub-sub cache.

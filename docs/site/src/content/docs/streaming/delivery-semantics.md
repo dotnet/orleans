@@ -58,7 +58,7 @@ Subscription start tokens are inclusive. A delivery token acknowledges its recor
 
 For Kinesis and ADO.NET, a subscription receives <xref:Orleans.Streams.DataNotAvailableException> when retention no longer contains an explicitly requested position. Invalid provider, partition, and token identities also fail explicitly.
 
-New explicit subscriptions to rewindable persistent streams can also select [a cache-relative start position](subscription-start-positions.md).
+New explicit subscriptions to rewindable persistent streams can also select [a cache-relative start position](subscription-start-positions.md). For concrete-token APIs, replay capacity, admission, failure behavior, and the distinction between subscription progress and queue checkpoints, see [Replay retained persistent-stream history](retained-history-replay.md).
 
 See the [provider matrix](stream-providers.md#provider-matrix) for provider capabilities.
 

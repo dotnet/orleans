@@ -45,7 +45,7 @@ Persistent providers expose common configuration through their stream configurat
 - <xref:Orleans.Configuration.StreamPullingAgentOptions.MaxEventDeliveryTime> bounds delivery attempts before the configured failure handler is involved.
 - <xref:Orleans.Configuration.SimpleQueueCacheOptions.CacheSize> controls item capacity for providers using the simple queue cache.
 
-Provider-specific controls matter as much as common controls: <xref:Orleans.Configuration.AzureQueueOptions.QueueNames>, Event Hubs partitions and cache-pressure settings, Redis `ReadCount` and retention, NATS `BatchSize` and `PartitionCount`, and ADO.NET visibility, expiry, and dead-letter settings.
+Provider-specific controls matter as much as common controls: <xref:Orleans.Configuration.AzureQueueOptions.QueueNames>, Event Hubs partitions and cache-pressure settings, Redis `ReadCount` and retention, NATS `BatchSize` and `PartitionCount`, and ADO.NET read size, checkpoint, retention, and replay-lease settings.
 
 Change one bottleneck at a time. More queues can increase parallelism but also broker cost, polling load, cache memory, and rebalance work. Reducing polling delay can lower latency while increasing empty reads.
 
@@ -54,8 +54,22 @@ Change one bottleneck at a time. More queues can increase parallelism but also b
 For each named memory stream provider, <xref:Orleans.Configuration.MemoryStreamCacheOptions.MaxAddCount> bounds the number of queue records requested in a single dequeue operation. The default is `100`, and options validation requires a value greater than zero. Configure it on the silo using <xref:Orleans.Hosting.MemoryStreamConfiguratorExtensions.ConfigureCache*> in the provider's `AddMemoryStreams` callback. For configuration-based provider registration, set `MaxAddCount` in the named memory provider's configuration section.
 
 Each record contains one published batch of events. A value such as `25` reduces the number of records combined into each queue-grain response, at the cost of more dequeue calls for the same throughput. Larger values amortize call overhead across more records and can increase serialization work, response size, and memory usage per call.
-
 The bound is measured in records. The aggregate byte size depends on the serialized payloads in those records, including all events in each published batch. Size producer batches and payloads so that a complete dequeue response fits the configured Orleans message-body limit. The queue grain removes records before its response is serialized; an oversized response can therefore lose those records when serialization fails. Tune the count alongside measured response sizes and queue lag.
+The bound is measured in records. The aggregate byte size depends on the serialized payloads in those records, including all events in each published batch. Size producer batches and payloads so that a complete dequeue response fits the configured Orleans message-body limit. The queue grain removes records before its response is serialized; an oversized response can therefore lose those records when serialization fails. Tune the count alongside measured response sizes and queue lag.
+
+## Diagnose retained-history replay
+
+Kinesis and ADO.NET retained replay use bounded independent readers. Correlate subscription errors with provider health and the configured <xref:Orleans.Configuration.RecoverableStreamReplayOptions>:
+
+| Symptom | Interpretation and action |
+|---|---|
+| <xref:Orleans.Streams.DataNotAvailableException> at subscription attachment | The token has an invalid provider or partition identity, retention removed its record, or retained history ended before the pinned live-cache boundary. Orleans keeps the failure visible instead of silently starting at live data. Select a valid retained token or explicitly choose a newer start. |
+| <xref:Orleans.Streams.TransientStreamReplayException> | Historical reader creation, reading, or lease renewal failed transiently. The pulling agent reports the failure and retries from its latest safe partition position with delivery backoff. Investigate Kinesis throttling and credentials or ADO.NET connectivity, latency, locks, and pool pressure. |
+| `retained-history replay admission queue reached its configured limit` | `MaxConcurrentReaders` are occupied and `MaxPendingReaders` waiting cursors are already admitted. Reduce simultaneous replay or raise bounded capacity only after validating provider read limits and memory. |
+| Replay remains active without delivery | A provider reader can be at a temporary tail, or its item-count fragment cache can be full behind a slow cursor. Inspect downstream processing time, replay cache sizing, provider read latency, and the retained window. |
+| Shutdown reports reader cleanup, checkpoint flush, or provider shutdown errors | Receiver shutdown attempts every cleanup stage and preserves failures. Keep the full exception or aggregate and allow sufficient <xref:Orleans.Configuration.StreamPullingAgentOptions.InitQueueTimeout> for provider cleanup. |
+
+Correlate subscription errors, provider logs and metrics, queue-cache pressure, and downstream lag to diagnose replay demand and progress. For the replay state machine and option defaults, see [Replay retained persistent-stream history](retained-history-replay.md).
 
 ## Observe health
 

@@ -140,6 +140,8 @@ items:
         href: streaming/streams-programming-apis.md
       - name: Subscription start positions
         href: streaming/subscription-start-positions.md
+      - name: Retained-history replay
+        href: streaming/retained-history-replay.md
       - name: Stream providers
         href: streaming/stream-providers.md
       - name: External producers and consumers
@@ -150,6 +152,8 @@ items:
         href: streaming/custom-queue-adapter.md
       - name: Amazon Kinesis
         href: streaming/kinesis-streaming.md
+      - name: ADO.NET partitioned streams
+        href: streaming/adonet-streaming.md
       - name: Amazon SQS
         href: streaming/sqs-streaming.md
       - name: Delivery semantics

@@ -58,6 +58,8 @@ The receiver pins the oldest live-cache handoff position while replay is active.
 
 Configure retained-history capacity with <xref:Orleans.Hosting.SiloKinesisStreamConfigurator.ConfigureReplay*>. <xref:Orleans.Configuration.RecoverableStreamReplayOptions.MaxConcurrentReaders> bounds active shard iterators, <xref:Orleans.Configuration.RecoverableStreamReplayOptions.MaxPendingReaders> bounds queued admissions, and <xref:Orleans.Configuration.RecoverableStreamReplayOptions.CacheSize> bounds each replay fragment. Live and historical readers share the per-shard <xref:Orleans.Streaming.Kinesis.KinesisStreamOptions.GetRecordsInterval> gate so aggregate reads remain within Kinesis limits.
 
+The replay defaults are four active readers, 32 normally pending cursors, 4,096 raw records per fragment, 256 records per read, and a 200 ms temporary-tail delay. These per-shard limits count readers and records; plan memory from encoded record sizes and pooled-buffer overhead. A full pending queue rejects another replay, with bounded replacement admission while a reader is being disposed. A full fragment pauses historical reads until safe consumer progress reclaims capacity. See [Replay retained persistent-stream history](retained-history-replay.md#configure-replay-capacity) for constraints, memory planning, and failure behavior.
+
 Kinesis tokens carry shard identity and arbitrary-precision shard sequence values. A token from another shard, an invalid sequence, or a position removed by Kinesis retention fails with <xref:Orleans.Streams.DataNotAvailableException>. Throughput throttling and iterator expiry retain their retry behavior.
 
 ## Operations and permissions
