@@ -190,7 +190,7 @@ public sealed class WorkflowTests : IAsyncLifetime
             siloBuilder
                 .UseInMemoryDurableJobs()
                 .AddDurableTasks(options => options.ResultRetentionPeriod = TimeSpan.FromHours(1))
-                .AddGrainExtension<IMissingLookupExtension, MissingLookupExtension>()
+                .AddGrainExtension<IWorkflowTestExtension, WorkflowTestExtension>()
                 .Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = "orleans-binary");
             siloBuilder.Services.RemoveAll<IJournalStorageProvider>();
             siloBuilder.Services.RemoveAll<IJournalStorageCatalog>();
@@ -456,10 +456,11 @@ public sealed class WorkflowEndpointTests : IAsyncLifetime
 
         _timeProvider.Advance(TimeSpan.FromHours(2));
         var workflow = _cluster.Client.GetGrain<IWorkflowGrain>(id);
-        // Completing another root on this grain sweeps responses past the one-hour retention period.
-        var cleanup = await workflow.RunBasicAsync("cleanup").ScheduleAsync($"cleanup-{id}");
+        // A local completion sweeps retained responses without introducing cross-clock transport work.
+        var cleanup = await workflow.AsReference<IWorkflowTestExtension>()
+            .CompleteAsync().ScheduleAsync($"cleanup-{id}");
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        Assert.Equal("CLEANUP", (await cleanup.WaitAsync(timeout.Token)).Output);
+        Assert.True(await cleanup.WaitAsync(timeout.Token));
 
         using var expired = await _http.GetAsync(location);
         Assert.Equal(HttpStatusCode.NotFound, expired.StatusCode);
@@ -497,7 +498,7 @@ public sealed class WorkflowEndpointTests : IAsyncLifetime
         var id = UniqueId();
         var rootId = $"{kind}-{id}";
         var workflow = _cluster.Client.GetGrain<IWorkflowGrain>(id);
-        var scheduled = await workflow.AsReference<IMissingLookupExtension>()
+        var scheduled = await workflow.AsReference<IWorkflowTestExtension>()
             .FailWithMissingLookupAsync(rootId, UniqueId())
             .ScheduleAsync(rootId);
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -551,13 +552,16 @@ public sealed class WorkflowEndpointTests : IAsyncLifetime
     private sealed record StatusDocument(string TaskId, string Status, JsonElement Result, string? Error);
 }
 
-public interface IMissingLookupExtension : IGrainExtension
+public interface IWorkflowTestExtension : IGrainExtension
 {
+    DurableTask<bool> CompleteAsync();
     DurableTask<ApprovalWorkflowResult> FailWithMissingLookupAsync(string rootId, string missingWorkflowId);
 }
 
-public sealed class MissingLookupExtension(IGrainFactory grainFactory) : IMissingLookupExtension
+public sealed class WorkflowTestExtension(IGrainFactory grainFactory) : IWorkflowTestExtension
 {
+    public DurableTask<bool> CompleteAsync() => DurableTask.FromResult(true);
+
     public async DurableTask<ApprovalWorkflowResult> FailWithMissingLookupAsync(string rootId, string missingWorkflowId)
     {
         var missing = grainFactory.GetGrain<IWorkflowGrain>(missingWorkflowId)
