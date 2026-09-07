@@ -60,6 +60,11 @@
     <Project Path="Deployment/AzureContainerApps/Scaler/Scaler.csproj" />
     <Project Path="Deployment/AzureContainerApps/Silo/Silo.csproj" />
   </Folder>
+  <Folder Name="/DurableWorkflows/">
+    <Project Path="DurableWorkflows/DurableWorkflows.AppHost/DurableWorkflows.AppHost.csproj" />
+    <Project Path="DurableWorkflows/DurableWorkflows.Service/DurableWorkflows.Service.csproj" />
+    <Project Path="DurableWorkflows/DurableWorkflows.Tests/DurableWorkflows.Tests.csproj" />
+  </Folder>
   <Folder Name="/FSharpHelloWorld/">
     <Project Path="FSharpHelloWorld/Grains/Grains.fsproj" />
     <Project Path="FSharpHelloWorld/HelloWorld/HelloWorld.csproj" />

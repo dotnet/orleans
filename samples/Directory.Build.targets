@@ -3,6 +3,8 @@
 
   <ItemGroup Condition="'$(OrleansSamplePackageVersion)' != ''">
     <PackageReference Update="Microsoft.Orleans.*" VersionOverride="$(OrleansSamplePackageVersion)" />
+    <PackageReference Update="Orleans.DurableTasks.Abstractions" VersionOverride="$(OrleansSamplePackageVersion)" />
     <PackageVersion Update="Microsoft.Orleans.*" Version="$(OrleansSamplePackageVersion)" />
+    <PackageVersion Update="Orleans.DurableTasks.Abstractions" Version="$(OrleansSamplePackageVersion)" />
   </ItemGroup>
 </Project>
