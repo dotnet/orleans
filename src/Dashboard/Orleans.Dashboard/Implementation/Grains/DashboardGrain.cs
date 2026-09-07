@@ -7,21 +7,26 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 using Orleans.Concurrency;
-using Orleans.Runtime;
-using Orleans.Serialization.Configuration;
+using Orleans.Dashboard.Core;
 using Orleans.Dashboard.Implementation.Helpers;
 using Orleans.Dashboard.Metrics.Details;
 using Orleans.Dashboard.Metrics.History;
 using Orleans.Dashboard.Metrics.TypeFormatting;
 using Orleans.Dashboard.Model;
 using Orleans.Dashboard.Model.History;
-using Orleans.Dashboard.Core;
+using Orleans.Runtime;
+using Orleans.Serialization.Configuration;
 
 namespace Orleans.Dashboard.Implementation.Grains;
 
 [Reentrant]
 internal sealed class DashboardGrain : Grain, IDashboardGrain
 {
+    private static readonly JsonSerializerOptions GrainStateSerializerOptions = new()
+    {
+        WriteIndented = true,
+    };
+
     private readonly TraceHistory _history;
     private readonly ISiloDetailsProvider _siloDetailsProvider;
     private readonly ISiloGrainClient _siloGrainClient;
@@ -391,10 +396,7 @@ internal sealed class DashboardGrain : Grain, IDashboardGrain
             result.TryAdd("error", error);
         }
 
-        return JsonSerializer.Serialize(result, options: new JsonSerializerOptions()
-        {
-            WriteIndented = true,
-        }).AsImmutable();
+        return JsonSerializer.Serialize(result, GrainStateSerializerOptions).AsImmutable();
     }
 
     public Task<Immutable<string[]>> GetGrainTypes(
