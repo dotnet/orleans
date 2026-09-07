@@ -3,6 +3,7 @@
   <PropertyGroup>
     <IsPackable Condition="'$(PackDurableTaskAdapter)' != 'true'">false</IsPackable>
     <IsPackable Condition="'$(PackDurableTaskAdapter)' == 'true'">true</IsPackable>
+    <PackageInventoryPackable>true</PackageInventoryPackable>
     <EnablePackageValidation>false</EnablePackageValidation>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <GenAPITargetDirectory>$(SourceRoot)src\api\Microsoft.Orleans.DurableTasks\</GenAPITargetDirectory>
