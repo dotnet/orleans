@@ -18,7 +18,6 @@ namespace Orleans.Runtime
         private readonly long _startTimestamp;
         private int _state;
         private StatusResponse? lastKnownStatus;
-        private ValueStopwatch stopwatch;
         private CancellationTokenRegistration _cancellationTokenRegistration;
 
         public CallbackData(
@@ -32,7 +31,6 @@ namespace Orleans.Runtime
             this.Message = msg;
             _applicationRequestInstruments = applicationRequestInstruments;
             _startTimestamp = shared.TimeProvider.GetTimestamp();
-            this.stopwatch = ValueStopwatch.StartNew();
         }
 
         public Message Message { get; } // might hold metadata used by response pipeline
@@ -128,10 +126,10 @@ namespace Orleans.Runtime
                 return;
             }
 
-            stopwatch.Stop();
+            var elapsedMilliseconds = GetElapsedMilliseconds();
             SignalCancellation();
             shared.Unregister(Message);
-            _applicationRequestInstruments.OnAppRequestsEnd((long)stopwatch.Elapsed.TotalMilliseconds);
+            _applicationRequestInstruments.OnAppRequestsEnd(elapsedMilliseconds);
             _applicationRequestInstruments.OnAppRequestsCanceled(GetTargetGrainType());
             OrleansCallBackDataEvent.Instance.OnCanceled(Message);
             context.Complete(Response.FromException(new OperationCanceledException(cancellationToken)));
@@ -145,7 +143,7 @@ namespace Orleans.Runtime
                 return;
             }
 
-            this.stopwatch.Stop();
+            var elapsedMilliseconds = GetElapsedMilliseconds();
             if (shared.CancelRequestOnTimeout)
             {
                 SignalCancellation();
@@ -153,7 +151,7 @@ namespace Orleans.Runtime
 
             this.shared.Unregister(this.Message);
             DisposeCancellationRegistration();
-            _applicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
+            _applicationRequestInstruments.OnAppRequestsEnd(elapsedMilliseconds);
             _applicationRequestInstruments.OnAppRequestsTimedOut(GetTargetGrainType());
 
             OrleansCallBackDataEvent.Instance.OnTimeout(this.Message);
@@ -175,10 +173,10 @@ namespace Orleans.Runtime
                 return;
             }
 
-            this.stopwatch.Stop();
+            var elapsedMilliseconds = GetElapsedMilliseconds();
             this.shared.Unregister(this.Message);
             DisposeCancellationRegistration();
-            _applicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
+            _applicationRequestInstruments.OnAppRequestsEnd(elapsedMilliseconds);
 
             OrleansCallBackDataEvent.Instance.OnTargetSiloFail(this.Message);
             var msg = this.Message;
@@ -195,10 +193,10 @@ namespace Orleans.Runtime
                 return;
             }
 
-            this.stopwatch.Stop();
+            var elapsedMilliseconds = GetElapsedMilliseconds();
             this.shared.Unregister(this.Message);
             DisposeCancellationRegistration();
-            _applicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
+            _applicationRequestInstruments.OnAppRequestsEnd(elapsedMilliseconds);
 
             var msg = this.Message;
             var exception = new SiloUnavailableException($"The local Orleans host is shutting down and can no longer process the request: {msg}.");
@@ -214,15 +212,18 @@ namespace Orleans.Runtime
 
             OrleansCallBackDataEvent.Instance.DoCallback(this.Message);
 
-            this.stopwatch.Stop();
+            var elapsedMilliseconds = GetElapsedMilliseconds();
             DisposeCancellationRegistration();
-            _applicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
+            _applicationRequestInstruments.OnAppRequestsEnd(elapsedMilliseconds);
 
             // do callback outside the CallbackData lock. Just not a good practice to hold a lock for this unrelated operation.
             ResponseCallback(response, this.context);
         }
 
         private bool TryComplete() => (Interlocked.Or(ref _state, StateCompleted) & StateCompleted) == 0;
+
+        private long GetElapsedMilliseconds()
+            => (long)shared.TimeProvider.GetElapsedTime(_startTimestamp).TotalMilliseconds;
 
         private void DisposeCancellationRegistration()
         {
