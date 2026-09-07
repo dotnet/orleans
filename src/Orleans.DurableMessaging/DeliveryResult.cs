@@ -4,7 +4,8 @@ namespace Orleans.DurableMessaging;
 
 /// <summary>
 /// Result of attempting to deliver a message to an inbox.
-/// Struct for future extensibility (can add fields without breaking changes).
+/// Orleans field IDs permit version-tolerant serialization as members evolve.
+/// Normal .NET binary compatibility rules still apply to this public struct.
 /// </summary>
 [GenerateSerializer, Alias("Orleans.DurableMessaging.DeliveryResult")]
 public readonly struct DeliveryResult
