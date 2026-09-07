@@ -39,6 +39,22 @@ public class InvokablePoolTests
     }
 
     [Fact]
+    public void DisposeDisposesPooledItems()
+    {
+        var pool = new InvokablePool<TestInvokable>();
+        var first = new TestInvokable();
+        var second = new TestInvokable();
+        pool.Return(first);
+        pool.Return(second);
+
+        pool.Dispose();
+
+        Assert.Equal(1, first.DisposeCount);
+        Assert.Equal(1, second.DisposeCount);
+        Assert.False(pool.TryGet(out _));
+    }
+
+    [Fact]
     public void RepeatedRentResetReturnReusesSingleInstance()
     {
         using var pool = new InvokablePool<TestInvokable>();
@@ -152,6 +168,7 @@ public class InvokablePoolTests
         public object? Payload { get; set; }
         public object? Target { get; set; }
         public CancellationToken Token { get; set; }
+        public int DisposeCount { get; private set; }
 
         public object GetTarget() => Target!;
 
@@ -185,6 +202,7 @@ public class InvokablePoolTests
 
         public void Dispose()
         {
+            DisposeCount++;
             Number = 0;
             Text = null;
             Payload = null;

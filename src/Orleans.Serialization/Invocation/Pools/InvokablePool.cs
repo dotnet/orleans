@@ -82,7 +82,7 @@ public sealed class InvokablePool<T> : IDisposable where T : class, IInvokable
             {
                 if (Volatile.Read(ref _disposed) != 0)
                 {
-                    Interlocked.Exchange(ref _items[index], null);
+                    Interlocked.Exchange(ref _items[index], null)?.Dispose();
                 }
 
                 return;
@@ -97,7 +97,7 @@ public sealed class InvokablePool<T> : IDisposable where T : class, IInvokable
         {
             for (var i = 0; i < _items.Length; i++)
             {
-                Interlocked.Exchange(ref _items[i], null);
+                Interlocked.Exchange(ref _items[i], null)?.Dispose();
             }
         }
     }
