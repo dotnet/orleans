@@ -178,11 +178,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// <returns>The new execution context.</returns>
     private GrainDurableExecutionContext CreateExecutionContext(TaskId taskId)
     {
-        if (!_logicalTimes.TryGetValue(taskId, out var utcNow))
-        {
-            utcNow = UtcNow;
-            _logicalTimes[taskId] = utcNow;
-        }
+        var utcNow = GetOrCreateLogicalTime(taskId);
 
         return _executionContexts.GetOrAdd(taskId, static (id, state) => new(
             id,
@@ -190,6 +186,18 @@ internal sealed partial class DurableTaskGrainRuntime(
             TaskScheduler.Current,
             state.Runtime._deactivationCts.Token,
             state.UtcNow), (Runtime: this, UtcNow: utcNow));
+    }
+
+    private DateTimeOffset GetOrCreateLogicalTime(TaskId taskId)
+    {
+        if (_logicalTimes.TryGetValue(taskId, out var utcNow))
+        {
+            return utcNow;
+        }
+
+        utcNow = UtcNow;
+        _logicalTimes[taskId] = utcNow;
+        return utcNow;
     }
 
     /// <summary>
@@ -477,9 +485,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         ThrowIfStopping();
         var transport = _messageTransport ?? throw new InvalidOperationException(
             "Durable messaging is not configured. Call AddDurableTasks on the silo builder.");
-        var logicalUtcNow = _logicalTimes.TryGetValue(taskId, out var recordedUtcNow)
-            ? recordedUtcNow
-            : UtcNow;
+        var logicalUtcNow = GetOrCreateLogicalTime(taskId);
         var duration = dueTime - logicalUtcNow;
         var stateExisted = _storage.TryGetTask(taskId, out var state);
         state ??= _storage.GetOrCreateTask(taskId, request: null);
@@ -490,6 +496,12 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         if (state.DueTime is { } existingDueTime)
         {
+            if (state.DelayDuration is { } existingDuration && existingDuration != duration)
+            {
+                throw new InvalidOperationException(
+                    $"Durable delay '{taskId}' was already scheduled for duration '{existingDuration}', not '{duration}'.");
+            }
+
             if (existingDueTime != dueTime)
             {
                 throw new InvalidOperationException(
@@ -534,7 +546,10 @@ internal sealed partial class DurableTaskGrainRuntime(
         TaskId taskId,
         TimeSpan duration,
         CancellationToken cancellationToken) =>
-        ScheduleDelayAsync(taskId, UtcNow + duration, cancellationToken);
+        ScheduleDelayAsync(
+            taskId,
+            GetOrCreateLogicalTime(taskId) + duration,
+            cancellationToken);
 
     public bool CanHandle(string jobName) =>
         string.Equals(jobName, DurableTaskMessageTransport.ResumeJobName, StringComparison.Ordinal);
