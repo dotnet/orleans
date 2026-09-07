@@ -266,7 +266,7 @@ namespace UnitTests.Grains
             }
 
             var thisSilo = this.LocalSiloDetails.SiloAddress;
-            var grainId = ((GrainReference)candidate).GrainId;
+            var grainId = candidate.GetGrainId();
             var directorySilo = this.LocalGrainDirectory.GetPrimaryForGrain(grainId);
             var activeSilos = ServiceProvider.GetRequiredService<IClusterMembershipService>().CurrentSnapshot.Members
                 .Where(member => member.Value.Status == SiloStatus.Active)
