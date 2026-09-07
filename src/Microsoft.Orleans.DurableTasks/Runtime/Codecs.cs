@@ -78,7 +78,7 @@ internal sealed class PendingDurableTaskResponseCodec : IFieldCodec<PendingDurab
 
     public bool IsShallowCopyable() => true;
     public object? DeepCopy(object? input, CopyContext context) => input;
-    public PendingDurableTaskResponse DeepCopy(PendingDurableTaskResponse input, CopyContext context) => input;
+    public PendingDurableTaskResponse? DeepCopy(PendingDurableTaskResponse? input, CopyContext context) => input;
 }
 
 [RegisterSerializer, RegisterCopier]
@@ -116,7 +116,7 @@ internal sealed class SubscribedDurableTaskResponseCodec : IFieldCodec<Subscribe
 
     public bool IsShallowCopyable() => true;
     public object? DeepCopy(object? input, CopyContext context) => input;
-    public SubscribedDurableTaskResponse DeepCopy(SubscribedDurableTaskResponse input, CopyContext context) => input;
+    public SubscribedDurableTaskResponse? DeepCopy(SubscribedDurableTaskResponse? input, CopyContext context) => input;
 }
 
 [RegisterSerializer, RegisterCopier]
@@ -154,7 +154,7 @@ internal sealed class SuccessDurableTaskResponseCodec : IFieldCodec<SuccessDurab
 
     public bool IsShallowCopyable() => true;
     public object? DeepCopy(object? input, CopyContext context) => input;
-    public SuccessDurableTaskResponse DeepCopy(SuccessDurableTaskResponse input, CopyContext context) => input;
+    public SuccessDurableTaskResponse? DeepCopy(SuccessDurableTaskResponse? input, CopyContext context) => input;
 }
 
 [RegisterSerializer]
