@@ -30,6 +30,8 @@ internal class ApplicationRequestInstruments
             _appRequestsLatencyHistogramAggregator.Record(durationMilliseconds);
     }
 
+    internal bool AppRequestsLatencyEnabled => _appRequestsLatencyHistogramSum.Enabled;
+
     internal void OnAppRequestsTimedOut(string grainType)
     {
         _timedOutRequestsCounter.Add(1, new KeyValuePair<string, object?>("grain_type", grainType));

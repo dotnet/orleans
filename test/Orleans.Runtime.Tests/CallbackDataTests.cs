@@ -119,6 +119,26 @@ public class CallbackDataTests
         Assert.Equal(long.MinValue, shared.GetTimestampTicks(TimeSpan.MinValue));
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
+    public void DisabledLatencyDiagnosticsDoNotReadCompletionTimestamp()
+    {
+        using var serviceProvider = CreateServiceProvider();
+        var timeProvider = new CountingTimeProvider();
+        var callback = CreateCallback(
+            new TestResponseCompletionSource(),
+            _ => { },
+            CreateInstruments(serviceProvider),
+            timeProvider);
+
+        Assert.Equal(1, timeProvider.GetTimestampCallCount);
+
+        callback.OnHostShutdown();
+
+        Assert.Equal(1, timeProvider.GetTimestampCallCount);
+    }
+
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static WeakReference CreateCompletedCallback(CancellationToken cancellationToken, ApplicationRequestInstruments instruments)
     {
@@ -179,5 +199,12 @@ public class CallbackDataTests
     private sealed class HighFrequencyTimeProvider : TimeProvider
     {
         public override long TimestampFrequency => long.MaxValue;
+    }
+
+    private sealed class CountingTimeProvider : TimeProvider
+    {
+        public int GetTimestampCallCount { get; private set; }
+
+        public override long GetTimestamp() => ++GetTimestampCallCount;
     }
 }
