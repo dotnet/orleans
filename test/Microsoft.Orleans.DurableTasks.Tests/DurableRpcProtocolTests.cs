@@ -153,7 +153,7 @@ public sealed class DurableRpcProtocolTests
         Assert.Equal(DurableTaskMessageTransport.ResumeJobName, request.JobName);
         Assert.Equal(
             DurableTaskMessageTransport.CreateStableResumeJobId(target, taskId, 7),
-            GetStableJobId(request));
+            request.JobId);
         Assert.Equal(target, request.Target);
         Assert.Equal(dueTime, request.DueTime);
         Assert.Equal(taskId.ToString(), request.Metadata![DurableTaskMessageTransport.ResumeTaskIdMetadata]);
@@ -188,11 +188,6 @@ public sealed class DurableRpcProtocolTests
                 && generation == 7,
             string.Equals(baseline, candidate, StringComparison.Ordinal));
     }
-
-    private static string? GetStableJobId(ScheduleJobRequest request) =>
-        (string?)typeof(ScheduleJobRequest)
-            .GetProperty("JobId", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .GetValue(request);
 
     [Fact]
     public void CompletionAcknowledgementUsesDedicatedDurableRoute()
