@@ -120,7 +120,18 @@ public sealed class WorkflowTests : IAsyncLifetime
         Assert.Equal(signal, (await cancellation.GetSnapshotAsync()).Signal);
 
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        var result = await scheduled.WaitAsync(timeout.Token);
+        CancellationWorkflowResult result;
+        try
+        {
+            result = await scheduled.WaitAsync(timeout.Token);
+        }
+        catch (OperationCanceledException exception) when (timeout.IsCancellationRequested)
+        {
+            throw new TimeoutException(
+                $"Workflow '{id}' did not complete task '{scheduled.Id}' after both grains were deactivated "
+                + $"and cancellation '{signal}' was recovered from storage.",
+                exception);
+        }
 
         Assert.True(result.Canceled);
         Assert.Equal(id, result.CancellationId);
