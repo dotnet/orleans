@@ -128,8 +128,25 @@ public static class Program
     private static async Task RunCommandLoopAsync(IServiceProvider services, CancellationTokenSource shutdown)
     {
         var commands = new ConcurrentDictionary<int, Task>();
-        while (!shutdown.IsCancellationRequested && await Console.In.ReadLineAsync() is { } line)
+        // Console.In's synchronized reader can block before returning its task.
+        using var input = new StreamReader(Console.OpenStandardInput(), Console.InputEncoding);
+        while (!shutdown.IsCancellationRequested)
         {
+            string? line;
+            try
+            {
+                line = await input.ReadLineAsync(shutdown.Token).AsTask().WaitAsync(shutdown.Token);
+            }
+            catch (OperationCanceledException) when (shutdown.IsCancellationRequested)
+            {
+                break;
+            }
+
+            if (line is null)
+            {
+                break;
+            }
+
             HostCommand? command;
             try
             {
