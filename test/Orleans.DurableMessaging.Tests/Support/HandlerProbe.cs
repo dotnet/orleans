@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using Orleans.Runtime;
 
 namespace Orleans.DurableMessaging.Tests.Support;
@@ -18,8 +19,11 @@ public sealed class HandlerProbe
         return barrier;
     }
 
-    public bool TryGet(GrainId grainId, string route, out Barrier barrier) =>
-        _barriers.TryGetValue((grainId, route), out barrier!);
+    public bool TryGet(
+        GrainId grainId,
+        string route,
+        [NotNullWhen(true)] out Barrier? barrier) =>
+        _barriers.TryGetValue((grainId, route), out barrier);
 
     public sealed class Barrier : IDisposable
     {
