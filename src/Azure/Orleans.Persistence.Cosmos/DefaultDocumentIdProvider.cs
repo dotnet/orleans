@@ -18,8 +18,13 @@ public sealed class DefaultDocumentIdProvider : IDocumentIdProvider
     /// Initializes a new instance of the <see cref="DefaultDocumentIdProvider"/> class.
     /// </summary>
     /// <param name="options">The cluster options.</param>
+    /// <exception cref="ArgumentNullException">
+    /// <paramref name="options"/> is <see langword="null"/>.
+    /// </exception>
     public DefaultDocumentIdProvider(IOptions<ClusterOptions> options)
     {
+        ArgumentNullException.ThrowIfNull(options);
+
         _options = options.Value;
     }
 
@@ -57,7 +62,15 @@ public sealed class DefaultDocumentIdProvider : IDocumentIdProvider
     /// <param name="grainType">The grain type.</param>
     /// <param name="grainId">The grain id.</param>
     /// <returns>The document partition key.</returns>
-    public string GetPartitionKey(string grainType, GrainId grainId) => Sanitize(grainType);
+    /// <exception cref="ArgumentNullException">
+    /// <paramref name="grainType"/> is <see langword="null"/>.
+    /// </exception>
+    public string GetPartitionKey(string grainType, GrainId grainId)
+    {
+        ArgumentNullException.ThrowIfNull(grainType);
+
+        return Sanitize(grainType);
+    }
 
     private async ValueTask<(string DocumentId, string PartitionKey)> GetDocumentIdentifiers(string documentId, string grainType, GrainId grainId)
     {

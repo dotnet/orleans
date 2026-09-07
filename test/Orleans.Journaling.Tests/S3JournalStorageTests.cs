@@ -180,6 +180,19 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
         }
 
         [Fact]
+        public void AddS3JournalStorage_NullBuilder_ThrowsBeforeConfiguring()
+        {
+            ISiloBuilder builder = null!;
+            var configureInvoked = false;
+
+            var exception = Assert.Throws<ArgumentNullException>(
+                () => builder.AddS3JournalStorage(_ => configureInvoked = true));
+
+            Assert.Equal("builder", exception.ParamName);
+            Assert.False(configureInvoked);
+        }
+
+        [Fact]
         public async Task ListAsync_CustomObjectKeyMapping_FiltersParsedJournalIds()
         {
             var client = CreateTrackingClient();
