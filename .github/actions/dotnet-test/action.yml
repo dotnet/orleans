@@ -15,6 +15,10 @@ inputs:
   framework:
     description: Target framework.
     required: true
+  max-parallel-test-modules:
+    description: Maximum number of test modules to execute concurrently.
+    required: false
+    default: '1'
   result-id:
     description: Unique test result identifier.
     required: true
@@ -66,7 +70,7 @@ runs:
         '--report-trx-filename'
         'test_results_${{ inputs.result-id }}_{asm}_{tfm}_{arch}.trx'
         '--max-parallel-test-modules'
-        '1'
+        '${{ inputs.max-parallel-test-modules }}'
       )
       ./.github/scripts/invoke-test.ps1 -ResultFilePattern 'test_results_${{ inputs.result-id }}_*.trx' -Command $command
   - name: Test with coverage
@@ -97,7 +101,7 @@ runs:
         '--report-trx-filename'
         'test_results_${{ inputs.result-id }}_{asm}_{tfm}_{arch}.trx'
         '--max-parallel-test-modules'
-        '1'
+        '${{ inputs.max-parallel-test-modules }}'
       )
       ./.github/scripts/invoke-coverage.ps1 -Settings ./.github/coverage.config.xml -Output "TestResults/${{ inputs.coverage-id }}.cobertura.xml" -RetryLogFile "logs/${{ inputs.coverage-id }}.retry.log" -Command $command
   - name: Validate coverage report
