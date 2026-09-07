@@ -103,6 +103,7 @@ public sealed class JsonDurableListCommandCodec<T>(JsonSerializerOptions? option
     /// <inheritdoc/>
     public void Apply(JournalBufferReader input, IDurableListCommandHandler<T> consumer)
     {
+        ArgumentNullException.ThrowIfNull(consumer);
         var reader = new JsonCommandReader(input);
         try
         {
@@ -227,6 +228,7 @@ public sealed class JsonDurableQueueCommandCodec<T>(JsonSerializerOptions? optio
     /// <inheritdoc/>
     public void Apply(JournalBufferReader input, IDurableQueueCommandHandler<T> consumer)
     {
+        ArgumentNullException.ThrowIfNull(consumer);
         var reader = new JsonCommandReader(input);
         try
         {
@@ -344,6 +346,7 @@ public sealed class JsonDurableSetCommandCodec<T>(JsonSerializerOptions? options
     /// <inheritdoc/>
     public void Apply(JournalBufferReader input, IDurableSetCommandHandler<T> consumer)
     {
+        ArgumentNullException.ThrowIfNull(consumer);
         var reader = new JsonCommandReader(input);
         try
         {

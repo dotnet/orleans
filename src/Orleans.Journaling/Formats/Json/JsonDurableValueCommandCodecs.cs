@@ -27,6 +27,7 @@ public sealed class JsonDurableValueCommandCodec<T>(JsonSerializerOptions? optio
     /// <inheritdoc/>
     public void Apply(JournalBufferReader input, IDurableValueCommandHandler<T> consumer)
     {
+        ArgumentNullException.ThrowIfNull(consumer);
         var reader = new JsonCommandReader(input);
         try
         {
@@ -87,6 +88,7 @@ public sealed class JsonPersistentStateCommandCodec<T>(JsonSerializerOptions? op
     /// <inheritdoc/>
     public void Apply(JournalBufferReader input, IPersistentStateCommandHandler<T> consumer)
     {
+        ArgumentNullException.ThrowIfNull(consumer);
         var reader = new JsonCommandReader(input);
         try
         {
@@ -154,6 +156,7 @@ public sealed class JsonDurableTaskCompletionSourceCommandCodec<T>(JsonSerialize
     /// <inheritdoc/>
     public void WriteFaulted(Exception exception, JournalStreamWriter writer)
     {
+        ArgumentNullException.ThrowIfNull(exception);
         JsonCommandWriter.Write(
             writer,
             exception.Message,
@@ -176,6 +179,7 @@ public sealed class JsonDurableTaskCompletionSourceCommandCodec<T>(JsonSerialize
     /// <inheritdoc/>
     public void Apply(JournalBufferReader input, IDurableTaskCompletionSourceCommandHandler<T> consumer)
     {
+        ArgumentNullException.ThrowIfNull(consumer);
         var reader = new JsonCommandReader(input);
         try
         {
