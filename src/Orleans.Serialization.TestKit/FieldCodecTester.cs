@@ -27,7 +27,8 @@ namespace Orleans.Serialization.TestKit
     [ExcludeFromCodeCoverage]
     public abstract class FieldCodecTester<TValue, TCodec> : SerializationTester where TCodec : class, IFieldCodec<TValue>
     {
-        private SerializerSessionPool _sessionPool => ServiceProvider.GetRequiredService<SerializerSessionPool>();
+        private SerializerSessionPool? _sessionPoolValue;
+        private SerializerSessionPool _sessionPool => _sessionPoolValue ??= ServiceProvider.GetRequiredService<SerializerSessionPool>();
 
         /// <summary>
         /// Initializes a new instance of the <see cref="FieldCodecTester{TValue, TCodec}"/> class.
