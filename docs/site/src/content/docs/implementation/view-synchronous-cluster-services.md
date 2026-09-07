@@ -172,7 +172,7 @@ Opted-in operations evaluate activation liveness using the admitted partition me
 
 The existing `DirectoryResult<T>` contract applies to both paths: success echoes the request version, an ownership redirect reports the receiver's view, and a lease hold supplies a retry delay. The receiver stamps a newly stored registration with its execution version. A valid predecessor-view response completes immediately. The requested version remains a minimum-view requirement with a narrowly permitted relaxation; a ready owner in a newer view can serve the operation using the established directory behavior.
 
-<xref:Orleans.Configuration.GrainDirectoryOptions.EnablePreviousViewRequests?displayProperty=nameWithType> defaults to `false`. Receiver support can be deployed first, followed by controlled enablement of the fast path. Turning the option off returns callers to strict admission while normal ownership transitions continue.
+<xref:Orleans.Configuration.GrainDirectoryOptions.EnablePreviousViewRequests?displayProperty=nameWithType> defaults to `true`. Callers permit the fast path whenever the operation's recovery and membership requirements allow it. Setting the option to `false` selects strict admission while normal ownership transitions continue.
 
 Lookup, registration, and deregistration append the permission bit after the existing cancellation-token parameter. Existing aliases, argument field IDs, and cancellation-token positions remain stable. The absent bit defaults to `false`, preserving older callers' minimum-version guarantee. Older receivers ignore the added field and enforce the supplied version. Both versions use the same response fields and interpretation.
 

@@ -38,6 +38,7 @@ internal class MyDirectoryTestGrain : Grain, IMyDirectoryTestGrain
 public sealed class GrainDirectoryResilienceTests
 {
     private static readonly TimeSpan DirectoryMigrationTimeout = TimeSpan.FromMinutes(1);
+    private static readonly TimeSpan ChaosScenarioTimeout = TimeSpan.FromMinutes(10);
 
     /// <summary>
     /// Cluster chaos test: tests directory functionality & integrity while starting/stopping/killing silos frequently.
@@ -46,19 +47,24 @@ public sealed class GrainDirectoryResilienceTests
     [Fact]
     public async Task ElasticChaos()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var runnerCancellationToken = TestContext.Current.CancellationToken;
+        using var deadline = new CancellationTokenSource(ChaosScenarioTimeout);
+        using var scenario = CancellationTokenSource.CreateLinkedTokenSource(runnerCancellationToken, deadline.Token);
+        var cancellationToken = scenario.Token;
         using var monitor = new DirectoryChaosMonitor();
         var testClusterBuilder = new TestClusterBuilder(1);
         testClusterBuilder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
         var testCluster = testClusterBuilder.Build();
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var deploymentTask = Task.CompletedTask;
         var loadTask = Task.CompletedTask;
         var chaosTask = Task.CompletedTask;
         var failures = new List<Exception>();
         var phase = "deploying the initial silo";
         try
         {
-            await testCluster.DeployAsync(cancellationToken);
+            deploymentTask = testCluster.DeployAsync(cancellationToken);
+            await deploymentTask.WaitAsync(cancellationToken);
             foreach (var silo in testCluster.Silos)
             {
                 monitor.TrackSilo(silo.SiloAddress);
@@ -68,7 +74,7 @@ public sealed class GrainDirectoryResilienceTests
             log.LogInformation("ServiceId: '{ServiceId}', ClusterId: '{ClusterId}'.",
                 testCluster.Options.ServiceId, testCluster.Options.ClusterId);
             var client = ((InProcessSiloHandle)testCluster.Primary!).SiloHost.Services.GetRequiredService<IGrainFactory>();
-            await EnsureDirectoryStableAsync(testCluster, client, cancellationToken);
+            await EnsureDirectoryStableAsync(testCluster, client, cancellationToken).WaitAsync(cancellationToken);
             phase = "running the workload and topology changes";
             loadTask = RunChaosWorkloadAsync(client, monitor, cts.Token);
             chaosTask = RunChaosTopologyAsync(testCluster, client, log, monitor, cts.Token);
@@ -87,16 +93,23 @@ public sealed class GrainDirectoryResilienceTests
             }
 
             cts.Cancel();
-            await loadTask;
+            await loadTask.WaitAsync(cancellationToken);
             phase = "establishing final progress and directory integrity";
             monitor.RecordPhase(phase);
             using var finalProbe = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             finalProbe.CancelAfter(DirectoryMigrationTimeout);
-            await EnsureDirectoryStableAsync(testCluster, client, finalProbe.Token);
-            await CreatePingBatch(client, -100, 100, finalProbe.Token);
-            await CheckIntegrityAsync(testCluster, client, finalProbe.Token);
+            await EnsureDirectoryStableAsync(testCluster, client, finalProbe.Token).WaitAsync(finalProbe.Token);
+            await CreatePingBatch(client, -100, 100, finalProbe.Token).WaitAsync(finalProbe.Token);
+            await CheckIntegrityAsync(testCluster, client, finalProbe.Token).WaitAsync(finalProbe.Token);
             log.LogInformation("Chaos completed: {SuccessfulBatches} successful batches, {ExpectedDisruptions} expected disruptions.",
                 monitor.SuccessfulBatches, monitor.ExpectedDisruptions);
+        }
+        catch (OperationCanceledException exception) when (deadline.IsCancellationRequested && !runnerCancellationToken.IsCancellationRequested)
+        {
+            failures.Add(monitor.InvariantFailure.IsCompletedSuccessfully
+                ? await monitor.InvariantFailure
+                : monitor.RuntimeFailure(phase, new TimeoutException(
+                    $"ElasticChaos exceeded its {ChaosScenarioTimeout} scenario deadline during {phase}.", exception)));
         }
         catch (Exception exception)
         {
@@ -111,7 +124,7 @@ public sealed class GrainDirectoryResilienceTests
             await CaptureCleanupFailureAsync("canceling scenario workers", _ => cts.CancelAsync());
             await CaptureCleanupFailureAsync("joining scenario workers", async token =>
             {
-                var workers = Task.WhenAll(loadTask, chaosTask);
+                var workers = Task.WhenAll(deploymentTask, loadTask, chaosTask);
                 try
                 {
                     await workers.WaitAsync(token);
