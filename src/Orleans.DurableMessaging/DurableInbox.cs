@@ -102,7 +102,14 @@ internal sealed class DurableInbox : IDurableInbox
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        if (_exactRouteHandlers.TryGetValue(context.Envelope.RouteKey, out handler))
+        var routeKey = context.Envelope.RouteKey;
+        if (string.IsNullOrWhiteSpace(routeKey))
+        {
+            handler = null;
+            return false;
+        }
+
+        if (_exactRouteHandlers.TryGetValue(routeKey, out handler))
         {
             return true;
         }
