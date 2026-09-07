@@ -2555,15 +2555,15 @@ internal sealed partial class DurableTaskGrainRuntime(
         return handle;
     }
 
-    internal Task StopAsync(CancellationToken cancellationToken)
+    internal Task StopAsync(CancellationToken _)
     {
         lock (_stopLock)
         {
-            return _stopTask ??= StopCoreAsync(cancellationToken);
+            return _stopTask ??= StopCoreAsync();
         }
     }
 
-    private async Task StopCoreAsync(CancellationToken cancellationToken)
+    private async Task StopCoreAsync()
     {
         await _responseCommitGate.WaitAsync(CancellationToken.None);
         try
@@ -2578,7 +2578,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         await _deactivationCts.CancelAsync();
         while (!_pendingHandleResponses.IsEmpty || !_committingHandleResponses.IsEmpty)
         {
-            await Task.Delay(TimeSpan.FromMilliseconds(10), cancellationToken);
+            await Task.Delay(TimeSpan.FromMilliseconds(10));
         }
 
         var shutdownResponse = DurableTaskResponse.FromCanceled(
