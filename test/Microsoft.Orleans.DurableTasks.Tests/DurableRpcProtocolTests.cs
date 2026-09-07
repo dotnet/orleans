@@ -4,8 +4,10 @@ using System.Reflection;
 using Orleans.DurableTasks;
 using Orleans.DurableTasks.Protocol;
 using Orleans.DurableTasks.Runtime;
+using Orleans.DurableTasks.Storage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using NSubstitute;
 using Orleans.Concurrency;
 using Orleans.Configuration;
@@ -433,6 +435,27 @@ public sealed class DurableRpcProtocolTests
         Assert.Equal(
             TimeSpan.FromSeconds(5),
             provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<DurableTaskOptions>>().Value.RecoveryExecutionDrainTimeout);
+    }
+
+    [Fact]
+    public void VolatileTaskStorageIsSharedWithinAnActivationScope()
+    {
+        var silo = new TestSiloBuilder();
+        silo.AddDurableTasks();
+        silo.Services.RemoveAll<DurableTaskGrainStorage>();
+        silo.Services.RemoveAll<IDurableTaskGrainStorage>();
+        silo.AddVolatileDurableTaskStorage();
+        using var provider = silo.Services.BuildServiceProvider();
+
+        using var firstScope = provider.CreateScope();
+        var concrete = firstScope.ServiceProvider.GetRequiredService<VolatileDurableTaskGrainStorage>();
+        var abstraction = firstScope.ServiceProvider.GetRequiredService<IDurableTaskGrainStorage>();
+        Assert.Same(concrete, abstraction);
+
+        using var secondScope = provider.CreateScope();
+        Assert.NotSame(
+            concrete,
+            secondScope.ServiceProvider.GetRequiredService<VolatileDurableTaskGrainStorage>());
     }
 
     [Fact]
