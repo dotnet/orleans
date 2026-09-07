@@ -104,7 +104,7 @@ public abstract class SystemTargetCancellationTokenTests(SystemTargetCancellatio
 
         using var cts = new CancellationTokenSource();
         var callId = Guid.NewGuid();
-        var task = systemTarget.LongWait(cts.Token, TimeSpan.FromSeconds(10), callId);
+        var task = systemTarget.LongWait(TimeSpan.FromSeconds(10), callId, cts.Token);
         cts.CancelAfter(delay);
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => task);
         if (delay > 0)
@@ -128,7 +128,7 @@ public abstract class SystemTargetCancellationTokenTests(SystemTargetCancellatio
 
         var tasks = systemTargets.Select(st =>
             Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
-                st.LongWait(cts.Token, TimeSpan.FromSeconds(10), callId)))
+                st.LongWait(TimeSpan.FromSeconds(10), callId, cts.Token)))
             .ToList();
 
         cts.CancelAfter(delay);
@@ -162,7 +162,7 @@ public abstract class SystemTargetCancellationTokenTests(SystemTargetCancellatio
             {
                 using var cts = new CancellationTokenSource();
                 // All these calls run concurrently since SystemTarget calls are interleaving
-                var task = systemTarget.LongWait(cts.Token, TimeSpan.FromSeconds(10), callId);
+                var task = systemTarget.LongWait(TimeSpan.FromSeconds(10), callId, cts.Token);
                 cts.CancelAfter(delay);
                 await Assert.ThrowsAnyAsync<OperationCanceledException>(() => task);
             })
@@ -187,7 +187,7 @@ public abstract class SystemTargetCancellationTokenTests(SystemTargetCancellatio
         using var cts = new CancellationTokenSource();
         try
         {
-            await systemTarget.LongWait(cts.Token, TimeSpan.FromMilliseconds(1), Guid.Empty);
+            await systemTarget.LongWait(TimeSpan.FromMilliseconds(1), Guid.Empty, cts.Token);
         }
         catch (Exception ex)
         {
@@ -206,7 +206,7 @@ public abstract class SystemTargetCancellationTokenTests(SystemTargetCancellatio
 
         // Expect an OperationCanceledException to be thrown as the token is already cancelled
         Assert.Throws<OperationCanceledException>(() =>
-            systemTarget.LongWait(cts.Token, TimeSpan.FromSeconds(10), Guid.Empty).Ignore());
+            systemTarget.LongWait(TimeSpan.FromSeconds(10), Guid.Empty, cts.Token).Ignore());
     }
 
     [Fact, TestCategory("BVT"), TestCategory("Cancellation")]
@@ -218,7 +218,7 @@ public abstract class SystemTargetCancellationTokenTests(SystemTargetCancellatio
 
         using var cts = new CancellationTokenSource();
         var callId = Guid.NewGuid();
-        var task = systemTarget.CancellationTokenCallbackResolve(cts.Token, callId);
+        var task = systemTarget.CancellationTokenCallbackResolve(callId, cts.Token);
         cts.CancelAfter(TimeSpan.FromMilliseconds(100));
 
         if (WaitForCancellationAcknowledgement)
@@ -267,7 +267,7 @@ public abstract class SystemTargetCancellationTokenTests(SystemTargetCancellatio
 
         using var cts = new CancellationTokenSource();
         var callId = Guid.NewGuid();
-        systemTarget.CancellationTokenCallbackThrow(cts.Token, callId).Ignore();
+        systemTarget.CancellationTokenCallbackThrow(callId, cts.Token).Ignore();
         // Cancellation is a cooperative mechanism, so we don't expect the exception to propagate
         cts.CancelAfter(100);
         await WaitForCallCancellation(systemTarget, callId, cancellationToken);
@@ -340,7 +340,7 @@ public abstract class SystemTargetCancellationTokenTests(SystemTargetCancellatio
 
         using var cts = new CancellationTokenSource();
         var callId = Guid.NewGuid();
-        var task = sourceTarget.CallOtherLongRunningTask(target, cts.Token, TimeSpan.FromSeconds(10), callId);
+        var task = sourceTarget.CallOtherLongRunningTask(target, TimeSpan.FromSeconds(10), callId, cts.Token);
         cts.CancelAfter(delay);
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => task);
         if (delay > 0)
@@ -406,9 +406,9 @@ public abstract class SystemTargetCancellationTokenTests(SystemTargetCancellatio
         var callId2 = Guid.NewGuid();
         var callId3 = Guid.NewGuid();
 
-        var task1 = systemTarget.LongWait(cts1.Token, TimeSpan.FromSeconds(10), callId1);
-        var task2 = systemTarget.LongWait(cts2.Token, TimeSpan.FromSeconds(10), callId2);
-        var task3 = systemTarget.LongWait(cts3.Token, TimeSpan.FromSeconds(10), callId3);
+        var task1 = systemTarget.LongWait(TimeSpan.FromSeconds(10), callId1, cts1.Token);
+        var task2 = systemTarget.LongWait(TimeSpan.FromSeconds(10), callId2, cts2.Token);
+        var task3 = systemTarget.LongWait(TimeSpan.FromSeconds(10), callId3, cts3.Token);
 
         // Wait for all to be running
         await Task.Delay(100, cancellationToken);
@@ -461,7 +461,7 @@ internal sealed class CancellationTestSystemTarget : SystemTarget, ICancellation
     }
 
     /// <inheritdoc />
-    public async Task LongWait(CancellationToken cancellationToken, TimeSpan delay, Guid callId)
+    public async Task LongWait(TimeSpan delay, Guid callId, CancellationToken cancellationToken)
     {
         try
         {
@@ -475,22 +475,22 @@ internal sealed class CancellationTestSystemTarget : SystemTarget, ICancellation
     }
 
     /// <inheritdoc />
-    public async Task CallOtherLongRunningTask(ICancellationTestSystemTarget target, CancellationToken cancellationToken, TimeSpan delay, Guid callId)
+    public async Task CallOtherLongRunningTask(ICancellationTestSystemTarget target, TimeSpan delay, Guid callId, CancellationToken cancellationToken)
     {
-        await target.LongWait(cancellationToken, delay, callId);
+        await target.LongWait(delay, callId, cancellationToken);
     }
 
     /// <inheritdoc />
     public async Task CallOtherLongRunningTaskWithLocalCancellation(ICancellationTestSystemTarget target, TimeSpan delay, TimeSpan delayBeforeCancel, Guid callId)
     {
         using var cts = new CancellationTokenSource();
-        var task = target.LongWait(cts.Token, delay, callId);
+        var task = target.LongWait(delay, callId, cts.Token);
         cts.CancelAfter(delayBeforeCancel);
         await task;
     }
 
     /// <inheritdoc />
-    public Task<bool> CancellationTokenCallbackResolve(CancellationToken cancellationToken, Guid callId)
+    public Task<bool> CancellationTokenCallbackResolve(Guid callId, CancellationToken cancellationToken)
     {
         var tcs = new TaskCompletionSource<bool>();
         var orleansTs = TaskScheduler.Current;
@@ -516,13 +516,13 @@ internal sealed class CancellationTestSystemTarget : SystemTarget, ICancellation
     public async Task<bool> CallOtherCancellationTokenCallbackResolve(ICancellationTestSystemTarget target, Guid callId)
     {
         using var cts = new CancellationTokenSource();
-        var task = target.CancellationTokenCallbackResolve(cts.Token, callId);
+        var task = target.CancellationTokenCallbackResolve(callId, cts.Token);
         cts.CancelAfter(300);
         return await task;
     }
 
     /// <inheritdoc />
-    public async Task CancellationTokenCallbackThrow(CancellationToken cancellationToken, Guid callId)
+    public async Task CancellationTokenCallbackThrow(Guid callId, CancellationToken cancellationToken)
     {
         cancellationToken.Register(() =>
         {

@@ -17,7 +17,7 @@ public interface ICancellationTestSystemTarget : ISystemTarget
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <param name="delay">The delay to wait.</param>
     /// <param name="callId">A unique identifier for this call, used to track cancellations.</param>
-    Task LongWait(CancellationToken cancellationToken, [Id(1)] TimeSpan delay, [Id(2)] Guid callId);
+    Task LongWait(TimeSpan delay, Guid callId, CancellationToken cancellationToken);
 
     /// <summary>
     /// Calls another system target's LongWait method, passing through the cancellation token.
@@ -28,9 +28,9 @@ public interface ICancellationTestSystemTarget : ISystemTarget
     /// <param name="callId">A unique identifier for this call, used to track cancellations.</param>
     Task CallOtherLongRunningTask(
         ICancellationTestSystemTarget target,
-        CancellationToken cancellationToken,
-        [Id(2)] TimeSpan delay,
-        [Id(3)] Guid callId);
+        TimeSpan delay,
+        Guid callId,
+        CancellationToken cancellationToken);
 
     /// <summary>
     /// Calls another system target's LongWait method with a locally created cancellation token
@@ -48,7 +48,7 @@ public interface ICancellationTestSystemTarget : ISystemTarget
     /// </summary>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <param name="callId">A unique identifier for this call, used to track cancellations.</param>
-    Task<bool> CancellationTokenCallbackResolve(CancellationToken cancellationToken, [Id(1)] Guid callId);
+    Task<bool> CancellationTokenCallbackResolve(Guid callId, CancellationToken cancellationToken);
 
     /// <summary>
     /// Calls another system target's CancellationTokenCallbackResolve method with a locally created
@@ -63,7 +63,7 @@ public interface ICancellationTestSystemTarget : ISystemTarget
     /// </summary>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <param name="callId">A unique identifier for this call, used to track cancellations.</param>
-    Task CancellationTokenCallbackThrow(CancellationToken cancellationToken, [Id(1)] Guid callId);
+    Task CancellationTokenCallbackThrow(Guid callId, CancellationToken cancellationToken);
 
     /// <summary>
     /// Checks if a specific call was cancelled.

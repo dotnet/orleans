@@ -27,7 +27,16 @@ public class RpcParameterFieldIdTests
 
         var result = await RunGenerator(code);
 
-        Assert.Empty(result.Diagnostics);
+        var diagnostics = result.Diagnostics
+            .Where(static diagnostic => diagnostic.Id == DiagnosticRuleId.CancellationTokenNotLast)
+            .ToArray();
+        Assert.Equal(2, diagnostics.Length);
+        Assert.All(diagnostics, static diagnostic => Assert.Equal(DiagnosticSeverity.Warning, diagnostic.Severity));
+        Assert.Equal(["cancellationToken", "cancellationToken"], diagnostics.Select(GetDiagnosticSource));
+        Assert.DoesNotContain(
+            result.Diagnostics,
+            static diagnostic => diagnostic.Id == DiagnosticRuleId.CancellationTokenNotLast
+                && diagnostic.GetMessage().Contains("TokenLast", StringComparison.Ordinal));
         AssertInvokable(
             result,
             "TokenFirst",
@@ -66,7 +75,10 @@ public class RpcParameterFieldIdTests
 
         var result = await RunGenerator(code);
 
-        Assert.Empty(result.Diagnostics);
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(DiagnosticRuleId.CancellationTokenNotLast, diagnostic.Id);
+        Assert.Equal(DiagnosticSeverity.Warning, diagnostic.Severity);
+        Assert.Contains("Call", diagnostic.GetMessage(), StringComparison.Ordinal);
         AssertInvokable(
             result,
             "Call",
