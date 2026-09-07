@@ -614,6 +614,11 @@ namespace UnitTests.OrleansRuntime.Streams
             cache.RemoveOldestMessage();
             cache.RemoveOldestMessage();
 
+            var result = cache.TryGetNextMessageWithResult(cursor, out var message);
+            Assert.Equal(QueueCacheCursorMoveResultKind.CacheMiss, result.Kind);
+            Assert.Null(message);
+            Assert.NotNull(result.CacheMiss);
+
             Assert.Throws<QueueCacheMissException>(() => cache.TryGetNextMessage(cursor, out _));
         }
 

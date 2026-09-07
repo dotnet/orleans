@@ -151,7 +151,7 @@ public sealed class CacheMemoryTests : IDisposable
         Assert.True(cache.GetMaxAddCount() > 0);
     }
 
-    [Fact]
+    [Fact, TestCategory("BVT")]
     public void SparseCachesRemainSmallAcross1024Partitions()
     {
         var options = new EventHubStreamCacheMemoryOptions();
