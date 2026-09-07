@@ -8,10 +8,12 @@ namespace Tester.EventSourcingTests;
 [TestArea("EventSourcing")]
 public sealed class StringEncodedWriteVectorTests
 {
-    [Fact, TestCategory("EventSourcing"), TestCategory("BVT")]
-    public void GetBit_ReturnsFalse_WhenReplicaStartsMalformedVector()
+    [Theory, TestCategory("EventSourcing"), TestCategory("BVT")]
+    [InlineData("A")]
+    [InlineData("missing-prefix")]
+    public void GetBit_ReturnsFalse_WhenLegacyVectorHasNoDelimitedToken(string writeVector)
     {
-        Assert.False(StringEncodedWriteVector.GetBit("A", "A"));
+        Assert.False(StringEncodedWriteVector.GetBit(writeVector, "A"));
     }
 
     [Fact, TestCategory("EventSourcing"), TestCategory("BVT")]
@@ -194,7 +196,6 @@ public sealed class StringEncodedWriteVectorTests
     [InlineData("v1:")]
     [InlineData("v1:x:A")]
     [InlineData("v1:5:abc")]
-    [InlineData("missing-prefix")]
     public void VersionedFormat_MalformedOrUnsupportedValueThrows(string writeVector)
     {
         Assert.Throws<FormatException>(() => StringEncodedWriteVector.GetBit(writeVector, "A"));
