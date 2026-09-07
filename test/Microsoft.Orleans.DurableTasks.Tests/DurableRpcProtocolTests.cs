@@ -29,6 +29,20 @@ namespace Microsoft.Orleans.DurableTasks.Tests;
 public sealed class DurableRpcProtocolTests
 {
     [Fact]
+    public void DefaultDiagnosticStatePreservesAbsentNullableMembers()
+    {
+        var serializer = CreateSerializer();
+        var state = default(DurableTaskDiagnosticState);
+
+        var roundTripped = serializer.Deserialize<DurableTaskDiagnosticState>(
+            serializer.SerializeToArray(state));
+
+        Assert.Null(roundTripped.Status);
+        Assert.Null(roundTripped.Waiters);
+        Assert.Equal("[, Created: , Completed: , Request: , Response: , Waiters: ]", roundTripped.ToString());
+    }
+
+    [Fact]
     public void DurableTaskExtensionOperationsDoNotAlwaysInterleaveWithGrainTurns()
     {
         var methods = typeof(IDurableTaskServer).GetMethods()
