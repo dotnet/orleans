@@ -38,10 +38,12 @@ To exercise .NET 8, use `--framework net8.0`. When the required runtime is insta
 ## Elastic chaos and failure attribution
 
 ```powershell
-dotnet test --project test\Orleans.GrainDirectory.Tests\Orleans.GrainDirectory.Tests.csproj --framework net10.0 --filter-class "*GrainDirectoryResilienceTests" --filter-method "ElasticChaos" --minimum-expected-tests 1
+dotnet test --project test\Orleans.GrainDirectory.Tests\Orleans.GrainDirectory.Tests.csproj --framework net10.0 --filter-class "*GrainDirectoryResilienceTests" --filter-method "*ElasticChaos*" --minimum-expected-tests 1
 ```
 
 `ElasticChaos` runs concurrent grain traffic with paced joins, graceful stops, and kills. Topology operations finish before the scenario establishes directory convergence and performs its next integrity probe. A final quiescent probe requires successful traffic and consistent registrations.
+
+The five-minute topology workload runs within a ten-minute scenario deadline, including deployment and final probes. Top-level awaits observe that deadline even when an underlying operation does not complete on cancellation. A deadline failure reports the active phase and recorded topology history. Cleanup retains its independent one-minute bounds per step.
 
 Failure reports distinguish:
 

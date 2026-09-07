@@ -25,7 +25,7 @@ public sealed partial class ControlledGrainDirectoryProtocolTests
     [InlineData("DeregisterAsync", 3)]
     public void PreviousViewPermissionPreservesGeneratedArgumentSlots(string method, int permissionSlot)
     {
-        Assert.False(new GrainDirectoryOptions().EnablePreviousViewRequests);
+        Assert.True(new GrainDirectoryOptions().EnablePreviousViewRequests);
         var requests = typeof(DistributedGrainDirectory).Assembly.GetTypes()
             .Where(t => t.Name.StartsWith("Invokable_IGrainDirectoryPartition_", StringComparison.Ordinal) && typeof(IInvokable).IsAssignableFrom(t))
             .Select(t => (IInvokable)Activator.CreateInstance(t)!).ToArray();

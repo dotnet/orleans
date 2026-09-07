@@ -2519,7 +2519,7 @@ public sealed partial class ControlledGrainDirectoryProtocolTests
         private bool _disposed;
 
         public ControlledProtocolFixture()
-            : this(false)
+            : this(new GrainDirectoryOptions().EnablePreviousViewRequests)
         {
         }
 
@@ -2533,7 +2533,7 @@ public sealed partial class ControlledGrainDirectoryProtocolTests
         }
 
         public ControlledProtocolFixture(params (SiloAddress Silo, uint Boundary)[] boundaries)
-            : this(false, TimeSpan.Zero, boundaries)
+            : this(new GrainDirectoryOptions().EnablePreviousViewRequests, TimeSpan.Zero, boundaries)
         {
         }
 
