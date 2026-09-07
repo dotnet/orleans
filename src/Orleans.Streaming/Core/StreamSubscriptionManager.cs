@@ -1,8 +1,9 @@
-using Orleans.Runtime;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
+using Orleans.Runtime;
 
 namespace Orleans.Streams.Core
 {
@@ -36,9 +37,12 @@ namespace Orleans.Streams.Core
         public Task<IEnumerable<StreamSubscription>> GetSubscriptions(string streamProviderName, StreamId streamId)
         {
             var internalStreamId = new QualifiedStreamId(streamProviderName, streamId);
-            return streamPubSub.GetAllSubscriptions(internalStreamId).ContinueWith(subs => subs.Result.AsEnumerable());
+            return streamPubSub.GetAllSubscriptions(internalStreamId).ContinueWith(
+                subs => subs.Result.AsEnumerable(),
+                CancellationToken.None,
+                TaskContinuationOptions.None,
+                TaskScheduler.Current);
         }
     }
 
 }
-
