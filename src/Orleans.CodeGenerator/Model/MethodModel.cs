@@ -3,7 +3,12 @@ namespace Orleans.CodeGenerator.Model;
 /// <summary>
 /// Describes a method parameter for invokable/proxy generation.
 /// </summary>
-internal readonly record struct MethodParameterModel(string Name, TypeRef Type, int Ordinal, bool IsCancellationToken);
+internal readonly record struct MethodParameterModel(
+    string Name,
+    TypeRef Type,
+    int Ordinal,
+    bool IsCancellationToken,
+    uint? ExplicitFieldId);
 
 /// <summary>
 /// Describes a method on a proxy interface for invokable generation.

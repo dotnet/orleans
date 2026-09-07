@@ -14,4 +14,5 @@ internal static class DiagnosticRuleId
     public const string MultipleCancellationTokenParameters = "ORLEANS0109";
     public const string ReferenceAssemblyWithGenerateSerializer = "ORLEANS0110";
     public const string InvalidInvokableBaseTypeMapping = "ORLEANS0111";
+    public const string InvalidRpcParameterId = "ORLEANS0112";
 }

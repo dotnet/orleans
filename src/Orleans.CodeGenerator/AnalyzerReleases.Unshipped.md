@@ -8,3 +8,4 @@ Rule ID | Category | Severity | Notes
 ORLEANS0109 | Usage | Error | Method has multiple CancellationToken parameters
 ORLEANS0110 | Usage | Error | ReferenceAssemblyWithGenerateSerializerDiagnostic
 ORLEANS0111 | Usage | Error | Invalid invokable base type mapping
+ORLEANS0112 | Usage | Error | Invalid RPC parameter field identifier

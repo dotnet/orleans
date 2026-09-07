@@ -709,6 +709,32 @@ public record DemoRecord([Id(42)] string Value);
         Assert.Equal(expectedMethodId, method.GeneratedMethodId);
     }
 
+    [Fact]
+    public async Task ExtractProxyInterfaceModel_CapturesExplicitParameterFieldIds()
+    {
+        const string code = """
+            using Orleans;
+            using Orleans.Runtime;
+            using System.Threading;
+            using System.Threading.Tasks;
+
+            namespace TestProject;
+
+            [GenerateMethodSerializers(typeof(GrainReference))]
+            public interface ITestGrain : IGrainWithIntegerKey
+            {
+                ValueTask Call(int first, CancellationToken cancellationToken, [Id(7)] string second);
+            }
+            """;
+
+        var model = ExtractProxyInterfaceModel(await CreateCompilation(code), "TestProject.ITestGrain");
+        var method = Assert.Single(model.Methods);
+
+        Assert.Null(method.Parameters[0].ExplicitFieldId);
+        Assert.Null(method.Parameters[1].ExplicitFieldId);
+        Assert.Equal((uint)7, method.Parameters[2].ExplicitFieldId);
+    }
+
     #region Helpers
 
     private static async Task<CSharpCompilation> CreateReferenceExtractionCompilation(bool reverseReferenceOrder = false)
