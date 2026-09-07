@@ -80,6 +80,30 @@ public class CallbackDataTests
         Assert.True(callback.IsExpired(timeProvider.GetTimestamp()));
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
+    public void TimestampConversionPreservesTimeSpanPrecision()
+    {
+        using var serviceProvider = CreateServiceProvider();
+        var timeProvider = new FakeTimeProvider();
+        var timeout = TimeSpan.FromTicks((1L << 53) + 1);
+        var callback = CreateCallback(
+            new TestResponseCompletionSource(),
+            _ => { },
+            CreateInstruments(serviceProvider),
+            timeProvider,
+            timeout);
+
+        Assert.False(callback.IsExpired(timeProvider.GetTimestamp()));
+
+        timeProvider.Advance(timeout);
+        Assert.False(callback.IsExpired(timeProvider.GetTimestamp()));
+
+        timeProvider.Advance(TimeSpan.FromTicks(1));
+        Assert.True(callback.IsExpired(timeProvider.GetTimestamp()));
+    }
+
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static WeakReference CreateCompletedCallback(CancellationToken cancellationToken, ApplicationRequestInstruments instruments)
     {

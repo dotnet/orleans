@@ -63,7 +63,7 @@ namespace DefaultCluster.Tests.General
                         .AddMemoryGrainStorage("PubSubStore")
                         .AddMemoryStreams<DefaultMemoryMessageBodySerializer>("MemStream");
                 });
-                builder.Services.AddKeyedSingleton(TimeProviderNames.Messaging, MessagingTimeProvider);
+                builder.Services.AddKeyedSingleton<TimeProvider>(TimeProviderNames.Messaging, MessagingTimeProvider);
                 Host = builder.Build();
                 await Host.StartAsync(cancellationToken);
             }
