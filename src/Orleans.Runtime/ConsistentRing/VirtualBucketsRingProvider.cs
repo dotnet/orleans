@@ -15,16 +15,15 @@ namespace Orleans.Runtime.ConsistentRing
     internal sealed partial class VirtualBucketsRingProvider :
         IConsistentRingProvider, ISiloStatusListener, IDisposable
     {
-        private readonly List<IRingRangeListener> statusListeners = new();
         private readonly SortedDictionary<uint, SiloAddress> bucketsMap = new();
         private (uint Hash, SiloAddress SiloAddress)[] sortedBucketsList = null!; // flattened sorted bucket list for fast lock-free calculation of CalculateTargetSilo
         private readonly ILogger logger;
         private readonly SiloAddress myAddress;
         private readonly int numBucketsPerSilo;
         private readonly ISiloStatusOracle _siloStatusOracle;
+        private readonly RingRangeListenerManager rangeChangeListeners;
         private bool running;
         private IRingRange myRange;
-        private (IRingRange OldRange, IRingRange NewRange, bool Increased) lastNotification;
 
         internal VirtualBucketsRingProvider(SiloAddress siloAddress, ILoggerFactory loggerFactory, int numVirtualBuckets, ISiloStatusOracle siloStatusOracle, ConsistentRingInstruments consistentRingInstruments)
         {
@@ -38,7 +37,7 @@ namespace Orleans.Runtime.ConsistentRing
             myAddress = siloAddress;
             running = true;
             myRange = RangeFactory.CreateFullRange();
-            lastNotification = (myRange, myRange, true);
+            rangeChangeListeners = new(myRange);
 
             LogDebugStarting(logger, nameof(VirtualBucketsRingProvider), new(siloAddress));
 
@@ -73,55 +72,30 @@ namespace Orleans.Runtime.ConsistentRing
             }
         }
 
-        public bool SubscribeToRangeChangeEvents(IRingRangeListener observer)
-        {
-            (IRingRange OldRange, IRingRange NewRange, bool Increased) notification;
-            lock (statusListeners)
-            {
-                if (statusListeners.Contains(observer)) return false;
+        public bool SubscribeToRangeChangeEvents(IRingRangeListener observer) => rangeChangeListeners.Subscribe(observer);
 
-                notification = lastNotification;
-                statusListeners.Add(observer);
-            }
+        public bool UnSubscribeFromRangeChangeEvents(IRingRangeListener observer) => rangeChangeListeners.Unsubscribe(observer);
 
-            observer.RangeChangeNotification(notification.OldRange, notification.NewRange, notification.Increased);
-            return true;
-        }
-
-        public bool UnSubscribeFromRangeChangeEvents(IRingRangeListener observer)
-        {
-            lock (statusListeners)
-            {
-                return statusListeners.Remove(observer);
-            }
-        }
-
-        private void NotifyLocalRangeSubscribers(IRingRange old, IRingRange now, bool increased)
+        private RingRangeListenerManager.NotificationWorkItem PublishRangeChange(IRingRange old, IRingRange now, bool increased)
         {
             LogTraceNotifyLocalRangeSubscribers(logger, old, now, increased);
-
-            IRingRangeListener[] copy;
-            lock (statusListeners)
-            {
-                lastNotification = (old, now, increased);
-                copy = statusListeners.ToArray();
-            }
-            foreach (IRingRangeListener listener in copy)
-            {
-                try
-                {
-                    listener.RangeChangeNotification(old, now, increased);
-                }
-                catch (Exception exc)
-                {
-                    LogWarningErrorNotifyingListener(logger, exc, listener.GetType().FullName, increased ? "expansion" : "contraction", old, now);
-                }
-            }
+            return rangeChangeListeners.Publish(
+                old,
+                now,
+                increased,
+                (listener, exception) => LogWarningErrorNotifyingListener(
+                    logger,
+                    exception,
+                    listener.GetType().FullName,
+                    increased ? "expansion" : "contraction",
+                    old,
+                    now));
         }
 
         private void AddServer(SiloAddress silo)
         {
             var hashes = silo.GetUniformHashCodes(numBucketsPerSilo);
+            RingRangeListenerManager.NotificationWorkItem notification;
             lock (bucketsMap)
             {
                 foreach (var hash in hashes)
@@ -138,12 +112,15 @@ namespace Orleans.Runtime.ConsistentRing
                 var myNewRange = UpdateRange();
                 LogTraceAddedServer(logger, new(silo), this);
 
-                NotifyLocalRangeSubscribers(myOldRange, myNewRange, true);
+                notification = PublishRangeChange(myOldRange, myNewRange, true);
             }
+
+            rangeChangeListeners.Dispatch(notification);
         }
 
         private void RemoveServer(SiloAddress silo)
         {
+            RingRangeListenerManager.NotificationWorkItem notification;
             lock (bucketsMap)
             {
                 if (!bucketsMap.ContainsValue(silo)) return; // we have already removed this silo
@@ -165,8 +142,10 @@ namespace Orleans.Runtime.ConsistentRing
 
                 LogTraceRemovedServer(logger, new(silo), this);
 
-                NotifyLocalRangeSubscribers(myOldRange, myNewRange, true);
+                notification = PublishRangeChange(myOldRange, myNewRange, true);
             }
+
+            rangeChangeListeners.Dispatch(notification);
         }
 
         private IRingRange UpdateRange()
