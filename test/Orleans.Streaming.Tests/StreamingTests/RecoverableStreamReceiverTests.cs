@@ -821,6 +821,25 @@ public sealed class RecoverableStreamReceiverTests
     }
 
     [Fact]
+    public async Task Receiver_InterfaceInitializationOverloadPropagatesCallerCancellation()
+    {
+        var source = new TestSource([]);
+        var checkpointer = new BlockingInitializationCheckpointer();
+        IQueueAdapterReceiver receiver = CreateReceiver(source, checkpointer);
+        using var cancellation = new CancellationTokenSource();
+
+        var initialization = receiver.Initialize(Timeout.InfiniteTimeSpan, cancellation.Token);
+        await checkpointer.FirstLoadStarted.Task;
+        cancellation.Cancel();
+
+        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => initialization);
+        Assert.Equal(cancellation.Token, exception.CancellationToken);
+        Assert.True(checkpointer.FirstLoadCancellation.IsCancellationRequested);
+        checkpointer.AllowFirstLoadToComplete.TrySetResult();
+        await receiver.Shutdown(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
     public async Task Receiver_IndependentInitializationCancellationIsNotRetried()
     {
         var source = new TestSource([]);
