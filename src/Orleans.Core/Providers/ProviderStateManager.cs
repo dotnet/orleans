@@ -17,10 +17,7 @@ namespace Orleans.Providers
         public ProviderState State { get; private set; }
         private ProviderState presetState;
 
-        public ProviderStateManager()
-        {
-            State = ProviderState.None;
-        }
+        public ProviderStateManager() => State = ProviderState.None;
 
         public bool PresetState(ProviderState state)
         {

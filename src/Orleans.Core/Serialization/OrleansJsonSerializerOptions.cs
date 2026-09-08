@@ -44,32 +44,19 @@ namespace Orleans.Serialization
         /// <summary>
         /// Initializes a new instance of the <see cref="OrleansJsonSerializerOptions"/> class using the default settings.
         /// </summary>
-        public OrleansJsonSerializerOptions()
-        {
-            JsonSerializerSettings = OrleansJsonSerializerSettings.GetDefaultSerializerSettings();
-        }
+        public OrleansJsonSerializerOptions() => JsonSerializerSettings = OrleansJsonSerializerSettings.GetDefaultSerializerSettings();
     }
 
     /// <summary>
     /// Configures <see cref="OrleansJsonSerializerOptions"/> with the Orleans serialization binder and converters.
     /// </summary>
-    public class ConfigureOrleansJsonSerializerOptions : IPostConfigureOptions<OrleansJsonSerializerOptions>
+    /// <param name="serviceProvider">The service provider used to resolve serializer dependencies.</param>
+    public class ConfigureOrleansJsonSerializerOptions(IServiceProvider serviceProvider) : IPostConfigureOptions<OrleansJsonSerializerOptions>
     {
-        private readonly IServiceProvider _serviceProvider;
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="ConfigureOrleansJsonSerializerOptions"/> class.
-        /// </summary>
-        /// <param name="serviceProvider">The service provider used to resolve serializer dependencies.</param>
-        public ConfigureOrleansJsonSerializerOptions(IServiceProvider serviceProvider)
-        {
-            _serviceProvider = serviceProvider;
-        }
-
         /// <inheritdoc />
         public void PostConfigure(string? name, OrleansJsonSerializerOptions options)
         {
-            OrleansJsonSerializerSettings.Configure(_serviceProvider, options.JsonSerializerSettings, options.AllowAllTypes);
+            OrleansJsonSerializerSettings.Configure(serviceProvider, options.JsonSerializerSettings, options.AllowAllTypes);
         }
     }
 }

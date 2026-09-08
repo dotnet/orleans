@@ -22,29 +22,23 @@ namespace Orleans.GrainReferences
     /// <summary>
     /// The central point for creating <see cref="GrainReference"/> instances.
     /// </summary>
-    public sealed class GrainReferenceActivator
+    /// <remarks>
+    /// Initializes a new instance of the <see cref="GrainReferenceActivator"/> class.
+    /// </remarks>
+    /// <param name="serviceProvider">The service provider.</param>
+    /// <param name="providers">The collection of grain reference activator providers.</param>
+    public sealed class GrainReferenceActivator(
+        IServiceProvider serviceProvider,
+        IEnumerable<IGrainReferenceActivatorProvider> providers)
     {
 #if NET9_0_OR_GREATER
         private readonly Lock _lockObj = new();
 #else
         private readonly object _lockObj = new();
 #endif
-        private readonly IServiceProvider _serviceProvider;
-        private readonly IGrainReferenceActivatorProvider[] _providers;
+        private readonly IServiceProvider _serviceProvider = serviceProvider;
+        private readonly IGrainReferenceActivatorProvider[] _providers = providers.ToArray();
         private Dictionary<(GrainType, GrainInterfaceType), IGrainReferenceActivator> _activators = new();
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="GrainReferenceActivator"/> class.
-        /// </summary>
-        /// <param name="serviceProvider">The service provider.</param>
-        /// <param name="providers">The collection of grain reference activator providers.</param>
-        public GrainReferenceActivator(
-            IServiceProvider serviceProvider,
-            IEnumerable<IGrainReferenceActivatorProvider> providers)
-        {
-            _serviceProvider = serviceProvider;
-            _providers = providers.ToArray();
-        }
 
         /// <summary>
         /// Creates a grain reference pointing to the specified grain id and implementing the specified grain interface type.

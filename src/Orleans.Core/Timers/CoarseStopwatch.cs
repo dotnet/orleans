@@ -27,10 +27,7 @@ namespace Orleans.Runtime
         /// <returns>A new stopwatch.</returns>
         public static CoarseStopwatch FromTimestamp(long timestamp) => new(timestamp);
 
-        private CoarseStopwatch(long timestamp)
-        {
-            _value = timestamp;
-        }
+        private CoarseStopwatch(long timestamp) => _value = timestamp;
 
         /// <summary>
         /// The number of ticks per second for this stopwatch.

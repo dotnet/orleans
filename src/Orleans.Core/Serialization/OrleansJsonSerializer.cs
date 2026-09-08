@@ -11,7 +11,11 @@ namespace Orleans.Serialization
     /// <summary>
     /// Serializes and deserializes values using Newtonsoft.Json settings configured for Orleans types.
     /// </summary>
-    public class OrleansJsonSerializer
+    /// <remarks>
+    /// Initializes a new instance of the <see cref="OrleansJsonSerializer"/> class.
+    /// </remarks>
+    /// <param name="options">The configured JSON serializer options.</param>
+    public class OrleansJsonSerializer(IOptions<OrleansJsonSerializerOptions> options)
     {
         /// <summary>
         /// The configuration property name for selecting full assembly-qualified type names.
@@ -27,16 +31,7 @@ namespace Orleans.Serialization
         /// The configuration property name for selecting how type names are included in JSON.
         /// </summary>
         public const string TypeNameHandlingProperty = "TypeNameHandling";
-        private readonly JsonSerializerSettings settings;
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="OrleansJsonSerializer"/> class.
-        /// </summary>
-        /// <param name="options">The configured JSON serializer options.</param>
-        public OrleansJsonSerializer(IOptions<OrleansJsonSerializerOptions> options)
-        {
-            this.settings = options.Value.JsonSerializerSettings;
-        }
+        private readonly JsonSerializerSettings settings = options.Value.JsonSerializerSettings;
 
         /// <summary>
         /// Deserializes an object of the specified expected type from the provided input.

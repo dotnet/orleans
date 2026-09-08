@@ -10,26 +10,17 @@ namespace Orleans.Serialization
     /// and enforces the configured Orleans type allow-list, preventing arbitrary types from being constructed
     /// during deserialization.
     /// </summary>
-    public class OrleansJsonSerializationBinder : DefaultSerializationBinder
+    /// <remarks>
+    /// This constructor does not enforce the Orleans type allow-list: any resolvable type may be constructed
+    /// during deserialization. It is retained for backwards compatibility. Prefer the constructor which accepts
+    /// a <see cref="TypeConverter"/> so that the type allow-list is enforced.
+    /// </remarks>
+    /// <param name="typeResolver">The type resolver.</param>
+    public class OrleansJsonSerializationBinder(TypeResolver typeResolver) : DefaultSerializationBinder
     {
-        private readonly TypeResolver _typeResolver;
+        private readonly TypeResolver _typeResolver = typeResolver;
         private readonly TypeConverter? _typeConverter;
-        private readonly bool _allowAllTypes;
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="OrleansJsonSerializationBinder"/> class.
-        /// </summary>
-        /// <param name="typeResolver">The type resolver.</param>
-        /// <remarks>
-        /// This constructor does not enforce the Orleans type allow-list: any resolvable type may be constructed
-        /// during deserialization. It is retained for backwards compatibility. Prefer the constructor which accepts
-        /// a <see cref="TypeConverter"/> so that the type allow-list is enforced.
-        /// </remarks>
-        public OrleansJsonSerializationBinder(TypeResolver typeResolver)
-        {
-            _typeResolver = typeResolver;
-            _allowAllTypes = true;
-        }
+        private readonly bool _allowAllTypes = true;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="OrleansJsonSerializationBinder"/> class which enforces the
@@ -42,9 +33,9 @@ namespace Orleans.Serialization
         /// during deserialization, bypassing the type allow-list. This is insecure and is not recommended.
         /// </param>
         public OrleansJsonSerializationBinder(TypeConverter typeConverter, TypeResolver typeResolver, bool allowAllTypes = false)
+            : this(typeResolver)
         {
             _typeConverter = typeConverter;
-            _typeResolver = typeResolver;
             _allowAllTypes = allowAllTypes;
         }
 
