@@ -2,18 +2,27 @@ using System.Net;
 using Cassandra;
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
+using Xunit;
 
 namespace Tester.Cassandra.Clustering;
 
 public class CassandraContainer
 {
     private static readonly TimeSpan CleanupTimeout = TimeSpan.FromSeconds(30);
+    private readonly string? _image = GetImage();
     private readonly object _lock = new();
     private Task<(IContainer container, ushort exposedPort, Cluster cluster, ISession session)>? _runImage;
+
+    public void EnsurePreconditionsMet()
+    {
+        Assert.SkipWhen(string.IsNullOrWhiteSpace(_image), "CASSANDRAVERSION is not configured.");
+    }
 
     public async Task<(IContainer container, ushort exposedPort, Cluster cluster, ISession session)> RunImage(
         CancellationToken cancellationToken)
     {
+        EnsurePreconditionsMet();
+
         Task<(IContainer container, ushort exposedPort, Cluster cluster, ISession session)> task;
         lock (_lock)
         {
@@ -45,7 +54,7 @@ public class CassandraContainer
         }
     }
 
-    private static async Task<(IContainer container, ushort exposedPort, Cluster cluster, ISession session)> RunImageCore(
+    private async Task<(IContainer container, ushort exposedPort, Cluster cluster, ISession session)> RunImageCore(
         CancellationToken cancellationToken)
     {
         var containerPort = 9042;
@@ -53,7 +62,7 @@ public class CassandraContainer
 
         try
         {
-            container = new ContainerBuilder("cassandra:" + Environment.GetEnvironmentVariable("CASSANDRAVERSION"))
+            container = new ContainerBuilder(_image!)
                 .WithPortBinding(containerPort, true)
                 .WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(containerPort))
                 .Build();
@@ -94,4 +103,10 @@ public class CassandraContainer
     }
 
     public string Name { get; set; } = string.Empty;
+
+    private static string? GetImage()
+    {
+        var version = Environment.GetEnvironmentVariable("CASSANDRAVERSION");
+        return string.IsNullOrWhiteSpace(version) ? null : $"cassandra:{version}";
+    }
 }

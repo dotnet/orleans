@@ -13,6 +13,12 @@ public class FirestorePersistenceGrainTests : GrainPersistenceTestsRunner, IClas
 {
     public class Fixture : TestExtensions.BaseTestClusterFixture
     {
+        protected override void CheckPreconditionsOrThrow()
+        {
+            base.CheckPreconditionsOrThrow();
+            _ = GoogleEmulatorHost.FirestoreEndpoint;
+        }
+
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             builder.Options.InitialSilosCount = 4;
