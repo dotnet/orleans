@@ -524,6 +524,48 @@ namespace NonSilo.Tests.Directory
         }
 
         [Fact]
+        public async Task InvalidatedGatewayRefreshContinuesPastFailedOwner()
+        {
+            var clientId = Client("multi-owner");
+            var failedSilo = Silo("127.0.0.1:222@100");
+            var healthySilo = Silo("127.0.0.1:333@100");
+            var failed = await AddRemoteClient(failedSilo, clientId);
+            var healthy = await AddRemoteClient(healthySilo, clientId);
+            var failure = new TimeoutException("Client directory owner did not respond.");
+            var attempts = 0;
+            SiloAddress? successfulSilo = null;
+            Configure(failed, failedSilo);
+            Configure(healthy, healthySilo);
+
+            _directory.InvalidateCache(clientId);
+
+            var address = Assert.Single(await _directory.Lookup(clientId));
+
+            Assert.Equal(Gateway.GetClientActivationAddress(clientId, successfulSilo!), address);
+            _ = failed.Received(1).GetClientRoutes(
+                Arg.Any<ImmutableDictionary<SiloAddress, long>>(),
+                Arg.Any<CancellationToken>());
+            _ = healthy.Received(1).GetClientRoutes(
+                Arg.Any<ImmutableDictionary<SiloAddress, long>>(),
+                Arg.Any<CancellationToken>());
+
+            void Configure(IRemoteClientDirectory remote, SiloAddress silo)
+            {
+                remote.GetClientRoutes(default!, Arg.Any<CancellationToken>()).ReturnsForAnyArgs(_ =>
+                {
+                    if (Interlocked.Increment(ref attempts) == 1)
+                    {
+                        throw failure;
+                    }
+
+                    successfulSilo = silo;
+                    return Task.FromResult(
+                        ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId>, long)>.Empty);
+                });
+            }
+        }
+
+        [Fact]
         public async Task InvalidationKeepsLocallyConnectedClientAvailable()
         {
             var clientId = Client("multiple-gateways");

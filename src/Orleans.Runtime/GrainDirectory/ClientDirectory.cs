@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -214,6 +215,8 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
 
     private async ValueTask<List<GrainAddress>?> RefreshInvalidatedRoutes(GrainId grainId)
     {
+        var attemptedRefreshes = new Dictionary<SiloAddress, object>();
+        Exception? refreshFailure = null;
         while (true)
         {
             SiloAddress silo;
@@ -232,23 +235,45 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
                 }
 
                 // A cached candidate excluded by TryLocalLookup has a pending owner refresh.
-                silo = candidates[0].SiloAddress!;
+                var candidate = candidates.FirstOrDefault(candidate =>
+                    _pendingRefreshes.TryGetValue(candidate.SiloAddress!, out var pendingToken)
+                    && (!attemptedRefreshes.TryGetValue(candidate.SiloAddress!, out var attemptedToken)
+                        || !ReferenceEquals(attemptedToken, pendingToken)));
+                if (candidate is null)
+                {
+                    if (refreshFailure is not null)
+                    {
+                        ExceptionDispatchInfo.Capture(refreshFailure).Throw();
+                    }
+
+                    return null;
+                }
+
+                silo = candidate.SiloAddress!;
                 token = _pendingRefreshes[silo];
+                attemptedRefreshes[silo] = token;
                 versionVector = _table.ToImmutableDictionary(e => e.Key, e => e.Value.Version);
             }
 
-            var remote = _grainFactory.GetSystemTarget<IRemoteClientDirectory>(Constants.ClientDirectoryType, silo);
-            var delta = await remote.GetClientRoutes(versionVector, _stoppingCts.Token);
-            lock (_lockObj)
+            try
             {
-                UpdateRoutingTable(delta);
-
-                // Keep the versioned row while refreshing: a same-version response confirms it,
-                // and a delayed response only completes the invalidation which initiated its read.
-                if (_pendingRefreshes.TryGetValue(silo, out var currentToken) && ReferenceEquals(currentToken, token))
+                var remote = _grainFactory.GetSystemTarget<IRemoteClientDirectory>(Constants.ClientDirectoryType, silo);
+                var delta = await remote.GetClientRoutes(versionVector, _stoppingCts.Token);
+                lock (_lockObj)
                 {
-                    _pendingRefreshes = _pendingRefreshes.Remove(silo);
+                    UpdateRoutingTable(delta);
+
+                    // Keep the versioned row while refreshing: a same-version response confirms it,
+                    // and a delayed response only completes the invalidation which initiated its read.
+                    if (_pendingRefreshes.TryGetValue(silo, out var currentToken) && ReferenceEquals(currentToken, token))
+                    {
+                        _pendingRefreshes = _pendingRefreshes.Remove(silo);
+                    }
                 }
+            }
+            catch (Exception exception) when (!_stoppingCts.IsCancellationRequested)
+            {
+                refreshFailure = exception;
             }
         }
     }

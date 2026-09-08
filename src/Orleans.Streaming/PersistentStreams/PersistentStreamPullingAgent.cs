@@ -36,6 +36,7 @@ namespace Orleans.Streams
         private readonly IStreamFailureHandler streamFailureHandler;
         private readonly StreamInstruments? _streamInstruments;
         private readonly TimeProvider _timeProvider;
+        private readonly CancellationTokenSource _shutdownCancellation = new();
         internal readonly QueueId QueueId;
 
         private int numMessages;
@@ -249,6 +250,7 @@ namespace Orleans.Streams
 
             var asyncTimer = timer;
             timer = null;
+            _shutdownCancellation.Cancel();
             var localDeliveryProgressTimer = deliveryProgressTimer;
             deliveryProgressTimer = null;
             localDeliveryProgressTimer?.Dispose();
@@ -1786,7 +1788,7 @@ namespace Orleans.Streams
             {
                 LogWarningConsumerIsDead(consumerData.StreamConsumer, consumerData.StreamId);
                 RemoveSubscriber_Impl(consumerData.SubscriptionId, consumerData.StreamId);
-                UnregisterUnavailableConsumer(consumerData, cancellationToken).Ignore();
+                UnregisterUnavailableConsumer(consumerData).Ignore();
                 return true;
             }
 
@@ -1830,15 +1832,48 @@ namespace Orleans.Streams
             return false;
         }
 
-        private async Task UnregisterUnavailableConsumer(StreamConsumerData consumerData, CancellationToken cancellationToken)
+        private async Task UnregisterUnavailableConsumer(StreamConsumerData consumerData)
         {
             StreamingEvents.EmitSubscriptionUnregistration(
                 streamProviderName, consumerData, Silo, StreamingEvents.SubscriptionUnregistrationStage.Requested);
             try
             {
-                await pubSub.UnregisterConsumer(consumerData.SubscriptionId, consumerData.StreamId, cancellationToken);
+                await AsyncExecutorWithRetries.ExecuteWithRetries(
+                    async _ =>
+                    {
+                        try
+                        {
+                            await pubSub.UnregisterConsumer(
+                                consumerData.SubscriptionId,
+                                consumerData.StreamId,
+                                _shutdownCancellation.Token);
+                            return true;
+                        }
+                        catch (Exception exception) when (!_shutdownCancellation.IsCancellationRequested)
+                        {
+                            StreamingEvents.EmitSubscriptionUnregistration(
+                                streamProviderName,
+                                consumerData,
+                                Silo,
+                                StreamingEvents.SubscriptionUnregistrationStage.Failed,
+                                exception);
+                            LogWarningUnregisterUnavailableConsumer(
+                                consumerData.SubscriptionId,
+                                consumerData.StreamId,
+                                exception);
+                            throw;
+                        }
+                    },
+                    AsyncExecutorWithRetries.INFINITE_RETRIES,
+                    static (_, _) => true,
+                    Timeout.InfiniteTimeSpan,
+                    deliveryBackoffProvider,
+                    _shutdownCancellation.Token);
                 StreamingEvents.EmitSubscriptionUnregistration(
                     streamProviderName, consumerData, Silo, StreamingEvents.SubscriptionUnregistrationStage.Completed);
+            }
+            catch (OperationCanceledException) when (_shutdownCancellation.IsCancellationRequested)
+            {
             }
             catch (Exception exception)
             {

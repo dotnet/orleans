@@ -144,7 +144,10 @@ namespace Orleans.Providers.Streams.Common
                 return QueueCacheCursorResult<object>.FromCacheMiss(cacheMiss);
             }
 
-            var cursor = new Cursor(streamId);
+            var cursor = new Cursor(streamId)
+            {
+                InclusiveStartToken = sequenceToken,
+            };
             if (SetCursor(cursor, sequenceToken) is { } racedCacheMiss)
             {
                 return QueueCacheCursorResult<object>.FromCacheMiss(racedCacheMiss);
@@ -215,6 +218,7 @@ namespace Orleans.Providers.Streams.Common
             }
 
             cursor.State = CursorStates.Unset;
+            cursor.InclusiveStartToken = sequenceToken;
             if (SetCursor(cursor, sequenceToken) is { } cacheMiss)
             {
                 throw cacheMiss.ToException();
@@ -585,14 +589,35 @@ namespace Orleans.Providers.Streams.Common
                 if (currentMessage.CompareStreamId(cursor.StreamId))
                 {
                     if (cursor.DeliveredThroughToken is { } deliveredThrough
-                        && cacheDataAdapter.Compare(ref currentMessage, deliveredThrough) <= 0)
+                        && cacheDataAdapter.Compare(ref currentMessage, deliveredThrough) < 0)
                     {
                         cursor.RecordScanned(currentToken);
                         continue;
                     }
 
-                    cursor.RecordPending(currentToken);
                     message = cacheDataAdapter.GetBatchContainer(ref currentMessage);
+                    if (cursor.DeliveredThroughToken is { } exclusiveStartToken
+                        && cacheDataAdapter.Compare(ref currentMessage, exclusiveStartToken) == 0)
+                    {
+                        if (message is not IQueueCacheBatchContainerFilter exclusiveFilter
+                            || exclusiveFilter.FilterAfter(exclusiveStartToken) is not { } filtered)
+                        {
+                            cursor.RecordScanned(exclusiveStartToken);
+                            continue;
+                        }
+
+                        message = filtered;
+                    }
+
+                    if (cursor.InclusiveStartToken is { } inclusiveStartToken)
+                    {
+                        if (message is IQueueCacheBatchContainerFilter filter)
+                        {
+                            message = filter.FilterFrom(inclusiveStartToken);
+                        }
+                    }
+
+                    cursor.RecordPending(message.SequenceToken);
                     return QueueCacheCursorMoveResult.Success;
                 }
 
@@ -612,7 +637,11 @@ namespace Orleans.Providers.Streams.Common
             => GetCursor(cursorObj).SafeSequenceToken;
 
         internal void SetCursorDeliveredThrough(object cursorObj, StreamSequenceToken token)
-            => GetCursor(cursorObj).DeliveredThroughToken = token;
+        {
+            var cursor = GetCursor(cursorObj);
+            cursor.DeliveredThroughToken = token;
+            cursor.InclusiveStartToken = null;
+        }
 
         internal void RecordDeliverySuccess(object cursorObj)
             => GetCursor(cursorObj).RecordDeliverySuccess();
@@ -628,6 +657,7 @@ namespace Orleans.Providers.Streams.Common
             cursor.State = CursorStates.Unset;
             cursor.CurrentBlock = null;
             cursor.SequenceToken = retryToken;
+            cursor.InclusiveStartToken = retryToken;
             if (SetCursor(cursor, retryToken) is { } cacheMiss)
             {
                 throw cacheMiss.ToException();
@@ -742,6 +772,7 @@ namespace Orleans.Providers.Streams.Common
 
             // current sequence token; null while waiting for the first message to arrive
             public StreamSequenceToken? SequenceToken;
+            public StreamSequenceToken? InclusiveStartToken;
             public long BlockGeneration;
             public StreamSequenceToken? SafeSequenceToken;
             public StreamSequenceToken? DeliveredThroughToken;
@@ -792,6 +823,8 @@ namespace Orleans.Providers.Streams.Common
                 pendingSequenceToken = null;
                 pendingStartToken = null;
                 hasPendingDelivery = false;
+                InclusiveStartToken = null;
+                DeliveredThroughToken = null;
             }
 
             public StreamSequenceToken? TakePendingStartToken()

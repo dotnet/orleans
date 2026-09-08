@@ -111,7 +111,9 @@ public abstract class AdoNetQueueAdapterFactoryTests(string invariant, TestEnvir
             adapter.CreateReceiver(queueId),
             factory.GetQueueAdapterCache().CreateQueueCache(queueId));
         var firstReceiver = adapter.CreateReceiver(queueId);
-        await firstReceiver.Shutdown(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        await ((IQueueAdapterReceiver)firstReceiver).Shutdown(
+            TimeSpan.FromSeconds(5),
+            TestContext.Current.CancellationToken);
         var reassignedReceiver = adapter.CreateReceiver(queueId);
         Assert.NotSame(firstReceiver, reassignedReceiver);
         Assert.Same(

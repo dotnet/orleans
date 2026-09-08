@@ -35,9 +35,14 @@ public partial class PersistentStreamPullingAgentTests
         data.Cursor = cache.GetCacheCursor(streamId.StreamId, token);
         data.IsRegistered = true;
         var unregister = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        pubSub.UnregisterConsumer(subscriptionId, streamId, Arg.Any<CancellationToken>()).Returns(unregister.Task);
+        var unregisterAttempts = 0;
+        pubSub.UnregisterConsumer(subscriptionId, streamId, Arg.Any<CancellationToken>()).Returns(_ =>
+            Interlocked.Increment(ref unregisterAttempts) == 1
+                ? unregister.Task
+                : Task.CompletedTask);
         var events = new ConcurrentQueue<StreamingEvents.StreamingEvent>();
-        var outcome = new TaskCompletionSource<StreamingEvents.SubscriptionUnregistration>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var failedOutcome = new TaskCompletionSource<StreamingEvents.SubscriptionUnregistration>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var completedOutcome = new TaskCompletionSource<StreamingEvents.SubscriptionUnregistration>(TaskCreationOptions.RunContinuationsAsynchronously);
         using var observer = StreamingEvents.AllEvents.Subscribe(value =>
         {
             if (value is StreamingEvents.MessageDeliveryFailed failed && failed.SubscriptionId == subscriptionId.Guid)
@@ -47,9 +52,13 @@ public partial class PersistentStreamPullingAgentTests
             else if (value is StreamingEvents.SubscriptionUnregistration registration && registration.SubscriptionId == subscriptionId.Guid)
             {
                 events.Enqueue(value);
-                if (registration.Stage != StreamingEvents.SubscriptionUnregistrationStage.Requested)
+                if (registration.Stage == StreamingEvents.SubscriptionUnregistrationStage.Failed)
                 {
-                    outcome.TrySetResult(registration);
+                    failedOutcome.TrySetResult(registration);
+                }
+                else if (registration.Stage == StreamingEvents.SubscriptionUnregistrationStage.Completed)
+                {
+                    completedOutcome.TrySetResult(registration);
                 }
             }
         });
@@ -72,7 +81,8 @@ public partial class PersistentStreamPullingAgentTests
             Assert.Equal(siloAddress, requested.SiloAddress);
             Assert.Same(consumer, requested.Consumer);
             Assert.Null(requested.Exception);
-            Assert.False(outcome.Task.IsCompleted);
+            Assert.False(failedOutcome.Task.IsCompleted);
+            Assert.False(completedOutcome.Task.IsCompleted);
             Assert.False(streamData.Contains(subscriptionId));
             Assert.Null(data.Cursor);
             Assert.DoesNotContain(streamId, await accessor.GetPubSubCache());
@@ -87,16 +97,22 @@ public partial class PersistentStreamPullingAgentTests
                 unregister.SetResult();
             }
 
-            var completed = await outcome.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
-            Assert.Equal(
-                failUnregistration ? StreamingEvents.SubscriptionUnregistrationStage.Failed : StreamingEvents.SubscriptionUnregistrationStage.Completed,
-                completed.Stage);
+            if (failUnregistration)
+            {
+                var failedRegistration = await failedOutcome.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+                Assert.Equal(StreamingEvents.SubscriptionUnregistrationStage.Failed, failedRegistration.Stage);
+                Assert.Same(exception, failedRegistration.Exception);
+            }
+
+            var completed = await completedOutcome.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            Assert.Equal(StreamingEvents.SubscriptionUnregistrationStage.Completed, completed.Stage);
             Assert.Equal(streamId.StreamId, completed.StreamId);
             Assert.Equal(streamId.ProviderName, completed.StreamProvider);
             Assert.Equal(siloAddress, completed.SiloAddress);
             Assert.Same(consumer, completed.Consumer);
-            Assert.Same(failUnregistration ? exception : null, completed.Exception);
-            _ = pubSub.Received(1).UnregisterConsumer(subscriptionId, streamId, Arg.Any<CancellationToken>());
+            Assert.Null(completed.Exception);
+            _ = pubSub.Received(failUnregistration ? 2 : 1)
+                .UnregisterConsumer(subscriptionId, streamId, Arg.Any<CancellationToken>());
         }
         finally
         {
