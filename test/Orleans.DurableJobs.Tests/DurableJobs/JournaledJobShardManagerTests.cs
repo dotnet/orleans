@@ -130,7 +130,7 @@ public partial class JournaledJobShardManagerTests
         fixture.Catalog.ReadPage = _ => new() { JournalIds = [first, second] };
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => fixture.DiscoverAsync(cancellationToken: cancellation.Token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => fixture.DiscoverWithCancellationAsync(cancellation.Token));
         Assert.Empty(fixture.Catalog.Tokens);
 
         using var midPageCancellation = new CancellationTokenSource();
@@ -140,7 +140,7 @@ public partial class JournaledJobShardManagerTests
             token.ThrowIfCancellationRequested();
             return ValueTask.CompletedTask;
         };
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => fixture.DiscoverAsync(cancellationToken: midPageCancellation.Token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => fixture.DiscoverWithCancellationAsync(midPageCancellation.Token));
         Assert.Equal(new[] { first }, fixture.Storage.MetadataReads);
         Assert.True(fixture.Manager.HasMoreCatalogWork);
         fixture.Storage.BeforeMetadataRead = null;
@@ -976,99 +976,102 @@ public partial class JournaledJobShardManagerTests
                 await inner.AppendAsync(value, cancellationToken).ConfigureAwait(false);
             }
 
-            private sealed class DiscoveryFixture : IAsyncDisposable
-            {
-                private readonly ServiceProvider _services;
-                private readonly HashSet<IJobShard> _opened = [];
-
-                public DiscoveryFixture()
-                {
-                    Catalog = new ScriptedCatalog(Storage);
-                    _services = CreateServices(Storage, catalog: Catalog);
-                    Membership.SetSiloStatus(Silo, SiloStatus.Active);
-                    Manager = CreateManager(_services, Membership, Silo);
-                }
-
-                public DateTimeOffset Now { get; } = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
-                public DateTimeOffset Horizon => Now.AddHours(1);
-                public SiloAddress Silo { get; } = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5100), 0);
-                public CountingJournalStorageProvider Storage { get; } = new(delayAppends: false);
-                public ScriptedCatalog Catalog { get; }
-                public TestClusterMembershipService Membership { get; } = new();
-                public JournaledJobShardManager Manager { get; }
-
-                public async Task<JournalId> AddShardAsync(string name, DateTimeOffset start, SiloAddress? owner = null, bool poisoned = false)
-                {
-                    var id = new JobShardId(name).ToJournalId();
-                    var properties = new Dictionary<string, string>
-                    {
-                        ["DurableJobsMinDueTime"] = start.ToString("O"),
-                        ["DurableJobsMaxDueTime"] = start.AddHours(1).ToString("O"),
-                        ["DurableJobsPoisoned"] = poisoned.ToString(),
-                        ["DurableJobsClosed"] = bool.TrueString
-                    };
-                    if (owner is not null)
-                    {
-                        properties["DurableJobsOwner"] = owner.ToParsableString();
-                    }
-
-                    await Storage.CreateStorage(id).CreateIfNotExistsAsync(properties, TestContext.Current.CancellationToken);
-                    return id;
-                }
-
-                public async Task<List<IJobShard>> DiscoverAsync(int maxNewClaims = int.MaxValue, CancellationToken cancellationToken = default, DateTimeOffset? horizon = null)
-                {
-                    var result = await Manager.DiscoverJobShardsAsync(horizon ?? Horizon, maxNewClaims, cancellationToken == default ? TestContext.Current.CancellationToken : cancellationToken);
-                    _opened.UnionWith(result);
-                    return result;
-                }
-
-                public async Task<List<IJobShard>> AssignAsync()
-                {
-                    var result = await Manager.AssignJobShardsAsync(Horizon, 0, TestContext.Current.CancellationToken);
-                    _opened.UnionWith(result);
-                    return result;
-                }
-
-                public async ValueTask DisposeAsync()
-                {
-                    foreach (var shard in _opened)
-                    {
-                        await shard.DisposeAsync();
-                    }
-
-                    await _services.DisposeAsync();
-                }
-            }
-
-            private sealed class ScriptedCatalog(IJournalStorageCatalog legacy) : IJournalStorageCatalog, IPagedJournalStorageCatalog
-            {
-                public Func<string?, JournalStorageCatalogPage> ReadPage { get; set; } = _ => throw new InvalidOperationException("Configure the catalog pages.");
-                public List<string?> Tokens { get; } = [];
-                public int ListCalls { get; private set; }
-
-                public ValueTask<JournalStorageCatalogPage> ReadPageAsync(
-                    JournalId prefix, int pageSize, string? continuationToken = null, CancellationToken cancellationToken = default)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    Assert.Equal(JobShardId.StoragePrefix, prefix);
-                    Assert.Equal(JournaledJobShardManager.CatalogPageSize, pageSize);
-                    Tokens.Add(continuationToken);
-                    return ValueTask.FromResult(ReadPage(continuationToken));
-                }
-
-                public IAsyncEnumerable<JournalId> ListAsync(JournalId prefix = default, CancellationToken cancellationToken = default)
-                {
-                    ListCalls++;
-                    return legacy.ListAsync(prefix, cancellationToken);
-                }
-            }
-
             public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
                 => inner.ReplaceAsync(value, cancellationToken);
 
             public ValueTask DeleteAsync(CancellationToken cancellationToken)
                 => inner.DeleteAsync(cancellationToken);
+        }
+    }
+
+    private sealed class DiscoveryFixture : IAsyncDisposable
+    {
+        private readonly ServiceProvider _services;
+        private readonly HashSet<IJobShard> _opened = [];
+
+        public DiscoveryFixture()
+        {
+            Catalog = new ScriptedCatalog(Storage);
+            _services = CreateServices(Storage, catalog: Catalog);
+            Membership.SetSiloStatus(Silo, SiloStatus.Active);
+            Manager = CreateManager(_services, Membership, Silo);
+        }
+
+        public DateTimeOffset Now { get; } = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        public DateTimeOffset Horizon => Now.AddHours(1);
+        public SiloAddress Silo { get; } = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5100), 0);
+        public CountingJournalStorageProvider Storage { get; } = new(delayAppends: false);
+        public ScriptedCatalog Catalog { get; }
+        public TestClusterMembershipService Membership { get; } = new();
+        public JournaledJobShardManager Manager { get; }
+
+        public async Task<JournalId> AddShardAsync(string name, DateTimeOffset start, SiloAddress? owner = null, bool poisoned = false)
+        {
+            var id = new JobShardId(name).ToJournalId();
+            var properties = new Dictionary<string, string>
+            {
+                ["DurableJobsMinDueTime"] = start.ToString("O"),
+                ["DurableJobsMaxDueTime"] = start.AddHours(1).ToString("O"),
+                ["DurableJobsPoisoned"] = poisoned.ToString(),
+                ["DurableJobsClosed"] = bool.TrueString
+            };
+            if (owner is not null)
+            {
+                properties["DurableJobsOwner"] = owner.ToParsableString();
+            }
+
+            await Storage.CreateStorage(id).CreateIfNotExistsAsync(properties, TestContext.Current.CancellationToken);
+            return id;
+        }
+
+        public Task<List<IJobShard>> DiscoverAsync(int maxNewClaims = int.MaxValue, DateTimeOffset? horizon = null)
+            => DiscoverWithCancellationAsync(TestContext.Current.CancellationToken, maxNewClaims, horizon);
+
+        public async Task<List<IJobShard>> DiscoverWithCancellationAsync(CancellationToken cancellationToken, int maxNewClaims = int.MaxValue, DateTimeOffset? horizon = null)
+        {
+            var result = await Manager.DiscoverJobShardsAsync(horizon ?? Horizon, maxNewClaims, cancellationToken);
+            _opened.UnionWith(result);
+            return result;
+        }
+
+        public async Task<List<IJobShard>> AssignAsync()
+        {
+            var result = await Manager.AssignJobShardsAsync(Horizon, 0, TestContext.Current.CancellationToken);
+            _opened.UnionWith(result);
+            return result;
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            foreach (var shard in _opened)
+            {
+                await shard.DisposeAsync();
+            }
+
+            await _services.DisposeAsync();
+        }
+    }
+
+    private sealed class ScriptedCatalog(IJournalStorageCatalog legacy) : IJournalStorageCatalog, IPagedJournalStorageCatalog
+    {
+        public Func<string?, JournalStorageCatalogPage> ReadPage { get; set; } = _ => throw new InvalidOperationException("Configure the catalog pages.");
+        public List<string?> Tokens { get; } = [];
+        public int ListCalls { get; private set; }
+
+        public ValueTask<JournalStorageCatalogPage> ReadPageAsync(
+            JournalId prefix, int pageSize, string? continuationToken = null, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Assert.Equal(JobShardId.StoragePrefix, prefix);
+            Assert.Equal(JournaledJobShardManager.CatalogPageSize, pageSize);
+            Tokens.Add(continuationToken);
+            return ValueTask.FromResult(ReadPage(continuationToken));
+        }
+
+        public IAsyncEnumerable<JournalId> ListAsync(JournalId prefix = default, CancellationToken cancellationToken = default)
+        {
+            ListCalls++;
+            return legacy.ListAsync(prefix, cancellationToken);
         }
     }
 
