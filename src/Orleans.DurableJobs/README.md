@@ -124,7 +124,8 @@ the previous cursor, subject to the catalog's mutation-consistency guarantees. E
 delivery therefore depends on progressing storage operations and sweeps; scan duration
 contributes to discovery latency.
 
-Discovery retains at most one page of candidate identities. Claimed shards, locally created
+Discovery retains at most one page of candidate identities and one page of pending assignments.
+Claimed shards, locally created
 writable shards, and their loaded job state remain resident according to the existing shard
 lifecycle. Writable-shard cleanup runs at periodic or membership checks; its cost depends on
 the number of local writable shards. Metadata I/O remains O(total catalog shards) per sweep
@@ -139,7 +140,9 @@ sweep frequency relative to a ten-minute interval.
 Cancellation is checked between candidates and passed through catalog, metadata, and
 journal operations. Candidate failures propagate to the runtime's error reporting; the
 next turn resumes at the following identity, and the next sweep revisits the failed
-candidate. Page-read failures preserve the continuation for the next attempt. Shutdown
+candidate. Successful assignments preceding a failed candidate are delivered first on the
+next turn, so a persistently failing candidate allows earlier and later shards to progress.
+Page-read failures preserve the continuation for the next attempt. Shutdown
 cancels discovery through the silo lifetime token.
 
 Custom and legacy `IJournalStorageCatalog` implementations retain full-scan discovery.

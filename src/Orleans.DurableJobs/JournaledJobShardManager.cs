@@ -46,9 +46,12 @@ internal sealed class JournaledJobShardManager : JobShardManager
     private IReadOnlyList<JournalId>? _catalogPage;
     private int _catalogPageIndex;
     private string? _catalogContinuationToken;
+    private List<IJobShard>? _pendingAssignments;
 
     internal override bool HasMoreCatalogWork
-        => _catalogPage is { } page && _catalogPageIndex < page.Count || _catalogContinuationToken is not null;
+        => _pendingAssignments is { Count: > 0 }
+            || _catalogPage is { } page && _catalogPageIndex < page.Count
+            || _catalogContinuationToken is not null;
 
     public JournaledJobShardManager(
         ILocalSiloDetails localSiloDetails,
@@ -118,6 +121,14 @@ internal sealed class JournaledJobShardManager : JobShardManager
             return await AssignJobShardsAsync(maxDueTime, maxNewClaims, cancellationToken);
         }
 
+        // Deliver a successful prefix before resuming after a later candidate failed.
+        // Repeated failures then leave both earlier and later shards able to make progress.
+        if (_pendingAssignments is { Count: > 0 } pending)
+        {
+            _pendingAssignments = null;
+            return pending;
+        }
+
         if (_catalogPage is null || _catalogPageIndex == _catalogPage.Count)
         {
             // Read at most one page, including empty nonterminal pages. Only the catalog
@@ -128,7 +139,7 @@ internal sealed class JournaledJobShardManager : JobShardManager
             _catalogContinuationToken = page.ContinuationToken;
         }
 
-        var result = new List<IJobShard>();
+        var result = _pendingAssignments = new List<IJobShard>();
         var newClaimCount = 0;
         while (_catalogPageIndex < _catalogPage.Count)
         {
@@ -148,6 +159,7 @@ internal sealed class JournaledJobShardManager : JobShardManager
             }
         }
 
+        _pendingAssignments = null;
         return result;
     }
 
