@@ -112,6 +112,7 @@ namespace DefaultCluster.Tests.General
             var cancellationToken = TestContext.Current.CancellationToken;
             var client = _host.Services.GetRequiredService<IClusterClient>();
             var runtimeClient = _host.Services.GetRequiredService<IRuntimeClient>();
+            var runtimeClientTestAccessor = (IRuntimeClientTestAccessor)runtimeClient;
             var typeResolver = _host.Services.GetRequiredService<GrainInterfaceTypeResolver>();
 
             var stuckGrainType = typeResolver.GetGrainInterfaceType(typeof(IStuckGrain));
@@ -133,12 +134,12 @@ namespace DefaultCluster.Tests.General
                         })
                     .WaitAsync(maxTimeout, cancellationToken);
 
-                Assert.Equal(expected: 1, actual: runtimeClient.GetRunningRequestsCount(stuckGrainType));
+                Assert.Equal(expected: 1, actual: runtimeClientTestAccessor.GetRunningRequestCount(stuckGrainType));
 
                 await assertionTask;
                 stopwatch.Stop();
 
-                Assert.Equal(expected: 0, actual: runtimeClient.GetRunningRequestsCount(stuckGrainType));
+                Assert.Equal(expected: 0, actual: runtimeClientTestAccessor.GetRunningRequestCount(stuckGrainType));
 
                 Assert.True(stopwatch.Elapsed >= timeout, $"Waited less than {timeout}. Waited {stopwatch.Elapsed}");
                 Assert.True(stopwatch.Elapsed <= maxTimeout, $"Waited longer than {maxTimeout}. Waited {stopwatch.Elapsed}");
