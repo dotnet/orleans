@@ -160,6 +160,28 @@ public class LocalDurableJobManagerTests
     }
 
     [Fact]
+    public async Task Discovery_CancellationBeforeBatchDeliveryLeavesBatchInactive()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var shard = CreateSubstituteShard("canceled-batch", timeProvider.GetUtcNow(), timeProvider.GetUtcNow().AddHours(1));
+        var shardManager = new TestJobShardManager
+        {
+            DiscoverShards = (_, _, _) =>
+            {
+                cancellation.Cancel();
+                return Task.FromResult<List<IJobShard>>([shard]);
+            }
+        };
+        var manager = CreateManager(shardManager, timeProvider, CreateOptions());
+        var accessor = new LocalDurableJobManager.TestAccessor(manager);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => accessor.ProcessShardCheckCycleAsync(cancellation.Token));
+        Assert.False(accessor.HasCachedShard(shard.Id));
+        Assert.False(accessor.TryGetRunningShardTask(shard.Id, out _));
+    }
+
+    [Fact]
     public async Task Stop_WhenActiveShardWaitsForQueueChange_CompletesAfterCleanupWithoutLifecycleError()
     {
         var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));

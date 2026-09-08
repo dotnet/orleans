@@ -439,6 +439,7 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
         var budget = ComputeClaimBudget();
 
         var shards = await _shardManager.DiscoverJobShardsAsync(now.Add(ShardLoadLookaheadPeriod), budget, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
 
         // Count newly claimed shards (those not already in our cache)
         var newClaimsThisCycle = 0;
