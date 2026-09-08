@@ -85,7 +85,7 @@ namespace Orleans.Transactions.TestKit
                 {
                     try
                     {
-                        await producer;
+                        await producer.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
                     }
                     finally
                     {

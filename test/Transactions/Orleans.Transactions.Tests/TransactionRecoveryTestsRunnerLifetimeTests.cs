@@ -28,6 +28,19 @@ public class TransactionRecoveryTestsRunnerLifetimeTests
     }
 
     [Fact]
+    public async Task ProducerCancellationScope_FaultedProducerDoesNotThrowDuringDisposal()
+    {
+        var stopProducing = new CancellationTokenSource();
+        var scope = new TransactionRecoveryTestsRunner.ProducerCancellationScope(
+            stopProducing,
+            Task.FromException(new InvalidOperationException("boom")));
+
+        await scope.DisposeAsync();
+
+        Assert.Throws<ObjectDisposedException>(() => stopProducing.Token);
+    }
+
+    [Fact]
     public async Task ProducerCancellationScope_ActiveProducerIsAwaitedBeforeCancellationSourceDisposal()
     {
         var stopProducing = new CancellationTokenSource();
