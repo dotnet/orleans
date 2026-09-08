@@ -22,6 +22,8 @@ namespace Orleans.DurableJobs;
 internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobManager, ILocalDurableJobManagerSystemTarget, ILifecycleParticipant<ISiloLifecycle>
 {
     internal static readonly GrainType JobManagerGrainType = SystemTargetGrainId.CreateGrainType("job-manager");
+    private static readonly TimeSpan ShardLoadLookaheadPeriod = TimeSpan.FromMinutes(10);
+    private static readonly TimeSpan ShardCheckInterval = TimeSpan.FromMinutes(5);
 
     private readonly JobShardManager _shardManager;
     private readonly ShardExecutor _shardExecutor;
@@ -362,32 +364,43 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
     {
         await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding | ConfigureAwaitOptions.ContinueOnCapturedContext);
 
-        using var timer = new PeriodicTimer(TimeSpan.FromMinutes(10), _timeProvider);
+        using var timer = new PeriodicTimer(ShardCheckInterval, _timeProvider);
 
-        Task timerTask = Task.CompletedTask;
+        var timerTask = timer.WaitForNextTickAsync(_cts.Token).AsTask();
+        var signalTask = _shardCheckSignal.WaitAsync(_cts.Token);
         while (!_cts.Token.IsCancellationRequested)
         {
             try
             {
-                // Wait for either periodic timer OR signal from membership changes
-                if (timerTask.IsCompleted)
+                if (_shardManager.HasMoreCatalogWork && !timerTask.IsCompleted && !signalTask.IsCompleted)
+                {
+                    await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding | ConfigureAwaitOptions.ContinueOnCapturedContext);
+                    await ProcessShardDiscoveryAsync(_cts.Token);
+                    continue;
+                }
+
+                var completedTask = await Task.WhenAny(timerTask, signalTask);
+                await completedTask;
+                // Retain the other pending wait: it can complete during discovery.
+                if (ReferenceEquals(completedTask, timerTask))
                 {
                     timerTask = timer.WaitForNextTickAsync(_cts.Token).AsTask();
                 }
-
-                var signalTask = _shardCheckSignal.WaitAsync(_cts.Token);
-                await Task.WhenAny(timerTask, signalTask);
+                else
+                {
+                    signalTask = _shardCheckSignal.WaitAsync(_cts.Token);
+                }
 
                 await ProcessShardCheckCycleAsync(_cts.Token);
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (_cts.IsCancellationRequested)
             {
                 break;
             }
             catch (Exception ex)
             {
                 LogErrorInPeriodicCheck(_logger, ex);
-                await Task.Delay(TimeSpan.FromSeconds(5), _cts.Token).SuppressThrowing();
+                await Task.Delay(TimeSpan.FromSeconds(5), _timeProvider, _cts.Token).SuppressThrowing();
             }
         }
     }
@@ -415,11 +428,17 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
             }
         }
 
-        // Compute the slow-start budget for this cycle
+        await ProcessShardDiscoveryAsync(cancellationToken);
+    }
+
+    private async Task ProcessShardDiscoveryAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var now = _timeProvider.GetUtcNow();
+        // Compute the slow-start budget for this turn.
         var budget = ComputeClaimBudget();
 
-        // Query ShardManager for assigned shards (source of truth)
-        var shards = await _shardManager.AssignJobShardsAsync(now.AddHours(1), budget, cancellationToken);
+        var shards = await _shardManager.DiscoverJobShardsAsync(now.Add(ShardLoadLookaheadPeriod), budget, cancellationToken);
 
         // Count newly claimed shards (those not already in our cache)
         var newClaimsThisCycle = 0;
@@ -608,6 +627,8 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
 
     internal sealed class TestAccessor(LocalDurableJobManager manager)
     {
+        public void SignalShardCheck() => manager._shardCheckSignal.Release();
+
         public Task ProcessShardCheckCycleAsync(CancellationToken cancellationToken) => manager.ProcessShardCheckCycleAsync(cancellationToken);
 
         public void AddWritableShard(DateTimeOffset shardKey, IJobShard shard, int stripe = 0)

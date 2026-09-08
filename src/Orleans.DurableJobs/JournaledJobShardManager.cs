@@ -15,6 +15,7 @@ namespace Orleans.DurableJobs;
 
 internal sealed class JournaledJobShardManager : JobShardManager
 {
+    internal const int CatalogPageSize = 256;
     private const string OwnerProperty = "DurableJobsOwner";
     private const string MembershipVersionProperty = "DurableJobsMembershipVersion";
     private const string MinDueTimeProperty = "DurableJobsMinDueTime";
@@ -40,6 +41,14 @@ internal sealed class JournaledJobShardManager : JobShardManager
     // (via UnregisterShardAsync). Mis-cache from split-brain is bounded by storage-layer ETag
     // conflicts triggering InconsistentStateException → the journaling layer's recovery path.
     private readonly ConcurrentDictionary<string, bool> _ownedShards = new(StringComparer.Ordinal);
+    // The local manager serializes discovery turns. Tokens belong to the catalog prefix,
+    // independently of membership; each candidate uses the latest membership snapshot.
+    private IReadOnlyList<JournalId>? _catalogPage;
+    private int _catalogPageIndex;
+    private string? _catalogContinuationToken;
+
+    internal override bool HasMoreCatalogWork
+        => _catalogPage is { } page && _catalogPageIndex < page.Count || _catalogContinuationToken is not null;
 
     public JournaledJobShardManager(
         ILocalSiloDetails localSiloDetails,
@@ -83,65 +92,113 @@ internal sealed class JournaledJobShardManager : JobShardManager
     {
         var result = new List<IJobShard>();
         var newClaimCount = 0;
-        var membershipSnapshot = _membershipService.CurrentSnapshot;
-
         await foreach (var storageId in _catalog.ListAsync(new() { Prefix = JobShardId.StoragePrefix }, cancellationToken))
         {
-            var descriptor = await GetDescriptorAsync(storageId, cancellationToken);
-            if (descriptor is null || descriptor.Poisoned || descriptor.StartTime > maxDueTime)
+            var (shard, claimed) = await TryAssignShardAsync(storageId, maxDueTime, newClaimCount < maxNewClaims, cancellationToken);
+            if (shard is not null)
             {
-                continue;
+                result.Add(shard);
             }
 
-            if (descriptor.MembershipVersion > membershipSnapshot.Version)
+            if (claimed)
             {
-                // Refresh membership to at least that version.
-                await _membershipService.Refresh(descriptor.MembershipVersion, cancellationToken);
-                membershipSnapshot = _membershipService.CurrentSnapshot;
+                newClaimCount++;
             }
-
-            if (descriptor.Owner is { } owner && owner.Equals(SiloAddress))
-            {
-                result.Add(await GetOrOpenShardAsync(descriptor, cancellationToken));
-                continue;
-            }
-
-            // Determine if this is an adopted shard (taken from dead owner) vs orphaned (gracefully released).
-            var isAdopted = false;
-            if (descriptor.Owner is { } previousOwner)
-            {
-                var ownerStatus = membershipSnapshot.GetSiloStatus(previousOwner);
-                if (ownerStatus is not SiloStatus.Dead and not SiloStatus.None)
-                {
-                    // Owner is still active and it's not me, skip this shard.
-                    continue;
-                }
-
-                isAdopted = ownerStatus == SiloStatus.Dead;
-            }
-
-            // Respect the slow-start budget: skip claiming if we've exhausted the budget.
-            // This must be checked before incrementing the adopted count to avoid
-            // inflating the count when the shard isn't actually claimed.
-            if (newClaimCount >= maxNewClaims)
-            {
-                continue;
-            }
-
-            // Try to claim orphaned or adopted shard.
-            var claimedShard = await TryClaimShardAsync(descriptor, isAdopted, cancellationToken);
-            if (claimedShard is null)
-            {
-                // Either poisoned shard or someone else took ownership.
-                continue;
-            }
-
-            _jobShardCache[claimedShard.Id] = claimedShard;
-            result.Add(claimedShard);
-            newClaimCount++;
         }
 
         return result;
+    }
+
+    internal override async Task<List<IJobShard>> DiscoverJobShardsAsync(DateTimeOffset maxDueTime, int maxNewClaims, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (_catalog is not IPagedJournalStorageCatalog pagedCatalog)
+        {
+            // Legacy catalogs retain their full-scan assignment behavior.
+            return await AssignJobShardsAsync(maxDueTime, maxNewClaims, cancellationToken);
+        }
+
+        if (_catalogPage is null || _catalogPageIndex == _catalogPage.Count)
+        {
+            // Read at most one page, including empty nonterminal pages. Only the catalog
+            // interprets its token; a completed sweep restarts at the next periodic check.
+            var page = await pagedCatalog.ReadPageAsync(JobShardId.StoragePrefix, CatalogPageSize, _catalogContinuationToken, cancellationToken);
+            _catalogPage = page.JournalIds;
+            _catalogPageIndex = 0;
+            _catalogContinuationToken = page.ContinuationToken;
+        }
+
+        var result = new List<IJobShard>();
+        var newClaimCount = 0;
+        while (_catalogPageIndex < _catalogPage.Count)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            // Failed attempts surface to the caller and are revisited on the next sweep,
+            // allowing the remainder of this sweep to progress.
+            var storageId = _catalogPage[_catalogPageIndex++];
+            var (shard, claimed) = await TryAssignShardAsync(storageId, maxDueTime, newClaimCount < maxNewClaims, cancellationToken);
+            if (shard is not null)
+            {
+                result.Add(shard);
+            }
+
+            if (claimed)
+            {
+                newClaimCount++;
+            }
+        }
+
+        return result;
+    }
+
+    private async ValueTask<(IJobShard? Shard, bool Claimed)> TryAssignShardAsync(
+        JournalId storageId, DateTimeOffset maxDueTime, bool canClaim, CancellationToken cancellationToken)
+    {
+        var descriptor = await GetDescriptorAsync(storageId, cancellationToken);
+        if (descriptor is null || descriptor.Poisoned || descriptor.StartTime > maxDueTime)
+        {
+            return default;
+        }
+
+        var membershipSnapshot = _membershipService.CurrentSnapshot;
+        if (descriptor.MembershipVersion > membershipSnapshot.Version)
+        {
+            await _membershipService.Refresh(descriptor.MembershipVersion, cancellationToken);
+            membershipSnapshot = _membershipService.CurrentSnapshot;
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        if (descriptor.Owner is { } owner && owner.Equals(SiloAddress))
+        {
+            return (await GetOrOpenShardAsync(descriptor, cancellationToken), false);
+        }
+
+        var isAdopted = false;
+        if (descriptor.Owner is { } previousOwner)
+        {
+            var ownerStatus = membershipSnapshot.GetSiloStatus(previousOwner);
+            if (ownerStatus is not SiloStatus.Dead and not SiloStatus.None)
+            {
+                return default;
+            }
+
+            isAdopted = ownerStatus == SiloStatus.Dead;
+        }
+
+        // Exhausting the claim budget still advances discovery to later locally owned shards.
+        if (!canClaim)
+        {
+            return default;
+        }
+
+        var claimedShard = await TryClaimShardAsync(descriptor, isAdopted, cancellationToken);
+        if (claimedShard is null)
+        {
+            return default;
+        }
+
+        _jobShardCache[claimedShard.Id] = claimedShard;
+        return (claimedShard, true);
     }
 
     public override async Task<IJobShard> CreateShardAsync(DateTimeOffset minDueTime, DateTimeOffset maxDueTime, IDictionary<string, string> metadata, CancellationToken cancellationToken)

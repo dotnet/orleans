@@ -19,6 +19,11 @@ public abstract class JobShardManager
     /// </summary>
     protected SiloAddress SiloAddress { get; }
 
+    internal virtual bool HasMoreCatalogWork => false;
+
+    internal virtual Task<List<IJobShard>> DiscoverJobShardsAsync(DateTimeOffset maxDueTime, int maxNewClaims, CancellationToken cancellationToken)
+        => AssignJobShardsAsync(maxDueTime, maxNewClaims, cancellationToken);
+
     /// <summary>
     /// Initializes a new instance of the <see cref="JobShardManager"/> class.
     /// </summary>

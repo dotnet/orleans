@@ -101,6 +101,52 @@ builder.UseOrleans(siloBuilder =>
 });
 ```
 
+## Shard discovery and lookahead
+
+Each silo discovers shards whose start time is within ten minutes of its current Durable Jobs
+time-provider clock. A discovered shard starts processing once its start time enters
+`ShardActivationBufferPeriod`. Periodic checks run every five minutes, and membership changes
+also trigger checks.
+
+For catalogs implementing `IPagedJournalStorageCatalog`, runtime discovery advances through
+an opaque, prefix-scoped continuation. Each discovery turn reads at most one catalog page
+and evaluates at most 256 identities, fetching metadata once per evaluated identity.
+Empty nonterminal pages and every visited identity consume this budget, including
+far-future shards, live-owner shards, duplicates, and candidates skipped by the shard-claim
+budget. Each eligible candidate can perform one conditional ownership metadata update and
+open its journal. Journal replay cost depends on the contents of that shard.
+
+The runtime yields between continuation turns. Membership changes preserve scan progress;
+ownership decisions use current membership and conditional storage updates. A completed
+sweep waits for the next periodic or membership check before starting again. Repeated
+complete sweeps revisit future shards as time advances and observe entries inserted behind
+the previous cursor, subject to the catalog's mutation-consistency guarantees. Eventual
+delivery therefore depends on progressing storage operations and sweeps; scan duration
+contributes to discovery latency.
+
+Discovery retains at most one page of candidate identities. Claimed shards, locally created
+writable shards, and their loaded job state remain resident according to the existing shard
+lifecycle. Writable-shard cleanup runs at periodic or membership checks; its cost depends on
+the number of local writable shards. Metadata I/O remains O(total catalog shards) per sweep
+because shard identifiers are random and due times and owners are stored in metadata.
+The `jobs/shards` prefix selects shard journals; time and ownership filtering uses metadata.
+Underlying listing I/O depends on the provider's prefix support: providers which filter
+logical prefixes after listing can traverse all journal headers or bucket objects.
+The shorter lookahead
+reduces early loading of recovered shards, while the five-minute polling interval increases
+sweep frequency relative to a ten-minute interval.
+
+Cancellation is checked between candidates and passed through catalog, metadata, and
+journal operations. Candidate failures propagate to the runtime's error reporting; the
+next turn resumes at the following identity, and the next sweep revisits the failed
+candidate. Page-read failures preserve the continuation for the next attempt. Shutdown
+cancels discovery through the silo lifetime token.
+
+Custom and legacy `IJournalStorageCatalog` implementations retain full-scan discovery.
+Their listing and metadata work per call scales with the catalog size. The public
+`JobShardManager.AssignJobShardsAsync` API also retains its full-result behavior; bounded
+runtime turns use the optional paging capability.
+
 ## Usage Examples
 
 ### Basic Job Scheduling

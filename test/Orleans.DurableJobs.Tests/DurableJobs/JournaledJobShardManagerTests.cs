@@ -24,6 +24,272 @@ namespace Tester.DurableJobs;
 public partial class JournaledJobShardManagerTests
 {
     [Fact]
+    public async Task Discovery_BoundsMostlyIneligibleIdentitiesAndResumes()
+    {
+        await using var fixture = new DiscoveryFixture();
+        var other = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5101), 0);
+        fixture.Membership.SetSiloStatus(other, SiloStatus.Active);
+        var identities = new List<JournalId>();
+        for (var i = 0; i < JournaledJobShardManager.CatalogPageSize; i++)
+        {
+            if (i % 4 == 3)
+            {
+                identities.Add(new JobShardId($"missing-{i}").ToJournalId());
+                continue;
+            }
+
+            identities.Add(await fixture.AddShardAsync(
+                $"skip-{i}", i % 4 == 0 ? fixture.Horizon.AddTicks(1) : fixture.Now,
+                owner: other, poisoned: i % 4 == 1));
+        }
+
+        var due = await fixture.AddShardAsync("due", fixture.Now);
+        fixture.Catalog.ReadPage = token => token is null
+            ? new() { JournalIds = identities, ContinuationToken = "tail" }
+            : new() { JournalIds = [due] };
+
+        Assert.Empty(await fixture.DiscoverAsync());
+        Assert.Equal(JournaledJobShardManager.CatalogPageSize, fixture.Storage.MetadataReads.Count);
+        Assert.Equal(new string?[] { null }, fixture.Catalog.Tokens);
+        Assert.True(fixture.Manager.HasMoreCatalogWork);
+
+        Assert.Equal("due", Assert.Single(await fixture.DiscoverAsync()).Id);
+        Assert.Equal(identities.Append(due), fixture.Storage.MetadataReads);
+        Assert.Equal(new string?[] { null, "tail" }, fixture.Catalog.Tokens);
+        Assert.False(fixture.Manager.HasMoreCatalogWork);
+        Assert.Equal(0, fixture.Catalog.ListCalls);
+    }
+
+    [Fact]
+    public async Task Discovery_EmptyNonterminalPagesEachConsumeATurn()
+    {
+        await using var fixture = new DiscoveryFixture();
+        var due = await fixture.AddShardAsync("due", fixture.Now);
+        fixture.Catalog.ReadPage = token => token switch
+        {
+            null => new() { JournalIds = [], ContinuationToken = "empty" },
+            "empty" => new() { JournalIds = [], ContinuationToken = "due" },
+            _ => new() { JournalIds = [due] }
+        };
+
+        Assert.Empty(await fixture.DiscoverAsync());
+        Assert.Single(fixture.Catalog.Tokens);
+        Assert.True(fixture.Manager.HasMoreCatalogWork);
+        Assert.Empty(await fixture.DiscoverAsync());
+        Assert.Equal(2, fixture.Catalog.Tokens.Count);
+        Assert.Empty(fixture.Storage.MetadataReads);
+        Assert.True(fixture.Manager.HasMoreCatalogWork);
+        Assert.Equal("due", Assert.Single(await fixture.DiscoverAsync()).Id);
+        Assert.Equal(new string?[] { null, "empty", "due" }, fixture.Catalog.Tokens);
+        Assert.False(fixture.Manager.HasMoreCatalogWork);
+    }
+
+    [Fact]
+    public async Task Discovery_ClaimBudgetExhaustionStillVisitsLocalShardsAndCompletesSweep()
+    {
+        await using var fixture = new DiscoveryFixture();
+        var orphan = await fixture.AddShardAsync("orphan", fixture.Now);
+        var local = await fixture.AddShardAsync("local", fixture.Now, fixture.Silo);
+        fixture.Catalog.ReadPage = _ => new() { JournalIds = [orphan, local] };
+
+        Assert.Equal("local", Assert.Single(await fixture.DiscoverAsync(maxNewClaims: 0)).Id);
+        Assert.Equal(new[] { orphan, local }, fixture.Storage.MetadataReads);
+        Assert.False(fixture.Manager.HasMoreCatalogWork);
+        Assert.Equal(new[] { "orphan", "local" }, (await fixture.DiscoverAsync(maxNewClaims: 1)).Select(shard => shard.Id));
+        Assert.Equal(new string?[] { null, null }, fixture.Catalog.Tokens);
+    }
+
+    [Fact]
+    public async Task Discovery_MetadataFailureSurfacesAndNextTurnContinuesBeforeRetryingNextSweep()
+    {
+        await using var fixture = new DiscoveryFixture();
+        var failing = await fixture.AddShardAsync("failing", fixture.Now);
+        var next = await fixture.AddShardAsync("next", fixture.Now);
+        fixture.Catalog.ReadPage = _ => new() { JournalIds = [failing, next] };
+        var failure = new InvalidOperationException("Metadata unavailable");
+        fixture.Storage.BeforeMetadataRead = (id, _) => id == failing ? throw failure : ValueTask.CompletedTask;
+
+        Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.DiscoverAsync()));
+        Assert.True(fixture.Manager.HasMoreCatalogWork);
+        Assert.Equal("next", Assert.Single(await fixture.DiscoverAsync()).Id);
+        Assert.Single(fixture.Catalog.Tokens);
+        Assert.False(fixture.Manager.HasMoreCatalogWork);
+
+        fixture.Storage.BeforeMetadataRead = null;
+        Assert.Equal(new[] { "failing", "next" }, (await fixture.DiscoverAsync()).Select(shard => shard.Id));
+        Assert.Equal(new[] { failing, next, failing, next }, fixture.Storage.MetadataReads);
+        Assert.Equal(new string?[] { null, null }, fixture.Catalog.Tokens);
+    }
+
+    [Fact]
+    public async Task Discovery_CancellationBetweenCandidatesRetainsRemainingPage()
+    {
+        await using var fixture = new DiscoveryFixture();
+        var first = await fixture.AddShardAsync("first", fixture.Now);
+        var second = await fixture.AddShardAsync("second", fixture.Now);
+        fixture.Catalog.ReadPage = _ => new() { JournalIds = [first, second] };
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => fixture.DiscoverAsync(cancellationToken: cancellation.Token));
+        Assert.Empty(fixture.Catalog.Tokens);
+
+        using var midPageCancellation = new CancellationTokenSource();
+        fixture.Storage.BeforeMetadataRead = (_, token) =>
+        {
+            midPageCancellation.Cancel();
+            token.ThrowIfCancellationRequested();
+            return ValueTask.CompletedTask;
+        };
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => fixture.DiscoverAsync(cancellationToken: midPageCancellation.Token));
+        Assert.Equal(new[] { first }, fixture.Storage.MetadataReads);
+        Assert.True(fixture.Manager.HasMoreCatalogWork);
+        fixture.Storage.BeforeMetadataRead = null;
+        Assert.Equal("second", Assert.Single(await fixture.DiscoverAsync()).Id);
+        Assert.Single(fixture.Catalog.Tokens);
+        Assert.Equal(new[] { "first", "second" }, (await fixture.DiscoverAsync()).Select(shard => shard.Id));
+    }
+
+    [Fact]
+    public async Task Discovery_FailureAfterClaimRediscoversClaimedShardOnNextSweep()
+    {
+        await using var fixture = new DiscoveryFixture();
+        var claimed = await fixture.AddShardAsync("claimed", fixture.Now);
+        var failing = await fixture.AddShardAsync("failing", fixture.Now);
+        var tail = await fixture.AddShardAsync("tail", fixture.Now);
+        fixture.Catalog.ReadPage = _ => new() { JournalIds = [claimed, failing, tail] };
+        fixture.Storage.BeforeMetadataRead = (id, _) => id == failing
+            ? throw new InvalidOperationException("Metadata unavailable")
+            : ValueTask.CompletedTask;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.DiscoverAsync());
+        Assert.Equal("tail", Assert.Single(await fixture.DiscoverAsync()).Id);
+        fixture.Storage.BeforeMetadataRead = null;
+        Assert.Equal(new[] { "claimed", "tail" }, (await fixture.DiscoverAsync(maxNewClaims: 0)).Select(shard => shard.Id));
+        Assert.Equal(new[] { claimed, failing, tail, claimed, failing, tail }, fixture.Storage.MetadataReads);
+        Assert.False(fixture.Manager.HasMoreCatalogWork);
+    }
+
+    [Fact]
+    public async Task Discovery_PageReadFailurePreservesOpaqueContinuation()
+    {
+        await using var fixture = new DiscoveryFixture();
+        var due = await fixture.AddShardAsync("due", fixture.Now);
+        var fail = true;
+        fixture.Catalog.ReadPage = token => token is null
+            ? new() { JournalIds = [], ContinuationToken = "opaque:next" }
+            : fail ? throw new OperationCanceledException() : new() { JournalIds = [due] };
+
+        Assert.Empty(await fixture.DiscoverAsync());
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => fixture.DiscoverAsync());
+        Assert.True(fixture.Manager.HasMoreCatalogWork);
+        fail = false;
+        Assert.Equal("due", Assert.Single(await fixture.DiscoverAsync()).Id);
+        Assert.Equal(new string?[] { null, "opaque:next", "opaque:next" }, fixture.Catalog.Tokens);
+    }
+
+    [Fact]
+    public async Task Discovery_MembershipChangesPreserveCursorAndUseCurrentOwnerStatus()
+    {
+        await using var fixture = new DiscoveryFixture();
+        var owner = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5101), 0);
+        fixture.Membership.SetSiloStatus(owner, SiloStatus.Dead);
+        var first = await fixture.AddShardAsync("first", fixture.Now, owner);
+        var second = await fixture.AddShardAsync("second", fixture.Now, owner);
+        fixture.Catalog.ReadPage = token => token is null
+            ? new() { JournalIds = [first], ContinuationToken = "second" }
+            : new() { JournalIds = [second] };
+        fixture.Storage.BeforeMetadataRead = (_, _) =>
+        {
+            fixture.Membership.SetSiloStatus(owner, SiloStatus.Active);
+            return ValueTask.CompletedTask;
+        };
+
+        Assert.Empty(await fixture.DiscoverAsync());
+        fixture.Storage.BeforeMetadataRead = null;
+        fixture.Membership.SetSiloStatus(owner, SiloStatus.Dead);
+        Assert.Equal("second", Assert.Single(await fixture.DiscoverAsync()).Id);
+        Assert.Equal(new string?[] { null, "second" }, fixture.Catalog.Tokens);
+        Assert.Equal("first", Assert.Single(await fixture.DiscoverAsync()).Id);
+        var metadata = await fixture.Storage.CreateStorage(second).GetMetadataAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(fixture.Silo.ToParsableString(), metadata!.Properties["DurableJobsOwner"]);
+        Assert.Equal("1", metadata.Properties["DurableJobsAdoptedCount"]);
+    }
+
+    [Fact]
+    public async Task Discovery_NewSweepObservesInsertionBehindCursorAndFutureEligibility()
+    {
+        await using var fixture = new DiscoveryFixture();
+        var future = await fixture.AddShardAsync("future", fixture.Horizon.AddMinutes(1));
+        var tail = await fixture.AddShardAsync("tail", fixture.Now);
+        JournalId? inserted = null;
+        fixture.Catalog.ReadPage = token => token is null
+            ? new() { JournalIds = inserted is { } id ? [id, future] : [future], ContinuationToken = "tail" }
+            : new() { JournalIds = [tail] };
+
+        Assert.Empty(await fixture.DiscoverAsync());
+        inserted = await fixture.AddShardAsync("behind", fixture.Now);
+        Assert.Equal("tail", Assert.Single(await fixture.DiscoverAsync()).Id);
+        Assert.False(fixture.Manager.HasMoreCatalogWork);
+        Assert.Equal(new[] { "behind", "future" }, (await fixture.DiscoverAsync(
+            horizon: fixture.Horizon.AddMinutes(1))).Select(shard => shard.Id));
+        Assert.Equal(new string?[] { null, "tail", null }, fixture.Catalog.Tokens);
+    }
+
+    [Fact]
+    public async Task Discovery_DuplicateIdentitiesConsumeBudgetAndReuseLocalShard()
+    {
+        await using var fixture = new DiscoveryFixture();
+        var due = await fixture.AddShardAsync("due", fixture.Now);
+        fixture.Catalog.ReadPage = _ => new() { JournalIds = [due, due] };
+
+        var result = await fixture.DiscoverAsync(maxNewClaims: 1);
+        Assert.Equal(2, result.Count);
+        Assert.Same(result[0], result[1]);
+        Assert.Equal(new[] { due, due }, fixture.Storage.MetadataReads);
+        Assert.False(fixture.Manager.HasMoreCatalogWork);
+    }
+
+    [Fact]
+    public async Task Discovery_LegacyCatalogRetainsFullAssignment()
+    {
+        var storage = new CountingJournalStorageProvider(delayAppends: false);
+        using var services = CreateServices(storage);
+        var membership = new TestClusterMembershipService();
+        var silo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5100), 0);
+        membership.SetSiloStatus(silo, SiloStatus.Active);
+        var manager = CreateManager(services, membership, silo);
+        var now = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        await storage.CreateStorage(new JobShardId("legacy").ToJournalId()).CreateIfNotExistsAsync(
+            new Dictionary<string, string>
+            {
+                ["DurableJobsMinDueTime"] = now.ToString("O"),
+                ["DurableJobsMaxDueTime"] = now.AddHours(1).ToString("O")
+            }, TestContext.Current.CancellationToken);
+
+        await using var shard = Assert.Single(await manager.DiscoverJobShardsAsync(now, 1, TestContext.Current.CancellationToken));
+        Assert.Equal("legacy", shard.Id);
+        Assert.False(manager.HasMoreCatalogWork);
+    }
+
+    [Fact]
+    public async Task Assignment_PublicFullScanRemainsIndependentOfRuntimeCursor()
+    {
+        await using var fixture = new DiscoveryFixture();
+        var first = await fixture.AddShardAsync("first", fixture.Now, fixture.Silo);
+        var second = await fixture.AddShardAsync("second", fixture.Now, fixture.Silo);
+        fixture.Catalog.ReadPage = token => token is null
+            ? new() { JournalIds = [first], ContinuationToken = "second" }
+            : new() { JournalIds = [second] };
+
+        Assert.Equal("first", Assert.Single(await fixture.DiscoverAsync()).Id);
+        var full = await fixture.AssignAsync();
+        Assert.Equal(new[] { "first", "second" }, full.Select(shard => shard.Id).Order());
+        Assert.Equal(1, fixture.Catalog.ListCalls);
+        Assert.Equal("second", Assert.Single(await fixture.DiscoverAsync()).Id);
+        Assert.Equal(new string?[] { null, "second" }, fixture.Catalog.Tokens);
+    }
+
+    [Fact]
     public async Task ReleasedShard_IsClaimedClosedAndReplayedFromJournal()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -567,7 +833,7 @@ public partial class JournaledJobShardManagerTests
         }
     }
 
-    private static ServiceProvider CreateServices(IJournalStorageProvider storageProvider, TimeProvider? timeProvider = null)
+    private static ServiceProvider CreateServices(IJournalStorageProvider storageProvider, TimeProvider? timeProvider = null, IJournalStorageCatalog? catalog = null)
     {
         var builder = new TestSiloBuilder();
         builder.AddJournalStorage();
@@ -576,7 +842,7 @@ public partial class JournaledJobShardManagerTests
         builder.Services.AddSingleton(timeProvider ?? TimeProvider.System);
         builder.Services.AddKeyedSingleton<TimeProvider>(KeyedService.AnyKey, static (sp, _) => sp.GetRequiredService<TimeProvider>());
         builder.Services.AddSingleton<IJournalStorageProvider>(storageProvider);
-        builder.Services.AddSingleton((IJournalStorageCatalog)storageProvider);
+        builder.Services.AddSingleton(catalog ?? (IJournalStorageCatalog)storageProvider);
         return builder.Services.BuildServiceProvider();
     }
 
@@ -597,6 +863,8 @@ public partial class JournaledJobShardManagerTests
 
     private sealed class CountingJournalStorageProvider : IJournalStorageProvider, IJournalStorageCatalog
     {
+        public ConcurrentQueue<JournalId> MetadataReads { get; } = new();
+        public Func<JournalId, CancellationToken, ValueTask>? BeforeMetadataRead { get; set; }
         private readonly VolatileJournalStorageProvider _inner = new();
         private readonly Func<CancellationToken, ValueTask>? _onAppend;
         private readonly object _appendGate = new();
@@ -643,7 +911,7 @@ public partial class JournaledJobShardManagerTests
             }
         }
 
-        public IJournalStorage CreateStorage(JournalId journalId) => new CountingJournalStorage(this, _inner.CreateStorage(journalId));
+        public IJournalStorage CreateStorage(JournalId journalId) => new CountingJournalStorage(this, journalId, _inner.CreateStorage(journalId));
 
         public IAsyncEnumerable<JournalId> ListAsync(ListOptions? options = null, CancellationToken cancellationToken = default)
             => _inner.ListAsync(options, cancellationToken);
@@ -669,15 +937,23 @@ public partial class JournaledJobShardManagerTests
             }
         }
 
-        private sealed class CountingJournalStorage(CountingJournalStorageProvider owner, IJournalStorage inner) : IJournalStorage
+        private sealed class CountingJournalStorage(CountingJournalStorageProvider owner, JournalId journalId, IJournalStorage inner) : IJournalStorage
         {
             public bool IsCompactionRequested => inner.IsCompactionRequested;
 
             public ValueTask<bool> CreateIfNotExistsAsync(IReadOnlyDictionary<string, string>? metadata = null, CancellationToken cancellationToken = default)
                 => inner.CreateIfNotExistsAsync(metadata, cancellationToken);
 
-            public ValueTask<IJournalMetadata?> GetMetadataAsync(CancellationToken cancellationToken = default)
-                => inner.GetMetadataAsync(cancellationToken);
+            public async ValueTask<IJournalMetadata?> GetMetadataAsync(CancellationToken cancellationToken = default)
+            {
+                owner.MetadataReads.Enqueue(journalId);
+                if (owner.BeforeMetadataRead is { } beforeRead)
+                {
+                    await beforeRead(journalId, cancellationToken);
+                }
+
+                return await inner.GetMetadataAsync(cancellationToken);
+            }
 
             public ValueTask<IJournalMetadata?> UpdateMetadataAsync(
                 IReadOnlyDictionary<string, string>? set = null,
@@ -693,6 +969,94 @@ public partial class JournaledJobShardManagerTests
             {
                 await owner.OnAppendAsync(cancellationToken).ConfigureAwait(false);
                 await inner.AppendAsync(value, cancellationToken).ConfigureAwait(false);
+            }
+
+            private sealed class DiscoveryFixture : IAsyncDisposable
+            {
+                private readonly ServiceProvider _services;
+                private readonly HashSet<IJobShard> _opened = [];
+
+                public DiscoveryFixture()
+                {
+                    Catalog = new ScriptedCatalog(Storage);
+                    _services = CreateServices(Storage, catalog: Catalog);
+                    Membership.SetSiloStatus(Silo, SiloStatus.Active);
+                    Manager = CreateManager(_services, Membership, Silo);
+                }
+
+                public DateTimeOffset Now { get; } = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+                public DateTimeOffset Horizon => Now.AddHours(1);
+                public SiloAddress Silo { get; } = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5100), 0);
+                public CountingJournalStorageProvider Storage { get; } = new(delayAppends: false);
+                public ScriptedCatalog Catalog { get; }
+                public TestClusterMembershipService Membership { get; } = new();
+                public JournaledJobShardManager Manager { get; }
+
+                public async Task<JournalId> AddShardAsync(string name, DateTimeOffset start, SiloAddress? owner = null, bool poisoned = false)
+                {
+                    var id = new JobShardId(name).ToJournalId();
+                    var properties = new Dictionary<string, string>
+                    {
+                        ["DurableJobsMinDueTime"] = start.ToString("O"),
+                        ["DurableJobsMaxDueTime"] = start.AddHours(1).ToString("O"),
+                        ["DurableJobsPoisoned"] = poisoned.ToString(),
+                        ["DurableJobsClosed"] = bool.TrueString
+                    };
+                    if (owner is not null)
+                    {
+                        properties["DurableJobsOwner"] = owner.ToParsableString();
+                    }
+
+                    await Storage.CreateStorage(id).CreateIfNotExistsAsync(properties, TestContext.Current.CancellationToken);
+                    return id;
+                }
+
+                public async Task<List<IJobShard>> DiscoverAsync(int maxNewClaims = int.MaxValue, CancellationToken cancellationToken = default, DateTimeOffset? horizon = null)
+                {
+                    var result = await Manager.DiscoverJobShardsAsync(horizon ?? Horizon, maxNewClaims, cancellationToken == default ? TestContext.Current.CancellationToken : cancellationToken);
+                    _opened.UnionWith(result);
+                    return result;
+                }
+
+                public async Task<List<IJobShard>> AssignAsync()
+                {
+                    var result = await Manager.AssignJobShardsAsync(Horizon, 0, TestContext.Current.CancellationToken);
+                    _opened.UnionWith(result);
+                    return result;
+                }
+
+                public async ValueTask DisposeAsync()
+                {
+                    foreach (var shard in _opened)
+                    {
+                        await shard.DisposeAsync();
+                    }
+
+                    await _services.DisposeAsync();
+                }
+            }
+
+            private sealed class ScriptedCatalog(IJournalStorageCatalog legacy) : IJournalStorageCatalog, IPagedJournalStorageCatalog
+            {
+                public Func<string?, JournalStorageCatalogPage> ReadPage { get; set; } = _ => throw new InvalidOperationException("Configure the catalog pages.");
+                public List<string?> Tokens { get; } = [];
+                public int ListCalls { get; private set; }
+
+                public ValueTask<JournalStorageCatalogPage> ReadPageAsync(
+                    JournalId prefix, int pageSize, string? continuationToken = null, CancellationToken cancellationToken = default)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    Assert.Equal(JobShardId.StoragePrefix, prefix);
+                    Assert.Equal(JournaledJobShardManager.CatalogPageSize, pageSize);
+                    Tokens.Add(continuationToken);
+                    return ValueTask.FromResult(ReadPage(continuationToken));
+                }
+
+                public IAsyncEnumerable<JournalId> ListAsync(JournalId prefix = default, CancellationToken cancellationToken = default)
+                {
+                    ListCalls++;
+                    return legacy.ListAsync(prefix, cancellationToken);
+                }
             }
 
             public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
