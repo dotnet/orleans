@@ -20,6 +20,15 @@ public class SqlServerStorageForTestingTests
         Assert.Equal(expected, SqlServerStorageForTesting.IsRetryableDatabaseResetError(errorNumber));
     }
 
+    [Theory]
+    [InlineData(924, true)]
+    [InlineData(1205, false)]
+    [InlineData(18456, false)]
+    public void ClassifiesRetryableDatabaseSetupErrors(int errorNumber, bool expected)
+    {
+        Assert.Equal(expected, SqlServerStorageForTesting.IsRetryableDatabaseSetupError(errorNumber));
+    }
+
     [Fact]
     public async Task RecreatesDatabaseWithActivePooledConnection()
     {

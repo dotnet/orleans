@@ -8,6 +8,7 @@ namespace UnitTests.General
     public class SqlServerStorageForTesting : RelationalStorageForTesting
     {
         private const int DeadlockVictimError = 1205;
+        private const int DatabaseAlreadyOpenError = 924;
         private const int DatabaseInUseError = 3702;
 
         protected override string ProviderMoniker => "SQLServer";
@@ -62,34 +63,25 @@ namespace UnitTests.General
             string databaseName,
             CancellationToken cancellationToken)
         {
-            var connectionStringBuilder = new SqlConnectionStringBuilder(CurrentConnectionString)
-            {
-                Pooling = false,
-                ConnectTimeout = 5
-            };
-
-            await using var connection = new SqlConnection(connectionStringBuilder.ConnectionString);
-            await OpenConnectionAsync(connection, cancellationToken);
-
-            using var commandBuilder = new SqlCommandBuilder();
-            var quotedDatabaseName = commandBuilder.QuoteIdentifier(databaseName);
-            using var scriptEnumerator = scripts.GetEnumerator();
-            if (!scriptEnumerator.MoveNext())
+            var scriptBatches = scripts.ToArray();
+            if (scriptBatches.Length == 0)
             {
                 return;
             }
 
+            using var commandBuilder = new SqlCommandBuilder();
+            var quotedDatabaseName = commandBuilder.QuoteIdentifier(databaseName);
             var setupSucceeded = false;
+            await using var connection = await AcquireSetupConnectionAsync(
+                scriptBatches[0],
+                quotedDatabaseName,
+                databaseName,
+                cancellationToken);
             try
             {
-                await ExecuteCommandAsync(
-                    connection,
-                    $"ALTER DATABASE {quotedDatabaseName} SET SINGLE_USER WITH ROLLBACK IMMEDIATE;\n{scriptEnumerator.Current}",
-                    cancellationToken);
-
-                while (scriptEnumerator.MoveNext())
+                for (var i = 1; i < scriptBatches.Length; i++)
                 {
-                    await ExecuteCommandAsync(connection, scriptEnumerator.Current, cancellationToken);
+                    await ExecuteCommandAsync(connection, scriptBatches[i], cancellationToken);
                 }
 
                 setupSucceeded = true;
@@ -99,10 +91,7 @@ namespace UnitTests.General
                 using var cleanupCancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
                 try
                 {
-                    await ExecuteCommandAsync(
-                        connection,
-                        $"ALTER DATABASE {quotedDatabaseName} SET MULTI_USER;",
-                        cleanupCancellation.Token);
+                    await RestoreMultiUserAsync(connection, quotedDatabaseName, cleanupCancellation.Token);
                 }
                 catch when (!setupSucceeded)
                 {
@@ -113,6 +102,72 @@ namespace UnitTests.General
                 SqlConnection.ClearPool(pooledConnection);
             }
         }
+
+        private async Task<SqlConnection> AcquireSetupConnectionAsync(
+            string firstScript,
+            string quotedDatabaseName,
+            string databaseName,
+            CancellationToken cancellationToken)
+        {
+            const int maxAttempts = 3;
+            var connectionStringBuilder = new SqlConnectionStringBuilder(CurrentConnectionString)
+            {
+                Pooling = false,
+                ConnectTimeout = 5
+            };
+
+            for (var attempt = 1; ; attempt++)
+            {
+                var connection = new SqlConnection(connectionStringBuilder.ConnectionString);
+                var acquired = false;
+                try
+                {
+                    await OpenConnectionAsync(connection, cancellationToken);
+                    await ExecuteCommandAsync(
+                        connection,
+                        $"ALTER DATABASE {quotedDatabaseName} SET SINGLE_USER WITH ROLLBACK IMMEDIATE;\n{firstScript}",
+                        cancellationToken);
+                    acquired = true;
+                    return connection;
+                }
+                catch (SqlException exception) when (IsRetryableDatabaseSetupError(exception.Number) && attempt < maxAttempts)
+                {
+                    Console.WriteLine(
+                        "SQL Server database '{0}' setup failed with transient error {1} on attempt {2}; retrying.",
+                        databaseName,
+                        exception.Number,
+                        attempt);
+                }
+                finally
+                {
+                    if (!acquired)
+                    {
+                        using var cleanupCancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                        try
+                        {
+                            await RestoreMultiUserAsync(connection, quotedDatabaseName, cleanupCancellation.Token);
+                        }
+                        catch
+                        {
+                            // Preserve the setup failure instead of replacing it with a cleanup failure.
+                        }
+
+                        await connection.DisposeAsync();
+                        using var pooledConnection = new SqlConnection(CurrentConnectionString);
+                        SqlConnection.ClearPool(pooledConnection);
+                    }
+                }
+            }
+        }
+
+        private static Task RestoreMultiUserAsync(
+            SqlConnection connection,
+            string quotedDatabaseName,
+            CancellationToken cancellationToken) =>
+            ExecuteCommandAsync(
+                connection,
+                $"ALTER DATABASE {quotedDatabaseName} SET MULTI_USER WITH ROLLBACK IMMEDIATE;",
+                cancellationToken);
 
         private static async Task OpenConnectionAsync(SqlConnection connection, CancellationToken cancellationToken)
         {
@@ -197,6 +252,9 @@ namespace UnitTests.General
 
         internal static bool IsRetryableDatabaseResetError(int errorNumber) =>
             errorNumber is DeadlockVictimError or DatabaseInUseError;
+
+        internal static bool IsRetryableDatabaseSetupError(int errorNumber) =>
+            errorNumber is DatabaseAlreadyOpenError;
 
         protected override string ExistsDatabaseTemplate
         {
