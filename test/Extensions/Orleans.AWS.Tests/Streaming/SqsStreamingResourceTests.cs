@@ -292,6 +292,23 @@ public sealed class SqsStreamingResourceTests
     }
 
     [Fact]
+    public void AddSqsStreaming_ProviderNameWithDoubleUnderscore_ThrowsActionableError()
+    {
+        var builder = CreateBuilder();
+        var aws = builder.AddAWSSDKConfig().WithRegion(RegionEndpoint.USEast1);
+        var orleans = builder.AddOrleans("cluster").WithDevelopmentClustering();
+
+        var exception = Assert.Throws<ArgumentException>(
+            () => orleans.AddSqsStreaming(
+                "orders__priority",
+                aws,
+                new SqsStreamingOptions { ServiceId = ServiceId }));
+
+        Assert.Equal("name", exception.ParamName);
+        Assert.Contains("configuration path segment", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void AddSqsStreaming_OverlongGeneratedQueueName_ThrowsActionableError()
     {
         var builder = CreateBuilder();
@@ -348,6 +365,25 @@ public sealed class SqsStreamingResourceTests
         Assert.Contains("conflicts with Orleans ServiceId", exception.Message, StringComparison.Ordinal);
         Assert.Contains("orders-service", exception.Message, StringComparison.Ordinal);
         Assert.Contains("billing-service", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AddSqsStreaming_ParameterizedServiceId_ThrowsBeforeReplacingIt()
+    {
+        var builder = CreateBuilder();
+        var aws = builder.AddAWSSDKConfig().WithRegion(RegionEndpoint.USEast1);
+        var serviceId = builder.AddParameter("service-id");
+        var orleans = builder.AddOrleans("cluster")
+            .WithDevelopmentClustering()
+            .WithServiceId(serviceId);
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => orleans.AddSqsStreaming(
+                ProviderName,
+                aws,
+                new SqsStreamingOptions { ServiceId = ServiceId }));
+
+        Assert.Contains("concrete string", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]

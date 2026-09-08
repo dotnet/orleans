@@ -9,7 +9,6 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Orleans.Client" Version="10.2.2" />
     <PackageReference Include="Microsoft.Orleans.Clustering.Redis" Version="10.2.2" />
-    <PackageReference Include="Microsoft.Orleans.Streaming.SQS" Version="10.2.2" />
     <PackageReference Include="Aspire.StackExchange.Redis" Version="13.4.6" />
   </ItemGroup>
   <!-- </client_packages> -->
@@ -17,7 +16,6 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.8" />
   </ItemGroup>
-
   <ItemGroup>
     <ProjectReference Include="..\ServiceDefaults\ServiceDefaults.csproj" />
   </ItemGroup>

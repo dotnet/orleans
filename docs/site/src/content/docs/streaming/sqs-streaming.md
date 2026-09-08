@@ -27,7 +27,7 @@ The `Service` connection value accepts an AWS region such as `us-east-1` or an S
 
 ## Configure SQS streams with Aspire
 
-Install [`Microsoft.Orleans.Streaming.SQS.Aspire`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.SQS.Aspire) in the AppHost. Its `WithSqsStreaming` extension uses the AWS-supported [`Aspire.Hosting.AWS`](https://www.nuget.org/packages/Aspire.Hosting.AWS) integration to configure AWS SDK for .NET v4 and provision the complete Orleans queue topology through AWS CDK.
+Install [`Microsoft.Orleans.Streaming.SQS.Aspire`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.SQS.Aspire) in the AppHost. Install [`Microsoft.Orleans.Streaming.SQS`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.SQS) in every silo and Orleans client project that uses the provider. The AppHost package's `WithSqsStreaming` extension uses the AWS-supported [`Aspire.Hosting.AWS`](https://www.nuget.org/packages/Aspire.Hosting.AWS) integration to configure AWS SDK for .NET v4 and provision the complete Orleans queue topology through AWS CDK.
 
 Configure the AWS SDK region and one `SqsStreamingOptions` object:
 
@@ -39,11 +39,11 @@ The extension applies the stable service ID and makes each referenced silo and c
 
 The silo activates generated `Orleans:Streaming:Orders` configuration through <xref:Microsoft.Extensions.Hosting.OrleansSiloGenericHostExtensions.UseOrleans*>:
 
-:::code language="csharp" source="../host/snippets/aspire/Silo/SiloProgram.cs" id="sqs_streaming_silo":::
+:::code language="csharp" source="../snippets/compiled/Streaming/SqsSnippets.cs" id="sqs_streaming_silo":::
 
 The client activates the matching publishing provider through <xref:Microsoft.Extensions.Hosting.OrleansClientGenericHostExtensions.UseOrleansClient*>:
 
-:::code language="csharp" source="../host/snippets/aspire/Client/ClientProgram.cs" id="sqs_streaming_client":::
+:::code language="csharp" source="../snippets/compiled/Streaming/SqsSnippets.cs" id="sqs_streaming_client":::
 
 For SQS-compatible local services, emit `ServiceEndpoint=http://localhost:9324` in the provider configuration. Provider configuration also accepts `Region`, `ConnectionString`, `ReceiveWaitTimeSeconds`, `VisibilityTimeoutSeconds`, indexed `ReceiveMessageAttributes` and `ReceiveMessageSystemAttributes`, and a keyed `ISQSDataAdapter` through `DataAdapterKey`.
 

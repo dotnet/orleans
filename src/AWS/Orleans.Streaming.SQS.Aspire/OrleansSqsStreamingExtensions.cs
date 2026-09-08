@@ -52,6 +52,12 @@ public static partial class OrleansSqsStreamingExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(awsSdkConfig);
         ArgumentNullException.ThrowIfNull(options);
+        if (name.Contains("__", StringComparison.Ordinal))
+        {
+            throw new ArgumentException(
+                "SQS stream provider names must form one configuration path segment; use a separator other than '__'.",
+                nameof(name));
+        }
 
         var validatedOptions = ValidateAndCopy(name, awsSdkConfig, options);
         ValidateServiceId(orleansService, validatedOptions.ServiceId, allowUnset: true);
@@ -225,7 +231,9 @@ public static partial class OrleansSqsStreamingExtensions
         bool allowUnset)
     {
         var configuredServiceId = GetServiceId(orleansService);
-        if (configuredServiceId is not string && allowUnset)
+        if (allowUnset
+            && configuredServiceId is ParameterResource generatedServiceId
+            && !orleansService.Builder.Resources.Contains(generatedServiceId))
         {
             return;
         }
