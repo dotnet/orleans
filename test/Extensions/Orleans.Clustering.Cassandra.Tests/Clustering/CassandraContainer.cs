@@ -21,6 +21,8 @@ public class CassandraContainer
     public async Task<(IContainer container, ushort exposedPort, Cluster cluster, ISession session)> RunImage(
         CancellationToken cancellationToken)
     {
+        EnsurePreconditionsMet();
+
         Task<(IContainer container, ushort exposedPort, Cluster cluster, ISession session)> task;
         lock (_lock)
         {
