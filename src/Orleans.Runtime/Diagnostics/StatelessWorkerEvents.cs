@@ -36,10 +36,10 @@ internal static class StatelessWorkerEvents
     internal sealed class MessageForwarded(
         IGrainContext context,
         IGrainContext replacementContext,
-        Message message) : StatelessWorkerEvent(context)
+        MessageSnapshot message) : StatelessWorkerEvent(context)
     {
         public readonly IGrainContext ReplacementContext = replacementContext;
-        public readonly Message Message = message;
+        public readonly MessageSnapshot Message = message;
     }
 
     internal static void EmitWorkerCreated(IGrainContext context, IGrainContext workerContext, int workerCount)
@@ -86,7 +86,7 @@ internal static class StatelessWorkerEvents
         [MethodImpl(MethodImplOptions.NoInlining)]
         static void Emit(IGrainContext context, IGrainContext replacementContext, Message message)
         {
-            Listener.Write(nameof(MessageForwarded), new MessageForwarded(context, replacementContext, message));
+            Listener.Write(nameof(MessageForwarded), new MessageForwarded(context, replacementContext, message.CaptureSnapshot()));
         }
     }
 

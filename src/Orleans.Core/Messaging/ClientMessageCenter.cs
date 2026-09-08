@@ -177,6 +177,7 @@ namespace Orleans.Messaging
             if (!Running)
             {
                 LogNotRunning(msg);
+                msg.ReleaseDropped("ClientMessageCenterNotRunning");
                 return;
             }
 
@@ -186,8 +187,8 @@ namespace Orleans.Messaging
                 var connection = connectionTask.Result;
                 if (connection is null) return;
 
-                connection.Send(msg);
                 LogSendingMessage(msg, connection.RemoteEndPoint);
+                connection.Send(msg);
             }
             else
             {
@@ -202,9 +203,8 @@ namespace Orleans.Messaging
                         // If the connection returned is null then the message was already rejected due to a failure.
                         if (connection is null) return;
 
-                        connection.Send(message);
-
                         LogSendingMessage(message, connection.RemoteEndPoint);
+                        connection.Send(message);
                     }
                     catch (Exception exception)
                     {
@@ -254,8 +254,8 @@ namespace Orleans.Messaging
                 int numGateways = gatewayAddresses.Count;
                 if (numGateways == 0)
                 {
-                    RejectMessage(msg, "No gateways available");
                     LogSendFailed(msg, gatewayManager);
+                    RejectMessage(msg, "No gateways available");
                     return new ValueTask<Connection?>(default(Connection));
                 }
 
@@ -288,8 +288,8 @@ namespace Orleans.Messaging
             var addr = gatewayManager.GetLiveGateway();
             if (addr == null)
             {
-                RejectMessage(msg, "No gateways available");
                 LogNoGatewayAvailableForMessage(msg, gatewayManager);
+                RejectMessage(msg, "No gateways available");
                 return new ValueTask<Connection?>(default(Connection));
             }
 
@@ -368,11 +368,16 @@ namespace Orleans.Messaging
 
         public void RejectMessage(Message msg, string reason, Exception? exc = null)
         {
-            if (!Running) return;
+            if (!Running)
+            {
+                msg.ReleaseDropped("ClientMessageCenterNotRunning");
+                return;
+            }
 
             if (msg.Direction != Message.Directions.Request)
             {
                 LogDroppingMessage(msg, reason);
+                msg.ReleaseDropped("DroppedNonRequest");
             }
             else
             {
@@ -380,6 +385,7 @@ namespace Orleans.Messaging
                 _messagingInstruments.OnRejectedMessage(msg);
                 var error = this.messageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable, reason, exc);
                 DispatchLocalMessage(error);
+                msg.ReleaseDropped("RejectedRequest");
             }
         }
 
@@ -417,7 +423,7 @@ namespace Orleans.Messaging
             Level = LogLevel.Trace,
             Message = "Sending message {Message} via gateway '{Gateway}'."
         )]
-        private partial void LogSendingMessage(Message message, EndPoint gateway);
+        private partial void LogSendingMessage(Message message, EndPoint? gateway);
 
         [LoggerMessage(
             Level = LogLevel.Trace,

@@ -77,14 +77,23 @@ namespace Orleans.Runtime.Messaging
         public bool TryDeliverToProxy(Message msg)
         {
             if (!msg.TargetGrain.IsClient()) return false;
-            if (this.Gateway is Gateway gateway && gateway.TryDeliverToProxy(msg)
-                || this.hostedClient is HostedClient client && client.TryDispatchToClient(msg))
-            {
-                _messageObserver?.Invoke(msg);
-                return true;
-            }
 
-            return false;
+            msg.Acquire();
+            try
+            {
+                if (this.Gateway is Gateway gateway && gateway.TryDeliverToProxy(msg)
+                    || this.hostedClient is HostedClient client && client.TryDispatchToClient(msg))
+                {
+                    _messageObserver?.Invoke(msg);
+                    return true;
+                }
+
+                return false;
+            }
+            finally
+            {
+                msg.Release();
+            }
         }
 
         public async Task StopAsync()
@@ -98,9 +107,8 @@ namespace Orleans.Runtime.Messaging
         /// Indicates that application messages should be blocked from being sent or received.
         /// This method is used by the "fast stop" process.
         /// <para>
-        /// Specifically, all outbound application requests and one-way messages are rejected or dropped,
-        /// while responses and messages to the membership table grain are allowed to complete.
-        /// Inbound application requests are rejected with cache invalidation, and other inbound application messages are dropped.
+        /// Specifically, all outbound application messages are dropped, except for rejections and messages to the membership table grain.
+        /// Inbound application requests are rejected, and other inbound application messages are dropped.
         /// </para>
         /// </summary>
         public void BlockApplicationMessages()
@@ -164,9 +172,8 @@ namespace Orleans.Runtime.Messaging
                 else
                 {
                     this.messagingTrace.OnDropBlockedApplicationMessage(msg);
+                    msg.ReleaseDropped("BlockedApplicationMessage");
                 }
-
-                return;
             }
             else
             {
@@ -176,6 +183,7 @@ namespace Orleans.Runtime.Messaging
                 {
                     LogInformationMessageQueuedAfterStop(log, msg);
                     SendRejection(msg, Message.RejectionTypes.Unrecoverable, "Message was queued for sending after outbound queue was stopped");
+                    msg.ReleaseDropped("MessageCenterStopped");
                     return;
                 }
 
@@ -183,6 +191,7 @@ namespace Orleans.Runtime.Messaging
                 if (msg.IsExpired)
                 {
                     this.messagingTrace.OnDropExpiredMessage(msg, MessagingInstruments.Phase.Send);
+                    msg.ReleaseDropped("ExpiredAtSend");
                     return;
                 }
 
@@ -197,6 +206,7 @@ namespace Orleans.Runtime.Messaging
                 {
                     LogErrorMessageNoTargetSilo(log, msg, new());
                     SendRejection(msg, Message.RejectionTypes.Unrecoverable, "Message to be sent does not have a target silo.");
+                    msg.ReleaseDropped("MissingTargetSilo");
                     return;
                 }
 
@@ -224,6 +234,7 @@ namespace Orleans.Runtime.Messaging
                             this.SendRejection(msg, Message.RejectionTypes.Transient, "Target silo is known to be dead", new SiloUnavailableException());
                         }
 
+                        msg.ReleaseDropped("TargetSiloDead");
                         return;
                     }
                     else
@@ -248,6 +259,7 @@ namespace Orleans.Runtime.Messaging
                                 catch (Exception exception)
                                 {
                                     messageCenter.SendRejection(msg, Message.RejectionTypes.Transient, $"Exception while sending message: {exception}");
+                                    msg.ReleaseDropped("ConnectionFailure");
                                 }
                             }
                         }
@@ -309,6 +321,7 @@ namespace Orleans.Runtime.Messaging
                     }
 
                     RejectMessage(message, Message.RejectionTypes.Transient, exc, failedOperation);
+                    message.ReleaseDropped("InvalidActivation");
                 }
             }
             else
@@ -356,6 +369,7 @@ namespace Orleans.Runtime.Messaging
                 }
 
                 this.RejectMessage(message, Message.RejectionTypes.Transient, exc, failedOperation);
+                message.ReleaseDropped("InvalidActivation");
             }
             else
             {
@@ -376,6 +390,7 @@ namespace Orleans.Runtime.Messaging
         {
             Debug.Assert(!message.IsLocalOnly);
 
+            message.Acquire();
             bool forwardingSucceeded = false;
             var forwardingAddress = destination?.SiloAddress;
             try
@@ -418,7 +433,15 @@ namespace Orleans.Runtime.Messaging
                         var str = $"Forwarding failed: tried to forward message {message} for {message.ForwardCount} times after \"{failedOperation}\" to invalid activation. Rejecting now.";
                         RejectMessage(message, Message.RejectionTypes.Transient, exc, str);
                     }
+
+                    message.ReleaseDropped("ForwardingFailed");
                 }
+                else
+                {
+                    message.MarkTransferred("MessageCenter.TryForwardRequest");
+                }
+
+                message.Release();
             }
         }
 
@@ -515,6 +538,7 @@ namespace Orleans.Runtime.Messaging
             {
                 this.messagingTrace.OnDispatcherSelectTargetFailed(m, ex);
                 RejectMessage(m, Message.RejectionTypes.Unrecoverable, ex);
+                m.ReleaseDropped("AddressingFailure");
             }
         }
 
@@ -559,8 +583,8 @@ namespace Orleans.Runtime.Messaging
                         return;
                     }
 
-                    targetActivation.ReceiveMessage(msg);
                     _messageObserver?.Invoke(msg);
+                    RuntimeMessageDispatcher.Dispatch(targetActivation, msg);
                 }
             }
             catch (Exception ex)
@@ -574,6 +598,7 @@ namespace Orleans.Runtime.Messaging
                 LogErrorCreatingActivation(log, ex, msg.TargetGrain, msg.InterfaceType, msg);
 
                 this.RejectMessage(msg, Message.RejectionTypes.Transient, ex);
+                msg.ReleaseDropped("ReceiveFailure");
             }
         }
 
@@ -595,6 +620,8 @@ namespace Orleans.Runtime.Messaging
 
                     SendMessage(response);
                 }
+
+                msg.ReleaseDropped("UnknownSystemTarget");
             }
             else
             {

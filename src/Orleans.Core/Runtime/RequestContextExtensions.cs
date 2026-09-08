@@ -46,7 +46,7 @@ namespace Orleans.Runtime
             return resultValues;
         }
 
-        internal static Guid GetReentrancyId(this Message message) => GetReentrancyId(message?.RequestContextData);
+        internal static Guid GetReentrancyId(this Message message) => GetReentrancyId(message.RequestContextData);
 
         internal static Guid GetReentrancyId(Dictionary<string, object>? contextData)
         {

@@ -91,20 +91,20 @@ namespace Orleans.Runtime
 
         internal void OnFailedSentMessage(Message? msg)
         {
-            if (msg == null || !msg.HasDirection) return;
-            FailedSentMessagesCounter.Add(1, new KeyValuePair<string, object?>("Direction", msg.Direction.ToString()));
+            if (msg is not { } message || !message.HasDirection) return;
+            FailedSentMessagesCounter.Add(1, new KeyValuePair<string, object?>("Direction", message.Direction.ToString()));
         }
 
         internal void OnDroppedSentMessage(Message? msg)
         {
-            if (msg == null || !msg.HasDirection) return;
-            DroppedSentMessagesCounter.Add(1, new KeyValuePair<string, object?>("Direction", msg.Direction.ToString()));
+            if (msg is not { } message || !message.HasDirection) return;
+            DroppedSentMessagesCounter.Add(1, new KeyValuePair<string, object?>("Direction", message.Direction.ToString()));
         }
 
         internal void OnRejectedMessage(Message? msg)
         {
-            if (msg == null || !msg.HasDirection) return;
-            RejectedMessagesCounter.Add(1, new KeyValuePair<string, object?>("Direction", msg.Direction.ToString()));
+            if (msg is not { } message || !message.HasDirection) return;
+            RejectedMessagesCounter.Add(1, new KeyValuePair<string, object?>("Direction", message.Direction.ToString()));
         }
 
         internal void OnMessageReRoute(Message msg)

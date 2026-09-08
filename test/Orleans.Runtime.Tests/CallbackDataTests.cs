@@ -55,6 +55,26 @@ public class CallbackDataTests
         GC.KeepAlive(cancellation);
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
+    public void CallbackExceptionReleasesRequestOwnership()
+    {
+        using var serviceProvider = CreateServiceProvider();
+        var expectedException = new InvalidOperationException("Test completion failure");
+        var callback = CreateCallback(
+            new ThrowingResponseCompletionSource(expectedException),
+            _ => { },
+            CreateInstruments(serviceProvider));
+        var response = new Message { BodyObject = Orleans.Serialization.Invocation.Response.Completed };
+
+        var exception = Assert.Throws<InvalidOperationException>(() => callback.DoCallback(response));
+        Assert.Same(expectedException, exception);
+        Assert.False(callback.TryAcquireMessage(out _));
+
+        response.Release();
+    }
+
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static WeakReference CreateCompletedCallback(CancellationToken cancellationToken, ApplicationRequestInstruments instruments)
     {
@@ -78,7 +98,11 @@ public class CallbackDataTests
             cancelOnTimeout: false,
             waitForCancellationAcknowledgement: false,
             cancellationManager: null);
-        return new CallbackData(shared, completion, new Message(), instruments);
+        var message = new Message();
+        message.InitializeRefCount();
+        var callback = new CallbackData(shared, completion, message, instruments);
+        message.Release();
+        return callback;
     }
 
     private static ServiceProvider CreateServiceProvider()
@@ -98,5 +122,12 @@ public class CallbackDataTests
         public void Complete(Response value) => Response = value;
 
         public void Complete() => Response = Orleans.Serialization.Invocation.Response.Completed;
+    }
+
+    private sealed class ThrowingResponseCompletionSource(InvalidOperationException exception) : IResponseCompletionSource
+    {
+        public void Complete(Response value) => throw exception;
+
+        public void Complete() => throw exception;
     }
 }
