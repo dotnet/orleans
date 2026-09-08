@@ -38,6 +38,7 @@ public class LocalDurableJobManagerTests
         var shard = new BlockingQueueShard("first-page", timeProvider.GetUtcNow(), timeProvider.GetUtcNow().AddHours(1));
         shard.AllowDispose.SetResult();
         var tailStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var tailCompleted = false;
         var calls = 0;
         shardManager.DiscoverShards = async (_, _, token) =>
         {
@@ -48,8 +49,21 @@ public class LocalDurableJobManagerTests
             }
 
             tailStarted.SetResult();
-            await Task.Delay(Timeout.InfiniteTimeSpan, token);
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, token);
+            }
+            finally
+            {
+                tailCompleted = true;
+            }
+
             return [];
+        };
+        shardManager.StopDiscovery = () =>
+        {
+            Assert.True(tailCompleted);
+            return ValueTask.CompletedTask;
         };
         var manager = CreateManager(shardManager, timeProvider, CreateOptions());
         var accessor = new LocalDurableJobManager.TestAccessor(manager);
@@ -62,6 +76,7 @@ public class LocalDurableJobManagerTests
             await shard.ConsumeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
             await tailStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
             Assert.Equal(2, Volatile.Read(ref calls));
+            Assert.Equal(0, shardManager.StopDiscoveryCalls);
             Assert.True(accessor.TryGetRunningShardTask(shard.Id, out var running));
             Assert.False(running!.IsCompleted);
         }
@@ -71,6 +86,7 @@ public class LocalDurableJobManagerTests
         }
 
         Assert.Equal(1, shard.DisposeCallCount);
+        Assert.Equal(1, shardManager.StopDiscoveryCalls);
         Assert.Equal(2, Volatile.Read(ref calls));
         Assert.False(accessor.TryGetRunningShardTask(shard.Id, out _));
     }
@@ -1527,6 +1543,16 @@ public class LocalDurableJobManagerTests
 
     private sealed class TestJobShardManager() : JobShardManager(SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0))
     {
+        public Func<ValueTask>? StopDiscovery { get; set; }
+
+        public int StopDiscoveryCalls { get; private set; }
+
+        internal override ValueTask StopDiscoveryAsync()
+        {
+            StopDiscoveryCalls++;
+            return StopDiscovery is { } stopDiscovery ? stopDiscovery() : ValueTask.CompletedTask;
+        }
+
         public bool MoreCatalogWork { get; set; }
 
         internal override bool HasMoreCatalogWork => MoreCatalogWork;
