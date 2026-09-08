@@ -150,7 +150,7 @@ public partial class JournaledJobShardManagerTests
     }
 
     [Fact]
-    public async Task Discovery_FailureAfterClaimRediscoversClaimedShardOnNextSweep()
+    public async Task Discovery_PersistentMetadataFailurePreservesEarlierAndLaterAssignments()
     {
         await using var fixture = new DiscoveryFixture();
         var claimed = await fixture.AddShardAsync("claimed", fixture.Now);
@@ -162,9 +162,14 @@ public partial class JournaledJobShardManagerTests
             : ValueTask.CompletedTask;
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.DiscoverAsync());
+        Assert.Equal("claimed", Assert.Single(await fixture.DiscoverAsync()).Id);
+        Assert.Equal(new[] { claimed, failing }, fixture.Storage.MetadataReads);
         Assert.Equal("tail", Assert.Single(await fixture.DiscoverAsync()).Id);
-        fixture.Storage.BeforeMetadataRead = null;
-        Assert.Equal(new[] { "claimed", "tail" }, (await fixture.DiscoverAsync(maxNewClaims: 0)).Select(shard => shard.Id));
+        Assert.False(fixture.Manager.HasMoreCatalogWork);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.DiscoverAsync(maxNewClaims: 0));
+        Assert.Equal("claimed", Assert.Single(await fixture.DiscoverAsync(maxNewClaims: 0)).Id);
+        Assert.Equal("tail", Assert.Single(await fixture.DiscoverAsync(maxNewClaims: 0)).Id);
         Assert.Equal(new[] { claimed, failing, tail, claimed, failing, tail }, fixture.Storage.MetadataReads);
         Assert.False(fixture.Manager.HasMoreCatalogWork);
     }
