@@ -746,6 +746,10 @@ dotnet_diagnostic.CA1062.severity = warning
 [src/{Orleans.Core.Abstractions,Orleans.EventSourcing,Orleans.Reminders,Orleans.Serialization.FSharp,Orleans.Serialization.TestKit,Orleans.Streaming,Orleans.Transactions,Orleans.Transactions.TestKit.Base}/**.cs]
 dotnet_diagnostic.CA1815.severity = warning
 
+# CA2214: Do not call overridable methods in constructors
+[src/{Orleans.EventSourcing,Orleans.Serialization.TestKit}/**.cs]
+dotnet_diagnostic.CA2214.severity = warning
+
 [src/{Azure/Orleans.Reminders.AzureStorage,Orleans.Reminders.TestKit}/**.cs]
 dotnet_diagnostic.CA2219.severity = warning
 

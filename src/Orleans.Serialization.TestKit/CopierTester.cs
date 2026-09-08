@@ -1,11 +1,11 @@
-using Orleans.Serialization.Cloning;
-using Orleans.Serialization.Serializers;
-using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
-using Xunit;
 using System.Linq;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Serialization.Cloning;
+using Orleans.Serialization.Serializers;
+using Xunit;
 
 namespace Orleans.Serialization.TestKit
 {
@@ -19,7 +19,8 @@ namespace Orleans.Serialization.TestKit
     [ExcludeFromCodeCoverage]
     public abstract class CopierTester<TValue, TCopier> : SerializationTester where TCopier : class, IDeepCopier<TValue>
     {
-        private readonly CodecProvider _codecProvider;
+        private CodecProvider? _codecProviderValue;
+        private CodecProvider _codecProvider => _codecProviderValue ??= ServiceProvider.GetRequiredService<CodecProvider>();
 
         /// <summary>
         /// Initializes a new <see cref="CopierTester{TValue, TCopier}"/> instance.
@@ -28,7 +29,6 @@ namespace Orleans.Serialization.TestKit
         protected CopierTester(ITestOutputHelper output) : base(output ?? throw new ArgumentNullException(nameof(output)))
         {
             output.WriteLine($"Random seed: {RandomSeed}");
-            _codecProvider = ServiceProvider.GetRequiredService<CodecProvider>();
         }
 
         /// <summary>
@@ -38,7 +38,6 @@ namespace Orleans.Serialization.TestKit
         protected CopierTester(ITestOutputHelper output, SerializationTesterFixture fixture) : base(output ?? throw new ArgumentNullException(nameof(output)), fixture)
         {
             output.WriteLine($"Random seed: {RandomSeed}");
-            _codecProvider = ServiceProvider.GetRequiredService<CodecProvider>();
         }
 
         /// <inheritdoc/>

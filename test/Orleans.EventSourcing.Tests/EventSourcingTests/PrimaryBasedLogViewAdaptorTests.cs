@@ -11,6 +11,21 @@ namespace Tester.EventSourcingTests;
 public sealed class PrimaryBasedLogViewAdaptorTests
 {
     [Fact]
+    public void Constructor_DefersConfirmedViewInitializationUntilDerivedStateIsReady()
+    {
+        var initialState = new TestLogView(["initial"]);
+
+        var (adaptor, _, _) = CreateAdaptor(initialState);
+        initialState.Entries.Add("mutated");
+
+        Assert.Equal(0, adaptor.InitializationCount);
+
+        Assert.Equal(0, adaptor.ConfirmedVersion);
+        Assert.Equal(1, adaptor.InitializationCount);
+        Assert.Equal(["initial"], adaptor.ConfirmedView.Entries);
+    }
+
+    [Fact]
     public async Task TryAppendRange_WithNonEmptyRange_AppendsAtomicallyInOrderAndCompletesTrue()
     {
         var (adaptor, host, _) = CreateAdaptor();
@@ -336,11 +351,11 @@ public sealed class PrimaryBasedLogViewAdaptorTests
     }
 
     private static (TestPrimaryBasedLogViewAdaptor Adaptor, RecordingLogViewAdaptorHost Host, RecordingProtocolServices Services)
-        CreateAdaptor()
+        CreateAdaptor(TestLogView? initialState = null)
     {
         var host = new RecordingLogViewAdaptorHost();
         var services = new RecordingProtocolServices();
-        return (new TestPrimaryBasedLogViewAdaptor(host, new TestLogView(), services), host, services);
+        return (new TestPrimaryBasedLogViewAdaptor(host, initialState ?? new TestLogView(), services), host, services);
     }
 
     private static TestLogEntry[] Entries(params string[] values) =>

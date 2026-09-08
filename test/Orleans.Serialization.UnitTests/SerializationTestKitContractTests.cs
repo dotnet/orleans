@@ -42,6 +42,132 @@ public sealed class SerializationTestKitContractTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public void SerializationTester_Constructor_DefersServiceCreationUntilDerivedConstructionCompletes()
+    {
+        var probe = new ConstructionProbe();
+        SerializationTesterHarness.Probe = probe;
+
+        using var tester = new SerializationTesterHarness(output);
+
+        Assert.Equal(0, probe.ServiceProviderFactoryCount);
+
+        var first = tester.GetServiceProvider();
+        var second = tester.GetServiceProvider();
+
+        Assert.Same(first, second);
+        Assert.Equal(1, probe.ServiceProviderFactoryCount);
+    }
+
+    [Fact]
+    public void SerializationTester_Dispose_DisposesOwnedServiceProviderOnce()
+    {
+        var probe = new ConstructionProbe();
+        SerializationTesterHarness.Probe = probe;
+        var tester = new SerializationTesterHarness(output);
+        _ = tester.GetServiceProvider();
+
+        ((IDisposable)tester).Dispose();
+        ((IDisposable)tester).Dispose();
+
+        Assert.Equal(1, probe.ServiceProviderDisposeCount);
+    }
+
+    [Fact]
+    public void SerializationTester_FixtureServiceProvider_IsAvailableAfterDerivedConstructionCompletes()
+    {
+        var probe = new ConstructionProbe();
+        SerializationTesterHarness.Probe = probe;
+        using var fixture = new SerializationTesterFixture();
+        using var tester = new SerializationTesterHarness(output, fixture);
+
+        Assert.Equal(0, probe.ServiceProviderFactoryCount);
+
+        var fixtureProvider = fixture.ServiceProvider;
+
+        Assert.Same(fixtureProvider, tester.GetServiceProvider());
+        Assert.Equal(1, probe.ServiceProviderFactoryCount);
+    }
+
+    [Fact]
+    public void SerializationTester_FixtureServiceProvider_UsesLatestLiveTester()
+    {
+        var probe = new ConstructionProbe();
+        SerializationTesterHarness.Probe = probe;
+        using var fixture = new SerializationTesterFixture();
+        var firstTester = new SerializationTesterHarness(output, fixture);
+        ((IDisposable)firstTester).Dispose();
+
+        using var secondTester = new SerializationTesterHarness(output, fixture);
+        var fixtureProvider = fixture.ServiceProvider;
+
+        Assert.Same(fixtureProvider, secondTester.GetServiceProvider());
+        Assert.Equal(1, probe.ServiceProviderFactoryCount);
+    }
+
+    [Fact]
+    public void SerializationTester_FixtureServiceProvider_DoesNotUseDisposedTester()
+    {
+        var probe = new ConstructionProbe();
+        SerializationTesterHarness.Probe = probe;
+        using var fixture = new SerializationTesterFixture();
+        var tester = new SerializationTesterHarness(output, fixture);
+        ((IDisposable)tester).Dispose();
+
+        Assert.Throws<ObjectDisposedException>(() => fixture.ServiceProvider);
+        GC.KeepAlive(tester);
+        Assert.Equal(0, probe.ServiceProviderFactoryCount);
+    }
+
+    [Fact]
+    public void SerializationTester_FixtureServiceProvider_RetriesAfterFactoryFailure()
+    {
+        var probe = new ConstructionProbe();
+        SerializationTesterHarness.Probe = probe;
+        using var fixture = new SerializationTesterFixture();
+        using var tester = new SerializationTesterHarness(output, fixture);
+        var failure = new InvalidOperationException("service provider factory failed");
+        probe.ServiceProviderFactoryException = failure;
+
+        var actual = Assert.Throws<InvalidOperationException>(() => fixture.ServiceProvider);
+        var provider = fixture.ServiceProvider;
+
+        Assert.Same(failure, actual);
+        Assert.Same(provider, tester.GetServiceProvider());
+        Assert.Equal(2, probe.ServiceProviderFactoryCount);
+    }
+
+    [Fact]
+    public void SerializationTester_FixtureServiceProvider_RemainsSharedWithLaterTesters()
+    {
+        var probe = new ConstructionProbe();
+        SerializationTesterHarness.Probe = probe;
+        using var fixture = new SerializationTesterFixture();
+        using var firstTester = new SerializationTesterHarness(output, fixture);
+        var provider = firstTester.GetServiceProvider();
+        using var secondTester = new SerializationTesterHarness(output, fixture);
+
+        Assert.Same(provider, secondTester.GetServiceProvider());
+        Assert.Same(provider, fixture.ServiceProvider);
+        Assert.Equal(1, probe.ServiceProviderFactoryCount);
+    }
+
+    [Fact]
+    public void SerializationTester_FixtureServiceProvider_RejectsReentrantFactoryAccess()
+    {
+        var probe = new ConstructionProbe { ReenterServiceProviderFactory = true };
+        SerializationTesterHarness.Probe = probe;
+        using var fixture = new SerializationTesterFixture();
+        using var tester = new SerializationTesterHarness(output, fixture);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => fixture.ServiceProvider);
+        var provider = fixture.ServiceProvider;
+
+        Assert.Equal("The service provider factory cannot access the service provider while it is being created.", exception.Message);
+        Assert.Same(provider, tester.GetServiceProvider());
+        Assert.Equal(2, probe.ServiceProviderFactoryCount);
+    }
+
+    [Fact]
     public void FieldCodecTester_FirstConstructor_NullOutput_ThrowsWithExactParamNameWithoutInvokingDependencies()
     {
         var probe = new ConstructionProbe();
@@ -175,6 +301,12 @@ public sealed class SerializationTestKitContractTests(ITestOutputHelper output)
     {
         public int ServiceProviderFactoryCount { get; set; }
 
+        public int ServiceProviderDisposeCount { get; set; }
+
+        public Exception? ServiceProviderFactoryException { get; set; }
+
+        public bool ReenterServiceProviderFactory { get; set; }
+
         public int ConfigureCount { get; set; }
 
         public int CodecCreationCount { get; set; }
@@ -190,22 +322,45 @@ public sealed class SerializationTestKitContractTests(ITestOutputHelper output)
 
     private sealed class SerializationTesterHarness : SerializationTester
     {
+        private bool _constructionCompleted;
+
         public SerializationTesterHarness(ITestOutputHelper output)
             : base(output)
         {
+            _constructionCompleted = true;
         }
 
         public SerializationTesterHarness(ITestOutputHelper output, SerializationTesterFixture fixture)
             : base(output, fixture)
         {
+            _constructionCompleted = true;
         }
 
         public static ConstructionProbe Probe { get; set; } = null!;
 
+        public IServiceProvider GetServiceProvider() => ServiceProvider;
+
         protected override IServiceProvider CreateServiceProvider()
         {
+            if (!_constructionCompleted)
+            {
+                throw new InvalidOperationException("Service creation ran before the derived constructor completed.");
+            }
+
             Probe.ServiceProviderFactoryCount++;
-            return new EmptyServiceProvider();
+            if (Probe.ReenterServiceProviderFactory)
+            {
+                Probe.ReenterServiceProviderFactory = false;
+                return GetServiceProvider();
+            }
+
+            if (Probe.ServiceProviderFactoryException is { } exception)
+            {
+                Probe.ServiceProviderFactoryException = null;
+                throw exception;
+            }
+
+            return new EmptyServiceProvider(Probe);
         }
     }
 
@@ -304,8 +459,10 @@ public sealed class SerializationTestKitContractTests(ITestOutputHelper output)
         }
     }
 
-    private sealed class EmptyServiceProvider : IServiceProvider
+    private sealed class EmptyServiceProvider(ConstructionProbe probe) : IServiceProvider, IDisposable
     {
         public object? GetService(Type serviceType) => null;
+
+        public void Dispose() => probe.ServiceProviderDisposeCount++;
     }
 }

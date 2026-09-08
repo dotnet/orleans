@@ -1,13 +1,18 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
 namespace Orleans.EventSourcing.Common
 {
+    internal interface IInitializableLogViewAdaptor
+    {
+        void EnsureConfirmedViewInitialized();
+    }
+
     /// <summary>
     /// A general template for constructing log view adaptors that are based on
     /// a sequentially read and written primary. We use this to construct 
@@ -28,7 +33,8 @@ namespace Orleans.EventSourcing.Common
     /// <typeparam name="TSubmissionEntry">The type of submission entries stored in pending queue</typeparam>
     public abstract class PrimaryBasedLogViewAdaptor<TLogView, TLogEntry, TSubmissionEntry> :
         ILogViewAdaptor<TLogView, TLogEntry>,
-        ICancellationAwareLogViewAdaptor
+        ICancellationAwareLogViewAdaptor,
+        IInitializableLogViewAdaptor
     where TLogView : class, new()
         where TLogEntry : class
         where TSubmissionEntry : SubmissionEntry<TLogEntry>
@@ -151,7 +157,7 @@ namespace Orleans.EventSourcing.Common
         /// </summary>
         protected virtual void ProcessNotifications()
         {
-            if (lastVersionNotified > this.GetConfirmedVersion())
+            if (lastVersionNotified > GetInitializedConfirmedVersion())
             {
                 Services.Log(LogLevel.Debug, "force refresh because of version notification v{0}", lastVersionNotified);
                 needRefresh = true;
@@ -191,13 +197,40 @@ namespace Orleans.EventSourcing.Common
             this.Host = host;
             this.Services = services;
             this.InitialState = Services.DeepCopy(initialstate);
-            InitializeConfirmedView(initialstate);
             worker = new BatchWorkerFromDelegate(Work);
+        }
+
+        private void EnsureConfirmedViewInitialized()
+        {
+            if (confirmedViewInitialized)
+            {
+                return;
+            }
+
+            // JournaledGrain calls this after adaptor construction; base operations initialize direct-construction paths on first use.
+            InitializeConfirmedView(InitialState);
+            confirmedViewInitialized = true;
+        }
+
+        void IInitializableLogViewAdaptor.EnsureConfirmedViewInitialized() => EnsureConfirmedViewInitialized();
+
+        private TLogView GetInitializedConfirmedView()
+        {
+            EnsureConfirmedViewInitialized();
+            return LastConfirmedView();
+        }
+
+        private int GetInitializedConfirmedVersion()
+        {
+            EnsureConfirmedViewInitialized();
+            return GetConfirmedVersion();
         }
 
         /// <inheritdoc/>
         public virtual Task PreOnActivate()
         {
+            EnsureConfirmedViewInitialized();
+
             Services.Log(LogLevel.Trace, "PreActivation Started");
 
             // this flag indicates we have not done an initial load from storage yet
@@ -293,6 +326,8 @@ namespace Orleans.EventSourcing.Common
         /// </summary>
         private readonly BatchWorker worker;
 
+        private bool confirmedViewInitialized;
+
         /// <summary>
         /// Cached version of initial state used during initialization. And for resetting.
         /// </summary>
@@ -323,6 +358,8 @@ namespace Orleans.EventSourcing.Common
         /// <inheritdoc />
         public void Submit(TLogEntry logEntry)
         {
+            EnsureConfirmedViewInitialized();
+
             if (!SupportSubmissions)
                 throw new InvalidOperationException("provider does not support submissions on cluster " + Services.MyClusterId);
 
@@ -338,6 +375,8 @@ namespace Orleans.EventSourcing.Common
         /// <inheritdoc />
         public void SubmitRange(IEnumerable<TLogEntry> logEntries)
         {
+            EnsureConfirmedViewInitialized();
+
             if (!SupportSubmissions)
                 throw new InvalidOperationException("Provider does not support submissions on cluster " + Services.MyClusterId);
 
@@ -356,6 +395,8 @@ namespace Orleans.EventSourcing.Common
         /// <inheritdoc />
         public Task<bool> TryAppend(TLogEntry logEntry)
         {
+            EnsureConfirmedViewInitialized();
+
             if (!SupportSubmissions)
                 throw new InvalidOperationException("Provider does not support submissions on cluster " + Services.MyClusterId);
 
@@ -365,7 +406,7 @@ namespace Orleans.EventSourcing.Common
 
             var promise = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-            SubmitInternal(DateTime.UtcNow, logEntry, GetConfirmedVersion() + pending.Count, promise);
+            SubmitInternal(DateTime.UtcNow, logEntry, GetInitializedConfirmedVersion() + pending.Count, promise);
 
             worker.Notify();
 
@@ -375,6 +416,8 @@ namespace Orleans.EventSourcing.Common
         /// <inheritdoc />
         public Task<bool> TryAppendRange(IEnumerable<TLogEntry> logEntries)
         {
+            EnsureConfirmedViewInitialized();
+
             if (!SupportSubmissions)
                 throw new InvalidOperationException("Provider does not support submissions on cluster " + Services.MyClusterId);
 
@@ -384,7 +427,7 @@ namespace Orleans.EventSourcing.Common
 
             var promise = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             var time = DateTime.UtcNow;
-            var pos = GetConfirmedVersion() + pending.Count;
+            var pos = GetInitializedConfirmedVersion() + pending.Count;
 
             bool first = true;
             foreach (var e in logEntries)
@@ -461,7 +504,7 @@ namespace Orleans.EventSourcing.Common
                 if (stats != null)
                     stats.EventCounters["ConfirmedViewCalled"]++;
 
-                return LastConfirmedView();
+                return GetInitializedConfirmedView();
             }
         }
 
@@ -473,7 +516,7 @@ namespace Orleans.EventSourcing.Common
                 if (stats != null)
                     stats.EventCounters["ConfirmedVersionCalled"]++;
 
-                return GetConfirmedVersion();
+                return GetInitializedConfirmedVersion();
             }
         }
 
@@ -484,6 +527,8 @@ namespace Orleans.EventSourcing.Common
         /// <returns></returns>
         public async Task<ILogConsistencyProtocolMessage?> OnProtocolMessageReceived(ILogConsistencyProtocolMessage payLoad)
         {
+            EnsureConfirmedViewInitialized();
+
             var notificationMessage = payLoad as INotificationMessage;
 
             if (notificationMessage != null)
@@ -552,7 +597,7 @@ namespace Orleans.EventSourcing.Common
         private void CalculateTentativeState()
         {
             // copy the confirmed view
-            this.tentativeStateInternal = Services.DeepCopy(LastConfirmedView());
+            this.tentativeStateInternal = Services.DeepCopy(GetInitializedConfirmedView());
 
             // Now apply all operations in pending 
             foreach (var u in this.pending)
@@ -626,11 +671,13 @@ namespace Orleans.EventSourcing.Common
         /// </summary>
         internal async Task Work()
         {
+            EnsureConfirmedViewInitialized();
+
             await ProcessClearLogRequest();
 
             Services.Log(LogLevel.Debug, "<1 ProcessNotifications");
 
-            var version = GetConfirmedVersion();
+            var version = GetInitializedConfirmedVersion();
 
             ProcessNotifications();
 
@@ -683,7 +730,7 @@ namespace Orleans.EventSourcing.Common
         /// </summary>
         internal async Task UpdatePrimary()
         {
-            int version = GetConfirmedVersion();
+            int version = GetInitializedConfirmedVersion();
 
             while (true)
             {
@@ -744,7 +791,7 @@ namespace Orleans.EventSourcing.Common
 
         private void NotifyViewChanges(ref int version, int numWritten = 0)
         {
-            var v = GetConfirmedVersion();
+            var v = GetInitializedConfirmedVersion();
             bool tentativeChanged = (v != version + numWritten);
             bool confirmedChanged = (v != version);
             if (tentativeChanged || confirmedChanged)
@@ -825,7 +872,7 @@ namespace Orleans.EventSourcing.Common
         /// </summary>
         protected void RemoveStaleConditionalUpdates()
         {
-            int version = GetConfirmedVersion();
+            int version = GetInitializedConfirmedVersion();
             bool foundFailedConditionalUpdates = false;
 
             for (int pos = 0; pos < pending.Count; pos++)
