@@ -243,7 +243,7 @@ public partial class JournaledJobShardManagerTests
     }
 
     [Fact]
-    public async Task Discovery_MembershipChangesPreserveCursorAndUseCurrentOwnerStatus()
+    public async Task Discovery_MembershipChangesPreserveEnumeratorAndUseCurrentOwnerStatus()
     {
         await using var fixture = new DiscoveryFixture();
         var owner = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5101), 0);
@@ -272,7 +272,7 @@ public partial class JournaledJobShardManagerTests
     }
 
     [Fact]
-    public async Task Discovery_NewSweepObservesInsertionBehindCursorAndFutureEligibility()
+    public async Task Discovery_NewSweepObservesInsertionBehindTraversalAndFutureEligibility()
     {
         await using var fixture = new DiscoveryFixture();
         var future = await fixture.AddShardAsync("future", fixture.Horizon.AddMinutes(1));
