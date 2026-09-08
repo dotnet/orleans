@@ -477,6 +477,7 @@ namespace Orleans.Runtime
             else
             {
                 LogDebugNoCallbackForResponse(this.logger, message);
+                message.Dispose();
             }
         }
 

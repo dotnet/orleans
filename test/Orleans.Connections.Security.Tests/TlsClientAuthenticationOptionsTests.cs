@@ -1,6 +1,6 @@
 using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
-using Orleans.Connections.Security;
+using Orleans.Connections.Transport.Security;
 using Xunit;
 
 namespace Orleans.Connections.Security.Tests;

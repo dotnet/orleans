@@ -99,7 +99,7 @@ namespace Orleans.TestingHost
         /// Gets or sets a value indicating what transport to use for connecting silos and clients.
         /// </summary>
         /// <remarks>
-        /// Defaults to InMemory.
+        /// Defaults to the in-memory transport.
         /// </remarks>
         public ConnectionTransportType ConnectionTransport { get; set; } = ConnectionTransportType.InMemory;
 

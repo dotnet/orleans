@@ -243,28 +243,6 @@ namespace Orleans.Configuration
         public System.TimeSpan TurnWarningLengthThreshold { get { throw null; } set { } }
     }
 
-    public partial class SiloConnectionOptions : SiloConnectionOptions.ISiloConnectionBuilderOptions
-    {
-        public void ConfigureGatewayInboundConnection(System.Action<Microsoft.AspNetCore.Connections.IConnectionBuilder> configure) { }
-
-        public void ConfigureSiloInboundConnection(System.Action<Microsoft.AspNetCore.Connections.IConnectionBuilder> configure) { }
-
-        public void ConfigureSiloOutboundConnection(System.Action<Microsoft.AspNetCore.Connections.IConnectionBuilder> configure) { }
-
-        void ISiloConnectionBuilderOptions.ConfigureGatewayInboundBuilder(Microsoft.AspNetCore.Connections.IConnectionBuilder builder) { }
-
-        void ISiloConnectionBuilderOptions.ConfigureSiloInboundBuilder(Microsoft.AspNetCore.Connections.IConnectionBuilder builder) { }
-
-        void ISiloConnectionBuilderOptions.ConfigureSiloOutboundBuilder(Microsoft.AspNetCore.Connections.IConnectionBuilder builder) { }
-
-        public partial interface ISiloConnectionBuilderOptions
-        {
-            void ConfigureGatewayInboundBuilder(Microsoft.AspNetCore.Connections.IConnectionBuilder builder);
-            void ConfigureSiloInboundBuilder(Microsoft.AspNetCore.Connections.IConnectionBuilder builder);
-            void ConfigureSiloOutboundBuilder(Microsoft.AspNetCore.Connections.IConnectionBuilder builder);
-        }
-    }
-
     public partial class SiloMessagingOptions : MessagingOptions
     {
         public static readonly System.TimeSpan DEFAULT_CLIENT_GW_NOTIFICATION_TIMEOUT;
@@ -507,6 +485,17 @@ namespace Orleans.Hosting
 
         public static ISiloBuilder AddStartupTask<TStartup>(this ISiloBuilder builder, int stage = 20000)
             where TStartup : class, Runtime.IStartupTask { throw null; }
+    }
+
+    public static partial class SiloTlsHostingExtensions
+    {
+        public static ISiloBuilder UseTls(this ISiloBuilder builder, System.Action<Connections.Transport.Security.TlsOptions> configureOptions) { throw null; }
+
+        public static ISiloBuilder UseTls(this ISiloBuilder builder, System.Security.Cryptography.X509Certificates.StoreName storeName, string subject, bool allowInvalid, System.Security.Cryptography.X509Certificates.StoreLocation location, System.Action<Connections.Transport.Security.TlsOptions> configureOptions) { throw null; }
+
+        public static ISiloBuilder UseTls(this ISiloBuilder builder, System.Security.Cryptography.X509Certificates.X509Certificate2 certificate, System.Action<Connections.Transport.Security.TlsOptions> configureOptions) { throw null; }
+
+        public static ISiloBuilder UseTls(this ISiloBuilder builder, System.Security.Cryptography.X509Certificates.X509Certificate2 certificate) { throw null; }
     }
 
     public static partial class SystemTextJsonSerializerExtensions

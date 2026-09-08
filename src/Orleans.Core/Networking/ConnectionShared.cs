@@ -1,24 +1,40 @@
-using System;
-using Microsoft.Extensions.Logging;
-using Orleans.Placement.Repartitioning;
+#nullable enable
 
-namespace Orleans.Runtime.Messaging
+using System;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Connections;
+
+namespace Orleans.Runtime.Messaging;
+
+internal sealed class ConnectionCommon(
+    IServiceProvider serviceProvider,
+    MessageFactory messageFactory,
+    MessagingTrace messagingTrace,
+    ConnectionTrace networkingTrace,
+    MessagingInstruments messagingInstruments,
+    NetworkingInstruments networkingInstruments,
+    Orleans.Placement.Repartitioning.IMessageStatisticsSink messageStatisticsSink)
 {
-    internal sealed class ConnectionCommon(
-        IServiceProvider serviceProvider,
-        MessageFactory messageFactory,
-        MessagingTrace messagingTrace,
-        OrleansInstruments orleansInstruments,
-        MessagingInstruments messagingInstruments,
-        ILogger<Connection> logger,
-        IMessageStatisticsSink messageStatisticsSink)
+    private readonly object _lock = new();
+    private MessageHandlerShared? _messageHandlerShared;
+
+    public MessageFactory MessageFactory { get; } = messageFactory;
+    public IServiceProvider ServiceProvider { get; } = serviceProvider;
+    public ConnectionTrace ConnectionTrace { get; } = networkingTrace;
+    public MessagingTrace MessagingTrace { get; } = messagingTrace;
+    public MessagingInstruments MessagingInstruments { get; } = messagingInstruments;
+    public NetworkingInstruments NetworkingInstruments { get; } = networkingInstruments;
+    public Action<Message>? MessageObserver { get; } = messageStatisticsSink.GetMessageObserver();
+
+    public MessageHandlerShared MessageHandlerShared
     {
-        public MessageFactory MessageFactory { get; } = messageFactory;
-        public IServiceProvider ServiceProvider { get; } = serviceProvider;
-        public NetworkingInstruments NetworkingInstruments { get; } = new(orleansInstruments);
-        public ILogger<Connection> Logger { get; } = logger;
-        public IMessageStatisticsSink MessageStatisticsSink { get; } = messageStatisticsSink;
-        public MessagingTrace MessagingTrace { get; } = messagingTrace;
-        public MessagingInstruments MessagingInstruments { get; } = messagingInstruments;
+        get
+        {
+            if (_messageHandlerShared is { } value) return value;
+            lock (_lock)
+            {
+                return _messageHandlerShared ??= ServiceProvider.GetRequiredService<MessageHandlerShared>();
+            }
+        }
     }
 }
