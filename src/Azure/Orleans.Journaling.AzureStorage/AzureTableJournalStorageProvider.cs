@@ -57,7 +57,7 @@ internal sealed class AzureTableJournalStorageProvider : ILifecycleParticipant<I
     }
 
     public async IAsyncEnumerable<JournalId> ListAsync(
-        JournalStorageCatalogOptions? options = null,
+        ListOptions? options = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();

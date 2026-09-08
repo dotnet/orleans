@@ -271,7 +271,7 @@ namespace Orleans.Journaling
 
     public partial interface IJournalStorageCatalog
     {
-        System.Collections.Generic.IAsyncEnumerable<JournalId> ListAsync(JournalStorageCatalogOptions? options = null, System.Threading.CancellationToken cancellationToken = default);
+        System.Collections.Generic.IAsyncEnumerable<JournalId> ListAsync(ListOptions? options = null, System.Threading.CancellationToken cancellationToken = default);
     }
 
     public partial interface IJournalStorageConsumer
@@ -458,11 +458,6 @@ namespace Orleans.Journaling
         public readonly IJournaledState ResolveState(JournalStreamId streamId) { throw null; }
     }
 
-    public sealed partial class JournalStorageCatalogOptions
-    {
-        public JournalId Prefix { get { throw null; } set { } }
-    }
-
     public static partial class JournalStorageConsumerExtensions
     {
         public static void Complete(this IJournalStorageConsumer consumer, IJournalMetadata? metadata) { }
@@ -514,6 +509,11 @@ namespace Orleans.Journaling
         public readonly JournalEntryScope BeginEntry() { throw null; }
     }
 
+    public sealed partial class ListOptions
+    {
+        public JournalId Prefix { get { throw null; } set { } }
+    }
+
     public sealed partial class VolatileJournalStorage : IJournalStorage
     {
         public VolatileJournalStorage() { }
@@ -545,7 +545,7 @@ namespace Orleans.Journaling
 
         public IJournalStorage CreateStorage(JournalId journalId) { throw null; }
 
-        public System.Collections.Generic.IAsyncEnumerable<JournalId> ListAsync(JournalStorageCatalogOptions? options = null, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+        public System.Collections.Generic.IAsyncEnumerable<JournalId> ListAsync(ListOptions? options = null, System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }
 }
 

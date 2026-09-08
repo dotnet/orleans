@@ -26,6 +26,6 @@ public interface IJournalStorageCatalog
     /// </remarks>
     /// <exception cref="OperationCanceledException"><paramref name="cancellationToken"/> is canceled.</exception>
     IAsyncEnumerable<JournalId> ListAsync(
-        JournalStorageCatalogOptions? options = null,
+        ListOptions? options = null,
         CancellationToken cancellationToken = default);
 }

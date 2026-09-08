@@ -110,9 +110,9 @@ Existing data is read using its stored format metadata, or as legacy OrleansBina
 
 ## Catalog enumeration
 
-`IJournalStorageCatalog.ListAsync` returns an `IAsyncEnumerable<JournalId>` in provider traversal order. Pass `JournalStorageCatalogOptions` with `Prefix` to select an exact journal id and its descendants, or omit the options to enumerate all ids. Options are read when enumeration begins.
+`IJournalStorageCatalog.ListAsync` returns an `IAsyncEnumerable<JournalId>` in provider traversal order. Pass `ListOptions` with `Prefix` to select an exact journal id and its descendants, or omit the options to enumerate all ids. Options are read when enumeration begins.
 
-When updating callers of the former prefix overload, pass `new JournalStorageCatalogOptions { Prefix = prefix }`. Applications which require ordinal ordering can materialize the sequence and sort `JournalId.Value` using `StringComparer.Ordinal`.
+When updating callers of the former prefix overload, pass `new ListOptions { Prefix = prefix }`. Applications which require ordinal ordering can materialize the sequence and sort `JournalId.Value` using `StringComparer.Ordinal`.
 
 Storage providers fetch pages internally and yield matching identities as they discover them. `await foreach` advances the traversal and disposes the enumerator when the loop ends. Consumers which process identities in batches can retain one enumerator across batches, advance it serially, and dispose it after the last pending `MoveNextAsync` completes. Use a cancellation token whose lifetime covers that enumeration.
 

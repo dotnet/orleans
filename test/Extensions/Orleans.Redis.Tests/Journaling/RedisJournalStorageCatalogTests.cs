@@ -45,7 +45,7 @@ public sealed class RedisJournalStorageCatalogTests
                 return Task.FromResult((RedisValue)ids[call.ArgAt<RedisKey>(0)].Value);
             });
         var provider = await CreateProviderAsync(database, CreateServer(ScanAsync(TestContext.Current.CancellationToken)));
-        var options = new JournalStorageCatalogOptions { Prefix = JournalId.Create("redis", "list") };
+        var options = new ListOptions { Prefix = JournalId.Create("redis", "list") };
         await using var enumerator = provider.ListAsync(options, TestContext.Current.CancellationToken).GetAsyncEnumerator(TestContext.Current.CancellationToken);
 
         Assert.True(await enumerator.MoveNextAsync());

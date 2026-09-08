@@ -80,7 +80,7 @@ public sealed class RedisJournalStorageTests
 
         var listed = await ToListAsync(
             provider.ListAsync(
-                new JournalStorageCatalogOptions { Prefix = JournalId.Create("redis", "list") },
+                new ListOptions { Prefix = JournalId.Create("redis", "list") },
                 TestContext.Current.CancellationToken),
             TestContext.Current.CancellationToken);
         Assert.Equal(3, listed.Count);
@@ -91,7 +91,7 @@ public sealed class RedisJournalStorageTests
 
         listed = await ToListAsync(
             provider.ListAsync(
-                new JournalStorageCatalogOptions { Prefix = JournalId.Create("redis", "list") },
+                new ListOptions { Prefix = JournalId.Create("redis", "list") },
                 TestContext.Current.CancellationToken),
             TestContext.Current.CancellationToken);
         Assert.Equal(2, listed.Count);

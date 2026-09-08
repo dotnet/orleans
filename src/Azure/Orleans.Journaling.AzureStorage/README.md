@@ -33,7 +33,7 @@ siloBuilder.AddAzureTableJournalStorage(options =>
 
 ## Catalog enumeration
 
-Both Azure providers implement `IJournalStorageCatalog.ListAsync`, returning identities incrementally in service traversal order. Set `JournalStorageCatalogOptions.Prefix` to enumerate an exact journal id and its descendants. The provider handles service continuations internally and yields identities from the current page before fetching the next page.
+Both Azure providers implement `IJournalStorageCatalog.ListAsync`, returning identities incrementally in service traversal order. Set `ListOptions.Prefix` to enumerate an exact journal id and its descendants. The provider handles service continuations internally and yields identities from the current page before fetching the next page.
 
 The Blob catalog scans the configured `ContainerName` and interprets append blobs named `<journalId>/wal` as journal identities. This traversal applies equally when a custom naming delegate or container factory produces the same entries. Each internal page requests up to 5000 blobs, including checkpoints and other entries before filtering.
 

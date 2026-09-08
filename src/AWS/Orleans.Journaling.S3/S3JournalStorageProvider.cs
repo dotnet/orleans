@@ -46,7 +46,7 @@ internal sealed class S3JournalStorageProvider : ILifecycleParticipant<ISiloLife
     }
 
     public async IAsyncEnumerable<JournalId> ListAsync(
-        JournalStorageCatalogOptions? options = null,
+        ListOptions? options = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();

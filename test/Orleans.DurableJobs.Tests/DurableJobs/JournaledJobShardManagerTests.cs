@@ -643,7 +643,7 @@ public class JournaledJobShardManagerTests
 
         public IJournalStorage CreateStorage(JournalId journalId) => new CountingJournalStorage(this, _inner.CreateStorage(journalId));
 
-        public IAsyncEnumerable<JournalId> ListAsync(JournalStorageCatalogOptions? options = null, CancellationToken cancellationToken = default)
+        public IAsyncEnumerable<JournalId> ListAsync(ListOptions? options = null, CancellationToken cancellationToken = default)
             => _inner.ListAsync(options, cancellationToken);
 
         private async ValueTask OnAppendAsync(CancellationToken cancellationToken)

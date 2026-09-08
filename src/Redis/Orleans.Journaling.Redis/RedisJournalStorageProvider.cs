@@ -57,7 +57,7 @@ internal sealed class RedisJournalStorageProvider : IJournalStorageProvider, IJo
     }
 
     public async IAsyncEnumerable<JournalId> ListAsync(
-        JournalStorageCatalogOptions? options = null,
+        ListOptions? options = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var prefix = options?.Prefix ?? default;

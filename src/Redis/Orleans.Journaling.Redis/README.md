@@ -35,11 +35,11 @@ If the Redis connection is already registered in dependency injection, configure
 
 ## Journal discovery
 
-Use `IJournalStorageCatalog.ListAsync` with optional `JournalStorageCatalogOptions` to filter by a journal id prefix:
+Use `IJournalStorageCatalog.ListAsync` with optional `ListOptions` to filter by a journal id prefix:
 
 ```csharp
 await foreach (var journalId in catalog.ListAsync(
-    new JournalStorageCatalogOptions { Prefix = JournalId.Create("jobs") },
+    new ListOptions { Prefix = JournalId.Create("jobs") },
     cancellationToken))
 {
     // Process the discovered journal.

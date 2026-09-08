@@ -56,7 +56,7 @@ public sealed class JournalStorageCatalogTests
     public async Task ListAsync_OptionsAreReadAtEnumerationStartAndRemainStable(string kind)
     {
         await using var context = await CreateAsync(kind, ["tenant/z", "tenant/a", "tenant/b", "other/q"]);
-        var options = new JournalStorageCatalogOptions { Prefix = new("other") };
+        var options = new ListOptions { Prefix = new("other") };
         var listing = context.Catalog.ListAsync(options, TestContext.Current.CancellationToken);
         options.Prefix = new("tenant");
         await using var enumerator = listing.GetAsyncEnumerator(TestContext.Current.CancellationToken);

@@ -10,7 +10,7 @@ Metadata updates rewrite the current WAL using a conditional single-object uploa
 
 ## Catalog enumeration
 
-`IJournalStorageCatalog.ListAsync` returns journal identities incrementally in S3 traversal order, including unordered directory-bucket listings. Set `JournalStorageCatalogOptions.Prefix` to select an exact journal id and its descendants.
+`IJournalStorageCatalog.ListAsync` returns journal identities incrementally in S3 traversal order, including unordered directory-bucket listings. Set `ListOptions.Prefix` to select an exact journal id and its descendants.
 
 The provider handles `ListObjectsV2` continuations internally, requests up to 1000 objects per page, and yields canonical WAL identities from that page before fetching more objects. The bucket traversal supports `GetObjectKey` and `TryParseJournalId` mappings; checkpoints, aliases, and unrelated objects consume space in the native page before filtering.
 
