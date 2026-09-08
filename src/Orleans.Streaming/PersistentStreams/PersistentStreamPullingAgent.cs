@@ -1873,6 +1873,7 @@ namespace Orleans.Streams
             if (exceptionOccured is ClientNotAvailableException)
             {
                 LogWarningConsumerIsDead(consumerData.StreamConsumer, consumerData.StreamId);
+                RemoveSubscriber_Impl(consumerData.SubscriptionId, consumerData.StreamId);
                 UnregisterUnavailableConsumer(consumerData, cancellationToken).Ignore();
                 return true;
             }
