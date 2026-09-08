@@ -1,4 +1,6 @@
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
+using System.Diagnostics.Metrics;
 using System.Net;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
@@ -185,6 +187,133 @@ namespace UnitTests.StreamingTests
             Assert.Equal(0, await pubSubGrain.ProducerCount(streamId, cancellationToken));
         }
 
+        [Fact, TestCategory("BVT"), TestCategory("Streaming"), TestCategory("PubSub")]
+        public async Task RegisterProducer_RejectedCleanupClearsEmptyState()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var providerName = $"Provider-{Guid.NewGuid():N}";
+            var streamId = new QualifiedStreamId(providerName, StreamId.Create("StreamNamespace", Guid.NewGuid()));
+            var pubSubGrain = this.fixture.GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamId.ToString());
+            var primarySilo = this.fixture.HostedCluster.Primary!;
+            RequestContext.Set(IPlacementDirector.PlacementHintKey, primarySilo.SiloAddress);
+            try
+            {
+                Assert.Equal(0, await pubSubGrain.ProducerCount(streamId, cancellationToken));
+            }
+            finally
+            {
+                RequestContext.Remove(IPlacementDirector.PlacementHintKey);
+            }
+
+            var managementGrain = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);
+            var rendezvousSilo = await managementGrain.GetActivationAddress(pubSubGrain, cancellationToken);
+            Assert.Equal(primarySilo.SiloAddress, rendezvousSilo);
+            var producerSilo = this.fixture.HostedCluster.GetActiveSilos()
+                .First(silo => silo.SiloAddress != rendezvousSilo);
+            var staleProducer = SystemTargetGrainId.Create(
+                Constants.StreamPullingAgentType,
+                producerSilo.SiloAddress,
+                $"{providerName}_1_test-queue").GrainId;
+
+            await pubSubGrain.RegisterProducer(
+                streamId,
+                staleProducer,
+                new MembershipVersion(1),
+                cancellationToken);
+            Assert.NotNull(await this.fixture.HostedCluster.RestartSiloAsync(producerSilo));
+            await this.fixture.HostedCluster.WaitForLivenessToStabilizeAsync();
+
+            var faultGrain = this.fixture.GrainFactory.GetGrain<IStorageFaultGrain>(nameof(PubSubRendezvousGrain));
+            const string clearFailure = "Expected rejected cleanup clear failure";
+            await faultGrain.AddFaultOnClear(
+                pubSubGrain.GetGrainId(),
+                new ApplicationException(clearFailure));
+
+            var clearException = await Assert.ThrowsAsync<OrleansException>(
+                () => pubSubGrain.RegisterProducer(
+                    streamId,
+                    staleProducer,
+                    new MembershipVersion(1),
+                    cancellationToken));
+            Assert.Contains(clearFailure, clearException.ToString());
+
+            var exception = await Assert.ThrowsAsync<OrleansException>(
+                () => pubSubGrain.RegisterProducer(
+                    streamId,
+                    staleProducer,
+                    new MembershipVersion(1),
+                    cancellationToken));
+            Assert.Contains("Registration requires a known, non-terminating producer silo", exception.Message);
+
+            await managementGrain.ForceActivationCollection(TimeSpan.Zero, cancellationToken);
+            Assert.Equal(0, await pubSubGrain.ProducerCount(streamId, cancellationToken));
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming"), TestCategory("PubSub")]
+        public async Task RegisterProducer_DuplicateHealingUpdatesProducerTotal()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var providerName = $"Provider-{Guid.NewGuid():N}";
+            var streamId = new QualifiedStreamId(providerName, StreamId.Create("StreamNamespace", Guid.NewGuid()));
+            var changes = new ConcurrentQueue<int>();
+            using var listener = new MeterListener();
+            listener.InstrumentPublished = (instrument, meterListener) =>
+            {
+                if (instrument.Meter.Name == "Microsoft.Orleans"
+                    && instrument.Name == InstrumentNames.STREAMS_PUBSUB_PRODUCERS_TOTAL)
+                {
+                    meterListener.EnableMeasurementEvents(instrument);
+                }
+            };
+            listener.SetMeasurementEventCallback<int>((_, measurement, tags, _) =>
+            {
+                if (HasTag(tags, "provider", providerName))
+                {
+                    changes.Enqueue(measurement);
+                }
+            });
+            listener.Start();
+
+            var pubSubGrain = this.fixture.GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamId.ToString());
+            var primarySilo = this.fixture.HostedCluster.Primary!;
+            RequestContext.Set(IPlacementDirector.PlacementHintKey, primarySilo.SiloAddress);
+            try
+            {
+                Assert.Equal(0, await pubSubGrain.ProducerCount(streamId, cancellationToken));
+            }
+            finally
+            {
+                RequestContext.Remove(IPlacementDirector.PlacementHintKey);
+            }
+
+            var managementGrain = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);
+            var currentSiloAddress = await managementGrain.GetActivationAddress(pubSubGrain, cancellationToken);
+            Assert.Equal(primarySilo.SiloAddress, currentSiloAddress);
+            var staleSilo = this.fixture.HostedCluster.GetActiveSilos()
+                .First(silo => silo.SiloAddress != primarySilo.SiloAddress);
+            var staleProducer = SystemTargetGrainId.Create(
+                Constants.StreamPullingAgentType,
+                staleSilo.SiloAddress,
+                $"{providerName}_1_test-queue").GrainId;
+            var currentProducer = SystemTargetGrainId.Create(
+                Constants.StreamPullingAgentType,
+                primarySilo.SiloAddress,
+                $"{providerName}_1_test-queue").GrainId;
+
+            await pubSubGrain.RegisterProducer(streamId, staleProducer, new MembershipVersion(1), cancellationToken);
+            await pubSubGrain.RegisterProducer(streamId, currentProducer, new MembershipVersion(1), cancellationToken);
+            Assert.Equal(2, await pubSubGrain.ProducerCount(streamId, cancellationToken));
+
+            Assert.NotNull(await this.fixture.HostedCluster.RestartSiloAsync(staleSilo));
+            await this.fixture.HostedCluster.WaitForLivenessToStabilizeAsync();
+            await pubSubGrain.RegisterProducer(streamId, currentProducer, new MembershipVersion(1), cancellationToken);
+
+            Assert.Equal(1, await pubSubGrain.ProducerCount(streamId, cancellationToken));
+            Assert.Equal([1, 1, -1], changes);
+
+            await pubSubGrain.UnregisterProducer(streamId, currentProducer, cancellationToken);
+        }
+
         [Theory]
         [InlineData(SiloStatus.None, false)]
         [InlineData(SiloStatus.Active, true)]
@@ -218,6 +347,22 @@ namespace UnitTests.StreamingTests
                 statuses);
 
             Assert.Equal(expected, actual);
+        }
+
+        private static bool HasTag(
+            ReadOnlySpan<KeyValuePair<string, object?>> tags,
+            string name,
+            string value)
+        {
+            foreach (var tag in tags)
+            {
+                if (tag.Key == name && string.Equals(tag.Value as string, value, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming"), TestCategory("PubSub")]
