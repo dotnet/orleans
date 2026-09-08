@@ -579,6 +579,118 @@ public sealed class KinesisPooledRuntimeTests
         }
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PooledReceiver_NonzeroStartTokenDeliversRequestedRecordSuffix(bool includeNewerRecord)
+    {
+        const string offset = "123456789012345678901234567890";
+        const string nextOffset = "123456789012345678901234567891";
+        await using var fixture = new Fixture();
+        await fixture.Factory.CreateAdapter(TestCancellation);
+        var receiver = fixture.GetReceiver();
+        var client = Assert.Single(fixture.ReceiverClients);
+        var records = includeNewerRecord
+            ? new[] { fixture.Record(offset, "first", "second", "third"), fixture.Record(nextOffset, "next") }
+            : new[] { fixture.Record(offset, "first", "second", "third") };
+        fixture.SetReads(client, () => Response("tail", records));
+        await receiver.GetQueueMessagesAsync(records.Length, TestCancellation);
+
+        var startToken = new KinesisSequenceToken(offset, sequenceNumber: 0, eventIndex: 1);
+        using var cursor = Assert.IsAssignableFrom<IQueueCacheCursor>(
+            receiver.TryGetCacheCursor(fixture.StreamId, startToken).Cursor);
+        var batch = ReadBatch(cursor);
+
+        Assert.Equal(startToken, batch.SequenceToken);
+        Assert.Equal(["second", "third"], batch.GetEvents<string>().Select(item => item.Item1));
+        Assert.Equal([1, 2], batch.GetEvents<string>().Select(item => item.Item2.EventIndex));
+        cursor.RecordDeliveryFailure();
+        var retried = ReadBatch(cursor);
+        Assert.Equal(startToken, retried.SequenceToken);
+        Assert.Equal(["second", "third"], retried.GetEvents<string>().Select(item => item.Item1));
+        Assert.Equal([1, 2], retried.GetEvents<string>().Select(item => item.Item2.EventIndex));
+        if (includeNewerRecord)
+        {
+            AssertBatch(ReadBatch(cursor), nextOffset, 1, "next");
+        }
+        else
+        {
+            Assert.Equal(QueueCacheCursorMoveResultKind.NoData, cursor.MoveNextWithResult().Kind);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PooledReceiver_NonzeroDeliveryTokenResumesAfterAcknowledgedEvent(bool includeNewerRecord)
+    {
+        const string offset = "123456789012345678901234567890";
+        const string nextOffset = "123456789012345678901234567891";
+        await using var fixture = new Fixture();
+        await fixture.Factory.CreateAdapter(TestCancellation);
+        var receiver = fixture.GetReceiver();
+        var client = Assert.Single(fixture.ReceiverClients);
+        var records = includeNewerRecord
+            ? new[] { fixture.Record(offset, "first", "second", "third"), fixture.Record(nextOffset, "next") }
+            : new[] { fixture.Record(offset, "first", "second", "third") };
+        fixture.SetReads(client, () => Response("tail", records));
+        await receiver.GetQueueMessagesAsync(records.Length, TestCancellation);
+
+        var deliveredToken = new KinesisSequenceToken(offset, sequenceNumber: 0, eventIndex: 1);
+        using var cursor = Assert.IsAssignableFrom<IQueueCacheCursor>(
+            receiver.TryGetCacheCursor(fixture.StreamId, deliveredToken).Cursor);
+        Assert.IsAssignableFrom<IQueueCacheCursorProgress>(cursor).SetDeliveredThrough(deliveredToken);
+        var batch = ReadBatch(cursor);
+
+        Assert.Equal(2, batch.SequenceToken.EventIndex);
+        Assert.Equal(["third"], batch.GetEvents<string>().Select(item => item.Item1));
+        Assert.Equal([2], batch.GetEvents<string>().Select(item => item.Item2.EventIndex));
+        if (includeNewerRecord)
+        {
+            AssertBatch(ReadBatch(cursor), nextOffset, 1, "next");
+        }
+        else
+        {
+            Assert.Equal(QueueCacheCursorMoveResultKind.NoData, cursor.MoveNextWithResult().Kind);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PooledReceiver_FinalEventDeliveryTokenPreservesSafePosition(bool includeNewerRecord)
+    {
+        const string offset = "123456789012345678901234567890";
+        const string nextOffset = "123456789012345678901234567891";
+        await using var fixture = new Fixture();
+        await fixture.Factory.CreateAdapter(TestCancellation);
+        var receiver = fixture.GetReceiver();
+        var client = Assert.Single(fixture.ReceiverClients);
+        var records = includeNewerRecord
+            ? new[] { fixture.Record(offset, "first", "second", "third"), fixture.Record(nextOffset, "next") }
+            : new[] { fixture.Record(offset, "first", "second", "third") };
+        fixture.SetReads(client, () => Response("tail", records));
+        await receiver.GetQueueMessagesAsync(records.Length, TestCancellation);
+
+        var deliveredToken = new KinesisSequenceToken(offset, sequenceNumber: 0, eventIndex: 2);
+        using var cursor = Assert.IsAssignableFrom<IQueueCacheCursor>(
+            receiver.TryGetCacheCursor(fixture.StreamId, deliveredToken).Cursor);
+        var progress = Assert.IsAssignableFrom<IQueueCacheCursorProgress>(cursor);
+        progress.SetDeliveredThrough(deliveredToken);
+        var result = cursor.MoveNextWithResult();
+
+        Assert.Equal(deliveredToken, progress.SafeSequenceToken);
+        if (includeNewerRecord)
+        {
+            Assert.Equal(QueueCacheCursorMoveResultKind.Success, result.Kind);
+            AssertBatch(Assert.IsType<KinesisBatchContainer>(cursor.GetCurrent(out _)), nextOffset, 1, "next");
+        }
+        else
+        {
+            Assert.Equal(QueueCacheCursorMoveResultKind.NoData, result.Kind);
+        }
+    }
+
     [Fact]
     public async Task Source_ReadReturnsOrderedRawRecordMetadataWithoutDecodingOrMutatingWirePayload()
     {

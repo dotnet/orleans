@@ -232,8 +232,7 @@ internal sealed class KinesisRecoverableStreamDataAdapter(
 
         var offset = 0;
         var shardSequence = SegmentBuilder.ReadNextString(cachedMessage.Segment, ref offset)!;
-        var difference = CompareShardSequences(shardSequence, kinesisToken.ShardSequence);
-        return difference != 0 ? difference : cachedMessage.EventIndex.CompareTo(kinesisToken.EventIndex);
+        return CompareShardSequences(shardSequence, kinesisToken.ShardSequence);
     }
 
     private static int CompareShardSequences(string left, string right)

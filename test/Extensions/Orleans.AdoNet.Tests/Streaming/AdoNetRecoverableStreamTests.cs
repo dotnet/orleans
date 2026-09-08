@@ -108,6 +108,29 @@ public class AdoNetRecoverableStreamTests
     }
 
     [Fact]
+    public async Task CreateAdapterInterfaceOverloadPropagatesCallerCancellation()
+    {
+        var lifetime = new FakeHostApplicationLifetime();
+        var adapter = Substitute.For<IQueueAdapter>();
+        var factory = new BlockingAdoNetQueueAdapterFactory(
+            CreateQueries(new CapturingRelationalStorage()),
+            adapter,
+            lifetime);
+        var first = factory.CreateAdapter();
+        await factory.AdapterConstructionStarted.Task;
+        using var cancellation = new CancellationTokenSource();
+
+        var canceled = ((IQueueAdapterFactory)factory).CreateAdapter(cancellation.Token);
+        cancellation.Cancel();
+
+        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => canceled);
+        Assert.True(exception.CancellationToken.IsCancellationRequested);
+        Assert.Equal(1, factory.AdapterConstructionCount);
+        factory.CompleteAdapterConstruction();
+        Assert.Same(adapter, await first);
+    }
+
+    [Fact]
     public void ResolveCheckpointUpdate_ReturnsAuthoritativeStateForExpectedVersionConflict()
     {
         var update = new AdoNetStreamCheckpointUpdate(
@@ -695,7 +718,12 @@ public class AdoNetRecoverableStreamTests
 
         public void CompleteAdapterConstruction() => _adapterConstruction.SetResult();
 
-        internal override ValueTask<RelationalOrleansQueries> GetQueriesAsync() => new(queries);
+        internal override ValueTask<RelationalOrleansQueries> GetQueriesAsync(
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return new(queries);
+        }
 
         internal override async ValueTask<IQueueAdapter> CreateAdapterCore(RelationalOrleansQueries value)
         {

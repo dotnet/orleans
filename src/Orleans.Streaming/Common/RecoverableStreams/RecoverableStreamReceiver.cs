@@ -60,13 +60,25 @@ public sealed class RecoverableStreamReceiver<TQueueMessage> : IQueueAdapterRece
     }
 
     /// <inheritdoc />
-    public async Task Initialize(TimeSpan timeout)
+    public Task Initialize(TimeSpan timeout)
+        => InitializeWithCancellation(timeout, CancellationToken.None);
+
+    /// <inheritdoc />
+    Task IQueueAdapterReceiver.Initialize(TimeSpan timeout, CancellationToken cancellationToken)
+        => InitializeWithCancellation(timeout, cancellationToken);
+
+    private async Task InitializeWithCancellation(TimeSpan timeout, CancellationToken cancellationToken)
     {
-        using var cancellation = timeout == Timeout.InfiniteTimeSpan
+        cancellationToken.ThrowIfCancellationRequested();
+        using var timeoutCancellation = timeout == Timeout.InfiniteTimeSpan
             ? null
             : new CancellationTokenSource(timeout);
-        var cancellationToken = cancellation?.Token ?? CancellationToken.None;
-        await EnsureInitialized(cancellationToken);
+        using var linkedCancellation = timeoutCancellation is null
+            ? null
+            : CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken,
+                timeoutCancellation.Token);
+        await EnsureInitialized(linkedCancellation?.Token ?? cancellationToken);
     }
 
     /// <summary>
@@ -238,8 +250,16 @@ public sealed class RecoverableStreamReceiver<TQueueMessage> : IQueueAdapterRece
             : Task.CompletedTask;
 
     /// <inheritdoc />
-    public async Task Shutdown(TimeSpan timeout)
+    public Task Shutdown(TimeSpan timeout)
+        => ShutdownWithCancellation(timeout, CancellationToken.None);
+
+    /// <inheritdoc />
+    Task IQueueAdapterReceiver.Shutdown(TimeSpan timeout, CancellationToken cancellationToken)
+        => ShutdownWithCancellation(timeout, cancellationToken);
+
+    private async Task ShutdownWithCancellation(TimeSpan timeout, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (Interlocked.Exchange(ref _shutdown, 1) != 0)
         {
             return;
@@ -248,10 +268,15 @@ public sealed class RecoverableStreamReceiver<TQueueMessage> : IQueueAdapterRece
         Volatile.Write(ref _running, 0);
         _lifecycleCancellation.Cancel();
         ClearPendingMessages();
-        using var cancellation = timeout == Timeout.InfiniteTimeSpan
+        using var timeoutCancellation = timeout == Timeout.InfiniteTimeSpan
             ? null
             : new CancellationTokenSource(timeout);
-        var cancellationToken = cancellation?.Token ?? CancellationToken.None;
+        using var linkedCancellation = timeoutCancellation is null
+            ? null
+            : CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken,
+                timeoutCancellation.Token);
+        cancellationToken = linkedCancellation?.Token ?? cancellationToken;
         List<Exception>? exceptions = null;
         Task? initializeTask;
         lock (_lifecycleLock)

@@ -40,7 +40,8 @@ internal class AdoNetQueueAdapterFactory : IQueueAdapterFactory, IQueueAdapterCa
     /// <summary>
     /// Ensures queries are loaded only once while allowing for recovery if the load fails.
     /// </summary>
-    internal virtual ValueTask<RelationalOrleansQueries> GetQueriesAsync()
+    internal virtual ValueTask<RelationalOrleansQueries> GetQueriesAsync(
+        CancellationToken cancellationToken = default)
     {
         // attempt fast path
         return Volatile.Read(ref _queries) is { } queries ? new(queries) : new(CoreAsync());
@@ -48,7 +49,7 @@ internal class AdoNetQueueAdapterFactory : IQueueAdapterFactory, IQueueAdapterCa
         // slow path
         async Task<RelationalOrleansQueries> CoreAsync()
         {
-            await WaitForInitializationLockAsync();
+            await WaitForInitializationLockAsync(cancellationToken);
             try
             {
                 // attempt fast path again
@@ -60,7 +61,7 @@ internal class AdoNetQueueAdapterFactory : IQueueAdapterFactory, IQueueAdapterCa
                 // slow path - the member variable will only be set if the call succeeds
                 var result = await RelationalOrleansQueries
                     .CreateInstance(_streamOptions.Invariant, _streamOptions.ConnectionString, _streamOptions.DataSource)
-                    .WaitAsync(_streamOptions.InitializationTimeout);
+                    .WaitAsync(_streamOptions.InitializationTimeout, cancellationToken);
                 Volatile.Write(ref _queries, result);
                 return result;
             }
@@ -71,16 +72,23 @@ internal class AdoNetQueueAdapterFactory : IQueueAdapterFactory, IQueueAdapterCa
         }
     }
 
-    public async Task<IQueueAdapter> CreateAdapter()
+    public Task<IQueueAdapter> CreateAdapter()
+        => CreateAdapterWithCancellation(CancellationToken.None);
+
+    Task<IQueueAdapter> IQueueAdapterFactory.CreateAdapter(CancellationToken cancellationToken)
+        => CreateAdapterWithCancellation(cancellationToken);
+
+    private async Task<IQueueAdapter> CreateAdapterWithCancellation(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (Volatile.Read(ref _adapter) is { } adapter)
         {
             return adapter;
         }
 
-        var queries = await GetQueriesAsync();
+        var queries = await GetQueriesAsync(cancellationToken);
 
-        await WaitForInitializationLockAsync();
+        await WaitForInitializationLockAsync(cancellationToken);
         try
         {
             if (_adapter is not null)
@@ -98,9 +106,12 @@ internal class AdoNetQueueAdapterFactory : IQueueAdapterFactory, IQueueAdapterCa
         }
     }
 
-    private async Task WaitForInitializationLockAsync()
+    private async Task WaitForInitializationLockAsync(CancellationToken cancellationToken = default)
     {
-        if (!await _semaphore.WaitAsync(_streamOptions.InitializationTimeout, _lifetime.ApplicationStopping))
+        using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken,
+            _lifetime.ApplicationStopping);
+        if (!await _semaphore.WaitAsync(_streamOptions.InitializationTimeout, linkedCancellation.Token))
         {
             throw new TimeoutException($"Timed out waiting to initialize ADO.NET stream provider '{_name}'.");
         }

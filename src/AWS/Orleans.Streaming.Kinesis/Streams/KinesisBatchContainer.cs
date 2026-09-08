@@ -11,7 +11,7 @@ namespace Orleans.Streaming.Kinesis
 {
     [Serializable]
     [Orleans.GenerateSerializer]
-    internal class KinesisBatchContainer : IBatchContainer, IComparable<KinesisBatchContainer>
+    internal class KinesisBatchContainer : IBatchContainer, IComparable<KinesisBatchContainer>, IQueueCacheBatchContainerFilter
     {
         [JsonProperty]
         [Id(0)]
@@ -48,13 +48,14 @@ namespace Orleans.Streaming.Kinesis
             Serializer<KinesisBatchContainer.Body> serializer,
             StreamId streamId,
             string shardSequence,
-            long sequenceId)
+            long sequenceId,
+            int eventIndex = 0)
         {
             Serializer = serializer;
             _rawRecord = rawRecord;
             _streamId = streamId;
             _hasStreamId = true;
-            Token = new KinesisSequenceToken(shardSequence, sequenceId, 0);
+            Token = new KinesisSequenceToken(shardSequence, sequenceId, eventIndex);
         }
 
         [GeneratedActivatorConstructor]
@@ -83,7 +84,7 @@ namespace Orleans.Streaming.Kinesis
         public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()
         {
             var events = GetPayload().Events;
-            for (var i = 0; i < events.Count; i++)
+            for (var i = Token.EventIndex; i < events.Count; i++)
             {
                 if (events[i] is T item)
                 {
@@ -111,6 +112,47 @@ namespace Orleans.Streaming.Kinesis
 
         public int CompareTo(KinesisBatchContainer? other)
             => other is null ? 1 : Token.CompareTo(other.Token);
+
+        IBatchContainer IQueueCacheBatchContainerFilter.FilterFrom(StreamSequenceToken inclusiveStartToken)
+        {
+            if (inclusiveStartToken is not KinesisSequenceToken token
+                || !string.Equals(token.ShardSequence, Token.ShardSequence, StringComparison.Ordinal)
+                || token.EventIndex <= 0)
+            {
+                return this;
+            }
+
+            return new KinesisBatchContainer(
+                _rawRecord,
+                Serializer,
+                StreamId,
+                Token.ShardSequence,
+                Token.SequenceNumber,
+                token.EventIndex);
+        }
+
+        IBatchContainer? IQueueCacheBatchContainerFilter.FilterAfter(StreamSequenceToken exclusiveStartToken)
+        {
+            if (exclusiveStartToken is not KinesisSequenceToken token
+                || !string.Equals(token.ShardSequence, Token.ShardSequence, StringComparison.Ordinal))
+            {
+                return this;
+            }
+
+            var firstEventIndex = token.EventIndex + 1;
+            if (firstEventIndex >= GetPayload().Events.Count)
+            {
+                return null;
+            }
+
+            return new KinesisBatchContainer(
+                _rawRecord,
+                Serializer,
+                StreamId,
+                Token.ShardSequence,
+                Token.SequenceNumber,
+                firstEventIndex);
+        }
 
         [Serializable]
         [GenerateSerializer]

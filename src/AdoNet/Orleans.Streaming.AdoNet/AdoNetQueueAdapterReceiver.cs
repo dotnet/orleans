@@ -63,11 +63,19 @@ internal sealed class AdoNetQueueAdapterReceiver : IQueueAdapterReceiver, IQueue
 
     public Task Initialize(TimeSpan timeout) => _inner.Initialize(timeout);
 
-    public async Task Shutdown(TimeSpan timeout)
+    Task IQueueAdapterReceiver.Initialize(TimeSpan timeout, CancellationToken cancellationToken)
+        => ((IQueueAdapterReceiver)_inner).Initialize(timeout, cancellationToken);
+
+    public Task Shutdown(TimeSpan timeout) => ShutdownWithCancellation(timeout, CancellationToken.None);
+
+    Task IQueueAdapterReceiver.Shutdown(TimeSpan timeout, CancellationToken cancellationToken)
+        => ShutdownWithCancellation(timeout, cancellationToken);
+
+    private async Task ShutdownWithCancellation(TimeSpan timeout, CancellationToken cancellationToken)
     {
         try
         {
-            await _inner.Shutdown(timeout);
+            await ((IQueueAdapterReceiver)_inner).Shutdown(timeout, cancellationToken);
         }
         finally
         {
