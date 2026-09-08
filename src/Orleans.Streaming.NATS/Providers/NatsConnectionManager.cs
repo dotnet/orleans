@@ -160,7 +160,7 @@ internal sealed partial class NatsConnectionManager
 
         var subject = $"{this._providerName}.{ns}.{id}";
 
-        var context = this._producerNatsContexts[Math.Abs(id.GetHashCode()) % this._producerNatsContexts.Length];
+        var context = this._producerNatsContexts[GetProducerIndex(id.GetHashCode(), this._producerNatsContexts.Length)];
 
         var ack = await context.TryPublishAsync(
             subject,
@@ -191,6 +191,9 @@ internal sealed partial class NatsConnectionManager
             partition,
             this._options.BatchSize,
             this._natsClientOptions.SerializerRegistry.GetDeserializer<NatsStreamMessage>());
+
+    internal static int GetProducerIndex(int hashCode, int producerCount)
+        => (int)((uint)hashCode % (uint)producerCount);
 
     /// <summary>
     /// Acknowledge messages on a subject in a NATS JetStream stream
