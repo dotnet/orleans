@@ -409,7 +409,7 @@ namespace Orleans.Runtime.Messaging
                         break;
                     }
 
-                    inflight.Clear();
+                    DisposeSentRequestBodies(inflight);
                 }
             }
             catch (Exception exception)
@@ -426,6 +426,16 @@ namespace Orleans.Runtime.Messaging
                 await _transport!.Output.CompleteAsync();
                 this.StartClosing(error);
             }
+        }
+
+        private static void DisposeSentRequestBodies(List<Message> messages)
+        {
+            foreach (var message in messages)
+            {
+                message.DisposeOwnedBody();
+            }
+
+            messages.Clear();
         }
 
         private void RerouteMessage(Message message)

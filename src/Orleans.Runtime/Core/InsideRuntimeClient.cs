@@ -138,85 +138,110 @@ namespace Orleans.Runtime
             IResponseCompletionSource? context,
             InvokeMethodOptions options)
         {
-            var cancellationToken = request.GetCancellationToken();
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var message = this.messageFactory.CreateMessage(request, options);
-            message.InterfaceType = target.InterfaceType;
-            message.InterfaceVersion = target.InterfaceVersion;
-
-            // fill in sender
-            if (message.SendingSilo == null)
-                message.SendingSilo = MySilo;
-
-            IGrainContext? sendingActivation = RuntimeContext.Current;
-
-            if (sendingActivation == null)
-            {
-                var clientAddress = this.HostedClient.Address;
-                message.SendingGrain = clientAddress.GrainId;
-            }
-            else
-            {
-                message.SendingGrain = sendingActivation.GrainId;
-            }
-
-            // fill in destination
-            var targetGrainId = target.GrainId;
-            message.TargetGrain = targetGrainId;
-            SharedCallbackData sharedData;
-            if (SystemTargetGrainId.TryParse(targetGrainId, out var systemTargetGrainId))
-            {
-                message.TargetSilo = systemTargetGrainId.GetSiloAddress();
-                message.IsSystemMessage = true;
-                sharedData = this.systemSharedCallbackData;
-            }
-            else
-            {
-                sharedData = this.sharedCallbackData;
-            }
-
-            if (this.messagingOptions.DropExpiredMessages && message.IsExpirableMessage())
-            {
-                message.TimeToLive = request.GetDefaultResponseTimeout() ?? sharedData.ResponseTimeout;
-            }
-
-            var oneWay = (options & InvokeMethodOptions.OneWay) != 0;
+            Message? message = null;
             CallbackData? callbackData = null;
-            if (!oneWay)
+            try
             {
-                Debug.Assert(context is not null);
+                var cancellationToken = request.GetCancellationToken();
+                cancellationToken.ThrowIfCancellationRequested();
 
-                // Register a callback for the request.
-                callbackData = new CallbackData(sharedData, context, message, _applicationRequestInstruments);
+                message = this.messageFactory.CreateMessage(request, options);
+                message.InterfaceType = target.InterfaceType;
+                message.InterfaceVersion = target.InterfaceVersion;
+
+                // fill in sender
+                if (message.SendingSilo == null)
+                    message.SendingSilo = MySilo;
+
+                IGrainContext? sendingActivation = RuntimeContext.Current;
+
+                if (sendingActivation == null)
+                {
+                    var clientAddress = this.HostedClient.Address;
+                    message.SendingGrain = clientAddress.GrainId;
+                }
+                else
+                {
+                    message.SendingGrain = sendingActivation.GrainId;
+                }
+
+                // fill in destination
+                var targetGrainId = target.GrainId;
+                message.TargetGrain = targetGrainId;
+                SharedCallbackData sharedData;
+                if (SystemTargetGrainId.TryParse(targetGrainId, out var systemTargetGrainId))
+                {
+                    message.TargetSilo = systemTargetGrainId.GetSiloAddress();
+                    message.IsSystemMessage = true;
+                    sharedData = this.systemSharedCallbackData;
+                }
+                else
+                {
+                    sharedData = this.sharedCallbackData;
+                }
+
+                if (this.messagingOptions.DropExpiredMessages && message.IsExpirableMessage())
+                {
+                    message.TimeToLive = request.GetDefaultResponseTimeout() ?? sharedData.ResponseTimeout;
+                }
+
+                var oneWay = (options & InvokeMethodOptions.OneWay) != 0;
+                if (!oneWay)
+                {
+                    Debug.Assert(context is not null);
+
+                    // Register a callback for the request.
+                    callbackData = new CallbackData(sharedData, context, message, _applicationRequestInstruments);
+                    if (Volatile.Read(ref _isStopping) != 0)
+                    {
+                        callbackData.OnHostShutdown();
+                        message.DisposeOwnedBody();
+                        return;
+                    }
+
+                    callbacks.TryAdd((message.SendingGrain, message.Id), callbackData);
+                    callbackData.SubscribeForCancellation(cancellationToken);
+                }
+                else
+                {
+                    context?.Complete();
+                    if (Volatile.Read(ref _isStopping) != 0)
+                    {
+                        message.DisposeOwnedBody();
+                        return;
+                    }
+                }
+
+                // Completing callbacks during shutdown can resume application code which issues follow-up
+                // calls. Reject those calls so that they cannot outlive the shutdown callback sweep.
                 if (Volatile.Read(ref _isStopping) != 0)
                 {
-                    callbackData.OnHostShutdown();
+                    callbackData?.OnHostShutdown();
+                    message.DisposeOwnedBody();
                     return;
                 }
 
-                callbacks.TryAdd((message.SendingGrain, message.Id), callbackData);
-                callbackData.SubscribeForCancellation(cancellationToken);
+                this.messagingTrace.OnSendRequest(message);
+                this.MessageCenter.AddressAndSendMessage(message);
             }
-            else
+            catch (Exception exception)
             {
-                context?.Complete();
-                if (Volatile.Read(ref _isStopping) != 0)
+                if (message is null)
                 {
-                    return;
+                    request.Dispose();
                 }
-            }
+                else
+                {
+                    message.DisposeOwnedBody();
+                    if (callbackData is not null)
+                    {
+                        callbackData.OnSendFailure(exception);
+                        return;
+                    }
+                }
 
-            // Completing callbacks during shutdown can resume application code which issues follow-up
-            // calls. Reject those calls so that they cannot outlive the shutdown callback sweep.
-            if (Volatile.Read(ref _isStopping) != 0)
-            {
-                callbackData?.OnHostShutdown();
-                return;
+                throw;
             }
-
-            this.messagingTrace.OnSendRequest(message);
-            this.MessageCenter.AddressAndSendMessage(message);
         }
 
         public void SendResponse(Message request, Response response)
@@ -324,7 +349,6 @@ namespace Orleans.Runtime
                                     response = this.responseCopier.Copy(response)!;
                                 }
 
-                                invokable.Dispose();
                                 break;
                             }
                         default:
@@ -375,6 +399,10 @@ namespace Orleans.Runtime
                 {
                     SafeSendExceptionResponse(message, exc2);
                 }
+            }
+            finally
+            {
+                message.DisposeOwnedBody();
             }
         }
 

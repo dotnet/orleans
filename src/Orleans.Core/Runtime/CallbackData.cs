@@ -16,6 +16,8 @@ namespace Orleans.Runtime
         private readonly SharedCallbackData shared;
         private readonly IResponseCompletionSource context;
         private readonly ApplicationRequestInstruments _applicationRequestInstruments;
+        private readonly TimeSpan? _defaultResponseTimeout;
+        private readonly bool _isCancellable;
         private int _state;
         private StatusResponse? lastKnownStatus;
         private ValueStopwatch stopwatch;
@@ -32,6 +34,11 @@ namespace Orleans.Runtime
             this.Message = msg;
             _applicationRequestInstruments = applicationRequestInstruments;
             this.stopwatch = ValueStopwatch.StartNew();
+            if (msg.BodyObject is IInvokable request)
+            {
+                _defaultResponseTimeout = request.GetDefaultResponseTimeout();
+                _isCancellable = request.IsCancellable;
+            }
         }
 
         public Message Message { get; } // might hold metadata used by response pipeline
@@ -74,7 +81,7 @@ namespace Orleans.Runtime
             // Only cancel requests which honor cancellation token.
             // Not all targets support IGrainCallCancellationExtension, so sending a cancellation in those cases could result in an error.
             // There are opportunities to cancel requests at the infrastructure layer which this will not exploit if the target method does not support cancellation.
-            if (Message.BodyObject is IInvokable invokable && invokable.IsCancellable)
+            if (_isCancellable)
             {
                 shared.CancellationManager?.SignalCancellation(Message.TargetSilo, Message.TargetGrain, Message.SendingGrain, Message.Id);
             }
@@ -93,16 +100,15 @@ namespace Orleans.Runtime
 
         private long GetResponseTimeoutStopwatchTicks()
         {
-            var defaultResponseTimeout = (Message.BodyObject as IInvokable)?.GetDefaultResponseTimeout();
-            if (defaultResponseTimeout.HasValue)
+            if (_defaultResponseTimeout.HasValue)
             {
-                return (long)(defaultResponseTimeout.Value.TotalSeconds * Stopwatch.Frequency);
+                return (long)(_defaultResponseTimeout.Value.TotalSeconds * Stopwatch.Frequency);
             }
 
             return shared.ResponseTimeoutStopwatchTicks;
         }
 
-        private TimeSpan GetResponseTimeout() => (Message.BodyObject as IInvokable)?.GetDefaultResponseTimeout() ?? shared.ResponseTimeout;
+        private TimeSpan GetResponseTimeout() => _defaultResponseTimeout ?? shared.ResponseTimeout;
 
         private string GetTargetGrainType()
         {
@@ -201,6 +207,20 @@ namespace Orleans.Runtime
 
             var msg = this.Message;
             var exception = new SiloUnavailableException($"The local Orleans host is shutting down and can no longer process the request: {msg}.");
+            this.context.Complete(Response.FromException(exception));
+        }
+
+        public void OnSendFailure(Exception exception)
+        {
+            if (!TryComplete())
+            {
+                return;
+            }
+
+            this.stopwatch.Stop();
+            this.shared.Unregister(this.Message);
+            DisposeCancellationRegistration();
+            _applicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
             this.context.Complete(Response.FromException(exception));
         }
 

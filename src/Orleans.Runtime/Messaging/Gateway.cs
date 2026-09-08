@@ -438,6 +438,7 @@ namespace Orleans.Runtime.Messaging
                 {
                     exception ??= new ClientNotAvailableException(Id.GrainId);
                     _gateway.messageCenter.RejectMessage(message, Message.RejectionTypes.Transient, exc: exception, rejectInfo: "Client dropped");
+                    message.DisposeOwnedBody();
                 }
             }
 

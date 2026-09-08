@@ -64,6 +64,7 @@ namespace Orleans.Runtime.Messaging
             if (msg.IsExpired)
             {
                 this.MessagingTrace.OnDropExpiredMessage(msg, MessagingInstruments.Phase.Receive);
+                msg.DisposeOwnedBody();
                 return;
             }
 
@@ -75,6 +76,7 @@ namespace Orleans.Runtime.Messaging
                 this.messageCenter.TryDeliverToProxy(rejection);
                 LogRejectingRequestDueToOverloading(this.Log, msg);
                 this.gatewayInstruments.OnGatewayLoadShedding();
+                msg.DisposeOwnedBody();
                 return;
             }
 
@@ -149,6 +151,7 @@ namespace Orleans.Runtime.Messaging
             if (msg.IsExpired)
             {
                 this.MessagingTrace.OnDropExpiredMessage(msg, MessagingInstruments.Phase.Send);
+                msg.DisposeOwnedBody();
                 return false;
             }
 
@@ -177,6 +180,8 @@ namespace Orleans.Runtime.Messaging
                 LogSiloDroppingMessage(this.Log, this.myAddress, msg, reason);
                 MessagingInstrumentation.OnDroppedSentMessage(msg);
             }
+
+            msg.DisposeOwnedBody();
         }
 
         protected override void RetryMessage(Message msg, Exception? ex = null)

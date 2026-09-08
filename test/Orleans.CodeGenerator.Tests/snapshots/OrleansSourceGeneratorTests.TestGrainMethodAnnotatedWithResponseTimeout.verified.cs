@@ -17,6 +17,16 @@ namespace OrleansCodeGen.TestProject
         public string arg0;
         global::TestProject.IResponseTimeoutGrain _target;
         private static readonly global::System.Reflection.MethodInfo MethodBackingField = OrleansGeneratedCodeHelper.GetMethodInfoOrDefault(typeof(global::TestProject.IResponseTimeoutGrain), "LongRunningMethod", null, new[] { typeof(string) });
+        private readonly global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8> _pool;
+        public Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8() : this(null !)
+        {
+        }
+
+        public Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8(global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8> pool) : base()
+        {
+            _pool = pool;
+        }
+
         private static readonly global::System.TimeSpan _responseTimeoutValue = global::System.TimeSpan.FromTicks(100000000L);
         public override global::System.TimeSpan? GetDefaultResponseTimeout() => _responseTimeoutValue;
         public override int GetArgumentCount() => 1;
@@ -31,6 +41,8 @@ namespace OrleansCodeGen.TestProject
         {
             arg0 = default;
             _target = default;
+            Options = default;
+            _pool?.Return(this);
         }
 
         public override object GetArgument(int index)
@@ -63,13 +75,15 @@ namespace OrleansCodeGen.TestProject
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     internal sealed class Proxy_IResponseTimeoutGrain : global::Orleans.Runtime.GrainReference, global::TestProject.IResponseTimeoutGrain
     {
+        private readonly global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8> _activator_6BE752C8_C54B5B18;
         public Proxy_IResponseTimeoutGrain(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.IdSpan arg1) : base(arg0, arg1)
         {
+            _activator_6BE752C8_C54B5B18 = CodecProvider.GetActivator<OrleansCodeGen.TestProject.Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8>();
         }
 
         global::System.Threading.Tasks.Task<string> global::TestProject.IResponseTimeoutGrain.LongRunningMethod(string arg0)
         {
-            var request = new OrleansCodeGen.TestProject.Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8();
+            var request = _activator_6BE752C8_C54B5B18.Create();
             request.arg0 = arg0;
             return base.InvokeAsync<string>(request).AsTask();
         }
@@ -79,6 +93,12 @@ namespace OrleansCodeGen.TestProject
     public sealed class Codec_Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8 : global::Orleans.Serialization.Codecs.IFieldCodec<OrleansCodeGen.TestProject.Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8>
     {
         private readonly global::System.Type _codecFieldType = typeof(OrleansCodeGen.TestProject.Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8);
+        private readonly global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8> _activator;
+        public Codec_Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8(global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8> _activator)
+        {
+            this._activator = OrleansGeneratedCodeHelper.UnwrapService(this, _activator);
+        }
+
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, OrleansCodeGen.TestProject.Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8 instance)
             where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
@@ -130,7 +150,7 @@ namespace OrleansCodeGen.TestProject
             if (field.IsReference)
                 return ReferenceCodec.ReadReference<OrleansCodeGen.TestProject.Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8, TReaderInput>(ref reader, field);
             field.EnsureWireTypeTagDelimited();
-            var result = new OrleansCodeGen.TestProject.Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8();
+            var result = _activator.Create();
             ReferenceCodec.MarkValueField(reader.Session);
             Deserialize(ref reader, result);
             return result;
@@ -140,15 +160,33 @@ namespace OrleansCodeGen.TestProject
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Copier_Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8 : global::Orleans.Serialization.Cloning.IDeepCopier<OrleansCodeGen.TestProject.Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8>
     {
+        private readonly global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8> _activator;
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public OrleansCodeGen.TestProject.Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8 DeepCopy(OrleansCodeGen.TestProject.Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8 original, global::Orleans.Serialization.Cloning.CopyContext context)
         {
             if (original is null)
                 return null;
-            var result = new OrleansCodeGen.TestProject.Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8();
+            var result = _activator.Create();
             result.arg0 = original.arg0;
             return result;
         }
+
+        public Copier_Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8(global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8> _activator)
+        {
+            this._activator = OrleansGeneratedCodeHelper.UnwrapService(this, _activator);
+        }
+    }
+
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    internal sealed class Activator_Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8 : global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8>
+    {
+        private readonly global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8> _arg0;
+        public Activator_Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8(global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8> arg0)
+        {
+            _arg0 = arg0;
+        }
+
+        public OrleansCodeGen.TestProject.Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8 Create() => _arg0.TryGet(out var item) ? item : new OrleansCodeGen.TestProject.Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8(_arg0);
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
@@ -161,6 +199,7 @@ namespace OrleansCodeGen.TestProject
             config.AddInterfaceProxy(typeof(OrleansCodeGen.TestProject.Proxy_IResponseTimeoutGrain));
             config.AddInterface(typeof(global::TestProject.IResponseTimeoutGrain));
             config.AddInterfaceImplementation(typeof(global::TestProject.ResponseTimeoutGrain));
+            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8));
             var n1 = config.CompoundTypeAliases.Add("inv");
             var n2 = n1.Add(typeof(global::Orleans.Runtime.GrainReference));
             var n3 = n2.Add(typeof(global::TestProject.IResponseTimeoutGrain));

@@ -1118,6 +1118,75 @@ public class BasicGrain : Grain, IBasicGrain
     }
 }");
 
+    [Fact]
+    public Task TestGrainRequestReturnShapes() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+using Orleans.Concurrency;
+using System.Threading.Tasks;
+
+namespace TestProject;
+
+public interface IRequestShapeGrain : IGrainWithIntegerKey
+{
+    Task ParameterlessTaskMethod();
+
+    ValueTask ValueTaskMethod(int value);
+
+    ValueTask<int> ValueTaskOfTMethod(string value);
+
+    Task TaskMethod(object value);
+
+    Task<int> TaskOfTMethod(byte[] value);
+
+    [OneWay]
+    void OneWayMethod(long value);
+}");
+
+    [Fact]
+    public async Task PooledInvokableActivatorFieldsRemainStableWhenMethodsReorder()
+    {
+        var first = await GetActivatorFields(
+@"    Task<int> Add(int left, int right);
+    Task<int> Multiply(int left, int right);");
+        var reordered = await GetActivatorFields(
+@"    Task<int> Multiply(int left, int right);
+    Task<int> Add(int left, int right);");
+
+        Assert.Equal(2, first.Count);
+        Assert.Equal(first, reordered);
+        Assert.All(first.Values, fieldName => Assert.StartsWith("_activator_", fieldName, StringComparison.Ordinal));
+
+        static async Task<Dictionary<string, string>> GetActivatorFields(string methods)
+        {
+            var compilation = await CreateCompilation(
+$@"using Orleans;
+using System.Threading.Tasks;
+
+namespace TestProject;
+
+public interface IPooledGrain : IGrainWithStringKey
+{{
+{methods}
+}}",
+                "TestProject");
+            Assert.Empty(compilation.GetDiagnostics());
+            var result = RunSourceGenerator(compilation);
+            Assert.Empty(result.Diagnostics);
+
+            var root = CSharpSyntaxTree.ParseText(ConcatenateGeneratedSources(result)).GetCompilationUnitRoot();
+            return root.DescendantNodes()
+                .OfType<FieldDeclarationSyntax>()
+                .Where(static field => field.Declaration.Type.ToString().Contains(
+                    "IActivator<",
+                    StringComparison.Ordinal)
+                    && field.Ancestors().OfType<ClassDeclarationSyntax>().First().Identifier.ValueText == "Proxy_IPooledGrain")
+                .ToDictionary(
+                    static field => field.Declaration.Type.ToString(),
+                    static field => field.Declaration.Variables.Single().Identifier.ValueText,
+                    StringComparer.Ordinal);
+        }
+    }
+
     /// <summary>
     /// Tests proxy generation for grains with different key types.
     /// Orleans supports multiple grain key types:
@@ -2185,10 +2254,10 @@ public class DemoClass
         var emittedActivatorNames = GetGeneratedClassNames(result, ".orleans.proxy.", "Activator_Invokable_");
         var registeredActivatorNames = GetRegisteredGeneratedInvokableActivatorNames(result);
 
-        Assert.Single(emittedActivatorNames);
+        Assert.Equal(2, emittedActivatorNames.Length);
         Assert.Equal(emittedActivatorNames, registeredActivatorNames);
         Assert.Contains(emittedActivatorNames, static name => name.Contains("IActivatingGrain", StringComparison.Ordinal));
-        Assert.DoesNotContain(registeredActivatorNames, static name => name.Contains("INormalGrain", StringComparison.Ordinal));
+        Assert.Contains(registeredActivatorNames, static name => name.Contains("INormalGrain", StringComparison.Ordinal));
     }
 
     [Fact]

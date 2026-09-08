@@ -81,6 +81,7 @@ namespace Orleans.Runtime.Messaging
             if (msg.IsExpired)
             {
                 this.MessagingTrace.OnDropExpiredMessage(msg, MessagingInstruments.Phase.Receive);
+                msg.DisposeOwnedBody();
                 return;
             }
 
@@ -92,6 +93,7 @@ namespace Orleans.Runtime.Messaging
                 if (msg.Direction != Message.Directions.Request)
                 {
                     this.MessagingTrace.OnDropBlockedApplicationMessage(msg);
+                    msg.DisposeOwnedBody();
                     return;
                 }
 
@@ -145,6 +147,8 @@ namespace Orleans.Runtime.Messaging
                     LogDebugRejectingObsoleteRequest(this.Log, targetSilo, siloAddress, msg);
                 }
             }
+
+            msg.DisposeOwnedBody();
         }
 
         private void HandlePingMessage(Message msg)
@@ -248,6 +252,7 @@ namespace Orleans.Runtime.Messaging
                     LogWarningDroppingExpiredPingMessage(this.Log, msg);
                 }
 
+                msg.DisposeOwnedBody();
                 return false;
             }
 
@@ -290,6 +295,8 @@ namespace Orleans.Runtime.Messaging
             {
                 this.MessagingTrace.OnSiloDropSendingMessage(this.LocalSiloAddress, msg, reason);
             }
+
+            msg.DisposeOwnedBody();
         }
 
         protected override void RetryMessage(Message msg, Exception? ex = null)
