@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
 using Orleans.Serialization;
 using Orleans.Streaming.SQS.Streams;
@@ -7,6 +8,24 @@ namespace Documentation.Streaming;
 
 internal static class SqsSnippets
 {
+    internal static void ConfigureAspireSilo(string[] args)
+    {
+        // <sqs_streaming_silo>
+        var builder = Host.CreateApplicationBuilder(args);
+        builder.UseOrleans();
+        builder.Build().Run();
+        // </sqs_streaming_silo>
+    }
+
+    internal static void ConfigureAspireClient(string[] args)
+    {
+        // <sqs_streaming_client>
+        var builder = Host.CreateApplicationBuilder(args);
+        builder.UseOrleansClient();
+        builder.Build().Run();
+        // </sqs_streaming_client>
+    }
+
     internal static void ConfigureSilo(ISiloBuilder siloBuilder)
     {
         // <configure_sqs_silo>
