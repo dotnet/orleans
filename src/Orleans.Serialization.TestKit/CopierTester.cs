@@ -19,7 +19,8 @@ namespace Orleans.Serialization.TestKit
     [ExcludeFromCodeCoverage]
     public abstract class CopierTester<TValue, TCopier> : SerializationTester where TCopier : class, IDeepCopier<TValue>
     {
-        private CodecProvider _codecProvider => ServiceProvider.GetRequiredService<CodecProvider>();
+        private CodecProvider? _codecProviderValue;
+        private CodecProvider _codecProvider => _codecProviderValue ??= ServiceProvider.GetRequiredService<CodecProvider>();
 
         /// <summary>
         /// Initializes a new <see cref="CopierTester{TValue, TCopier}"/> instance.
