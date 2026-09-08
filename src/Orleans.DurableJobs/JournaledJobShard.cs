@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Diagnostics;
 using Orleans.Journaling;
+using Orleans.Runtime;
 
 namespace Orleans.DurableJobs;
 
@@ -21,7 +22,7 @@ internal sealed class JournaledJobShard : IJobShard
     private readonly TimeSpan _batchLingerDelay;
     private readonly object _pendingOperationsLock = new();
     private readonly Queue<PendingOperation> _pendingOperations = new();
-    private readonly SemaphoreSlim _pendingOperationSignal = new(0);
+    private readonly SingleWaiterAutoResetEvent _pendingOperationSignal = new() { RunContinuationsAsynchronously = true };
     private readonly CancellationTokenSource _shutdownCancellation = new();
     private readonly Task _operationProcessor;
     private int _disposed;
@@ -260,14 +261,13 @@ internal sealed class JournaledJobShard : IJobShard
         try
         {
             _shutdownCancellation.Cancel();
-            _pendingOperationSignal.Release();
+            _pendingOperationSignal.Signal();
             await _operationProcessor.ConfigureAwait(false);
             await _stateManager.DisposeAsync();
         }
         finally
         {
             _shutdownCancellation.Dispose();
-            _pendingOperationSignal.Dispose();
             GC.SuppressFinalize(this);
         }
     }
@@ -282,7 +282,7 @@ internal sealed class JournaledJobShard : IJobShard
         {
             ThrowIfDisposed();
             _pendingOperations.Enqueue(operation);
-            _pendingOperationSignal.Release();
+            _pendingOperationSignal.Signal();
         }
     }
 
@@ -293,10 +293,12 @@ internal sealed class JournaledJobShard : IJobShard
         {
             while (true)
             {
-                await _pendingOperationSignal.WaitAsync(_shutdownCancellation.Token).ConfigureAwait(false);
+                _shutdownCancellation.Token.ThrowIfCancellationRequested();
 
                 if (!TryDequeueOperation(out var operation) || operation is null)
                 {
+                    // The queue is authoritative: drain it before waiting for another coalesced signal.
+                    await _pendingOperationSignal.WaitAsync().ConfigureAwait(false);
                     continue;
                 }
 
