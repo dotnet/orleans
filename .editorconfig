@@ -749,6 +749,10 @@ dotnet_diagnostic.CA1815.severity = warning
 [src/{Azure/Orleans.Reminders.AzureStorage,Orleans.Reminders.TestKit}/**.cs]
 dotnet_diagnostic.CA2219.severity = warning
 
+# CA2025: Do not pass IDisposable instances into unawaited tasks
+[src/Orleans.Transactions.TestKit.Base/**.cs]
+dotnet_diagnostic.CA2025.severity = warning
+
 # Production source enforces the correctness baseline. Tests, samples, documentation,
 # playgrounds, templates, and tools retain advisory diagnostics during this rollout.
 [src/**/*.{cs,vb}]

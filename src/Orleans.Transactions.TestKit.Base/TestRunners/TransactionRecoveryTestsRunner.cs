@@ -71,26 +71,27 @@ namespace Orleans.Transactions.TestKit
 
         private sealed record InFlightBatch(int Index, int PendingCount);
 
-        private sealed class ProducerCancellationScope(
+        internal sealed class ProducerCancellationScope(
             CancellationTokenSource stopProducing,
-            Task producer) : IDisposable
+            Task producer) : IAsyncDisposable
         {
-            public void Dispose()
+            public async ValueTask DisposeAsync()
             {
-                stopProducing.Cancel();
-                producer.Ignore();
-                if (producer.IsCompleted)
+                try
                 {
-                    stopProducing.Dispose();
-                    return;
+                    await stopProducing.CancelAsync();
                 }
-
-                _ = producer.ContinueWith(
-                    static (_, state) => ((CancellationTokenSource)state!).Dispose(),
-                    stopProducing,
-                    CancellationToken.None,
-                    TaskContinuationOptions.ExecuteSynchronously,
-                    TaskScheduler.Default);
+                finally
+                {
+                    try
+                    {
+                        await producer.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+                    }
+                    finally
+                    {
+                        stopProducing.Dispose();
+                    }
+                }
             }
         }
 
@@ -281,6 +282,7 @@ namespace Orleans.Transactions.TestKit
 
             TransactionRecoveryEventObserver.PhaseGate? cleanupGate = null;
             Task<TransactionRecoveryEventObserver.RecoveryTransition>? cleanupObservation = null;
+            using var cleanupCancellation = new CancellationTokenSource();
             if (requireParticipantConfirmation)
             {
                 cleanupGate = recoveryEvents.GateNextTransition(candidate =>
@@ -289,9 +291,15 @@ namespace Orleans.Transactions.TestKit
                     && candidate.TransactionId is { } transactionId
                     && transition.TransactionIds.Contains(transactionId)
                     && candidate.GrainId != transition.GrainId);
-                cleanupObservation = ObserveAndReleaseGateAsync(cleanupGate, GetDeadline(this.recoveryTimeout));
+#pragma warning disable CA2025 // The observation is cancelled and awaited in finally before cleanupGate is disposed.
+                cleanupObservation = ObserveAndReleaseGateAsync(
+                    cleanupGate,
+                    GetDeadline(this.recoveryTimeout),
+                    cleanupCancellation.Token);
+#pragma warning restore CA2025
             }
 
+            var operationCompleted = false;
             try
             {
                 var siloToTerminate = this.testCluster.Silos.Single(
@@ -302,7 +310,9 @@ namespace Orleans.Transactions.TestKit
                 var stopping = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                 using var stoppingRegistration = applicationLifetime.ApplicationStopping.Register(
                     () => stopping.TrySetResult());
+#pragma warning disable CA2025 // The original shutdown task is awaited normally and on timeout before the fixture can dispose testCluster or siloToTerminate.
                 var shutdown = this.testCluster.KillSiloAsync(siloToTerminate);
+#pragma warning restore CA2025
                 try
                 {
                     await stopping.Task.WaitAsync(this.failureDetectionTimeout);
@@ -312,7 +322,7 @@ namespace Orleans.Transactions.TestKit
                 catch (TimeoutException)
                 {
                     phaseGate.Release();
-                    shutdown.Ignore();
+                    await shutdown;
                     throw;
                 }
 
@@ -356,22 +366,40 @@ namespace Orleans.Transactions.TestKit
                 }
 
                 await ValidateResults(txGrains, transactionGroups);
+                operationCompleted = true;
             }
             finally
             {
                 phaseGate.Release();
-                cleanupObservation?.Ignore();
+                await cleanupCancellation.CancelAsync();
+                if (cleanupObservation is not null)
+                {
+                    try
+                    {
+                        await cleanupObservation;
+                    }
+                    catch (OperationCanceledException) when (cleanupCancellation.IsCancellationRequested)
+                    {
+                    }
+                    catch (TimeoutException) when (!operationCompleted)
+                    {
+                        this.Log(
+                            "Recovery phase=participant-cleanup-watchdog also expired while the recovery operation failed.");
+                    }
+                }
+
                 cleanupGate?.Dispose();
             }
         }
 
-        private static async Task<TransactionRecoveryEventObserver.RecoveryTransition> ObserveAndReleaseGateAsync(
+        internal static async Task<TransactionRecoveryEventObserver.RecoveryTransition> ObserveAndReleaseGateAsync(
             TransactionRecoveryEventObserver.PhaseGate gate,
-            long deadline)
+            long deadline,
+            CancellationToken cancellationToken)
         {
             try
             {
-                return await gate.WaitAsync(deadline);
+                return await gate.WaitAsync(deadline, cancellationToken);
             }
             finally
             {
@@ -438,16 +466,15 @@ namespace Orleans.Transactions.TestKit
             Task<List<ExpectedGrainActivity>[]?> producer = RunWhileSucceeding(
                 transactionGroups,
                 getIndex,
-                stopProducing,
+                stopProducing.Token,
                 firstFailure,
                 firstInFlightBatch);
-            using var producerCancellationScope = new ProducerCancellationScope(stopProducing, producer);
+            await using var producerCancellationScope = new ProducerCancellationScope(stopProducing, producer);
             var inFlightBatch = await firstInFlightBatch.Task.WaitAsync(this.failureDetectionTimeout, cancellationToken);
 
             if (firstFailure.Task.IsCompleted)
             {
-                stopProducing.Cancel();
-                producer.Ignore();
+                await stopProducing.CancelAsync();
                 var prematureFailure = await firstFailure.Task.WaitAsync(cancellationToken);
                 throw new InvalidOperationException(
                     $"A transaction failed before the silo was terminated. Index: {prematureFailure.Index}. "
@@ -629,7 +656,7 @@ namespace Orleans.Transactions.TestKit
         private async Task<List<ExpectedGrainActivity>[]?> RunWhileSucceeding(
             List<ExpectedGrainActivity>[] transactionGroups,
             Func<int> getIndex,
-            CancellationTokenSource stopProducing,
+            CancellationToken stopProducing,
             TaskCompletionSource<TransactionFailure> firstFailure,
             TaskCompletionSource<InFlightBatch> firstInFlightBatch)
         {
@@ -641,10 +668,7 @@ namespace Orleans.Transactions.TestKit
                     transactionIndex,
                     failure =>
                     {
-                        if (firstFailure.TrySetResult(failure))
-                        {
-                            stopProducing.Cancel();
-                        }
+                        firstFailure.TrySetResult(failure);
                     },
                     tasks =>
                     {
