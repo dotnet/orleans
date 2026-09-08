@@ -1630,6 +1630,7 @@ internal sealed partial class ActivationData :
         {
             _shared.MessagingProcessingInstruments.OnDispatcherMessageProcessedError(message);
             _shared.InternalRuntime.MessagingTrace.OnDropExpiredMessage(message, MessagingInstruments.Phase.Dispatch);
+            message.Dispose();
             return;
         }
 

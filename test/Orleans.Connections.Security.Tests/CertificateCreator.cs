@@ -60,18 +60,5 @@ namespace Orleans.Connections.Security.Tests
 #pragma warning restore SYSLIB0057
 #endif
         }
-
-        public static X509Certificate2 CreateCertificateWithoutPrivateKey(string subjectName)
-        {
-            using var certificate = CreateSelfSignedCertificate(subjectName);
-            var rawData = certificate.Export(X509ContentType.Cert);
-#if NET10_0_OR_GREATER
-            return X509CertificateLoader.LoadCertificate(rawData);
-#else
-#pragma warning disable SYSLIB0057
-            return new X509Certificate2(rawData);
-#pragma warning restore SYSLIB0057
-#endif
-        }
     }
 }
