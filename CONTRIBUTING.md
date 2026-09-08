@@ -22,13 +22,13 @@ The `Orleans.slnx` solution includes the source projects under `src` and the tes
 
 ### Verify formatting
 
-Verify the repository-wide formatting baseline with:
+After building the solution, verify the repository-wide formatting baseline with:
 
 ```console
 dotnet format whitespace Orleans.slnx --verify-no-changes --no-restore
 ```
 
-The `whitespace` subcommand matches the formatting check enforced by CI. It verifies whitespace, final newlines, and encoding for the projects supported by `dotnet format`.
+This command checks the same whitespace formatting scope as CI and reuses the restore from the preceding build. Code-style and analyzer diagnostics are enforced by the repository build.
 
 ### Package compatibility
 
