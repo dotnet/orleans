@@ -2870,8 +2870,25 @@ interface Outer.IInnerGrain [Version(1)]
                 }
                 """,
                 TestContext.Current.CancellationToken);
+            var nuGetConfigPath = Path.Combine(tempDirectory, "NuGet.Config");
+            await File.WriteAllTextAsync(
+                nuGetConfigPath,
+                """
+                <configuration>
+                  <packageSources>
+                    <clear />
+                  </packageSources>
+                </configuration>
+                """,
+                TestContext.Current.CancellationToken);
 
-            var restore = await RunDotNetAsync(repositoryRoot, "restore", projectPath, "--nologo");
+            var restore = await RunDotNetAsync(
+                repositoryRoot,
+                "restore",
+                projectPath,
+                "--configfile",
+                nuGetConfigPath,
+                "--nologo");
             Assert.True(restore.ExitCode == 0, restore.Output);
             Assert.False(File.Exists(contractsPath));
 
