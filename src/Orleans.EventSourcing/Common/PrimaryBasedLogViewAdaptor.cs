@@ -208,7 +208,7 @@ namespace Orleans.EventSourcing.Common
                 return;
             }
 
-            // Concrete adaptors call this after their instance state is ready; base operations provide lazy initialization for external subclasses.
+            // JournaledGrain calls this after adaptor construction; base operations initialize direct-construction paths on first use.
             InitializeConfirmedView(initialStateForConfirmedView);
             confirmedViewInitialized = true;
         }
