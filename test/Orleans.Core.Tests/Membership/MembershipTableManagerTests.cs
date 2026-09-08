@@ -1563,6 +1563,51 @@ namespace NonSilo.Tests.Membership
             Assert.Equal(0, readCount);
         }
 
+        [Fact]
+        public async Task MembershipTableManager_FreshTargetRefreshStopsOnShutdown()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var innerMembershipTable = new InMemoryMembershipTable();
+            var membershipTable = new DelegatingMembershipTable(innerMembershipTable);
+            var lifecycle = new SiloLifecycleSubject(this.loggerFactory.CreateLogger<SiloLifecycleSubject>());
+            using var manager = CreateMembershipTableManager(membershipTable, lifecycle);
+            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(lifecycle);
+            await lifecycle.OnStart(cancellationToken);
+
+            var blockedRead = new TaskCompletionSource<MembershipTableData>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            var blockedReadStarted = new TaskCompletionSource(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            var blockedReadResult = await innerMembershipTable.ReadAll();
+            var readCount = 0;
+            membershipTable.ReadAllOverride = () =>
+            {
+                if (Interlocked.Increment(ref readCount) == 1)
+                {
+                    return innerMembershipTable.ReadAll();
+                }
+
+                blockedReadStarted.TrySetResult();
+                return blockedRead.Task;
+            };
+
+            var refresh = manager.Refresh(
+                targetVersion: new MembershipVersion(long.MaxValue),
+                cancellationToken: CancellationToken.None,
+                requireFresh: true);
+            await blockedReadStarted.Task.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
+
+            try
+            {
+                await lifecycle.OnStop(cancellationToken);
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => refresh);
+            }
+            finally
+            {
+                blockedRead.TrySetResult(blockedReadResult);
+            }
+        }
+
         private static SiloAddress Silo(string value) => SiloAddress.FromParsableString(value);
 
         private MembershipTableManager CreateMembershipTableManager(
@@ -1581,6 +1626,33 @@ namespace NonSilo.Tests.Membership
                 timerFactory: timerFactory ?? new AsyncTimerFactory(this.loggerFactory),
                 siloLifecycle: lifecycle ?? this.lifecycle,
                 timeProvider: timeProvider ?? TimeProvider.System);
+        }
+
+        private sealed class DelegatingMembershipTable(IMembershipTable inner) : IMembershipTable
+        {
+            public Func<Task<MembershipTableData>>? ReadAllOverride { get; set; }
+
+            public Task InitializeMembershipTable(bool tryInitTableVersion) =>
+                inner.InitializeMembershipTable(tryInitTableVersion);
+
+            public Task DeleteMembershipTableEntries(string clusterId) =>
+                inner.DeleteMembershipTableEntries(clusterId);
+
+            public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) =>
+                inner.CleanupDefunctSiloEntries(beforeDate);
+
+            public Task<MembershipTableData> ReadRow(SiloAddress key) => inner.ReadRow(key);
+
+            public Task<MembershipTableData> ReadAll() =>
+                ReadAllOverride?.Invoke() ?? inner.ReadAll();
+
+            public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) =>
+                inner.InsertRow(entry, tableVersion);
+
+            public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) =>
+                inner.UpdateRow(entry, etag, tableVersion);
+
+            public Task UpdateIAmAlive(MembershipEntry entry) => inner.UpdateIAmAlive(entry);
         }
 
         private static MembershipTableSnapshot Snapshot(MembershipVersion version, params MembershipEntry[] entries)

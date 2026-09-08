@@ -151,7 +151,14 @@ namespace Orleans.Streams
                     LogWarningProducerRegistrationIgnored(publisherState, streamId);
                     if (stateChanged)
                     {
-                        await ((IStorage)_storage).WriteStateAsync(cancellationToken);
+                        if (await TryClearState(cancellationToken))
+                        {
+                            DeactivateOnIdle();
+                        }
+                        else
+                        {
+                            await ((IStorage)_storage).WriteStateAsync(cancellationToken);
+                        }
                     }
 
                     RecordRemovedProducers(removedProducers);
@@ -159,6 +166,7 @@ namespace Orleans.Streams
                 }
                 else
                 {
+                    var producerAdded = false;
                     if (State.Producers.TryGetValue(publisherState, out var existingPublisher))
                     {
                         if (validatedMembershipVersion > existingPublisher.MembershipVersion)
@@ -168,14 +176,14 @@ namespace Orleans.Streams
                     }
                     else
                     {
-                        State.Producers.Add(publisherState);
+                        producerAdded = State.Producers.Add(publisherState);
                     }
 
                     LogPubSubCounts("RegisterProducer {0}", streamProducer);
                     await ((IStorage)_storage).WriteStateAsync(cancellationToken);
                     RecordRemovedProducers(removedProducers);
                     StreamingEvents.EmitProducerRegistered(streamId.ProviderName, streamId.StreamId, streamProducer, GrainContext.Address.SiloAddress);
-                    if (_streamInstruments.PubSubProducersTotal.Enabled)
+                    if (producerAdded && _streamInstruments.PubSubProducersTotal.Enabled)
                     {
                         tags ??= StreamInstrumentsTagUtils.InitializeTags(streamId, streamProducer);
                         _streamInstruments.PubSubProducersTotal.Add(1, tags.Value);
