@@ -198,6 +198,41 @@ public class LocalDurableJobManagerTests
     }
 
     [Fact]
+    public async Task Stop_WhenDiscoveryDisposalFails_StillAwaitsRunningShardCleanup()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var shardManager = new TestJobShardManager
+        {
+            StopDiscovery = () => throw new InvalidOperationException("Discovery disposal failed")
+        };
+        var manager = CreateManager(shardManager, timeProvider, CreateOptions());
+        var accessor = new LocalDurableJobManager.TestAccessor(manager);
+        var logger = new RecordingLogger<SiloLifecycleSubject>();
+        var lifecycle = new SiloLifecycleSubject(logger);
+        var shardKey = timeProvider.GetUtcNow();
+        var shard = new BlockingQueueShard("cleanup-after-disposal-failure", shardKey, shardKey.AddHours(1));
+
+        manager.Participate(lifecycle);
+        await lifecycle.OnStart(cancellationToken);
+        accessor.AddWritableShard(shardKey, shard);
+        accessor.TryActivateShard(shard);
+        await shard.ConsumeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+
+        var stop = lifecycle.OnStop(cancellationToken);
+        await shard.DisposeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+        Assert.False(stop.IsCompleted);
+        shard.AllowDispose.SetResult();
+        await stop.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+
+        Assert.Equal(1, shardManager.StopDiscoveryCalls);
+        Assert.Equal(1, shard.DisposeCallCount);
+        Assert.False(accessor.TryGetRunningShardTask(shard.Id, out _));
+        Assert.Contains(logger.Entries, entry => entry.Level == LogLevel.Error
+            && entry.Exception is InvalidOperationException { Message: "Discovery disposal failed" });
+    }
+
+    [Fact]
     public async Task Stop_WhenActiveShardWaitsForQueueChange_CompletesAfterCleanupWithoutLifecycleError()
     {
         var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
