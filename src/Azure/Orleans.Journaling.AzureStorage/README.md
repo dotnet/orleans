@@ -31,13 +31,15 @@ siloBuilder.AddAzureTableJournalStorage(options =>
 
 `AzureTableJournalStorageOptions.GetPartitionKey` can be used to apply a custom partition layout. The returned key must be unique per journal, satisfy Azure Table partition-key restrictions, and contain at most 1,024 characters. The canonical journal id is stored in the header so catalog listing remains accurate with custom mappings.
 
-## Catalog paging
+## Catalog enumeration
 
-Both Azure catalogs implement `IPagedJournalStorageCatalog` on the registered `IJournalStorageCatalog` instance. Each call reads one native service page, applies journal identity and prefix filtering, and returns the service continuation in a prefix- and provider-scoped opaque token. Continue through empty pages while a token is present. `ListAsync` retains its ordinal journal id ordering; paged traversal follows storage order.
+Both Azure providers implement `IJournalStorageCatalog.ListAsync`, returning identities incrementally in service traversal order. Set `JournalStorageCatalogOptions.Prefix` to enumerate an exact journal id and its descendants. The provider handles service continuations internally and yields identities from the current page before fetching the next page.
 
-Both Blob catalog APIs scan the configured `ContainerName` and interpret append blobs named `<journalId>/wal` as journal identities. This traversal applies equally when a custom naming delegate or container factory produces the same entries. A page examines at most `min(pageSize, 5000)` returned blobs, including checkpoints and other entries before filtering.
+The Blob catalog scans the configured `ContainerName` and interprets append blobs named `<journalId>/wal` as journal identities. This traversal applies equally when a custom naming delegate or container factory produces the same entries. Each internal page requests up to 5000 blobs, including checkpoints and other entries before filtering.
 
-Table paging supports custom partition mappings through the canonical journal id stored in each header. It requests at most `min(pageSize, 1000)` header rows; Table Storage determines the internal scan work required by that query. Prefix filtering occurs on the returned headers, so a sparse prefix can require multiple empty pages.
+Table enumeration supports custom partition mappings through the canonical journal id stored in each header. It requests up to 1000 header rows per service page; Table Storage determines the internal scan work required by that query. Prefix filtering occurs on the returned headers, so one enumerator advance can cross multiple empty or filtered pages.
+
+Use `await foreach` or dispose a retained enumerator when stopping early. Pass a cancellation token covering the traversal lifetime; cancellation and service errors propagate to the caller.
 
 ## Getting Started
 To use this package, install it via NuGet:

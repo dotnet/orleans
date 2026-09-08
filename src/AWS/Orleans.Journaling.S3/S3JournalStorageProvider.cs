@@ -9,13 +9,12 @@ using Orleans.Runtime;
 
 namespace Orleans.Journaling;
 
-internal sealed class S3JournalStorageProvider : ILifecycleParticipant<ISiloLifecycle>, IJournalStorageProvider, IJournalStorageCatalog, IPagedJournalStorageCatalog
+internal sealed class S3JournalStorageProvider : ILifecycleParticipant<ISiloLifecycle>, IJournalStorageProvider, IJournalStorageCatalog
 {
     private static readonly TimeSpan MaximumTaskDelay = TimeSpan.FromMilliseconds(uint.MaxValue - 1d);
     private readonly S3JournalStorageOptions _options;
     private readonly S3JournalStorage.S3JournalStorageShared _shared;
     private IAmazonS3? _client;
-    private JournalStorageCatalogToken _catalogToken = new();
 
     public S3JournalStorageProvider(
         IOptions<S3JournalStorageOptions> options,
@@ -47,12 +46,13 @@ internal sealed class S3JournalStorageProvider : ILifecycleParticipant<ISiloLife
     }
 
     public async IAsyncEnumerable<JournalId> ListAsync(
-        JournalId prefix = default,
+        JournalStorageCatalogOptions? options = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        var prefix = options?.Prefix ?? default;
         var client = GetClient();
         var bucketName = GetBucketName();
-        var journalIds = new HashSet<JournalId>();
         string? continuationToken = null;
 
         do
@@ -61,16 +61,18 @@ internal sealed class S3JournalStorageProvider : ILifecycleParticipant<ISiloLife
                 new ListObjectsV2Request
                 {
                     BucketName = bucketName,
+                    MaxKeys = 1000,
                     ContinuationToken = continuationToken,
                 },
                 cancellationToken).ConfigureAwait(false);
 
+            cancellationToken.ThrowIfCancellationRequested();
             foreach (var item in response.S3Objects)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (TryGetJournalId(item.Key, prefix, out var id))
                 {
-                    journalIds.Add(id);
+                    yield return id;
                 }
             }
 
@@ -78,47 +80,7 @@ internal sealed class S3JournalStorageProvider : ILifecycleParticipant<ISiloLife
         }
         while (continuationToken is not null);
 
-        foreach (var journalId in journalIds.OrderBy(static journalId => journalId.Value, StringComparer.Ordinal))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            yield return journalId;
-        }
-    }
-
-    public async ValueTask<JournalStorageCatalogPage> ReadPageAsync(
-        JournalId prefix,
-        int pageSize,
-        string? continuationToken = null,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(pageSize);
         cancellationToken.ThrowIfCancellationRequested();
-        var cursor = _catalogToken.Parse(prefix, continuationToken);
-        var response = await GetClient().ListObjectsV2Async(
-            new ListObjectsV2Request
-            {
-                BucketName = GetBucketName(),
-                MaxKeys = Math.Min(pageSize, 1000),
-                ContinuationToken = cursor,
-            },
-            cancellationToken).ConfigureAwait(false);
-
-        cancellationToken.ThrowIfCancellationRequested();
-        List<JournalId> journalIds = [];
-        foreach (var item in response.S3Objects)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (TryGetJournalId(item.Key, prefix, out var id))
-            {
-                journalIds.Add(id);
-            }
-        }
-
-        return new()
-        {
-            JournalIds = journalIds,
-            ContinuationToken = _catalogToken.Create(prefix, response.IsTruncated == true ? response.NextContinuationToken : null),
-        };
     }
 
     private bool TryGetJournalId(string objectKey, JournalId prefix, out JournalId journalId)
@@ -156,7 +118,6 @@ internal sealed class S3JournalStorageProvider : ILifecycleParticipant<ISiloLife
         try
         {
             await EnsureBucketAsync(client, GetBucketName(), _options.CreateBucketIfNotExists, cancellationToken).ConfigureAwait(false);
-            _catalogToken = new();
             _client = client;
         }
         catch

@@ -284,7 +284,7 @@ public sealed class AzureTableJournalStorageProviderTests
     }
 
     [Fact]
-    public async Task ListAsync_MultipleHeaders_ReturnsOrdinallySortedJournalIds()
+    public async Task ListAsync_MultipleHeaders_ReturnsProviderTraversalOrder()
     {
         var table = new FakeTableClient();
         var lower = new JournalId("catalog/a");
@@ -299,7 +299,7 @@ public sealed class AzureTableJournalStorageProviderTests
             context.Provider.ListAsync(cancellationToken: TestContext.Current.CancellationToken),
             TestContext.Current.CancellationToken);
 
-        Assert.Equal([upper, lower, last], result);
+        Assert.Equal([last, lower, upper], result);
         Assert.Equal(3, result.Count);
     }
 
@@ -318,10 +318,10 @@ public sealed class AzureTableJournalStorageProviderTests
         using var context = await CreateStartedProviderAsync(table, TestContext.Current.CancellationToken);
 
         var result = await ToListAsync(
-            context.Provider.ListAsync(prefix, TestContext.Current.CancellationToken),
+            context.Provider.ListAsync(new() { Prefix = prefix }, TestContext.Current.CancellationToken),
             TestContext.Current.CancellationToken);
 
-        Assert.Equal([exact, child], result);
+        Assert.Equal([child, exact], result);
         var query = Assert.Single(table.QueryCalls);
         Assert.Equal(
             TableClient.CreateQueryFilter($"RowKey eq {AzureTableJournalStorage.HeaderRowKey}"),
@@ -401,7 +401,7 @@ public sealed class AzureTableJournalStorageProviderTests
         await StartAsync(context.Provider, TestContext.Current.CancellationToken);
 
         var result = await ToListAsync(
-            context.Provider.ListAsync(new JournalId("tenant/orders"), TestContext.Current.CancellationToken),
+            context.Provider.ListAsync(new() { Prefix = new JournalId("tenant/orders") }, TestContext.Current.CancellationToken),
             TestContext.Current.CancellationToken);
 
         Assert.Equal([included], result);
@@ -419,7 +419,7 @@ public sealed class AzureTableJournalStorageProviderTests
         using var context = await CreateStartedProviderAsync(table, TestContext.Current.CancellationToken);
 
         var result = await ToListAsync(
-            context.Provider.ListAsync(new JournalId("legacy/orders"), TestContext.Current.CancellationToken),
+            context.Provider.ListAsync(new() { Prefix = new JournalId("legacy/orders") }, TestContext.Current.CancellationToken),
             TestContext.Current.CancellationToken);
 
         Assert.Equal([journalId], result);
@@ -442,7 +442,7 @@ public sealed class AzureTableJournalStorageProviderTests
     }
 
     [Fact]
-    public async Task ListAsync_WhenCanceledAfterQuery_ThrowsBeforeYieldingBufferedIds()
+    public async Task ListAsync_WhenCanceledAfterQuery_ThrowsBeforeYieldingIds()
     {
         using var cts = new CancellationTokenSource();
         var table = new FakeTableClient { AfterQuery = cts.Cancel };

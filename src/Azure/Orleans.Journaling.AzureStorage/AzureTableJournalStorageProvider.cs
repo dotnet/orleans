@@ -7,14 +7,13 @@ using Orleans.Runtime;
 
 namespace Orleans.Journaling;
 
-internal sealed class AzureTableJournalStorageProvider : ILifecycleParticipant<ISiloLifecycle>, IJournalStorageProvider, IJournalStorageCatalog, IPagedJournalStorageCatalog
+internal sealed class AzureTableJournalStorageProvider : ILifecycleParticipant<ISiloLifecycle>, IJournalStorageProvider, IJournalStorageCatalog
 {
     private static readonly string[] JournalIdSelect = [AzureTableJournalStorage.JournalIdPropertyName];
 
     private readonly AzureTableJournalStorageOptions _options;
     private readonly AzureTableJournalStorage.InitializedTableClientProvider _tableClientProvider = new();
     private readonly AzureTableJournalStorage.AzureTableJournalStorageShared _shared;
-    private JournalStorageCatalogToken _catalogToken = new();
 
     public AzureTableJournalStorageProvider(
         IOptions<AzureTableJournalStorageOptions> options,
@@ -44,7 +43,6 @@ internal sealed class AzureTableJournalStorageProvider : ILifecycleParticipant<I
             ?? throw new InvalidOperationException("The configured Azure Table service client factory returned null.");
         var table = client.GetTableClient(_options.TableName);
         await table.CreateIfNotExistsAsync(cancellationToken).ConfigureAwait(false);
-        _catalogToken = new();
         _tableClientProvider.SetTableClient(table);
     }
 
@@ -59,65 +57,31 @@ internal sealed class AzureTableJournalStorageProvider : ILifecycleParticipant<I
     }
 
     public async IAsyncEnumerable<JournalId> ListAsync(
-        JournalId prefix = default,
+        JournalStorageCatalogOptions? options = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        var table = _tableClientProvider.GetTableClient();
-        var filter = TableClient.CreateQueryFilter($"RowKey eq {AzureTableJournalStorage.HeaderRowKey}");
-        var journalIds = new List<JournalId>();
-        await foreach (var entity in table.QueryAsync<TableEntity>(filter, select: JournalIdSelect, cancellationToken: cancellationToken))
-        {
-            if (TryGetJournalId(entity, out var journalId) && prefix.IsPrefixOf(journalId))
-            {
-                journalIds.Add(journalId);
-            }
-        }
-
-        foreach (var journalId in journalIds.OrderBy(static journalId => journalId.Value, StringComparer.Ordinal))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            yield return journalId;
-        }
-    }
-
-    public async ValueTask<JournalStorageCatalogPage> ReadPageAsync(
-        JournalId prefix,
-        int pageSize,
-        string? continuationToken = null,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(pageSize);
         cancellationToken.ThrowIfCancellationRequested();
-        var cursor = _catalogToken.Parse(prefix, continuationToken);
+        var prefix = options?.Prefix ?? default;
         var table = _tableClientProvider.GetTableClient();
         var filter = TableClient.CreateQueryFilter($"RowKey eq {AzureTableJournalStorage.HeaderRowKey}");
-        var maximum = Math.Min(pageSize, 1000);
         await foreach (var page in table.QueryAsync<TableEntity>(
             filter,
-            maxPerPage: maximum,
+            maxPerPage: 1000,
             select: JournalIdSelect,
-            cancellationToken: cancellationToken).AsPages(cursor, maximum))
+            cancellationToken: cancellationToken).AsPages(pageSizeHint: 1000))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            List<JournalId> journalIds = [];
             foreach (var entity in page.Values)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (TryGetJournalId(entity, out var journalId) && prefix.IsPrefixOf(journalId))
                 {
-                    journalIds.Add(journalId);
+                    yield return journalId;
                 }
             }
-
-            return new()
-            {
-                JournalIds = journalIds,
-                ContinuationToken = _catalogToken.Create(prefix, page.ContinuationToken),
-            };
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        return new() { JournalIds = [] };
     }
 
     private static bool TryGetJournalId(TableEntity entity, out JournalId journalId)

@@ -108,24 +108,25 @@ Inside the operation payload array, element 0 is the command name, followed by c
 
 Existing data is read using its stored format metadata, or as legacy OrleansBinary data when metadata is absent, and migrated to the configured write format by the next snapshot write.
 
-## Catalog paging
+## Catalog enumeration
 
-`IJournalStorageCatalog.ListAsync` enumerates matching journal ids in ordinal `JournalId.Value` order. Catalogs which also implement `IPagedJournalStorageCatalog` support resumable pages through the same catalog instance. `ReadPageAsync` returns at most `pageSize` matching ids in provider traversal order.
+`IJournalStorageCatalog.ListAsync` returns an `IAsyncEnumerable<JournalId>` in provider traversal order. Pass `JournalStorageCatalogOptions` with `Prefix` to select an exact journal id and its descendants, or omit the options to enumerate all ids. Options are read when enumeration begins.
 
-Start with a null continuation token, then pass each returned token with the same prefix to the next call. A null returned token marks completion. An empty page with a non-null token advances the traversal and gives callers a point to yield before requesting more work. Page size can change between calls. Tokens belong to one prefix and one initialized provider instance; start a new traversal after replacing or restarting the provider. Malformed or mismatched tokens raise `ArgumentException`; storage-service token expiry and request errors propagate to the caller.
+When updating callers of the former prefix overload, pass `new JournalStorageCatalogOptions { Prefix = prefix }`. Applications which require ordinal ordering can materialize the sequence and sort `JournalId.Value` using `StringComparer.Ordinal`.
 
-| Provider | Work represented by one page | Traversal and memory |
+Storage providers fetch pages internally and yield matching identities as they discover them. `await foreach` advances the traversal and disposes the enumerator when the loop ends. Consumers which process identities in batches can retain one enumerator across batches, advance it serially, and dispose it after the last pending `MoveNextAsync` completes. Use a cancellation token whose lifetime covers that enumeration.
+
+| Provider | Internal traversal | Client memory |
 | --- | --- | --- |
-| Volatile | A seek into the journal prefix range followed by at most `pageSize` indexed identities, then hierarchical prefix filtering | Ordinal journal id order. The maintained existence index occupies O(catalog size) memory; page allocation is O(page size + log(catalog size)). |
-| Azure Blob | One service page of at most `min(pageSize, 5000)` blobs, then WAL and prefix filtering | Blob service traversal order over `<journalId>/wal` entries in the configured container, matching `ListAsync` catalog interpretation. Page allocation is proportional to the service page. |
-| Azure Table | One service page of at most `min(pageSize, 1000)` journal headers, then prefix filtering | Table partition/row order, with canonical ids from headers and reversible legacy partition keys. Page allocation is proportional to the service page. |
-| S3 | One `ListObjectsV2` page of at most `min(pageSize, 1000)` bucket objects, then canonical WAL and prefix filtering | S3 traversal order, including unordered S3 Express directory-bucket results. Page allocation is proportional to the service page. |
+| Volatile | Enumerates the existing concurrent storage dictionary, checks journal existence, and applies the prefix | Constant additional traversal state; the storage dictionary holds the journals. |
+| Azure Blob | Requests up to 5000 blobs per service page, then applies WAL and hierarchical prefix filtering | Proportional to the current service page. |
+| Azure Table | Requests up to 1000 journal headers per service page, then decodes canonical or reversible legacy ids and applies the prefix | Proportional to the current service page. |
+| S3 | Requests up to 1000 bucket objects per `ListObjectsV2` page, then applies canonical WAL and prefix filtering | Proportional to the current service page; includes unordered S3 Express listings. |
+| Redis | Scans primary-server metadata keys and reads canonical ids in bounded batches, suppressing repeated ids | Read-batch state plus a seen-id set which grows with the catalog. `SCAN` count remains a service work hint. |
 
-Storage services determine scanning work, request latency, and retries. In particular, a Table header query can examine additional rows internally, and a filtered traversal can require many pages to find matching journals. The page bounds describe returned storage records and client-side processing.
+One `MoveNextAsync` can traverse multiple empty or filtered storage pages before yielding an identity. A consumer's identity or metadata-read budget therefore bounds returned candidates, while storage services determine internal scan work, request latency, and retries. Table header queries can inspect additional rows internally, and S3 custom mappings require a bucket traversal.
 
-Pages observe the live catalog. With an unchanged catalog, following continuations visits the matching identities. Concurrent changes follow each provider's listing semantics: callers should tolerate repeated identities and use subsequent traversals to discover new journals. Volatile traversal advances past the last visited id, so newly created earlier ids become visible on the next traversal. Journal existence can change between discovery and a storage operation.
-
-Redis provides the existing sorted `ListAsync` catalog operation. It scans metadata keys on the primary servers and deduplicates identities before yielding them. Its `SCAN` count is a work hint and its cursor traversal can repeat keys; a paged Redis capability requires a separate design for bounded responses and lossless continuation.
+Enumeration observes live storage. Concurrent changes follow each provider's listing semantics; callers should tolerate repeated identities during changes and use subsequent enumerations to discover later updates. Journal existence can change between discovery and a storage operation. Cancellation and storage errors propagate through enumeration. Dispose a failed enumerator and begin a new enumeration when retrying a listing operation.
 
 ## Documentation
 For more comprehensive documentation, please refer to:
