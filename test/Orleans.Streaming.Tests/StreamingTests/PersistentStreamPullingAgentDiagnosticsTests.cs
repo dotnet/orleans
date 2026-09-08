@@ -73,6 +73,9 @@ public partial class PersistentStreamPullingAgentTests
             Assert.Same(consumer, requested.Consumer);
             Assert.Null(requested.Exception);
             Assert.False(outcome.Task.IsCompleted);
+            Assert.False(streamData.Contains(subscriptionId));
+            Assert.Null(data.Cursor);
+            Assert.DoesNotContain(streamId, await accessor.GetPubSubCache());
 
             var exception = new InvalidOperationException("unregistration storage failure");
             if (failUnregistration)
