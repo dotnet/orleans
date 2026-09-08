@@ -378,10 +378,22 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
             throw new ArgumentOutOfRangeException(nameof(offset));
         }
 
-        if (offset >= Length)
+        var length = Length;
+        if (offset >= length)
         {
             value = default;
             return false;
+        }
+
+        // Owned buffers end at the write page's written length; pinned slices can end partway through a page.
+        if (!_hasPinnedPages)
+        {
+            var writePageOffset = offset - (length - _writePage.Length);
+            if (writePageOffset >= 0)
+            {
+                value = _writePage.AsSpan((int)writePageOffset, 1)[0];
+                return true;
+            }
         }
 
         Debug.Assert(offset <= int.MaxValue);
