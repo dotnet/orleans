@@ -91,7 +91,7 @@ namespace UnitTests.General
                 using var cleanupCancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
                 try
                 {
-                    await RestoreMultiUserAsync(quotedDatabaseName, cleanupCancellation.Token);
+                    await RestoreMultiUserAsync(connection, quotedDatabaseName, cleanupCancellation.Token);
                 }
                 catch when (!setupSucceeded)
                 {
@@ -142,17 +142,17 @@ namespace UnitTests.General
                 {
                     if (!acquired)
                     {
-                        await connection.DisposeAsync();
                         using var cleanupCancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
                         try
                         {
-                            await RestoreMultiUserAsync(quotedDatabaseName, cleanupCancellation.Token);
+                            await RestoreMultiUserAsync(connection, quotedDatabaseName, cleanupCancellation.Token);
                         }
                         catch
                         {
                             // Preserve the setup failure instead of replacing it with a cleanup failure.
                         }
 
+                        await connection.DisposeAsync();
                         using var pooledConnection = new SqlConnection(CurrentConnectionString);
                         SqlConnection.ClearPool(pooledConnection);
                     }
@@ -160,22 +160,14 @@ namespace UnitTests.General
             }
         }
 
-        private async Task RestoreMultiUserAsync(string quotedDatabaseName, CancellationToken cancellationToken)
-        {
-            var connectionStringBuilder = new SqlConnectionStringBuilder(CurrentConnectionString)
-            {
-                InitialCatalog = "master",
-                Pooling = false,
-                ConnectTimeout = 5
-            };
-
-            await using var connection = new SqlConnection(connectionStringBuilder.ConnectionString);
-            await OpenConnectionAsync(connection, cancellationToken);
-            await ExecuteCommandAsync(
+        private static Task RestoreMultiUserAsync(
+            SqlConnection connection,
+            string quotedDatabaseName,
+            CancellationToken cancellationToken) =>
+            ExecuteCommandAsync(
                 connection,
                 $"ALTER DATABASE {quotedDatabaseName} SET MULTI_USER WITH ROLLBACK IMMEDIATE;",
                 cancellationToken);
-        }
 
         private static async Task OpenConnectionAsync(SqlConnection connection, CancellationToken cancellationToken)
         {
