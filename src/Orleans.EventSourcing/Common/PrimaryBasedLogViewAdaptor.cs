@@ -196,7 +196,6 @@ namespace Orleans.EventSourcing.Common
             Debug.Assert(host != null && services != null && initialstate != null);
             this.Host = host;
             this.Services = services;
-            initialStateForConfirmedView = initialstate;
             this.InitialState = Services.DeepCopy(initialstate);
             worker = new BatchWorkerFromDelegate(Work);
         }
@@ -209,7 +208,7 @@ namespace Orleans.EventSourcing.Common
             }
 
             // JournaledGrain calls this after adaptor construction; base operations initialize direct-construction paths on first use.
-            InitializeConfirmedView(initialStateForConfirmedView);
+            InitializeConfirmedView(InitialState);
             confirmedViewInitialized = true;
         }
 
@@ -327,7 +326,6 @@ namespace Orleans.EventSourcing.Common
         /// </summary>
         private readonly BatchWorker worker;
 
-        private readonly TLogView initialStateForConfirmedView;
         private bool confirmedViewInitialized;
 
         /// <summary>

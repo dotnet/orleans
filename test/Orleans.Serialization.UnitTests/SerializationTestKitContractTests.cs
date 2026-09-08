@@ -59,6 +59,20 @@ public sealed class SerializationTestKitContractTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public void SerializationTester_Dispose_DisposesOwnedServiceProviderOnce()
+    {
+        var probe = new ConstructionProbe();
+        SerializationTesterHarness.Probe = probe;
+        var tester = new SerializationTesterHarness(output);
+        _ = tester.GetServiceProvider();
+
+        ((IDisposable)tester).Dispose();
+        ((IDisposable)tester).Dispose();
+
+        Assert.Equal(1, probe.ServiceProviderDisposeCount);
+    }
+
+    [Fact]
     public void SerializationTester_FixtureServiceProvider_IsAvailableAfterDerivedConstructionCompletes()
     {
         var probe = new ConstructionProbe();
@@ -287,6 +301,8 @@ public sealed class SerializationTestKitContractTests(ITestOutputHelper output)
     {
         public int ServiceProviderFactoryCount { get; set; }
 
+        public int ServiceProviderDisposeCount { get; set; }
+
         public Exception? ServiceProviderFactoryException { get; set; }
 
         public bool ReenterServiceProviderFactory { get; set; }
@@ -344,7 +360,7 @@ public sealed class SerializationTestKitContractTests(ITestOutputHelper output)
                 throw exception;
             }
 
-            return new EmptyServiceProvider();
+            return new EmptyServiceProvider(Probe);
         }
     }
 
@@ -443,8 +459,10 @@ public sealed class SerializationTestKitContractTests(ITestOutputHelper output)
         }
     }
 
-    private sealed class EmptyServiceProvider : IServiceProvider
+    private sealed class EmptyServiceProvider(ConstructionProbe probe) : IServiceProvider, IDisposable
     {
         public object? GetService(Type serviceType) => null;
+
+        public void Dispose() => probe.ServiceProviderDisposeCount++;
     }
 }

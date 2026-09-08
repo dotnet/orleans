@@ -122,8 +122,12 @@ namespace Orleans.Serialization.TestKit
         /// <inheritdoc/>
         void IDisposable.Dispose()
         {
+            if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            {
+                return;
+            }
+
             Dispose(disposing: true);
-            Volatile.Write(ref _disposed, 1);
             GC.SuppressFinalize(this);
         }
     }

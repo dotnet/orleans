@@ -16,6 +16,7 @@ public sealed class PrimaryBasedLogViewAdaptorTests
         var initialState = new TestLogView(["initial"]);
 
         var (adaptor, _, _) = CreateAdaptor(initialState);
+        initialState.Entries.Add("mutated");
 
         Assert.Equal(0, adaptor.InitializationCount);
 
