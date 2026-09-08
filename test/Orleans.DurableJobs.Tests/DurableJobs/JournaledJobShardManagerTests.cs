@@ -1115,7 +1115,7 @@ public partial class JournaledJobShardManagerTests
         public int MoveNextCalls { get; private set; }
         public int DisposeCalls { get; private set; }
 
-        public IAsyncEnumerable<JournalId> ListAsync(JournalStorageCatalogOptions? options = null, CancellationToken cancellationToken = default)
+        public IAsyncEnumerable<JournalId> ListAsync(ListOptions? options = null, CancellationToken cancellationToken = default)
         {
             Assert.NotNull(options);
             Assert.Equal(JobShardId.StoragePrefix, options.Prefix);
