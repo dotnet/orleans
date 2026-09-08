@@ -637,10 +637,21 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
         await schedulerBlocked.Task.WaitAsync(cancellation.Token);
 
         var refreshRead = reminderTable.BlockNextRangeRead(cancellation.Token);
+        var rangeChangePending = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var releaseRangeChange = new ManualResetEventSlim();
+        var rangeChangeBarrier = new Task(() =>
+        {
+            rangeChangePending.TrySetResult();
+            releaseRangeChange.Wait(cancellation.Token);
+        });
+        var rangeChangeBarrierQueued = false;
         RangeReadGate? rangeChangeRead = null;
         try
         {
             var refresh = reminderService.TestOnlyRefresh();
+            // Hold the scheduler between both operations so the second provider gate is armed before the range change can run.
+            reminderService.Scheduler.QueueTask(rangeChangeBarrier);
+            rangeChangeBarrierQueued = true;
             var rangeChange = reminderService.TestOnlyChangeRange(oldRange, newRange, increased: false);
             var reconciliation = reminderService.TestOnlyWaitForRangeChangeReconciliation(cancellation.Token);
             Assert.False(reconciliation.IsCompleted);
@@ -648,21 +659,32 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
             releaseScheduler.Set();
             await blockingTask.WaitAsync(cancellation.Token);
             await refreshRead.WaitUntilBlockedAsync(cancellation.Token);
+            await rangeChangePending.Task.WaitAsync(cancellation.Token);
 
             rangeChangeRead = reminderTable.BlockNextRangeRead(cancellation.Token);
-            refreshRead.Release();
+            releaseRangeChange.Set();
+            await rangeChangeBarrier.WaitAsync(cancellation.Token);
             await rangeChangeRead.WaitUntilBlockedAsync(cancellation.Token);
             Assert.False(reconciliation.IsCompleted);
 
             rangeChangeRead.Release();
-            await Task.WhenAll(refresh, rangeChange, reconciliation).WaitAsync(cancellation.Token);
+            await Task.WhenAll(rangeChange, reconciliation).WaitAsync(cancellation.Token);
+            Assert.False(refresh.IsCompleted);
+
+            refreshRead.Release();
+            await refresh.WaitAsync(cancellation.Token);
         }
         finally
         {
             releaseScheduler.Set();
+            releaseRangeChange.Set();
             refreshRead.Release();
             rangeChangeRead?.Release();
             await blockingTask.WaitAsync(cancellation.Token);
+            if (rangeChangeBarrierQueued)
+            {
+                await rangeChangeBarrier.WaitAsync(cancellation.Token);
+            }
         }
     }
 
