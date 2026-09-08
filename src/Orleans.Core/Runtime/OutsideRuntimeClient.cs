@@ -25,7 +25,7 @@ namespace Orleans
         private readonly ILogger logger;
         private readonly ClientMessagingOptions clientMessagingOptions;
 
-        private readonly ConcurrentDictionary<CorrelationId, CallbackData> callbacks;
+        private readonly ConcurrentDictionary<CorrelationId, CallbackDataOwner> callbacks;
         private InvokableObjectManager? localObjects;
         private int _isStopping;
         private bool disposing;
@@ -88,7 +88,7 @@ namespace Orleans
             this.loggerFactory = loggerFactory;
             this.messagingTrace = messagingTrace;
             this.logger = loggerFactory.CreateLogger<OutsideRuntimeClient>();
-            callbacks = new ConcurrentDictionary<CorrelationId, CallbackData>();
+            callbacks = new ConcurrentDictionary<CorrelationId, CallbackDataOwner>();
             this.clientMessagingOptions = clientMessagingOptions.Value;
             var period = Max(
                 TimeSpan.FromMilliseconds(1),
@@ -294,20 +294,42 @@ namespace Orleans
 
             if (!oneWay)
             {
-                var callbackData = new CallbackData(this.sharedCallbackData, context!, message, _applicationRequestInstruments);
-                if (Volatile.Read(ref _isStopping) != 0)
+                var owner = CallbackDataPool.Rent(this.sharedCallbackData, context!, message, _applicationRequestInstruments, out var lease);
+                try
                 {
-                    callbackData.OnHostShutdown();
-                    return;
+                    var callbackData = lease.Value;
+                    if (!callbacks.TryAdd(message.Id, owner))
+                    {
+                        CallbackDataPool.Return(owner);
+                        throw new InvalidOperationException($"Duplicate callback registration for message {message}.");
+                    }
+
+                    // Cancellation can run synchronously during registration.
+                    if (Volatile.Read(ref _isStopping) != 0)
+                    {
+                        callbackData.OnHostShutdown();
+                        return;
+                    }
+
+                    try
+                    {
+                        callbackData.SubscribeForCancellation(cancellationToken);
+                    }
+                    catch
+                    {
+                        UnregisterCallback(message.Id);
+                        throw;
+                    }
+
+                    if (Volatile.Read(ref _isStopping) != 0)
+                    {
+                        callbackData.OnHostShutdown();
+                        return;
+                    }
                 }
-
-                callbacks.TryAdd(message.Id, callbackData);
-                callbackData.SubscribeForCancellation(cancellationToken);
-
-                if (Volatile.Read(ref _isStopping) != 0)
+                finally
                 {
-                    callbackData.OnHostShutdown();
-                    return;
+                    lease.Dispose();
                 }
             }
             else
@@ -332,46 +354,53 @@ namespace Orleans
             if (response.Result is Message.ResponseTypes.Status)
             {
                 var status = (StatusResponse)response.BodyObject!;
-                callbacks.TryGetValue(response.Id, out var callback);
-                var request = callback?.Message;
-                if (request is not null)
+                if (callbacks.TryGetValue(response.Id, out var owner))
                 {
-                    callback!.OnStatusUpdate(status);
-                    if (status.Diagnostics != null && status.Diagnostics.Count > 0)
+                    using var lease = owner.Acquire();
+                    if (lease.TryGetValue(out var callback))
                     {
-                        LogReceivedStatusUpdateForPendingRequest(logger, request, new(status.Diagnostics));
+                        var request = callback.Message;
+                        callback.OnStatusUpdate(status);
+                        if (status.Diagnostics != null && status.Diagnostics.Count > 0)
+                        {
+                            LogReceivedStatusUpdateForPendingRequest(logger, request, new(status.Diagnostics));
+                        }
+
+                        return;
                     }
                 }
-                else
-                {
-                    if (clientMessagingOptions.CancelUnknownRequestOnStatusUpdate)
-                    {
-                        // Cancel the call since the caller has abandoned it.
-                        // Note that the target and sender arguments are swapped because this is a response to the original request.
-                        _cancellationManager?.SignalCancellation(
-                            response.SendingSilo,
-                            targetGrainId: response.SendingGrain,
-                            sendingGrainId: response.TargetGrain,
-                            messageId: response.Id);
-                    }
 
-                    if (status.Diagnostics != null && status.Diagnostics.Count > 0)
-                    {
-                        LogReceivedStatusUpdateForUnknownRequest(logger, response, new(status.Diagnostics));
-                    }
+                if (clientMessagingOptions.CancelUnknownRequestOnStatusUpdate)
+                {
+                    // Cancel the call since the caller has abandoned it.
+                    // Note that the target and sender arguments are swapped because this is a response to the original request.
+                    _cancellationManager?.SignalCancellation(
+                        response.SendingSilo,
+                        targetGrainId: response.SendingGrain,
+                        sendingGrainId: response.TargetGrain,
+                        messageId: response.Id);
+                }
+
+                if (status.Diagnostics != null && status.Diagnostics.Count > 0)
+                {
+                    LogReceivedStatusUpdateForUnknownRequest(logger, response, new(status.Diagnostics));
                 }
 
                 return;
             }
 
-            CallbackData? callbackData;
-            var found = callbacks.TryRemove(response.Id, out callbackData);
+            var found = callbacks.TryRemove(response.Id, out var removedOwner);
             if (found)
             {
-                // We need to import the RequestContext here as well.
-                // Unfortunately, it is not enough, since CallContext.LogicalGetData will not flow "up" from task completion source into the resolved task.
-                // RequestContextExtensions.Import(response.RequestContextData);
-                callbackData!.DoCallback(response);
+                using var removedLease = removedOwner.TransferToLease();
+                if (removedLease.TryGetValue(out var callbackData))
+                {
+                    callbackData.DoCallback(response);
+                }
+                else
+                {
+                    LogDebugNoCallbackForResponseMessage(logger, response);
+                }
             }
             else
             {
@@ -381,7 +410,10 @@ namespace Orleans
 
         private void UnregisterCallback(CorrelationId id)
         {
-            callbacks.TryRemove(id, out _);
+            if (callbacks.TryRemove(id, out var owner))
+            {
+                CallbackDataPool.Return(owner);
+            }
         }
 
         private void ConstructorReset()
@@ -451,22 +483,27 @@ namespace Orleans
 
         public void BreakOutstandingMessagesToSilo(SiloAddress deadSilo)
         {
-            foreach (var callback in callbacks)
+            foreach (var (_, owner) in callbacks)
             {
-                if (deadSilo.Equals(callback.Value.Message.TargetSilo))
+                using var lease = owner.Acquire();
+                if (lease.TryGetValue(out var callback) && deadSilo.Equals(callback.Message.TargetSilo))
                 {
-                    callback.Value.OnTargetSiloFail();
+                    callback.OnTargetSiloFail();
                 }
             }
         }
 
         private void BreakOutstandingMessages()
         {
-            foreach (var (_, callback) in callbacks)
+            foreach (var (_, owner) in callbacks)
             {
                 try
                 {
-                    callback.OnHostShutdown();
+                    using var lease = owner.Acquire();
+                    if (lease.TryGetValue(out var callback))
+                    {
+                        callback.OnHostShutdown();
+                    }
                 }
                 catch (Exception exception)
                 {
@@ -476,7 +513,18 @@ namespace Orleans
         }
 
         public int GetRunningRequestsCount(GrainInterfaceType grainInterfaceType)
-            => this.callbacks.Count(c => c.Value.Message.InterfaceType == grainInterfaceType);
+        {
+            var count = 0;
+            foreach (var (_, owner) in callbacks)
+            {
+                using var lease = owner.Acquire();
+                if (lease.TryGetValue(out var callback) && callback.Message.InterfaceType == grainInterfaceType)
+                {
+                    count++;
+                }
+            }
+            return count;
+        }
 
         /// <inheritdoc />
         public void NotifyClusterConnectionLost()
@@ -520,8 +568,14 @@ namespace Orleans
                 try
                 {
                     var currentStopwatchTicks = ValueStopwatch.GetTimestamp();
-                    foreach (var (_, callback) in callbacks)
+                    foreach (var (_, owner) in callbacks)
                     {
+                        using var lease = owner.Acquire();
+                        if (!lease.TryGetValue(out var callback))
+                        {
+                            continue;
+                        }
+
                         if (callback.IsCompleted)
                         {
                             continue;
