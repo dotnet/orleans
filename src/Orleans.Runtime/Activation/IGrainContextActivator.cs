@@ -161,6 +161,10 @@ namespace Orleans.Runtime
         void Configure(IGrainContext context);
     }
 
+    internal interface IConfigureGrainContextPerActivation : IConfigureGrainContext
+    {
+    }
+
     /// <summary>
     /// Resolves components which are common to all instances of a given grain type.
     /// </summary>
@@ -346,7 +350,7 @@ namespace Orleans.Runtime
         public bool Invoke(object instance, IInvokable bodyObject) => _mayInterleavePredicate((T)instance, bodyObject);
     }
 
-    internal class MayInterleaveConfigurator : IConfigureGrainContext
+    internal class MayInterleaveConfigurator : IConfigureGrainContextPerActivation
     {
         private readonly IMayInterleavePredicate? _mayInterleavePredicate;
 
@@ -357,19 +361,26 @@ namespace Orleans.Runtime
 
         public void Configure(IGrainContext context)
         {
-            var component = context.GetComponent<GrainCanInterleave>();
-            if (component is null)
-            {
-                component = new GrainCanInterleave();
-                context.SetComponent<GrainCanInterleave>(component);
-            }
-
+            var component = new GrainCanInterleave(context.GetComponent<GrainCanInterleave>());
+            context.SetComponent<GrainCanInterleave>(component);
             component.MayInterleavePredicates.Add(_mayInterleavePredicate);
         }
     }
 
     internal class GrainCanInterleave
     {
+        public GrainCanInterleave()
+        {
+        }
+
+        public GrainCanInterleave(GrainCanInterleave? source)
+        {
+            if (source is not null)
+            {
+                MayInterleavePredicates.AddRange(source.MayInterleavePredicates);
+            }
+        }
+
         public List<IMayInterleavePredicate?> MayInterleavePredicates { get; } = new List<IMayInterleavePredicate?>();
         public bool MayInterleave(object? instance, Message message)
         {

@@ -19,6 +19,7 @@ public interface IDurableValue<T>
 internal sealed class DurableValue<T> : IDurableValue<T>, IJournaledState, IDurableValueCommandHandler<T>
 {
     private readonly IDurableValueCommandCodec<T> _codec;
+    private readonly IJournaledStateMutationGuard? _mutationGuard;
     private T? _value;
     private bool _isDirty;
 
@@ -30,6 +31,7 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IJournaledState, IDura
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = JournalFormatServices.GetRequiredCommandCodec<IDurableValueCommandCodec<T>>(serviceProvider, shared.JournalFormatKey);
+        _mutationGuard = manager as IJournaledStateMutationGuard;
         manager.RegisterState(key, this);
     }
 
@@ -37,6 +39,7 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IJournaledState, IDura
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = codec;
+        _mutationGuard = manager as IJournaledStateMutationGuard;
         manager.RegisterState(key, this);
     }
 
@@ -45,8 +48,9 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IJournaledState, IDura
         get => _value;
         set
         {
+            _mutationGuard?.ThrowIfMutationBlocked();
             _value = value;
-            OnModified();
+            _isDirty = true;
         }
     }
 
@@ -54,7 +58,11 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IJournaledState, IDura
 
     private void OnValuePersisted() => OnPersisted?.Invoke();
 
-    public void OnModified() => _isDirty = true;
+    public void OnModified()
+    {
+        _mutationGuard?.ThrowIfMutationBlocked();
+        _isDirty = true;
+    }
 
     void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
         context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);

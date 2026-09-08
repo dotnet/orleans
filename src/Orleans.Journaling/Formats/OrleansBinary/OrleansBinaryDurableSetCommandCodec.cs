@@ -115,7 +115,7 @@ internal sealed class OrleansBinaryDurableSetCommandCodec<T>(
         consumer.Reset(count);
         for (var i = 0; i < count; i++)
         {
-            consumer.ApplyAdd(OrleansBinaryCommandCodecHelpers.ReadValue(codec, ref reader));
+            consumer.ApplyAdd(OrleansBinaryCommandCodecHelpers.ReadIndependentValue(codec, ref reader));
         }
     }
 }

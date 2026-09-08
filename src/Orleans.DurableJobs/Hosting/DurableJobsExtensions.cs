@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration.Internal;
 using Orleans.Runtime;
+using Orleans.Runtime.DurableTasks;
 using Orleans.DurableJobs;
 using Orleans.Journaling;
 using Orleans.Journaling.Json;
@@ -49,7 +50,21 @@ public static class DurableJobsExtensions
         services.AddSingleton<LocalDurableJobManager>();
         services.AddFromExisting<ILocalDurableJobManager, LocalDurableJobManager>();
         services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, LocalDurableJobManager>();
-        services.AddScoped<IDurableJobHandlerRegistry, DurableJobHandlerRegistry>();
+        services.AddScoped<DurableJobHandlerRegistry>();
+        services.AddScoped<IDurableJobHandlerRegistry>(sp => sp.GetRequiredService<DurableJobHandlerRegistry>());
+        services.TryAddScoped<DurableJobTurnIsolation>();
+        services.TryAddScoped<IDurableTaskTurnIsolation>(
+            static serviceProvider => serviceProvider.GetRequiredService<DurableJobTurnIsolation>());
+        services.TryAddScoped(sp =>
+        {
+            var context = sp.GetRequiredService<IGrainContextAccessor>().GrainContext;
+            return context.GetComponent<DurableJobExecutionLifetime>()
+                ?? new DurableJobExecutionLifetime(context);
+        });
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IConfigureGrainContextProvider, DurableJobGrainContextConfigurator>());
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IIncomingGrainCallFilter, DurableJobTurnIsolationFilter>());
         services.AddSingleton(sp => new DurableJobReceiverExtensionShared(
             sp.GetRequiredService<ILogger<DurableJobReceiverExtension>>(),
             sp.GetRequiredService<IOptions<DurableJobsOptions>>(),
@@ -71,6 +86,11 @@ public static class DurableJobsExtensions
                 sp.GetRequiredService<DurableJobReceiverExtensionShared>(),
                 lookup);
         });
+        services.AddKeyedTransient<IGrainExtension>(typeof(IDurableJobFeatureReceiverExtension), (sp, _) =>
+            new DurableJobFeatureReceiverExtension(
+                sp.GetRequiredService<DurableJobHandlerRegistry>(),
+                sp.GetRequiredService<DurableJobReceiverExtensionShared>(),
+                sp.GetRequiredService<DurableJobTurnIsolation>()));
     }
 
     /// <summary>

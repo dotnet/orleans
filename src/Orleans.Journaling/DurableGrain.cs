@@ -17,6 +17,11 @@ public abstract class DurableGrain : Grain, IGrainBase
         {
             participant.Participate(((IGrainBase)this).GrainContext.ObservableLifecycle);
         }
+
+        foreach (var feature in ServiceProvider.GetServices<IJournaledGrainParticipant>())
+        {
+            feature.Initialize();
+        }
     }
 
     /// <summary>
@@ -60,5 +65,6 @@ public abstract class DurableGrain : Grain, IGrainBase
     /// </summary>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A <see cref="ValueTask"/> representing the write operation.</returns>
-    protected ValueTask WriteStateAsync(CancellationToken cancellationToken = default) => StateManager.WriteStateAsync(cancellationToken);
+    protected ValueTask WriteStateAsync(CancellationToken cancellationToken = default) =>
+        StateManager.WriteStateAsync(cancellationToken);
 }

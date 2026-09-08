@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Runtime;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -26,6 +27,65 @@ namespace UnitTests.General;
 [TestArea("Runtime")]
 public class StatelessWorkerActivationTests : IClassFixture<StatelessWorkerActivationTests.Fixture>
 {
+    [Fact]
+    public void MayInterleaveConfigurator_CreatesActivationLocalComponentWithoutMutatingSharedPredicates()
+    {
+        var shared = new GrainCanInterleave();
+        shared.MayInterleavePredicates.Add(ReentrantPredicate.Instance);
+        var mayInterleave = new MayInterleaveStaticPredicate(static _ => false);
+        var configurator = new MayInterleaveConfigurator(mayInterleave);
+        var first = ConfigureContext();
+        var second = ConfigureContext();
+
+        Assert.IsAssignableFrom<IConfigureGrainContextPerActivation>(configurator);
+        Assert.NotSame(shared, first);
+        Assert.NotSame(shared, second);
+        Assert.NotSame(first, second);
+        Assert.Equal([ReentrantPredicate.Instance], shared.MayInterleavePredicates);
+        Assert.Equal([ReentrantPredicate.Instance, mayInterleave], first.MayInterleavePredicates);
+        Assert.Equal([ReentrantPredicate.Instance, mayInterleave], second.MayInterleavePredicates);
+
+        GrainCanInterleave ConfigureContext()
+        {
+            var context = new ComponentContext(shared);
+            configurator.Configure(context);
+            return Assert.IsType<GrainCanInterleave>(context.Component);
+        }
+    }
+
+    private sealed class ComponentContext(GrainCanInterleave shared) : IGrainContext
+    {
+        public GrainCanInterleave? Component { get; private set; }
+        public GrainReference GrainReference => throw new NotSupportedException();
+        public GrainId GrainId => default;
+        public object? GrainInstance => null;
+        public ActivationId ActivationId => default;
+        public GrainAddress Address => throw new NotSupportedException();
+        public IServiceProvider ActivationServices => throw new NotSupportedException();
+        public IGrainLifecycle ObservableLifecycle => throw new NotSupportedException();
+        public IWorkItemScheduler Scheduler => throw new NotSupportedException();
+        public Task Deactivated => Task.CompletedTask;
+
+        public object? GetComponent(Type componentType) =>
+            componentType == typeof(GrainCanInterleave) ? Component ?? shared : null;
+
+        public void SetComponent<TComponent>(TComponent? value) where TComponent : class
+        {
+            if (typeof(TComponent) == typeof(GrainCanInterleave))
+            {
+                Component = (GrainCanInterleave?)(object?)value;
+            }
+        }
+
+        public object? GetTarget() => null;
+        public void ReceiveMessage(object message) => throw new NotSupportedException();
+        public void Activate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public void Deactivate(DeactivationReason deactivationReason, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public void Rehydrate(IRehydrationContext context) => throw new NotSupportedException();
+        public void Migrate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public bool Equals(IGrainContext? other) => ReferenceEquals(this, other);
+    }
+
     public class Fixture : BaseTestClusterFixture
     {
         protected override void ConfigureTestCluster(TestClusterBuilder builder)

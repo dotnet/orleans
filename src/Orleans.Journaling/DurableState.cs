@@ -9,6 +9,7 @@ internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, IP
 {
     private readonly IPersistentStateCommandCodec<T> _codec;
     private readonly IJournaledStateManager _manager;
+    private readonly IJournaledStateMutationGuard? _mutationGuard;
     private T? _value;
     private ulong _version;
     private ulong _pendingVersion;
@@ -26,6 +27,7 @@ internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, IP
         _codec = JournalFormatServices.GetRequiredCommandCodec<IPersistentStateCommandCodec<T>>(serviceProvider, shared.JournalFormatKey);
         manager.RegisterState(key, this);
         _manager = manager;
+        _mutationGuard = manager as IJournaledStateMutationGuard;
     }
 
     internal DurableState(string key, IJournaledStateManager manager, IPersistentStateCommandCodec<T> codec)
@@ -34,6 +36,7 @@ internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, IP
         _codec = codec;
         manager.RegisterState(key, this);
         _manager = manager;
+        _mutationGuard = manager as IJournaledStateMutationGuard;
     }
 
     public Action? OnPersisted { get; set; }
@@ -41,11 +44,13 @@ internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, IP
     {
         get
         {
+            _mutationGuard?.ThrowIfMutationBlocked();
             _hasState = true;
             return _value ??= Activator.CreateInstance<T>();
         }
         set
         {
+            _mutationGuard?.ThrowIfMutationBlocked();
             _value = value;
             _hasState = true;
             _clearRequested = false;
@@ -150,6 +155,7 @@ internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, IP
     Task IStorage.ClearStateAsync() => ((IStorage)this).ClearStateAsync(CancellationToken.None);
     async Task IStorage.ClearStateAsync(CancellationToken cancellationToken)
     {
+        _mutationGuard?.ThrowIfMutationBlocked();
         _value = default;
         _hasState = false;
         _clearRequested = true;

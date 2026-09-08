@@ -13,5 +13,8 @@ namespace Orleans.Runtime
 
         /// <inheritdoc/>
         public override bool IsUsingGrainDirectory => false;
+
+        /// <inheritdoc />
+        public override bool IsGrain => false;
     }
 }

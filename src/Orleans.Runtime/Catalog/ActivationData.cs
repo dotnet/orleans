@@ -13,6 +13,7 @@ using Orleans.GrainDirectory;
 using Orleans.Internal;
 using Orleans.Runtime.Diagnostics;
 using Orleans.Runtime.GrainDirectory;
+using Orleans.Runtime.Internal;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Scheduler;
 using Orleans.Serialization.Invocation;
@@ -711,9 +712,12 @@ internal sealed partial class ActivationData :
         var deactivateActivity = activityContext is { } parent
             ? ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.DeactivateGrain, ActivityKind.Internal, parentContext: parent)
             : ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.DeactivateGrain);
-        lock (_lock)
+        IActivationDeactivationParticipant? deactivationParticipant = null;
+        var operationScheduled = false;
+
+        try
         {
-            try
+            lock (_lock)
             {
                 var state = State;
                 if (deactivateActivity is { IsAllDataRequested: true })
@@ -744,6 +748,7 @@ internal sealed partial class ActivationData :
 
                 if (state is ActivationState.Creating or ActivationState.Activating or ActivationState.Valid)
                 {
+                    deactivationParticipant = GetComponent<IActivationDeactivationParticipant>();
                     GrainLifecycleEvents.EmitDeactivating(this, DeactivationReason);
 
                     CancelPendingOperations();
@@ -752,7 +757,9 @@ internal sealed partial class ActivationData :
                     SetState(ActivationState.Deactivating);
                     var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                     cts.CancelAfter(_shared.InternalRuntime.CollectionOptions.Value.DeactivationTimeout);
-                    ScheduleOperation(new Command.Deactivate(cts, state, deactivateActivity));
+                    _pendingOperations ??= new();
+                    _pendingOperations.Enqueue(new Command.Deactivate(cts, state, deactivateActivity));
+                    operationScheduled = true;
                 }
                 else
                 {
@@ -761,16 +768,37 @@ internal sealed partial class ActivationData :
 
                 Debug.Assert(State is ActivationState.Deactivating or ActivationState.Invalid, "Deactivate should leave the activation deactivating or invalid.");
             }
-            catch (Exception ex)
+
+            if (deactivationParticipant is { })
             {
-                SetActivityError(deactivateActivity, ex, "Error deactivating grain");
-                deactivateActivity?.Stop();
-                throw;
+                try
+                {
+                    deactivationParticipant.OnDeactivationRequested();
+                }
+                catch (Exception exception)
+                {
+                    LogErrorInGrainMethod(
+                        _shared.Logger,
+                        exception,
+                        nameof(IActivationDeactivationParticipant.OnDeactivationRequested),
+                        this);
+                }
             }
-            finally
+        }
+        catch (Exception ex)
+        {
+            SetActivityError(deactivateActivity, ex, "Error deactivating grain");
+            deactivateActivity?.Stop();
+            throw;
+        }
+        finally
+        {
+            if (operationScheduled)
             {
-                Activity.Current = currentActivity;
+                _workSignal.Signal();
             }
+
+            Activity.Current = currentActivity;
         }
     }
 
@@ -2053,6 +2081,23 @@ internal sealed partial class ActivationData :
                 // If the grain was valid when deactivation started, call OnDeactivateAsync.
                 if (deactivateCommand.PreviousState == ActivationState.Valid)
                 {
+                    if (GetComponent<IActivationDeactivationParticipant>() is { } participant)
+                    {
+                        try
+                        {
+                            await participant.OnDeactivatingAsync(cancellationToken).WaitAsync(cancellationToken);
+                        }
+                        catch (Exception exception)
+                        {
+                            LogErrorInGrainMethod(
+                                _shared.Logger,
+                                exception,
+                                nameof(IActivationDeactivationParticipant.OnDeactivatingAsync),
+                                this);
+                            encounteredError = true;
+                        }
+                    }
+
                     if (GrainInstance is IGrainBase grainBase)
                     {
                         // Start a span for OnDeactivateAsync execution

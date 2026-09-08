@@ -23,6 +23,10 @@ Requests reach the grain after setup succeeds. A storage read, format, codec, or
 
 Storage providers can split reads at arbitrary byte boundaries. The journal format buffers incomplete entries and only applies complete ordered records.
 
+An explicit rollback through <xref:Orleans.Journaling.IJournaledStateManager.RevertPendingChangesAsync*> enters the same recovery boundary. The manager resets every registered state, reloads storage, and replays the complete journal before accepting later work. If reset, read, or replay fails, the manager remains recovery-pending and queued operations wait for a later successful recovery attempt. No caller observes a partially rebuilt state.
+
+Recovery also releases ownership held by displaced durable values. Replaced, removed, or cleared values which implement <xref:System.IDisposable> are disposed exactly once as replay establishes the recovered state.
+
 ## Mutation and write acknowledgement
 
 Durable collections encode their operation before applying it to the in-memory collection. A codec failure therefore leaves both the journal buffer and collection unchanged.

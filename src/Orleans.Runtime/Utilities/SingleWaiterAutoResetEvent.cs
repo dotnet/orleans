@@ -5,7 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Sources;
 
-namespace Orleans.Runtime
+namespace Orleans.Runtime.Internal
 {
     /// <summary>
     /// Represents a synchronization event that, when signaled, resets automatically after releasing a single waiter.

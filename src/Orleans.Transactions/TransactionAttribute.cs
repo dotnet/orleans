@@ -459,6 +459,9 @@ namespace Orleans
             set => _response.Exception = value;
         }
 
+        /// <inheritdoc/>
+        public override bool IsFinal => _response.IsFinal;
+
         /// <summary>
         /// Gets the exception from the wrapped response.
         /// </summary>

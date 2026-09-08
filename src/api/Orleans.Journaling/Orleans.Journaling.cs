@@ -208,6 +208,16 @@ namespace Orleans.Journaling
         T? Value { get; set; }
     }
 
+    public partial interface IJournaledGrainParticipant
+    {
+        void Initialize();
+    }
+
+    public partial interface IJournaledResourceOwner : System.IDisposable
+    {
+        object ResourceIdentity { get; }
+    }
+
     public partial interface IJournaledState
     {
         void AppendEntries(JournalStreamWriter writer);
@@ -541,6 +551,16 @@ namespace Orleans.Journaling
         public IJournalStorage CreateStorage(JournalId journalId) { throw null; }
 
         public System.Collections.Generic.IAsyncEnumerable<JournalId> ListAsync(JournalId prefix = default, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+    }
+}
+
+namespace Orleans.Journaling.DurableTasks
+{
+    public static partial class DurableTaskHostingExtensions
+    {
+        public static Hosting.ISiloBuilder AddJournaledDurableTaskStorage(this Hosting.ISiloBuilder siloBuilder) { throw null; }
+
+        public static Hosting.ISiloBuilder AddVolatileDurableTaskStorage(this Hosting.ISiloBuilder siloBuilder) { throw null; }
     }
 }
 

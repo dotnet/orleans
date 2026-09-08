@@ -92,3 +92,19 @@ public interface IJournaledState
     /// <returns>A replica of this instance.</returns>
     IJournaledState DeepCopy();
 }
+
+/// <summary>
+/// Identifies the resource owned by a disposable journaled value.
+/// </summary>
+public interface IJournaledResourceOwner : IDisposable
+{
+    /// <summary>
+    /// Gets the reference identity used to coordinate ownership of the resource.
+    /// </summary>
+    object ResourceIdentity { get; }
+}
+
+internal interface IJournaledStateWriteParticipant
+{
+    void OnWritePreparing();
+}

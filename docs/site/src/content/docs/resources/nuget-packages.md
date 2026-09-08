@@ -112,6 +112,8 @@ These packages don't replace the cluster membership provider.
 | Package | Purpose |
 | --- | --- |
 | [Microsoft.Orleans.EventSourcing](https://www.nuget.org/packages/Microsoft.Orleans.EventSourcing) | Event-sourced grain base types and log-consistency abstractions. |
+| [Microsoft.Orleans.DurableMessaging](https://www.nuget.org/packages/Microsoft.Orleans.DurableMessaging) | Alpha journaled inbox and outbox messaging with atomic handler completion, idempotent delivery, and durable retries. |
+| [Microsoft.Orleans.DurableTasks](https://www.nuget.org/packages/Microsoft.Orleans.DurableTasks) | Alpha recoverable task scheduling and durable RPC for Orleans grains, including stable task identities, restart recovery, and durable cancellation. |
 | [Microsoft.Orleans.Journaling](https://www.nuget.org/packages/Microsoft.Orleans.Journaling) | Pre-release alpha durable journaled collections and values with experimental diagnostic `ORLEANSEXP005`; see the [Journaling overview](../grains/journaling/index.md). |
 | [Microsoft.Orleans.Journaling.AzureStorage](https://www.nuget.org/packages/Microsoft.Orleans.Journaling.AzureStorage) | Pre-release alpha Azure Blob and Azure Table providers for Orleans Journaling. |
 | [Microsoft.Orleans.Journaling.Redis](https://www.nuget.org/packages/Microsoft.Orleans.Journaling.Redis) | Pre-release alpha Redis provider for Orleans Journaling. |

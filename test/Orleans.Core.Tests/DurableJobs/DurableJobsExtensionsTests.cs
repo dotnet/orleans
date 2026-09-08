@@ -1,8 +1,10 @@
+using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using Orleans.DurableJobs;
 using Orleans.Hosting;
+using Orleans.Metadata;
 using Orleans.Runtime;
 using Xunit;
 
@@ -14,6 +16,42 @@ namespace NonSilo.Tests.ScheduledJobs;
 [TestArea("DurableJobs")]
 public class DurableJobsExtensionsTests
 {
+    [Fact]
+    public void AddDurableJobs_RegistersEagerGrainContextConfiguration()
+    {
+        var services = new ServiceCollection();
+
+        services.AddDurableJobs();
+
+        var descriptor = Assert.Single(
+            services,
+            service => service.ServiceType == typeof(IConfigureGrainContextProvider)
+                && service.ImplementationType == typeof(DurableJobGrainContextConfigurator));
+        Assert.Equal(ServiceLifetime.Singleton, descriptor.Lifetime);
+
+        var configurator = new DurableJobGrainContextConfigurator();
+        Assert.True(configurator.TryGetConfigurator(
+            GrainType.Create("test"),
+            new GrainProperties(ImmutableDictionary.Create<string, string>(StringComparer.Ordinal)),
+            out var resolved));
+        Assert.Same(configurator, resolved);
+
+        var context = Substitute.For<IGrainContext>();
+        context.ObservableLifecycle.Returns(Substitute.For<IGrainLifecycle>());
+        configurator.Configure(context);
+        var componentTypes = context.ReceivedCalls()
+            .Where(static call => call.GetMethodInfo().Name == nameof(IGrainContext.SetComponent))
+            .Select(static call => call.GetMethodInfo().GetGenericArguments()[0])
+            .ToList();
+        Assert.Equal(
+            [
+                typeof(DurableJobExecutionLifetime),
+                typeof(ActivationDeactivationCoordinator),
+                typeof(IActivationDeactivationParticipant),
+            ],
+            componentTypes);
+    }
+
     [Fact]
     public async Task AddDurableJobs_RegistryAndReceiverShareScope_WhileSeparateScopesAreIsolated()
     {
@@ -140,15 +178,36 @@ public class DurableJobsExtensionsTests
         public void Register(IDurableJobFeatureHandler handler)
         {
         }
+
+        public void Register(IDurableJobFeatureHandler handler, bool requiresTurnIsolation)
+        {
+        }
     }
 
     private sealed class LookupReplacementRegistry : IDurableJobHandlerRegistry, IDurableJobHandlerLookup
     {
+        public CancellationToken ExecutionToken => CancellationToken.None;
+
         public void Register(IDurableJobFeatureHandler handler)
         {
         }
 
+        public void Register(IDurableJobFeatureHandler handler, bool requiresTurnIsolation)
+        {
+        }
+
+        public Task<TResult> StartExecution<TResult>(
+            Func<CancellationToken, Task<TResult>> factory,
+            bool holdTurnIsolation) =>
+            factory(CancellationToken.None);
+
         public bool TryGetHandler(string jobName, [NotNullWhen(true)] out IDurableJobFeatureHandler? handler)
+        {
+            handler = null;
+            return false;
+        }
+
+        public bool TryGetIsolatedHandler(string jobName, [NotNullWhen(true)] out IDurableJobFeatureHandler? handler)
         {
             handler = null;
             return false;
