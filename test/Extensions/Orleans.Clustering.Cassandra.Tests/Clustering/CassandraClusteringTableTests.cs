@@ -27,6 +27,7 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
 
     public CassandraClusteringTableTests(CassandraContainer cassandraContainer, ITestOutputHelper testOutputHelper)
     {
+        cassandraContainer.EnsurePreconditionsMet();
         _cassandraContainer = cassandraContainer;
         _cassandraContainer.Name = nameof(Cassandra);
         _testOutputHelper = testOutputHelper;

@@ -22,7 +22,7 @@ namespace ServiceBus.Tests.StreamingTests
         private readonly SubscriptionMultiplicityTestRunner runner;
         private readonly Fixture fixture;
 
-        public class Fixture : BaseTestClusterFixture
+        public class Fixture : BaseEventHubTestClusterFixture
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
@@ -60,6 +60,7 @@ namespace ServiceBus.Tests.StreamingTests
 
         public EHBatchedSubscriptionMultiplicityTests(Fixture fixture)
         {
+            fixture.EnsurePreconditionsMet();
             this.fixture = fixture;
             this.runner = new SubscriptionMultiplicityTestRunner(StreamProviderName, fixture.HostedCluster);
         }
