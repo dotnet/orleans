@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Text;
 using Orleans.Journaling.Json;
+using Orleans.Serialization.Buffers;
 using Xunit;
 
 namespace Orleans.Journaling.Tests;
@@ -252,6 +253,50 @@ public sealed class JournalBufferWriterOwnershipTests
         Assert.NotNull(exception);
         Assert.Equal("offset", exception.ParamName);
         Assert.Empty(ToArray(writer));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void JsonEmptyEntry_RetainsValidationAfterLargeOrConsumedPrefix(bool consumePrefix)
+    {
+        using var writer = CreateWriter(JsonFormat);
+        var payload = Encoding.UTF8.GetBytes($"[\"set\",\"{new string('x', ArcBufferWriter.MinimumPageSize * 3 + 17)}\"]");
+        AppendEntry(writer.CreateJournalStreamWriter(new JournalStreamId(1)), payload);
+        using var prefix = writer.GetCommittedBuffer();
+        var prefixBytes = Encoding.UTF8.GetBytes($"[1,{Encoding.UTF8.GetString(payload)}]\n");
+        Assert.Equal(prefixBytes, prefix.ToArray());
+        if (consumePrefix)
+        {
+            writer.Consume(prefix);
+        }
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            AppendEntry(writer.CreateJournalStreamWriter(new JournalStreamId(2)), []));
+        Assert.Equal("The JSON Lines journal entry has no entry payload.", exception.Message);
+        Assert.Equal(consumePrefix ? [] : prefixBytes, ToArray(writer));
+
+        AppendEntry(writer.CreateJournalStreamWriter(new JournalStreamId(3)), GetThirdPayload(JsonFormat));
+        var suffix = """[3,["set",3]]""" + "\n";
+        Assert.Equal(Encoding.UTF8.GetBytes((consumePrefix ? "" : Encoding.UTF8.GetString(prefixBytes)) + suffix), ToArray(writer));
+        Assert.Equal(prefixBytes, prefix.ToArray());
+    }
+
+    [Fact]
+    public void JsonEmptyEntry_RetainsValidationOnNewAndResetWriter()
+    {
+        using var writer = CreateWriter(JsonFormat);
+        for (var iteration = 0; iteration < 2; iteration++)
+        {
+            var stream = writer.CreateJournalStreamWriter(new JournalStreamId(1));
+            var exception = Assert.Throws<InvalidOperationException>(() => AppendEntry(stream, []));
+            Assert.Equal("The JSON Lines journal entry has no entry payload.", exception.Message);
+            Assert.Empty(ToArray(writer));
+
+            AppendEntry(stream, GetFirstPayload(JsonFormat));
+            Assert.Equal(Encoding.UTF8.GetBytes("""[1,["set",1]]""" + "\n"), ToArray(writer));
+            writer.Reset();
+        }
     }
 
     private static JournalBufferWriter CreateWriter(string format) => format switch

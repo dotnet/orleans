@@ -142,6 +142,117 @@ public class ArcBufferWriterTests
         Assert.Equal(data.Length * 1_000L, length);
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(17)]
+    [InlineData(PageSize)]
+    [InlineData(PageSize * 2 + 3)]
+    [InlineData(PageSize * 3 + 3)]
+    public void Peek_ReturnsEveryUnreadByteAcrossPages(int consumed)
+    {
+        using var writer = new ArcBufferWriter();
+        var data = Enumerable.Range(0, PageSize * 3 + 17).Select(static i => (byte)(i % 251)).ToArray();
+        writer.Write(data);
+        writer.AdvanceReader(consumed);
+
+        for (var offset = 0; offset < writer.Length; offset++)
+        {
+            Assert.Equal(data[consumed + offset], writer.Reader.Peek(offset));
+        }
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => writer.Reader.Peek(-1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => writer.Reader.Peek(writer.Length));
+        Assert.Throws<ArgumentOutOfRangeException>(() => writer.Reader.Peek(long.MaxValue));
+    }
+
+    [Fact]
+    public void Peek_UsesWrittenPageWhenLaterPagesAreReserved()
+    {
+        using var writer = new ArcBufferWriter();
+        var buffers = new List<ArraySegment<byte>>(4);
+        writer.ReplenishBuffers(buffers);
+        var data = Enumerable.Range(0, PageSize + 17).Select(static i => (byte)(i % 251)).ToArray();
+        writer.Write(data);
+
+        Assert.Equal(data[^1], writer.Reader.Peek(writer.Length - 1));
+        Assert.Equal(data[PageSize], writer.Reader.Peek(PageSize));
+        Assert.Equal(data[0], writer.Reader.Peek(0));
+    }
+
+    [Fact]
+    public void Peek_PreservesTailWhenNewWritePageIsEmpty()
+    {
+        using var writer = new ArcBufferWriter();
+        writer.Write([1, 2, 3]);
+        var memory = writer.GetMemory(PageSize * 2);
+
+        Assert.Equal(3, writer.Reader.Peek(2));
+        Assert.Throws<ArgumentOutOfRangeException>(() => writer.Reader.Peek(3));
+
+        memory.Span[0] = 4;
+        writer.AdvanceWriter(1);
+        Assert.Equal(4, writer.Reader.Peek(3));
+        Assert.Equal(3, writer.Reader.Peek(2));
+    }
+
+    [Fact]
+    public void Peek_TracksTruncationPatchingAndAppends()
+    {
+        using var writer = new ArcBufferWriter();
+        var data = Enumerable.Range(0, PageSize * 3 + 17).Select(static i => (byte)(i % 251)).ToArray();
+        writer.Write(data);
+        writer.AdvanceReader(13);
+        writer.Truncate(PageSize + 7);
+
+        Assert.Equal(data[13 + PageSize + 6], writer.Reader.Peek(writer.Length - 1));
+        writer.WriteAt(writer.Length - 1, [255]);
+        Assert.Equal(255, writer.Reader.Peek(writer.Length - 1));
+        writer.Write([254, 253]);
+        Assert.Equal(254, writer.Reader.Peek(writer.Length - 2));
+        Assert.Equal(253, writer.Reader.Peek(writer.Length - 1));
+    }
+
+    [Fact]
+    public void Peek_RespectsPinnedSliceEndWhenSourceTailGrows()
+    {
+        using var source = new ArcBufferWriter();
+        var data = Enumerable.Range(0, PageSize + 64).Select(static i => (byte)(i % 251)).ToArray();
+        source.Write(data);
+        using var all = source.PeekSlice(source.Length);
+        using var slice = all.Slice(13, PageSize + 4);
+        using var destination = new ArcBufferWriter();
+        destination.AppendPinned(slice);
+        source.Write([253, 254, 255]);
+
+        for (var offset = 0; offset < destination.Length; offset++)
+        {
+            Assert.Equal(data[13 + offset], destination.Reader.Peek(offset));
+        }
+
+        destination.AdvanceReader(PageSize);
+        Assert.Equal(data[PageSize + 16], destination.Reader.Peek(3));
+        Assert.Throws<ArgumentOutOfRangeException>(() => destination.Reader.Peek(4));
+    }
+
+    [Fact]
+    public void Peek_ObservesResetReuseAndDisposal()
+    {
+        using var writer = new ArcBufferWriter();
+        var reader = writer.Reader;
+        writer.Write([1, 2, 3]);
+        writer.AdvanceReader(3);
+        Assert.Throws<ArgumentOutOfRangeException>(() => reader.Peek(0));
+        writer.Write([6]);
+        Assert.Equal(6, reader.Peek(0));
+
+        writer.Reset();
+        Assert.Throws<ArgumentOutOfRangeException>(() => reader.Peek(0));
+        writer.Write([4, 5]);
+        Assert.Equal(5, reader.Peek(1));
+        writer.Dispose();
+        Assert.Throws<ObjectDisposedException>(() => reader.Peek(0));
+    }
+
     [Fact]
     public void AppendPinned_WholeBufferPinsPagesAndReadsData()
     {
