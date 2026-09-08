@@ -10,10 +10,13 @@ namespace Orleans.Journaling;
 /// <summary>
 /// Provides shared in-memory journal storage instances identified by journal id.
 /// </summary>
-public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJournalStorageCatalog
+public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJournalStorageCatalog, IPagedJournalStorageCatalog
 {
     private readonly IOptions<JournaledStateManagerOptions>? _options;
     private readonly ConcurrentDictionary<string, VolatileJournalStorage.Store> _storage = new(StringComparer.Ordinal);
+    private readonly SortedSet<string> _catalog = new(StringComparer.Ordinal);
+    private readonly object _catalogLock = new();
+    private readonly JournalStorageCatalogToken _catalogToken = new();
 
     /// <summary>
     /// Initializes a new instance of the <see cref="VolatileJournalStorageProvider"/> class using the default journal format.
@@ -42,7 +45,7 @@ public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJ
 
         var journalFormatKey = GetJournalFormatKey();
         var store = _storage.GetOrAdd(journalId.Value, static key => new VolatileJournalStorage.Store(key));
-        return new VolatileJournalStorage(store, journalFormatKey);
+        return new VolatileJournalStorage(store, journalFormatKey, OnExistenceChanged);
     }
 
     /// <inheritdoc/>
@@ -84,6 +87,87 @@ public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJ
     private string GetJournalFormatKey()
         => JournalFormatServices.ValidateJournalFormatKey(_options?.Value.JournalFormatKey ?? JsonJournalExtensions.JournalFormatKey);
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Pages traverse the maintained catalog index in ordinal journal id order using memory proportional
+    /// to the page size and the index traversal stack. Each call examines at most <paramref name="pageSize"/>
+    /// indexed identities in the prefix range after seeking past the preceding cursor. Filtering can produce empty pages.
+    /// Concurrently created ids beyond the cursor can be visited; start a new traversal to visit earlier ids.
+    /// </remarks>
+    public ValueTask<JournalStorageCatalogPage> ReadPageAsync(
+        JournalId prefix,
+        int pageSize,
+        string? continuationToken = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(pageSize);
+        cancellationToken.ThrowIfCancellationRequested();
+        var cursor = _catalogToken.Parse(prefix, continuationToken);
+        List<JournalId> journalIds = [];
+        string? nextCursor = null;
+        lock (_catalogLock)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (_catalog.Count > 0)
+            {
+                var lower = cursor ?? prefix.Value ?? _catalog.Min!;
+                // '/' separates journal segments. Its ordinal successor bounds the exact id and all descendants.
+                var upper = prefix.IsDefault ? _catalog.Max! : prefix.Value + "0";
+                // GetViewBetween seeks into the index; using its Count would enumerate the range.
+                SortedSet<string> range = StringComparer.Ordinal.Compare(lower, upper) <= 0
+                    ? _catalog.GetViewBetween(lower, upper)
+                    : [];
+                var visited = 0;
+                foreach (var value in range)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (!prefix.IsDefault && string.Equals(value, upper, StringComparison.Ordinal))
+                    {
+                        break;
+                    }
+
+                    if (string.Equals(value, cursor, StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    var journalId = new JournalId(value);
+                    if (prefix.IsPrefixOf(journalId))
+                    {
+                        journalIds.Add(journalId);
+                    }
+
+                    if (++visited == pageSize)
+                    {
+                        nextCursor = value;
+                        break;
+                    }
+                }
+            }
+        }
+
+        return new(new JournalStorageCatalogPage
+        {
+            JournalIds = journalIds,
+            ContinuationToken = _catalogToken.Create(prefix, nextCursor),
+        });
+    }
+
+    private void OnExistenceChanged(string journalId, bool exists)
+    {
+        lock (_catalogLock)
+        {
+            if (exists)
+            {
+                _catalog.Add(journalId);
+            }
+            else
+            {
+                _catalog.Remove(journalId);
+            }
+        }
+    }
+
     private static bool TryParseJournalId(string value, out JournalId journalId)
     {
         try
@@ -105,6 +189,7 @@ public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJ
 public sealed class VolatileJournalStorage : IJournalStorage
 {
     private readonly Store _store;
+    private readonly Action<string, bool>? _onExistenceChanged;
     private string? _configuredJournalFormatKey;
 
     /// <summary>
@@ -122,10 +207,11 @@ public sealed class VolatileJournalStorage : IJournalStorage
     {
     }
 
-    internal VolatileJournalStorage(Store store, string? journalFormatKey)
+    internal VolatileJournalStorage(Store store, string? journalFormatKey, Action<string, bool>? onExistenceChanged = null)
     {
         ArgumentNullException.ThrowIfNull(store);
         _store = store;
+        _onExistenceChanged = onExistenceChanged;
         SetConfiguredJournalFormatKey(journalFormatKey);
     }
 
@@ -182,6 +268,7 @@ public sealed class VolatileJournalStorage : IJournalStorage
             }
 
             _store.Create(values);
+            _onExistenceChanged?.Invoke(_store.StorageId, true);
             return new(true);
         }
     }
@@ -250,10 +337,15 @@ public sealed class VolatileJournalStorage : IJournalStorage
         cancellationToken.ThrowIfCancellationRequested();
         lock (_store.SyncRoot)
         {
+            var created = !_store.Exists;
             _store.Exists = true;
             _store.StoredJournalFormatKey = _configuredJournalFormatKey;
             _store.Segments.Add(segment.ToArray());
             _store.RefreshETag();
+            if (created)
+            {
+                _onExistenceChanged?.Invoke(_store.StorageId, true);
+            }
         }
 
         return default;
@@ -265,11 +357,16 @@ public sealed class VolatileJournalStorage : IJournalStorage
         cancellationToken.ThrowIfCancellationRequested();
         lock (_store.SyncRoot)
         {
+            var created = !_store.Exists;
             _store.Exists = true;
             _store.StoredJournalFormatKey = _configuredJournalFormatKey;
             _store.Segments.Clear();
             _store.Segments.Add(snapshot.ToArray());
             _store.RefreshETag();
+            if (created)
+            {
+                _onExistenceChanged?.Invoke(_store.StorageId, true);
+            }
         }
 
         return default;
@@ -282,6 +379,7 @@ public sealed class VolatileJournalStorage : IJournalStorage
         lock (_store.SyncRoot)
         {
             _store.Delete();
+            _onExistenceChanged?.Invoke(_store.StorageId, false);
         }
 
         return default;
@@ -291,6 +389,8 @@ public sealed class VolatileJournalStorage : IJournalStorage
 
     internal sealed class Store(string storageId)
     {
+        public string StorageId { get; } = storageId;
+
         public object SyncRoot { get; } = new();
 
         public List<byte[]> Segments { get; } = [];
@@ -367,7 +467,7 @@ public sealed class VolatileJournalStorage : IJournalStorage
             return ETag;
         }
 
-        public override string ToString() => storageId;
+        public override string ToString() => StorageId;
     }
 
     private static IReadOnlySet<string> CopyRemove(IEnumerable<string>? remove, IReadOnlyDictionary<string, string> set)
