@@ -24,6 +24,8 @@ public abstract class JobShardManager
     internal virtual Task<List<IJobShard>> DiscoverJobShardsAsync(DateTimeOffset maxDueTime, int maxNewClaims, CancellationToken cancellationToken)
         => AssignJobShardsAsync(maxDueTime, maxNewClaims, cancellationToken);
 
+    internal virtual ValueTask StopDiscoveryAsync() => ValueTask.CompletedTask;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="JobShardManager"/> class.
     /// </summary>

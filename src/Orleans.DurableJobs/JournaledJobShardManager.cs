@@ -15,7 +15,7 @@ namespace Orleans.DurableJobs;
 
 internal sealed class JournaledJobShardManager : JobShardManager
 {
-    internal const int CatalogPageSize = 256;
+    internal const int DiscoveryBatchSize = 256;
     private const string OwnerProperty = "DurableJobsOwner";
     private const string MembershipVersionProperty = "DurableJobsMembershipVersion";
     private const string MinDueTimeProperty = "DurableJobsMinDueTime";
@@ -41,17 +41,14 @@ internal sealed class JournaledJobShardManager : JobShardManager
     // (via UnregisterShardAsync). Mis-cache from split-brain is bounded by storage-layer ETag
     // conflicts triggering InconsistentStateException → the journaling layer's recovery path.
     private readonly ConcurrentDictionary<string, bool> _ownedShards = new(StringComparer.Ordinal);
-    // The local manager serializes discovery turns. Tokens belong to the catalog prefix,
-    // independently of membership; each candidate uses the latest membership snapshot.
-    private IReadOnlyList<JournalId>? _catalogPage;
-    private int _catalogPageIndex;
-    private string? _catalogContinuationToken;
+    // The local manager serializes discovery and passes its lifetime token on every turn.
+    // Membership changes preserve the enumerator; each candidate uses current membership.
+    private IAsyncEnumerator<JournalId>? _catalogEnumerator;
     private List<IJobShard>? _pendingAssignments;
 
     internal override bool HasMoreCatalogWork
         => _pendingAssignments is { Count: > 0 }
-            || _catalogPage is { } page && _catalogPageIndex < page.Count
-            || _catalogContinuationToken is not null;
+            || _catalogEnumerator is not null;
 
     public JournaledJobShardManager(
         ILocalSiloDetails localSiloDetails,
@@ -115,12 +112,6 @@ internal sealed class JournaledJobShardManager : JobShardManager
     internal override async Task<List<IJobShard>> DiscoverJobShardsAsync(DateTimeOffset maxDueTime, int maxNewClaims, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (_catalog is not IPagedJournalStorageCatalog pagedCatalog)
-        {
-            // Legacy catalogs retain their full-scan assignment behavior.
-            return await AssignJobShardsAsync(maxDueTime, maxNewClaims, cancellationToken);
-        }
-
         // Deliver a successful prefix before resuming after a later candidate failed.
         // Repeated failures then leave both earlier and later shards able to make progress.
         if (_pendingAssignments is { Count: > 0 } pending)
@@ -129,24 +120,36 @@ internal sealed class JournaledJobShardManager : JobShardManager
             return pending;
         }
 
-        if (_catalogPage is null || _catalogPageIndex == _catalogPage.Count)
-        {
-            // Read at most one page, including empty nonterminal pages. Only the catalog
-            // interprets its token; a completed sweep restarts at the next periodic check.
-            var page = await pagedCatalog.ReadPageAsync(JobShardId.StoragePrefix, CatalogPageSize, _catalogContinuationToken, cancellationToken);
-            _catalogPage = page.JournalIds;
-            _catalogPageIndex = 0;
-            _catalogContinuationToken = page.ContinuationToken;
-        }
+        var enumerator = _catalogEnumerator ??= _catalog.ListAsync(
+            new() { Prefix = JobShardId.StoragePrefix }, cancellationToken).GetAsyncEnumerator(cancellationToken);
 
         var result = _pendingAssignments = new List<IJobShard>();
         var newClaimCount = 0;
-        while (_catalogPageIndex < _catalogPage.Count)
+        for (var visited = 0; visited < DiscoveryBatchSize; visited++)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            var advanced = false;
+            try
+            {
+                advanced = await enumerator.MoveNextAsync();
+                if (!advanced)
+                {
+                    break;
+                }
+            }
+            finally
+            {
+                // An exhausted or faulted iterator has ended its sweep. Storage failures
+                // surface to the runtime; a later periodic check starts a new enumeration.
+                if (!advanced)
+                {
+                    await DisposeCatalogEnumeratorAsync();
+                }
+            }
+
             // Failed attempts surface to the caller and are revisited on the next sweep,
             // allowing the remainder of this sweep to progress.
-            var storageId = _catalogPage[_catalogPageIndex++];
+            var storageId = enumerator.Current;
             var (shard, claimed) = await TryAssignShardAsync(storageId, maxDueTime, newClaimCount < maxNewClaims, cancellationToken);
             if (shard is not null)
             {
@@ -161,6 +164,22 @@ internal sealed class JournaledJobShardManager : JobShardManager
 
         _pendingAssignments = null;
         return result;
+    }
+
+    internal override async ValueTask StopDiscoveryAsync()
+    {
+        _pendingAssignments = null;
+        await DisposeCatalogEnumeratorAsync();
+    }
+
+    private async ValueTask DisposeCatalogEnumeratorAsync()
+    {
+        var enumerator = _catalogEnumerator;
+        _catalogEnumerator = null;
+        if (enumerator is not null)
+        {
+            await enumerator.DisposeAsync();
+        }
     }
 
     private async ValueTask<(IJobShard? Shard, bool Claimed)> TryAssignShardAsync(

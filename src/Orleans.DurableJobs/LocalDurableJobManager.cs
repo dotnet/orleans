@@ -241,7 +241,14 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
             await _periodicCheckTask.SuppressThrowing();
         }
 
-        await Task.WhenAll(runningShards);
+        try
+        {
+            await _shardManager.StopDiscoveryAsync();
+        }
+        finally
+        {
+            await Task.WhenAll(runningShards);
+        }
 
         LogStopped(_logger);
     }

@@ -108,23 +108,28 @@ time-provider clock. A discovered shard starts processing once its start time en
 `ShardActivationBufferPeriod`. Periodic checks run every five minutes, and membership changes
 also trigger checks.
 
-For catalogs implementing `IPagedJournalStorageCatalog`, runtime discovery advances through
-an opaque, prefix-scoped continuation. Each discovery turn reads at most one catalog page
-and evaluates at most 256 identities, fetching metadata once per evaluated identity.
-Empty nonterminal pages and every visited identity consume this budget, including
-far-future shards, live-owner shards, duplicates, and candidates skipped by the shard-claim
-budget. Each eligible candidate can perform one conditional ownership metadata update and
-open its journal. Journal replay cost depends on the contents of that shard.
+Runtime discovery retains one asynchronous catalog enumerator across turns. Each turn
+evaluates at most 256 yielded identities, fetching metadata once per evaluated identity.
+Every yielded identity consumes this budget, including far-future shards, live-owner shards,
+duplicates, and candidates skipped by the shard-claim budget. Each eligible candidate can
+perform one conditional ownership metadata update and open its journal. Journal replay cost
+depends on the contents of that shard.
+
+Catalog providers manage paging internally and yield identities in provider traversal order.
+One `MoveNextAsync` can traverse arbitrarily many empty or filtered backend pages before
+yielding an identity or completing. The per-turn bound therefore covers yielded identities
+and candidate metadata evaluations; underlying listing requests, latency, and provider
+working memory depend on the storage implementation.
 
 The runtime yields between continuation turns. Membership changes preserve scan progress;
 ownership decisions use current membership and conditional storage updates. A completed
 sweep waits for the next periodic or membership check before starting again. Repeated
 complete sweeps revisit future shards as time advances and observe entries inserted behind
-the previous cursor, subject to the catalog's mutation-consistency guarantees. Eventual
+the previous traversal position, subject to the catalog's mutation-consistency guarantees. Eventual
 delivery therefore depends on progressing storage operations and sweeps; scan duration
 contributes to discovery latency.
 
-Discovery retains at most one page of candidate identities and one page of pending assignments.
+Discovery retains the enumerator and at most one batch of pending assignments.
 Claimed shards, locally created
 writable shards, and their loaded job state remain resident according to the existing shard
 lifecycle. Writable-shard cleanup runs at periodic or membership checks; its cost depends on
@@ -137,18 +142,22 @@ The shorter lookahead
 reduces early loading of recovered shards, while the five-minute polling interval increases
 sweep frequency relative to a ten-minute interval.
 
-Cancellation is checked between candidates and passed through catalog, metadata, and
-journal operations. Candidate failures propagate to the runtime's error reporting; the
+The local manager serializes enumeration and uses the silo lifetime cancellation token
+for the whole sweep. Cancellation is checked between candidates and passed through catalog,
+metadata, and journal operations. Candidate failures propagate to the runtime's error reporting; the
 next turn resumes at the following identity, and the next sweep revisits the failed
 candidate. Successful assignments preceding a failed candidate are delivered first on the
 next turn, so a persistently failing candidate allows earlier and later shards to progress.
-Page-read failures preserve the continuation for the next attempt. Shutdown
-cancels discovery through the silo lifetime token.
+Listing failures surface and dispose the failed enumerator. Successful assignments already
+collected are delivered before a later periodic or membership check starts a fresh sweep.
+Recovery from a listing failure depends on that subsequent enumeration progressing past the
+failure; a persistently failing listing prefix can delay later identities. Completed sweeps
+dispose their enumerators. Shutdown cancels the lifetime token, awaits the active discovery
+turn, and disposes any remaining enumerator before completing.
 
-Custom and legacy `IJournalStorageCatalog` implementations retain full-scan discovery.
-Their listing and metadata work per call scales with the catalog size. The public
-`JobShardManager.AssignJobShardsAsync` API also retains its full-result behavior; bounded
-runtime turns use the optional paging capability.
+The public `JobShardManager.AssignJobShardsAsync` API retains its full-result behavior,
+using its own enumeration. Runtime discovery applies the yielded-identity budget to each
+turn over the shared catalog contract.
 
 ## Usage Examples
 
