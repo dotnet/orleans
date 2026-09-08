@@ -224,7 +224,8 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
                     }
                 };
 
-                silo = await TestCluster.StartSiloAsync(cluster, siloIdx, testClusterOptions, sources);
+                // Allocate against the current listener set so the client cannot consume a future gateway port as an ephemeral endpoint.
+                silo = await TestCluster.StartSiloAsync(cluster, siloIdx, testClusterOptions, sources, startSiloOnNewPort: true);
             }
 
             this.deployedSilos.Add(silo);
