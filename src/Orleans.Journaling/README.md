@@ -108,6 +108,25 @@ Inside the operation payload array, element 0 is the command name, followed by c
 
 Existing data is read using its stored format metadata, or as legacy OrleansBinary data when metadata is absent, and migrated to the configured write format by the next snapshot write.
 
+## Catalog paging
+
+`IJournalStorageCatalog.ListAsync` enumerates matching journal ids in ordinal `JournalId.Value` order. Catalogs which also implement `IPagedJournalStorageCatalog` support resumable pages through the same catalog instance. `ReadPageAsync` returns at most `pageSize` matching ids in provider traversal order.
+
+Start with a null continuation token, then pass each returned token with the same prefix to the next call. A null returned token marks completion. An empty page with a non-null token advances the traversal and gives callers a point to yield before requesting more work. Page size can change between calls. Tokens belong to one prefix and one initialized provider instance; start a new traversal after replacing or restarting the provider. Malformed or mismatched tokens raise `ArgumentException`; storage-service token expiry and request errors propagate to the caller.
+
+| Provider | Work represented by one page | Traversal and memory |
+| --- | --- | --- |
+| Volatile | A seek into the journal prefix range followed by at most `pageSize` indexed identities, then hierarchical prefix filtering | Ordinal journal id order. The maintained existence index occupies O(catalog size) memory; page allocation is O(page size + log(catalog size)). |
+| Azure Blob | One service page of at most `min(pageSize, 5000)` blobs, then WAL and prefix filtering | Blob service traversal order in the default container and WAL naming layout. Page allocation is proportional to the service page. |
+| Azure Table | One service page of at most `min(pageSize, 1000)` journal headers, then prefix filtering | Table partition/row order, with canonical ids from headers and reversible legacy partition keys. Page allocation is proportional to the service page. |
+| S3 | One `ListObjectsV2` page of at most `min(pageSize, 1000)` bucket objects, then canonical WAL and prefix filtering | S3 traversal order, including unordered S3 Express directory-bucket results. Page allocation is proportional to the service page. |
+
+Storage services determine scanning work, request latency, and retries. In particular, a Table header query can examine additional rows internally, and a filtered traversal can require many pages to find matching journals. The page bounds describe returned storage records and client-side processing.
+
+Pages observe the live catalog. With an unchanged catalog, following continuations visits the matching identities. Concurrent changes follow each provider's listing semantics: callers should tolerate repeated identities and use subsequent traversals to discover new journals. Volatile traversal advances past the last visited id, so newly created earlier ids become visible on the next traversal. Journal existence can change between discovery and a storage operation.
+
+Redis provides the existing sorted `ListAsync` catalog operation. It scans metadata keys on the primary servers and deduplicates identities before yielding them. Its `SCAN` count is a work hint and its cursor traversal can repeat keys; a paged Redis capability requires a separate design for bounded responses and lossless continuation.
+
 ## Documentation
 For more comprehensive documentation, please refer to:
 - [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)

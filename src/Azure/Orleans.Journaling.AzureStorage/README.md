@@ -31,6 +31,14 @@ siloBuilder.AddAzureTableJournalStorage(options =>
 
 `AzureTableJournalStorageOptions.GetPartitionKey` can be used to apply a custom partition layout. The returned key must be unique per journal, satisfy Azure Table partition-key restrictions, and contain at most 1,024 characters. The canonical journal id is stored in the header so catalog listing remains accurate with custom mappings.
 
+## Catalog paging
+
+Both Azure catalogs implement `IPagedJournalStorageCatalog` on the registered `IJournalStorageCatalog` instance. Each call reads one native service page, applies journal identity and prefix filtering, and returns the service continuation in a prefix- and provider-scoped opaque token. Continue through empty pages while a token is present. `ListAsync` retains its ordinal journal id ordering; paged traversal follows storage order.
+
+Blob paging uses the default container factory and `<journalId>/wal` naming layout. Custom container factories or WAL naming delegates raise `NotSupportedException` for paging. A page examines at most `min(pageSize, 5000)` returned blobs, including checkpoints and other entries before filtering.
+
+Table paging supports custom partition mappings through the canonical journal id stored in each header. It requests at most `min(pageSize, 1000)` header rows; Table Storage determines the internal scan work required by that query. Prefix filtering occurs on the returned headers, so a sparse prefix can require multiple empty pages.
+
 ## Getting Started
 To use this package, install it via NuGet:
 

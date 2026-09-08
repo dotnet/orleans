@@ -10,12 +10,13 @@ using Orleans.Runtime;
 
 namespace Orleans.Journaling;
 
-internal sealed class AzureBlobJournalStorageProvider : ILifecycleParticipant<ISiloLifecycle>, IJournalStorageProvider, IJournalStorageCatalog
+internal sealed class AzureBlobJournalStorageProvider : ILifecycleParticipant<ISiloLifecycle>, IJournalStorageProvider, IJournalStorageCatalog, IPagedJournalStorageCatalog
 {
     private readonly IBlobContainerFactory _containerFactory;
     private readonly AzureBlobJournalStorageOptions _options;
     private readonly AzureBlobJournalStorage.AzureBlobJournalStorageShared _shared;
     private BlobContainerClient? _defaultContainer;
+    private JournalStorageCatalogToken _catalogToken = new();
 
     public AzureBlobJournalStorageProvider(
         IOptions<AzureBlobJournalStorageOptions> options,
@@ -40,9 +41,11 @@ internal sealed class AzureBlobJournalStorageProvider : ILifecycleParticipant<IS
     private async Task Initialize(CancellationToken cancellationToken)
     {
         var client = await _options.CreateClient!(cancellationToken);
-        _defaultContainer = client.GetBlobContainerClient(_options.ContainerName);
-        await _defaultContainer.CreateIfNotExistsAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+        var container = client.GetBlobContainerClient(_options.ContainerName);
+        await container.CreateIfNotExistsAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
         await _containerFactory.InitializeAsync(client, cancellationToken).ConfigureAwait(false);
+        _catalogToken = new();
+        _defaultContainer = container;
     }
 
     public IJournalStorage CreateStorage(JournalId journalId)
@@ -90,6 +93,57 @@ internal sealed class AzureBlobJournalStorageProvider : ILifecycleParticipant<IS
             cancellationToken.ThrowIfCancellationRequested();
             yield return journalId;
         }
+    }
+
+    public async ValueTask<JournalStorageCatalogPage> ReadPageAsync(
+        JournalId prefix,
+        int pageSize,
+        string? continuationToken = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(pageSize);
+        cancellationToken.ThrowIfCancellationRequested();
+        var cursor = _catalogToken.Parse(prefix, continuationToken);
+        var container = GetDefaultContainerClient();
+        if (_containerFactory is not DefaultBlobContainerFactory
+            || !ReferenceEquals(_options.GetWalBlobName, AzureBlobJournalStorageOptions.DefaultGetWalBlobName))
+        {
+            throw new NotSupportedException(
+                "Azure Blob journal catalog paging requires the default container factory and WAL blob naming layout.");
+        }
+
+        await foreach (var page in container.GetBlobsAsync(
+            traits: BlobTraits.None,
+            states: BlobStates.None,
+            prefix: prefix.IsDefault ? null : prefix.Value,
+            cancellationToken: cancellationToken).AsPages(cursor, Math.Min(pageSize, 5000)))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            List<JournalId> journalIds = [];
+            foreach (var item in page.Values)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (item.Properties.BlobType is { } blobType && blobType != BlobType.Append
+                    || !item.Name.EndsWith("/wal", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                if (TryParseJournalId(item.Name[..^"/wal".Length], out var journalId) && prefix.IsPrefixOf(journalId))
+                {
+                    journalIds.Add(journalId);
+                }
+            }
+
+            return new()
+            {
+                JournalIds = journalIds,
+                ContinuationToken = _catalogToken.Create(prefix, page.ContinuationToken),
+            };
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        return new() { JournalIds = [] };
     }
 
     public void Participate(ISiloLifecycle observer)

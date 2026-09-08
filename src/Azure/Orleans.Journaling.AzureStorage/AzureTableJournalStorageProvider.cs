@@ -7,13 +7,14 @@ using Orleans.Runtime;
 
 namespace Orleans.Journaling;
 
-internal sealed class AzureTableJournalStorageProvider : ILifecycleParticipant<ISiloLifecycle>, IJournalStorageProvider, IJournalStorageCatalog
+internal sealed class AzureTableJournalStorageProvider : ILifecycleParticipant<ISiloLifecycle>, IJournalStorageProvider, IJournalStorageCatalog, IPagedJournalStorageCatalog
 {
     private static readonly string[] JournalIdSelect = [AzureTableJournalStorage.JournalIdPropertyName];
 
     private readonly AzureTableJournalStorageOptions _options;
     private readonly AzureTableJournalStorage.InitializedTableClientProvider _tableClientProvider = new();
     private readonly AzureTableJournalStorage.AzureTableJournalStorageShared _shared;
+    private JournalStorageCatalogToken _catalogToken = new();
 
     public AzureTableJournalStorageProvider(
         IOptions<AzureTableJournalStorageOptions> options,
@@ -43,6 +44,7 @@ internal sealed class AzureTableJournalStorageProvider : ILifecycleParticipant<I
             ?? throw new InvalidOperationException("The configured Azure Table service client factory returned null.");
         var table = client.GetTableClient(_options.TableName);
         await table.CreateIfNotExistsAsync(cancellationToken).ConfigureAwait(false);
+        _catalogToken = new();
         _tableClientProvider.SetTableClient(table);
     }
 
@@ -76,6 +78,46 @@ internal sealed class AzureTableJournalStorageProvider : ILifecycleParticipant<I
             cancellationToken.ThrowIfCancellationRequested();
             yield return journalId;
         }
+    }
+
+    public async ValueTask<JournalStorageCatalogPage> ReadPageAsync(
+        JournalId prefix,
+        int pageSize,
+        string? continuationToken = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(pageSize);
+        cancellationToken.ThrowIfCancellationRequested();
+        var cursor = _catalogToken.Parse(prefix, continuationToken);
+        var table = _tableClientProvider.GetTableClient();
+        var filter = TableClient.CreateQueryFilter($"RowKey eq {AzureTableJournalStorage.HeaderRowKey}");
+        var maximum = Math.Min(pageSize, 1000);
+        await foreach (var page in table.QueryAsync<TableEntity>(
+            filter,
+            maxPerPage: maximum,
+            select: JournalIdSelect,
+            cancellationToken: cancellationToken).AsPages(cursor, maximum))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            List<JournalId> journalIds = [];
+            foreach (var entity in page.Values)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (TryGetJournalId(entity, out var journalId) && prefix.IsPrefixOf(journalId))
+                {
+                    journalIds.Add(journalId);
+                }
+            }
+
+            return new()
+            {
+                JournalIds = journalIds,
+                ContinuationToken = _catalogToken.Create(prefix, page.ContinuationToken),
+            };
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        return new() { JournalIds = [] };
     }
 
     private static bool TryGetJournalId(TableEntity entity, out JournalId journalId)
