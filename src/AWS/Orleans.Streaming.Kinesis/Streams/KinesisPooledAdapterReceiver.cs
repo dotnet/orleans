@@ -71,10 +71,24 @@ internal sealed class KinesisPooledAdapterReceiver : IQueueAdapterReceiver, IQue
             maxCacheSize: cacheOptions.CacheSize);
     }
 
-    public async Task Initialize(TimeSpan timeout)
+    public Task Initialize(TimeSpan timeout)
+        => InitializeWithCancellation(timeout, CancellationToken.None);
+
+    Task IQueueAdapterReceiver.Initialize(TimeSpan timeout, CancellationToken cancellationToken)
+        => InitializeWithCancellation(timeout, cancellationToken);
+
+    private async Task InitializeWithCancellation(TimeSpan timeout, CancellationToken cancellationToken)
     {
-        using var cancellation = new CancellationTokenSource(timeout);
-        await EnsureInitialized(cancellation.Token);
+        cancellationToken.ThrowIfCancellationRequested();
+        using var timeoutCancellation = timeout == Timeout.InfiniteTimeSpan
+            ? null
+            : new CancellationTokenSource(timeout);
+        using var linkedCancellation = timeoutCancellation is null
+            ? null
+            : CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken,
+                timeoutCancellation.Token);
+        await EnsureInitialized(linkedCancellation?.Token ?? cancellationToken);
     }
 
     public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
@@ -103,8 +117,15 @@ internal sealed class KinesisPooledAdapterReceiver : IQueueAdapterReceiver, IQue
     public Task MessagesDeliveredAsync(IList<IBatchContainer> messages, CancellationToken cancellationToken)
         => cancellationToken.IsCancellationRequested ? Task.FromCanceled(cancellationToken) : Task.CompletedTask;
 
-    public async Task Shutdown(TimeSpan timeout)
+    public Task Shutdown(TimeSpan timeout)
+        => ShutdownWithCancellation(timeout, CancellationToken.None);
+
+    Task IQueueAdapterReceiver.Shutdown(TimeSpan timeout, CancellationToken cancellationToken)
+        => ShutdownWithCancellation(timeout, cancellationToken);
+
+    private async Task ShutdownWithCancellation(TimeSpan timeout, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (Interlocked.Exchange(ref _shutdown, 1) != 0)
         {
             return;
@@ -114,10 +135,15 @@ internal sealed class KinesisPooledAdapterReceiver : IQueueAdapterReceiver, IQue
         {
             _lifecycleCancellation.Cancel();
             var shutdownWatch = Stopwatch.StartNew();
-            using var cancellation = timeout == Timeout.InfiniteTimeSpan
+            using var timeoutCancellation = timeout == Timeout.InfiniteTimeSpan
                 ? null
                 : new CancellationTokenSource(timeout);
-            var cancellationToken = cancellation?.Token ?? CancellationToken.None;
+            using var linkedCancellation = timeoutCancellation is null
+                ? null
+                : CancellationTokenSource.CreateLinkedTokenSource(
+                    cancellationToken,
+                    timeoutCancellation.Token);
+            cancellationToken = linkedCancellation?.Token ?? cancellationToken;
             List<Exception>? exceptions = null;
             Task? initializationTask;
             lock (_lifecycleLock)
@@ -155,7 +181,7 @@ internal sealed class KinesisPooledAdapterReceiver : IQueueAdapterReceiver, IQue
                         : timeout > shutdownWatch.Elapsed
                             ? timeout - shutdownWatch.Elapsed
                             : TimeSpan.Zero;
-                    await _inner.Shutdown(remaining);
+                    await ((IQueueAdapterReceiver)_inner).Shutdown(remaining, cancellationToken);
                 }
             }
             catch (Exception exception)
