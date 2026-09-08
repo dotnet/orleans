@@ -125,6 +125,7 @@ internal sealed class RedisJournalStorageProvider : IJournalStorageProvider, IJo
                             ReadJournalIdScript,
                             [batch[i]],
                             NoValues).ConfigureAwait(false);
+                        cancellationToken.ThrowIfCancellationRequested();
                         if (result is not { Length: > 0 })
                         {
                             throw new InvalidOperationException("The Redis journal discovery script returned an invalid response.");
@@ -165,6 +166,7 @@ internal sealed class RedisJournalStorageProvider : IJournalStorageProvider, IJo
             }
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         if (!scannedServer)
         {
             throw new InvalidOperationException("No connected primary Redis servers are available for journal discovery.");
