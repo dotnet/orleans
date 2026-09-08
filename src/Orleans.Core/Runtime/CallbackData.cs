@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using System.Threading;
 using Microsoft.Extensions.Logging;
 using Orleans.Serialization.Invocation;
@@ -16,9 +15,9 @@ namespace Orleans.Runtime
         private readonly SharedCallbackData shared;
         private readonly IResponseCompletionSource context;
         private readonly ApplicationRequestInstruments _applicationRequestInstruments;
+        private readonly long _startTimestamp;
         private int _state;
         private StatusResponse? lastKnownStatus;
-        private ValueStopwatch stopwatch;
         private CancellationTokenRegistration _cancellationTokenRegistration;
 
         public CallbackData(
@@ -31,7 +30,7 @@ namespace Orleans.Runtime
             this.context = ctx;
             this.Message = msg;
             _applicationRequestInstruments = applicationRequestInstruments;
-            this.stopwatch = ValueStopwatch.StartNew();
+            _startTimestamp = shared.TimeProvider.GetTimestamp();
         }
 
         public Message Message { get; } // might hold metadata used by response pipeline
@@ -87,19 +86,19 @@ namespace Orleans.Runtime
 
         public bool IsExpired(long currentTimestamp)
         {
-            var duration = currentTimestamp - this.stopwatch.GetRawTimestamp();
-            return duration > GetResponseTimeoutStopwatchTicks();
+            var duration = currentTimestamp - _startTimestamp;
+            return duration > GetResponseTimeoutTimestampTicks();
         }
 
-        private long GetResponseTimeoutStopwatchTicks()
+        private long GetResponseTimeoutTimestampTicks()
         {
             var defaultResponseTimeout = (Message.BodyObject as IInvokable)?.GetDefaultResponseTimeout();
             if (defaultResponseTimeout.HasValue)
             {
-                return (long)(defaultResponseTimeout.Value.TotalSeconds * Stopwatch.Frequency);
+                return shared.GetTimestampTicks(defaultResponseTimeout.Value);
             }
 
-            return shared.ResponseTimeoutStopwatchTicks;
+            return shared.ResponseTimeoutTimestampTicks;
         }
 
         private TimeSpan GetResponseTimeout() => (Message.BodyObject as IInvokable)?.GetDefaultResponseTimeout() ?? shared.ResponseTimeout;
@@ -127,10 +126,9 @@ namespace Orleans.Runtime
                 return;
             }
 
-            stopwatch.Stop();
+            RecordElapsedTime();
             SignalCancellation();
             shared.Unregister(Message);
-            _applicationRequestInstruments.OnAppRequestsEnd((long)stopwatch.Elapsed.TotalMilliseconds);
             _applicationRequestInstruments.OnAppRequestsCanceled(GetTargetGrainType());
             OrleansCallBackDataEvent.Instance.OnCanceled(Message);
             context.Complete(Response.FromException(new OperationCanceledException(cancellationToken)));
@@ -144,7 +142,7 @@ namespace Orleans.Runtime
                 return;
             }
 
-            this.stopwatch.Stop();
+            RecordElapsedTime();
             if (shared.CancelRequestOnTimeout)
             {
                 SignalCancellation();
@@ -152,7 +150,6 @@ namespace Orleans.Runtime
 
             this.shared.Unregister(this.Message);
             DisposeCancellationRegistration();
-            _applicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
             _applicationRequestInstruments.OnAppRequestsTimedOut(GetTargetGrainType());
 
             OrleansCallBackDataEvent.Instance.OnTimeout(this.Message);
@@ -174,10 +171,9 @@ namespace Orleans.Runtime
                 return;
             }
 
-            this.stopwatch.Stop();
+            RecordElapsedTime();
             this.shared.Unregister(this.Message);
             DisposeCancellationRegistration();
-            _applicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
 
             OrleansCallBackDataEvent.Instance.OnTargetSiloFail(this.Message);
             var msg = this.Message;
@@ -194,10 +190,9 @@ namespace Orleans.Runtime
                 return;
             }
 
-            this.stopwatch.Stop();
+            RecordElapsedTime();
             this.shared.Unregister(this.Message);
             DisposeCancellationRegistration();
-            _applicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
 
             var msg = this.Message;
             var exception = new SiloUnavailableException($"The local Orleans host is shutting down and can no longer process the request: {msg}.");
@@ -213,15 +208,23 @@ namespace Orleans.Runtime
 
             OrleansCallBackDataEvent.Instance.DoCallback(this.Message);
 
-            this.stopwatch.Stop();
+            RecordElapsedTime();
             DisposeCancellationRegistration();
-            _applicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
 
             // do callback outside the CallbackData lock. Just not a good practice to hold a lock for this unrelated operation.
             ResponseCallback(response, this.context);
         }
 
         private bool TryComplete() => (Interlocked.Or(ref _state, StateCompleted) & StateCompleted) == 0;
+
+        private void RecordElapsedTime()
+        {
+            if (_applicationRequestInstruments.AppRequestsLatencyEnabled)
+            {
+                var elapsedMilliseconds = (long)shared.TimeProvider.GetElapsedTime(_startTimestamp).TotalMilliseconds;
+                _applicationRequestInstruments.OnAppRequestsEnd(elapsedMilliseconds);
+            }
+        }
 
         private void DisposeCancellationRegistration()
         {

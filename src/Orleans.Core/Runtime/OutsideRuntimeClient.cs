@@ -99,6 +99,7 @@ namespace Orleans
             this.sharedCallbackData = new SharedCallbackData(
                 msg => this.UnregisterCallback(msg.Id),
                 this.loggerFactory.CreateLogger<CallbackData>(),
+                timeProvider,
                 this.clientMessagingOptions.ResponseTimeout,
                 this.clientMessagingOptions.CancelRequestOnTimeout,
                 this.clientMessagingOptions.WaitForCancellationAcknowledgement,
@@ -519,7 +520,7 @@ namespace Orleans
             {
                 try
                 {
-                    var currentStopwatchTicks = ValueStopwatch.GetTimestamp();
+                    var currentTimestamp = TimeProvider.GetTimestamp();
                     foreach (var (_, callback) in callbacks)
                     {
                         if (callback.IsCompleted)
@@ -527,7 +528,7 @@ namespace Orleans
                             continue;
                         }
 
-                        if (callback.IsExpired(currentStopwatchTicks))
+                        if (callback.IsExpired(currentTimestamp))
                         {
                             callback.OnTimeout();
                         }

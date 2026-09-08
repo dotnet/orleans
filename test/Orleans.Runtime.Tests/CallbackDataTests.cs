@@ -4,6 +4,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Time.Testing;
 using Orleans.Runtime;
 using Orleans.Serialization.Invocation;
 using Xunit;
@@ -55,6 +56,89 @@ public class CallbackDataTests
         GC.KeepAlive(cancellation);
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
+    public void ExpirationUsesConfiguredTimeProvider()
+    {
+        using var serviceProvider = CreateServiceProvider();
+        var timeProvider = new FakeTimeProvider();
+        var timeout = TimeSpan.FromSeconds(1);
+        var callback = CreateCallback(
+            new TestResponseCompletionSource(),
+            _ => { },
+            CreateInstruments(serviceProvider),
+            timeProvider,
+            timeout);
+
+        Assert.False(callback.IsExpired(timeProvider.GetTimestamp()));
+
+        timeProvider.Advance(timeout);
+        Assert.False(callback.IsExpired(timeProvider.GetTimestamp()));
+
+        timeProvider.Advance(TimeSpan.FromTicks(1));
+        Assert.True(callback.IsExpired(timeProvider.GetTimestamp()));
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
+    public void TimestampConversionPreservesTimeSpanPrecision()
+    {
+        using var serviceProvider = CreateServiceProvider();
+        var timeProvider = new FakeTimeProvider();
+        var timeout = TimeSpan.FromTicks((1L << 53) + 1);
+        var callback = CreateCallback(
+            new TestResponseCompletionSource(),
+            _ => { },
+            CreateInstruments(serviceProvider),
+            timeProvider,
+            timeout);
+
+        Assert.False(callback.IsExpired(timeProvider.GetTimestamp()));
+
+        timeProvider.Advance(timeout);
+        Assert.False(callback.IsExpired(timeProvider.GetTimestamp()));
+
+        timeProvider.Advance(TimeSpan.FromTicks(1));
+        Assert.True(callback.IsExpired(timeProvider.GetTimestamp()));
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
+    public void TimestampConversionClampsToLongRange()
+    {
+        using var serviceProvider = CreateServiceProvider();
+        var shared = CreateSharedCallbackData(
+            _ => { },
+            new HighFrequencyTimeProvider(),
+            TimeSpan.Zero);
+
+        Assert.Equal(long.MaxValue, shared.GetTimestampTicks(TimeSpan.MaxValue));
+        Assert.Equal(long.MinValue, shared.GetTimestampTicks(TimeSpan.MinValue));
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
+    public void DisabledLatencyDiagnosticsDoNotReadCompletionTimestamp()
+    {
+        using var serviceProvider = CreateServiceProvider();
+        var timeProvider = new CountingTimeProvider();
+        var callback = CreateCallback(
+            new TestResponseCompletionSource(),
+            _ => { },
+            CreateInstruments(serviceProvider),
+            timeProvider);
+
+        Assert.Equal(1, timeProvider.GetTimestampCallCount);
+
+        callback.OnHostShutdown();
+
+        Assert.Equal(1, timeProvider.GetTimestampCallCount);
+    }
+
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static WeakReference CreateCompletedCallback(CancellationToken cancellationToken, ApplicationRequestInstruments instruments)
     {
@@ -69,17 +153,29 @@ public class CallbackDataTests
     private static CallbackData CreateCallback(
         IResponseCompletionSource completion,
         Action<Message> unregister,
-        ApplicationRequestInstruments instruments)
+        ApplicationRequestInstruments instruments,
+        TimeProvider? timeProvider = null,
+        TimeSpan? responseTimeout = null)
     {
-        var shared = new SharedCallbackData(
+        var shared = CreateSharedCallbackData(
+            unregister,
+            timeProvider ?? TimeProvider.System,
+            responseTimeout ?? TimeSpan.FromMinutes(1));
+        return new CallbackData(shared, completion, new Message(), instruments);
+    }
+
+    private static SharedCallbackData CreateSharedCallbackData(
+        Action<Message> unregister,
+        TimeProvider timeProvider,
+        TimeSpan responseTimeout)
+        => new(
             unregister,
             logger: NullLogger<CallbackData>.Instance,
-            responseTimeout: TimeSpan.FromMinutes(1),
+            timeProvider,
+            responseTimeout,
             cancelOnTimeout: false,
             waitForCancellationAcknowledgement: false,
             cancellationManager: null);
-        return new CallbackData(shared, completion, new Message(), instruments);
-    }
 
     private static ServiceProvider CreateServiceProvider()
     {
@@ -98,5 +194,17 @@ public class CallbackDataTests
         public void Complete(Response value) => Response = value;
 
         public void Complete() => Response = Orleans.Serialization.Invocation.Response.Completed;
+    }
+
+    private sealed class HighFrequencyTimeProvider : TimeProvider
+    {
+        public override long TimestampFrequency => long.MaxValue;
+    }
+
+    private sealed class CountingTimeProvider : TimeProvider
+    {
+        public int GetTimestampCallCount { get; private set; }
+
+        public override long GetTimestamp() => ++GetTimestampCallCount;
     }
 }

@@ -2,6 +2,7 @@ using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Time.Testing;
 using Orleans.Concurrency;
 using Orleans.Configuration;
 using Orleans.Internal;
@@ -31,11 +32,13 @@ namespace DefaultCluster.Tests.General
     {
         private readonly TimeSpan _timeout = Debugger.IsAttached ? TimeSpan.FromMinutes(5) : TimeSpan.FromSeconds(10);
         private readonly IHost _host;
+        private readonly FakeTimeProvider _messagingTimeProvider;
 
         public class Fixture : IAsyncLifetime
         {
             private readonly TestClusterPortAllocator portAllocator;
             public IHost Host { get; private set; } = null!;
+            public FakeTimeProvider MessagingTimeProvider { get; } = new();
 
             public Fixture()
             {
@@ -46,21 +49,22 @@ namespace DefaultCluster.Tests.General
             {
                 var cancellationToken = TestContext.Current.CancellationToken;
                 var (siloPort, gatewayPort) = portAllocator.AllocateConsecutivePortPairs(1);
-                Host = Microsoft.Extensions.Hosting.Host.CreateApplicationBuilder()
-                    .UseOrleans(siloBuilder =>
-                    {
-                        siloBuilder
-                            .UseLocalhostClustering(siloPort, gatewayPort)
-                            .Configure<ClusterOptions>(options =>
-                            {
-                                options.ClusterId = Guid.NewGuid().ToString();
-                                options.ServiceId = Guid.NewGuid().ToString();
-                            })
-                            .ConfigureLogging(logging => logging.AddDebug())
-                            .AddMemoryGrainStorage("PubSubStore")
-                            .AddMemoryStreams<DefaultMemoryMessageBodySerializer>("MemStream");
-                    })
-                    .Build();
+                var builder = Microsoft.Extensions.Hosting.Host.CreateApplicationBuilder();
+                builder.UseOrleans(siloBuilder =>
+                {
+                    siloBuilder
+                        .UseLocalhostClustering(siloPort, gatewayPort)
+                        .Configure<ClusterOptions>(options =>
+                        {
+                            options.ClusterId = Guid.NewGuid().ToString();
+                            options.ServiceId = Guid.NewGuid().ToString();
+                        })
+                        .ConfigureLogging(logging => logging.AddDebug())
+                        .AddMemoryGrainStorage("PubSubStore")
+                        .AddMemoryStreams<DefaultMemoryMessageBodySerializer>("MemStream");
+                });
+                builder.Services.AddKeyedSingleton<TimeProvider>(TimeProviderNames.Messaging, MessagingTimeProvider);
+                Host = builder.Build();
                 await Host.StartAsync(cancellationToken);
             }
 
@@ -82,6 +86,7 @@ namespace DefaultCluster.Tests.General
         public HostedClientTests(Fixture fixture)
         {
             _host = fixture.Host;
+            _messagingTimeProvider = fixture.MessagingTimeProvider;
         }
 
         /// <summary>
@@ -118,31 +123,25 @@ namespace DefaultCluster.Tests.General
             var initialTimeout = runtimeClient.GetResponseTimeout();
 
             var timeout = TimeSpan.FromSeconds(1);
-            var maxTimeout = timeout.Multiply(3.5);
 
             try
             {
                 runtimeClient.SetResponseTimeout(timeout);
-                var stopwatch = Stopwatch.StartNew();
-
                 var assertionTask = Assert.ThrowsAsync<TimeoutException>(
-                        async () =>
-                        {
-                            var grain = client.GetGrain<IStuckGrain>(Guid.NewGuid());
-                            await grain.RunForever();
-                        })
-                    .WaitAsync(maxTimeout, cancellationToken);
+                    async () =>
+                    {
+                        var grain = client.GetGrain<IStuckGrain>(Guid.NewGuid());
+                        await grain.RunForever();
+                    });
 
+                Assert.False(assertionTask.IsCompleted);
                 Assert.Equal(expected: 1, actual: runtimeClient.GetRunningRequestsCount(stuckGrainType));
 
-                await assertionTask;
-                stopwatch.Stop();
+                // Callback expiry is checked at least once per second.
+                _messagingTimeProvider.Advance(timeout + TimeSpan.FromSeconds(1));
+                await assertionTask.WaitAsync(cancellationToken);
 
                 Assert.Equal(expected: 0, actual: runtimeClient.GetRunningRequestsCount(stuckGrainType));
-
-                Assert.True(stopwatch.Elapsed >= timeout, $"Waited less than {timeout}. Waited {stopwatch.Elapsed}");
-                Assert.True(stopwatch.Elapsed <= maxTimeout, $"Waited longer than {maxTimeout}. Waited {stopwatch.Elapsed}");
-                stopwatch.Stop();
             }
             finally
             {
