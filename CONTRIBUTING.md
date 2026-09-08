@@ -20,6 +20,16 @@ dotnet build Orleans.slnx -bl
 
 The `Orleans.slnx` solution includes the source projects under `src` and the test projects under `test`. On Windows, `Build.cmd` additionally restores, builds, and packs the solution, placing packages in `Artifacts/<Configuration>`.
 
+### Verify formatting
+
+After building the solution, verify the repository-wide formatting baseline with:
+
+```console
+dotnet format whitespace Orleans.slnx --verify-no-changes --no-restore
+```
+
+This command checks the same whitespace formatting scope as CI and reuses the restore from the preceding build. Code-style and analyzer diagnostics are enforced by the repository build.
+
 ### Package compatibility
 
 Packing validates API-bearing Orleans packages against the latest released package baseline. This catches binary breaking changes, dropped target frameworks, and inconsistent assets across target frameworks in the produced NuGet package. The generated API-diff workflow remains the reviewable source representation of the public API; package validation enforces compatibility on the actual package.
