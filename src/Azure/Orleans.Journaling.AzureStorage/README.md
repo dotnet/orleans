@@ -35,7 +35,7 @@ siloBuilder.AddAzureTableJournalStorage(options =>
 
 Both Azure catalogs implement `IPagedJournalStorageCatalog` on the registered `IJournalStorageCatalog` instance. Each call reads one native service page, applies journal identity and prefix filtering, and returns the service continuation in a prefix- and provider-scoped opaque token. Continue through empty pages while a token is present. `ListAsync` retains its ordinal journal id ordering; paged traversal follows storage order.
 
-Blob paging uses the default container factory and `<journalId>/wal` naming layout. Custom container factories or WAL naming delegates raise `NotSupportedException` for paging. A page examines at most `min(pageSize, 5000)` returned blobs, including checkpoints and other entries before filtering.
+Both Blob catalog APIs scan the configured `ContainerName` and interpret append blobs named `<journalId>/wal` as journal identities. This traversal applies equally when a custom naming delegate or container factory produces the same entries. A page examines at most `min(pageSize, 5000)` returned blobs, including checkpoints and other entries before filtering.
 
 Table paging supports custom partition mappings through the canonical journal id stored in each header. It requests at most `min(pageSize, 1000)` header rows; Table Storage determines the internal scan work required by that query. Prefix filtering occurs on the returned headers, so a sparse prefix can require multiple empty pages.
 

@@ -105,12 +105,6 @@ internal sealed class AzureBlobJournalStorageProvider : ILifecycleParticipant<IS
         cancellationToken.ThrowIfCancellationRequested();
         var cursor = _catalogToken.Parse(prefix, continuationToken);
         var container = GetDefaultContainerClient();
-        if (_containerFactory is not DefaultBlobContainerFactory
-            || !ReferenceEquals(_options.GetWalBlobName, AzureBlobJournalStorageOptions.DefaultGetWalBlobName))
-        {
-            throw new NotSupportedException(
-                "Azure Blob journal catalog paging requires the default container factory and WAL blob naming layout.");
-        }
 
         await foreach (var page in container.GetBlobsAsync(
             traits: BlobTraits.None,

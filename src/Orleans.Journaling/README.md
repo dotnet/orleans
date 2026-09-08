@@ -117,7 +117,7 @@ Start with a null continuation token, then pass each returned token with the sam
 | Provider | Work represented by one page | Traversal and memory |
 | --- | --- | --- |
 | Volatile | A seek into the journal prefix range followed by at most `pageSize` indexed identities, then hierarchical prefix filtering | Ordinal journal id order. The maintained existence index occupies O(catalog size) memory; page allocation is O(page size + log(catalog size)). |
-| Azure Blob | One service page of at most `min(pageSize, 5000)` blobs, then WAL and prefix filtering | Blob service traversal order in the default container and WAL naming layout. Page allocation is proportional to the service page. |
+| Azure Blob | One service page of at most `min(pageSize, 5000)` blobs, then WAL and prefix filtering | Blob service traversal order over `<journalId>/wal` entries in the configured container, matching `ListAsync` catalog interpretation. Page allocation is proportional to the service page. |
 | Azure Table | One service page of at most `min(pageSize, 1000)` journal headers, then prefix filtering | Table partition/row order, with canonical ids from headers and reversible legacy partition keys. Page allocation is proportional to the service page. |
 | S3 | One `ListObjectsV2` page of at most `min(pageSize, 1000)` bucket objects, then canonical WAL and prefix filtering | S3 traversal order, including unordered S3 Express directory-bucket results. Page allocation is proportional to the service page. |
 

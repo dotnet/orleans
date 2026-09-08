@@ -548,20 +548,24 @@ public sealed class JournalStorageCatalogPagingTests
     [Theory]
     [InlineData("CustomContainerFactory")]
     [InlineData("EquivalentCustomWalDelegate")]
-    public async Task AzureBlobReadPageAsync_CustomLayout_ThrowsBeforeListing(string layout)
+    public async Task AzureBlobReadPageAsync_EquivalentLayout_PreservesListAsyncCatalog(string layout)
     {
-        await using var context = await CreateAsync("AzureBlob", Ids("tenant/a", "tenant/b"), blobLayout: layout);
+        await using var context = await CreateAsync(
+            "AzureBlob", Ids("jobs/shards/z", "jobs/shards2", "jobs/shards/a", "jobs/shards/child"),
+            serverPageSize: 2, blobLayout: layout);
+        var prefix = new JournalId("jobs/shards");
+        var listed = await context.ListAsync(prefix);
+
+        Assert.Equal(["jobs/shards/a", "jobs/shards/child", "jobs/shards/z"], listed);
+        Assert.Equal(2, context.Native.SetupCalls);
         var before = context.Native.Counts;
 
-        var exception = await Assert.ThrowsAsync<NotSupportedException>(() => context.ReadAsync(default, 2).AsTask());
+        var paged = await SweepAsync(context, prefix, [2, 1]);
 
-        Assert.Contains("default container factory and WAL blob naming layout", exception.Message);
-        Assert.Equal(before, context.Native.Counts);
-        Assert.Equal(2, context.Native.SetupCalls);
-
-        // Paging is the optional capability; its layout restriction must not disable ListAsync.
-        Assert.Equal(["tenant/a", "tenant/b"], await context.ListAsync());
-        Assert.Equal(new NativeCounts(1, 1, 1, 1), context.Native.Counts);
+        Assert.Equal(["jobs/shards/z", "jobs/shards/a", "jobs/shards/child"], paged);
+        AssertExactMembership(listed.ToArray(), paged);
+        Assert.Equal(before.Attempts + 3, context.Native.Attempts);
+        Assert.All(context.Native.Listings, listing => Assert.Equal(prefix.Value, listing.Prefix));
     }
 
     [Fact]
