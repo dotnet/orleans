@@ -8,6 +8,8 @@ The `Microsoft.Orleans.Streaming.SQS.Aspire` package configures an Orleans SQS s
 dotnet add package Microsoft.Orleans.Streaming.SQS.Aspire
 ```
 
+Install `Microsoft.Orleans.Streaming.SQS` in every silo and Orleans client project that uses the provider.
+
 ## Configure
 
 ```csharp
