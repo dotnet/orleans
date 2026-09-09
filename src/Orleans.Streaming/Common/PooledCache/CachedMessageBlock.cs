@@ -94,6 +94,7 @@ namespace Orleans.Providers.Streams.Common
         {
             if (readIndex < writeIndex)
             {
+                cachedMessages[readIndex] = default;
                 readIndex++;
                 return true;
             }
@@ -235,6 +236,7 @@ namespace Orleans.Providers.Streams.Common
         /// <inheritdoc/>
         public override void OnResetState()
         {
+            Array.Clear(cachedMessages, 0, writeIndex);
             writeIndex = 0;
             readIndex = 0;
             generation++;
