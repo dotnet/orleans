@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -15,7 +16,6 @@ namespace Orleans.DurableJobs;
 
 internal sealed class JournaledJobShardManager : JobShardManager
 {
-    internal const int DiscoveryBatchSize = 256;
     private const string OwnerProperty = "DurableJobsOwner";
     private const string MembershipVersionProperty = "DurableJobsMembershipVersion";
     private const string MinDueTimeProperty = "DurableJobsMinDueTime";
@@ -41,15 +41,6 @@ internal sealed class JournaledJobShardManager : JobShardManager
     // (via UnregisterShardAsync). Mis-cache from split-brain is bounded by storage-layer ETag
     // conflicts triggering InconsistentStateException → the journaling layer's recovery path.
     private readonly ConcurrentDictionary<string, bool> _ownedShards = new(StringComparer.Ordinal);
-    // The local manager serializes discovery and passes its lifetime token on every turn.
-    // Membership changes preserve the enumerator; each candidate uses current membership.
-    private IAsyncEnumerator<JournalId>? _catalogEnumerator;
-    private List<IJobShard>? _pendingAssignments;
-
-    internal override bool HasMoreCatalogWork
-        => _pendingAssignments is { Count: > 0 }
-            || _catalogEnumerator is not null;
-
     public JournaledJobShardManager(
         ILocalSiloDetails localSiloDetails,
         IJournaledStateManagerFactory stateManagerFactory,
@@ -91,94 +82,46 @@ internal sealed class JournaledJobShardManager : JobShardManager
     public override async Task<List<IJobShard>> AssignJobShardsAsync(DateTimeOffset maxDueTime, int maxNewClaims, CancellationToken cancellationToken)
     {
         var result = new List<IJobShard>();
-        var newClaimCount = 0;
-        await foreach (var storageId in _catalog.ListAsync(new() { Prefix = JobShardId.StoragePrefix }, cancellationToken))
+        await foreach (var shard in DiscoverJobShardsAsync(maxDueTime, maxNewClaims, cancellationToken))
         {
-            var (shard, claimed) = await TryAssignShardAsync(storageId, maxDueTime, newClaimCount < maxNewClaims, cancellationToken);
-            if (shard is not null)
-            {
-                result.Add(shard);
-            }
-
-            if (claimed)
-            {
-                newClaimCount++;
-            }
+            result.Add(shard);
         }
 
         return result;
     }
 
-    internal override async Task<List<IJobShard>> DiscoverJobShardsAsync(DateTimeOffset maxDueTime, int maxNewClaims, CancellationToken cancellationToken)
+    internal override async IAsyncEnumerable<IJobShard> DiscoverJobShardsAsync(
+        DateTimeOffset maxDueTime,
+        int maxNewClaims,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        // Deliver a successful prefix before resuming after a later candidate failed.
-        // Repeated failures then leave both earlier and later shards able to make progress.
-        if (_pendingAssignments is { Count: > 0 } pending)
+        var storageIds = new SortedSet<JournalId>(Comparer<JournalId>.Create(
+            static (left, right) => StringComparer.Ordinal.Compare(left.Value, right.Value)));
+        var options = new ListOptions
         {
-            _pendingAssignments = null;
-            return pending;
+            Prefix = JobShardId.StoragePrefix,
+            MaxId = JobShardId.GetMaxJournalId(maxDueTime)
+        };
+        await foreach (var storageId in _catalog.ListAsync(options, cancellationToken))
+        {
+            storageIds.Add(storageId);
         }
 
-        var enumerator = _catalogEnumerator ??= _catalog.ListAsync(
-            new() { Prefix = JobShardId.StoragePrefix }, cancellationToken).GetAsyncEnumerator(cancellationToken);
-
-        var result = _pendingAssignments = new List<IJobShard>();
+        // Providers can return identities in any order. Names order the selected shards by UTC start time.
         var newClaimCount = 0;
-        for (var visited = 0; visited < DiscoveryBatchSize; visited++)
+        foreach (var storageId in storageIds)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var advanced = false;
-            try
-            {
-                advanced = await enumerator.MoveNextAsync();
-                if (!advanced)
-                {
-                    break;
-                }
-            }
-            finally
-            {
-                // An exhausted or faulted iterator has ended its sweep. Storage failures
-                // surface to the runtime; a later periodic check starts a new enumeration.
-                if (!advanced)
-                {
-                    await DisposeCatalogEnumeratorAsync();
-                }
-            }
-
-            // Failed attempts surface to the caller and are revisited on the next sweep,
-            // allowing the remainder of this sweep to progress.
-            var storageId = enumerator.Current;
             var (shard, claimed) = await TryAssignShardAsync(storageId, maxDueTime, newClaimCount < maxNewClaims, cancellationToken);
-            if (shard is not null)
-            {
-                result.Add(shard);
-            }
-
             if (claimed)
             {
                 newClaimCount++;
             }
-        }
-
-        _pendingAssignments = null;
-        return result;
-    }
-
-    internal override async ValueTask StopDiscoveryAsync()
-    {
-        _pendingAssignments = null;
-        await DisposeCatalogEnumeratorAsync();
-    }
-
-    private async ValueTask DisposeCatalogEnumeratorAsync()
-    {
-        var enumerator = _catalogEnumerator;
-        _catalogEnumerator = null;
-        if (enumerator is not null)
-        {
-            await enumerator.DisposeAsync();
+            if (shard is not null)
+            {
+                yield return shard;
+            }
         }
     }
 
@@ -236,7 +179,7 @@ internal sealed class JournaledJobShardManager : JobShardManager
     {
         while (true)
         {
-            var shardId = JobShardId.New();
+            var shardId = JobShardId.New(minDueTime);
             var storageId = shardId.ToJournalId();
             var initialProperties = CreateInitialProperties(minDueTime, maxDueTime, metadata);
             var storage = _storageProvider.CreateStorage(storageId);

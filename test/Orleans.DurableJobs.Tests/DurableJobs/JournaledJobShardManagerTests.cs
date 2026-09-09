@@ -25,329 +25,6 @@ namespace Tester.DurableJobs;
 public partial class JournaledJobShardManagerTests
 {
     [Fact]
-    public async Task Discovery_BoundsMostlyIneligibleIdentitiesAndResumes()
-    {
-        await using var fixture = new DiscoveryFixture();
-        var other = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5101), 0);
-        fixture.Membership.SetSiloStatus(other, SiloStatus.Active);
-        var identities = new List<JournalId>();
-        for (var i = 0; i < JournaledJobShardManager.DiscoveryBatchSize; i++)
-        {
-            if (i % 4 == 3)
-            {
-                identities.Add(new JobShardId($"missing-{i}").ToJournalId());
-                continue;
-            }
-
-            identities.Add(await fixture.AddShardAsync(
-                $"skip-{i}", i % 4 == 0 ? fixture.Horizon.AddTicks(1) : fixture.Now,
-                owner: other, poisoned: i % 4 == 1));
-        }
-
-        var due = await fixture.AddShardAsync("due", fixture.Now);
-        fixture.Catalog.Ids.AddRange(identities);
-        fixture.Catalog.Ids.Add(due);
-
-        Assert.Empty(await fixture.DiscoverAsync());
-        Assert.Equal(JournaledJobShardManager.DiscoveryBatchSize, fixture.Storage.MetadataReads.Count);
-        Assert.Equal(JournaledJobShardManager.DiscoveryBatchSize, fixture.Catalog.MoveNextCalls);
-        Assert.Equal(1, fixture.Catalog.ListCalls);
-        Assert.Equal(0, fixture.Catalog.DisposeCalls);
-        Assert.True(fixture.Manager.HasMoreCatalogWork);
-
-        Assert.Equal("due", Assert.Single(await fixture.DiscoverAsync()).Id);
-        Assert.Equal(identities.Append(due), fixture.Storage.MetadataReads);
-        Assert.Equal(JournaledJobShardManager.DiscoveryBatchSize + 2, fixture.Catalog.MoveNextCalls);
-        Assert.Equal(1, fixture.Catalog.ListCalls);
-        Assert.Equal(1, fixture.Catalog.DisposeCalls);
-        Assert.False(fixture.Manager.HasMoreCatalogWork);
-    }
-
-    [Fact]
-    public async Task Discovery_EmptyEnumerationCompletesAndDisposesEachSweep()
-    {
-        await using var fixture = new DiscoveryFixture();
-        Assert.Empty(await fixture.DiscoverAsync());
-        Assert.Equal(1, fixture.Catalog.MoveNextCalls);
-        Assert.Equal(1, fixture.Catalog.DisposeCalls);
-        Assert.False(fixture.Manager.HasMoreCatalogWork);
-        Assert.Empty(await fixture.DiscoverAsync());
-        Assert.Equal(2, fixture.Catalog.ListCalls);
-        Assert.Equal(2, fixture.Catalog.DisposeCalls);
-        Assert.Empty(fixture.Storage.MetadataReads);
-        Assert.False(fixture.Manager.HasMoreCatalogWork);
-    }
-
-    [Fact]
-    public async Task Discovery_ClaimBudgetExhaustionStillVisitsLocalShardsAndCompletesSweep()
-    {
-        await using var fixture = new DiscoveryFixture();
-        var orphan = await fixture.AddShardAsync("orphan", fixture.Now);
-        var local = await fixture.AddShardAsync("local", fixture.Now, fixture.Silo);
-        fixture.Catalog.Ids.AddRange([orphan, local]);
-
-        Assert.Equal("local", Assert.Single(await fixture.DiscoverAsync(maxNewClaims: 0)).Id);
-        Assert.Equal(new[] { orphan, local }, fixture.Storage.MetadataReads);
-        Assert.False(fixture.Manager.HasMoreCatalogWork);
-        Assert.Equal(new[] { "orphan", "local" }, (await fixture.DiscoverAsync(maxNewClaims: 1)).Select(shard => shard.Id));
-        Assert.Equal(2, fixture.Catalog.ListCalls);
-        Assert.Equal(2, fixture.Catalog.DisposeCalls);
-    }
-
-    [Fact]
-    public async Task Discovery_MetadataFailureSurfacesAndNextTurnContinuesBeforeRetryingNextSweep()
-    {
-        await using var fixture = new DiscoveryFixture();
-        var failing = await fixture.AddShardAsync("failing", fixture.Now);
-        var next = await fixture.AddShardAsync("next", fixture.Now);
-        fixture.Catalog.Ids.AddRange([failing, next]);
-        var failure = new InvalidOperationException("Metadata unavailable");
-        fixture.Storage.BeforeMetadataRead = (id, _) => id == failing ? throw failure : ValueTask.CompletedTask;
-
-        Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.DiscoverAsync()));
-        Assert.True(fixture.Manager.HasMoreCatalogWork);
-        Assert.Equal("next", Assert.Single(await fixture.DiscoverAsync()).Id);
-        Assert.Equal(1, fixture.Catalog.ListCalls);
-        Assert.False(fixture.Manager.HasMoreCatalogWork);
-
-        fixture.Storage.BeforeMetadataRead = null;
-        Assert.Equal(new[] { "failing", "next" }, (await fixture.DiscoverAsync()).Select(shard => shard.Id));
-        Assert.Equal(new[] { failing, next, failing, next }, fixture.Storage.MetadataReads);
-        Assert.Equal(2, fixture.Catalog.ListCalls);
-        Assert.Equal(2, fixture.Catalog.DisposeCalls);
-    }
-
-    [Fact]
-    public async Task Discovery_CancellationDuringMoveNextDisposesLifetimeScopedEnumerator()
-    {
-        await using var fixture = new DiscoveryFixture();
-        var first = await fixture.AddShardAsync("first", fixture.Now);
-        fixture.Catalog.Ids.Add(first);
-        using var cancellation = new CancellationTokenSource();
-        cancellation.Cancel();
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => fixture.DiscoverWithCancellationAsync(cancellation.Token));
-        Assert.Equal(0, fixture.Catalog.ListCalls);
-
-        using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        var moveNextStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        fixture.Catalog.BeforeMoveNext = async (_, token) =>
-        {
-            Assert.Equal(lifetime.Token, token);
-            moveNextStarted.SetResult();
-            await Task.Delay(Timeout.InfiniteTimeSpan, token);
-        };
-        var discovery = fixture.DiscoverWithCancellationAsync(lifetime.Token);
-        await moveNextStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-        lifetime.Cancel();
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => discovery);
-        Assert.Empty(fixture.Storage.MetadataReads);
-        Assert.Equal(1, fixture.Catalog.DisposeCalls);
-        Assert.False(fixture.Manager.HasMoreCatalogWork);
-        await fixture.Manager.StopDiscoveryAsync();
-        Assert.Equal(1, fixture.Catalog.DisposeCalls);
-    }
-
-    [Fact]
-    public async Task Discovery_CancellationBetweenMetadataReadsStopsBeforeNextIdentity()
-    {
-        await using var fixture = new DiscoveryFixture();
-        var first = await fixture.AddShardAsync("future", fixture.Horizon.AddMinutes(1));
-        var next = await fixture.AddShardAsync("next", fixture.Now);
-        fixture.Catalog.Ids.AddRange([first, next]);
-        using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        fixture.Storage.BeforeMetadataRead = (_, _) =>
-        {
-            lifetime.Cancel();
-            return ValueTask.CompletedTask;
-        };
-
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => fixture.DiscoverWithCancellationAsync(lifetime.Token));
-        Assert.Equal(new[] { first }, fixture.Storage.MetadataReads);
-        Assert.Equal(1, fixture.Catalog.MoveNextCalls);
-        Assert.Equal(0, fixture.Catalog.DisposeCalls);
-        await fixture.Manager.StopDiscoveryAsync();
-        Assert.Equal(1, fixture.Catalog.DisposeCalls);
-        Assert.False(fixture.Manager.HasMoreCatalogWork);
-    }
-
-    [Fact]
-    public async Task Discovery_StopAwaitsDisposalOfPartialSweep()
-    {
-        await using var fixture = new DiscoveryFixture();
-        fixture.Catalog.Ids.AddRange(Enumerable.Range(0, JournaledJobShardManager.DiscoveryBatchSize + 1)
-            .Select(index => new JobShardId($"missing-{index}").ToJournalId()));
-        Assert.Empty(await fixture.DiscoverAsync());
-        Assert.True(fixture.Manager.HasMoreCatalogWork);
-        var disposalStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var allowDisposal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        fixture.Catalog.OnDispose = async () =>
-        {
-            disposalStarted.SetResult();
-            await allowDisposal.Task.WaitAsync(TestContext.Current.CancellationToken);
-        };
-
-        var stop = fixture.Manager.StopDiscoveryAsync().AsTask();
-        await disposalStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-        Assert.False(stop.IsCompleted);
-        allowDisposal.SetResult();
-        await stop;
-        Assert.Equal(JournaledJobShardManager.DiscoveryBatchSize, fixture.Catalog.MoveNextCalls);
-        Assert.Equal(1, fixture.Catalog.DisposeCalls);
-        Assert.False(fixture.Manager.HasMoreCatalogWork);
-    }
-
-    [Fact]
-    public async Task Discovery_PersistentMetadataFailurePreservesEarlierAndLaterAssignments()
-    {
-        await using var fixture = new DiscoveryFixture();
-        var claimed = await fixture.AddShardAsync("claimed", fixture.Now);
-        var failing = await fixture.AddShardAsync("failing", fixture.Now);
-        var tail = await fixture.AddShardAsync("tail", fixture.Now);
-        fixture.Catalog.Ids.AddRange([claimed, failing, tail]);
-        fixture.Storage.BeforeMetadataRead = (id, _) => id == failing
-            ? throw new InvalidOperationException("Metadata unavailable")
-            : ValueTask.CompletedTask;
-
-        await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.DiscoverAsync());
-        Assert.Equal("claimed", Assert.Single(await fixture.DiscoverAsync()).Id);
-        Assert.Equal(new[] { claimed, failing }, fixture.Storage.MetadataReads);
-        Assert.Equal("tail", Assert.Single(await fixture.DiscoverAsync()).Id);
-        Assert.False(fixture.Manager.HasMoreCatalogWork);
-
-        await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.DiscoverAsync(maxNewClaims: 0));
-        Assert.Equal("claimed", Assert.Single(await fixture.DiscoverAsync(maxNewClaims: 0)).Id);
-        Assert.Equal("tail", Assert.Single(await fixture.DiscoverAsync(maxNewClaims: 0)).Id);
-        Assert.Equal(new[] { claimed, failing, tail, claimed, failing, tail }, fixture.Storage.MetadataReads);
-        Assert.False(fixture.Manager.HasMoreCatalogWork);
-    }
-
-    [Fact]
-    public async Task Discovery_ListingFailureDisposesAndRestartsWithPendingAssignmentsPreserved()
-    {
-        await using var fixture = new DiscoveryFixture();
-        var first = await fixture.AddShardAsync("first", fixture.Now);
-        var tail = await fixture.AddShardAsync("tail", fixture.Now);
-        fixture.Catalog.Ids.AddRange([first, tail]);
-        var failure = new InvalidOperationException("Listing unavailable");
-        fixture.Catalog.BeforeMoveNext = (index, _) => index == 1 ? throw failure : ValueTask.CompletedTask;
-        Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.DiscoverAsync()));
-        Assert.Equal(1, fixture.Catalog.DisposeCalls);
-        Assert.True(fixture.Manager.HasMoreCatalogWork);
-        Assert.Equal("first", Assert.Single(await fixture.DiscoverAsync()).Id);
-        Assert.False(fixture.Manager.HasMoreCatalogWork);
-        Assert.Equal(1, fixture.Catalog.ListCalls);
-        fixture.Catalog.BeforeMoveNext = null;
-        Assert.Equal(new[] { "first", "tail" }, (await fixture.DiscoverAsync()).Select(shard => shard.Id));
-        Assert.Equal(2, fixture.Catalog.ListCalls);
-        Assert.Equal(2, fixture.Catalog.DisposeCalls);
-    }
-
-    [Fact]
-    public async Task Discovery_MembershipChangesPreserveEnumeratorAndUseCurrentOwnerStatus()
-    {
-        await using var fixture = new DiscoveryFixture();
-        var owner = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5101), 0);
-        fixture.Membership.SetSiloStatus(owner, SiloStatus.Dead);
-        var first = await fixture.AddShardAsync("first", fixture.Now, owner);
-        var second = await fixture.AddShardAsync("second", fixture.Now, owner);
-        fixture.Catalog.Ids.Add(first);
-        fixture.Catalog.Ids.AddRange(Enumerable.Range(0, JournaledJobShardManager.DiscoveryBatchSize - 1)
-            .Select(index => new JobShardId($"missing-{index}").ToJournalId()));
-        fixture.Catalog.Ids.Add(second);
-        fixture.Storage.BeforeMetadataRead = (_, _) =>
-        {
-            fixture.Membership.SetSiloStatus(owner, SiloStatus.Active);
-            return ValueTask.CompletedTask;
-        };
-
-        Assert.Empty(await fixture.DiscoverAsync());
-        fixture.Storage.BeforeMetadataRead = null;
-        fixture.Membership.SetSiloStatus(owner, SiloStatus.Dead);
-        Assert.Equal("second", Assert.Single(await fixture.DiscoverAsync()).Id);
-        Assert.Equal(1, fixture.Catalog.ListCalls);
-        Assert.Equal("first", Assert.Single(await fixture.DiscoverAsync()).Id);
-        var metadata = await fixture.Storage.CreateStorage(second).GetMetadataAsync(TestContext.Current.CancellationToken);
-        Assert.Equal(fixture.Silo.ToParsableString(), metadata!.Properties["DurableJobsOwner"]);
-        Assert.Equal("1", metadata.Properties["DurableJobsAdoptedCount"]);
-    }
-
-    [Fact]
-    public async Task Discovery_NewSweepObservesInsertionBehindTraversalAndFutureEligibility()
-    {
-        await using var fixture = new DiscoveryFixture();
-        var future = await fixture.AddShardAsync("future", fixture.Horizon.AddMinutes(1));
-        var tail = await fixture.AddShardAsync("tail", fixture.Now);
-        fixture.Catalog.Ids.Add(future);
-        fixture.Catalog.Ids.AddRange(Enumerable.Range(0, JournaledJobShardManager.DiscoveryBatchSize - 1)
-            .Select(index => new JobShardId($"missing-{index}").ToJournalId()));
-        fixture.Catalog.Ids.Add(tail);
-
-        Assert.Empty(await fixture.DiscoverAsync());
-        var inserted = await fixture.AddShardAsync("behind", fixture.Now);
-        fixture.Catalog.Ids.Insert(0, inserted);
-        Assert.Equal("tail", Assert.Single(await fixture.DiscoverAsync()).Id);
-        Assert.False(fixture.Manager.HasMoreCatalogWork);
-        Assert.Equal(new[] { "behind", "future" }, (await fixture.DiscoverAsync(
-            horizon: fixture.Horizon.AddMinutes(1))).Select(shard => shard.Id));
-        Assert.Equal(2, fixture.Catalog.ListCalls);
-    }
-
-    [Fact]
-    public async Task Discovery_DuplicateIdentitiesConsumeBudgetAndReuseLocalShard()
-    {
-        await using var fixture = new DiscoveryFixture();
-        var due = await fixture.AddShardAsync("due", fixture.Now);
-        fixture.Catalog.Ids.AddRange([due, due]);
-
-        var result = await fixture.DiscoverAsync(maxNewClaims: 1);
-        Assert.Equal(2, result.Count);
-        Assert.Same(result[0], result[1]);
-        Assert.Equal(new[] { due, due }, fixture.Storage.MetadataReads);
-        Assert.False(fixture.Manager.HasMoreCatalogWork);
-    }
-
-    [Fact]
-    public async Task Discovery_OrdinaryEnumerableCatalogAssignsShards()
-    {
-        var storage = new CountingJournalStorageProvider(delayAppends: false);
-        using var services = CreateServices(storage);
-        var membership = new TestClusterMembershipService();
-        var silo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5100), 0);
-        membership.SetSiloStatus(silo, SiloStatus.Active);
-        var manager = CreateManager(services, membership, silo);
-        var now = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
-        await storage.CreateStorage(new JobShardId("legacy").ToJournalId()).CreateIfNotExistsAsync(
-            new Dictionary<string, string>
-            {
-                ["DurableJobsMinDueTime"] = now.ToString("O"),
-                ["DurableJobsMaxDueTime"] = now.AddHours(1).ToString("O")
-            }, TestContext.Current.CancellationToken);
-
-        await using var shard = Assert.Single(await manager.DiscoverJobShardsAsync(now, 1, TestContext.Current.CancellationToken));
-        Assert.Equal("legacy", shard.Id);
-        Assert.False(manager.HasMoreCatalogWork);
-    }
-
-    [Fact]
-    public async Task Assignment_PublicFullScanRemainsIndependentOfRuntimeEnumerator()
-    {
-        await using var fixture = new DiscoveryFixture();
-        var first = await fixture.AddShardAsync("first", fixture.Now, fixture.Silo);
-        var second = await fixture.AddShardAsync("second", fixture.Now, fixture.Silo);
-        fixture.Catalog.Ids.Add(first);
-        fixture.Catalog.Ids.AddRange(Enumerable.Range(0, JournaledJobShardManager.DiscoveryBatchSize - 1)
-            .Select(index => new JobShardId($"missing-{index}").ToJournalId()));
-        fixture.Catalog.Ids.Add(second);
-
-        Assert.Equal("first", Assert.Single(await fixture.DiscoverAsync()).Id);
-        var full = await fixture.AssignAsync();
-        Assert.Equal(new[] { "first", "second" }, full.Select(shard => shard.Id).Order());
-        Assert.Equal(2, fixture.Catalog.ListCalls);
-        Assert.Equal("second", Assert.Single(await fixture.DiscoverAsync()).Id);
-        Assert.Equal(2, fixture.Catalog.ListCalls);
-    }
-
-    [Fact]
     public async Task ReleasedShard_IsClaimedClosedAndReplayedFromJournal()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -1042,10 +719,10 @@ public partial class JournaledJobShardManagerTests
         private readonly ServiceProvider _services;
         private readonly HashSet<IJobShard> _opened = [];
 
-        public DiscoveryFixture()
+        public DiscoveryFixture(bool useStorageCatalog = false)
         {
             Catalog = new ScriptedCatalog();
-            _services = CreateServices(Storage, catalog: Catalog);
+            _services = CreateServices(Storage, catalog: useStorageCatalog ? Storage : Catalog);
             Membership.SetSiloStatus(Silo, SiloStatus.Active);
             Manager = CreateManager(_services, Membership, Silo);
         }
@@ -1060,7 +737,8 @@ public partial class JournaledJobShardManagerTests
 
         public async Task<JournalId> AddShardAsync(string name, DateTimeOffset start, SiloAddress? owner = null, bool poisoned = false)
         {
-            var id = new JobShardId(name).ToJournalId();
+            var timestampedId = JobShardId.New(start);
+            var id = new JobShardId(timestampedId.Value[..^32] + name).ToJournalId();
             var properties = new Dictionary<string, string>
             {
                 ["DurableJobsMinDueTime"] = start.ToString("O"),
@@ -1082,9 +760,25 @@ public partial class JournaledJobShardManagerTests
 
         public async Task<List<IJobShard>> DiscoverWithCancellationAsync(CancellationToken cancellationToken, int maxNewClaims = int.MaxValue, DateTimeOffset? horizon = null)
         {
-            var result = await Manager.DiscoverJobShardsAsync(horizon ?? Horizon, maxNewClaims, cancellationToken);
-            _opened.UnionWith(result);
+            var result = new List<IJobShard>();
+            await foreach (var shard in DiscoverStreamAsync(cancellationToken, maxNewClaims, horizon))
+            {
+                result.Add(shard);
+            }
+
             return result;
+        }
+
+        public async IAsyncEnumerable<IJobShard> DiscoverStreamAsync(
+            [EnumeratorCancellation] CancellationToken cancellationToken,
+            int maxNewClaims = int.MaxValue,
+            DateTimeOffset? horizon = null)
+        {
+            await foreach (var shard in Manager.DiscoverJobShardsAsync(horizon ?? Horizon, maxNewClaims, cancellationToken))
+            {
+                _opened.Add(shard);
+                yield return shard;
+            }
         }
 
         public async Task<List<IJobShard>> AssignAsync()
@@ -1096,13 +790,14 @@ public partial class JournaledJobShardManagerTests
 
         public async ValueTask DisposeAsync()
         {
-            await Manager.StopDiscoveryAsync();
-            foreach (var shard in _opened)
+            try
             {
-                await shard.DisposeAsync();
+                await Task.WhenAll(_opened.Select(shard => shard.DisposeAsync().AsTask()));
             }
-
-            await _services.DisposeAsync();
+            finally
+            {
+                await _services.DisposeAsync();
+            }
         }
     }
 
@@ -1114,18 +809,28 @@ public partial class JournaledJobShardManagerTests
         public int ListCalls { get; private set; }
         public int MoveNextCalls { get; private set; }
         public int DisposeCalls { get; private set; }
+        public int YieldedIds { get; private set; }
+        public List<(JournalId Prefix, JournalId MaxId)> Requests { get; } = [];
 
         public IAsyncEnumerable<JournalId> ListAsync(ListOptions? options = null, CancellationToken cancellationToken = default)
         {
             Assert.NotNull(options);
             Assert.Equal(JobShardId.StoragePrefix, options.Prefix);
+            Assert.False(options.MaxId.IsDefault);
             ListCalls++;
-            return Enumerate(cancellationToken);
+            var prefix = options.Prefix;
+            var maxId = options.MaxId;
+            Requests.Add((prefix, maxId));
+            return Enumerate(prefix, maxId, cancellationToken);
         }
 
-        private async IAsyncEnumerable<JournalId> Enumerate([EnumeratorCancellation] CancellationToken cancellationToken)
+        private async IAsyncEnumerable<JournalId> Enumerate(
+            JournalId prefix,
+            JournalId maxId,
+            [EnumeratorCancellation] CancellationToken cancellationToken)
         {
-            var snapshot = Ids.ToArray();
+            var snapshot = Ids.Where(id => prefix.IsPrefixOf(id)
+                && StringComparer.Ordinal.Compare(id.Value, maxId.Value) <= 0).ToArray();
             try
             {
                 for (var index = 0; ; index++)
@@ -1142,6 +847,7 @@ public partial class JournaledJobShardManagerTests
                         yield break;
                     }
 
+                    YieldedIds++;
                     yield return snapshot[index];
                 }
             }
