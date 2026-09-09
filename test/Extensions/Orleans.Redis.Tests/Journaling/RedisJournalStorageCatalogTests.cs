@@ -21,7 +21,7 @@ public sealed class RedisJournalStorageCatalogTests
     private const string KeyPrefix = "catalog-tests";
 
     [Fact]
-    public async Task ListAsync_YieldsFirstBatchBeforeScanCompletesAndSnapshotsPrefix()
+    public async Task ListAsync_YieldsFirstBatchBeforeScanCompletesAndSnapshotsOptions()
     {
         var firstId = JournalId.Create("redis", "list", "z");
         var secondId = JournalId.Create("redis", "list", "a");
@@ -45,8 +45,11 @@ public sealed class RedisJournalStorageCatalogTests
                 return Task.FromResult((RedisValue)ids[call.ArgAt<RedisKey>(0)].Value);
             });
         var provider = await CreateProviderAsync(database, CreateServer(ScanAsync(TestContext.Current.CancellationToken)));
-        var options = new ListOptions { Prefix = JournalId.Create("redis", "list") };
-        await using var enumerator = provider.ListAsync(options, TestContext.Current.CancellationToken).GetAsyncEnumerator(TestContext.Current.CancellationToken);
+        var options = new ListOptions { Prefix = nonmatchingId, MaxId = new("a") };
+        var listing = provider.ListAsync(options, TestContext.Current.CancellationToken);
+        options.Prefix = JournalId.Create("redis", "list");
+        options.MaxId = firstId;
+        await using var enumerator = listing.GetAsyncEnumerator(TestContext.Current.CancellationToken);
 
         Assert.True(await enumerator.MoveNextAsync());
         Assert.Equal(firstId, enumerator.Current);
@@ -56,6 +59,7 @@ public sealed class RedisJournalStorageCatalogTests
         Assert.False(scanDisposed);
 
         options.Prefix = JournalId.Create("redis", "listing");
+        options.MaxId = new("a");
 
         Assert.True(await enumerator.MoveNextAsync());
         Assert.Equal(secondId, enumerator.Current);
@@ -82,6 +86,47 @@ public sealed class RedisJournalStorageCatalogTests
             finally
             {
                 scanDisposed = true;
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ListAsync_MaxIdIsInclusiveAndDoesNotStopUnorderedScan(bool bounded)
+    {
+        var future = JournalId.Create("redis", "list", "z");
+        var earlier = JournalId.Create("redis", "list", "a");
+        var maximum = JournalId.Create("redis", "list", "b");
+        var ids = Enumerable.Repeat(future, 128).Concat([earlier, maximum, JournalId.Create("redis", "listing")]).ToArray();
+        var keys = ids.Select((_, index) => RedisJournalStorage.GetMetadataKey(KeyPrefix, $"mapped-{index}")).ToArray();
+        var database = Substitute.For<IDatabase>();
+        for (var index = 0; index < keys.Length; index++)
+        {
+            database.HashGetAsync(keys[index], RedisJournalStorage.JournalIdMetadataKey)
+                .Returns(Task.FromResult((RedisValue)ids[index].Value));
+        }
+
+        var scanned = 0;
+        var provider = await CreateProviderAsync(database, CreateServer(ScanAsync()));
+        var result = new List<JournalId>();
+        await foreach (var id in provider.ListAsync(
+            new() { Prefix = JournalId.Create("redis", "list"), MaxId = bounded ? maximum : default },
+            TestContext.Current.CancellationToken))
+        {
+            result.Add(id);
+        }
+
+        Assert.Equal(bounded ? [earlier, maximum] : new[] { future, earlier, maximum }, result);
+        Assert.Equal(131, scanned);
+
+        async IAsyncEnumerable<RedisKey> ScanAsync()
+        {
+            await Task.CompletedTask;
+            foreach (var key in keys)
+            {
+                scanned++;
+                yield return key;
             }
         }
     }

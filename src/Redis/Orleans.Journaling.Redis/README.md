@@ -46,7 +46,7 @@ await foreach (var journalId in catalog.ListAsync(
 }
 ```
 
-The prefix is read when enumeration begins. Discovery scans primary servers incrementally and reads canonical journal ids in batches of at most 128 metadata keys, yielding matching ids in traversal order without sorting or buffering the whole catalog. Duplicate ids are suppressed across the traversal using O(N) seen-id memory for N distinct matching ids; metadata keys are not retained for the whole traversal, so repeated scan results can cause repeated metadata reads.
+`ListOptions.MaxId` adds an inclusive ordinal upper bound on the journal id; its default value is unlimited. The prefix and upper bound both apply and are snapshotted when enumeration begins. Discovery scans primary servers incrementally and reads canonical journal ids in batches of at most 128 metadata keys, yielding matching ids in traversal order without sorting or buffering the whole catalog. Redis `SCAN` is unordered, so encountering a future id does not end traversal. Consumers requiring due order must sort the selected ids using `StringComparer.Ordinal`. Duplicate ids are suppressed across the traversal using O(N) seen-id memory for N distinct matching ids; metadata keys are not retained for the whole traversal, so repeated scan results can cause repeated metadata reads.
 
 The Redis `SCAN COUNT` value of 250 is a hint, not a strict response-size or server-work bound. One enumerator advancement can traverse many empty or nonmatching scans, and Redis/client-side scan buffering is not bounded by the metadata batch size. Discovery observes live storage rather than a snapshot.
 

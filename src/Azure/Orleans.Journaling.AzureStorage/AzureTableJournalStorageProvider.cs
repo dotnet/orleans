@@ -62,8 +62,9 @@ internal sealed class AzureTableJournalStorageProvider : ILifecycleParticipant<I
     {
         cancellationToken.ThrowIfCancellationRequested();
         var prefix = options?.Prefix ?? default;
+        var maxId = options?.MaxId ?? default;
         var table = _tableClientProvider.GetTableClient();
-        var filter = TableClient.CreateQueryFilter($"RowKey eq {AzureTableJournalStorage.HeaderRowKey}");
+        var filter = GetCatalogFilter(prefix, maxId);
         await foreach (var page in table.QueryAsync<TableEntity>(
             filter,
             maxPerPage: 1000,
@@ -74,7 +75,9 @@ internal sealed class AzureTableJournalStorageProvider : ILifecycleParticipant<I
             foreach (var entity in page.Values)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (TryGetJournalId(entity, out var journalId) && prefix.IsPrefixOf(journalId))
+                if (TryGetJournalId(entity, out var journalId)
+                    && prefix.IsPrefixOf(journalId)
+                    && (maxId.IsDefault || string.CompareOrdinal(journalId.Value, maxId.Value) <= 0))
                 {
                     yield return journalId;
                 }
@@ -82,6 +85,59 @@ internal sealed class AzureTableJournalStorageProvider : ILifecycleParticipant<I
         }
 
         cancellationToken.ThrowIfCancellationRequested();
+    }
+
+    private static string GetCatalogFilter(JournalId prefix, JournalId maxId)
+    {
+        var headers = TableClient.CreateQueryFilter($"RowKey eq {AzureTableJournalStorage.HeaderRowKey}");
+        if (prefix.IsDefault)
+        {
+            // Legacy headers have no JournalId property. Without a prefix, their escaped partition
+            // keys cannot safely be range-filtered by an arbitrary ordinal JournalId bound.
+            return headers;
+        }
+
+        var descendantPrefix = prefix.Value + "/";
+        var descendantEnd = prefix.Value + "0";
+        var identities = TableClient.CreateQueryFilter(
+            $"(JournalId eq {prefix.Value} or (JournalId ge {descendantPrefix} and JournalId lt {descendantEnd}))");
+        if (!maxId.IsDefault)
+        {
+            identities += TableClient.CreateQueryFilter($" and JournalId le {maxId.Value}");
+        }
+
+        var partition = Uri.EscapeDataString(prefix.Value);
+        var legacyStart = partition + "%2F";
+        var legacyEnd = partition + "%2G";
+        var legacy = TableClient.CreateQueryFilter(
+            $"(PartitionKey eq {partition} or (PartitionKey ge {legacyStart} and PartitionKey lt {legacyEnd}))");
+        if (!maxId.IsDefault
+            && maxId.Value.StartsWith(descendantPrefix, StringComparison.Ordinal)
+            && IsUnescapedSuffix(maxId.Value.AsSpan(descendantPrefix.Length)))
+        {
+            // For a shared encoded prefix and an unreserved ASCII upper-bound suffix, escaping
+            // any lesser suffix can only move it earlier ('%' sorts before every unreserved char).
+            // This covers time-prefixed shard bounds without assuming general URI order preservation.
+            var legacyMax = Uri.EscapeDataString(maxId.Value);
+            legacy += TableClient.CreateQueryFilter($" and PartitionKey le {legacyMax}");
+        }
+
+        // The OR also preserves custom partition mappings with canonical JournalId properties.
+        // Table queries cannot test for an absent property, so the legacy arm can over-select.
+        return $"{headers} and (({identities}) or ({legacy}))";
+    }
+
+    private static bool IsUnescapedSuffix(ReadOnlySpan<char> value)
+    {
+        foreach (var character in value)
+        {
+            if (!char.IsAsciiLetterOrDigit(character) && character is not ('-' or '.' or '_' or '~'))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static bool TryGetJournalId(TableEntity entity, out JournalId journalId)

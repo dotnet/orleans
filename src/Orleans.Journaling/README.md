@@ -110,7 +110,7 @@ Existing data is read using its stored format metadata, or as legacy OrleansBina
 
 ## Catalog enumeration
 
-`IJournalStorageCatalog.ListAsync` returns an `IAsyncEnumerable<JournalId>` in provider traversal order. Pass `ListOptions` with `Prefix` to select an exact journal id and its descendants, or omit the options to enumerate all ids. Options are read when enumeration begins.
+`IJournalStorageCatalog.ListAsync` returns an `IAsyncEnumerable<JournalId>` in provider traversal order, not sorted order. Pass `ListOptions` with `Prefix` to select an exact journal id and its descendants. `MaxId` supplies an inclusive upper bound on `JournalId.Value` using `StringComparison.Ordinal`; its default value is unlimited. Both constraints apply and are snapshotted when enumeration begins. Omit the options to enumerate all ids.
 
 When updating callers of the former prefix overload, pass `new ListOptions { Prefix = prefix }`. Applications which require ordinal ordering can materialize the sequence and sort `JournalId.Value` using `StringComparer.Ordinal`.
 
@@ -118,13 +118,13 @@ Storage providers fetch pages internally and yield matching identities as they d
 
 | Provider | Internal traversal | Client memory |
 | --- | --- | --- |
-| Volatile | Enumerates the existing concurrent storage dictionary, checks journal existence, and applies the prefix | Constant additional traversal state; the storage dictionary holds the journals. |
-| Azure Blob | Requests up to 5000 blobs per service page, then applies WAL and hierarchical prefix filtering | Proportional to the current service page. |
-| Azure Table | Requests up to 1000 journal headers per service page, then decodes canonical or reversible legacy ids and applies the prefix | Proportional to the current service page. |
-| S3 | Requests up to 1000 bucket objects per `ListObjectsV2` page, then applies canonical WAL and prefix filtering | Proportional to the current service page; includes unordered S3 Express listings. |
-| Redis | Scans primary-server metadata keys and reads canonical ids in bounded batches, suppressing repeated ids | Read-batch state plus a seen-id set which grows with the catalog. `SCAN` count remains a service work hint. |
+| Volatile | Enumerates the existing concurrent storage dictionary, checks journal existence, and applies the prefix and upper bound | Constant additional traversal state; the storage dictionary holds the journals. |
+| Azure Blob | Pushes the name prefix into requests of up to 5000 blobs per page, then applies WAL and identity bounds; stops past a conservative raw-name bound | Proportional to the current service page. |
+| Azure Table | Pushes safe identity/legacy-key prefix and range filters into requests of up to 1000 headers per page, then checks decoded ids | Proportional to the current service page. |
+| S3 | Pushes an explicitly mapped native prefix into requests of up to 1000 objects, then applies canonical WAL and identity bounds | Proportional to the current service page; includes unordered S3 Express listings. |
+| Redis | Scans primary-server metadata keys and reads canonical ids in bounded batches, applying both constraints and suppressing repeated ids | Read-batch state plus a seen-id set which grows with the catalog. `SCAN` count remains a service work hint. |
 
-One `MoveNextAsync` can traverse multiple empty or filtered storage pages before yielding an identity. A consumer's identity or metadata-read budget therefore bounds returned candidates, while storage services determine internal scan work, request latency, and retries. Table header queries can inspect additional rows internally, and S3 custom mappings require a bucket traversal.
+One `MoveNextAsync` can traverse multiple empty or filtered storage pages before yielding an identity. A consumer's identity or metadata-read budget therefore bounds returned candidates, while storage services determine internal scan work, request latency, and retries. Table header queries can inspect additional rows internally. Custom S3 object-key mappings require an explicit `GetObjectKeyPrefix` mapper for prefixed listings. S3 directory-bucket and Redis traversal is unordered, so neither stops when it encounters an id beyond `MaxId`.
 
 Enumeration observes live storage. Concurrent changes follow each provider's listing semantics; callers should tolerate repeated identities during changes and use subsequent enumerations to discover later updates. Journal existence can change between discovery and a storage operation. Cancellation and storage errors propagate through enumeration. Dispose a failed enumerator and begin a new enumeration when retrying a listing operation.
 

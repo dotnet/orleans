@@ -51,6 +51,8 @@ internal sealed class S3JournalStorageProvider : ILifecycleParticipant<ISiloLife
     {
         cancellationToken.ThrowIfCancellationRequested();
         var prefix = options?.Prefix ?? default;
+        var maxId = options?.MaxId ?? default;
+        var objectKeyPrefix = _options.GetObjectKeyPrefixForCatalog(prefix);
         var client = GetClient();
         var bucketName = GetBucketName();
         string? continuationToken = null;
@@ -61,6 +63,7 @@ internal sealed class S3JournalStorageProvider : ILifecycleParticipant<ISiloLife
                 new ListObjectsV2Request
                 {
                     BucketName = bucketName,
+                    Prefix = objectKeyPrefix,
                     MaxKeys = 1000,
                     ContinuationToken = continuationToken,
                 },
@@ -70,7 +73,9 @@ internal sealed class S3JournalStorageProvider : ILifecycleParticipant<ISiloLife
             foreach (var item in response.S3Objects)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (TryGetJournalId(item.Key, prefix, out var id))
+                // Directory buckets do not return keys in lexical order.
+                if (TryGetJournalId(item.Key, prefix, out var id)
+                    && (maxId.IsDefault || string.CompareOrdinal(id.Value, maxId.Value) <= 0))
                 {
                     yield return id;
                 }

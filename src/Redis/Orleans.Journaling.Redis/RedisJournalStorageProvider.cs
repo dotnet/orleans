@@ -61,6 +61,7 @@ internal sealed class RedisJournalStorageProvider : IJournalStorageProvider, IJo
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var prefix = options?.Prefix ?? default;
+        var maxId = options?.MaxId ?? default;
         cancellationToken.ThrowIfCancellationRequested();
         var connection = GetConnection();
         var database = GetDatabase();
@@ -152,7 +153,9 @@ internal sealed class RedisJournalStorageProvider : IJournalStorageProvider, IJo
                             $"Redis journal metadata '{batch[i]}' contains an invalid '{RedisJournalStorage.JournalIdMetadataKey}' value.");
                     }
 
-                    if (prefix.IsPrefixOf(journalId) && journalIds.Add(journalId))
+                    if (prefix.IsPrefixOf(journalId)
+                        && (maxId.IsDefault || string.CompareOrdinal(journalId.Value, maxId.Value) <= 0)
+                        && journalIds.Add(journalId))
                     {
                         cancellationToken.ThrowIfCancellationRequested();
                         yield return journalId;

@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Globalization;
+using System.Text.RegularExpressions;
 using Amazon.S3;
 using Amazon.S3.Model;
 using Azure;
@@ -56,21 +57,43 @@ public sealed class JournalStorageCatalogTests
     public async Task ListAsync_OptionsAreReadAtEnumerationStartAndRemainStable(string kind)
     {
         await using var context = await CreateAsync(kind, ["tenant/z", "tenant/a", "tenant/b", "other/q"]);
-        var options = new ListOptions { Prefix = new("other") };
+        var options = new ListOptions { Prefix = new("other"), MaxId = new("other") };
         var listing = context.Catalog.ListAsync(options, TestContext.Current.CancellationToken);
         options.Prefix = new("tenant");
+        options.MaxId = new("tenant/b");
         await using var enumerator = listing.GetAsyncEnumerator(TestContext.Current.CancellationToken);
         Assert.True(await enumerator.MoveNextAsync());
         var result = new List<string> { enumerator.Current.Value };
 
         options.Prefix = new("other");
+        options.MaxId = default;
         while (await enumerator.MoveNextAsync())
         {
             result.Add(enumerator.Current.Value);
         }
 
-        AssertMembership(["tenant/z", "tenant/a", "tenant/b"], result);
+        AssertMembership(["tenant/a", "tenant/b"], result);
         AssertMembership(["other/q"], await DrainAsync(listing));
+    }
+
+    [Theory]
+    [InlineData("Volatile")]
+    [InlineData("AzureBlob")]
+    [InlineData("AzureTable")]
+    [InlineData("S3")]
+    public async Task ListAsync_MaxIdIsInclusiveOrdinalAndCombinedWithPrefix(string kind)
+    {
+        string[] ids = ["tenant/z", "tenant/a", "tenant/B", "tenant", "tenant/a/child", "other", "tenant2"];
+        await using var context = await CreateAsync(kind, ids);
+
+        AssertMembership(ids, await DrainAsync(context.Catalog.ListAsync(
+            new() { MaxId = default }, TestContext.Current.CancellationToken)));
+        AssertMembership(["other", "tenant", "tenant/B", "tenant/a"], await DrainAsync(context.Catalog.ListAsync(
+            new() { MaxId = new("tenant/a") }, TestContext.Current.CancellationToken)));
+        AssertMembership(["tenant", "tenant/B", "tenant/a"], await DrainAsync(context.Catalog.ListAsync(
+            new() { Prefix = new("tenant"), MaxId = new("tenant/a") }, TestContext.Current.CancellationToken)));
+        Assert.Empty(await DrainAsync(context.Catalog.ListAsync(
+            new() { Prefix = new("tenant"), MaxId = new("other") }, TestContext.Current.CancellationToken)));
     }
 
     [Theory]
@@ -88,10 +111,10 @@ public sealed class JournalStorageCatalogTests
 
         Assert.Empty(context.Native.Requests);
         Assert.True(await enumerator.MoveNextAsync());
-        Assert.Equal("tenant/z", enumerator.Current.Value);
+        Assert.Equal(kind == "AzureBlob" ? "tenant/a" : "tenant/z", enumerator.Current.Value);
         Assert.Single(context.Native.Requests);
         Assert.True(await enumerator.MoveNextAsync());
-        Assert.Equal("tenant/a", enumerator.Current.Value);
+        Assert.Equal(kind == "AzureBlob" ? "tenant/b" : "tenant/a", enumerator.Current.Value);
         Assert.Single(context.Native.Requests);
 
         var actual = await Assert.ThrowsAsync<InvalidOperationException>(() => enumerator.MoveNextAsync().AsTask());
@@ -105,7 +128,7 @@ public sealed class JournalStorageCatalogTests
         }
 
         context.Native.Failure = null;
-        Assert.Equal(
+        AssertMembership(
             ["tenant/z", "tenant/a", "tenant/b"],
             await DrainAsync(context.Catalog.ListAsync(cancellationToken: TestContext.Current.CancellationToken)));
         Assert.Null(context.Native.Requests[2].Cursor);
@@ -121,7 +144,7 @@ public sealed class JournalStorageCatalogTests
         await using (var enumerator = context.Catalog.ListAsync(cancellationToken: TestContext.Current.CancellationToken).GetAsyncEnumerator(TestContext.Current.CancellationToken))
         {
             Assert.True(await enumerator.MoveNextAsync());
-            Assert.Equal("z", enumerator.Current.Value);
+            Assert.Equal(kind == "AzureBlob" ? "a" : "z", enumerator.Current.Value);
             Assert.Single(context.Native.Requests);
         }
 
@@ -142,10 +165,17 @@ public sealed class JournalStorageCatalogTests
 
         Assert.True(await enumerator.MoveNextAsync());
         Assert.Equal("tenant/valid", enumerator.Current.Value);
-        Assert.Equal(3, context.Native.Requests.Count);
-        Assert.Equal([0, 2, 1], context.Native.Requests.Select(request => request.ResultCount));
+        var expectedCounts = kind == "AzureBlob" ? new[] { 0, 2 } : [0, 1];
+        Assert.Equal(expectedCounts, context.Native.Requests.Select(request => request.ResultCount));
         Assert.False(await enumerator.MoveNextAsync());
-        Assert.Equal(3, context.Native.Requests.Count);
+        if (kind == "AzureBlob")
+        {
+            Assert.Equal([0, 2, 1], context.Native.Requests.Select(request => request.ResultCount));
+        }
+        else
+        {
+            Assert.Equal(2, context.Native.Requests.Count);
+        }
     }
 
     [Theory]
@@ -186,7 +216,8 @@ public sealed class JournalStorageCatalogTests
             await using var context = await CreateAsync(kind, empty ? [] : ["z", "a"]);
             using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
             context.Native.BeforeResponse = cancellation.Cancel;
-            await using var enumerator = context.Catalog.ListAsync(cancellationToken: cancellation.Token).GetAsyncEnumerator(cancellation.Token);
+            await using var enumerator = context.Catalog.ListAsync(
+                new() { MaxId = new("0") }, cancellation.Token).GetAsyncEnumerator(cancellation.Token);
 
             var actual = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => enumerator.MoveNextAsync().AsTask());
             Assert.Equal(cancellation.Token, actual.CancellationToken);
@@ -204,7 +235,7 @@ public sealed class JournalStorageCatalogTests
     {
         await using var context = await CreateAsync(kind, ["tenant/z", "tenant/a", "tenant/b"]);
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        Assert.Equal(
+        AssertMembership(
             ["tenant/z", "tenant/a", "tenant/b"],
             await DrainAsync(context.Catalog.ListAsync(new() { Prefix = new("tenant") }, cancellation.Token)));
 
@@ -216,13 +247,12 @@ public sealed class JournalStorageCatalogTests
         {
             Assert.Equal(kind == "AzureBlob" ? 5000 : 1000, request.Maximum);
             Assert.Equal(cancellation.Token, request.CancellationToken);
-            Assert.Equal(kind == "AzureBlob" ? "tenant" : null, request.Prefix);
+            Assert.Equal(kind switch { "AzureBlob" => "tenant", "S3" => "tenant/", _ => null }, request.Prefix);
         });
         if (kind == "AzureTable")
         {
-            Assert.Equal(
-                TableClient.CreateQueryFilter($"RowKey eq {AzureTableJournalStorage.HeaderRowKey}"),
-                context.Native.Filter);
+            Assert.Contains("JournalId eq 'tenant'", context.Native.Filter);
+            Assert.Contains("PartitionKey ge 'tenant%2F'", context.Native.Filter);
             Assert.Equal([AzureTableJournalStorage.JournalIdPropertyName], Assert.IsType<string[]>(context.Native.Select));
         }
     }
@@ -279,7 +309,7 @@ public sealed class JournalStorageCatalogTests
         var result = await DrainAsync(context.Catalog.ListAsync(
             new() { Prefix = new("jobs/shards") }, TestContext.Current.CancellationToken));
 
-        Assert.Equal(["jobs/shards/z", "jobs/shards/a", "jobs/shards/child"], result);
+        Assert.Equal(["jobs/shards/a", "jobs/shards/child", "jobs/shards/z"], result);
         Assert.Equal(2, context.Native.Requests.Count);
         Assert.All(context.Native.Requests, request => Assert.Equal("jobs/shards", request.Prefix));
     }
@@ -296,9 +326,254 @@ public sealed class JournalStorageCatalogTests
         ];
         await using var context = await CreateAsync("AzureBlob", [], blobs: blobs);
         Assert.Equal(
-            ["tenant/z", "tenant/child", "tenant"],
+            ["tenant/child", "tenant", "tenant/z"],
             await DrainAsync(context.Catalog.ListAsync(new() { Prefix = new("tenant") }, TestContext.Current.CancellationToken)));
         Assert.Equal(8, context.Native.Requests.Sum(request => request.ResultCount));
+    }
+
+    [Fact]
+    public async Task AzureBlobListAsync_MaxIdStopsBeforeFetchingFutureTail()
+    {
+        await using var context = await CreateAsync("AzureBlob", ["a", "b", "z", "zz", "zzz"]);
+        context.Native.Failure = new InvalidOperationException("future tail must not be requested");
+        context.Native.FailureAtRequest = 3;
+        context.Native.EmptyFirstPage = true;
+
+        Assert.Equal(["a"], await DrainAsync(context.Catalog.ListAsync(
+            new() { MaxId = new("a") }, TestContext.Current.CancellationToken)));
+        Assert.Equal([0, 2], context.Native.Requests.Select(request => request.ResultCount));
+        Assert.Equal(1, context.Native.DisposedEnumerators);
+    }
+
+    [Fact]
+    public async Task AzureBlobListAsync_MaxIdIncludesExactJournalWalAfterCheckpoint()
+    {
+        await using var context = await CreateAsync("AzureBlob", [],
+            blobs: [Blob("a/chk.1", BlobType.Block), Blob("a/wal"), Blob("b/chk.1", BlobType.Block), Blob("b/wal"), Blob("z/wal")]);
+        context.Native.Failure = new InvalidOperationException("future tail must not be requested");
+        context.Native.FailureAtRequest = 3;
+
+        Assert.Equal(["a"], await DrainAsync(context.Catalog.ListAsync(
+            new() { MaxId = new("a") }, TestContext.Current.CancellationToken)));
+        Assert.Equal([2, 2], context.Native.Requests.Select(request => request.ResultCount));
+        Assert.Equal(1, context.Native.DisposedEnumerators);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AzureBlobListAsync_TimePrefixedNamespaceStopsBeforeFuturePages(bool hasExactPrefixJournal)
+    {
+        const string prefix = "jobs/shards/v2";
+        const string overdue = prefix + "/20250101T0000000000000Z-11111111111111111111111111111111";
+        const string due = prefix + "/20260909T2100000000000Z-22222222222222222222222222222222";
+        const string maximum = prefix + "/20260909T2100000000000Z~";
+        var ids = new List<string> { overdue, due, maximum };
+        ids.AddRange(Enumerable.Range(0, 256).Select(index =>
+            $"{prefix}/20260909T2100010000000Z-{index.ToString("x32", CultureInfo.InvariantCulture)}"));
+        if (hasExactPrefixJournal)
+        {
+            ids.Add(prefix);
+        }
+
+        await using var context = await CreateAsync("AzureBlob", ids.ToArray());
+        context.Native.Failure = new InvalidOperationException("future tail must not be requested");
+        context.Native.FailureAtRequest = 4;
+
+        var result = await DrainAsync(context.Catalog.ListAsync(
+            new() { Prefix = new(prefix), MaxId = new(maximum) }, TestContext.Current.CancellationToken));
+
+        Assert.Equal(hasExactPrefixJournal ? [prefix, overdue, due, maximum] : new[] { overdue, due, maximum }, result);
+        Assert.Equal(3, context.Native.Requests.Count);
+        var exactRequest = context.Native.Requests[0];
+        Assert.Equal(prefix + "/wal", exactRequest.Prefix);
+        Assert.Equal(1, exactRequest.Maximum);
+        Assert.Equal(hasExactPrefixJournal ? 1 : 0, exactRequest.ResultCount);
+        Assert.All(context.Native.Requests.Skip(1), request =>
+        {
+            Assert.Equal(prefix + "/", request.Prefix);
+            Assert.Equal(5000, request.Maximum);
+            Assert.Equal(2, request.ResultCount);
+        });
+        Assert.Equal(2, context.Native.DisposedEnumerators);
+    }
+
+    [Theory]
+    [InlineData("Append")]
+    [InlineData("Block")]
+    [InlineData("Missing")]
+    public async Task AzureBlobListAsync_BoundedPrefixFiltersExactWalAndDoesNotDuplicateIt(string exactWal)
+    {
+        var blobs = new List<BlobItem> { Blob("tenant/wal-child/wal"), Blob("tenant/z/wal") };
+        if (exactWal != "Missing")
+        {
+            blobs.Add(Blob("tenant/wal", exactWal == "Append" ? BlobType.Append : BlobType.Block));
+        }
+
+        await using var context = await CreateAsync("AzureBlob", [], blobs: blobs.ToArray());
+        var result = await DrainAsync(context.Catalog.ListAsync(
+            new() { Prefix = new("tenant"), MaxId = new("tenant/z") }, TestContext.Current.CancellationToken));
+
+        Assert.Equal(exactWal == "Append" ? ["tenant", "tenant/wal-child", "tenant/z"] : new[] { "tenant/wal-child", "tenant/z" }, result);
+        Assert.Equal("tenant/wal", context.Native.Requests[0].Prefix);
+        Assert.Equal(1, context.Native.Requests[0].ResultCount);
+        Assert.All(context.Native.Requests.Skip(1), request => Assert.Equal("tenant/", request.Prefix));
+    }
+
+    [Theory]
+    [InlineData("a!")]
+    [InlineData("a/0")]
+    [InlineData("a/w")]
+    [InlineData("a/wal!")]
+    [InlineData("\u00e9")]
+    public async Task AzureBlobListAsync_BoundedPrefixPreservesShorterDescendants(string suffix)
+    {
+        string[] ids = ["tenant", "tenant/a", "tenant/a!", "tenant/a/0", "tenant/a/w", "tenant/a/wal!", "tenant/\u00e9", "tenant/\uffff"];
+        var maximum = "tenant/" + suffix;
+        await using var context = await CreateAsync("AzureBlob", ids);
+
+        AssertMembership(ids.Where(id => string.CompareOrdinal(id, maximum) <= 0).ToArray(),
+            await DrainAsync(context.Catalog.ListAsync(
+                new() { Prefix = new("tenant"), MaxId = new(maximum) }, TestContext.Current.CancellationToken)));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AzureBlobListAsync_BoundedPrefixDisposalOrCancellationStopsBeforeDescendants(bool cancel)
+    {
+        await using var context = await CreateAsync("AzureBlob", ["tenant", "tenant/a"]);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        await using (var enumerator = context.Catalog.ListAsync(
+            new() { Prefix = new("tenant"), MaxId = new("tenant/z") }, cancellation.Token).GetAsyncEnumerator(cancellation.Token))
+        {
+            Assert.True(await enumerator.MoveNextAsync());
+            Assert.Equal("tenant", enumerator.Current.Value);
+            if (cancel)
+            {
+                cancellation.Cancel();
+                var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => enumerator.MoveNextAsync().AsTask());
+                Assert.Equal(cancellation.Token, exception.CancellationToken);
+            }
+        }
+
+        Assert.Equal("tenant/wal", Assert.Single(context.Native.Requests).Prefix);
+        Assert.Equal(1, context.Native.DisposedEnumerators);
+    }
+
+    [Fact]
+    public async Task AzureBlobListAsync_BoundedPrefixCancellationAfterEmptyExactPagePropagates()
+    {
+        await using var context = await CreateAsync("AzureBlob", ["tenant/a"]);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        context.Native.BeforeResponse = cancellation.Cancel;
+
+        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => DrainAsync(context.Catalog.ListAsync(
+            new() { Prefix = new("tenant"), MaxId = new("tenant/z") }, cancellation.Token)));
+
+        Assert.Equal(cancellation.Token, exception.CancellationToken);
+        var request = Assert.Single(context.Native.Requests);
+        Assert.Equal("tenant/wal", request.Prefix);
+        Assert.Equal(0, request.ResultCount);
+    }
+
+    [Fact]
+    public async Task AzureBlobListAsync_BoundedPrefixCrossesEmptyExactAndDescendantPages()
+    {
+        await using var context = await CreateAsync("AzureBlob", ["tenant", "tenant/a", "tenant/b"]);
+        context.Native.EmptyFirstPage = true;
+
+        Assert.Equal(["tenant", "tenant/a"], await DrainAsync(context.Catalog.ListAsync(
+            new() { Prefix = new("tenant"), MaxId = new("tenant/a") }, TestContext.Current.CancellationToken)));
+        Assert.Equal([0, 1, 0, 2], context.Native.Requests.Select(request => request.ResultCount));
+        Assert.Equal(2, context.Native.DisposedEnumerators);
+    }
+
+    [Theory]
+    [InlineData("tenant")]
+    [InlineData("tenant!")]
+    public async Task AzureBlobListAsync_BoundedPrefixMaximumBeforeDescendantsListsOnlyExactWal(string maximum)
+    {
+        await using var context = await CreateAsync("AzureBlob", ["tenant", "tenant/a"]);
+
+        Assert.Equal(["tenant"], await DrainAsync(context.Catalog.ListAsync(
+            new() { Prefix = new("tenant"), MaxId = new(maximum) }, TestContext.Current.CancellationToken)));
+        Assert.Equal("tenant/wal", Assert.Single(context.Native.Requests).Prefix);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task AzureBlobListAsync_BoundedPrefixListingErrorPropagates(int failedRequest)
+    {
+        await using var context = await CreateAsync("AzureBlob", ["tenant/a"]);
+        var failure = new RequestFailedException(503, "listing failed");
+        context.Native.Failure = failure;
+        context.Native.FailureAtRequest = failedRequest;
+
+        Assert.Same(failure, await Assert.ThrowsAsync<RequestFailedException>(() => DrainAsync(context.Catalog.ListAsync(
+            new() { Prefix = new("tenant"), MaxId = new("tenant/z") }, TestContext.Current.CancellationToken))));
+        Assert.Equal(failedRequest, context.Native.Requests.Count);
+    }
+
+    [Theory]
+    [InlineData("a!")]
+    [InlineData("a/0")]
+    [InlineData("a/w")]
+    [InlineData("a/wal!")]
+    public async Task AzureBlobListAsync_MaxIdPreservesShorterIdsWhoseWalSortsLater(string maximum)
+    {
+        string[] ids = ["a", "a!", "a/0", "a/w", "a/wal!", "z"];
+        await using var context = await CreateAsync("AzureBlob", ids);
+        AssertMembership(ids.Where(id => string.CompareOrdinal(id, maximum) <= 0).ToArray(),
+            await DrainAsync(context.Catalog.ListAsync(
+                new() { MaxId = new(maximum) }, TestContext.Current.CancellationToken)));
+    }
+
+    [Fact]
+    public async Task AzureBlobListAsync_NonAsciiMaxIdFiltersWithoutLexicalCutoff()
+    {
+        await using var context = await CreateAsync("AzureBlob", ["a", "\u00e9", "\uffff"]);
+        Assert.Equal(["a", "\u00e9"], await DrainAsync(context.Catalog.ListAsync(
+            new() { MaxId = new("\u00e9") }, TestContext.Current.CancellationToken)));
+        Assert.Equal(2, context.Native.Requests.Count);
+        Assert.Equal(3, context.Native.Requests.Sum(request => request.ResultCount));
+    }
+
+    [Fact]
+    public async Task AzureTableListAsync_PushesDownBoundsWithoutLosingCustomOrLegacyHeaders()
+    {
+        const string prefix = "jobs/shards/v2";
+        const string due = prefix + "/20260909-a";
+        const string maximum = prefix + "/20260909~";
+        const string future = prefix + "/20260910-a";
+        TableEntity[] headers =
+        [
+            Header("opaque-future", future), Header("opaque-due", due),
+            Header(Uri.EscapeDataString(due)), Header(Uri.EscapeDataString(future)),
+            Header(Uri.EscapeDataString(prefix)), Header("other", "other/id"),
+        ];
+        await using var context = await CreateAsync("AzureTable", [], headers: headers);
+
+        Assert.Equal([due, due, prefix], await DrainAsync(context.Catalog.ListAsync(
+            new() { Prefix = new(prefix), MaxId = new(maximum) }, TestContext.Current.CancellationToken)));
+        Assert.Equal(3, context.Native.Requests.Sum(request => request.ResultCount));
+        Assert.Contains($"JournalId le '{maximum}'", context.Native.Filter);
+        Assert.Contains($"PartitionKey le '{Uri.EscapeDataString(maximum)}'", context.Native.Filter);
+    }
+
+    [Fact]
+    public async Task AzureTableListAsync_ReservedBoundPreservesLegacyAndEscapesQueryLiterals()
+    {
+        const string prefix = "tenant'one";
+        string[] ids = [prefix, prefix + "/a", prefix + "/a/child", prefix + "/z"];
+        await using var context = await CreateAsync("AzureTable", [],
+            headers: ids.Select(id => Header(Uri.EscapeDataString(id))).ToArray());
+
+        Assert.Equal(ids[..3], await DrainAsync(context.Catalog.ListAsync(
+            new() { Prefix = new(prefix), MaxId = new(prefix + "/a/child") }, TestContext.Current.CancellationToken)));
+        Assert.Contains("JournalId eq 'tenant''one'", context.Native.Filter);
+        Assert.DoesNotContain("PartitionKey le", context.Native.Filter);
     }
 
     [Fact]
@@ -324,7 +599,7 @@ public sealed class JournalStorageCatalogTests
         var mapped = new List<string>();
         string[] keys =
         [
-            "current/tenant/z/wal", "legacy/tenant/z/wal", "current/tenant/a/chk.1",
+            "current/tenant/z/wal", "current/tenant/alias/wal", "current/tenant/a/chk.1",
             "current/tenant/a/wal", "current/other/x/wal", "invalid/wal", "default/wal",
         ];
         await using var context = await CreateAsync("S3", [], keys: keys, configureS3: options =>
@@ -334,8 +609,10 @@ public sealed class JournalStorageCatalogTests
                 mapped.Add(id.Value);
                 return $"current/{id.Value}";
             };
+            options.GetObjectKeyPrefix = id => $"current/{id.Value}/";
             options.TryParseJournalId = value => value switch
             {
+                "current/tenant/alias" => new JournalId("tenant/z"),
                 "invalid" => null,
                 "default" => default(JournalId),
                 _ => new JournalId(value[(value.IndexOf('/') + 1)..]),
@@ -346,6 +623,42 @@ public sealed class JournalStorageCatalogTests
             ["tenant/z", "tenant/a"],
             await DrainAsync(context.Catalog.ListAsync(new() { Prefix = new("tenant") }, TestContext.Current.CancellationToken)));
         Assert.Equal(["tenant/z", "tenant/z", "tenant/a"], mapped);
+        Assert.All(context.Native.Requests, request => Assert.Equal("current/tenant/", request.Prefix));
+    }
+
+    [Fact]
+    public async Task S3ListAsync_MaxIdDoesNotStopUnorderedDirectoryBucketTraversal()
+    {
+        await using var context = await CreateAsync("S3", ["tenant/z", "tenant/y", "tenant/a", "tenant/b"]);
+        context.Native.EmptyFirstPage = true;
+
+        Assert.Equal(["tenant/a", "tenant/b"], await DrainAsync(context.Catalog.ListAsync(
+            new() { Prefix = new("tenant"), MaxId = new("tenant/b") }, TestContext.Current.CancellationToken)));
+        Assert.Equal([0, 2, 2], context.Native.Requests.Select(request => request.ResultCount));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("current/tenant")]
+    public async Task S3ListAsync_CustomMappingRequiresValidExplicitPrefix(string? mappedPrefix)
+    {
+        await using var context = await CreateAsync("S3", [], keys: ["current/tenant/wal"], configureS3: options =>
+        {
+            options.GetObjectKey = id => "current/" + id.Value;
+            options.TryParseJournalId = key => new JournalId(key["current/".Length..]);
+            if (mappedPrefix is not null)
+            {
+                options.GetObjectKeyPrefix = _ => mappedPrefix;
+            }
+        });
+
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => DrainAsync(context.Catalog.ListAsync(
+            new() { Prefix = new("tenant") }, TestContext.Current.CancellationToken)));
+        Assert.Contains(nameof(S3JournalStorageOptions.GetObjectKeyPrefix), failure.Message);
+        Assert.Empty(context.Native.Requests);
+        Assert.Equal(["tenant"], await DrainAsync(context.Catalog.ListAsync(cancellationToken: TestContext.Current.CancellationToken)));
+        Assert.Null(Assert.Single(context.Native.Requests).Prefix);
     }
 
     [Theory]
@@ -500,9 +813,10 @@ public sealed class JournalStorageCatalogTests
                     {
                         var request = call.Arg<ListObjectsV2Request>();
                         Assert.Equal("journals", request.BucketName);
-                        Assert.Null(request.Prefix);
                         Assert.Null(request.StartAfter);
-                        var page = Native.Fetch(objects, request.ContinuationToken, request.MaxKeys, request.Prefix, call.Arg<CancellationToken>());
+                        var matching = objects.Where(item => request.Prefix is null
+                            || item.Key.StartsWith(request.Prefix, StringComparison.Ordinal)).ToArray();
+                        var page = Native.Fetch(matching, request.ContinuationToken, request.MaxKeys, request.Prefix, call.Arg<CancellationToken>());
                         return Task.FromResult(new ListObjectsV2Response
                         {
                             S3Objects = page.Values.ToList(),
@@ -567,7 +881,7 @@ public sealed class JournalStorageCatalogTests
         public NativePage<T> Fetch<T>(T[] records, string? cursor, int? maximum, string? prefix, CancellationToken cancellationToken)
         {
             var offset = cursor is null ? 0 : int.Parse(cursor.AsSpan("native:".Length), CultureInfo.InvariantCulture);
-            var count = cursor is null && EmptyFirstPage ? 0 : Math.Min(2, records.Length - offset);
+            var count = cursor is null && EmptyFirstPage ? 0 : Math.Min(Math.Min(2, maximum ?? 2), records.Length - offset);
             var next = offset + count < records.Length ? $"native:{offset + count}" : null;
             Requests.Add(new(cursor, maximum, prefix, cancellationToken, count, next));
             if (Requests.Count == FailureAtRequest && Failure is { } failure)
@@ -638,7 +952,8 @@ public sealed class JournalStorageCatalogTests
             Assert.Equal(BlobTraits.None, traits);
             Assert.Equal(BlobStates.None, states);
             return new FakePageable<BlobItem>(
-                state, records.Where(item => prefix is null || item.Name.StartsWith(prefix, StringComparison.Ordinal)).ToArray(),
+                state, records.Where(item => prefix is null || item.Name.StartsWith(prefix, StringComparison.Ordinal))
+                    .OrderBy(item => item.Name, StringComparer.Ordinal).ToArray(),
                 null, prefix, cancellationToken);
         }
     }
@@ -671,9 +986,9 @@ public sealed class JournalStorageCatalogTests
             state.Filter = filter;
             state.Select = select?.ToArray();
             Assert.Equal(1000, maxPerPage);
-            Assert.Equal(TableClient.CreateQueryFilter($"RowKey eq {AzureTableJournalStorage.HeaderRowKey}"), filter);
+            Assert.NotNull(filter);
             Assert.Equal([AzureTableJournalStorage.JournalIdPropertyName], Assert.IsType<string[]>(state.Select));
-            var values = records.Where(entity => entity.RowKey == AzureTableJournalStorage.HeaderRowKey).Select(entity =>
+            var values = records.Where(entity => MatchesFilter(entity, filter)).Select(entity =>
             {
                 var projected = new TableEntity(entity.PartitionKey, entity.RowKey);
                 if (entity.TryGetValue(AzureTableJournalStorage.JournalIdPropertyName, out var value))
@@ -684,6 +999,74 @@ public sealed class JournalStorageCatalogTests
                 return (T)(ITableEntity)projected;
             }).ToArray();
             return new FakePageable<T>(state, values, maxPerPage, null, cancellationToken);
+        }
+
+        private static bool MatchesFilter(TableEntity entity, string filter)
+        {
+            var tokens = Regex.Matches(filter, "'(?:[^']|'')*'|[()]|[^\\s()]+").Select(match => match.Value).ToArray();
+            var index = 0;
+            var result = ParseOr();
+            Assert.Equal(tokens.Length, index);
+            return result;
+
+            bool ParseOr()
+            {
+                var value = ParseAnd();
+                while (index < tokens.Length && tokens[index] == "or")
+                {
+                    index++;
+                    value |= ParseAnd();
+                }
+
+                return value;
+            }
+
+            bool ParseAnd()
+            {
+                var value = ParseComparison();
+                while (index < tokens.Length && tokens[index] == "and")
+                {
+                    index++;
+                    value &= ParseComparison();
+                }
+
+                return value;
+            }
+
+            bool ParseComparison()
+            {
+                if (tokens[index] == "(")
+                {
+                    index++;
+                    var value = ParseOr();
+                    Assert.Equal(")", tokens[index++]);
+                    return value;
+                }
+
+                var name = tokens[index++];
+                var operation = tokens[index++];
+                var expected = tokens[index++][1..^1].Replace("''", "'", StringComparison.Ordinal);
+                var actual = name switch
+                {
+                    "PartitionKey" => entity.PartitionKey,
+                    "RowKey" => entity.RowKey,
+                    _ => entity.GetString(name),
+                };
+                if (actual is null)
+                {
+                    return false;
+                }
+
+                var comparison = string.CompareOrdinal(actual, expected);
+                return operation switch
+                {
+                    "eq" => comparison == 0,
+                    "ge" => comparison >= 0,
+                    "le" => comparison <= 0,
+                    "lt" => comparison < 0,
+                    _ => throw new InvalidOperationException($"Unexpected filter operator: {operation}"),
+                };
+            }
         }
     }
 
