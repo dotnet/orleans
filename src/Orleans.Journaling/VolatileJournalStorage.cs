@@ -47,14 +47,16 @@ public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJ
 
     /// <inheritdoc/>
     public async IAsyncEnumerable<JournalId> ListAsync(
-        JournalId prefix = default,
+        ListOptions? options = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        List<JournalId> journalIds = [];
+        cancellationToken.ThrowIfCancellationRequested();
+        var prefix = options?.Prefix ?? default;
         foreach (var (key, store) in _storage)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!TryParseJournalId(key, out var journalId) || !prefix.IsPrefixOf(journalId))
+            var journalId = new JournalId(key);
+            if (!prefix.IsPrefixOf(journalId))
             {
                 continue;
             }
@@ -67,36 +69,16 @@ public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJ
                 }
             }
 
-            journalIds.Add(journalId);
-        }
-
-        journalIds.Sort(static (left, right) => StringComparer.Ordinal.Compare(left.Value, right.Value));
-
-        foreach (var journalId in journalIds)
-        {
             cancellationToken.ThrowIfCancellationRequested();
             yield return journalId;
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         await Task.CompletedTask.ConfigureAwait(false);
     }
 
     private string GetJournalFormatKey()
         => JournalFormatServices.ValidateJournalFormatKey(_options?.Value.JournalFormatKey ?? JsonJournalExtensions.JournalFormatKey);
-
-    private static bool TryParseJournalId(string value, out JournalId journalId)
-    {
-        try
-        {
-            journalId = new JournalId(value);
-            return true;
-        }
-        catch (ArgumentException)
-        {
-            journalId = default;
-            return false;
-        }
-    }
 }
 
 /// <summary>

@@ -79,16 +79,24 @@ public sealed class RedisJournalStorageTests
         await provider.CreateStorage(other).CreateIfNotExistsAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         var listed = await ToListAsync(
-            provider.ListAsync(JournalId.Create("redis", "list"), TestContext.Current.CancellationToken),
+            provider.ListAsync(
+                new ListOptions { Prefix = JournalId.Create("redis", "list") },
+                TestContext.Current.CancellationToken),
             TestContext.Current.CancellationToken);
-        Assert.Equal([idA, child, idB], listed);
+        Assert.Equal(3, listed.Count);
+        Assert.Equal(listed.Count, listed.Distinct().Count());
+        Assert.True(new HashSet<JournalId> { idA, child, idB }.SetEquals(listed));
 
         await provider.CreateStorage(idA).DeleteAsync(TestContext.Current.CancellationToken);
 
         listed = await ToListAsync(
-            provider.ListAsync(JournalId.Create("redis", "list"), TestContext.Current.CancellationToken),
+            provider.ListAsync(
+                new ListOptions { Prefix = JournalId.Create("redis", "list") },
+                TestContext.Current.CancellationToken),
             TestContext.Current.CancellationToken);
-        Assert.Equal([child, idB], listed);
+        Assert.Equal(2, listed.Count);
+        Assert.Equal(listed.Count, listed.Distinct().Count());
+        Assert.True(new HashSet<JournalId> { child, idB }.SetEquals(listed));
     }
 
     [Fact]

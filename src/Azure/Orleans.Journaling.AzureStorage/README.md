@@ -31,6 +31,16 @@ siloBuilder.AddAzureTableJournalStorage(options =>
 
 `AzureTableJournalStorageOptions.GetPartitionKey` can be used to apply a custom partition layout. The returned key must be unique per journal, satisfy Azure Table partition-key restrictions, and contain at most 1,024 characters. The canonical journal id is stored in the header so catalog listing remains accurate with custom mappings.
 
+## Catalog enumeration
+
+Both Azure providers implement `IJournalStorageCatalog.ListAsync`, returning identities incrementally in service traversal order. Set `ListOptions.Prefix` to enumerate an exact journal id and its descendants. The provider handles service continuations internally and yields identities from the current page before fetching the next page.
+
+The Blob catalog scans the configured `ContainerName` and interprets append blobs named `<journalId>/wal` as journal identities. This traversal applies equally when a custom naming delegate or container factory produces the same entries. Each internal page requests up to 5000 blobs, including checkpoints and other entries before filtering.
+
+Table enumeration supports custom partition mappings through the canonical journal id stored in each header. It requests up to 1000 header rows per service page; Table Storage determines the internal scan work required by that query. Prefix filtering occurs on the returned headers, so one enumerator advance can cross multiple empty or filtered pages.
+
+Use `await foreach` or dispose a retained enumerator when stopping early. Pass a cancellation token covering the traversal lifetime; cancellation and service errors propagate to the caller.
+
 ## Getting Started
 To use this package, install it via NuGet:
 

@@ -111,7 +111,7 @@ public partial class JournaledJobShardManagerTests
 
         Assert.Null(await storageProvider.CreateStorage(storageId).GetMetadataAsync(cancellationToken));
         Assert.Empty(await ToListAsync(storageProvider.ListAsync(
-            JobShardId.StoragePrefix,
+            new() { Prefix = JobShardId.StoragePrefix },
             cancellationToken), cancellationToken));
     }
 
@@ -645,8 +645,8 @@ public partial class JournaledJobShardManagerTests
 
         public IJournalStorage CreateStorage(JournalId journalId) => new CountingJournalStorage(this, _inner.CreateStorage(journalId));
 
-        public IAsyncEnumerable<JournalId> ListAsync(JournalId prefix = default, CancellationToken cancellationToken = default)
-            => _inner.ListAsync(prefix, cancellationToken);
+        public IAsyncEnumerable<JournalId> ListAsync(ListOptions? options = null, CancellationToken cancellationToken = default)
+            => _inner.ListAsync(options, cancellationToken);
 
         private async ValueTask OnAppendAsync(CancellationToken cancellationToken)
         {

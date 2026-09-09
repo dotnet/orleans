@@ -33,6 +33,25 @@ builder.UseOrleans(siloBuilder =>
 
 If the Redis connection is already registered in dependency injection, configure it using a keyed service and the `GrainJournaling` provider configuration `ServiceKey`.
 
+## Journal discovery
+
+Use `IJournalStorageCatalog.ListAsync` with optional `ListOptions` to filter by a journal id prefix:
+
+```csharp
+await foreach (var journalId in catalog.ListAsync(
+    new ListOptions { Prefix = JournalId.Create("jobs") },
+    cancellationToken))
+{
+    // Process the discovered journal.
+}
+```
+
+The prefix is read when enumeration begins. Discovery scans primary servers incrementally and reads canonical journal ids in batches of at most 128 metadata keys, yielding matching ids in traversal order without sorting or buffering the whole catalog. Duplicate ids are suppressed across the traversal using O(N) seen-id memory for N distinct matching ids; metadata keys are not retained for the whole traversal, so repeated scan results can cause repeated metadata reads.
+
+The Redis `SCAN COUNT` value of 250 is a hint, not a strict response-size or server-work bound. One enumerator advancement can traverse many empty or nonmatching scans, and Redis/client-side scan buffering is not bounded by the metadata batch size. Discovery observes live storage rather than a snapshot.
+
+Storage errors and cancellation propagate without provider-level retries, restarts, or success fallbacks. A disconnected primary or the absence of any primary is an error; failures on later servers can occur after earlier ids have been yielded. Dispose the enumerator when stopping early. Cancellation is checked between scan and metadata operations, but does not abort an in-flight Redis metadata request.
+
 ## Documentation
 
 - [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)

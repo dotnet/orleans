@@ -57,25 +57,31 @@ internal sealed class AzureTableJournalStorageProvider : ILifecycleParticipant<I
     }
 
     public async IAsyncEnumerable<JournalId> ListAsync(
-        JournalId prefix = default,
+        ListOptions? options = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        var prefix = options?.Prefix ?? default;
         var table = _tableClientProvider.GetTableClient();
         var filter = TableClient.CreateQueryFilter($"RowKey eq {AzureTableJournalStorage.HeaderRowKey}");
-        var journalIds = new List<JournalId>();
-        await foreach (var entity in table.QueryAsync<TableEntity>(filter, select: JournalIdSelect, cancellationToken: cancellationToken))
+        await foreach (var page in table.QueryAsync<TableEntity>(
+            filter,
+            maxPerPage: 1000,
+            select: JournalIdSelect,
+            cancellationToken: cancellationToken).AsPages(pageSizeHint: 1000))
         {
-            if (TryGetJournalId(entity, out var journalId) && prefix.IsPrefixOf(journalId))
+            cancellationToken.ThrowIfCancellationRequested();
+            foreach (var entity in page.Values)
             {
-                journalIds.Add(journalId);
+                cancellationToken.ThrowIfCancellationRequested();
+                if (TryGetJournalId(entity, out var journalId) && prefix.IsPrefixOf(journalId))
+                {
+                    yield return journalId;
+                }
             }
         }
 
-        foreach (var journalId in journalIds.OrderBy(static journalId => journalId.Value, StringComparer.Ordinal))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            yield return journalId;
-        }
+        cancellationToken.ThrowIfCancellationRequested();
     }
 
     private static bool TryGetJournalId(TableEntity entity, out JournalId journalId)

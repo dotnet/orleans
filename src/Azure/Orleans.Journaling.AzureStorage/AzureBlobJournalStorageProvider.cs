@@ -40,9 +40,10 @@ internal sealed class AzureBlobJournalStorageProvider : ILifecycleParticipant<IS
     private async Task Initialize(CancellationToken cancellationToken)
     {
         var client = await _options.CreateClient!(cancellationToken);
-        _defaultContainer = client.GetBlobContainerClient(_options.ContainerName);
-        await _defaultContainer.CreateIfNotExistsAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+        var container = client.GetBlobContainerClient(_options.ContainerName);
+        await container.CreateIfNotExistsAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
         await _containerFactory.InitializeAsync(client, cancellationToken).ConfigureAwait(false);
+        _defaultContainer = container;
     }
 
     public IJournalStorage CreateStorage(JournalId journalId)
@@ -56,40 +57,37 @@ internal sealed class AzureBlobJournalStorageProvider : ILifecycleParticipant<IS
     }
 
     public async IAsyncEnumerable<JournalId> ListAsync(
-        JournalId prefix = default,
+        ListOptions? options = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        var prefix = options?.Prefix ?? default;
         var container = GetDefaultContainerClient();
-        var blobPrefix = prefix.IsDefault ? null : prefix.Value;
-        var journalIds = new List<JournalId>();
-        await foreach (var item in container.GetBlobsAsync(
+
+        await foreach (var page in container.GetBlobsAsync(
             traits: BlobTraits.None,
             states: BlobStates.None,
-            prefix: blobPrefix,
-            cancellationToken: cancellationToken))
-        {
-            if (item.Properties.BlobType is { } blobType && blobType != BlobType.Append)
-            {
-                continue;
-            }
-
-            if (!item.Name.EndsWith("/wal", StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            var storageIdValue = item.Name[..^"/wal".Length];
-            if (TryParseJournalId(storageIdValue, out var journalId) && prefix.IsPrefixOf(journalId))
-            {
-                journalIds.Add(journalId);
-            }
-        }
-
-        foreach (var journalId in journalIds.OrderBy(static journalId => journalId.Value, StringComparer.Ordinal))
+            prefix: prefix.IsDefault ? null : prefix.Value,
+            cancellationToken: cancellationToken).AsPages(pageSizeHint: 5000))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            yield return journalId;
+            foreach (var item in page.Values)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (item.Properties.BlobType is { } blobType && blobType != BlobType.Append
+                    || !item.Name.EndsWith("/wal", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                if (TryParseJournalId(item.Name[..^"/wal".Length], out var journalId) && prefix.IsPrefixOf(journalId))
+                {
+                    yield return journalId;
+                }
+            }
         }
+
+        cancellationToken.ThrowIfCancellationRequested();
     }
 
     public void Participate(ISiloLifecycle observer)

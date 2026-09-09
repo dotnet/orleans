@@ -217,7 +217,7 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
             await provider.InitializeAsync(CancellationToken.None);
 
             var listed = new List<JournalId>();
-            await foreach (var journalId in provider.ListAsync(new JournalId("journals"), CancellationToken.None))
+            await foreach (var journalId in provider.ListAsync(new() { Prefix = new JournalId("journals") }, CancellationToken.None))
             {
                 listed.Add(journalId);
             }
@@ -254,7 +254,7 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
             await provider.InitializeAsync(CancellationToken.None);
 
             var listed = new List<JournalId>();
-            await foreach (var journalId in provider.ListAsync(new JournalId("journals"), CancellationToken.None))
+            await foreach (var journalId in provider.ListAsync(new() { Prefix = new JournalId("journals") }, CancellationToken.None))
             {
                 listed.Add(journalId);
             }
@@ -287,7 +287,7 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
             await provider.InitializeAsync(CancellationToken.None);
 
             var listed = new List<JournalId>();
-            await foreach (var journalId in provider.ListAsync(new JournalId("journals"), CancellationToken.None))
+            await foreach (var journalId in provider.ListAsync(new() { Prefix = new JournalId("journals") }, CancellationToken.None))
             {
                 listed.Add(journalId);
             }
@@ -1593,7 +1593,7 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task ListAsync_ReturnsSortedJournalIdsMatchingPrefix()
+    public async Task ListAsync_ReturnsJournalIdsMatchingPrefix()
     {
         EnsureDockerAvailable();
         var provider = CreateProvider();
@@ -1602,12 +1602,12 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
         await CreateStorage("other/beta").AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
 
         var listed = new List<JournalId>();
-        await foreach (var journalId in provider.ListAsync(new JournalId("journals"), CancellationToken.None))
+        await foreach (var journalId in provider.ListAsync(new() { Prefix = new JournalId("journals") }, CancellationToken.None))
         {
             listed.Add(journalId);
         }
 
-        Assert.Equal(["journals/alpha", "journals/zeta"], listed.Select(static id => id.Value));
+        Assert.Equal(["journals/alpha", "journals/zeta"], listed.Select(static id => id.Value).Order(StringComparer.Ordinal));
     }
 
     [Fact]

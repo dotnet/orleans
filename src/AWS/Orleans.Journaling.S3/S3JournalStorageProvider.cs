@@ -46,12 +46,13 @@ internal sealed class S3JournalStorageProvider : ILifecycleParticipant<ISiloLife
     }
 
     public async IAsyncEnumerable<JournalId> ListAsync(
-        JournalId prefix = default,
+        ListOptions? options = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        var prefix = options?.Prefix ?? default;
         var client = GetClient();
         var bucketName = GetBucketName();
-        var journalIds = new HashSet<JournalId>();
         string? continuationToken = null;
 
         do
@@ -60,30 +61,18 @@ internal sealed class S3JournalStorageProvider : ILifecycleParticipant<ISiloLife
                 new ListObjectsV2Request
                 {
                     BucketName = bucketName,
+                    MaxKeys = 1000,
                     ContinuationToken = continuationToken,
                 },
                 cancellationToken).ConfigureAwait(false);
 
+            cancellationToken.ThrowIfCancellationRequested();
             foreach (var item in response.S3Objects)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (!item.Key.EndsWith("/wal", StringComparison.Ordinal))
+                if (TryGetJournalId(item.Key, prefix, out var id))
                 {
-                    continue;
-                }
-
-                var storageIdValue = item.Key[..^"/wal".Length];
-                var journalId = _options.TryParseJournalId(storageIdValue);
-                if (journalId is not { IsDefault: false } id || !prefix.IsPrefixOf(id))
-                {
-                    continue;
-                }
-
-                var journalObjectKey = _options.GetObjectKeyForJournal(id);
-                var canonicalWalObjectKey = S3JournalStorageOptions.GetWalObjectKeyForJournal(id, journalObjectKey);
-                if (string.Equals(item.Key, canonicalWalObjectKey, StringComparison.Ordinal))
-                {
-                    journalIds.Add(id);
+                    yield return id;
                 }
             }
 
@@ -91,11 +80,26 @@ internal sealed class S3JournalStorageProvider : ILifecycleParticipant<ISiloLife
         }
         while (continuationToken is not null);
 
-        foreach (var journalId in journalIds.OrderBy(static journalId => journalId.Value, StringComparer.Ordinal))
+        cancellationToken.ThrowIfCancellationRequested();
+    }
+
+    private bool TryGetJournalId(string objectKey, JournalId prefix, out JournalId journalId)
+    {
+        if (objectKey.EndsWith("/wal", StringComparison.Ordinal)
+            && _options.TryParseJournalId(objectKey[..^"/wal".Length]) is { IsDefault: false } id
+            && prefix.IsPrefixOf(id))
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            yield return journalId;
+            var journalObjectKey = _options.GetObjectKeyForJournal(id);
+            var canonicalWalObjectKey = S3JournalStorageOptions.GetWalObjectKeyForJournal(id, journalObjectKey);
+            if (string.Equals(objectKey, canonicalWalObjectKey, StringComparison.Ordinal))
+            {
+                journalId = id;
+                return true;
+            }
         }
+
+        journalId = default;
+        return false;
     }
 
     public void Participate(ISiloLifecycle observer)

@@ -38,9 +38,9 @@ public sealed class VolatileJournalStorageProviderTests
         Assert.Equal("one", (await storageA.GetMetadataAsync(TestContext.Current.CancellationToken))!.Properties["owner"]);
 
         var listed = await ToListAsync(
-            provider.ListAsync(JournalId.Create("named", "logs"), TestContext.Current.CancellationToken),
+            provider.ListAsync(new() { Prefix = JournalId.Create("named", "logs") }, TestContext.Current.CancellationToken),
             TestContext.Current.CancellationToken);
-        Assert.Equal([idA, idChild, idB], listed);
+        Assert.Equal([idA, idChild, idB], listed.OrderBy(id => id.Value, StringComparer.Ordinal));
 
         Assert.NotNull(await provider.CreateStorage(idB).GetMetadataAsync(TestContext.Current.CancellationToken));
         Assert.Null(await provider.CreateStorage(JournalId.Create("named", "missing")).GetMetadataAsync(TestContext.Current.CancellationToken));
@@ -116,14 +116,14 @@ public sealed class VolatileJournalStorageProviderTests
         Assert.Equal(
             [storageId],
             await ToListAsync(
-                provider.ListAsync(storageId, TestContext.Current.CancellationToken),
+                provider.ListAsync(new() { Prefix = storageId }, TestContext.Current.CancellationToken),
                 TestContext.Current.CancellationToken));
 
         await storage.DeleteAsync(TestContext.Current.CancellationToken);
 
         Assert.Null(await storage.GetMetadataAsync(TestContext.Current.CancellationToken));
         Assert.Empty(await ToListAsync(
-            provider.ListAsync(storageId, TestContext.Current.CancellationToken),
+            provider.ListAsync(new() { Prefix = storageId }, TestContext.Current.CancellationToken),
             TestContext.Current.CancellationToken));
     }
 
