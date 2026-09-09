@@ -638,4 +638,247 @@ public sealed class RingRangeTests
             }
         });
     }
+
+    [Fact]
+    public void BoundaryValueAnalysis_RangeCreationAndProperties()
+    {
+        // 1. Empty range boundary
+        var empty = RingRange.Create(0, 0);
+        Assert.True(empty.IsEmpty);
+        Assert.False(empty.IsFull);
+        Assert.False(empty.IsWrapped);
+        Assert.Equal(0u, empty.Start);
+        Assert.Equal(0u, empty.End);
+        Assert.Equal(0u, empty.Size);
+        Assert.Equal(0.0f, empty.SizePercent);
+
+        // 2. Full range boundaries (Start == End > 0)
+        var fullBoundary1 = RingRange.Create(1, 1);
+        var fullBoundary2 = RingRange.Create(2, 2);
+        var fullBoundaryMax = RingRange.Create(uint.MaxValue, uint.MaxValue);
+        Assert.Equal(RingRange.Full, fullBoundary1);
+        Assert.Equal(RingRange.Full, fullBoundary2);
+        Assert.Equal(RingRange.Full, fullBoundaryMax);
+
+        foreach (var full in new[] { RingRange.Full, fullBoundary1, fullBoundary2, fullBoundaryMax })
+        {
+            Assert.False(full.IsEmpty);
+            Assert.True(full.IsFull);
+            Assert.True(full.IsWrapped);
+            Assert.Equal(0u, full.Start);
+            Assert.Equal(0u, full.End);
+            Assert.Equal(uint.MaxValue, full.Size);
+            Assert.Equal(100.0f, full.SizePercent);
+        }
+
+        // 3. FromPoint boundary cases (0, 1, 2, uint.MaxValue - 1, uint.MaxValue)
+        var p0 = RingRange.FromPoint(0);
+        Assert.Equal(uint.MaxValue, p0.Start);
+        Assert.Equal(0u, p0.End);
+        Assert.Equal(1u, p0.Size);
+        Assert.True(p0.IsWrapped);
+
+        var p1 = RingRange.FromPoint(1);
+        Assert.Equal(0u, p1.Start);
+        Assert.Equal(1u, p1.End);
+        Assert.Equal(1u, p1.Size);
+        Assert.False(p1.IsWrapped);
+
+        var pMax = RingRange.FromPoint(uint.MaxValue);
+        Assert.Equal(uint.MaxValue - 1, pMax.Start);
+        Assert.Equal(uint.MaxValue, pMax.End);
+        Assert.Equal(1u, pMax.Size);
+        Assert.False(pMax.IsWrapped);
+
+        // 4. Normal range boundaries
+        var minNormal = RingRange.Create(0, 1);
+        Assert.Equal(0u, minNormal.Start);
+        Assert.Equal(1u, minNormal.End);
+        Assert.Equal(1u, minNormal.Size);
+        Assert.False(minNormal.IsWrapped);
+
+        var maxNormal0 = RingRange.Create(0, uint.MaxValue);
+        Assert.Equal(0u, maxNormal0.Start);
+        Assert.Equal(uint.MaxValue, maxNormal0.End);
+        Assert.Equal(uint.MaxValue, maxNormal0.Size);
+        Assert.False(maxNormal0.IsWrapped);
+
+        var minNormalAtEnd = RingRange.Create(uint.MaxValue - 1, uint.MaxValue);
+        Assert.Equal(uint.MaxValue - 1, minNormalAtEnd.Start);
+        Assert.Equal(uint.MaxValue, minNormalAtEnd.End);
+        Assert.Equal(1u, minNormalAtEnd.Size);
+        Assert.False(minNormalAtEnd.IsWrapped);
+
+        // 5. Wrapped range boundaries
+        var minWrapped = RingRange.Create(uint.MaxValue, 0);
+        Assert.Equal(uint.MaxValue, minWrapped.Start);
+        Assert.Equal(0u, minWrapped.End);
+        Assert.Equal(1u, minWrapped.Size);
+        Assert.True(minWrapped.IsWrapped);
+
+        var maxWrapped1 = RingRange.Create(1, 0);
+        Assert.Equal(1u, maxWrapped1.Start);
+        Assert.Equal(0u, maxWrapped1.End);
+        Assert.Equal(uint.MaxValue, maxWrapped1.Size);
+        Assert.True(maxWrapped1.IsWrapped);
+
+        var maxWrapped2 = RingRange.Create(uint.MaxValue - 1, 0);
+        Assert.Equal(uint.MaxValue - 1, maxWrapped2.Start);
+        Assert.Equal(0u, maxWrapped2.End);
+        Assert.Equal(2u, maxWrapped2.Size);
+        Assert.True(maxWrapped2.IsWrapped);
+    }
+
+    [Fact]
+    public void BoundaryValueAnalysis_ContainsAndCompareTo()
+    {
+        uint[] points = [0, 1, 2, 10, 11, 20, 21, 100, uint.MaxValue - 1, uint.MaxValue];
+
+        // Empty range
+        foreach (var p in points)
+        {
+            Assert.False(RingRange.Empty.Contains(p));
+            if (p == 0)
+                Assert.Equal(1, RingRange.Empty.CompareTo(p));
+            else
+                Assert.Equal(-1, RingRange.Empty.CompareTo(p));
+        }
+
+        // Full range
+        foreach (var p in points)
+        {
+            Assert.True(RingRange.Full.Contains(p));
+            Assert.Equal(0, RingRange.Full.CompareTo(p));
+        }
+
+        // Normal range (10, 20]
+        var normal = RingRange.Create(10, 20);
+        Assert.False(normal.Contains(10)); // Start is exclusive
+        Assert.True(normal.Contains(11));
+        Assert.True(normal.Contains(20));  // End is inclusive
+        Assert.False(normal.Contains(21));
+        Assert.Equal(1, normal.CompareTo(0));
+        Assert.Equal(1, normal.CompareTo(10));
+        Assert.Equal(0, normal.CompareTo(11));
+        Assert.Equal(0, normal.CompareTo(20));
+        Assert.Equal(-1, normal.CompareTo(21));
+        Assert.Equal(-1, normal.CompareTo(uint.MaxValue));
+
+        // Wrapped range (uint.MaxValue - 1, 1]
+        var wrapped = RingRange.Create(uint.MaxValue - 1, 1);
+        Assert.False(wrapped.Contains(uint.MaxValue - 1)); // Start is exclusive
+        Assert.True(wrapped.Contains(uint.MaxValue));
+        Assert.True(wrapped.Contains(0));
+        Assert.True(wrapped.Contains(1));                  // End is inclusive
+        Assert.False(wrapped.Contains(2));
+        Assert.Equal(0, wrapped.CompareTo(0));
+        Assert.Equal(0, wrapped.CompareTo(1));
+        Assert.Equal(0, wrapped.CompareTo(uint.MaxValue));
+        Assert.Equal(-1, wrapped.CompareTo(2));
+        Assert.Equal(-1, wrapped.CompareTo(100));
+        Assert.Equal(-1, wrapped.CompareTo(uint.MaxValue - 1));
+    }
+
+    [Fact]
+    public void BoundaryValueAnalysis_TwoWrappedRangesIntersections()
+    {
+        // Double intersection when two wrapped ranges overlap in two distinct segments
+        // w1: (1000, 500] covers 1001..uint.MaxValue and 0..500
+        // w2: (2000, 1200] covers 2001..uint.MaxValue and 0..1200
+        var w1 = RingRange.Create(1000, 500);
+        var w2 = RingRange.Create(2000, 1200);
+
+        var intersections = w1.Intersections(w2).ToArray();
+        Assert.Equal(2, intersections.Length);
+        Assert.Equal(RingRange.Create(2000, 500), intersections[0]);
+        Assert.Equal(RingRange.Create(1000, 1200), intersections[1]);
+
+        // Symmetric check
+        var reversedIntersections = w2.Intersections(w1).ToArray();
+        Assert.Equal(2, reversedIntersections.Length);
+        Assert.Equal(RingRange.Create(2000, 500), reversedIntersections[0]);
+        Assert.Equal(RingRange.Create(1000, 1200), reversedIntersections[1]);
+    }
+
+    [Fact]
+    public void BoundaryValueAnalysis_TryFormat()
+    {
+        Span<char> smallBuffer = stackalloc char[1];
+        Span<char> largeBuffer = stackalloc char[128];
+
+        // Empty
+        Assert.False(((ISpanFormattable)RingRange.Empty).TryFormat(smallBuffer, out var written, default, null));
+        Assert.Equal(0, written);
+        Assert.True(((ISpanFormattable)RingRange.Empty).TryFormat(largeBuffer, out written, default, null));
+        Assert.Equal("(0, 0) 0.00%", largeBuffer[..written].ToString());
+
+        // Full
+        Assert.False(((ISpanFormattable)RingRange.Full).TryFormat(smallBuffer, out written, default, null));
+        Assert.Equal(0, written);
+        Assert.True(((ISpanFormattable)RingRange.Full).TryFormat(largeBuffer, out written, default, null));
+        Assert.Equal("(0, 0] (100.00%)", largeBuffer[..written].ToString());
+
+        // Normal
+        var normal = RingRange.Create(0, 1);
+        Assert.False(((ISpanFormattable)normal).TryFormat(smallBuffer, out written, default, null));
+        Assert.Equal(0, written);
+        Assert.True(((ISpanFormattable)normal).TryFormat(largeBuffer, out written, default, null));
+
+        // Wrapped
+        var wrapped = RingRange.Create(uint.MaxValue, 0);
+        Assert.False(((ISpanFormattable)wrapped).TryFormat(smallBuffer, out written, default, null));
+        Assert.Equal(0, written);
+        Assert.True(((ISpanFormattable)wrapped).TryFormat(largeBuffer, out written, default, null));
+    }
+
+    [Fact]
+    public void BoundaryValueAnalysis_CsCheckAllBoundaries()
+    {
+        var genBoundaryUint = Gen.OneOf(
+            Gen.Const(0u),
+            Gen.Const(1u),
+            Gen.Const(2u),
+            Gen.Const(uint.MaxValue - 1),
+            Gen.Const(uint.MaxValue),
+            Gen.UInt
+        );
+
+        var genBoundaryRange = Gen.Select(genBoundaryUint, genBoundaryUint, RingRange.Create);
+
+        Gen.Select(genBoundaryRange, genBoundaryUint).Sample((range, point) =>
+        {
+            // Verify size is correct and non-negative
+            Assert.True(range.Size <= uint.MaxValue);
+
+            // Verify contains logic matches boundary definition
+            var contains = range.Contains(point);
+            if (range.IsEmpty)
+            {
+                Assert.False(contains);
+            }
+            else if (range.IsFull)
+            {
+                Assert.True(contains);
+            }
+            else if (range.Start < range.End)
+            {
+                Assert.Equal(point > range.Start && point <= range.End, contains);
+            }
+            else
+            {
+                Assert.Equal(point > range.Start || point <= range.End, contains);
+            }
+
+            // Verify CompareTo contract
+            var cmp = range.CompareTo(point);
+            if (contains)
+            {
+                Assert.Equal(0, cmp);
+            }
+            else
+            {
+                Assert.NotEqual(0, cmp);
+            }
+        });
+    }
 }
