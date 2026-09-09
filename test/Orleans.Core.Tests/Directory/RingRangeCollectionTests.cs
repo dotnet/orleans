@@ -43,17 +43,17 @@ public sealed class RingRangeCollectionTests
         Assert.False(empty.IsDefault);
         Assert.True(empty.IsEmpty);
         Assert.False(empty.IsFull);
-        Assert.Equal(0u, empty.Size);
+        Assert.Equal(0UL, empty.Size);
         Assert.Equal(0f, empty.SizePercent);
 
         Assert.False(full.IsEmpty);
         Assert.True(full.IsFull);
-        Assert.Equal(uint.MaxValue, full.Size);
+        Assert.Equal(1UL << 32, full.Size);
         Assert.Equal(100f, full.SizePercent);
 
         Assert.False(partial.IsEmpty);
         Assert.False(partial.IsFull);
-        Assert.Equal(20u, partial.Size);
+        Assert.Equal(20UL, partial.Size);
     }
 
     [Fact]
@@ -150,6 +150,19 @@ public sealed class RingRangeCollectionTests
     }
 
     [Fact]
+    public void Difference_ReturnsMissingPointWhenRangeBecomesFull()
+    {
+        var previous = Create(RingRange.Create(0, uint.MaxValue));
+        var current = Create(RingRange.Full);
+
+        var growth = current.Difference(previous);
+
+        Assert.Equal(RingRange.FromPoint(0), Assert.Single(growth));
+        Assert.Equal(1UL, growth.Size);
+        Assert.True(previous.Difference(current).IsEmpty);
+    }
+
+    [Fact]
     public void Difference_PreservesSortOrderWhenWrappedRangeGrowthMovesToTheFront()
     {
         var previous = Create(RingRange.Create(10, 20), RingRange.Create(100, 5));
@@ -198,6 +211,36 @@ public sealed class RingRangeCollectionTests
 
         Assert.Equal(RingRangeCollection.Empty, emptyWithExplicitRange);
         Assert.NotEqual(first, RingRangeCollection.Empty);
+    }
+
+    [Fact]
+    public void Equality_EmptyRepresentationsShareHashCode()
+    {
+        RingRangeCollection[] collections =
+        [
+            default,
+            RingRangeCollection.Empty,
+            new(ImmutableArray.Create(RingRange.Empty))
+        ];
+
+        foreach (var collection in collections)
+        {
+            Assert.Equal(RingRangeCollection.Empty, collection);
+            Assert.Equal(RingRangeCollection.Empty.GetHashCode(), collection.GetHashCode());
+        }
+
+        Assert.Single(new HashSet<RingRangeCollection>(collections));
+    }
+
+    [Fact]
+    public void Enumeration_DefaultCollectionIsEmpty()
+    {
+        var collection = default(RingRangeCollection);
+        var enumerator = collection.GetEnumerator();
+
+        Assert.False(enumerator.MoveNext());
+        Assert.Empty((IEnumerable<RingRange>)collection);
+        Assert.Empty((IEnumerable)collection);
     }
 
     [Fact]
@@ -282,7 +325,7 @@ public sealed class RingRangeCollectionTests
         Assert.True(defaultCol.IsDefault);
         Assert.True(defaultCol.IsEmpty);
         Assert.False(defaultCol.IsFull);
-        Assert.Equal(0u, defaultCol.Size);
+        Assert.Equal(0UL, defaultCol.Size);
         Assert.Equal(0.0f, defaultCol.SizePercent);
         Assert.False(defaultCol.Contains(0));
         Assert.False(defaultCol.Contains(uint.MaxValue));
@@ -295,7 +338,7 @@ public sealed class RingRangeCollectionTests
         Assert.False(emptyCol.IsDefault);
         Assert.True(emptyCol.IsEmpty);
         Assert.False(emptyCol.IsFull);
-        Assert.Equal(0u, emptyCol.Size);
+        Assert.Equal(0UL, emptyCol.Size);
         Assert.Equal(0.0f, emptyCol.SizePercent);
         Assert.False(emptyCol.Contains(0));
         Assert.False(emptyCol.Intersects(RingRange.Full));
@@ -308,7 +351,7 @@ public sealed class RingRangeCollectionTests
         Assert.False(fullCol.IsDefault);
         Assert.False(fullCol.IsEmpty);
         Assert.True(fullCol.IsFull);
-        Assert.Equal(uint.MaxValue, fullCol.Size);
+        Assert.Equal(1UL << 32, fullCol.Size);
         Assert.Equal(100.0f, fullCol.SizePercent);
 
         uint[] samplePoints = [0, 1, 2, uint.MaxValue - 1, uint.MaxValue];
@@ -324,24 +367,50 @@ public sealed class RingRangeCollectionTests
     [Fact]
     public void BoundaryValueAnalysis_SizingAndOverflow()
     {
-        // Single range excluding 1 point: Size is uint.MaxValue, but IsFull must be false
+        // The almost-full range covers every point except 1.
         var almostFull = Create(RingRange.Create(1, 0));
-        Assert.Equal(uint.MaxValue, almostFull.Size);
+        Assert.Equal((ulong)uint.MaxValue, almostFull.Size);
         Assert.False(almostFull.IsFull);
 
-        // Combination of non-overlapping ranges that exactly covers the ring
+        // Together, the two non-overlapping ranges cover all 2^32 points.
         var half1 = RingRange.Create(0, 2_147_483_647u);
         var half2 = RingRange.Create(2_147_483_647u, 0);
 
         var fullCombined = Create(half1, half2);
         Assert.True(fullCombined.IsFull);
-        Assert.Equal(uint.MaxValue, fullCombined.Size);
+        Assert.Equal(1UL << 32, half1.Size + half2.Size);
+        Assert.Equal(1UL << 32, fullCombined.Size);
 
-        // Multiple ranges with a gap: IsFull must be false
+        // A five-point gap reduces the covered point count by five.
         var withGap1 = RingRange.Create(0, 100);
         var withGap2 = RingRange.Create(105, 0);
         var collectionWithGap = Create(withGap1, withGap2);
+        Assert.Equal((1UL << 32) - 5, collectionWithGap.Size);
         Assert.False(collectionWithGap.IsFull);
+    }
+
+    [Theory]
+    [InlineData(0u)]
+    [InlineData(1u)]
+    [InlineData(2u)]
+    [InlineData((1u << 31) - 1)]
+    [InlineData(1u << 31)]
+    [InlineData(uint.MaxValue - 1)]
+    [InlineData(uint.MaxValue)]
+    public void Size_CountsComplementaryRangesAtBoundaries(uint point)
+    {
+        var singlePoint = RingRange.FromPoint(point);
+        var almostFull = Create(singlePoint.Complement());
+        var full = Create(singlePoint, singlePoint.Complement());
+
+        Assert.Equal(1UL, Create(singlePoint).Size);
+        Assert.Equal((1UL << 32) - 1, almostFull.Size);
+        Assert.False(almostFull.IsFull);
+        Assert.False(almostFull.Contains(point));
+        Assert.Equal(1UL << 32, full.Size);
+        Assert.True(full.IsFull);
+        Assert.True(full.Contains(point));
+        Assert.Equal(100f, full.SizePercent);
     }
 
     [Fact]
@@ -412,23 +481,38 @@ public sealed class RingRangeCollectionTests
     {
         GenRingRangeCollection.Sample(collection =>
         {
-            if (collection.IsEmpty)
-            {
-                Assert.Equal(0u, collection.Size);
-                Assert.False(collection.IsFull);
-            }
-            else
-            {
-                long expectedSum = 0;
-                foreach (var r in collection.Ranges)
-                {
-                    expectedSum += r.Size;
-                }
+            var expectedSize = collection.Ranges.Aggregate(0UL, static (sum, range) => sum + RingRangeTests.GetExpectedSize(range));
 
-                uint expectedSize = expectedSum >= uint.MaxValue ? uint.MaxValue : (uint)expectedSum;
-                Assert.Equal(expectedSize, collection.Size);
-                Assert.Equal(expectedSize == uint.MaxValue, collection.IsFull);
-            }
+            Assert.InRange(expectedSize, 0UL, 1UL << 32);
+            Assert.Equal(expectedSize, collection.Size);
+            Assert.Equal(expectedSize == 1UL << 32, collection.IsFull);
+            Assert.Equal(expectedSize * (100.0f / (1UL << 32)), collection.SizePercent);
+        });
+    }
+
+    [Fact]
+    public void Property_SizeCountsFullPartitionsAndSinglePointGaps()
+    {
+        Gen.Select(RingRangeTests.GenBoundaryPoint.Array[Gen.Int[0, 12]], RingRangeTests.GenBoundaryPoint).Sample((points, missingPoint) =>
+        {
+            var boundaries = points.Append(0u).Distinct().Order().ToArray();
+            var ranges = boundaries.Length == 1
+                ? new[] { RingRange.Full }
+                : boundaries.Select((start, index) => RingRange.Create(start, boundaries[(index + 1) % boundaries.Length])).ToArray();
+            var full = Create(ranges);
+
+            Assert.Equal(1UL << 32, ranges.Aggregate(0UL, static (sum, range) => sum + range.Size));
+            Assert.Equal(1UL << 32, full.Size);
+            Assert.True(full.IsFull);
+            Assert.True(full.Contains(missingPoint));
+
+            var gap = RingRange.FromPoint(missingPoint);
+            var almostFull = Create(ranges.SelectMany(range => range.Difference(gap)).ToArray());
+
+            Assert.Equal((1UL << 32) - 1, almostFull.Size);
+            Assert.False(almostFull.IsFull);
+            Assert.False(almostFull.Contains(missingPoint));
+            Assert.Equal(1UL, full.Size - almostFull.Size);
         });
     }
 

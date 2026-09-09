@@ -16,6 +16,14 @@ public sealed class RingRangeTests
 {
     internal static Gen<RingRange> GenRingRange => Gen.Select(Gen.UInt, Gen.UInt, RingRange.Create);
 
+    internal static Gen<uint> GenBoundaryPoint => Gen.OneOf(
+        Gen.Const(0u),
+        Gen.Const(1u),
+        Gen.Const(2u),
+        Gen.Const(uint.MaxValue - 1),
+        Gen.Const(uint.MaxValue),
+        Gen.UInt);
+
     [Fact]
     public void RingRangeDifference_EquallyDividedRange()
     {
@@ -173,8 +181,7 @@ public sealed class RingRangeTests
             previous = range;
         }
 
-        var expectedSum = count == 1 ? uint.MaxValue : (ulong)uint.MaxValue + 1;
-        Assert.Equal(expectedSum, sum);
+        Assert.Equal(1UL << 32, sum);
     }
 
     private static RingRange CreateEquallyDividedRange(int count, int index)
@@ -302,6 +309,9 @@ public sealed class RingRangeTests
         }
     }
 
+    internal static ulong GetExpectedSize(RingRange range) =>
+        ToIntervals(range).Aggregate(0UL, static (sum, interval) => sum + ((ulong)interval.End - interval.Start + 1));
+
     private static RingRange FromInclusiveInterval(uint start, uint end)
     {
         if (start == 0 && end == uint.MaxValue)
@@ -319,7 +329,7 @@ public sealed class RingRangeTests
         var range0 = RingRange.FromPoint(0);
         Assert.Equal(uint.MaxValue, range0.Start);
         Assert.Equal(0u, range0.End);
-        Assert.Equal(1u, range0.Size);
+        Assert.Equal(1UL, range0.Size);
         Assert.False(range0.IsEmpty);
         Assert.False(range0.IsFull);
         Assert.True(range0.IsWrapped);
@@ -331,7 +341,7 @@ public sealed class RingRangeTests
         var range1 = RingRange.FromPoint(1);
         Assert.Equal(0u, range1.Start);
         Assert.Equal(1u, range1.End);
-        Assert.Equal(1u, range1.Size);
+        Assert.Equal(1UL, range1.Size);
         Assert.False(range1.IsEmpty);
         Assert.False(range1.IsFull);
         Assert.False(range1.IsWrapped);
@@ -343,7 +353,7 @@ public sealed class RingRangeTests
         var range42 = RingRange.FromPoint(42);
         Assert.Equal(41u, range42.Start);
         Assert.Equal(42u, range42.End);
-        Assert.Equal(1u, range42.Size);
+        Assert.Equal(1UL, range42.Size);
         Assert.True(range42.Contains(42));
         Assert.False(range42.Contains(41));
         Assert.False(range42.Contains(43));
@@ -352,7 +362,7 @@ public sealed class RingRangeTests
         var rangeMax = RingRange.FromPoint(uint.MaxValue);
         Assert.Equal(uint.MaxValue - 1, rangeMax.Start);
         Assert.Equal(uint.MaxValue, rangeMax.End);
-        Assert.Equal(1u, rangeMax.Size);
+        Assert.Equal(1UL, rangeMax.Size);
         Assert.True(rangeMax.Contains(uint.MaxValue));
         Assert.False(rangeMax.Contains(uint.MaxValue - 1));
         Assert.False(rangeMax.Contains(0));
@@ -372,7 +382,7 @@ public sealed class RingRangeTests
         Gen.Select(Gen.UInt, Gen.UInt).Sample((point, other) =>
         {
             var range = RingRange.FromPoint(point);
-            Assert.Equal(1u, range.Size);
+            Assert.Equal(1UL, range.Size);
             Assert.False(range.IsEmpty);
             Assert.False(range.IsFull);
             Assert.True(range.Contains(point));
@@ -385,7 +395,7 @@ public sealed class RingRangeTests
 
             var complement = range.Complement();
             Assert.False(complement.Contains(point));
-            Assert.Equal(uint.MaxValue, complement.Size);
+            Assert.Equal((ulong)uint.MaxValue, complement.Size);
         });
     }
 
@@ -421,29 +431,39 @@ public sealed class RingRangeTests
     [Fact]
     public void RingRange_SizeAndPercent_CsCheckProperty()
     {
-        Gen.Select(Gen.UInt, Gen.UInt).Sample((start, end) =>
+        Gen.Select(GenBoundaryPoint, GenBoundaryPoint).Sample((start, end) =>
         {
             var range = RingRange.Create(start, end);
-            ulong expectedSize;
-            if (start == end)
-            {
-                expectedSize = start == 0 ? 0UL : uint.MaxValue;
-            }
-            else if (start < end)
-            {
-                expectedSize = (ulong)end - start;
-            }
-            else
-            {
-                expectedSize = (ulong)uint.MaxValue - start + end + 1;
-            }
+            var expectedSize = GetExpectedSize(range);
 
-            Assert.Equal((uint)expectedSize, range.Size);
-            Assert.Equal((float)(expectedSize * (100.0f / uint.MaxValue)), range.SizePercent);
+            Assert.Equal(expectedSize, range.Size);
+            Assert.Equal(expectedSize * (100.0f / (1UL << 32)), range.SizePercent);
             Assert.Equal(start == 0 && end == 0, range.IsEmpty);
             Assert.Equal(start == end && start != 0, range.IsFull);
             Assert.Equal(start >= end && start != 0, range.IsWrapped);
         });
+    }
+
+    [Theory]
+    [InlineData(0u, 0u, 0UL)]
+    [InlineData(1u, 1u, 1UL << 32)]
+    [InlineData(uint.MaxValue, uint.MaxValue, 1UL << 32)]
+    [InlineData(0u, 1u, 1UL)]
+    [InlineData(uint.MaxValue, 0u, 1UL)]
+    [InlineData(uint.MaxValue - 1, 0u, 2UL)]
+    [InlineData(0u, 1u << 31, 1UL << 31)]
+    [InlineData(1u << 31, 0u, 1UL << 31)]
+    [InlineData(0u, uint.MaxValue - 1, (1UL << 32) - 2)]
+    [InlineData(2u, 0u, (1UL << 32) - 2)]
+    [InlineData(0u, uint.MaxValue, (1UL << 32) - 1)]
+    [InlineData(1u, 0u, (1UL << 32) - 1)]
+    public void Size_CountsCoveredPointsAtBoundaries(uint start, uint end, ulong expectedSize)
+    {
+        var range = RingRange.Create(start, end);
+
+        Assert.Equal(expectedSize, range.Size);
+        Assert.Equal((1UL << 32) - expectedSize, range.Complement().Size);
+        Assert.Equal(expectedSize == 1UL << 32, range.IsFull);
     }
 
     [Fact]
@@ -625,17 +645,14 @@ public sealed class RingRangeTests
     [Fact]
     public void RingRange_Complement_CsCheckProperty()
     {
-        Gen.Select(GenRingRange, Gen.UInt).Sample((r, p) =>
+        var genRange = Gen.Select(GenBoundaryPoint, GenBoundaryPoint, RingRange.Create);
+        Gen.Select(genRange, GenBoundaryPoint).Sample((r, p) =>
         {
             var comp = r.Complement();
             Assert.Equal(r, comp.Complement());
-
-            if (!r.IsEmpty && !r.IsFull)
-            {
-                Assert.True(r.Contains(p) ^ comp.Contains(p));
-                Assert.Equal((ulong)uint.MaxValue + 1, (ulong)r.Size + comp.Size);
-                Assert.False(r.Intersects(comp));
-            }
+            Assert.True(r.Contains(p) ^ comp.Contains(p));
+            Assert.Equal(1UL << 32, r.Size + comp.Size);
+            Assert.False(r.Intersects(comp));
         });
     }
 
@@ -649,7 +666,7 @@ public sealed class RingRangeTests
         Assert.False(empty.IsWrapped);
         Assert.Equal(0u, empty.Start);
         Assert.Equal(0u, empty.End);
-        Assert.Equal(0u, empty.Size);
+        Assert.Equal(0UL, empty.Size);
         Assert.Equal(0.0f, empty.SizePercent);
 
         // 2. Full range boundaries (Start == End > 0)
@@ -667,7 +684,7 @@ public sealed class RingRangeTests
             Assert.True(full.IsWrapped);
             Assert.Equal(0u, full.Start);
             Assert.Equal(0u, full.End);
-            Assert.Equal(uint.MaxValue, full.Size);
+            Assert.Equal(1UL << 32, full.Size);
             Assert.Equal(100.0f, full.SizePercent);
         }
 
@@ -675,57 +692,57 @@ public sealed class RingRangeTests
         var p0 = RingRange.FromPoint(0);
         Assert.Equal(uint.MaxValue, p0.Start);
         Assert.Equal(0u, p0.End);
-        Assert.Equal(1u, p0.Size);
+        Assert.Equal(1UL, p0.Size);
         Assert.True(p0.IsWrapped);
 
         var p1 = RingRange.FromPoint(1);
         Assert.Equal(0u, p1.Start);
         Assert.Equal(1u, p1.End);
-        Assert.Equal(1u, p1.Size);
+        Assert.Equal(1UL, p1.Size);
         Assert.False(p1.IsWrapped);
 
         var pMax = RingRange.FromPoint(uint.MaxValue);
         Assert.Equal(uint.MaxValue - 1, pMax.Start);
         Assert.Equal(uint.MaxValue, pMax.End);
-        Assert.Equal(1u, pMax.Size);
+        Assert.Equal(1UL, pMax.Size);
         Assert.False(pMax.IsWrapped);
 
         // 4. Normal range boundaries
         var minNormal = RingRange.Create(0, 1);
         Assert.Equal(0u, minNormal.Start);
         Assert.Equal(1u, minNormal.End);
-        Assert.Equal(1u, minNormal.Size);
+        Assert.Equal(1UL, minNormal.Size);
         Assert.False(minNormal.IsWrapped);
 
         var maxNormal0 = RingRange.Create(0, uint.MaxValue);
         Assert.Equal(0u, maxNormal0.Start);
         Assert.Equal(uint.MaxValue, maxNormal0.End);
-        Assert.Equal(uint.MaxValue, maxNormal0.Size);
+        Assert.Equal((ulong)uint.MaxValue, maxNormal0.Size);
         Assert.False(maxNormal0.IsWrapped);
 
         var minNormalAtEnd = RingRange.Create(uint.MaxValue - 1, uint.MaxValue);
         Assert.Equal(uint.MaxValue - 1, minNormalAtEnd.Start);
         Assert.Equal(uint.MaxValue, minNormalAtEnd.End);
-        Assert.Equal(1u, minNormalAtEnd.Size);
+        Assert.Equal(1UL, minNormalAtEnd.Size);
         Assert.False(minNormalAtEnd.IsWrapped);
 
         // 5. Wrapped range boundaries
         var minWrapped = RingRange.Create(uint.MaxValue, 0);
         Assert.Equal(uint.MaxValue, minWrapped.Start);
         Assert.Equal(0u, minWrapped.End);
-        Assert.Equal(1u, minWrapped.Size);
+        Assert.Equal(1UL, minWrapped.Size);
         Assert.True(minWrapped.IsWrapped);
 
         var maxWrapped1 = RingRange.Create(1, 0);
         Assert.Equal(1u, maxWrapped1.Start);
         Assert.Equal(0u, maxWrapped1.End);
-        Assert.Equal(uint.MaxValue, maxWrapped1.Size);
+        Assert.Equal((ulong)uint.MaxValue, maxWrapped1.Size);
         Assert.True(maxWrapped1.IsWrapped);
 
         var maxWrapped2 = RingRange.Create(uint.MaxValue - 1, 0);
         Assert.Equal(uint.MaxValue - 1, maxWrapped2.Start);
         Assert.Equal(0u, maxWrapped2.End);
-        Assert.Equal(2u, maxWrapped2.Size);
+        Assert.Equal(2UL, maxWrapped2.Size);
         Assert.True(maxWrapped2.IsWrapped);
     }
 
@@ -834,21 +851,12 @@ public sealed class RingRangeTests
     [Fact]
     public void BoundaryValueAnalysis_CsCheckAllBoundaries()
     {
-        var genBoundaryUint = Gen.OneOf(
-            Gen.Const(0u),
-            Gen.Const(1u),
-            Gen.Const(2u),
-            Gen.Const(uint.MaxValue - 1),
-            Gen.Const(uint.MaxValue),
-            Gen.UInt
-        );
+        var genBoundaryRange = Gen.Select(GenBoundaryPoint, GenBoundaryPoint, RingRange.Create);
 
-        var genBoundaryRange = Gen.Select(genBoundaryUint, genBoundaryUint, RingRange.Create);
-
-        Gen.Select(genBoundaryRange, genBoundaryUint).Sample((range, point) =>
+        Gen.Select(genBoundaryRange, GenBoundaryPoint).Sample((range, point) =>
         {
-            // Verify size is correct and non-negative
-            Assert.True(range.Size <= uint.MaxValue);
+            Assert.InRange(range.Size, 0UL, 1UL << 32);
+            Assert.Equal(GetExpectedSize(range), range.Size);
 
             // Verify contains logic matches boundary definition
             var contains = range.Contains(point);

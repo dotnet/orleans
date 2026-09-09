@@ -175,7 +175,9 @@ public sealed class DirectoryMembershipSnapshotTests
                 var allRanges = new List<RingRange>();
                 foreach (var member in snapshot.Members)
                 {
-                    Assert.Equal(snapshot.GetMemberRanges(member).Sum(range => (long)range.Size), snapshot.GetMemberRangesByPartition(member).Sum(range => (long)range.Size));
+                    Assert.Equal(
+                        snapshot.GetMemberRanges(member).Aggregate(0UL, static (sum, range) => sum + range.Size),
+                        snapshot.GetMemberRangesByPartition(member).Aggregate(0UL, static (sum, range) => sum + range.Size));
                     foreach (var range in snapshot.GetMemberRanges(member))
                     {
                         allRanges.Add(range);
@@ -183,10 +185,11 @@ public sealed class DirectoryMembershipSnapshotTests
                     }
                 }
 
-                Assert.True(sum >= uint.MaxValue);
+                Assert.Equal(1UL << 32, sum);
 
                 var allRangesCollection = RingRangeCollection.Create(allRanges);
 
+                Assert.Equal(1UL << 32, allRangesCollection.Size);
                 Assert.Equal(100f, allRangesCollection.SizePercent);
                 Assert.False(allRangesCollection.IsEmpty);
                 Assert.False(allRangesCollection.IsDefault);
@@ -212,8 +215,9 @@ public sealed class DirectoryMembershipSnapshotTests
                     }
                 }
 
-                Assert.True(sum >= uint.MaxValue);
+                Assert.Equal(1UL << 32, sum);
                 var allRangesCollection = RingRangeCollection.Create(allRanges);
+                Assert.Equal(1UL << 32, allRangesCollection.Size);
                 Assert.Equal(100f, allRangesCollection.SizePercent);
                 Assert.False(allRangesCollection.IsEmpty);
                 Assert.False(allRangesCollection.IsDefault);

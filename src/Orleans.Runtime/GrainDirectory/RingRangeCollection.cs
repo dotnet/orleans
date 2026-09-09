@@ -62,33 +62,12 @@ internal readonly struct RingRangeCollection : IEquatable<RingRangeCollection>, 
 
     public bool IsEmpty => Ranges.IsDefaultOrEmpty || Ranges.All(static r => r.IsEmpty);
 
-    public bool IsFull
-    {
-        get
-        {
-            if (Ranges.IsDefaultOrEmpty)
-            {
-                return false;
-            }
+    public bool IsFull => Size == RingRange.Full.Size;
 
-            if (Ranges.Length == 1)
-            {
-                return Ranges[0].IsFull;
-            }
-
-            for (var i = 0; i < Ranges.Length - 1; i++)
-            {
-                if (Ranges[i].End != Ranges[i + 1].Start)
-                {
-                    return false;
-                }
-            }
-
-            return Ranges[^1].End == Ranges[0].Start;
-        }
-    }
-
-    public uint Size
+    /// <summary>
+    /// Gets the total number of points covered by the non-overlapping ranges, from zero to 2^32.
+    /// </summary>
+    public ulong Size
     {
         get
         {
@@ -97,17 +76,17 @@ internal readonly struct RingRangeCollection : IEquatable<RingRangeCollection>, 
                 return 0;
             }
 
-            long sum = 0;
+            ulong sum = 0;
             foreach (var range in Ranges)
             {
                 sum += range.Size;
             }
 
-            return sum >= uint.MaxValue ? uint.MaxValue : (uint)sum;
+            return sum;
         }
     }
 
-    public float SizePercent => Size * (100.0f / uint.MaxValue);
+    public float SizePercent => Size * (100.0f / RingRange.Full.Size);
 
     public bool Contains(GrainId grainId) => Contains(grainId.GetUniformHashCode());
 
@@ -247,20 +226,22 @@ internal readonly struct RingRangeCollection : IEquatable<RingRangeCollection>, 
 
     public override int GetHashCode()
     {
-        var result = new HashCode();
-        result.Add(Ranges.IsDefault ? 0 : Ranges.Length);
-        if (!Ranges.IsDefaultOrEmpty)
+        if (IsEmpty)
         {
-            foreach (var range in Ranges)
-            {
-                result.Add(range);
-            }
+            return 0;
+        }
+
+        var result = new HashCode();
+        result.Add(Ranges.Length);
+        foreach (var range in Ranges)
+        {
+            result.Add(range);
         }
 
         return result.ToHashCode();
     }
 
-    public ImmutableArray<RingRange>.Enumerator GetEnumerator() => Ranges.IsDefault ? default : Ranges.GetEnumerator();
+    public ImmutableArray<RingRange>.Enumerator GetEnumerator() => Ranges.IsDefault ? ImmutableArray<RingRange>.Empty.GetEnumerator() : Ranges.GetEnumerator();
 
     public override string ToString() => $"{this}";
     string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString();
