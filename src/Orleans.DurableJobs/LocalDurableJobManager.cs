@@ -22,8 +22,6 @@ namespace Orleans.DurableJobs;
 internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobManager, ILocalDurableJobManagerSystemTarget, ILifecycleParticipant<ISiloLifecycle>
 {
     internal static readonly GrainType JobManagerGrainType = SystemTargetGrainId.CreateGrainType("job-manager");
-    private static readonly TimeSpan ShardLoadLookaheadPeriod = TimeSpan.FromMinutes(10);
-    private static readonly TimeSpan ShardCheckInterval = TimeSpan.FromMinutes(5);
 
     private readonly JobShardManager _shardManager;
     private readonly ShardExecutor _shardExecutor;
@@ -372,7 +370,7 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
     {
         await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding | ConfigureAwaitOptions.ContinueOnCapturedContext);
 
-        using var timer = new PeriodicTimer(ShardCheckInterval, _timeProvider);
+        using var timer = new PeriodicTimer(_options.ShardCheckInterval, _timeProvider);
 
         var timerTask = timer.WaitForNextTickAsync(_cts.Token).AsTask();
         var signalTask = _shardCheckSignal.WaitAsync(_cts.Token);
@@ -446,7 +444,7 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
         // Compute the slow-start budget for this turn.
         var budget = ComputeClaimBudget();
 
-        var shards = await _shardManager.DiscoverJobShardsAsync(now.Add(ShardLoadLookaheadPeriod), budget, cancellationToken);
+        var shards = await _shardManager.DiscoverJobShardsAsync(now.Add(_options.ShardLoadLookaheadPeriod), budget, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
 
         // Count newly claimed shards (those not already in our cache)

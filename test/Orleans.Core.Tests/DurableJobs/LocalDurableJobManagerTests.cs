@@ -92,8 +92,10 @@ public class LocalDurableJobManagerTests
         Assert.False(accessor.TryGetRunningShardTask(shard.Id, out _));
     }
 
-    [Fact]
-    public async Task PeriodicDiscovery_RetainsMembershipSignalDuringSweepAndRestartsOnTimer()
+    [Theory]
+    [InlineData(null)]
+    [InlineData(2)]
+    public async Task PeriodicDiscovery_RetainsMembershipSignalDuringSweepAndRestartsOnTimer(int? checkIntervalMinutes)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
@@ -102,6 +104,12 @@ public class LocalDurableJobManagerTests
         var finishSweep = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var membershipSweep = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var periodicSweep = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var options = CreateOptions();
+        if (checkIntervalMinutes is { } minutes)
+        {
+            options.ShardCheckInterval = TimeSpan.FromMinutes(minutes);
+        }
+
         var calls = 0;
         shardManager.DiscoverShards = async (_, _, token) =>
         {
@@ -125,7 +133,7 @@ public class LocalDurableJobManagerTests
 
             return [];
         };
-        var manager = CreateManager(shardManager, timeProvider, CreateOptions());
+        var manager = CreateManager(shardManager, timeProvider, options);
         var accessor = new LocalDurableJobManager.TestAccessor(manager);
         var lifecycle = new SiloLifecycleSubject(NullLogger<SiloLifecycleSubject>.Instance);
         manager.Participate(lifecycle);
@@ -139,7 +147,7 @@ public class LocalDurableJobManagerTests
             await membershipSweep.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
             Assert.Equal(3, Volatile.Read(ref calls));
 
-            timeProvider.Advance(TimeSpan.FromMinutes(5));
+            timeProvider.Advance(TimeSpan.FromMinutes(checkIntervalMinutes ?? 5));
             await periodicSweep.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
             Assert.Equal(4, Volatile.Read(ref calls));
         }
@@ -147,6 +155,32 @@ public class LocalDurableJobManagerTests
         {
             await lifecycle.OnStop(cancellationToken).WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
         }
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(0)]
+    [InlineData(23)]
+    public async Task Discovery_UsesConfiguredLookahead(int? lookaheadMinutes)
+    {
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var shardManager = new TestJobShardManager();
+        var options = CreateOptions();
+        if (lookaheadMinutes is { } minutes)
+        {
+            options.ShardLoadLookaheadPeriod = TimeSpan.FromMinutes(minutes);
+        }
+
+        var manager = CreateManager(shardManager, timeProvider, options);
+        var accessor = new LocalDurableJobManager.TestAccessor(manager);
+        var expectedLookahead = TimeSpan.FromMinutes(lookaheadMinutes ?? 10);
+
+        await accessor.ProcessShardCheckCycleAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(timeProvider.GetUtcNow().Add(expectedLookahead), shardManager.LastMaxDueTime);
+
+        timeProvider.Advance(TimeSpan.FromMinutes(1));
+        await accessor.ProcessShardCheckCycleAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(timeProvider.GetUtcNow().Add(expectedLookahead), shardManager.LastMaxDueTime);
     }
 
     [Fact]
