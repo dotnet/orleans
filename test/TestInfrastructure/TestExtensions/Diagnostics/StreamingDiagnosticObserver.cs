@@ -18,8 +18,12 @@ namespace TestExtensions;
 /// </remarks>
 public sealed class StreamingDiagnosticObserver : IDisposable
 {
+    private const int DiagnosticHistoryLimit = 16;
     private readonly IConnectableObservable<StreamingEvents.StreamingEvent> _events;
     private readonly IDisposable _connection;
+    private readonly object _diagnosticsLock = new();
+    private readonly Dictionary<(StreamId StreamId, Guid SubscriptionId, string Provider), Queue<StreamingEvents.StreamingEvent>> _subscriptionDiagnostics = [];
+    private bool _disposed;
 
     /// <summary>
     /// Creates a new instance of the observer and starts listening for streaming diagnostic events.
@@ -31,11 +35,19 @@ public sealed class StreamingDiagnosticObserver : IDisposable
     public static StreamingDiagnosticObserver Create(SiloAddress siloAddress) => new(DiagnosticObserverSiloScope.For(siloAddress));
 
     private StreamingDiagnosticObserver(DiagnosticObserverSiloScope scope)
+        : this(scope, StreamingEvents.AllEvents)
     {
-        _events = StreamingEvents.AllEvents
+    }
+
+    internal StreamingDiagnosticObserver(
+        DiagnosticObserverSiloScope scope,
+        IObservable<StreamingEvents.StreamingEvent> events)
+    {
+        _events = events
             .Where(e => e is StreamingEvents.ItemDelivered delivered
                 ? scope.Matches(delivered.SiloAddress, delivered.ClusterId)
                 : scope.Matches(e.SiloAddress))
+            .Do(RecordSubscriptionDiagnostic)
             .Replay();
         _connection = _events.Connect();
     }
@@ -409,48 +421,72 @@ public sealed class StreamingDiagnosticObserver : IDisposable
     }
 
     /// <summary>
-    /// Summarizes the most recent lifecycle events for one subscription.
+    /// Summarizes up to 16 of the most recent lifecycle events for one subscription.
     /// </summary>
     public string GetSubscriptionDiagnostics(StreamId streamId, Guid subscriptionId, string streamProvider)
     {
-        var recent = new Queue<string>();
-        using var subscription = _events.Subscribe(value =>
+        StreamingEvents.StreamingEvent[] recent;
+        lock (_diagnosticsLock)
         {
-            var entry = value switch
+            if (!_subscriptionDiagnostics.TryGetValue((streamId, subscriptionId, streamProvider), out var history))
             {
-                StreamingEvents.MessageDeliveryFailed failed
-                    when MatchesSubscription(failed.StreamId, failed.SubscriptionId, failed.StreamProvider, streamId, subscriptionId, streamProvider)
-                    => $"Delivery failed on {failed.SiloAddress} to {failed.Consumer} at {failed.SequenceToken}: {failed.Exception}",
-                StreamingEvents.SubscriptionUnregistration unregister
-                    when MatchesSubscription(unregister.StreamId, unregister.SubscriptionId, unregister.StreamProvider, streamId, subscriptionId, streamProvider)
-                    => $"Unregistration {unregister.Stage} on {unregister.SiloAddress} for {unregister.Consumer}: {unregister.Exception}",
-                StreamingEvents.SubscriptionUnregistered unregistered
-                    when MatchesSubscription(unregistered.StreamId, unregistered.SubscriptionId, unregistered.StreamProvider, streamId, subscriptionId, streamProvider)
-                    => $"Durably unregistered on {unregistered.SiloAddress}",
-                StreamingEvents.SubscriptionAttached attached
-                    when MatchesSubscription(attached.StreamId, attached.SubscriptionId, attached.StreamProvider, streamId, subscriptionId, streamProvider)
-                    => $"Attached on {attached.SiloAddress} to {attached.ConsumerGrainId}",
-                StreamingEvents.ConsumerCursorDrained drained
-                    when MatchesSubscription(drained.StreamId, drained.SubscriptionId, drained.StreamProvider, streamId, subscriptionId, streamProvider)
-                    => $"Cursor drained on {drained.SiloAddress}",
-                _ => null,
-            };
-            if (entry is not null)
-            {
-                lock (recent)
-                {
-                    if (recent.Count == 16)
-                    {
-                        recent.Dequeue();
-                    }
-
-                    recent.Enqueue(entry);
-                }
+                return "No matching lifecycle events were observed.";
             }
-        });
-        lock (recent)
+
+            recent = history.ToArray();
+        }
+
+        return string.Join(Environment.NewLine, recent.Select(static value => value switch
         {
-            return recent.Count == 0 ? "No matching lifecycle events were observed." : string.Join(Environment.NewLine, recent);
+            StreamingEvents.MessageDeliveryFailed failed
+                => $"Delivery failed on {failed.SiloAddress} to {failed.Consumer} at {failed.SequenceToken}: {failed.Exception}",
+            StreamingEvents.SubscriptionUnregistration unregister
+                => $"Unregistration {unregister.Stage} on {unregister.SiloAddress} for {unregister.Consumer}: {unregister.Exception}",
+            StreamingEvents.SubscriptionUnregistered unregistered
+                => $"Durably unregistered on {unregistered.SiloAddress}",
+            StreamingEvents.SubscriptionAttached attached
+                => $"Attached on {attached.SiloAddress} to {attached.ConsumerGrainId}",
+            StreamingEvents.ConsumerCursorDrained drained
+                => $"Cursor drained on {drained.SiloAddress}",
+            _ => throw new InvalidOperationException("Unexpected subscription diagnostic event."),
+        }));
+    }
+
+    private void RecordSubscriptionDiagnostic(StreamingEvents.StreamingEvent value)
+    {
+        (StreamId StreamId, Guid SubscriptionId, string Provider)? key = value switch
+        {
+            StreamingEvents.MessageDeliveryFailed failed => (failed.StreamId, failed.SubscriptionId, failed.StreamProvider),
+            StreamingEvents.SubscriptionUnregistration unregister => (unregister.StreamId, unregister.SubscriptionId, unregister.StreamProvider),
+            StreamingEvents.SubscriptionUnregistered unregistered => (unregistered.StreamId, unregistered.SubscriptionId, unregistered.StreamProvider),
+            StreamingEvents.SubscriptionAttached attached => (attached.StreamId, attached.SubscriptionId, attached.StreamProvider),
+            StreamingEvents.ConsumerCursorDrained drained => (drained.StreamId, drained.SubscriptionId, drained.StreamProvider),
+            _ => null,
+        };
+        if (key is not { } subscriptionKey)
+        {
+            return;
+        }
+
+        lock (_diagnosticsLock)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            if (!_subscriptionDiagnostics.TryGetValue(subscriptionKey, out var history))
+            {
+                history = new Queue<StreamingEvents.StreamingEvent>(DiagnosticHistoryLimit);
+                _subscriptionDiagnostics.Add(subscriptionKey, history);
+            }
+
+            if (history.Count == DiagnosticHistoryLimit)
+            {
+                history.Dequeue();
+            }
+
+            history.Enqueue(value);
         }
     }
 
@@ -591,7 +627,16 @@ public sealed class StreamingDiagnosticObserver : IDisposable
     }
 
     /// <inheritdoc/>
-    public void Dispose() => _connection.Dispose();
+    public void Dispose()
+    {
+        lock (_diagnosticsLock)
+        {
+            _disposed = true;
+            _subscriptionDiagnostics.Clear();
+        }
+
+        _connection.Dispose();
+    }
 }
 
 /// <summary>
