@@ -86,6 +86,26 @@ The directory's existing RPCs carry `MembershipVersion`. Its adapter requires th
 
 The simple provider rejects a refresh request for an epoch it does not serve. A host can then report an authority mismatch explicitly instead of trying to repair it by refreshing an unrelated membership counter.
 
+### Atomic register-backed views
+
+`RegisteredClusterServiceViewProvider` supports explicit placement changes while cluster membership stays fixed. Its `RegisteredServiceViewId` identifies the logical service, authority namespace, and revision. `RegisteredClusterServiceView` publishes configuration, eligible silo incarnations, resources, ownership, and the membership watermark together. Ordinal resource identities and sorted participants give independent observers the same canonical representation. Forward ownership and frozen per-owner resource sets are constructed together.
+
+`AzureBlobClusterServiceViewRegister` provides the concrete authority. One blob on an Azure Storage primary endpoint contains the complete snapshot. A single content download returns both that snapshot and its ETag. Initial publication uses `If-None-Match: *`; replacement uses `If-Match` with the observed ETag. Concurrent proposals against the same token have one winner. The ETag governs conditional publication, the service revision orders placement, and an external fence governs resource effects.
+
+The host provisions a container and a distinct blob for each service authority, supplies primary-endpoint authentication, and constructs the provider with that service's membership source and participation policy. Dynamic opt-in and opt-out enter the published participant set. Writers validate participants against the required membership observation before committing a proposal; readers install the published mapping atomically.
+
+Each successful proposal records the actual register predecessor. Polling readers can skip revisions and still distinguish an ordinary handoff from recovery. Repeated identical observations preserve the installed view. A conflicting definition for an existing identity, regressed revision, removed initialized register, or changed authority terminates that provider with an explicit error. Recreating an authority requires a new namespace and a coordinated bootstrap/fencing policy.
+
+`RefreshLivenessAsync` advances membership knowledge independently of placement. A newly dead owner becomes unavailable in the installed mapping; assigning its resources to a replacement requires another conditional publication. Refresh waits for an adequate authoritative view, and cancellation belongs to the individual waiter. Provider failure and disposal release pending waits with the corresponding terminal outcome.
+
+### Reference resource ownership
+
+`ResourceOwnershipConsumer` drives the typed gates for a finite set of service resources. Its caller feeds installed provider views into `InstallViewAsync`. The consumer compares local owned sets, synchronously registers transitions, and then exposes the new local assignment. A service implements `IResourceOwnershipProtocol` for checkpoint/replay, peer transport, and recipient-enforced external fencing.
+
+A continuous move requests the predecessor's retained state after its release has drained. Missing continuity, including skipped A -> B -> A placement, selects recovery. The destination installs state and acquires an external fence before opening admission. Requests and snapshot replies are tied to a receiver identity and view, and the consumer rechecks those identities after waits. A delayed response therefore cannot populate a replacement receiver.
+
+The reference consumer makes the service-specific recovery and effect boundary explicit. Its protocol implementation supplies the durable recovery source and enforces fencing at the recipient of writes or other effects. Transition failures retain their original fault and keep the resource gated through terminal shutdown.
+
 ### Configuration changes within a view stream
 
 A concrete service view can include operating settings, state-format information, or administrative metadata, all identified by the same view ID.
@@ -104,6 +124,9 @@ Admission policy belongs to the service's operation contract. Another service co
 | `ClusterServiceTopology` | Deterministic range assignment and owner lookup. |
 | `IClusterServiceViewProvider<TViewId, TView>` | Per-service contract for current views, view updates, refresh, and lifecycle. |
 | `MembershipBasedClusterServiceViewProvider` | Project membership into service views within a configured provider epoch. |
+| `RegisteredClusterServiceViewProvider` and `RegisteredClusterServiceView` | Publish and observe explicit canonical placement with authoritative lineage and independent membership liveness. |
+| `AzureBlobClusterServiceViewRegister` | Read atomic primary-blob snapshots and conditionally publish their replacements. |
+| `ResourceOwnershipConsumer` | Apply local finite-resource differences, drain receivers, transfer or recover state, and establish external fencing. |
 | `TransitionGate<TViewId>` and its acquisition, release, and barrier types | Own atomic transition progress, readiness, failure, and shutdown. |
 | `ResourceTransitionGateMap<TResourceId, TViewId>` and `RangeTransitionGateMap<TViewId>` | Associate resource identities or ring ranges with relevant blocking gates. |
 | `DirectoryAcquisition`, `DirectoryRelease`, `DirectoryBarrier`, and `DirectoryTransitions` | Bind typed ownership coordination to the directory's scheduler and lifecycle. |
@@ -295,12 +318,34 @@ These helpers are internal runtime code. Another service using them needs to def
 
 For a finite resource set, a view publishes the resource-to-owner map together with immutable owner-to-resource sets. The local adapter compares its previous and current owned sets: resources removed from the set begin release, and resources added to it begin acquisition. Expected local comparison work is `O(|oldOwned| + |newOwned|)`. Constructing both immutable indexes is view-production work and traverses the full assignment separately.
 
+## Measured coordination costs
+
+A bounded comparison used the original extraction at commit `232a96ca0353281e2e29e5361cb2e1447b093ce3` and the typed-gate implementation, compiled in Release with BenchmarkDotNet 0.15.6 on .NET 10.0.12, x64, on a shared Windows virtual machine. The old coordinator and topology bodies were compiled unchanged apart from namespace isolation. Short runs used three warmups and three measurement iterations.
+
+| Measured operation | Original | Typed-gate implementation | Allocated bytes, original -> current |
+| --- | ---: | ---: | ---: |
+| Version check, unblocked range selection, completed `ValueTask` | 20.02 ns | 20.50 ns | 0 -> 0 |
+| Blocked range selection, last of 16 gates | 80.99 ns | 79.61 ns | 0 -> 0 |
+| Acquisition creation, registration, state/fence progression, completion and maintenance | 123.60 ns | 151.62 ns | 240 -> 224 |
+| Owner query over 1,024 partitions, one output partner | 5,390 ns | 121 ns | 0 -> 0 |
+| Ring construction, 128 silos and eight partitions per silo | 26.90 microseconds | 27.25 microseconds | 68,920 -> 68,920 |
+
+One million unblocked calls per implementation completed synchronously and allocated zero bytes. These measurements cover coordination selection and completion; request dispatch, grain runtime-context checks, asynchronous wakeups, and transport remain outside the measured operation. The small unblocked timing difference supports an allocation/completion comparison, rather than a production throughput claim.
+
+The complete acquisition ownership graph grows from three objects / 200 bytes to four objects / 224 bytes. The additional monitor is 24 bytes per gate. Isolated monitor allocation measured 5.06 ns and uncontended enter/exit measured 19.94 ns. Role progression pays this synchronization cost on the transition path. Optimized, warmed construction allocates 224 bytes; a cold-tier audit observed 288 bytes because generic struct argument checks can box before optimization.
+
+The narrow ring query counted nine binary-search probes and one owner callback, compared with 1,024 baseline candidates. Full-ring queries emit every owner. This measures partner discovery; registration extraction from the directory's entry store has its own cost.
+
+For a registered view with 1,024 resources, 64 participants, and 16 locally owned resources, local set comparison visited 32 entries, found one release and one acquisition, and allocated zero bytes at approximately 407 ns. Constructing the complete immutable view and both indexes allocated 492,704 bytes at approximately 469 microseconds. The resource timings had wide confidence intervals on the shared machine and indicate scale rather than latency guarantees. Publication work and local comparison are accounted for separately.
+
 ## Source map and executable protocol scenarios
 
 The provider contract and directory integration are developed in [the cluster-service implementation PR](https://github.com/dotnet/orleans/pull/10969/files). Start with these files:
 
 - `ClusterServices\IClusterServiceViewProvider.cs`, `ClusterServiceView.cs`, `ClusterServiceViewId.cs`, and `MembershipBasedClusterServiceViewProvider.cs`: generic contracts, membership view payload, authority-scoped identity, and membership projection.
 - `ClusterServices\ClusterServiceTopology.cs`, `TransitionGate.cs`, `ResourceTransitionGateMap.cs`, and `RangeTransitionGateMap.cs`: assignment lookup, typed progress, and resource-to-gate associations.
+- `ClusterServices\RegisteredClusterServiceView.cs`, `RegisteredClusterServiceViewProvider.cs`, `IClusterServiceViewRegister.cs`, and `ResourceOwnershipConsumer.cs`: authoritative publication, immutable resource indexes, provider lifecycle, and the reference state-transition consumer.
+- `Azure\Orleans.Persistence.AzureStorage\AzureBlobClusterServiceViewRegister.cs`: primary-blob snapshot encoding and conditional publication.
 - `GrainDirectory\DirectoryTransitions.cs`: sealed directory gate bindings.
 - `GrainDirectory\DirectoryMembershipService.cs` and `DirectoryMembershipSnapshot.cs`: the membership-version wire adapter and provider lifetime boundary.
 - `GrainDirectory\DistributedGrainDirectory.cs`, `GrainDirectoryPartition.cs`, and `GrainDirectoryPartition.Interface.cs`: invocation, recovery watermark, state transfer, admission, and fencing.
