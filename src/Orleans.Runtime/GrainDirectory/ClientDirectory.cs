@@ -57,7 +57,8 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
     private ImmutableHashSet<GrainId> _localClients = ImmutableHashSet<GrainId>.Empty;
     private ImmutableDictionary<GrainId, List<GrainAddress>> _currentSnapshot = ImmutableDictionary<GrainId, List<GrainAddress>>.Empty;
     private ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId> ConnectedClients, long Version)> _table = ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId> ConnectedClients, long Version)>.Empty;
-    private volatile ImmutableDictionary<SiloAddress, object> _pendingRefreshes = ImmutableDictionary<SiloAddress, object>.Empty;
+    private volatile ImmutableDictionary<(GrainId GrainId, SiloAddress SiloAddress), object> _pendingRefreshes =
+        ImmutableDictionary<(GrainId, SiloAddress), object>.Empty;
 
     // For synchronization with remote silos.
     private Task? _nextPublishTask;
@@ -167,9 +168,9 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
             {
                 foreach (var route in clientRoutes)
                 {
-                    if (pendingRefreshes.ContainsKey(route.SiloAddress!))
+                    if (pendingRefreshes.ContainsKey((grainId, route.SiloAddress!)))
                     {
-                        clientRoutes = clientRoutes.FindAll(candidate => !pendingRefreshes.ContainsKey(candidate.SiloAddress!));
+                        clientRoutes = clientRoutes.FindAll(candidate => !pendingRefreshes.ContainsKey((grainId, candidate.SiloAddress!)));
                         break;
                     }
                 }
@@ -204,7 +205,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
                 {
                     if (!route.SiloAddress!.Equals(_localSilo))
                     {
-                        pending[route.SiloAddress] = token;
+                        pending[(grainId, route.SiloAddress)] = token;
                     }
                 }
 
@@ -236,7 +237,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
 
                 // A cached candidate excluded by TryLocalLookup has a pending owner refresh.
                 var candidate = candidates.FirstOrDefault(candidate =>
-                    _pendingRefreshes.TryGetValue(candidate.SiloAddress!, out var pendingToken)
+                    _pendingRefreshes.TryGetValue((grainId, candidate.SiloAddress!), out var pendingToken)
                     && (!attemptedRefreshes.TryGetValue(candidate.SiloAddress!, out var attemptedToken)
                         || !ReferenceEquals(attemptedToken, pendingToken)));
                 if (candidate is null)
@@ -250,7 +251,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
                 }
 
                 silo = candidate.SiloAddress!;
-                token = _pendingRefreshes[silo];
+                token = _pendingRefreshes[(grainId, silo)];
                 attemptedRefreshes[silo] = token;
                 versionVector = _table.ToImmutableDictionary(e => e.Key, e => e.Value.Version);
             }
@@ -265,9 +266,9 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
 
                     // Keep the versioned row while refreshing: a same-version response confirms it,
                     // and a delayed response only completes the invalidation which initiated its read.
-                    if (_pendingRefreshes.TryGetValue(silo, out var currentToken) && ReferenceEquals(currentToken, token))
+                    if (_pendingRefreshes.TryGetValue((grainId, silo), out var currentToken) && ReferenceEquals(currentToken, token))
                     {
-                        _pendingRefreshes = _pendingRefreshes.Remove(silo);
+                        _pendingRefreshes = _pendingRefreshes.Remove((grainId, silo));
                     }
                 }
             }
@@ -392,8 +393,6 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
                 var silo = member.SiloAddress;
                 if (member.Status.IsTerminating())
                 {
-                    _pendingRefreshes = _pendingRefreshes.Remove(silo);
-
                     // Remove the silo only if it is in the table. This prevents us from rebuilding data structures unnecessarily.
                     if (_table.ContainsKey(silo))
                     {
@@ -446,6 +445,12 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
                 }
 
                 _currentSnapshot = clientsBuilder.ToImmutable();
+                if (_pendingRefreshes.Count > 0)
+                {
+                    // Retire invalidations along with the client routes removed from the versioned table.
+                    _pendingRefreshes = _pendingRefreshes.RemoveRange(_pendingRefreshes.Keys.Where(key =>
+                        !_table.TryGetValue(key.SiloAddress, out var owner) || !owner.ConnectedClients.Contains(key.GrainId)));
+                }
             }
         }
     }
