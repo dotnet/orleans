@@ -364,7 +364,7 @@ public sealed class JournalStorageCatalogTests
     [InlineData(true)]
     public async Task AzureBlobListAsync_TimePrefixedNamespaceStopsBeforeFuturePages(bool hasExactPrefixJournal)
     {
-        const string prefix = "jobs/shards/v2";
+        const string prefix = "jobs/shards";
         const string overdue = prefix + "/20250101T0000000000000Z-11111111111111111111111111111111";
         const string due = prefix + "/20260909T2100000000000Z-22222222222222222222222222222222";
         const string maximum = prefix + "/20260909T2100000000000Z~";
@@ -543,7 +543,7 @@ public sealed class JournalStorageCatalogTests
     [Fact]
     public async Task AzureTableListAsync_PushesDownBoundsWithoutLosingCustomOrLegacyHeaders()
     {
-        const string prefix = "jobs/shards/v2";
+        const string prefix = "jobs/shards";
         const string due = prefix + "/20260909-a";
         const string maximum = prefix + "/20260909~";
         const string future = prefix + "/20260910-a";
