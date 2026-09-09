@@ -142,14 +142,16 @@ public class PartitionedStreamSequenceToken : EventSequenceTokenV2, IPartitioned
             rightStart++;
         }
 
-        var leftIsNumeric = left[leftStart..].All(char.IsAsciiDigit);
-        var rightIsNumeric = right[rightStart..].All(char.IsAsciiDigit);
+        var leftValue = left.AsSpan(leftStart);
+        var rightValue = right.AsSpan(rightStart);
+        var leftIsNumeric = IsNumeric(leftValue);
+        var rightIsNumeric = IsNumeric(rightValue);
         if (leftIsNumeric && rightIsNumeric)
         {
-            var lengthComparison = (left.Length - leftStart).CompareTo(right.Length - rightStart);
+            var lengthComparison = leftValue.Length.CompareTo(rightValue.Length);
             return lengthComparison != 0
                 ? lengthComparison
-                : left.AsSpan(leftStart).SequenceCompareTo(right.AsSpan(rightStart));
+                : leftValue.SequenceCompareTo(rightValue);
         }
 
         return string.CompareOrdinal(left, right);
@@ -164,8 +166,21 @@ public class PartitionedStreamSequenceToken : EventSequenceTokenV2, IPartitioned
         }
 
         var value = position.AsSpan(start);
-        return value.Length == 0 || value.IndexOfAnyExceptInRange('0', '9') < 0
+        return IsNumeric(value)
             ? string.GetHashCode(value, StringComparison.Ordinal)
             : StringComparer.Ordinal.GetHashCode(position);
+    }
+
+    private static bool IsNumeric(ReadOnlySpan<char> value)
+    {
+        foreach (var character in value)
+        {
+            if (!char.IsAsciiDigit(character))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 }
