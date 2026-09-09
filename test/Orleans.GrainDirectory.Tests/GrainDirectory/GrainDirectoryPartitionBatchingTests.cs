@@ -60,6 +60,7 @@ public sealed class GrainDirectoryPartitionBatchingTests
         var ranges = GrainDirectoryPartition.GetActivationQueryRanges(RingRange.Full).ToArray();
 
         Assert.True(ranges.Length > 1);
+        Assert.Equal(1UL << 32, ranges.Aggregate(0UL, static (sum, range) => sum + range.Size));
         AssertRangePartition(RingRange.Full, ranges);
         AssertBalancedRanges(ranges);
     }
@@ -70,7 +71,7 @@ public sealed class GrainDirectoryPartitionBatchingTests
         Assert.All(ranges, static candidate => Assert.False(candidate.IsEmpty));
         Assert.Equal(range.Start, ranges[0].Start);
         Assert.Equal(range.End, ranges[^1].End);
-        Assert.Equal(GetRangeSize(range), ranges.Aggregate(0UL, static (sum, range) => sum + GetRangeSize(range)));
+        Assert.Equal(range.Size, ranges.Aggregate(0UL, static (sum, range) => sum + range.Size));
 
         for (var i = 1; i < ranges.Length; i++)
         {
@@ -80,20 +81,8 @@ public sealed class GrainDirectoryPartitionBatchingTests
 
     private static void AssertBalancedRanges(RingRange[] ranges)
     {
-        var sizes = ranges.Select(GetRangeSize).ToArray();
+        var sizes = ranges.Select(static range => range.Size).ToArray();
 
         Assert.True(sizes.Max() - sizes.Min() <= 1);
-    }
-
-    private static ulong GetRangeSize(RingRange range)
-    {
-        if (range.IsFull)
-        {
-            return (ulong)uint.MaxValue + 1;
-        }
-
-        return range.IsWrapped
-            ? (ulong)uint.MaxValue - range.Start + range.End + 1
-            : range.Size;
     }
 }

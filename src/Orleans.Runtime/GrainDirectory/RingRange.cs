@@ -52,9 +52,9 @@ internal readonly struct RingRange : IEquatable<RingRange>, ISpanFormattable, IC
     public static RingRange FromPoint(uint point) => new(unchecked(point - 1), point);
 
     /// <summary>
-    /// Gets the size of the range.
+    /// Gets the number of points covered by the range, from zero to 2^32 for a full ring.
     /// </summary>
-    public uint Size
+    public ulong Size
     {
         get
         {
@@ -64,14 +64,14 @@ internal readonly struct RingRange : IEquatable<RingRange>, ISpanFormattable, IC
                 if (_start == 0) return 0;
 
                 // Full
-                return uint.MaxValue;
+                return (ulong)uint.MaxValue + 1;
             }
 
             // Normal
             if (_end > _start) return _end - _start;
 
             // Wrapped
-            return uint.MaxValue - _start + _end;
+            return (ulong)uint.MaxValue - _start + _end + 1;
         }
     }
 
@@ -136,7 +136,7 @@ internal readonly struct RingRange : IEquatable<RingRange>, ISpanFormattable, IC
         return num > Start || num <= End;
     }
 
-    public float SizePercent => Size * (100.0f / uint.MaxValue);
+    public float SizePercent => Size * (100.0f / Full.Size);
 
     public bool Equals(RingRange other) => _start == other._start && _end == other._end;
 

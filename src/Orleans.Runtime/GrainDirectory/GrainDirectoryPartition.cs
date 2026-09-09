@@ -995,7 +995,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
             yield break;
         }
 
-        var totalSize = GetRangeCoverageSize(range);
+        var totalSize = range.Size;
         queryRangeCount = (int)Math.Min((ulong)queryRangeCount, totalSize);
         if (queryRangeCount == 1)
         {
@@ -1011,18 +1011,6 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
             var end = unchecked((uint)((ulong)start + size));
             yield return RingRange.Create(start, end);
             start = end;
-        }
-
-        static ulong GetRangeCoverageSize(RingRange range)
-        {
-            if (range.IsFull)
-            {
-                return (ulong)uint.MaxValue + 1;
-            }
-
-            return range.IsWrapped
-                ? (ulong)uint.MaxValue - range.Start + range.End + 1
-                : range.Size;
         }
     }
 
