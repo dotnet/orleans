@@ -108,7 +108,7 @@ public sealed class TransitionGateMapTests
         Assert.Same(failure, await Assert.ThrowsAsync<ApplicationException>(() => wait));
         Assert.Throws<InvalidOperationException>(() => map.Add("selected", new ViewBarrier<long>(2)));
 
-        failed.Abort();
+        failed.Abort(TestContext.Current.CancellationToken);
         map.Prune("selected");
         Assert.Equal("other", Assert.Single(entries).Key);
         Assert.False(map.IsBlocked("selected", 2));
@@ -252,7 +252,7 @@ public sealed class TransitionGateMapTests
         Assert.False(resourceMap.IsBlocked("r", 2));
         Assert.False(rangeMap.IsBlocked(range, 2));
 
-        second.Abort();
+        second.Abort(TestContext.Current.CancellationToken);
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => resourceWait);
         resourceMap.Prune();
         rangeMap.Prune();
@@ -300,7 +300,7 @@ public sealed class TransitionGateMapTests
         Assert.Same(replacement.Completion, resourceWait);
         Assert.Same(resourceWait, rangeWait);
 
-        replacement.Abort();
+        replacement.Abort(TestContext.Current.CancellationToken);
         resourceMap.Prune();
         rangeMap.Prune();
         Assert.Equal(0, AssociationCount(resourceMap));

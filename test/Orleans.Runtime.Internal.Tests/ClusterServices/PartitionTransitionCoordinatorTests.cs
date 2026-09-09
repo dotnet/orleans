@@ -236,7 +236,7 @@ public sealed class PartitionTransitionCoordinatorTests
         Assert.Equal(TransitionGateStatus.Aborted, acquisition.Status);
         Assert.False(transitions.TryGetBlockingTransition(Range, View2, out _));
 
-        acquisition.Abort();
+        acquisition.Abort(TestContext.Current.CancellationToken);
         transitions.Prune();
         transitions.AbortAll(shutdown.Token);
 
@@ -280,8 +280,8 @@ public sealed class PartitionTransitionCoordinatorTests
             Assert.Equal(TransitionGateStatus.Failed, gate.Status);
             Assert.True(gate.IsBlocking);
             Assert.Same(failure, await Assert.ThrowsAsync<ApplicationException>(() => gate.Completion));
-            gate.Abort();
-            gate.Abort();
+            gate.Abort(TestContext.Current.CancellationToken);
+            gate.Abort(TestContext.Current.CancellationToken);
             Assert.Equal(TransitionGateStatus.Aborted, gate.Status);
             Assert.False(gate.IsBlocking);
             Assert.Same(failure, await Assert.ThrowsAsync<ApplicationException>(() => gate.Completion));
