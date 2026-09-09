@@ -38,7 +38,7 @@ public sealed class DurableJobsOptions
 
     /// <summary>
     /// Gets or sets the interval between periodic shard discovery and writable-shard cleanup checks.
-    /// Membership changes also trigger checks, and in-progress catalog sweeps continue between checks.
+    /// Membership changes also trigger a fresh discovery sweep.
     /// Must be between 1 and 4294967294 milliseconds, inclusive. Default: 5 minutes.
     /// </summary>
     public TimeSpan ShardCheckInterval { get; set; } = TimeSpan.FromMinutes(5);

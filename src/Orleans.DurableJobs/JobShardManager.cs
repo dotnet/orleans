@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Runtime;
@@ -19,12 +20,17 @@ public abstract class JobShardManager
     /// </summary>
     protected SiloAddress SiloAddress { get; }
 
-    internal virtual bool HasMoreCatalogWork => false;
-
-    internal virtual Task<List<IJobShard>> DiscoverJobShardsAsync(DateTimeOffset maxDueTime, int maxNewClaims, CancellationToken cancellationToken)
-        => AssignJobShardsAsync(maxDueTime, maxNewClaims, cancellationToken);
-
-    internal virtual ValueTask StopDiscoveryAsync() => ValueTask.CompletedTask;
+    internal virtual async IAsyncEnumerable<IJobShard> DiscoverJobShardsAsync(
+        DateTimeOffset maxDueTime,
+        int maxNewClaims,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        foreach (var shard in await AssignJobShardsAsync(maxDueTime, maxNewClaims, cancellationToken))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            yield return shard;
+        }
+    }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="JobShardManager"/> class.

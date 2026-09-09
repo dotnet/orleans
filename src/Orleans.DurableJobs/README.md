@@ -115,55 +115,44 @@ checks, with a default of five minutes. Membership changes also trigger checks.
 The lookahead accepts non-negative durations; zero selects shards whose start time is at or
 before the current time. The check interval accepts durations from 1 to 4294967294 milliseconds.
 
-Runtime discovery retains one asynchronous catalog enumerator across turns. Each turn
-evaluates at most 256 yielded identities, fetching metadata once per evaluated identity.
-Every yielded identity consumes this budget, including far-future shards, live-owner shards,
-duplicates, and candidates skipped by the shard-claim budget. Each eligible candidate can
-perform one conditional ownership metadata update and open its journal. Journal replay cost
-depends on the contents of that shard.
+Shard journals use names such as
+`jobs/shards/v2/20260909T1200000000000Z-<unique-id>`. The fixed-width UTC start time
+precedes the unique suffix, so ordinal name order is shard-start-time order. Each sweep
+lists the shard prefix with an inclusive `ListOptions.MaxId` bound covering the lookahead
+horizon. The range includes every earlier start time, including jobs overdue after a long
+outage. Future shard identities are filtered by the catalog before candidate metadata reads.
 
-Catalog providers manage paging internally and yield identities in provider traversal order.
-One `MoveNextAsync` can traverse arbitrarily many empty or filtered backend pages before
-yielding an identity or completing. The per-turn bound therefore covers yielded identities
-and candidate metadata evaluations; underlying listing requests, latency, and provider
-working memory depend on the storage implementation.
+Each periodic or membership check starts a fresh, locally scoped sweep. Discovery orders
+and deduplicates the selected identities, then reads current ownership metadata and attempts
+conditional claims oldest first. Assigned shards are delivered as they are opened, allowing
+execution to proceed while later candidates are evaluated. The claim budget limits new claims;
+locally owned shards remain eligible after that budget is exhausted.
 
-The runtime yields between continuation turns. Membership changes preserve scan progress;
-ownership decisions use current membership and conditional storage updates. A completed
-sweep waits for the next periodic or membership check before starting again. Repeated
-complete sweeps revisit future shards as time advances and observe entries inserted behind
-the previous traversal position, subject to the catalog's mutation-consistency guarantees. Eventual
-delivery therefore depends on progressing storage operations and sweeps; scan duration
-contributes to discovery latency.
+Catalog providers apply prefix and upper-bound constraints using their storage capabilities.
+Azure Blob's ordered listing can stop at the upper bound. S3 Express and Redis traversal order
+is provider-defined, so they filter the selected identities while traversing storage. Discovery
+orders the selected names itself to provide consistent oldest-first processing across providers.
+Storage listing work and request latency remain provider-dependent; candidate metadata work
+scales with the distinct identities returned for the due range.
 
-Discovery retains the enumerator and at most one batch of pending assignments.
-Claimed shards, locally created
-writable shards, and their loaded job state remain resident according to the existing shard
-lifecycle. Writable-shard cleanup runs at periodic or membership checks; its cost depends on
-the number of local writable shards. Metadata I/O remains O(total catalog shards) per sweep
-because shard identifiers are random and due times and owners are stored in metadata.
-The `jobs/shards` prefix selects shard journals; time and ownership filtering uses metadata.
-Underlying listing I/O depends on the provider's prefix support: providers which filter
-logical prefixes after listing can traverse all journal headers or bucket objects.
+The sweep owns its enumeration and selected identity set until completion. Storage errors
+propagate to the runtime's error reporting, and a later check starts a fresh sweep. Shards
+already delivered to the local manager continue through their execution lifecycle.
+Cancellation flows through listing, metadata, and journal operations. Shutdown cancels and
+awaits the active sweep, including enumeration disposal, then awaits running-shard cleanup.
+
 Shorter lookahead periods reduce early loading of recovered shards. Shorter check intervals
-increase sweep frequency and reduce the wait for future shards to become eligible.
+increase sweep frequency and reduce the wait for newly inserted or newly eligible shards.
+The public `JobShardManager.AssignJobShardsAsync` method collects the same ordered discovery
+stream into its full-result list.
 
-The local manager serializes enumeration and uses the silo lifetime cancellation token
-for the whole sweep. Cancellation is checked between candidates and passed through catalog,
-metadata, and journal operations. Candidate failures propagate to the runtime's error reporting; the
-next turn resumes at the following identity, and the next sweep revisits the failed
-candidate. Successful assignments preceding a failed candidate are delivered first on the
-next turn, so a persistently failing candidate allows earlier and later shards to progress.
-Listing failures surface and dispose the failed enumerator. Successful assignments already
-collected are delivered before a later periodic or membership check starts a fresh sweep.
-Recovery from a listing failure depends on that subsequent enumeration progressing past the
-failure; a persistently failing listing prefix can delay later identities. Completed sweeps
-dispose their enumerators. Shutdown cancels the lifetime token, awaits the active discovery
-turn, and disposes any remaining enumerator before completing.
+### Alpha storage-format upgrade
 
-The public `JobShardManager.AssignJobShardsAsync` API retains its full-result behavior,
-using its own enumeration. Runtime discovery applies the yielded-identity budget to each
-turn over the shared catalog contract.
+The time-addressable `jobs/shards/v2` namespace replaces the earlier
+`jobs/shards/<random-id>` layout. **Drain all outstanding Durable Jobs using the previous
+version before upgrading**, then deploy the new version to the cluster. The new namespace
+is the discovery boundary for this alpha format. Keep the previous deployment and its
+journals available until outstanding jobs have completed.
 
 ## Usage Examples
 

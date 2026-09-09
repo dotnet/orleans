@@ -229,19 +229,17 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
 
         _cts.Cancel();
 
-        if (_listenForClusterChangesTask is not null)
-        {
-            await _listenForClusterChangesTask.SuppressThrowing();
-        }
-
-        if (_periodicCheckTask is not null)
-        {
-            await _periodicCheckTask.SuppressThrowing();
-        }
-
         try
         {
-            await _shardManager.StopDiscoveryAsync();
+            if (_listenForClusterChangesTask is not null)
+            {
+                await _listenForClusterChangesTask.SuppressThrowing();
+            }
+
+            if (_periodicCheckTask is not null)
+            {
+                await _periodicCheckTask.SuppressThrowing();
+            }
         }
         finally
         {
@@ -378,13 +376,6 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
         {
             try
             {
-                if (_shardManager.HasMoreCatalogWork && !timerTask.IsCompleted && !signalTask.IsCompleted)
-                {
-                    await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding | ConfigureAwaitOptions.ContinueOnCapturedContext);
-                    await ProcessShardDiscoveryAsync(_cts.Token);
-                    continue;
-                }
-
                 var completedTask = await Task.WhenAny(timerTask, signalTask);
                 await completedTask;
                 // Retain the other pending wait: it can complete during discovery.
@@ -441,29 +432,29 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
     {
         cancellationToken.ThrowIfCancellationRequested();
         var now = _timeProvider.GetUtcNow();
-        // Compute the slow-start budget for this turn.
+        // Compute the slow-start budget for this sweep.
         var budget = ComputeClaimBudget();
-
-        var shards = await _shardManager.DiscoverJobShardsAsync(now.Add(_options.ShardLoadLookaheadPeriod), budget, cancellationToken);
-        cancellationToken.ThrowIfCancellationRequested();
-
-        // Count newly claimed shards (those not already in our cache)
         var newClaimsThisCycle = 0;
-        if (shards.Count > 0)
+        var assignedCount = 0;
+        await foreach (var shard in _shardManager.DiscoverJobShardsAsync(now.Add(_options.ShardLoadLookaheadPeriod), budget, cancellationToken))
         {
-            LogAssignedShards(_logger, shards.Count);
-            foreach (var shard in shards)
+            cancellationToken.ThrowIfCancellationRequested();
+            assignedCount++;
+            if (_shardCache.TryAdd(shard.Id, shard))
             {
-                if (_shardCache.TryAdd(shard.Id, shard))
-                {
-                    newClaimsThisCycle++;
-                }
-
-                if (!_runningShards.ContainsKey(shard.Id))
-                {
-                    TryActivateShard(shard);
-                }
+                newClaimsThisCycle++;
+                _totalClaimedShards++;
             }
+
+            if (!_runningShards.ContainsKey(shard.Id))
+            {
+                TryActivateShard(shard);
+            }
+        }
+
+        if (assignedCount > 0)
+        {
+            LogAssignedShards(_logger, assignedCount);
         }
         else
         {
@@ -472,7 +463,6 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
 
         if (newClaimsThisCycle > 0)
         {
-            _totalClaimedShards += newClaimsThisCycle;
             LogOrphanedShardsClaimed(_logger, newClaimsThisCycle, _totalClaimedShards);
         }
     }

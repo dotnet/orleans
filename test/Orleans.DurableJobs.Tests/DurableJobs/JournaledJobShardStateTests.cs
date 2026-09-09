@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Text.Json;
 using Orleans.DurableJobs;
+using Orleans.Journaling;
 using Orleans.Runtime;
 using Xunit;
 
@@ -171,6 +172,67 @@ public class JournaledJobShardStateTests
 
         Assert.True(JobShardId.StoragePrefix.IsPrefixOf(storageId));
         Assert.Equal(shardId, JobShardId.FromJournalId(storageId));
+    }
+
+    [Fact]
+    public void JobShardId_New_EncodesUtcStartTimeBeforeUniqueSuffix()
+    {
+        var start = new DateTimeOffset(2026, 9, 9, 13, 0, 0, TimeSpan.FromHours(5.5)).AddTicks(1234567);
+        const string expectedPrefix = "20260909T0730001234567Z-";
+
+        var first = JobShardId.New(start);
+        var second = JobShardId.New(start.ToUniversalTime());
+
+        Assert.StartsWith(expectedPrefix, first.Value);
+        Assert.StartsWith(expectedPrefix, second.Value);
+        Assert.True(Guid.TryParseExact(first.Value[expectedPrefix.Length..], "N", out _));
+        Assert.NotEqual(first, second);
+        Assert.Equal($"jobs/shards/v2/{first.Value}", first.ToJournalId().Value);
+        Assert.Equal(first, JobShardId.FromJournalId(first.ToJournalId()));
+        Assert.Equal(first, JobShardId.Parse(first.Value));
+    }
+
+    [Fact]
+    public void JobShardId_NameOrderMatchesStartTimeAcrossDateBoundaries()
+    {
+        DateTimeOffset[] starts =
+        [
+            DateTimeOffset.MinValue,
+            new(2025, 12, 31, 23, 59, 59, TimeSpan.Zero),
+            new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+            new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero).AddTicks(1),
+            DateTimeOffset.MaxValue
+        ];
+        var ids = starts.Select(JobShardId.New).ToArray();
+
+        Assert.Equal(ids, ids.AsEnumerable().Reverse().OrderBy(id => id.ToJournalId().Value, StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public void JobShardId_DiscoveryBoundIncludesExactStartTimeAndExcludesNextTick()
+    {
+        var horizon = new DateTimeOffset(2026, 9, 9, 12, 0, 0, TimeSpan.Zero).AddTicks(1234567);
+        var before = JobShardId.New(horizon.AddTicks(-1)).ToJournalId();
+        var exact = JobShardId.New(horizon).ToJournalId();
+        var after = JobShardId.New(horizon.AddTicks(1)).ToJournalId();
+        var bound = JobShardId.GetMaxJournalId(horizon);
+
+        Assert.True(JobShardId.StoragePrefix.IsPrefixOf(bound));
+        Assert.True(StringComparer.Ordinal.Compare(before.Value, bound.Value) < 0);
+        Assert.True(StringComparer.Ordinal.Compare(exact.Value, bound.Value) < 0);
+        Assert.True(StringComparer.Ordinal.Compare(after.Value, bound.Value) > 0);
+        Assert.True(StringComparer.Ordinal.Compare(
+            JobShardId.New(DateTimeOffset.MaxValue).ToJournalId().Value,
+            JobShardId.GetMaxJournalId(DateTimeOffset.MaxValue).Value) < 0);
+    }
+
+    [Fact]
+    public void JobShardId_TimeAddressableNamespaceIsDistinctFromPreviousAlphaFormat()
+    {
+        var previous = JournalId.Create("jobs", "shards", "previous-shard");
+
+        Assert.False(JobShardId.StoragePrefix.IsPrefixOf(previous));
+        Assert.Throws<ArgumentException>(() => JobShardId.FromJournalId(previous));
     }
 
     [Fact]
