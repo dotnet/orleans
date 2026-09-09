@@ -175,15 +175,15 @@ public static class LegacyTokenRecoveryFixture
             : StreamHandshakeToken.CreateStartToken(legacy);
         var handle = CreateHandle(streamId, observer, handshake);
         Add(100, 0);
-        var cursor = cache.GetCursor(streamId, handle.GetSequenceToken()!.Token);
+        var cursor = GetCursor(cache, streamId, handle.GetSequenceToken()!.Token);
 
-        Assert.False(cache.TryGetNextMessage(cursor, out _));
+        Assert.False(TryGetNextMessage(cache, cursor, out _));
         foreach (var sequence in new[] { 101L, 102L })
         {
             Add(sequence, 0);
             // This is the real Refresh path invoked by StartInactiveCursors after every nonempty read.
             cache.Refresh(cursor, createToken(sequence, 0));
-            Assert.False(cache.TryGetNextMessage(cursor, out _));
+            Assert.False(TryGetNextMessage(cache, cursor, out _));
             Assert.Empty(observer.Tokens);
         }
 
@@ -196,7 +196,7 @@ public static class LegacyTokenRecoveryFixture
         Add(501, 0);
         cache.Refresh(cursor, createToken(499, 0));
         SkipAcknowledgedPosition();
-        Assert.True(cache.TryGetNextMessage(cursor, out var first));
+        Assert.True(TryGetNextMessage(cache, cursor, out var first));
         Assert.Equal(500, first.SequenceToken.SequenceNumber);
         Assert.Equal(acknowledged ? 3 : 2, first.SequenceToken.EventIndex);
 
@@ -206,9 +206,9 @@ public static class LegacyTokenRecoveryFixture
             Assert.Same(handshake, requested);
             Assert.Same(legacy, requested!.Token);
             Assert.Empty(observer.Tokens);
-            cursor = cache.GetCursor(streamId, requested.Token);
+            cursor = GetCursor(cache, streamId, requested.Token);
             SkipAcknowledgedPosition();
-            Assert.True(cache.TryGetNextMessage(cursor, out first));
+            Assert.True(TryGetNextMessage(cache, cursor, out first));
             Assert.Equal(acknowledged ? 3 : 2, first.SequenceToken.EventIndex);
         }
 
@@ -217,7 +217,7 @@ public static class LegacyTokenRecoveryFixture
         cache.Refresh(cursor, createToken(100, 0));
         Assert.Null(await handle.DeliverBatch(first, handshake));
 
-        while (cache.TryGetNextMessage(cursor, out var batch))
+        while (TryGetNextMessage(cache, cursor, out var batch))
         {
             Assert.Null(await handle.DeliverBatch(batch, handle.GetSequenceToken()));
         }
@@ -240,7 +240,7 @@ public static class LegacyTokenRecoveryFixture
                 return;
             }
 
-            Assert.True(cache.TryGetNextMessage(cursor, out var duplicate));
+            Assert.True(TryGetNextMessage(cache, cursor, out var duplicate));
             Assert.Equal(0, EventSequenceTokenCompatibility.Compare(legacy, duplicate.SequenceToken));
             Assert.Equal(0, EventSequenceTokenCompatibility.Compare(duplicate.SequenceToken, legacy));
         }
@@ -311,6 +311,24 @@ public static class LegacyTokenRecoveryFixture
 
     private sealed class InheritedV1Token(long sequence, int index) : EventSequenceToken(sequence, index);
     private sealed class InheritedV2Token(long sequence, int index) : EventSequenceTokenV2(sequence, index);
+
+    private static object GetCursor(PooledQueueCache cache, StreamId streamId, StreamSequenceToken? token)
+    {
+        var result = cache.TryGetCursor(streamId, token);
+        Assert.Equal(QueueCacheCursorResultKind.Success, result.Kind);
+        Assert.Null(result.CacheMiss);
+        Assert.NotNull(result.Cursor);
+        return result.Cursor;
+    }
+
+    private static bool TryGetNextMessage(PooledQueueCache cache, object cursor, out IBatchContainer message)
+    {
+        var result = cache.TryGetNextMessageWithResult(cursor, out var current);
+        Assert.NotEqual(QueueCacheCursorMoveResultKind.CacheMiss, result.Kind);
+        Assert.Null(result.CacheMiss);
+        message = current!;
+        return result.Kind == QueueCacheCursorMoveResultKind.Success;
+    }
 
     private static StreamSubscriptionHandleImpl<int> CreateHandle(
         StreamId streamId,
