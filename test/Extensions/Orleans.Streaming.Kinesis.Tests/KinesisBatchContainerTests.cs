@@ -3,6 +3,7 @@ using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streaming.Kinesis;
+using Orleans.Streams;
 using TestExtensions;
 using Xunit;
 using KinesisRecord = Amazon.Kinesis.Model.Record;
@@ -124,6 +125,58 @@ public sealed class KinesisBatchContainerTests
 
         Assert.True(readFirstButNewer.CompareTo(readSecondButOlder) > 0);
         Assert.True(readSecondButOlder.CompareTo(readFirstButNewer) < 0);
+    }
+
+    [Theory]
+    [InlineData("7", "7")]
+    [InlineData("7", "0007")]
+    [InlineData("0007", "7")]
+    [InlineData("0", "000")]
+    [InlineData("000", "0")]
+    [InlineData("170141183460469231731687303715884105727", "000170141183460469231731687303715884105727")]
+    [InlineData("000170141183460469231731687303715884105727", "170141183460469231731687303715884105727")]
+    public void BatchFilters_RespectNumericShardSequenceIdentity(string recordOffset, string recoveredOffset)
+    {
+        var streamId = StreamId.Create("test", Guid.NewGuid());
+        var payload = KinesisBatchContainer.ToKinesisPayload(
+            serializer, streamId, new object[] { "first", 2, "third", "fourth" }, requestContext: null);
+        var batch = KinesisBatchContainer.FromCachedRecord(serializer, streamId, payload, recordOffset, sequenceId: 7);
+        var filter = (IQueueCacheBatchContainerFilter)batch;
+        var token = new KinesisSequenceToken(recoveredOffset, sequenceNumber: 999, eventIndex: 2);
+
+        var inclusive = Assert.IsType<KinesisBatchContainer>(filter.FilterFrom(token));
+        Assert.Equal(["third", "fourth"], inclusive.GetEvents<string>().Select(item => item.Item1));
+        Assert.Equal([2, 3], inclusive.GetEvents<string>().Select(item => item.Item2.EventIndex));
+        Assert.Empty(inclusive.GetEvents<int>());
+        Assert.Equal(streamId, inclusive.StreamId);
+        Assert.Equal(recordOffset, inclusive.Token.ShardSequence);
+        Assert.Equal(7, inclusive.Token.SequenceNumber);
+
+        var exclusive = Assert.IsType<KinesisBatchContainer>(filter.FilterAfter(token));
+        Assert.Equal(["fourth"], exclusive.GetEvents<string>().Select(item => item.Item1));
+        Assert.Equal([3], exclusive.GetEvents<string>().Select(item => item.Item2.EventIndex));
+        Assert.Empty(exclusive.GetEvents<int>());
+        Assert.Equal(streamId, exclusive.StreamId);
+        Assert.Equal(recordOffset, exclusive.Token.ShardSequence);
+        Assert.Equal(7, exclusive.Token.SequenceNumber);
+        Assert.Null(filter.FilterAfter(new KinesisSequenceToken(recoveredOffset, sequenceNumber: 999, eventIndex: 3)));
+        Assert.Equal(["first", "third", "fourth"], batch.GetEvents<string>().Select(item => item.Item1));
+    }
+
+    [Theory]
+    [InlineData("7", "8")]
+    [InlineData("0008", "7")]
+    [InlineData("170141183460469231731687303715884105727", "170141183460469231731687303715884105728")]
+    public void BatchFilters_PreserveBatchesFromDifferentRecords(string recordOffset, string recoveredOffset)
+    {
+        var streamId = StreamId.Create("test", Guid.NewGuid());
+        var payload = KinesisBatchContainer.ToKinesisPayload(serializer, streamId, new[] { "first", "second" }, requestContext: null);
+        var batch = KinesisBatchContainer.FromCachedRecord(serializer, streamId, payload, recordOffset, sequenceId: 7);
+        var filter = (IQueueCacheBatchContainerFilter)batch;
+        var token = new KinesisSequenceToken(recoveredOffset, sequenceNumber: 7, eventIndex: 1);
+
+        Assert.Same(batch, filter.FilterFrom(token));
+        Assert.Same(batch, filter.FilterAfter(token));
     }
 
     [Fact]
