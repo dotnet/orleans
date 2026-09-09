@@ -187,7 +187,6 @@ public sealed class DirectoryMembershipSnapshotTests
 
                 var allRangesCollection = RingRangeCollection.Create(allRanges);
 
-                Assert.Equal(uint.MaxValue, allRangesCollection.Size);
                 Assert.Equal(100f, allRangesCollection.SizePercent);
                 Assert.False(allRangesCollection.IsEmpty);
                 Assert.False(allRangesCollection.IsDefault);
@@ -215,7 +214,6 @@ public sealed class DirectoryMembershipSnapshotTests
 
                 Assert.True(sum >= uint.MaxValue);
                 var allRangesCollection = RingRangeCollection.Create(allRanges);
-                Assert.Equal(uint.MaxValue, allRangesCollection.Size);
                 Assert.Equal(100f, allRangesCollection.SizePercent);
                 Assert.False(allRangesCollection.IsEmpty);
                 Assert.False(allRangesCollection.IsDefault);

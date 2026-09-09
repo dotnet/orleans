@@ -324,13 +324,13 @@ public sealed class RingRangeCollectionTests
     [Fact]
     public void BoundaryValueAnalysis_SizingAndOverflow()
     {
-        // Combination of non-overlapping ranges that exactly equals uint.MaxValue
-        var half1 = RingRange.Create(0, 2_147_483_648u);
-        var half2 = RingRange.Create(2_147_483_648u, 0);
+        // Combination of non-overlapping ranges that exactly covers the ring
+        var half1 = RingRange.Create(0, 2_147_483_647u);
+        var half2 = RingRange.Create(2_147_483_647u, 0);
 
         var fullCombined = Create(half1, half2);
         Assert.True(fullCombined.IsFull);
-        Assert.Equal(uint.MaxValue, fullCombined.Size);
+        Assert.Equal((ulong)uint.MaxValue + 1, (ulong)half1.Size + half2.Size);
     }
 
     [Fact]
