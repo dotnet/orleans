@@ -791,6 +791,13 @@ namespace Orleans.Streams
                 // loop through the queue until it is empty.
                 while (!IsShutdown && !cancellationToken.IsCancellationRequested) // shutdown sets IsShutdown and cancels the timer token.
                 {
+                    // Flow controllers can purge while calculating capacity, so publish subscription protection first.
+                    if (HasPendingStreamRegistration())
+                    {
+                        return;
+                    }
+
+                    queueCache?.UpdatePurgeProtection(HasActiveSubscriptions());
                     int maxCacheAddCount = queueCache?.GetMaxAddCount() ?? QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG;
                     if (maxCacheAddCount != QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG && maxCacheAddCount <= 0)
                         return;
@@ -844,7 +851,7 @@ namespace Orleans.Streams
             }
 
             // Pause all queue reads so a cold stream's first batch stays pinned until registration completes.
-            if (pubSubCache.Values.Any(static stream => stream.RegistrationTask is { IsCompleted: false }))
+            if (HasPendingStreamRegistration())
             {
                 return false;
             }
@@ -866,6 +873,7 @@ namespace Orleans.Streams
 
             if (queueCache is not null)
             {
+                queueCache.UpdatePurgeProtection(HasActiveSubscriptions());
                 if (queueCache.TryPurgeFromCache(out var purgedItems))
                 {
                     try
@@ -934,6 +942,32 @@ namespace Orleans.Streams
             return !IsShutdown && !cancellationToken.IsCancellationRequested;
         }
 
+        private bool HasPendingStreamRegistration()
+        {
+            foreach (var stream in pubSubCache.Values)
+            {
+                if (stream.RegistrationTask is { IsCompleted: false })
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private bool HasActiveSubscriptions()
+        {
+            foreach (var stream in pubSubCache.Values)
+            {
+                if (stream.Count > 0)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private void CleanupPubSubCache(DateTime now)
         {
             List<QualifiedStreamId>? inactiveStreams = null;
@@ -966,12 +1000,14 @@ namespace Orleans.Streams
         /// </summary>
         private void NotifyDeliveryProgress()
         {
-            if (queueCache is null) return;
+            if (queueCache is null)
+            {
+                return;
+            }
 
-            var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
             if (TryGetDeliveryProgress(out var earliest))
             {
-                queueCache.UpdateDeliveryProgress(earliest, utcNow);
+                queueCache.UpdateDeliveryProgress(earliest, _timeProvider.GetUtcNow().UtcDateTime);
             }
         }
 
@@ -989,6 +1025,11 @@ namespace Orleans.Streams
                 foreach (var consumer in streamConsumers.AllConsumers())
                 {
                     if (!consumer.IsRegistered)
+                    {
+                        return false;
+                    }
+
+                    if (consumer.State == StreamConsumerDataState.Active)
                     {
                         return false;
                     }

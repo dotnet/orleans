@@ -1,6 +1,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using Orleans.Runtime;
 using Orleans.Streams;
 
@@ -16,7 +17,9 @@ namespace Orleans.Providers.Streams.Common
         private const int OneKb = 1024;
         private const int DefaultCachedMessagesPerBlock = 16 * OneKb; // 16kb
 
-        private readonly CachedMessage[] cachedMessages;
+        private static readonly int CachedMessageSize = Unsafe.SizeOf<CachedMessage>();
+        private CachedMessage[] cachedMessages;
+        private readonly int initialBlockSize;
         private readonly int blockSize;
         private int writeIndex;
         private int readIndex;
@@ -74,13 +77,39 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <summary>
+        /// Gets the number of bytes allocated for cached message entries.
+        /// </summary>
+        public int AllocatedSizeInBytes => cachedMessages.Length * CachedMessageSize;
+
+        /// <summary>
         /// Block of cached messages.
         /// </summary>
         /// <param name="blockSize">The block size, expressed as a number of messages.</param>
         public CachedMessageBlock(int blockSize = DefaultCachedMessagesPerBlock)
+            : this(blockSize, blockSize)
         {
-            this.blockSize = blockSize;
-            cachedMessages = new CachedMessage[blockSize];
+        }
+
+        /// <summary>
+        /// Initializes a block which grows geometrically from <paramref name="initialBlockSize"/> to <paramref name="maxBlockSize"/>.
+        /// </summary>
+        /// <param name="initialBlockSize">The initial number of cached message entries.</param>
+        /// <param name="maxBlockSize">The maximum number of cached message entries.</param>
+        public CachedMessageBlock(int initialBlockSize, int maxBlockSize)
+        {
+            if (initialBlockSize <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(initialBlockSize));
+            }
+
+            if (maxBlockSize < initialBlockSize)
+            {
+                throw new ArgumentOutOfRangeException(nameof(maxBlockSize));
+            }
+
+            this.initialBlockSize = initialBlockSize;
+            this.blockSize = maxBlockSize;
+            cachedMessages = new CachedMessage[initialBlockSize];
             writeIndex = 0;
             readIndex = 0;
             Node = new LinkedListNode<CachedMessageBlock>(this);
@@ -94,6 +123,7 @@ namespace Orleans.Providers.Streams.Common
         {
             if (readIndex < writeIndex)
             {
+                cachedMessages[readIndex] = default;
                 readIndex++;
                 return true;
             }
@@ -112,6 +142,12 @@ namespace Orleans.Providers.Streams.Common
             if (!HasCapacity)
             {
                 throw new InvalidOperationException("Block is full");
+            }
+
+            if (writeIndex == cachedMessages.Length)
+            {
+                var newSize = Math.Min(blockSize, cachedMessages.Length * 2);
+                Array.Resize(ref cachedMessages, newSize);
             }
 
             int index = writeIndex++;
@@ -235,6 +271,20 @@ namespace Orleans.Providers.Streams.Common
         /// <inheritdoc/>
         public override void OnResetState()
         {
+            ResetCore();
+        }
+
+        private void ResetCore()
+        {
+            if (cachedMessages.Length != initialBlockSize)
+            {
+                cachedMessages = new CachedMessage[initialBlockSize];
+            }
+            else
+            {
+                Array.Clear(cachedMessages, readIndex, writeIndex - readIndex);
+            }
+
             writeIndex = 0;
             readIndex = 0;
             generation++;
