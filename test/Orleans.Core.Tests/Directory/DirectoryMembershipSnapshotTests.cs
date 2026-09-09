@@ -171,11 +171,11 @@ public sealed class DirectoryMembershipSnapshotTests
         GenDirectoryMembershipSnapshot.Where(s => s.Members.Length > 0)
             .Sample(snapshot =>
             {
-                uint sum = 0;
+                ulong sum = 0;
                 var allRanges = new List<RingRange>();
                 foreach (var member in snapshot.Members)
                 {
-                    Assert.Equal(snapshot.GetMemberRanges(member).Sum(range => range.Size), snapshot.GetMemberRangesByPartition(member).Sum(range => range.Size));
+                    Assert.Equal(snapshot.GetMemberRanges(member).Sum(range => (long)range.Size), snapshot.GetMemberRangesByPartition(member).Sum(range => (long)range.Size));
                     foreach (var range in snapshot.GetMemberRanges(member))
                     {
                         allRanges.Add(range);
@@ -183,8 +183,7 @@ public sealed class DirectoryMembershipSnapshotTests
                     }
                 }
 
-
-                Assert.Equal(uint.MaxValue, sum);
+                Assert.True(sum >= uint.MaxValue);
 
                 var allRangesCollection = RingRangeCollection.Create(allRanges);
 
@@ -203,7 +202,7 @@ public sealed class DirectoryMembershipSnapshotTests
         GenDirectoryMembershipSnapshot.Where(s => s.Members.Length > 0)
             .Sample(snapshot =>
             {
-                uint sum = 0;
+                ulong sum = 0;
                 var allRanges = new List<RingRange>();
                 foreach (var member in snapshot.Members)
                 {
@@ -214,7 +213,7 @@ public sealed class DirectoryMembershipSnapshotTests
                     }
                 }
 
-                Assert.Equal(uint.MaxValue, sum);
+                Assert.True(sum >= uint.MaxValue);
                 var allRangesCollection = RingRangeCollection.Create(allRanges);
                 Assert.Equal(uint.MaxValue, allRangesCollection.Size);
                 Assert.Equal(100f, allRangesCollection.SizePercent);

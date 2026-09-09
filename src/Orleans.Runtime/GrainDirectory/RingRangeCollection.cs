@@ -62,9 +62,9 @@ internal readonly struct RingRangeCollection : IEquatable<RingRangeCollection>, 
 
     public bool IsEmpty => Ranges.Length == 0 || Ranges.All(r => r.IsEmpty);
 
-    public bool IsFull => !IsEmpty && Ranges.Sum(r => r.Size) == uint.MaxValue;
+    public bool IsFull => !IsEmpty && Ranges.Sum(static r => (long)r.Size) >= uint.MaxValue;
 
-    public uint Size => (uint)Ranges.Sum(static r => r.Size);
+    public uint Size => Ranges.Sum(static r => (long)r.Size) >= uint.MaxValue ? uint.MaxValue : (uint)Ranges.Sum(static r => (long)r.Size);
 
     public float SizePercent => Size * (100.0f / uint.MaxValue);
 

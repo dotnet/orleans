@@ -71,7 +71,7 @@ internal readonly struct RingRange : IEquatable<RingRange>, ISpanFormattable, IC
             if (_end > _start) return _end - _start;
 
             // Wrapped
-            return uint.MaxValue - _start + _end;
+            return uint.MaxValue - _start + _end + 1;
         }
     }
 
