@@ -402,18 +402,13 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         var skippedActivationCount = 0;
         var stopwatch = CoarseStopwatch.StartNew();
 
-        foreach (var (grainId, activation) in _localActivations)
+        foreach (var (_, activation) in _localActivations.EnumerateRange(range))
         {
             cancellationToken.ThrowIfCancellationRequested();
             var directory = GetGrainDirectory(activation, _grainDirectoryResolver!);
             if (directory == this)
             {
                 var address = activation.Address;
-                if (!range.Contains(address.GrainId))
-                {
-                    continue;
-                }
-
                 if (address.MembershipVersion == MembershipVersion.MinValue
                     || activation is ActivationData { State: ActivationState.Deactivating or ActivationState.Invalid })
                 {

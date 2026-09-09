@@ -32,7 +32,7 @@ internal sealed class LocalGrainDirectoryClientCompatibility : SystemTarget, IGr
         cancellationToken.ThrowIfCancellationRequested();
         var grainDirectoryResolver = _grainDirectoryResolver ??= ActivationServices.GetRequiredService<GrainDirectoryResolver>();
         List<GrainAddress> result = [];
-        foreach (var (_, activation) in _localActivations)
+        foreach (var (_, activation) in _localActivations.EnumerateRange(range))
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (!UsesLocalGrainDirectory(activation, grainDirectoryResolver))
@@ -45,11 +45,7 @@ internal sealed class LocalGrainDirectoryClientCompatibility : SystemTarget, IGr
                 continue;
             }
 
-            var address = activation.Address;
-            if (range.Contains(address.GrainId))
-            {
-                result.Add(address);
-            }
+            result.Add(activation.Address);
         }
 
         return new(result.AsImmutable());

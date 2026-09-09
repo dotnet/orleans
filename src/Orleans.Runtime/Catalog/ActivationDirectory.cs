@@ -1,9 +1,10 @@
 using System;
 using System.Collections;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Orleans.Runtime.GrainDirectory;
+using Orleans.Runtime.Utilities;
 
 namespace Orleans.Runtime;
 
@@ -11,7 +12,7 @@ internal sealed class ActivationDirectory : IEnumerable<KeyValuePair<GrainId, IG
 {
     private int _activationsCount;
 
-    private readonly ConcurrentDictionary<GrainId, IGrainContext> _activations = new();
+    private readonly ConcurrentHashRangeDictionary<GrainId, IGrainContext, GrainIdUniformHashComparer> _activations = new(default);
 
     public ActivationDirectory(CatalogInstruments catalogInstruments)
     {
@@ -45,8 +46,11 @@ internal sealed class ActivationDirectory : IEnumerable<KeyValuePair<GrainId, IG
         return false;
     }
 
-    public IEnumerator<KeyValuePair<GrainId, IGrainContext>> GetEnumerator() => _activations.GetEnumerator();
+    public ConcurrentHashRangeDictionary<GrainId, IGrainContext, GrainIdUniformHashComparer>.Enumerator GetEnumerator() => _activations.GetEnumerator();
 
+    public ConcurrentHashRangeDictionary<GrainId, IGrainContext, GrainIdUniformHashComparer>.RangeEnumerable EnumerateRange(RingRange range) => _activations.EnumerateRange(range);
+
+    IEnumerator<KeyValuePair<GrainId, IGrainContext>> IEnumerable<KeyValuePair<GrainId, IGrainContext>>.GetEnumerator() => GetEnumerator();
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
     async ValueTask IAsyncDisposable.DisposeAsync()

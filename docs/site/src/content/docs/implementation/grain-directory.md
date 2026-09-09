@@ -82,6 +82,14 @@ Requests and responses carry view information. A range cannot serve a request un
 
 API: <xref:Orleans.Hosting.CoreHostingExtensions.AddDistributedGrainDirectory*?displayProperty=nameWithType> and <xref:Orleans.Configuration.GrainDirectoryOptions>. Implementation: [hosting registration](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Hosting/CoreHostingExtensions.cs) and [`DistributedGrainDirectory`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/GrainDirectory/DistributedGrainDirectory.cs).
 
+### Range-aware activation storage
+
+The activation directory uses a concurrent hash table whose buckets cover contiguous portions of the 32-bit hash ring. Point lookup, insertion, replacement, expected-value removal, and range enumeration access the same entries. A concrete struct implementing `IConsistentHashComparer<GrainId>` supplies key equality and the stable unsigned `GrainId.GetUniformHashCode()` hash shared by silos. The JIT can specialize comparer calls for that struct. Hashes are inexpensive to compute from the grain type and key's cached hashes, so each table entry stores its key, value, and next link. Internal callers can reuse a precomputed comparer hash for point lookup or enumerate every entry at a hash coordinate.
+
+Recovery enumerates buckets intersecting the requested range and computes hashes only for entries in boundary buckets, using the exclusive-start, inclusive-end convention. Fully covered buckets contribute all their entries. Wrapped ranges visit each bucket once. The table grows by splitting hash prefixes, refining range selection as the activation population increases. For uniformly distributed activations, selective queries examine matching entries plus entries from at most two boundary buckets. A concentrated hash distribution increases boundary scanning and write contention within the affected buckets.
+
+Enumeration captures one table generation and observes concurrent changes to that table. Resizing publishes a new table after copying entries under the writer locks, while readers can finish traversing the prior generation. Writers check the table generation after acquiring their bucket's lock and retry when it changes. The recovery membership watermark advances before enumeration, and the activation-registration protocol ensures that registrations racing with recovery complete at an appropriate membership version. Expected-value removal preserves a newer context when an older context finishes deactivating. Ownership handoff transfers registration records; running contexts continue through their activation lifecycle.
+
 ## Tradeoffs
 
 | Property | Default `LocalGrainDirectory` | Experimental `DistributedGrainDirectory` |
