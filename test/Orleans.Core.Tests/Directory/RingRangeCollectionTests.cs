@@ -324,13 +324,24 @@ public sealed class RingRangeCollectionTests
     [Fact]
     public void BoundaryValueAnalysis_SizingAndOverflow()
     {
+        // Single range excluding 1 point: Size is uint.MaxValue, but IsFull must be false
+        var almostFull = Create(RingRange.Create(1, 0));
+        Assert.Equal(uint.MaxValue, almostFull.Size);
+        Assert.False(almostFull.IsFull);
+
         // Combination of non-overlapping ranges that exactly covers the ring
         var half1 = RingRange.Create(0, 2_147_483_647u);
         var half2 = RingRange.Create(2_147_483_647u, 0);
 
         var fullCombined = Create(half1, half2);
         Assert.True(fullCombined.IsFull);
-        Assert.Equal((ulong)uint.MaxValue + 1, (ulong)half1.Size + half2.Size);
+        Assert.Equal(uint.MaxValue, fullCombined.Size);
+
+        // Multiple ranges with a gap: IsFull must be false
+        var withGap1 = RingRange.Create(0, 100);
+        var withGap2 = RingRange.Create(105, 0);
+        var collectionWithGap = Create(withGap1, withGap2);
+        Assert.False(collectionWithGap.IsFull);
     }
 
     [Fact]
