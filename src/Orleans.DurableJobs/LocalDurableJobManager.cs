@@ -247,7 +247,8 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
         }
         finally
         {
-            await Task.WhenAll(runningShards);
+            // Include final activations and retain failures from tasks which already left the running set.
+            await Task.WhenAll(runningShards.Concat(_runningShards.Values));
         }
 
         LogStopped(_logger);
