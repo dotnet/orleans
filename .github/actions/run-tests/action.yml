@@ -31,23 +31,6 @@ runs:
   - uses: ./.github/actions/setup-test-environment
     with:
       coverage: ${{ runner.os == 'Linux' && inputs.framework == 'net10.0' }}
-  - name: Restore
-    shell: pwsh
-    run: |
-      & dotnet restore Orleans.slnx 2>&1 | Tee-Object -Variable restoreOutput
-      $exitCode = $LASTEXITCODE
-
-      if ($exitCode -eq 0) {
-        exit 0
-      }
-
-      if (($restoreOutput | Out-String) -notmatch 'Failed to retrieve information about .+ from remote source') {
-        exit $exitCode
-      }
-
-      Write-Warning 'Retrying restore after a remote package metadata retrieval failure.'
-      & dotnet restore Orleans.slnx
-      exit $LASTEXITCODE
   - name: Test
     id: test
     continue-on-error: ${{ env.ORLEANS_TEST_RETRY == 'true' }}
