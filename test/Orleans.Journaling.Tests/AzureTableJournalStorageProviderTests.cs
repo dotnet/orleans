@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Azure;
 using Azure.Core;
 using Azure.Data.Tables;
@@ -304,14 +305,15 @@ public sealed class AzureTableJournalStorageProviderTests
     }
 
     [Fact]
-    public async Task ListAsync_WithPrefix_ReturnsExactIdAndDescendantsOnly()
+    public async Task ListAsync_WithPrefix_ReturnsExactIdDescendantsAndPartialSegmentMatches()
     {
         var table = new FakeTableClient();
         var prefix = new JournalId("tenant/orders");
         var exact = prefix;
         var child = new JournalId("tenant/orders/2026");
+        var partialSegment = new JournalId("tenant/orders-archive");
         table.AddHeader(new JournalId("tenant/order"));
-        table.AddHeader(new JournalId("tenant/orders-archive"));
+        table.AddHeader(partialSegment);
         table.AddHeader(new JournalId("tenant/payments"));
         table.AddHeader(child);
         table.AddHeader(exact);
@@ -321,10 +323,172 @@ public sealed class AzureTableJournalStorageProviderTests
             context.Provider.ListAsync(new() { Prefix = prefix }, TestContext.Current.CancellationToken),
             TestContext.Current.CancellationToken);
 
-        Assert.Equal([child, exact], result);
+        Assert.Equal([partialSegment, child, exact], result);
         var query = Assert.Single(table.QueryCalls);
-        Assert.Contains("JournalId eq 'tenant/orders'", query.Filter);
-        Assert.Contains("PartitionKey ge 'tenant%2Forders%2F'", query.Filter);
+        var prefixKey = AzureTableJournalStorageOptions.EncodePartitionKey(prefix.Value);
+        Assert.Equal(
+            TableClient.CreateQueryFilter($"RowKey eq {AzureTableJournalStorage.HeaderRowKey}")
+            + TableClient.CreateQueryFilter($" and PartitionKey ge {prefixKey}")
+            + TableClient.CreateQueryFilter($" and PartitionKey lt {prefixKey + "G"}"),
+            query.Filter);
+        Assert.Equal(3, query.ReturnedCount);
+        Assert.DoesNotContain("JournalId", query.Filter);
+        Assert.DoesNotContain(" or ", query.Filter);
+    }
+
+    [Theory]
+    [InlineData(null, "jobs/2026-09-03", "jobs/2026-09-05", "jobs/2026-09-03", "jobs/2026-09-05")]
+    [InlineData("jobs/2026-09", "jobs/2026-09-03", "jobs/2026-09-05", "jobs/2026-09-03", "jobs/2026-09-05")]
+    [InlineData("jobs/2026-09", "jobs/2026-08-01", "jobs/2026-09-03", "jobs/2026-09-02", "jobs/2026-09-03")]
+    [InlineData("jobs/2026-09", "jobs/2026-09-03", "jobs/2026-09-03", "jobs/2026-09-03", null)]
+    [InlineData(null, "jobs/2026-09-06", null, "jobs/2026-09-06", "jobs/2026-10-01")]
+    [InlineData(null, null, "jobs/2026-09-02", "jobs/2026-08-01", "jobs/2026-09-02")]
+    public async Task ListAsync_RangeBounds_PruneEarlierAndFutureRowsOnServer(
+        string? prefix,
+        string? minId,
+        string? maxId,
+        string firstExpected,
+        string? secondExpected)
+    {
+        var table = new FakeTableClient();
+        string[] values =
+        [
+            "jobs/2026-08-01",
+            "jobs/2026-09-02",
+            "jobs/2026-09-03",
+            "jobs/2026-09-05",
+            "jobs/2026-09-06",
+            "jobs/2026-10-01",
+        ];
+        foreach (var value in values)
+        {
+            table.AddHeader(new JournalId(value));
+        }
+
+        using var context = await CreateStartedProviderAsync(table, TestContext.Current.CancellationToken);
+        var options = new ListOptions
+        {
+            Prefix = prefix is null ? default : new(prefix),
+            MinId = minId is null ? default : new(minId),
+            MaxId = maxId is null ? default : new(maxId),
+        };
+
+        var result = await ToListAsync(
+            context.Provider.ListAsync(options, TestContext.Current.CancellationToken),
+            TestContext.Current.CancellationToken);
+
+        var expected = secondExpected is null ? new[] { firstExpected } : new[] { firstExpected, secondExpected };
+        Assert.Equal(expected, result.Select(id => id.Value));
+        var query = Assert.Single(table.QueryCalls);
+        Assert.Equal(expected.Length, query.ReturnedCount);
+        Assert.Equal(1000, query.MaxPerPage);
+        Assert.DoesNotContain("JournalId", query.Filter);
+        Assert.DoesNotContain(" or ", query.Filter);
+        if (minId is not null)
+        {
+            var lowerBound = prefix is not null && string.CompareOrdinal(prefix, minId) > 0 ? prefix : minId;
+            var minKey = AzureTableJournalStorageOptions.EncodePartitionKey(lowerBound);
+            Assert.Contains(TableClient.CreateQueryFilter($"PartitionKey ge {minKey}"), query.Filter);
+        }
+
+        if (maxId is not null)
+        {
+            var maxKey = AzureTableJournalStorageOptions.EncodePartitionKey(maxId);
+            Assert.Contains(TableClient.CreateQueryFilter($"PartitionKey le {maxKey}"), query.Filter);
+        }
+    }
+
+    [Theory]
+    [InlineData(null, "b", "a")]
+    [InlineData("orders", "payments", null)]
+    [InlineData("orders", null, "order")]
+    [InlineData("orders", "ordert", "ordert")]
+    public async Task ListAsync_EmptyIntersection_DoesNotQuery(string? prefix, string? minId, string? maxId)
+    {
+        var table = new FakeTableClient();
+        using var context = await CreateStartedProviderAsync(table, TestContext.Current.CancellationToken);
+        var options = new ListOptions
+        {
+            Prefix = prefix is null ? default : new(prefix),
+            MinId = minId is null ? default : new(minId),
+            MaxId = maxId is null ? default : new(maxId),
+        };
+
+        var result = await ToListAsync(
+            context.Provider.ListAsync(options, TestContext.Current.CancellationToken),
+            TestContext.Current.CancellationToken);
+
+        Assert.Empty(result);
+        Assert.Empty(table.QueryCalls);
+    }
+
+    [Fact]
+    public async Task ListAsync_UnicodeBoundsAndUnpairedSurrogatePrefix_AreOrdinalAndPrunedOnServer()
+    {
+        var table = new FakeTableClient();
+        string[] values =
+        [
+            "unicode/\uD7FF",
+            "unicode/\uD800",
+            "unicode/😀",
+            "unicode/\uD83D",
+            "unicode/\uDFFF",
+            "unicode/\uE000",
+            "unicode/\uFFFF",
+            "unicode/\uFFFF/child",
+        ];
+        foreach (var value in values)
+        {
+            table.AddHeader(new JournalId(value));
+        }
+
+        using var context = await CreateStartedProviderAsync(table, TestContext.Current.CancellationToken);
+        var result = await ToListAsync(
+            context.Provider.ListAsync(
+                new() { MinId = new("unicode/\uD800"), MaxId = new("unicode/\uDFFF") },
+                TestContext.Current.CancellationToken),
+            TestContext.Current.CancellationToken);
+        var prefixed = await ToListAsync(
+            context.Provider.ListAsync(
+                new() { Prefix = new("unicode/\uD83D") },
+                TestContext.Current.CancellationToken),
+            TestContext.Current.CancellationToken);
+        var maxCodeUnitPrefix = await ToListAsync(
+            context.Provider.ListAsync(
+                new() { Prefix = new("unicode/\uFFFF") },
+                TestContext.Current.CancellationToken),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(values[1..5], result.Select(id => id.Value));
+        Assert.Equal(["unicode/😀", "unicode/\uD83D"], prefixed.Select(id => id.Value));
+        Assert.Equal(values[6..], maxCodeUnitPrefix.Select(id => id.Value));
+        Assert.Equal([4, 2, 2], table.QueryCalls.Select(query => query.ReturnedCount));
+    }
+
+    [Fact]
+    public async Task ListAsync_OptionsAreSnapshottedAtEnumerationStart()
+    {
+        var table = new FakeTableClient();
+        table.AddHeader(new JournalId("orders/1"));
+        table.AddHeader(new JournalId("orders/2"));
+        table.AddHeader(new JournalId("orders/3"));
+        var options = new ListOptions { Prefix = new("unused"), MinId = new("z"), MaxId = new("z") };
+        using var context = await CreateStartedProviderAsync(table, TestContext.Current.CancellationToken);
+        var listing = context.Provider.ListAsync(options, TestContext.Current.CancellationToken);
+        options.Prefix = new("orders");
+        options.MinId = new("orders/2");
+        options.MaxId = new("orders/3");
+        table.AfterQuery = () =>
+        {
+            options.Prefix = new("other");
+            options.MinId = new("z");
+            options.MaxId = new("a");
+        };
+
+        var result = await ToListAsync(listing, TestContext.Current.CancellationToken);
+
+        Assert.Equal(["orders/2", "orders/3"], result.Select(id => id.Value));
+        Assert.Equal(2, Assert.Single(table.QueryCalls).ReturnedCount);
     }
 
     [Fact]
@@ -356,7 +520,17 @@ public sealed class AzureTableJournalStorageProviderTests
         table.AddEntity(
             AzureTableJournalStorageOptions.GetDefaultPartitionKey(orphan),
             "g00000000000000000001-r0000000000");
-        table.AddEntity("%20", AzureTableJournalStorage.HeaderRowKey);
+        table.AddEntity(
+            AzureTableJournalStorageOptions.EncodePartitionKey("missing-id"),
+            AzureTableJournalStorage.HeaderRowKey);
+        table.AddEntity(
+            AzureTableJournalStorageOptions.EncodePartitionKey("invalid-id"),
+            AzureTableJournalStorage.HeaderRowKey,
+            new Dictionary<string, object> { [AzureTableJournalStorage.JournalIdPropertyName] = " " });
+        table.AddEntity(
+            AzureTableJournalStorageOptions.EncodePartitionKey("wrong-type"),
+            AzureTableJournalStorage.HeaderRowKey,
+            new Dictionary<string, object> { [AzureTableJournalStorage.JournalIdPropertyName] = 42 });
         using var context = await CreateStartedProviderAsync(table, TestContext.Current.CancellationToken);
 
         var result = await ToListAsync(
@@ -382,44 +556,67 @@ public sealed class AzureTableJournalStorageProviderTests
         var listed = Assert.Single(result);
         Assert.Equal(escaped, listed);
         Assert.Equal(
-            "tenant%2Fslash%5Chash%23query%3Fcontrol%01",
+            AzureTableJournalStorageOptions.GetDefaultPartitionKey(escaped),
             table.Entities.Single().PartitionKey);
     }
 
     [Fact]
-    public async Task ListAsync_CustomPartitionMapping_UsesCanonicalJournalIdAndAppliesPrefix()
+    public async Task ListAsync_CustomPartitionMapping_UsesOnlyCanonicalJournalIdFilters()
     {
         var table = new FakeTableClient();
         var included = new JournalId("tenant/orders/42");
         var excluded = new JournalId("other/orders/42");
-        table.AddHeader(included, "hash-a");
+        table.AddHeader(included, "hash-z");
         table.AddHeader(excluded, "hash-b");
+        table.AddHeader(new JournalId("tenant/orders/41"), "hash-y");
+        table.AddHeader(new JournalId("tenant/orders/43"), "hash-a");
         var options = CreateOptions(table);
-        options.GetPartitionKey = static journalId => journalId.Value == "tenant/orders/42" ? "hash-a" : "hash-b";
+        options.GetPartitionKey = static _ => throw new InvalidOperationException("Listing must not invoke custom partition mapping.");
         using var context = CreateProvider(options);
         await StartAsync(context.Provider, TestContext.Current.CancellationToken);
 
         var result = await ToListAsync(
-            context.Provider.ListAsync(new() { Prefix = new JournalId("tenant/orders") }, TestContext.Current.CancellationToken),
+            context.Provider.ListAsync(
+                new() { Prefix = new("tenant/order"), MinId = included, MaxId = included },
+                TestContext.Current.CancellationToken),
             TestContext.Current.CancellationToken);
 
         Assert.Equal([included], result);
-        Assert.Contains("JournalId eq 'tenant/orders'", Assert.Single(table.QueryCalls).Filter);
+        var query = Assert.Single(table.QueryCalls);
+        Assert.Equal(1, query.ReturnedCount);
+        Assert.Equal(
+            TableClient.CreateQueryFilter($"RowKey eq {AzureTableJournalStorage.HeaderRowKey}")
+            + " and JournalId ge 'tenant/orders/42' and JournalId le 'tenant/orders/42'",
+            query.Filter);
+        Assert.DoesNotContain("PartitionKey", query.Filter);
+        Assert.DoesNotContain(" or ", query.Filter);
     }
 
     [Fact]
-    public async Task ListAsync_LegacyHeaderUsingDefaultPartitionMapping_IsStillReturned()
+    public async Task ListAsync_CustomPartitionMapping_RawPrefixExcludesSuccessor()
     {
         var table = new FakeTableClient();
-        var journalId = new JournalId("legacy/orders/42");
-        table.AddLegacyHeader(journalId);
-        using var context = await CreateStartedProviderAsync(table, TestContext.Current.CancellationToken);
+        var exact = new JournalId("tenant/order");
+        var partialSegment = new JournalId("tenant/orders/42");
+        table.AddHeader(exact, "hash-z");
+        table.AddHeader(partialSegment, "hash-y");
+        table.AddHeader(new JournalId("tenant/ordes"), "hash-x");
+        var options = CreateOptions(table);
+        options.GetPartitionKey = static _ => "custom";
+        using var context = CreateProvider(options);
+        await StartAsync(context.Provider, TestContext.Current.CancellationToken);
 
         var result = await ToListAsync(
-            context.Provider.ListAsync(new() { Prefix = new JournalId("legacy/orders") }, TestContext.Current.CancellationToken),
+            context.Provider.ListAsync(
+                new() { Prefix = exact, MaxId = new("tenant/ordes") },
+                TestContext.Current.CancellationToken),
             TestContext.Current.CancellationToken);
 
-        Assert.Equal([journalId], result);
+        Assert.Equal([exact, partialSegment], result);
+        var query = Assert.Single(table.QueryCalls);
+        Assert.Equal(2, query.ReturnedCount);
+        Assert.Contains("JournalId ge 'tenant/order' and JournalId lt 'tenant/ordes'", query.Filter);
+        Assert.DoesNotContain("PartitionKey", query.Filter);
     }
 
     [Fact]
@@ -619,11 +816,6 @@ public sealed class AzureTableJournalStorageProviderTests
                     [AzureTableJournalStorage.JournalIdPropertyName] = journalId.Value,
                 });
 
-        public void AddLegacyHeader(JournalId journalId)
-            => AddEntity(
-                AzureTableJournalStorageOptions.GetDefaultPartitionKey(journalId),
-                AzureTableJournalStorage.HeaderRowKey);
-
         public void RemoveHeader(JournalId journalId)
             => _entities.RemoveAll(entity =>
                 entity.PartitionKey == AzureTableJournalStorageOptions.GetDefaultPartitionKey(journalId)
@@ -683,9 +875,33 @@ public sealed class AzureTableJournalStorageProviderTests
             CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            QueryCalls.Add(new(filter, select?.ToArray()));
+            var clauses = Regex.Matches(filter!, @"(RowKey|PartitionKey|JournalId) (eq|ge|le|lt) '((?:[^']|'')*)'");
+            Assert.Equal(filter, string.Join(" and ", clauses.Select(clause => clause.Value)));
             var values = _entities
-                .Where(entity => entity.RowKey == AzureTableJournalStorage.HeaderRowKey)
+                .Where(entity => clauses.All(clause =>
+                {
+                    var property = clause.Groups[1].Value;
+                    var value = property switch
+                    {
+                        "PartitionKey" => entity.PartitionKey,
+                        "RowKey" => entity.RowKey,
+                        _ => entity.TryGetValue(property, out var stored) ? stored as string : null,
+                    };
+                    if (value is null)
+                    {
+                        return false;
+                    }
+
+                    var comparison = string.CompareOrdinal(value, clause.Groups[3].Value.Replace("''", "'"));
+                    return clause.Groups[2].Value switch
+                    {
+                        "eq" => comparison == 0,
+                        "ge" => comparison >= 0,
+                        "le" => comparison <= 0,
+                        "lt" => comparison < 0,
+                        _ => throw new InvalidOperationException("Unexpected table filter comparison."),
+                    };
+                }))
                 .Select(entity =>
                 {
                     var projected = new TableEntity(entity.PartitionKey, entity.RowKey);
@@ -700,6 +916,7 @@ public sealed class AzureTableJournalStorageProviderTests
                     return (T)(ITableEntity)projected;
                 })
                 .ToList();
+            QueryCalls.Add(new(filter, select?.ToArray(), maxPerPage, values.Count));
             var page = Page<T>.FromValues(values, continuationToken: null, new FakeResponse(200, default));
             AfterQuery?.Invoke();
             return AsyncPageable<T>.FromPages([page]);
@@ -707,7 +924,7 @@ public sealed class AzureTableJournalStorageProviderTests
 
     }
 
-    private sealed record QueryCall(string? Filter, IReadOnlyList<string>? Select);
+    private sealed record QueryCall(string? Filter, IReadOnlyList<string>? Select, int? MaxPerPage, int ReturnedCount);
 
     private sealed class FakeResponse(int status, ETag eTag) : Response
     {

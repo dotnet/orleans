@@ -46,6 +46,8 @@ namespace Orleans.Journaling
 
         public bool UseConditionalDelete { get { throw null; } set { } }
 
+        public bool UseOrderedListing { get { throw null; } set { } }
+
         public bool UseS3ExpressAppend { get { throw null; } set { } }
 
         public void ConfigureS3Client(Amazon.RegionEndpoint regionEndpoint) { }

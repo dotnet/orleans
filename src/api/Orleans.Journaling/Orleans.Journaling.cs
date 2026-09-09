@@ -513,6 +513,8 @@ namespace Orleans.Journaling
     {
         public JournalId MaxId { get { throw null; } set { } }
 
+        public JournalId MinId { get { throw null; } set { } }
+
         public JournalId Prefix { get { throw null; } set { } }
     }
 

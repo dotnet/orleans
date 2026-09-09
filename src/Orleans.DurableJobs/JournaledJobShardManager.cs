@@ -100,7 +100,7 @@ internal sealed class JournaledJobShardManager : JobShardManager
             static (left, right) => StringComparer.Ordinal.Compare(left.Value, right.Value)));
         var options = new ListOptions
         {
-            Prefix = JobShardId.StoragePrefix,
+            Prefix = new JournalId(JobShardId.StoragePrefix.Value + "/"),
             MaxId = JobShardId.GetMaxJournalId(maxDueTime)
         };
         await foreach (var storageId in _catalog.ListAsync(options, cancellationToken))

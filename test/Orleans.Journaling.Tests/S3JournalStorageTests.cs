@@ -198,7 +198,8 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
             var options = CreateOptions();
             options.S3Client = client;
             options.GetObjectKey = static id => $"tenant/{id.Value}";
-            options.GetObjectKeyPrefix = static prefix => $"tenant/{prefix.Value}/";
+            options.GetObjectKeyPrefix = static prefix => $"tenant/{prefix.Value}";
+            options.UseOrderedListing = true;
             options.TryParseJournalId = static key => key.StartsWith("tenant/", StringComparison.Ordinal)
                 ? new JournalId(key["tenant/".Length..])
                 : null;
@@ -213,7 +214,7 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
 
             Assert.Equal(["journals/alpha"], listed.Select(static id => id.Value));
             await client.Received(1).ListObjectsV2Async(
-                Arg.Is<ListObjectsV2Request>(request => request.Prefix == "tenant/journals/"),
+                Arg.Is<ListObjectsV2Request>(request => request.Prefix == "tenant/journals" && request.StartAfter == null),
                 Arg.Any<CancellationToken>());
             await provider.CloseAsync(CancellationToken.None);
         }
@@ -235,7 +236,7 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
             var options = CreateOptions();
             options.S3Client = client;
             options.GetObjectKey = static id => $"current/{id.Value}";
-            options.GetObjectKeyPrefix = static prefix => $"current/{prefix.Value}/";
+            options.GetObjectKeyPrefix = static prefix => $"current/{prefix.Value}";
             options.TryParseJournalId = static key =>
                 key.EndsWith("journals/alpha", StringComparison.Ordinal)
                     ? new JournalId("journals/alpha")
@@ -269,7 +270,7 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
             var options = CreateOptions();
             options.S3Client = client;
             options.GetObjectKey = static id => $"current/{id.Value}";
-            options.GetObjectKeyPrefix = static prefix => $"current/{prefix.Value}/";
+            options.GetObjectKeyPrefix = static prefix => $"current/{prefix.Value}";
             options.TryParseJournalId = static key =>
                 key.EndsWith("journals/alpha", StringComparison.Ordinal)
                     ? new JournalId("journals/alpha")
@@ -1696,8 +1697,7 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
             UseConditionalDelete = false,
             StorageClass = null,
             MetadataOnlyConflictInitialBackoff = TimeSpan.Zero,
-            GetObjectKey = id => id.Value,
-            GetObjectKeyPrefix = prefix => prefix.Value + "/",
+            UseOrderedListing = true,
         };
     }
 

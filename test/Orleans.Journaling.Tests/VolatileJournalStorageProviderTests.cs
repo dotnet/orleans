@@ -9,6 +9,56 @@ namespace Orleans.Journaling.Tests;
 public sealed class VolatileJournalStorageProviderTests
 {
     [Fact]
+    public async Task ListAsync_UsesRawPrefixAndSnapshotsInclusiveRange()
+    {
+        var provider = new VolatileJournalStorageProvider();
+        string[] ids = ["jobs/20260908-a", "jobs/20260909-a", "jobs/20260909-b", "jobs/20260909-c", "jobs/20260910-a", "other"];
+        foreach (var value in ids)
+        {
+            await provider.CreateStorage(new(value)).CreateIfNotExistsAsync(cancellationToken: TestContext.Current.CancellationToken);
+        }
+
+        var options = new ListOptions { Prefix = new("other") };
+        var listing = provider.ListAsync(options, TestContext.Current.CancellationToken);
+        options.Prefix = new("jobs/20260909");
+        options.MinId = new("jobs/20260909-b");
+        options.MaxId = new("jobs/20260909-c");
+        await using var enumerator = listing.GetAsyncEnumerator(TestContext.Current.CancellationToken);
+        Assert.True(await enumerator.MoveNextAsync());
+        Assert.Equal("jobs/20260909-b", enumerator.Current.Value);
+
+        options.Prefix = new("other");
+        options.MinId = default;
+        options.MaxId = default;
+        Assert.True(await enumerator.MoveNextAsync());
+        Assert.Equal("jobs/20260909-c", enumerator.Current.Value);
+        Assert.False(await enumerator.MoveNextAsync());
+        Assert.Equal([new JournalId("other")], await ToListAsync(listing, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task ListAsync_RangeIndexIncludesRecreatedStoresAndExcludesDeletedStores()
+    {
+        var provider = new VolatileJournalStorageProvider();
+        var lower = new JournalId("range/b");
+        var upper = new JournalId("range/d");
+        foreach (var name in new[] { "range/a", "range/b", "range/c", "range/d", "range/e" })
+        {
+            await provider.CreateStorage(new(name)).CreateIfNotExistsAsync(cancellationToken: TestContext.Current.CancellationToken);
+        }
+
+        var deleted = provider.CreateStorage(new("range/c"));
+        await deleted.DeleteAsync(TestContext.Current.CancellationToken);
+        var options = new ListOptions { MinId = lower, MaxId = upper };
+        Assert.Equal([lower, upper], await ToListAsync(provider.ListAsync(options, TestContext.Current.CancellationToken), TestContext.Current.CancellationToken));
+
+        await deleted.CreateIfNotExistsAsync(cancellationToken: TestContext.Current.CancellationToken);
+        Assert.Equal([lower, new JournalId("range/c"), upper], await ToListAsync(provider.ListAsync(options, TestContext.Current.CancellationToken), TestContext.Current.CancellationToken));
+        options.MinId = new("z");
+        Assert.Empty(await ToListAsync(provider.ListAsync(options, TestContext.Current.CancellationToken), TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
     public async Task CreateIfNotExists_ListAndGetMetadataUseJournalIds()
     {
         var provider = new VolatileJournalStorageProvider();

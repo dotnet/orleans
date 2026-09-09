@@ -26,13 +26,29 @@ public sealed class S3JournalStorageOptions
     /// Gets or sets the delegate mapping a non-default catalog prefix to an S3 object-key prefix.
     /// </summary>
     /// <remarks>
-    /// The result must be non-empty, end in '/', and include the canonical WAL key of the exact
-    /// journal id and every descendant. Additional matches are filtered by the catalog.
-    /// When unset, the default identity <see cref="GetObjectKey"/> mapping uses the journal prefix
-    /// followed by '/'. Custom object-key mappings must configure this delegate to use prefixed
-    /// listings. Unprefixed listings do not require this delegate.
+    /// The result must be non-empty and include the canonical WAL key of every journal whose id
+    /// starts with the supplied raw ordinal prefix, including partial segments. Additional matches
+    /// are filtered by the catalog. When unset, the default identity <see cref="GetObjectKey"/>
+    /// mapping uses the raw journal prefix. Custom object-key mappings must configure this delegate
+    /// to use prefixed listings. Unprefixed listings do not require this delegate.
+    /// When <see cref="UseOrderedListing"/> is false, the mapped prefix is widened to its nearest
+    /// slash-terminated directory boundary to support directory buckets.
     /// </remarks>
     public Func<JournalId, string>? GetObjectKeyPrefix { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating that the bucket supports lexically ordered
+    /// <see cref="Amazon.S3.Model.ListObjectsV2Request"/> listings. Defaults to false.
+    /// </summary>
+    /// <remarks>
+    /// Enable this only for general-purpose buckets or compatible services which guarantee ordered
+    /// listings and support <see cref="Amazon.S3.Model.ListObjectsV2Request.StartAfter"/>.
+    /// Directory buckets are unordered and must leave this disabled. With the default identity
+    /// object-key mapping, ordered listings can seek to an ASCII lower bound and stop beyond an
+    /// ASCII upper bound. Custom mappings do not use native key-range bounds.
+    /// This capability is independent of <see cref="UseS3ExpressAppend"/>.
+    /// </remarks>
+    public bool UseOrderedListing { get; set; }
 
     /// <summary>
     /// Gets or sets the delegate used to parse journal ids from catalog object keys.
@@ -134,25 +150,27 @@ public sealed class S3JournalStorageOptions
 
     internal bool IsClientExternallyOwned { get; private set; }
 
-    internal string? GetObjectKeyPrefixForCatalog(JournalId prefix)
+    internal bool UsesDefaultObjectKey => GetObjectKey == DefaultGetObjectKey;
+
+    internal string? GetObjectKeyPrefixForCatalog(string? prefix)
     {
-        if (prefix.IsDefault)
+        if (prefix is null)
         {
             return null;
         }
 
         var mapper = GetObjectKeyPrefix;
-        if (mapper is null && GetObjectKey != DefaultGetObjectKey)
+        if (mapper is null && !UsesDefaultObjectKey)
         {
             throw new InvalidOperationException(
                 $"Custom {nameof(GetObjectKey)} mappings require {nameof(GetObjectKeyPrefix)} for prefixed journal listings.");
         }
 
-        var result = mapper is null ? prefix.Value + "/" : mapper(prefix);
-        if (string.IsNullOrWhiteSpace(result) || !result.EndsWith("/", StringComparison.Ordinal))
+        var result = mapper is null ? prefix : mapper(new JournalId(prefix));
+        if (string.IsNullOrEmpty(result))
         {
             throw new InvalidOperationException(
-                $"{nameof(GetObjectKeyPrefix)} must return a non-empty object-key prefix ending in '/'.");
+                $"{nameof(GetObjectKeyPrefix)} must return a non-empty object-key prefix.");
         }
 
         return result;

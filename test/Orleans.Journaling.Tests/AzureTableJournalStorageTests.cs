@@ -186,16 +186,16 @@ public sealed class AzureTableJournalStorageTests
     }
 
     [Fact]
-    public async Task LegacyHeader_ReadsAndMigratesThroughMetadataAppendReplaceAndDelete()
+    public async Task CanonicalHeader_PreservesIdentityThroughMetadataAppendReplaceAndDelete()
     {
         var store = new FakeTableStore();
         store.PutEntity(
             TestPartitionKey,
             AzureTableJournalStorage.HeaderRowKey,
-            CreateLegacyHeaderProperties("legacy", rowCount: 1, length: 1, metadataJson: """{"owner":"alice"}"""));
+            CreateHeaderProperties("current", rowCount: 1, length: 1, metadataJson: """{"owner":"alice"}"""));
         store.PutEntity(
             TestPartitionKey,
-            FormatDataRowKey("legacy", 0),
+            FormatDataRowKey("current", 0),
             new Dictionary<string, object> { ["Data00"] = new byte[] { 1 } });
         var storage = CreateStorage(store, compactionRowCountThreshold: 2);
 
@@ -206,7 +206,7 @@ public sealed class AzureTableJournalStorageTests
         Assert.Equal([1], consumer.Bytes.ToArray());
         Assert.Equal("alice", Assert.IsAssignableFrom<IJournalMetadata>(metadata).Properties["owner"]);
         Assert.NotNull(await storage.UpdateMetadataAsync(
-            set: new Dictionary<string, string> { ["migrated"] = "true" },
+            set: new Dictionary<string, string> { ["updated"] = "true" },
             cancellationToken: CancellationToken.None));
         Assert.Equal(
             TestJournalId.Value,
@@ -747,9 +747,9 @@ public sealed class AzureTableJournalStorageTests
     }
 
     [Fact]
-    public void DefaultPartitionKey_EscapesJournalIdValue()
+    public void DefaultPartitionKey_HexEncodesJournalIdValue()
     {
-        Assert.Equal("journals%2Ftest", AzureTableJournalStorageOptions.GetDefaultPartitionKey(new JournalId("journals/test")));
+        Assert.Equal("006A006F00750072006E0061006C0073002F0074006500730074", AzureTableJournalStorageOptions.GetDefaultPartitionKey(new JournalId("journals/test")));
     }
 
     [Fact]
@@ -1786,20 +1786,6 @@ public sealed class AzureTableJournalStorageTests
 
         return result;
     }
-
-    private static Dictionary<string, object> CreateLegacyHeaderProperties(
-        string generation,
-        long rowCount,
-        long length,
-        string metadataJson)
-        => new()
-        {
-            [AzureTableJournalStorage.FormatPropertyName] = string.Empty,
-            [AzureTableJournalStorage.GenerationPropertyName] = generation,
-            [AzureTableJournalStorage.RowCountPropertyName] = rowCount,
-            [AzureTableJournalStorage.LengthPropertyName] = length,
-            [AzureTableJournalStorage.MetadataPropertyName] = metadataJson,
-        };
 
     private static string FormatDataRowKey(string generation, long sequence) => $"{generation}-{sequence:D12}";
 
