@@ -512,6 +512,10 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         async Task OnRuntimeInitializeStop(CancellationToken cancellationToken)
         {
             _stoppedCts.Cancel();
+            foreach (var partition in _partitions)
+            {
+                await partition.OnStoppedAsync();
+            }
 
             if (_runTask is { } task)
             {
@@ -599,8 +603,17 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
                 if (!_stoppedCts.IsCancellationRequested)
                 {
                     LogErrorProcessingMembershipUpdates(exception);
+                    _fatalErrorHandler.OnFatalException(this, nameof(ProcessMembershipUpdates), exception);
                 }
+
+                break;
             }
+        }
+
+        _stoppedCts.Cancel();
+        foreach (var partition in _partitions)
+        {
+            await partition.OnStoppedAsync();
         }
 
         await Task.WhenAll(tasks).SuppressThrowing();

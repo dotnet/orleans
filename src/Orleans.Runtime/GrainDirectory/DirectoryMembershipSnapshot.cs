@@ -103,6 +103,11 @@ internal sealed class DirectoryMembershipSnapshot
 
     public RangeCollection RangeOwners => new(this);
 
+    internal void VisitRangeOwners<TState>(
+        RingRange range,
+        Action<ClusterServicePartitionOwner, TState> visitor,
+        TState state) => _topology.VisitRangeOwners(range, visitor, state);
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool TryGetOwner(
         GrainId grainId,

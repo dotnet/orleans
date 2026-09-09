@@ -1,13 +1,13 @@
 ---
 title: View-synchronous cluster services
-description: Internal ownership, transition, recovery, and fencing contracts for membership-derived cluster services.
-ms.date: 09/06/2026
+description: Internal authoritative views, typed ownership gates, state transfer, recovery, and fencing.
+ms.date: 09/09/2026
 ms.topic: concept-article
 ---
 
 # View-synchronous cluster services
 
-Orleans cluster services use the [Virtual Synchrony approach](https://doi.org/10.1145/41457.37515): normal operation runs within a membership view, and a view-change protocol carries work and state into the next view. Before a new owner starts serving, the runtime accounts for preceding work, transfers or recovers state, and establishes fencing. Requests wait at the affected range's gate while that transition is underway.
+Orleans cluster services use the [Virtual Synchrony approach](https://doi.org/10.1145/41457.37515): normal operation runs within an authoritative service view, and a view-change protocol carries work and state into the next view. Before a new owner starts serving, the runtime accounts for preceding work, transfers or recovers state, and establishes fencing. Requests wait at the affected resource's gate while that transition is underway.
 
 Orleans uses range-based partitioning for elastic scaling. A hash ring with a configurable number of virtual nodes per silo determines where each key belongs. View synchrony coordinates when a new owner can start serving it.
 
@@ -31,18 +31,20 @@ These papers explain the models behind the implementation:
 
 ## Service views and their authority
 
-`ClusterServiceViewId` has two parts:
+`IClusterServiceView<TViewId>` supplies a canonical identity and an authoritative predecessor. Each provider chooses its identity type, and each concrete view carries its own assignment and service metadata. Resource-set and ring services share the same gate contracts.
+
+The membership-derived `ClusterServiceViewId` has two parts:
 
 - `ProviderEpoch` identifies a coordinated generation of the service's view authority.
 - `Version`, a `ClusterServiceViewVersion`, is the ordered revision supplied by that authority.
 
-IDs are compared by provider epoch first, then revision. For example, `(epoch 2, revision 1)` follows `(epoch 1, revision 500)`. The counters belong to different authorities, so the second provider can start with a smaller revision.
+Revisions are comparable within the configured authority. Comparing different epochs reports an authority mismatch. Activating a replacement authority requires an explicit bootstrap policy which establishes agreement and fences the previous authority.
 
-This gives a future rolling provider change a distinct identity. Activating a new epoch is a coordinated operation: participants must agree on the new authority and fence the old one. Epochs are scoped to a logical service and cluster, and are separate from software versions or local configuration fingerprints.
+Epochs are scoped to a logical service and cluster. Service-view revision, cluster-membership watermark, and external fencing token each describe a separate boundary: placement, liveness knowledge, and authority to perform effects.
 
-`ClusterServiceView` holds the ID, topology, and an optional `PreviousViewId`. Derived views carry their service-specific configuration and metadata. One ID identifies one canonical view, including that payload. Configuration changes are represented by publishing a new view, rather than by independently changing fields in its identity.
+One ID identifies one immutable, canonical view, including its participant set, silo incarnations, assignment, and compatibility-relevant configuration. An authority publishes those inputs atomically. Configuration changes enter the stream through new authoritative snapshots.
 
-`PreviousViewId` identifies the authoritative predecessor, not the last view a particular reader happened to observe. A view is a direct successor when that ID matches the installed view. This can express continuity across nonconsecutive revisions or a coordinated provider change. Missing or skipped continuity selects recovery.
+`TryGetPredecessor` supplies the predecessor recorded by the authority. A view is a direct successor when that ID matches the installed view and the service's configuration is compatible. This supports authorities with nonconsecutive revisions. Missing or skipped continuity selects recovery, including an A -> B -> A assignment whose final local resource set matches the initial set.
 
 The implemented `MembershipBasedClusterServiceViewProvider` uses cluster membership revisions within its configured epoch. Its `MembershipBasedClusterServiceView` carries the cluster membership snapshot and fixed `ClusterServiceConfiguration`. Membership revisions are consecutive, so this provider identifies the predecessor as the preceding membership revision. It ignores repeated and older snapshots and relies on the membership layer to give each revision a canonical meaning.
 
@@ -70,23 +72,23 @@ The membership-derived view selects `Active` silos, then builds `ClusterServiceT
 
 Ring positions are sorted by hash, then partition index, then sorted member index. Hash collisions are resolved deterministically; losing partitions have empty ranges. The directory creates one `GrainDirectoryPartition` system target per configured virtual node, identified by silo identity and partition index.
 
-Owner lookup uses binary search over the sorted boundaries. Per-member range collections are derived from the same assignment. <xref:Orleans.Configuration.GrainDirectoryOptions.PartitionsPerSilo?displayProperty=nameWithType> controls directory partition granularity and defaults to one.
+Owner lookup uses binary search over the sorted boundaries. `VisitRangeOwners` searches for `Start + 1` using unsigned wrap, then walks the intersecting owners in ring order. It reports each partner's full range once, including when a wrapping query begins and ends inside the same owner's range. A partial query costs `O(log P + K)` for `P` ring partitions and `K` output partners. Per-member range collections are derived from the same assignment. <xref:Orleans.Configuration.GrainDirectoryOptions.PartitionsPerSilo?displayProperty=nameWithType> controls directory partition granularity and defaults to one.
 
-Membership-derived assignment is a design choice. The [register-backed configuration proposal](https://github.com/dotnet/orleans/issues/11156) would publish assignment, service configuration, and metadata atomically in a shared consistent register. Its revision would identify that whole record, and its views could carry typed configuration alongside topology. Draining, state transfer or recovery, and fencing would still govern ownership changes.
+The topology also indexes explicitly published ring assignments. Its source boundary validates participant eligibility, partition identity, full coverage, and nonoverlap before building the lookup index. The directory continues to compute local range differences and discovers transfer partners through the ordered index. Each partner receives one transfer/acknowledgement unit; that unit batches intersections and retires source state after installation of all required data.
 
 ### Selecting a provider per service
 
-`IClusterServiceViewProvider` supplies the current view, an asynchronous stream of newer views, and minimum-view refresh. Providers are keyed singleton services, using the logical service identifier as the key. Different services can select different providers without changing each other's assignment policy or authority.
+`IClusterServiceViewProvider<TViewId, TView>` supplies `TryGetCurrentView`, an asynchronous stream of newer views, `RefreshAsync`, and `RefreshAtLeastAsync`. The concrete view type flows through the contract. Providers are scoped to a logical service and authority; keyed registrations use the service identifier.
 
 <xref:Orleans.Hosting.CoreHostingExtensions.AddDistributedGrainDirectory*?displayProperty=nameWithType> registers the membership-derived provider under `orleans-grain-directory` when that key has no provider registration. A service-specific registration can replace that selection. The DI container owns the provider's lifetime; the directory adapter owns its local projection. Direct construction of the directory adapter creates and owns a private provider.
 
-The directory's existing RPCs carry `MembershipVersion`. Its adapter therefore requires the membership-derived provider in epoch zero and explicitly converts between wire membership versions and service-view IDs. Using a different authority for the directory also requires a coordinated wire/protocol migration. The current increment supplies per-service selection and the simple provider; register-backed configuration and live authority migration remain follow-up work.
+The directory's existing RPCs carry `MembershipVersion`. Its adapter requires the membership-derived provider in epoch zero and explicitly converts between wire membership versions and service-view IDs. It retains the empty startup baseline, deterministic ring, system-target addressing, RPC aliases, and serialized field meanings. An alternate directory authority requires a coordinated wire/protocol migration.
 
 The simple provider rejects a refresh request for an epoch it does not serve. A host can then report an authority mismatch explicitly instead of trying to repair it by refreshing an unrelated membership counter.
 
 ### Configuration changes within a view stream
 
-A service view can carry more than an assignment. A derived view can include operating settings, state-format information, or administrative metadata, all identified by the same view ID.
+A concrete service view can include operating settings, state-format information, or administrative metadata, all identified by the same view ID.
 
 The service decides what a new payload requires. A metadata-only change can leave topology unchanged. A change to execution or state semantics may need a barrier even when ownership stays the same. The provider publishes the authoritative view; the service and transition coordinator establish readiness to use it.
 
@@ -97,12 +99,14 @@ Admission policy belongs to the service's operation contract. Another service co
 | Component | Responsibility |
 | --- | --- |
 | `ClusterServiceViewId` and `ClusterServiceViewVersion` | Provider-scoped identity and consistent ordering for comparisons and gates. |
-| `ClusterServiceView` | Canonical topology and source-backed predecessor identity; derived views carry typed configuration and metadata. |
+| `IClusterServiceView<TViewId>` | Canonical identity and authoritative predecessor; concrete views define their assignment and metadata. |
 | `ClusterServiceConfiguration` | Fixed assignment inputs for the simple membership-derived provider. |
 | `ClusterServiceTopology` | Deterministic range assignment and owner lookup. |
-| `IClusterServiceViewProvider` | Per-service contract for current views, view updates, refresh, and lifecycle. |
+| `IClusterServiceViewProvider<TViewId, TView>` | Per-service contract for current views, view updates, refresh, and lifecycle. |
 | `MembershipBasedClusterServiceViewProvider` | Project membership into service views within a configured provider epoch. |
-| `PartitionTransitionCoordinator` and `PartitionTransition` | Track versioned range gates and enforce legal local transition stages. |
+| `TransitionGate<TViewId>` and its acquisition, release, and barrier types | Own atomic transition progress, readiness, failure, and shutdown. |
+| `ResourceTransitionGateMap<TResourceId, TViewId>` and `RangeTransitionGateMap<TViewId>` | Associate resource identities or ring ranges with relevant blocking gates. |
+| `DirectoryAcquisition`, `DirectoryRelease`, `DirectoryBarrier`, and `DirectoryTransitions` | Bind typed ownership coordination to the directory's scheduler and lifecycle. |
 | `ClusterServiceOperationResult<T>` | Describe execution certainty and whether retry requires deduplication. |
 | `DirectoryMembershipService` and `DirectoryMembershipSnapshot` | Adapt service views into directory routing snapshots and partition references. |
 | `DistributedGrainDirectory` | Route client operations, dispatch membership changes to partitions, coordinate the recovery watermark and activation enumeration, and report fatal transition errors. |
@@ -117,13 +121,13 @@ flowchart TD
     Adapter --> Routing[DirectoryMembershipSnapshot and RPC references]
     Routing --> Directory[DistributedGrainDirectory]
     Directory --> Partition[GrainDirectoryPartition]
-    Partition --> Gates[PartitionTransitionCoordinator]
+    Partition --> Gates[DirectoryTransitions and typed gates]
     Partition <-->|snapshot and recovery RPCs| Peers[Peer partitions and activation hosts]
 ```
 
 Membership projection and partition updates run asynchronously. A routing snapshot can therefore be ahead of a partition's local view. Request processing waits for the view and range it needs before using local state.
 
-`RefreshViewAsync` returns immediately when the local view satisfies the requested ID in the provider's epoch. A null minimum forces a refresh. The simple provider awaits membership refresh and then its local projection. Refresh errors propagate to the caller. If shutdown or stream termination interrupts the wait, the caller receives cancellation.
+`RefreshAtLeastAsync` returns an adequate view within the configured authority, or reports cancellation, failure, or unavailability. `RefreshAsync` requests a fresh observation. The membership provider awaits membership refresh and its local projection; the directory adapter then waits for its own projection of that returned view. Stream failures propagate the original exception to readers and pending refreshes. Normal stream termination and shutdown cancel pending requests, including requests whose minimum has not been installed.
 
 ## Scheduling, admission, and versioned gates
 
@@ -131,7 +135,7 @@ Each directory partition is a system target. Its scheduler serializes synchronou
 
 The partition **installs the range gate synchronously, before the transition's first `await`**. A caller can already see the new owner in its routing snapshot while that owner is still acquiring the range. The gate keeps the request waiting until the range is ready.
 
-A transition blocks an intersecting request when its target view ID is less than or equal to the ID that the request must wait for. Both the provider epoch and revision participate in this comparison. The directory maps wire membership versions into epoch-zero IDs. Lookup, registration, and deregistration wait for the maximum of the caller's version and the partition's current version. They pass the local range gate, re-read the view after waiting, and establish ownership before accessing the map.
+A transition blocks a relevant request when its target view ID is at or before the required view within the same authority. The directory maps wire membership versions into epoch-zero IDs. Lookup, registration, and deregistration wait for the maximum of the caller's version and the partition's current version. They pass the local range gate, re-read the view after waiting, and establish ownership before accessing the map.
 
 A ready current owner can serve a caller whose view is arbitrarily older. A receiver behind the caller refreshes to at least the requested view before serving, even when it already owns the key.
 
@@ -141,24 +145,23 @@ Acquisition, release, and recovery wait for preceding local transitions using th
 
 Once a directory request has passed its gate, its map operation runs synchronously within the turn. Together with the predecessor gates, this gives the directory a clear draining boundary. A service which awaits external work inside an admitted operation needs to drain or fence that work before handoff.
 
-Canceling one caller cancels its wait, while the shared transition continues. Transition completions run continuations asynchronously, keeping waiter code outside the coordinator's collection lock.
+Canceling one caller cancels its wait, while the shared transition continues. Waiters re-query the map after each completed gate. Lookup is read-only and single-pass; registration and finish/shutdown paths prune released gates. A current directory partition with no blocker returns `ValueTask.CompletedTask` directly from `WaitForRange`.
 
 ## Transition state machine
 
-Each transition records its range, previous view, target view, direction, stage, completion task, and any failure or fencing information.
+The abstract `TransitionGate<TViewId>` owns the target view, completion task, lifecycle status, and failure/shutdown handling. Concrete role types expose their valid progress operations and completion method. Acquisitions and releases also carry the previous view. Named sealed directory subclasses bind these roles to ranges.
 
-| Direction | Successful progression | What must be finished |
+| Gate type | Successful progression while pending | Completion requirement |
 | --- | --- | --- |
-| Inbound | `Blocking` -> `StateInstalled` -> `Fenced` -> `Completed` | State installation and the service's fencing conditions are established. |
-| Outbound with handoff | `Blocking` -> `Drained` -> `StateRetained` -> `Completed` | Preceding work is drained and the state needed by transfer partners is retained. |
-| Outbound without a retained handoff | `Blocking` -> `Drained` -> `Completed` | Draining completes; the directory uses this path when continuity is unavailable or there are no transfer partners. |
-| Barrier | `Blocking` -> `Completed` | The protected operation finishes. Directory integrity probes use this form. |
+| `OwnershipAcquisition<TViewId>` | `AwaitingState` -> `StateInstalled` -> `Fenced` | State installation and the service's fencing conditions are established. |
+| `OwnershipRelease<TViewId>` | `Blocking` -> `Drained` -> optionally `StateRetained` | Preceding work is drained; handoff retains the state needed by transfer partners. |
+| `ViewBarrier<TViewId>` | Pending until the protected operation finishes | Directory integrity probes complete this gate in their finish path. |
 
 Overlapping active transitions with the same target view are rejected. Different target views can overlap; their predecessor waits establish the ordering.
 
-`Fail` records the exception, cancels the completion task to wake waiters, and retains the gate in `Failed`. `Complete` accepts only the required stages. In the directory integration, an exception takes precedence over a completion-eligible stage, and the transition task is observed by the silo's fatal-error handler.
+Lifecycle status is `Pending`, `Completed`, `Failed`, or `Aborted`. Pending and failed gates block admission. Phase changes, readiness validation, completion, failure, and abort share a per-gate synchronization boundary. Role-specific completion-validation overrides are sealed. The gate's completion task is its sole exception store: `Fail` faults it with the original exception and retains the blocking gate. That exception survives a later shutdown abort.
 
-`Abort` removes the gate and cancels its completion. The directory uses this during shutdown, after its stopped token has closed request admission. A new integration must establish the corresponding admission boundary before abandoning a transition.
+Directory-owned typed finish helpers centralize completion, failure, and pruning. A readiness-validation exception faults a still-pending gate and enters fatal-error handling. An operation exception takes precedence over a completion-eligible phase. Terminal shutdown closes request admission, aborts remaining gates, and prunes their associations. Successful completion and abort release their associations; failed completions remain discoverable until shutdown.
 
 ## Contiguous directory handoff
 
@@ -290,14 +293,15 @@ These helpers are internal runtime code. Another service using them needs to def
 - Execution certainty, retry/deduplication behavior, cancellation, and shutdown ordering.
 - The relationship between observable transition completion and actual readiness to serve.
 
-The provider interface and per-service selection are implemented. [The register-backed configuration proposal](https://github.com/dotnet/orleans/issues/11156) covers shared configuration records, service-specific participant groups, and coordinated authority migration.
+For a finite resource set, a view publishes the resource-to-owner map together with immutable owner-to-resource sets. The local adapter compares its previous and current owned sets: resources removed from the set begin release, and resources added to it begin acquisition. Expected local comparison work is `O(|oldOwned| + |newOwned|)`. Constructing both immutable indexes is view-production work and traverses the full assignment separately.
 
 ## Source map and executable protocol scenarios
 
 The provider contract and directory integration are developed in [the cluster-service implementation PR](https://github.com/dotnet/orleans/pull/10969/files). Start with these files:
 
-- `ClusterServices\IClusterServiceViewProvider.cs`, `ClusterServiceView.cs`, `ClusterServiceViewId.cs`, and `MembershipBasedClusterServiceViewProvider.cs`: provider selection, canonical view payload, identity, and the simple provider.
-- `ClusterServices\ClusterServiceTopology.cs` and `PartitionTransitionCoordinator.cs`: assignment lookup, transition stages, and versioned gates.
+- `ClusterServices\IClusterServiceViewProvider.cs`, `ClusterServiceView.cs`, `ClusterServiceViewId.cs`, and `MembershipBasedClusterServiceViewProvider.cs`: generic contracts, membership view payload, authority-scoped identity, and membership projection.
+- `ClusterServices\ClusterServiceTopology.cs`, `TransitionGate.cs`, `ResourceTransitionGateMap.cs`, and `RangeTransitionGateMap.cs`: assignment lookup, typed progress, and resource-to-gate associations.
+- `GrainDirectory\DirectoryTransitions.cs`: sealed directory gate bindings.
 - `GrainDirectory\DirectoryMembershipService.cs` and `DirectoryMembershipSnapshot.cs`: the membership-version wire adapter and provider lifetime boundary.
 - `GrainDirectory\DistributedGrainDirectory.cs`, `GrainDirectoryPartition.cs`, and `GrainDirectoryPartition.Interface.cs`: invocation, recovery watermark, state transfer, admission, and fencing.
 

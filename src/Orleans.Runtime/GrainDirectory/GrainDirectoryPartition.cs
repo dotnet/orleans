@@ -42,7 +42,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
 
     private readonly TimeProvider _timeProvider;
 
-    private readonly PartitionTransitionCoordinator _transitionCoordinator = new();
+    private readonly DirectoryTransitions _transitions = new();
 
     // Ranges which were previously at least partially owned by this partition, but which are pending transfer to a new partition.
     private readonly List<PartitionSnapshotState> _partitionSnapshots = [];
@@ -94,7 +94,8 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
     {
         if (version == default || CurrentView.Version < version)
         {
-            await _owner.RefreshViewAsync(version, cancellationToken);
+            var refreshed = await _owner.RefreshViewAsync(version, cancellationToken);
+            version = refreshed.Version;
         }
 
         if (CurrentView.Version < version)
@@ -103,9 +104,11 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
             {
                 if (view.Version >= version)
                 {
-                    break;
+                    return view;
                 }
             }
+
+            throw new OperationCanceledException("Directory partition updates ended before the required view was installed.", cancellationToken);
         }
 
         return CurrentView;
@@ -254,7 +257,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         return ValueTask.CompletedTask;
 
         bool TryGetIntersectingLock(RingRange range, MembershipVersion version, [NotNullWhen(true)] out Task? completion) =>
-            _transitionCoordinator.TryGetBlockingTransition(range, DirectoryMembershipSnapshot.GetViewId(version), out completion);
+            _transitions.TryGetBlockingTransition(range, DirectoryMembershipSnapshot.GetViewId(version), out completion);
 
         async ValueTask WaitForRangeCore(
             RingRange range,
@@ -292,6 +295,15 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
             }
         });
     }
+
+    internal Task OnStoppedAsync() => this.QueueAction(
+        static self =>
+        {
+            self._transitions.AbortAll(self.ShutdownToken);
+            self._viewUpdates.Dispose();
+        },
+        this,
+        nameof(OnStoppedAsync));
 
     internal Task OnSiloRemovedFromClusterAsync(
         ClusterMember change,
@@ -440,17 +452,12 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
     private async Task ReleaseRangeAsync(DirectoryMembershipSnapshot previous, DirectoryMembershipSnapshot current, RingRange removedRange)
     {
         GrainRuntime.CheckRuntimeContext(this);
-        var (transition, sw) = BeginRangeTransition(
-            removedRange,
-            previous,
-            current,
-            PartitionTransitionDirection.Outbound,
-            GrainDirectoryEvents.ReleaseOperationName);
-        LogDebugRelinquishingOwnership(_logger, removedRange, current.Version);
+        var (transition, sw) = BeginRelease(removedRange, previous, current);
         Exception? transitionFailure = null;
 
         try
         {
+            LogDebugRelinquishingOwnership(_logger, removedRange, current.Version);
             // Snapshot & remove everything not in the current range.
             // The new owner will have the opportunity to retrieve the snapshot as they take ownership.
             List<GrainAddress> removedAddresses = [];
@@ -462,15 +469,14 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
 
             GrainRuntime.CheckRuntimeContext(this);
 
-            foreach (var (range, ownerIndex, partitionIndex) in current.RangeOwners)
-            {
-                if (range.Intersects(removedRange))
+            current.VisitRangeOwners(
+                removedRange,
+                static (owner, state) =>
                 {
-                    var owner = current.Members[ownerIndex];
-                    Debug.Assert(!_id.Equals(owner));
-                    transferPartners.Add((owner, partitionIndex));
-                }
-            }
+                    Debug.Assert(!state.Self._id.Equals(owner.SiloAddress));
+                    state.Partners.Add((owner.SiloAddress, owner.PartitionIndex));
+                },
+                (Self: this, Partners: transferPartners));
 
             // Collect all addresses that are not in the owned range.
             foreach (var entry in _directory)
@@ -515,11 +521,10 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         }
         finally
         {
-            CompleteRangeTransition(
+            FinishRelease(
                 transition,
                 current.Version,
                 sw.Elapsed,
-                GrainDirectoryEvents.ReleaseOperationName,
                 transitionFailure);
         }
     }
@@ -527,14 +532,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
     private async Task AcquireRangeAsync(DirectoryMembershipSnapshot previous, DirectoryMembershipSnapshot current, RingRange addedRange)
     {
         GrainRuntime.CheckRuntimeContext(this);
-        // Suspend the range and transfer state from the previous owners.
-        // If the predecessor becomes unavailable or membership advances quickly, we will declare data loss and unlock the range.
-        var (transition, sw) = BeginRangeTransition(
-            addedRange,
-            previous,
-            current,
-            PartitionTransitionDirection.Inbound,
-            GrainDirectoryEvents.AcquireOperationName);
+        var (transition, sw) = BeginAcquisition(addedRange, previous, current);
         Exception? transitionFailure = null;
 
         try
@@ -543,26 +541,26 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
             LogDebugAcquiringRange(_logger, addedRange);
             stopwatch = CoarseStopwatch.StartNew();
 
-            // The view change is contiguous if the new version is exactly one greater than the previous version.
-            // If not, we have missed some updates, so we must declare a potential data loss event.
+            // The provider's authoritative predecessor determines whether handoff can preserve state.
             var isContiguous = current.IsDirectSuccessorOf(previous);
             bool success;
             if (isContiguous)
             {
                 // Transfer subranges from previous owners.
                 var tasks = new List<Task<bool>>();
-                foreach (var previousOwner in previous.Members)
-                {
-                    var previousOwnerRanges = previous.GetMemberRangesByPartition(previousOwner);
-                    for (var partitionIndex = 0; partitionIndex < previousOwnerRanges.Length; partitionIndex++)
+                previous.VisitRangeOwners(
+                    addedRange,
+                    static (owner, state) =>
                     {
-                        var previousOwnerRange = previousOwnerRanges[partitionIndex];
-                        if (previousOwnerRange.Intersects(addedRange))
-                        {
-                            tasks.Add(TransferSnapshotAsync(current, previousOwnerRange, addedRange, previousOwner, partitionIndex, previous.Version));
-                        }
-                    }
-                }
+                        state.Tasks.Add(state.Self.TransferSnapshotAsync(
+                            state.Current,
+                            owner.Range,
+                            state.AddedRange,
+                            owner.SiloAddress,
+                            owner.PartitionIndex,
+                            state.PreviousVersion));
+                    },
+                    (Self: this, Current: current, AddedRange: addedRange, PreviousVersion: previous.Version, Tasks: tasks));
 
                 // Note: there should be no 'await' points before this point.
                 // An await before this point would result in ranges not being locked synchronously.
@@ -617,11 +615,10 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         }
         finally
         {
-            CompleteRangeTransition(
+            FinishAcquisition(
                 transition,
                 current.Version,
                 sw.Elapsed,
-                GrainDirectoryEvents.AcquireOperationName,
                 transitionFailure);
         }
     }
@@ -632,28 +629,20 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         RingRange addedRange)
     {
         var result = TimeSpan.Zero;
-        foreach (var previousOwner in previous.Members)
-        {
-            foreach (var range in previous.GetMemberRangesByPartition(previousOwner))
+        previous.VisitRangeOwners(
+            addedRange,
+            (owner, _) =>
             {
-                if (range.Intersects(addedRange))
+                current.ClusterMembershipSnapshot.Members.TryGetValue(owner.SiloAddress, out var member);
+                var duration = GetLeaseDurationForPreviousOwner(_deadSiloLeaseDuration, member);
+                if (duration > result)
                 {
-                    var duration = GetLeaseDuration(previousOwner);
-                    if (duration > result)
-                    {
-                        result = duration;
-                    }
+                    result = duration;
                 }
-            }
-        }
+            },
+            state: 0);
 
         return result;
-
-        TimeSpan GetLeaseDuration(SiloAddress previousOwner)
-        {
-            current.ClusterMembershipSnapshot.Members.TryGetValue(previousOwner, out var member);
-            return GetLeaseDurationForPreviousOwner(_deadSiloLeaseDuration, member);
-        }
     }
 
     internal static TimeSpan GetLeaseDurationForPreviousOwner(
@@ -670,56 +659,112 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
             : TimeSpan.Zero;
     }
 
-    private (PartitionTransition Transition, ValueStopwatch Stopwatch) BeginRangeTransition(
+    private (DirectoryAcquisition Transition, ValueStopwatch Stopwatch) BeginAcquisition(
         RingRange range,
         DirectoryMembershipSnapshot previous,
-        DirectoryMembershipSnapshot current,
-        PartitionTransitionDirection direction,
-        string operationName)
+        DirectoryMembershipSnapshot current)
     {
-        var transition = direction switch
-        {
-            PartitionTransitionDirection.Inbound =>
-                _transitionCoordinator.BeginInbound(range, previous.ViewId, current.ViewId),
-            PartitionTransitionDirection.Outbound =>
-                _transitionCoordinator.BeginOutbound(range, previous.ViewId, current.ViewId),
-            _ => throw new ArgumentOutOfRangeException(nameof(direction))
-        };
-
-        GrainDirectoryEvents.EmitRangeOperationStarted(_id, _partitionIndex, current.Version, range, operationName);
+        var transition = new DirectoryAcquisition(range, previous.ViewId, current.ViewId);
+        RegisterRangeTransition(transition, range, current.Version, GrainDirectoryEvents.AcquireOperationName);
         return (transition, ValueStopwatch.StartNew());
     }
 
-    private void CompleteRangeTransition(
-        PartitionTransition transition,
+    private (DirectoryRelease Transition, ValueStopwatch Stopwatch) BeginRelease(
+        RingRange range,
+        DirectoryMembershipSnapshot previous,
+        DirectoryMembershipSnapshot current)
+    {
+        var transition = new DirectoryRelease(range, previous.ViewId, current.ViewId);
+        RegisterRangeTransition(transition, range, current.Version, GrainDirectoryEvents.ReleaseOperationName);
+        return (transition, ValueStopwatch.StartNew());
+    }
+
+    private void RegisterRangeTransition(
+        TransitionGate<ClusterServiceViewId> transition,
+        RingRange range,
+        MembershipVersion version,
+        string operationName)
+    {
+        _transitions.Add(range, transition);
+        try
+        {
+            GrainDirectoryEvents.EmitRangeOperationStarted(_id, _partitionIndex, version, range, operationName);
+        }
+        catch (Exception exception)
+        {
+            transition.Fail(exception);
+            throw;
+        }
+    }
+
+    private DirectoryBarrier BeginBarrier(RingRange range, ClusterServiceViewId view)
+    {
+        var barrier = new DirectoryBarrier(range, view);
+        _transitions.Add(range, barrier);
+        return barrier;
+    }
+
+    private void FinishAcquisition(DirectoryAcquisition transition, MembershipVersion version, TimeSpan heldDuration, Exception? failure) =>
+        FinishRangeTransition(transition, transition.Range, version, heldDuration, GrainDirectoryEvents.AcquireOperationName, failure, static gate => gate.Complete());
+
+    private void FinishRelease(DirectoryRelease transition, MembershipVersion version, TimeSpan heldDuration, Exception? failure) =>
+        FinishRangeTransition(transition, transition.Range, version, heldDuration, GrainDirectoryEvents.ReleaseOperationName, failure, static gate => gate.Complete());
+
+    private void FinishBarrier(DirectoryBarrier barrier) =>
+        FinishTransition(barrier, failure: null, static gate => gate.Complete());
+
+    private void FinishRangeTransition<TGate>(
+        TGate transition,
+        RingRange range,
         MembershipVersion version,
         TimeSpan heldDuration,
         string operationName,
-        Exception? failure)
+        Exception? failure,
+        Action<TGate> complete) where TGate : TransitionGate<ClusterServiceViewId>
     {
-        _directoryInstruments.RangeLockHeldDuration.Record((long)heldDuration.TotalMilliseconds);
-        var canceled = ShutdownToken.IsCancellationRequested;
-        if (canceled)
+        try
         {
-            transition.Abort(ShutdownToken);
+            FinishTransition(transition, failure, complete);
         }
-        else if (failure is not null)
+        finally
         {
-            transition.Fail(failure);
+            _directoryInstruments.RangeLockHeldDuration.Record((long)heldDuration.TotalMilliseconds);
+            GrainDirectoryEvents.EmitRangeOperationCompleted(
+                _id, _partitionIndex, version, range, operationName, heldDuration, ShutdownToken.IsCancellationRequested);
         }
-        else
-        {
-            transition.Complete();
-        }
+    }
 
-        GrainDirectoryEvents.EmitRangeOperationCompleted(
-            _id,
-            _partitionIndex,
-            version,
-            transition.Range,
-            operationName,
-            heldDuration,
-            canceled);
+    private void FinishTransition<TGate>(TGate transition, Exception? failure, Action<TGate> complete)
+        where TGate : TransitionGate<ClusterServiceViewId>
+    {
+        try
+        {
+            if (ShutdownToken.IsCancellationRequested)
+            {
+                transition.Abort(ShutdownToken);
+            }
+            else if (failure is not null)
+            {
+                transition.Fail(failure);
+            }
+            else
+            {
+                complete(transition);
+            }
+        }
+        catch (Exception exception)
+        {
+            if (transition.Status == TransitionGateStatus.Pending)
+            {
+                transition.Fail(exception);
+            }
+
+            throw;
+        }
+        finally
+        {
+            _transitions.Prune();
+        }
     }
 
     private async Task<bool> TransferSnapshotAsync(
@@ -1117,7 +1162,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         Debug.Assert(range.Equals(current.GetRange(_id, _partitionIndex)));
 
         await WaitForRange(RingRange.Full, current.Version, cancellationToken).AsTask().WaitAsync(cancellationToken);
-        var barrier = _transitionCoordinator.BeginBarrier(RingRange.Full, current.ViewId);
+        var barrier = BeginBarrier(RingRange.Full, current.ViewId);
         try
         {
             foreach (var entry in _directory)
@@ -1163,14 +1208,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         }
         finally
         {
-            if (ShutdownToken.IsCancellationRequested)
-            {
-                barrier.Abort(ShutdownToken);
-            }
-            else
-            {
-                barrier.Complete();
-            }
+            FinishBarrier(barrier);
         }
     }
 
@@ -1210,7 +1248,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         var current = CurrentView;
 
         await WaitForRange(RingRange.Full, current.Version, cancellationToken).AsTask().WaitAsync(cancellationToken);
-        var barrier = _transitionCoordinator.BeginBarrier(RingRange.Full, current.ViewId);
+        var barrier = BeginBarrier(RingRange.Full, current.ViewId);
         try
         {
             List<GrainId> checkedGrains = [];
@@ -1244,14 +1282,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         }
         finally
         {
-            if (ShutdownToken.IsCancellationRequested)
-            {
-                barrier.Abort(ShutdownToken);
-            }
-            else
-            {
-                barrier.Complete();
-            }
+            FinishBarrier(barrier);
         }
     }
 

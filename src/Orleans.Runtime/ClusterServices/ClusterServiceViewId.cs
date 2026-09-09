@@ -1,8 +1,8 @@
 namespace Orleans.Runtime.ClusterServices;
 
 /// <summary>
-/// Identifies a view within a logical service. Provider epochs order changes of authority;
-/// revisions are ordered within an epoch.
+/// Identifies a membership-derived view within a logical service.
+/// Revisions are ordered within the configured provider epoch.
 /// </summary>
 [GenerateSerializer, Immutable, Alias("ClusterServiceViewIdentity")]
 internal readonly record struct ClusterServiceViewId(
@@ -11,8 +11,12 @@ internal readonly record struct ClusterServiceViewId(
 {
     public int CompareTo(ClusterServiceViewId other)
     {
-        var epoch = ProviderEpoch.CompareTo(other.ProviderEpoch);
-        return epoch != 0 ? epoch : Version.CompareTo(other.Version);
+        if (ProviderEpoch != other.ProviderEpoch)
+        {
+            throw new InvalidOperationException("Comparing different provider epochs requires an explicit authority migration.");
+        }
+
+        return Version.CompareTo(other.Version);
     }
 
     public static bool operator <(ClusterServiceViewId left, ClusterServiceViewId right) => left.CompareTo(right) < 0;
