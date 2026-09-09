@@ -400,6 +400,59 @@ namespace UnitTests.MembershipTests
         }
 
         [Fact, TestCategory("Liveness")]
+        public async Task ForwardedDeadSiloRequestReplacesStaleDestinationTracking()
+        {
+            var primaryServices = ((InProcessSiloHandle)HostedCluster.Primary!).ServiceProvider;
+            var gateway = primaryServices.GetRequiredService<MessageCenter>().Gateway!;
+            var clientId = Assert.Single(((IConnectedClientCollection)gateway).GetConnectedClientIds());
+            var deadSilo = HostedCluster.SecondarySilos[0];
+            var destination = new RecordingConnection();
+            var original = new Message
+            {
+                Id = new CorrelationId(3),
+                Direction = Message.Directions.Request,
+                SendingSilo = HostedCluster.Primary!.SiloAddress,
+                SendingGrain = clientId,
+                TargetSilo = HostedCluster.Primary.SiloAddress,
+                TargetGrain = GrainId.Create("target", Guid.NewGuid().ToString()),
+            };
+            var forwarded = new Message
+            {
+                Id = original.Id,
+                Direction = Message.Directions.Request,
+                SendingSilo = original.SendingSilo,
+                SendingGrain = original.SendingGrain,
+                TargetSilo = deadSilo.SiloAddress,
+                TargetGrain = original.TargetGrain,
+                ForwardCount = original.ForwardCount + 1,
+            };
+            Assert.True(gateway.TryGetClientState(original, out var client));
+            client.SendRequest(original, destination);
+            Assert.Same(original, Assert.Single(destination.Messages));
+            Assert.Equal(1, gateway.TrackedRequestClientCount);
+
+            await HostedCluster.KillSiloAsync(deadSilo, TestContext.Current.CancellationToken);
+            await HostedCluster.WaitForLivenessToStabilizeAsync(didKill: true)
+                .WaitAsync(TestContext.Current.CancellationToken);
+
+            using var gatewayEvents = new DiagnosticEventCollector(GatewayEvents.ListenerName);
+            var rejectionTask = gatewayEvents.WaitForEventAsync(
+                nameof(GatewayEvents.DeadSiloRequestRejected),
+                diagnosticEvent => diagnosticEvent.Payload is GatewayEvents.DeadSiloRequestRejected rejected
+                    && rejected.ClientId.Equals(clientId)
+                    && rejected.Rejection.Id.Equals(forwarded.Id),
+                TimeSpan.FromSeconds(30),
+                TestContext.Current.CancellationToken);
+
+            client.RejectRequest(forwarded, deadSilo.SiloAddress);
+
+            var rejected = Assert.IsType<GatewayEvents.DeadSiloRequestRejected>((await rejectionTask).Payload);
+            Assert.Equal(deadSilo.SiloAddress, rejected.Rejection.SendingSilo);
+            Assert.Equal(clientId, rejected.Rejection.TargetGrain);
+            Assert.Equal(0, gateway.TrackedRequestClientCount);
+        }
+
+        [Fact, TestCategory("Liveness")]
         public async Task ThrowingDiagnosticObserverDoesNotInterruptDeadSiloRejection()
         {
             var primaryServices = ((InProcessSiloHandle)HostedCluster.Primary!).ServiceProvider;
@@ -408,7 +461,7 @@ namespace UnitTests.MembershipTests
             var deadSilo = HostedCluster.SecondarySilos[0];
             var request = new Message
             {
-                Id = new CorrelationId(3),
+                Id = new CorrelationId(4),
                 Direction = Message.Directions.Request,
                 SendingSilo = HostedCluster.Primary!.SiloAddress,
                 SendingGrain = clientId,
