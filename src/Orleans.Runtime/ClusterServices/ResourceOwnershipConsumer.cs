@@ -14,7 +14,7 @@ internal sealed record ResourceHandoffState(
     ReadOnlyMemory<byte> State);
 
 /// <summary>
-/// Service-specific durable state, transport, and external fencing. A placement revision is not a fence.
+/// Service-specific durable state, transport, and external fencing establish each resource's authority to act.
 /// Implementations must provide checkpoint/replay and external-effect guarantees appropriate to their resource.
 /// </summary>
 internal interface IResourceOwnershipProtocol
@@ -26,7 +26,7 @@ internal interface IResourceOwnershipProtocol
 }
 
 /// <summary>
-/// A focused finite-resource reference adapter, not an Event Hub receiver or an external-effects framework.
+/// Coordinates finite and hash-ring resources through service-scoped immutable ownership views.
 /// Admission, receiver identity, draining, state installation, and fencing exercise the production typed gates.
 /// </summary>
 internal sealed class ResourceOwnershipConsumer : IAsyncDisposable
@@ -43,6 +43,8 @@ internal sealed class ResourceOwnershipConsumer : IAsyncDisposable
     private TaskCompletionSource _viewChanged = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private RegisteredClusterServiceView? _view;
     private Task _installation = Task.CompletedTask;
+    private int _operations;
+    private TaskCompletionSource? _operationsDrained;
     private bool _disposed;
 
     public ResourceOwnershipConsumer(SiloAddress local, RegisteredClusterServiceViewProvider provider, IResourceOwnershipProtocol protocol)
@@ -77,7 +79,7 @@ internal sealed class ResourceOwnershipConsumer : IAsyncDisposable
             }
 
             var previous = _view;
-            var previousId = previous?.Id ?? new(view.Id.ServiceId, view.Id.AuthorityId, 0);
+            var previousId = previous?.Id ?? new(view.Id.ServiceId, view.Id.AuthorityId, -1);
             var continuous = previous is not null && view.TryGetPredecessor(out var predecessor)
                 && predecessor == previous.Id && previous.Configuration == view.Configuration;
             var newOwned = view.GetOwnedResources(_local);
@@ -100,7 +102,10 @@ internal sealed class ResourceOwnershipConsumer : IAsyncDisposable
 
             foreach (var resource in newOwned)
             {
-                if (continuous && previous!.GetOwnedResources(_local).Contains(resource)
+                var resourceContinuous = continuous
+                    && previous!.ResourceRanges.TryGetValue(resource, out var previousRange) == view.ResourceRanges.TryGetValue(resource, out var targetRange)
+                    && previousRange.Equals(targetRange);
+                if (resourceContinuous && previous!.GetOwnedResources(_local).Contains(resource)
                     && _receivers[resource].Ready && !_gates.IsBlocked(resource, previous.Id))
                 {
                     _receivers[resource].View = view.Id;
@@ -112,14 +117,13 @@ internal sealed class ResourceOwnershipConsumer : IAsyncDisposable
                 _receivers[resource] = receiver;
                 var gate = new OwnershipAcquisition<RegisteredServiceViewId>(previousId, view.Id);
                 _gates.Add(resource, gate);
-                work.Add(() => AcquireAsync(resource, receiver, oldReceiver, previous, view, continuous, gate));
+                work.Add(() => AcquireAsync(resource, receiver, oldReceiver, previous, view, resourceContinuous, gate));
             }
 
             _view = view;
             var changed = _viewChanged;
             _viewChanged = new(TaskCreationOptions.RunContinuationsAsynchronously);
             changed.TrySetResult();
-            _gates.Prune();
             completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
             _installation = completion.Task;
             _work.RemoveWhere(static task => task.IsCompleted);
@@ -147,6 +151,35 @@ internal sealed class ResourceOwnershipConsumer : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// Routes a hash point through the authoritative ring's stable resource identity and receiver admission.
+    /// </summary>
+    public ValueTask<ReadOnlyMemory<byte>> ExecuteRingAsync(
+        uint hashCode,
+        RegisteredServiceViewId requestView,
+        Func<ReadOnlyMemory<byte>, CancellationToken, ValueTask<ReadOnlyMemory<byte>>> operation,
+        CancellationToken cancellationToken)
+    {
+        string resource;
+        lock (_lock)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            if (_view is null || _view.Id != requestView
+                || !_view.TryGetRingResource(hashCode, out var routedResource, out var owner) || !owner.Equals(_local))
+            {
+                throw new ClusterServiceViewUnavailableException($"Ring point '{hashCode}' is not available on '{_local}' in '{requestView}'.");
+            }
+
+            resource = routedResource;
+        }
+
+        return ExecuteAsync(resource, requestView, operation, cancellationToken);
+    }
+
+    /// <summary>
+    /// Serializes state transformations for each receiver, revalidating ownership, gates, and receiver
+    /// identity after admission waits and before committing the result.
+    /// </summary>
     public async ValueTask<ReadOnlyMemory<byte>> ExecuteAsync(
         string resource,
         RegisteredServiceViewId requestView,
@@ -159,55 +192,99 @@ internal sealed class ResourceOwnershipConsumer : IAsyncDisposable
         {
             ValidateOwnership(resource, requestView);
             receiver = _receivers[resource];
-        }
-
-        while (_gates.TryGetBlockingTransition(resource, requestView, out var blocker))
-        {
-            await blocker.WaitAsync(cancellationToken);
-            lock (_lock)
-            {
-                ValidateReceiver(resource, receiver, requestView);
-            }
-        }
-
-        ReadOnlyMemory<byte> state;
-        lock (_lock)
-        {
-            ValidateReceiver(resource, receiver, requestView);
-            if (!receiver.Ready || _gates.IsBlocked(resource, requestView))
-            {
-                throw new ClusterServiceViewUnavailableException($"Resource '{resource}' is gated in '{requestView}'.");
-            }
-
-            receiver.Active++;
-            state = receiver.State;
+            _operations++;
         }
 
         try
         {
-            var next = await operation(state, cancellationToken);
-            lock (_lock)
-            {
-                // Delayed old-view requests cannot overwrite a new receiver or a newer ownership view.
-                ValidateReceiver(resource, receiver, requestView);
-                if (_gates.IsBlocked(resource, requestView))
-                {
-                    throw new ClusterServiceViewUnavailableException($"Resource '{resource}' became gated in '{requestView}'.");
-                }
-
-                receiver.State = next.ToArray();
-                return receiver.State;
-            }
+            return await ExecuteCoreAsync(resource, requestView, receiver, operation, cancellationToken);
         }
         finally
         {
             lock (_lock)
             {
-                if (--receiver.Active == 0)
+                if (--_operations == 0)
                 {
-                    receiver.Drained?.TrySetResult();
+                    _operationsDrained?.TrySetResult();
                 }
             }
+        }
+    }
+
+    private async ValueTask<ReadOnlyMemory<byte>> ExecuteCoreAsync(
+        string resource,
+        RegisteredServiceViewId requestView,
+        Receiver receiver,
+        Func<ReadOnlyMemory<byte>, CancellationToken, ValueTask<ReadOnlyMemory<byte>>> operation,
+        CancellationToken cancellationToken)
+    {
+        using var operationCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _shutdown.Token);
+        while (_gates.TryGetBlockingTransition(resource, requestView, out var blocker))
+        {
+            try
+            {
+                await blocker.WaitAsync(operationCancellation.Token);
+            }
+            catch (OperationCanceledException) when (blocker.IsCanceled
+                && !cancellationToken.IsCancellationRequested && !_shutdown.IsCancellationRequested)
+            {
+                // Superseded acquisitions release their gate; admission rechecks the receiver and map.
+            }
+
+            lock (_lock)
+            {
+                ValidateReceiver(resource, receiver, requestView);
+            }
+        }
+
+        await receiver.Operations.WaitAsync(operationCancellation.Token);
+        try
+        {
+            operationCancellation.Token.ThrowIfCancellationRequested();
+            ReadOnlyMemory<byte> state;
+            lock (_lock)
+            {
+                ValidateReceiver(resource, receiver, requestView);
+                if (!receiver.Ready || _gates.IsBlocked(resource, requestView))
+                {
+                    throw new ClusterServiceViewUnavailableException($"Resource '{resource}' is gated in '{requestView}'.");
+                }
+
+                receiver.Active++;
+                state = receiver.State;
+            }
+
+            try
+            {
+                var next = await operation(state, operationCancellation.Token);
+                operationCancellation.Token.ThrowIfCancellationRequested();
+                lock (_lock)
+                {
+                    // Delayed old-view requests cannot overwrite a new receiver or a newer ownership view.
+                    ValidateReceiver(resource, receiver, requestView);
+                    if (_gates.IsBlocked(resource, requestView))
+                    {
+                        throw new ClusterServiceViewUnavailableException($"Resource '{resource}' became gated in '{requestView}'.");
+                    }
+
+                    receiver.State = next.ToArray();
+                    return receiver.State;
+                }
+            }
+            finally
+            {
+                lock (_lock)
+                {
+                    if (--receiver.Active == 0)
+                    {
+                        receiver.Drained?.TrySetResult();
+                    }
+                }
+            }
+        }
+        finally
+        {
+            receiver.Operations.Release();
         }
     }
 
@@ -329,7 +406,7 @@ internal sealed class ResourceOwnershipConsumer : IAsyncDisposable
                 gate.MarkFenced(fence);
                 receiver.Ready = true;
                 gate.Complete();
-                _gates.Prune();
+                _gates.Prune(resource);
             }
         }
         catch (Exception exception)
@@ -340,11 +417,11 @@ internal sealed class ResourceOwnershipConsumer : IAsyncDisposable
                     && (_view?.Id != target.Id || !_receivers.TryGetValue(resource, out var current) || !ReferenceEquals(current, receiver)))
                 {
                     gate.Abort();
-                    _gates.Prune();
+                    _gates.Prune(resource);
                 }
                 else
                 {
-                    FinishFailure(gate, exception);
+                    FinishFailure(resource, gate, exception);
                 }
             }
         }
@@ -369,11 +446,11 @@ internal sealed class ResourceOwnershipConsumer : IAsyncDisposable
             await _protocol.CheckpointAsync(resource, retained.Receiver.State, gate.PreviousView, _shutdown.Token);
             gate.MarkStateRetained();
             gate.Complete();
-            _gates.Prune();
+            _gates.Prune(resource);
         }
         catch (Exception exception)
         {
-            FinishFailure(gate, exception);
+            FinishFailure(resource, gate, exception);
         }
 
         await gate.Completion;
@@ -387,7 +464,7 @@ internal sealed class ResourceOwnershipConsumer : IAsyncDisposable
             {
                 await blocker.WaitAsync(_shutdown.Token);
             }
-            catch (OperationCanceledException) when (!_shutdown.IsCancellationRequested)
+            catch (OperationCanceledException) when (blocker.IsCanceled && !_shutdown.IsCancellationRequested)
             {
                 // A superseded acquisition can abort while a newer transition waits on it.
                 // Re-query the map: failed gates still fault, but aborted gates no longer block.
@@ -432,7 +509,7 @@ internal sealed class ResourceOwnershipConsumer : IAsyncDisposable
         }
     }
 
-    private void FinishFailure(TransitionGate<RegisteredServiceViewId> gate, Exception exception)
+    private void FinishFailure(string resource, TransitionGate<RegisteredServiceViewId> gate, Exception exception)
     {
         lock (_lock)
         {
@@ -448,13 +525,14 @@ internal sealed class ResourceOwnershipConsumer : IAsyncDisposable
                 }
             }
 
-            _gates.Prune();
+            _gates.Prune(resource);
         }
     }
 
     public async ValueTask DisposeAsync()
     {
         Task[] work;
+        Task operationsDrained;
         lock (_lock)
         {
             if (_disposed)
@@ -463,6 +541,8 @@ internal sealed class ResourceOwnershipConsumer : IAsyncDisposable
             }
 
             _disposed = true;
+            operationsDrained = _operations == 0 ? Task.CompletedTask
+                : (_operationsDrained ??= new(TaskCreationOptions.RunContinuationsAsynchronously)).Task;
             _shutdown.Cancel();
             _viewChanged.TrySetResult();
             _gates.AbortAll(_shutdown.Token);
@@ -477,6 +557,8 @@ internal sealed class ResourceOwnershipConsumer : IAsyncDisposable
         {
             // Each transition's original exception remains available through its returned task.
         }
+
+        await operationsDrained;
     }
 
     private sealed class Receiver(RegisteredServiceViewId view)
@@ -484,6 +566,7 @@ internal sealed class ResourceOwnershipConsumer : IAsyncDisposable
         public Guid Id { get; } = Guid.NewGuid();
         public RegisteredServiceViewId View { get; set; } = view;
         public ReadOnlyMemory<byte> State { get; set; }
+        public SemaphoreSlim Operations { get; } = new(1, 1);
         public bool Ready { get; set; }
         public int Active { get; set; }
         public TaskCompletionSource? Drained { get; set; }
