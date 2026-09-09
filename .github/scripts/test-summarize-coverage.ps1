@@ -899,6 +899,33 @@ exit 0
         $secondManifestSha = (Get-Content -Raw $validationPath | ConvertFrom-Json).manifest_sha256
         Assert-Equal $firstManifestSha $secondManifestSha 'Artifact manifest fingerprints must use ordinal ordering.'
 
+        $firstRetryArtifact = "$firstArtifact-attempt-1-retry"
+        Move-Item -LiteralPath $firstArtifact -Destination $firstRetryArtifact
+        Invoke-ArtifactValidator $testCase.ReportDirectory $expectedArtifacts | Out-Null
+
+        [void] (New-Item -ItemType Directory -Path $firstArtifact)
+        [IO.File]::WriteAllText(
+            (Join-Path $firstArtifact 'test_output_a.cobertura.xml'),
+            '<coverage />',
+            [Text.UTF8Encoding]::new($false)
+        )
+        Write-ArtifactMetadata $firstArtifact 'test_output_a'
+        Invoke-ArtifactValidator $testCase.ReportDirectory $expectedArtifacts | Out-Null
+        Assert-Equal $false (Test-Path -LiteralPath $firstArtifact) 'A legacy canonical artifact must yield to an attempt-qualified artifact.'
+        Assert-Equal $true (Test-Path -LiteralPath $firstRetryArtifact) 'The attempt-qualified artifact must remain available for aggregation.'
+
+        $secondAttemptArtifact = "$firstArtifact-attempt-2"
+        [void] (New-Item -ItemType Directory -Path $secondAttemptArtifact)
+        [IO.File]::WriteAllText(
+            (Join-Path $secondAttemptArtifact 'test_output_a.cobertura.xml'),
+            '<coverage />',
+            [Text.UTF8Encoding]::new($false)
+        )
+        Write-ArtifactMetadata $secondAttemptArtifact 'test_output_a'
+        Invoke-ArtifactValidator $testCase.ReportDirectory $expectedArtifacts | Out-Null
+        Assert-Equal $false (Test-Path -LiteralPath $firstRetryArtifact) 'An artifact from an older run attempt must not be aggregated.'
+        Assert-Equal $true (Test-Path -LiteralPath $secondAttemptArtifact) 'The newest run attempt must remain available for aggregation.'
+
         $unexpectedArtifact = Join-Path $testCase.ReportDirectory 'coverage_test_output_unexpected'
         [void] (New-Item -ItemType Directory -Path $unexpectedArtifact)
         [IO.File]::WriteAllText(
@@ -1209,15 +1236,16 @@ exit 0
             $archiveTestResultsAction `
             "github\.event_name == 'push'.*?github\.event\.repository\.default_branch" `
             'Current-main test jobs must publish the same raw coverage artifacts.'
-        Assert-Equal 1 ([regex]::Matches($archiveTestResultsAction, "github\.event_name == 'push' && 7 \|\| 1")).Count 'Current-main coverage retention count differs.'
+        Assert-Equal 2 ([regex]::Matches($archiveTestResultsAction, "github\.event_name == 'push' && 7 \|\| 1")).Count 'Current-main coverage retention count differs.'
         Assert-Matches `
             $archiveTestResultsAction `
             '(?s)path:\s*\|.*?TestResults/\$\{\{ inputs\.name \}\}\.cobertura\.xml.*?TestResults/\$\{\{ inputs\.name \}\}\.coverage\.json' `
             'Each selected test job must publish its exact coverage report.'
-        Assert-Equal 2 ([regex]::Matches($archiveTestResultsAction, 'uses: actions/upload-artifact@')).Count 'Each artifact must have one immutable upload attempt.'
+        Assert-Equal 3 ([regex]::Matches($archiveTestResultsAction, 'uses: actions/upload-artifact@')).Count 'Coverage must have one distinct-name retry.'
+        Assert-Equal 1 ([regex]::Matches($archiveTestResultsAction, 'run: Start-Sleep -Seconds 30')).Count 'Coverage upload retry delay count differs.'
         Assert-Equal 0 ([regex]::Matches($archiveTestResultsAction, 'overwrite: true')).Count 'Artifact uploads must not replace an ambiguous partial upload.'
-        Assert-Equal 1 ([regex]::Matches($archiveTestResultsAction, 'if-no-files-found: error')).Count 'Coverage upload must require the report.'
-        Assert-Equal 1 ([regex]::Matches($archiveTestResultsAction, 'continue-on-error: true')).Count 'Only diagnostic upload may remain advisory.'
+        Assert-Equal 2 ([regex]::Matches($archiveTestResultsAction, 'if-no-files-found: error')).Count 'Both coverage upload attempts must require the report.'
+        Assert-Equal 2 ([regex]::Matches($archiveTestResultsAction, 'continue-on-error: true')).Count 'Only diagnostic upload and the initial coverage attempt may remain advisory.'
         Assert-Equal 1 ([regex]::Matches($archiveTestResultsAction, 'retention-days: \$\{\{ inputs\[''retention-days''\] \}\}')).Count 'Diagnostic upload must use the requested retention period.'
         Assert-Equal 1 ([regex]::Matches($runTestsAction, '(?m)^    id: retry\r?$')).Count 'The retry outcome must be available to diagnostic retention policy.'
         Assert-Equal 1 ([regex]::Matches($runTestsAction, 'retention-days: \$\{\{ steps\.test\.outcome == ''failure'' && steps\.retry\.outcome != ''success'' && 14 \|\| 1 \}\}')).Count 'Only unrecovered test failures may retain diagnostics for 14 days.'
@@ -1227,8 +1255,8 @@ exit 0
             'Test result upload failures must remain advisory and explicit.'
         Assert-Matches `
             $archiveTestResultsAction `
-            "(?ms)^  - name: Archive coverage\r?\n    if: .*?github\.event_name == 'pull_request'.*?github\.event_name == 'push'.*?\r?\n    uses: actions/upload-artifact@.*?\r?\n    with:\r?\n(?:(?!^  - ).)*?      if-no-files-found: error\r?$" `
-            'Coverage upload must remain directly gating.'
+            "(?ms)^  - name: Archive coverage\r?\n    id: archive-coverage\r?\n    if: .*?github\.event_name == 'pull_request'.*?github\.event_name == 'push'.*?\r?\n    continue-on-error: true\r?\n    uses: actions/upload-artifact@.*?\r?\n    with:\r?\n(?:(?!^  - ).)*?      name: coverage_\$\{\{ inputs\.name \}\}-attempt-\$\{\{ github\.run_attempt \}\}\r?\n.*?^  - name: Report coverage upload retry\r?\n    if: .*?steps\.archive-coverage\.outcome == 'failure'\r?\n    shell: pwsh\r?\n    run: Write-Output '::warning title=Coverage artifact upload failed::.*?^  - name: Retry coverage upload\r?\n    if: .*?steps\.archive-coverage\.outcome == 'failure'\r?\n    uses: actions/upload-artifact@.*?\r?\n    with:\r?\n(?:(?!^  - ).)*?      name: coverage_\$\{\{ inputs\.name \}\}-attempt-\$\{\{ github\.run_attempt \}\}-retry\r?$" `
+            'Coverage upload must retry under a distinct immutable name and keep the retry gating.'
     }
 
     Invoke-Test 'collects GitHub coverage only on Linux .NET 10' {
