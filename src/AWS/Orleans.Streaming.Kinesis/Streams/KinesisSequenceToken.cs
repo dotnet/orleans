@@ -45,6 +45,9 @@ namespace Orleans.Streaming.Kinesis
         public string ShardSequence { get; } = null!;
 
         /// <inheritdoc />
+        protected override Type SequenceTokenCompatibilityDomain => typeof(KinesisSequenceToken);
+
+        /// <inheritdoc />
         public override bool Equals(object? obj) => obj is StreamSequenceToken token && Equals(token);
 
         /// <inheritdoc />

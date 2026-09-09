@@ -86,22 +86,9 @@ public sealed class LegacySequenceTokenRecoveryTests
     }
 
     [Fact]
-    public void OverridingAnyContractMember_PreservesSeparateCompatibility()
+    public void ExplicitCompatibilityDomain_PreservesSeparateCompatibility()
     {
-        StreamSequenceToken[] overrides =
-        [
-            new ObjectEqualityToken(500, 2),
-            new TokenEqualityToken(500, 2),
-            new OrderingToken(500, 2),
-            new HashingToken(500, 2),
-            new InterfaceEqualityToken(500, 2),
-            new InterfaceOrderingToken(500, 2),
-        ];
-
-        foreach (var token in overrides)
-        {
-            LegacyTokenRecoveryFixture.AssertProviderIsolation(token);
-        }
+        LegacyTokenRecoveryFixture.AssertProviderIsolation(new IsolatedV2Token(500, 2));
     }
 
     [Theory]
@@ -149,37 +136,9 @@ public sealed class LegacySequenceTokenRecoveryTests
 
     private sealed class OtherV2Token(long sequence, int index) : EventSequenceTokenV2(sequence, index);
 
-    private sealed class ObjectEqualityToken(long sequence, int index) : EventSequenceTokenV2(sequence, index)
+    private sealed class IsolatedV2Token(long sequence, int index) : EventSequenceTokenV2(sequence, index)
     {
-        public override bool Equals(object? obj) => base.Equals(obj);
-        public override int GetHashCode() => base.GetHashCode();
-    }
-
-    private sealed class TokenEqualityToken(long sequence, int index) : EventSequenceTokenV2(sequence, index)
-    {
-        public override bool Equals(StreamSequenceToken? other) => base.Equals(other);
-    }
-
-    private sealed class OrderingToken(long sequence, int index) : EventSequenceTokenV2(sequence, index)
-    {
-        public override int CompareTo(StreamSequenceToken? other) => base.CompareTo(other);
-    }
-
-    private sealed class HashingToken(long sequence, int index) : EventSequenceTokenV2(sequence, index)
-    {
-        public override int GetHashCode() => base.GetHashCode();
-    }
-
-    private sealed class InterfaceEqualityToken(long sequence, int index)
-        : EventSequenceTokenV2(sequence, index), IEquatable<StreamSequenceToken?>
-    {
-        bool IEquatable<StreamSequenceToken?>.Equals(StreamSequenceToken? other) => base.Equals(other);
-    }
-
-    private sealed class InterfaceOrderingToken(long sequence, int index)
-        : EventSequenceTokenV2(sequence, index), IComparable<StreamSequenceToken?>
-    {
-        int IComparable<StreamSequenceToken?>.CompareTo(StreamSequenceToken? other) => base.CompareTo(other);
+        protected override Type SequenceTokenCompatibilityDomain => typeof(IsolatedV2Token);
     }
 }
 

@@ -33,8 +33,8 @@ namespace Orleans.Streaming.EventHubs
     ///   and ordering of application layer events within an EventHub message.
     /// </summary>
     /// <remarks>
-    /// Event Hub token versions and subclasses which inherit their complete equality, ordering,
-    /// and hashing contract compare using the Event Hubs sequence number and event index.
+    /// Event Hub token versions and subclasses which retain the Event Hubs compatibility domain
+    /// compare using the Event Hubs sequence number and event index.
     /// During recovery, Orleans interprets exact <see cref="EventSequenceToken"/> positions from
     /// the earlier inherited event-token factory in this provider's sequence-number space.
     /// Delivered event tokens preserve their concrete type and Event Hubs offset.
@@ -72,9 +72,13 @@ namespace Orleans.Streaming.EventHubs
         {
         }
 
+        /// <inheritdoc />
+        protected override Type SequenceTokenCompatibilityDomain => typeof(EventHubSequenceToken);
+
         internal override StreamSequenceToken NormalizeLegacyToken(StreamSequenceToken token)
         {
-            if (token.GetType() == typeof(EventSequenceToken) && HasInheritedEventHubContract(this))
+            if (token.GetType() == typeof(EventSequenceToken)
+                && SequenceTokenCompatibilityDomain == typeof(EventHubSequenceToken))
             {
                 // The former inherited factory persisted the position without the offset.
                 // Empty offsets also identify sequence-only tokens produced by EventHubDataAdapter.
@@ -128,13 +132,7 @@ namespace Orleans.Streaming.EventHubs
                 return false;
             }
 
-            return GetType() == other.GetType()
-                || other is EventHubSequenceToken
-                    && HasInheritedEventHubContract(this)
-                    && HasInheritedEventHubContract(other);
+            return EventSequenceTokenCompatibility.IsCompatibleNumericToken(this, other);
         }
-
-        private static bool HasInheritedEventHubContract(StreamSequenceToken token)
-            => EventSequenceTokenCompatibility.HasInheritedContract(token, typeof(EventHubSequenceToken), typeof(EventSequenceToken));
     }
 }

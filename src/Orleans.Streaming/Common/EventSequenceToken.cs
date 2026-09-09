@@ -10,9 +10,10 @@ namespace Orleans.Providers.Streams.Common
     /// </summary>
     /// <remarks>
     /// <see cref="EventSequenceToken"/> and <see cref="EventSequenceTokenV2"/> share a numeric
-    /// position contract with subclasses which inherit their complete equality, ordering, and
-    /// hashing implementations. This includes exact base tokens persisted by earlier event-token
-    /// factories. Subclasses which override that contract define their own compatibility.
+    /// position contract with subclasses which retain the same
+    /// <see cref="SequenceTokenCompatibilityDomain"/>. This includes exact base tokens persisted
+    /// by earlier event-token factories. Subclasses which add position identity override that
+    /// domain together with equality, ordering, and hashing.
     /// </remarks>
     [Serializable]
     [GenerateSerializer]
@@ -74,6 +75,19 @@ namespace Orleans.Providers.Streams.Common
             result.EventIndex = eventInd;
             return result;
         }
+
+        /// <summary>
+        /// Gets the compatibility domain used to determine which event sequence tokens share
+        /// this token's numeric equality and ordering contract.
+        /// </summary>
+        /// <remarks>
+        /// Derived tokens which add position identity override this property and return a stable
+        /// type representing their contract. Tokens in the same domain compare by
+        /// <see cref="SequenceNumber"/> and <see cref="EventIndex"/>.
+        /// </remarks>
+        protected virtual Type SequenceTokenCompatibilityDomain => typeof(EventSequenceToken);
+
+        internal Type GetSequenceTokenCompatibilityDomain() => SequenceTokenCompatibilityDomain;
 
         internal virtual StreamSequenceToken NormalizeLegacyToken(StreamSequenceToken token) => token;
 

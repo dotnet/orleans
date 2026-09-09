@@ -48,6 +48,9 @@ internal sealed class RedisStreamSequenceToken : EventSequenceTokenV2
     [JsonProperty]
     public long RedisSequenceNumber { get; private set; }
 
+    /// <inheritdoc />
+    protected override Type SequenceTokenCompatibilityDomain => typeof(RedisStreamSequenceToken);
+
     /// <summary>
     /// Creates a token for an event within the same Redis entry.
     /// </summary>

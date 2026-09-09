@@ -119,8 +119,8 @@ public sealed class EventHubSequenceTokenTests
             batch);
 
     [Fact]
-    public void OverriddenEventHubContract_KeepsLegacyGenericTokensIsolated()
-        => LegacyTokenRecoveryFixture.AssertProviderIsolation(new OverriddenEventHubSequenceToken("offset", 500, 2));
+    public void ExplicitEventHubCompatibilityDomain_KeepsLegacyGenericTokensIsolated()
+        => LegacyTokenRecoveryFixture.AssertProviderIsolation(new IsolatedEventHubSequenceToken("offset", 500, 2));
 
     [Theory]
     [InlineData(false)]
@@ -179,9 +179,9 @@ public sealed class EventHubSequenceTokenTests
         public string Metadata { get; } = "custom-metadata";
     }
 
-    private sealed class OverriddenEventHubSequenceToken(string offset, long sequence, int index)
+    private sealed class IsolatedEventHubSequenceToken(string offset, long sequence, int index)
         : EventHubSequenceToken(offset, sequence, index)
     {
-        public override int CompareTo(StreamSequenceToken? other) => base.CompareTo(other);
+        protected override Type SequenceTokenCompatibilityDomain => typeof(IsolatedEventHubSequenceToken);
     }
 }
