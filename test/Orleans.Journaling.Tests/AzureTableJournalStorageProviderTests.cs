@@ -323,9 +323,8 @@ public sealed class AzureTableJournalStorageProviderTests
 
         Assert.Equal([child, exact], result);
         var query = Assert.Single(table.QueryCalls);
-        Assert.Equal(
-            TableClient.CreateQueryFilter($"RowKey eq {AzureTableJournalStorage.HeaderRowKey}"),
-            query.Filter);
+        Assert.Contains("JournalId eq 'tenant/orders'", query.Filter);
+        Assert.Contains("PartitionKey ge 'tenant%2Forders%2F'", query.Filter);
     }
 
     [Fact]
@@ -405,9 +404,7 @@ public sealed class AzureTableJournalStorageProviderTests
             TestContext.Current.CancellationToken);
 
         Assert.Equal([included], result);
-        Assert.Equal(
-            TableClient.CreateQueryFilter($"RowKey eq {AzureTableJournalStorage.HeaderRowKey}"),
-            Assert.Single(table.QueryCalls).Filter);
+        Assert.Contains("JournalId eq 'tenant/orders'", Assert.Single(table.QueryCalls).Filter);
     }
 
     [Fact]

@@ -23,6 +23,18 @@ public sealed class S3JournalStorageOptions
     public Func<JournalId, string> GetObjectKey { get; set; } = DefaultGetObjectKey;
 
     /// <summary>
+    /// Gets or sets the delegate mapping a non-default catalog prefix to an S3 object-key prefix.
+    /// </summary>
+    /// <remarks>
+    /// The result must be non-empty, end in '/', and include the canonical WAL key of the exact
+    /// journal id and every descendant. Additional matches are filtered by the catalog.
+    /// When unset, the default identity <see cref="GetObjectKey"/> mapping uses the journal prefix
+    /// followed by '/'. Custom object-key mappings must configure this delegate to use prefixed
+    /// listings. Unprefixed listings do not require this delegate.
+    /// </remarks>
+    public Func<JournalId, string>? GetObjectKeyPrefix { get; set; }
+
+    /// <summary>
     /// Gets or sets the delegate used to parse journal ids from catalog object keys.
     /// </summary>
     public Func<string, JournalId?> TryParseJournalId { get; set; } = DefaultTryParseJournalId;
@@ -121,6 +133,30 @@ public sealed class S3JournalStorageOptions
     internal Func<CancellationToken, Task<IAmazonS3>>? CreateClient { get; private set; }
 
     internal bool IsClientExternallyOwned { get; private set; }
+
+    internal string? GetObjectKeyPrefixForCatalog(JournalId prefix)
+    {
+        if (prefix.IsDefault)
+        {
+            return null;
+        }
+
+        var mapper = GetObjectKeyPrefix;
+        if (mapper is null && GetObjectKey != DefaultGetObjectKey)
+        {
+            throw new InvalidOperationException(
+                $"Custom {nameof(GetObjectKey)} mappings require {nameof(GetObjectKeyPrefix)} for prefixed journal listings.");
+        }
+
+        var result = mapper is null ? prefix.Value + "/" : mapper(prefix);
+        if (string.IsNullOrWhiteSpace(result) || !result.EndsWith("/", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"{nameof(GetObjectKeyPrefix)} must return a non-empty object-key prefix ending in '/'.");
+        }
+
+        return result;
+    }
 
     internal string GetObjectKeyForJournal(JournalId journalId)
     {

@@ -52,11 +52,13 @@ public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJ
     {
         cancellationToken.ThrowIfCancellationRequested();
         var prefix = options?.Prefix ?? default;
+        var maxId = options?.MaxId ?? default;
         foreach (var (key, store) in _storage)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var journalId = new JournalId(key);
-            if (!prefix.IsPrefixOf(journalId))
+            if (!prefix.IsPrefixOf(journalId)
+                || !maxId.IsDefault && string.CompareOrdinal(journalId.Value, maxId.Value) > 0)
             {
                 continue;
             }

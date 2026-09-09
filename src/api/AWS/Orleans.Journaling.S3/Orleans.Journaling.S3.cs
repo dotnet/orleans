@@ -30,6 +30,8 @@ namespace Orleans.Journaling
 
         public System.Func<JournalId, string> GetObjectKey { get { throw null; } set { } }
 
+        public System.Func<JournalId, string>? GetObjectKeyPrefix { get { throw null; } set { } }
+
         public int MaxMetadataOnlyConflictRetries { get { throw null; } set { } }
 
         public System.TimeSpan MetadataOnlyConflictInitialBackoff { get { throw null; } set { } }
