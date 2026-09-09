@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using Orleans.Diagnostics;
 using Orleans.Serialization;
 
@@ -20,7 +19,7 @@ namespace Orleans.Runtime
         {
             var values = contextData switch
             {
-                { Count: > 0 } => contextData.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+                { Count: > 0 } => new Dictionary<string, object>(contextData),
                 _ => null,
             };
 
