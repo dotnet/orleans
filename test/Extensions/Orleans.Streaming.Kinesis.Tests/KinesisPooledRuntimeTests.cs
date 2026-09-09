@@ -580,9 +580,11 @@ public sealed class KinesisPooledRuntimeTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task PooledReceiver_NonzeroStartTokenDeliversRequestedRecordSuffix(bool includeNewerRecord)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task PooledReceiver_NonzeroStartTokenDeliversRequestedRecordSuffix(bool includeNewerRecord, bool zeroPaddedToken)
     {
         const string offset = "123456789012345678901234567890";
         const string nextOffset = "123456789012345678901234567891";
@@ -596,7 +598,7 @@ public sealed class KinesisPooledRuntimeTests
         fixture.SetReads(client, () => Response("tail", records));
         await receiver.GetQueueMessagesAsync(records.Length, TestCancellation);
 
-        var startToken = new KinesisSequenceToken(offset, sequenceNumber: 0, eventIndex: 1);
+        var startToken = new KinesisSequenceToken(zeroPaddedToken ? $"000{offset}" : offset, sequenceNumber: 0, eventIndex: 1);
         using var cursor = Assert.IsAssignableFrom<IQueueCacheCursor>(
             receiver.TryGetCacheCursor(fixture.StreamId, startToken).Cursor);
         var batch = ReadBatch(cursor);
@@ -620,9 +622,11 @@ public sealed class KinesisPooledRuntimeTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task PooledReceiver_NonzeroDeliveryTokenResumesAfterAcknowledgedEvent(bool includeNewerRecord)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task PooledReceiver_NonzeroDeliveryTokenResumesAfterAcknowledgedEvent(bool includeNewerRecord, bool zeroPaddedToken)
     {
         const string offset = "123456789012345678901234567890";
         const string nextOffset = "123456789012345678901234567891";
@@ -636,7 +640,7 @@ public sealed class KinesisPooledRuntimeTests
         fixture.SetReads(client, () => Response("tail", records));
         await receiver.GetQueueMessagesAsync(records.Length, TestCancellation);
 
-        var deliveredToken = new KinesisSequenceToken(offset, sequenceNumber: 0, eventIndex: 1);
+        var deliveredToken = new KinesisSequenceToken(zeroPaddedToken ? $"000{offset}" : offset, sequenceNumber: 0, eventIndex: 1);
         using var cursor = Assert.IsAssignableFrom<IQueueCacheCursor>(
             receiver.TryGetCacheCursor(fixture.StreamId, deliveredToken).Cursor);
         Assert.IsAssignableFrom<IQueueCacheCursorProgress>(cursor).SetDeliveredThrough(deliveredToken);
@@ -656,9 +660,11 @@ public sealed class KinesisPooledRuntimeTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task PooledReceiver_FinalEventDeliveryTokenPreservesSafePosition(bool includeNewerRecord)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task PooledReceiver_FinalEventDeliveryTokenPreservesSafePosition(bool includeNewerRecord, bool zeroPaddedToken)
     {
         const string offset = "123456789012345678901234567890";
         const string nextOffset = "123456789012345678901234567891";
@@ -672,7 +678,7 @@ public sealed class KinesisPooledRuntimeTests
         fixture.SetReads(client, () => Response("tail", records));
         await receiver.GetQueueMessagesAsync(records.Length, TestCancellation);
 
-        var deliveredToken = new KinesisSequenceToken(offset, sequenceNumber: 0, eventIndex: 2);
+        var deliveredToken = new KinesisSequenceToken(zeroPaddedToken ? $"000{offset}" : offset, sequenceNumber: 0, eventIndex: 2);
         using var cursor = Assert.IsAssignableFrom<IQueueCacheCursor>(
             receiver.TryGetCacheCursor(fixture.StreamId, deliveredToken).Cursor);
         var progress = Assert.IsAssignableFrom<IQueueCacheCursorProgress>(cursor);
