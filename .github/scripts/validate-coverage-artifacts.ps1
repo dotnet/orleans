@@ -91,7 +91,7 @@ foreach ($artifact in Get-ChildItem -LiteralPath $resolvedReportDirectory -Force
     if ($contents.Where({ $_.PSIsContainer }, 'First').Count -gt 0 -or
         $actualContents.Count -ne $expectedContents.Count -or
         (Compare-Object $expectedContents $actualContents)) {
-        throw "Coverage artifact '$artifactName' must contain only '$expectedReport' and '$expectedMetadata'"
+        throw "Coverage artifact '$($artifact.Name)' must contain only '$expectedReport' and '$expectedMetadata'"
     }
     foreach ($content in $contents) {
         Assert-NotReparsePoint $content.FullName
@@ -99,23 +99,23 @@ foreach ($artifact in Get-ChildItem -LiteralPath $resolvedReportDirectory -Force
 
     $metadataPath = Join-Path $artifact.FullName $expectedMetadata
     if ((Get-Item -LiteralPath $metadataPath -Force).Length -gt 1MB) {
-        throw "Coverage artifact '$artifactName' metadata exceeds the 1 MB parsing limit"
+        throw "Coverage artifact '$($artifact.Name)' metadata exceeds the 1 MB parsing limit"
     }
     try {
         $metadata = Get-Content -Raw -LiteralPath $metadataPath | ConvertFrom-Json
     } catch {
-        throw "Coverage artifact '$artifactName' contains invalid metadata: $($_.Exception.Message)"
+        throw "Coverage artifact '$($artifact.Name)' contains invalid metadata: $($_.Exception.Message)"
     }
     $metadataProperties = @($metadata.PSObject.Properties.Name | Sort-Object)
     $expectedMetadataProperties = @('artifact_name', 'commit_sha', 'coverage_id', 'format_version')
     if (Compare-Object $expectedMetadataProperties $metadataProperties) {
-        throw "Coverage artifact '$artifactName' contains unexpected metadata fields"
+        throw "Coverage artifact '$($artifact.Name)' contains unexpected metadata fields"
     }
     if ($metadata.format_version -ne 1 -or
         $metadata.artifact_name -ne $artifactName -or
         $metadata.coverage_id -ne $coverageId -or
         $metadata.commit_sha -notmatch '^[0-9a-f]{40}$') {
-        throw "Coverage artifact '$artifactName' contains inconsistent metadata"
+        throw "Coverage artifact '$($artifact.Name)' contains inconsistent metadata"
     }
     if ($null -eq $testedSha) {
         $testedSha = $metadata.commit_sha
