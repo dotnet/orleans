@@ -121,6 +121,43 @@ public partial class PersistentStreamPullingAgentTests
         }
     }
 
+    [Fact]
+    public async Task ShutdownDrainsUnavailableConsumerUnregistrationBeforeCancelingRetries()
+    {
+        var streamId = new QualifiedStreamId("provider", StreamId.Create("shutdown-unregister", Guid.NewGuid()));
+        var subscriptionId = GuidId.GetGuidId(Guid.NewGuid());
+        var token = new EventSequenceTokenV2(1);
+        var cache = new ScriptedQueueCache();
+        cache.AddToCache([new TestBatchContainer(streamId.StreamId, token)]);
+        var (accessor, pubSub, streamData) = await CreateInitializedAgentWithStream(
+            streamId, token, cache, new StreamPullingAgentOptions());
+        var unavailable = Tester.ClientConnectionTests.ClientObserverRoutingTests.CreateUnavailableClientException();
+        var data = streamData.AddConsumer(
+            subscriptionId,
+            streamId,
+            new UnavailableConsumer(unavailable),
+            filterData: null,
+            DateTime.UtcNow);
+        data.Cursor = cache.GetCacheCursor(streamId.StreamId, token);
+        data.IsRegistered = true;
+        var firstAttempt = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var attempts = 0;
+        pubSub.UnregisterConsumer(subscriptionId, streamId, Arg.Any<CancellationToken>()).Returns(_ =>
+            Interlocked.Increment(ref attempts) == 1 ? firstAttempt.Task : Task.CompletedTask);
+
+        await accessor.RunConsumerCursor(data).WaitAsync(
+            TimeSpan.FromSeconds(10),
+            TestContext.Current.CancellationToken);
+        var shutdown = accessor.Shutdown();
+
+        Assert.False(shutdown.IsCompleted);
+        firstAttempt.SetException(new InvalidOperationException("transient cleanup failure"));
+        await shutdown.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        _ = pubSub.Received(2)
+            .UnregisterConsumer(subscriptionId, streamId, Arg.Any<CancellationToken>());
+    }
+
     private sealed class UnavailableConsumer(ClientNotAvailableException exception) : IStreamConsumerExtension
     {
         public Task<StreamHandshakeToken?> DeliverImmutable(GuidId subscriptionId, QualifiedStreamId streamId, object item,

@@ -37,6 +37,7 @@ namespace Orleans.Streams
         private readonly StreamInstruments? _streamInstruments;
         private readonly TimeProvider _timeProvider;
         private readonly CancellationTokenSource _shutdownCancellation = new();
+        private readonly HashSet<Task> _pendingUnavailableConsumerUnregistrations = [];
         internal readonly QueueId QueueId;
 
         private int numMessages;
@@ -250,7 +251,6 @@ namespace Orleans.Streams
 
             var asyncTimer = timer;
             timer = null;
-            _shutdownCancellation.Cancel();
             var localDeliveryProgressTimer = deliveryProgressTimer;
             deliveryProgressTimer = null;
             localDeliveryProgressTimer?.Dispose();
@@ -304,6 +304,18 @@ namespace Orleans.Streams
             {
                 await Task.WhenAll(inFlightRegistrations)
                     .ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
+            }
+
+            try
+            {
+                if (_pendingUnavailableConsumerUnregistrations.Count > 0)
+                {
+                    await Task.WhenAll(_pendingUnavailableConsumerUnregistrations).WaitAsync(cancellationToken);
+                }
+            }
+            finally
+            {
+                _shutdownCancellation.Cancel();
             }
 
             var unregisterTasks = new List<Task>();
@@ -1788,7 +1800,7 @@ namespace Orleans.Streams
             {
                 LogWarningConsumerIsDead(consumerData.StreamConsumer, consumerData.StreamId);
                 RemoveSubscriber_Impl(consumerData.SubscriptionId, consumerData.StreamId);
-                UnregisterUnavailableConsumer(consumerData).Ignore();
+                TrackUnavailableConsumerUnregistration(consumerData);
                 return true;
             }
 
@@ -1830,6 +1842,19 @@ namespace Orleans.Streams
                 return true;
             }
             return false;
+        }
+
+        private void TrackUnavailableConsumerUnregistration(StreamConsumerData consumerData)
+        {
+            var task = UnregisterUnavailableConsumer(consumerData);
+            _pendingUnavailableConsumerUnregistrations.Add(task);
+            RemoveWhenComplete(task).Ignore();
+
+            async Task RemoveWhenComplete(Task pending)
+            {
+                await pending.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
+                _pendingUnavailableConsumerUnregistrations.Remove(pending);
+            }
         }
 
         private async Task UnregisterUnavailableConsumer(StreamConsumerData consumerData)
