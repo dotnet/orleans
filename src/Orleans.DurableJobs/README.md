@@ -81,6 +81,10 @@ builder.UseOrleans(siloBuilder =>
             {
                 // Duration of each job shard (jobs are partitioned by time)
                 options.ShardDuration = TimeSpan.FromMinutes(5);
+
+                // Load eligible shards within this horizon and check at this interval
+                options.ShardLoadLookaheadPeriod = TimeSpan.FromMinutes(10);
+                options.ShardCheckInterval = TimeSpan.FromMinutes(5);
                 
                 // Maximum number of jobs that can execute concurrently on each silo
                 options.MaxConcurrentJobsPerSilo = 100;
@@ -103,10 +107,13 @@ builder.UseOrleans(siloBuilder =>
 
 ## Shard discovery and lookahead
 
-Each silo discovers shards whose start time is within ten minutes of its current Durable Jobs
-time-provider clock. A discovered shard starts processing once its start time enters
-`ShardActivationBufferPeriod`. Periodic checks run every five minutes, and membership changes
-also trigger checks.
+Each silo discovers shards whose start time is within `DurableJobsOptions.ShardLoadLookaheadPeriod`
+of its current Durable Jobs time-provider clock. The default lookahead is ten minutes.
+A discovered shard starts processing once its start time enters `ShardActivationBufferPeriod`.
+`DurableJobsOptions.ShardCheckInterval` controls periodic discovery and writable-shard cleanup
+checks, with a default of five minutes. Membership changes also trigger checks.
+The lookahead accepts non-negative durations; zero selects shards whose start time is at or
+before the current time. The check interval accepts durations from 1 to 4294967294 milliseconds.
 
 Runtime discovery retains one asynchronous catalog enumerator across turns. Each turn
 evaluates at most 256 yielded identities, fetching metadata once per evaluated identity.
@@ -138,9 +145,8 @@ because shard identifiers are random and due times and owners are stored in meta
 The `jobs/shards` prefix selects shard journals; time and ownership filtering uses metadata.
 Underlying listing I/O depends on the provider's prefix support: providers which filter
 logical prefixes after listing can traverse all journal headers or bucket objects.
-The shorter lookahead
-reduces early loading of recovered shards, while the five-minute polling interval increases
-sweep frequency relative to a ten-minute interval.
+Shorter lookahead periods reduce early loading of recovered shards. Shorter check intervals
+increase sweep frequency and reduce the wait for future shards to become eligible.
 
 The local manager serializes enumeration and uses the silo lifetime cancellation token
 for the whole sweep. Cancellation is checked between candidates and passed through catalog,
