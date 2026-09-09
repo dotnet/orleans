@@ -15,7 +15,7 @@ public sealed class ClusterServiceAccordantTests
     [Fact]
     public async Task Accordant_TypedOwnershipStateMachine_CoversAcquisitionReleaseBarrierFailureAndAbort()
     {
-        var coverage = await Run(validCommandsOnly: true, maxDepth: 5, sequenceLength: 7);
+        var coverage = await Run(validCommandsOnly: true);
         foreach (var kind in Enum.GetValues<GateOperationKind>())
         {
             if (kind is not GateOperationKind.BeginNonIncreasingView)
@@ -36,7 +36,7 @@ public sealed class ClusterServiceAccordantTests
     [Fact]
     public async Task Accordant_InvalidCommandsAndRangeViewProbes_PreserveStateOnRejection()
     {
-        var coverage = await Run(validCommandsOnly: false, maxDepth: 3, sequenceLength: 4);
+        var coverage = await Run(validCommandsOnly: false);
         foreach (var kind in new[]
         {
             GateOperationKind.BeginNonIncreasingView,
@@ -61,22 +61,13 @@ public sealed class ClusterServiceAccordantTests
         Assert.Contains(GateOperationKind.ProbeNewerDisjoint, coverage.Executed);
     }
 
-    private static async Task<GateExecutionCoverage> Run(bool validCommandsOnly, int maxDepth, int sequenceLength)
+    private static async Task<GateExecutionCoverage> Run(bool validCommandsOnly)
     {
         var spec = new GateBehavioralSpec();
         var initial = GateModelState.Create();
         var coverage = new GateExecutionCoverage();
-        var cases = spec.GenerateTests(
-            initial,
-            spec.CreateInputSet(),
-            new TestGenerationOptions
-            {
-                MaxDepth = maxDepth,
-                SequentialTestCaseAlgorithm = SequentialTestCaseAlgorithms.CreateTransitionCoverage(sequenceLength),
-                ShouldApply = (input, state) => !validCommandsOnly
-                    || GateModel.CanApply(((GateRequest)input.Request).Kind, (GateModelState)state)
-            }).ToList();
         var context = spec.CreateTestingContext();
+        var cases = CreateCases(context, spec.CreateInputSet(), validCommandsOnly);
         context.RequestPrinter = request => request?.ToString() ?? "<null>";
         context.ResponsePrinter = response => response?.ToString() ?? "<null>";
         var results = await spec.RunTests(
@@ -94,6 +85,53 @@ public sealed class ClusterServiceAccordantTests
             $"cases={cases.Count}; failure={failure?.LastFailureMessage}; log={failure?.LogFilePath}");
         return coverage;
     }
+
+    private static List<SequentialTestCase> CreateCases(TestingContext context, InputSet inputs, bool validCommandsOnly)
+    {
+        // Accordant's transition-coverage traversal enumerates paths, including permutations
+        // through probe/self-loop edges. Visit each finite model state once instead, retaining
+        // its shortest prefix and executing every state/input edge through Accordant.
+        var cases = new List<SequentialTestCase>();
+        var pending = new Queue<(GateModelState State, GateOperationKind[] Prefix)>();
+        var seen = new HashSet<(int Role, int Status, int Phase, bool HasFence, int TaskState)>();
+        var initial = GateModelState.Create();
+        pending.Enqueue((initial, []));
+        seen.Add((initial.Role, initial.Status, initial.Phase, initial.HasFence, initial.TaskState));
+        while (pending.TryDequeue(out var current))
+        {
+            foreach (var kind in Enum.GetValues<GateOperationKind>())
+            {
+                var next = GateModel.Predict(kind, current.State);
+                if (validCommandsOnly && !next.Accepted)
+                {
+                    continue;
+                }
+
+                var sequence = current.Prefix.Append(kind).ToArray();
+                Assert.True(sequence.Length <= 6, "Every gate state must be reachable within five setup commands.");
+                cases.Add(TestCaseGenerator.CreateManualSequentialTestCase(
+                    context,
+                    inputs,
+                    sequence.Select(static (operation, position) => $"{position}:{operation}").ToArray()));
+                if (seen.Add((next.Role, next.Status, next.Phase, next.HasFence, next.TaskState)))
+                {
+                    Assert.True(seen.Count <= 33, "The gate model must remain a bounded finite state machine.");
+                    pending.Enqueue((new GateModelState
+                    {
+                        Role = next.Role,
+                        Status = next.Status,
+                        Phase = next.Phase,
+                        HasFence = next.HasFence,
+                        TaskState = next.TaskState
+                    }, sequence));
+                }
+            }
+        }
+
+        Assert.Equal(33, seen.Count);
+        Assert.Equal(validCommandsOnly ? 269 : 528, cases.Count);
+        return cases;
+    }
 }
 
 internal sealed class GateBehavioralSpec : Spec<GateModelState>
@@ -105,9 +143,13 @@ internal sealed class GateBehavioralSpec : Spec<GateModelState>
     public InputSet CreateInputSet()
     {
         var inputs = new InputSet();
-        foreach (var kind in Enum.GetValues<GateOperationKind>())
+        // Accordant requires distinct call names even when a scenario repeats an operation.
+        for (var position = 0; position < 6; position++)
         {
-            inputs.Add(_operation.With(new(kind), kind.ToString()));
+            foreach (var kind in Enum.GetValues<GateOperationKind>())
+            {
+                inputs.Add(_operation.With(new(kind), $"{position}:{kind}"));
+            }
         }
 
         return inputs;
