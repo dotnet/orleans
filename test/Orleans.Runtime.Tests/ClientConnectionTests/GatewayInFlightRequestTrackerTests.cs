@@ -143,9 +143,25 @@ public class GatewayInFlightRequestTrackerTests
         Assert.True(tracker.Track(original));
         Assert.True(tracker.Track(retry));
 
-        Assert.False(tracker.TryRemove(original.Id, Silo1, out _));
+        Assert.False(tracker.TryClaimForRejection(original, Silo1, out _));
         Assert.Equal(1, tracker.Count);
-        Assert.True(tracker.TryRemove(retry.Id, Silo2, out var removed));
+        Assert.True(tracker.TryClaimForRejection(retry, Silo2, out var removed));
+        Assert.Equal(Silo2, removed.TargetSilo);
+        Assert.Equal(0, tracker.Count);
+    }
+
+    [Fact]
+    public void ForwardedAttemptClaimsStaleDestination()
+    {
+        var tracker = CreateTracker();
+        var original = CreateMessage(1, Message.Directions.Request, Silo1);
+        var forwarded = CreateMessage(1, Message.Directions.Request, Silo2);
+        forwarded.ForwardCount = original.ForwardCount + 1;
+        Assert.True(tracker.Track(original));
+
+        Assert.True(tracker.TryClaimForRejection(forwarded, Silo2, out var removed));
+
+        Assert.Same(forwarded, removed);
         Assert.Equal(Silo2, removed.TargetSilo);
         Assert.Equal(0, tracker.Count);
     }
@@ -161,9 +177,9 @@ public class GatewayInFlightRequestTrackerTests
         Assert.True(tracker.Track(original));
         Assert.True(tracker.Track(retry));
 
-        Assert.False(tracker.TryRemove(original.Id, oldGeneration, out _));
+        Assert.False(tracker.TryClaimForRejection(original, oldGeneration, out _));
         Assert.Equal(1, tracker.Count);
-        Assert.True(tracker.TryRemove(retry.Id, newGeneration, out var removed));
+        Assert.True(tracker.TryClaimForRejection(retry, newGeneration, out var removed));
         Assert.Equal(newGeneration, removed.TargetSilo);
         Assert.Equal(0, tracker.Count);
     }
@@ -178,11 +194,11 @@ public class GatewayInFlightRequestTrackerTests
         Assert.True(firstClient.Track(firstRequest));
         Assert.True(secondClient.Track(secondRequest));
 
-        Assert.True(firstClient.TryRemove(firstRequest.Id, Silo1, out _));
+        Assert.True(firstClient.TryClaimForRejection(firstRequest, Silo1, out _));
 
         Assert.Equal(0, firstClient.Count);
         Assert.Equal(1, secondClient.Count);
-        Assert.True(secondClient.TryRemove(secondRequest.Id, Silo2, out var removed));
+        Assert.True(secondClient.TryClaimForRejection(secondRequest, Silo2, out var removed));
         Assert.Equal(Silo2, removed.TargetSilo);
         Assert.Equal(0, secondClient.Count);
     }

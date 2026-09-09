@@ -35,6 +35,7 @@ namespace Orleans.Runtime.Messaging
                 request.SendingGrain,
                 targetSilo,
                 request.TargetGrain,
+                request.ForwardCount,
                 request.CacheInvalidationHeader is { } cacheInvalidationHeader ? new(cacheInvalidationHeader) : null,
                 timeProvider.GetTimestamp(),
                 explicitTimeToLive.HasValue,
@@ -67,18 +68,30 @@ namespace Orleans.Runtime.Messaging
             return false;
         }
 
-        internal bool TryRemove(CorrelationId requestId, SiloAddress targetSilo, out Message request)
+        internal bool TryClaimForRejection(Message request, SiloAddress targetSilo, out Message requestToReject)
         {
-            if (_requests is { } requests
-                && requests.TryGetValue(requestId, out var trackedRequest)
-                && targetSilo.Equals(trackedRequest.TargetSilo)
-                && requests.Remove(requestId))
+            if (_requests is not { } requests || !requests.TryGetValue(request.Id, out var trackedRequest))
             {
-                request = CreateRequest(trackedRequest);
+                requestToReject = request;
                 return true;
             }
 
-            request = null!;
+            if (targetSilo.Equals(trackedRequest.TargetSilo))
+            {
+                requests.Remove(request.Id);
+                requestToReject = CreateRequest(trackedRequest);
+                return true;
+            }
+
+            // Forwarding advances ForwardCount, so this request supersedes the destination captured by the prior send.
+            if (request.ForwardCount > trackedRequest.ForwardCount)
+            {
+                requests.Remove(request.Id);
+                requestToReject = request;
+                return true;
+            }
+
+            requestToReject = null!;
             return false;
         }
 
@@ -166,6 +179,7 @@ namespace Orleans.Runtime.Messaging
                 SendingGrain = request.SendingGrain,
                 TargetSilo = request.TargetSilo,
                 TargetGrain = request.TargetGrain,
+                ForwardCount = request.ForwardCount,
                 CacheInvalidationHeader = request.CacheInvalidationHeader,
                 TimeToLive = timeToLive,
             };
@@ -180,6 +194,7 @@ namespace Orleans.Runtime.Messaging
             GrainId SendingGrain,
             SiloAddress TargetSilo,
             GrainId TargetGrain,
+            int ForwardCount,
             List<GrainAddressCacheUpdate>? CacheInvalidationHeader,
             long StartTimestamp,
             bool HasTimeToLive,
