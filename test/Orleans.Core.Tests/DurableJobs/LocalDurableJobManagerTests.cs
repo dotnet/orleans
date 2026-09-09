@@ -19,6 +19,7 @@ using Orleans.Journaling;
 using Orleans.Journaling.Json;
 using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
+using Orleans.Runtime.Scheduler;
 using Xunit;
 
 namespace NonSilo.Tests.DurableJobs;
@@ -194,6 +195,83 @@ public class LocalDurableJobManagerTests
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => accessor.ProcessShardCheckCycleAsync(cancellation.Token));
         Assert.False(accessor.HasCachedShard(shard.Id));
+        Assert.False(accessor.TryGetRunningShardTask(shard.Id, out _));
+    }
+
+    [Fact]
+    public async Task Stop_WhenDiscoveryActivatesShardDuringShutdown_AwaitsShardCleanup()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var shardManager = new TestJobShardManager();
+        var manager = CreateManager(shardManager, timeProvider, CreateOptions());
+        var accessor = new LocalDurableJobManager.TestAccessor(manager);
+        var lifecycle = Substitute.For<ISiloLifecycle>();
+        ILifecycleObserver? observer = null;
+        lifecycle.Subscribe(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<ILifecycleObserver>())
+            .Returns(call =>
+            {
+                observer = call.ArgAt<ILifecycleObserver>(2);
+                return Substitute.For<IDisposable>();
+            });
+        manager.Participate(lifecycle);
+        Assert.NotNull(observer);
+
+        var shard = new BlockingQueueShard("final-activation", timeProvider.GetUtcNow(), timeProvider.GetUtcNow().AddHours(1));
+        var discoveredShard = Substitute.For<IJobShard>();
+        Task? stop = null;
+        discoveredShard.Id.Returns(_ =>
+        {
+            // The batch has passed its cancellation check, but has not activated this shard yet.
+            stop ??= observer.OnStop(cancellationToken);
+            return shard.Id;
+        });
+        discoveredShard.StartTime.Returns(shard.StartTime);
+        discoveredShard.EndTime.Returns(shard.EndTime);
+        discoveredShard.ConsumeDurableJobsAsync().Returns(_ => shard.ConsumeDurableJobsAsync());
+        discoveredShard.DisposeAsync().Returns(_ => shard.DisposeAsync());
+        shardManager.AssignedShards.Add(discoveredShard);
+
+        var discoveryStopped = new TaskCompletionSource<Task>(TaskCreationOptions.RunContinuationsAsynchronously);
+        shardManager.StopDiscovery = () =>
+        {
+            // Run the assertion after Stop has returned from this callback on the same scheduler.
+            discoveryStopped.SetResult(manager.QueueTask(() =>
+            {
+                Assert.NotNull(stop);
+                Assert.False(stop.IsCompleted);
+                return Task.CompletedTask;
+            }));
+            return ValueTask.CompletedTask;
+        };
+
+        await observer.OnStart(cancellationToken);
+        Task? running = null;
+        try
+        {
+            accessor.SignalShardCheck();
+            await shard.DisposeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+            Assert.True(accessor.TryGetRunningShardTask(shard.Id, out running));
+            var shutdownAssertion = await discoveryStopped.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+            await shutdownAssertion.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+            Assert.Equal(0, shard.DisposeCallCount);
+        }
+        finally
+        {
+            shard.AllowDispose.TrySetResult();
+            if (stop is not null)
+            {
+                await stop.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+            }
+
+            if (running is not null)
+            {
+                await running.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+            }
+        }
+
+        Assert.Equal(1, shardManager.StopDiscoveryCalls);
+        Assert.Equal(1, shard.DisposeCallCount);
         Assert.False(accessor.TryGetRunningShardTask(shard.Id, out _));
     }
 
