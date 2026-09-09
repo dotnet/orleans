@@ -2,6 +2,8 @@ using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
+using Orleans.Internal;
+using Orleans.Runtime.GrainDirectory;
 
 namespace Orleans.Runtime.ClusterServices;
 
@@ -50,8 +52,8 @@ internal sealed class RegisteredClusterServiceViewProvider : IClusterServiceView
     {
         lock (_lock)
         {
-            view = _current!;
-            return view is not null && _terminal is null;
+            view = _terminal is null ? _current! : null!;
+            return view is not null;
         }
     }
 
@@ -62,10 +64,51 @@ internal sealed class RegisteredClusterServiceViewProvider : IClusterServiceView
         RefreshCoreAsync(minimumView, cancellationToken);
 
     public ValueTask RefreshLivenessAsync(CancellationToken cancellationToken) =>
-        _membership.Refresh(cancellationToken: cancellationToken);
+        RefreshLivenessAsync(default, cancellationToken);
 
-    public bool IsOwnerLive(SiloAddress owner, MembershipVersion watermark) =>
-        _membership.CurrentSnapshot.Version >= watermark && _membership.CurrentSnapshot.GetSiloStatus(owner) is SiloStatus.Active;
+    public async ValueTask RefreshLivenessAsync(MembershipVersion minimumVersion, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        lock (_lock)
+        {
+            ThrowIfTerminated();
+            if (_current is { } current && current.MembershipWatermark > minimumVersion)
+            {
+                minimumVersion = current.MembershipWatermark;
+            }
+        }
+
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _shutdown.Token);
+        try
+        {
+            await _membership.Refresh(minimumVersion, linked.Token);
+            ThrowIfTerminated();
+            cancellationToken.ThrowIfCancellationRequested();
+            if (_membership.CurrentSnapshot.Version < minimumVersion)
+            {
+                throw new ClusterServiceViewUnavailableException($"Membership has not reached the requested liveness watermark '{minimumVersion}' for '{_namespace}'.");
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            ThrowIfTerminated();
+            Terminate(exception);
+            throw;
+        }
+    }
+
+    public bool IsOwnerLive(SiloAddress owner, MembershipVersion watermark)
+    {
+        lock (_lock)
+        {
+            var membership = _membership.CurrentSnapshot;
+            return _terminal is null && membership.Version >= watermark && membership.GetSiloStatus(owner) is SiloStatus.Active;
+        }
+    }
 
     /// <summary>
     /// Publishes against the actual register predecessor. A losing writer returns null without rebasing the proposal.
@@ -77,19 +120,28 @@ internal sealed class RegisteredClusterServiceViewProvider : IClusterServiceView
         IEnumerable<string> resources,
         IEnumerable<KeyValuePair<string, SiloAddress>> assignments,
         CancellationToken cancellationToken,
-        ImmutableArray<ClusterServicePartitionAssignment> ringAssignments = default)
+        ImmutableArray<ClusterServicePartitionAssignment> ringAssignments = default,
+        IEnumerable<KeyValuePair<string, RingRange>>? resourceRanges = null)
     {
         ThrowIfTerminated();
         cancellationToken.ThrowIfCancellationRequested();
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _shutdown.Token);
-        await _reader.WaitAsync(linked.Token);
         try
         {
-            return await TryPublishCoreAsync(configuration, participants, resources, assignments, linked.Token, ringAssignments);
+            await _reader.WaitAsync(linked.Token);
+            try
+            {
+                return await TryPublishCoreAsync(configuration, participants, resources, assignments, linked.Token, ringAssignments, resourceRanges);
+            }
+            finally
+            {
+                _reader.Release();
+            }
         }
-        finally
+        catch (OperationCanceledException) when (_shutdown.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
         {
-            _reader.Release();
+            ThrowIfTerminated();
+            throw;
         }
     }
 
@@ -99,7 +151,8 @@ internal sealed class RegisteredClusterServiceViewProvider : IClusterServiceView
         IEnumerable<string> resources,
         IEnumerable<KeyValuePair<string, SiloAddress>> assignments,
         CancellationToken cancellationToken,
-        ImmutableArray<ClusterServicePartitionAssignment> ringAssignments)
+        ImmutableArray<ClusterServicePartitionAssignment> ringAssignments,
+        IEnumerable<KeyValuePair<string, RingRange>>? resourceRanges)
     {
         ClusterServiceRegisterRead read;
         try
@@ -130,7 +183,8 @@ internal sealed class RegisteredClusterServiceViewProvider : IClusterServiceView
             participants,
             resources,
             assignments,
-            ringAssignments);
+            ringAssignments,
+            resourceRanges);
         foreach (var participant in proposed.Participants)
         {
             if (!membership.Members.TryGetValue(participant, out var member)
@@ -180,6 +234,11 @@ internal sealed class RegisteredClusterServiceViewProvider : IClusterServiceView
             _ = ObserveAbandonedReadAsync(refresh);
             throw;
         }
+        catch (OperationCanceledException) when (_shutdown.IsCancellationRequested)
+        {
+            ThrowIfTerminated();
+            throw;
+        }
 
         while (true)
         {
@@ -206,14 +265,8 @@ internal sealed class RegisteredClusterServiceViewProvider : IClusterServiceView
 
     private static async Task ObserveAbandonedReadAsync(Task read)
     {
-        try
-        {
-            await read;
-        }
-        catch
-        {
-            // ReadAndInstallAsync publishes its failure to all remaining refreshes and subscribers.
-        }
+        // ReadAndInstallAsync publishes its failure to remaining refreshes and subscribers.
+        await read.SuppressThrowing();
     }
 
     private async Task ReadAndInstallAsync()
@@ -364,9 +417,16 @@ internal sealed class RegisteredClusterServiceViewProvider : IClusterServiceView
     {
         lock (_lock)
         {
-            _terminal ??= exception;
+            if (_terminal is not null)
+            {
+                return;
+            }
+
+            _terminal = exception;
             Signal();
         }
+
+        _shutdown.Cancel();
     }
 
     private void ThrowIfTerminated()
@@ -390,10 +450,9 @@ internal sealed class RegisteredClusterServiceViewProvider : IClusterServiceView
             }
 
             _disposed = true;
-            Terminate(new ObjectDisposedException(nameof(RegisteredClusterServiceViewProvider)));
         }
 
-        _shutdown.Cancel();
+        Terminate(new ObjectDisposedException(nameof(RegisteredClusterServiceViewProvider)));
         await _polling;
         await _reader.WaitAsync();
         _reader.Release();

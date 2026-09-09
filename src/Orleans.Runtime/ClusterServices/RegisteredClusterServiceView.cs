@@ -1,5 +1,6 @@
 using System.Collections.Frozen;
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using Orleans.Runtime.GrainDirectory;
 
 namespace Orleans.Runtime.ClusterServices;
@@ -7,6 +8,7 @@ namespace Orleans.Runtime.ClusterServices;
 /// <summary>
 /// An assignment revision, not a storage ETag, membership version, or permission to perform external effects.
 /// Recreating the register requires a new authority namespace and an explicit service bootstrap.
+/// Revision -1 is reserved for local bootstrap gates and is never a published authoritative view.
 /// </summary>
 internal readonly record struct RegisteredServiceViewId : IComparable<RegisteredServiceViewId>
 {
@@ -14,7 +16,7 @@ internal readonly record struct RegisteredServiceViewId : IComparable<Registered
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(serviceId);
         ArgumentException.ThrowIfNullOrWhiteSpace(authorityId);
-        ArgumentOutOfRangeException.ThrowIfNegative(revision);
+        ArgumentOutOfRangeException.ThrowIfLessThan(revision, -1);
         ServiceId = serviceId;
         AuthorityId = authorityId;
         Revision = revision;
@@ -66,10 +68,12 @@ internal sealed record RegisteredServiceConfiguration
 /// One complete immutable publication. Both resource indexes are constructed together in O(resources);
 /// local transition planning subsequently compares only the two local owned sets.
 /// String resource identities are ordinal and service-scoped; adapters can encode qualified queue identities.
+/// Ring resources use those same stable identities; silo/partition slots are lookup addresses, not resource identities.
 /// </summary>
 internal sealed class RegisteredClusterServiceView : IClusterServiceView<RegisteredServiceViewId>
 {
     private static readonly FrozenSet<string> EmptyResources = Array.Empty<string>().ToFrozenSet(StringComparer.Ordinal);
+    private readonly FrozenDictionary<(SiloAddress, int), string> _resourceByPartition;
 
     internal RegisteredClusterServiceView(
         RegisteredServiceViewId id,
@@ -79,14 +83,15 @@ internal sealed class RegisteredClusterServiceView : IClusterServiceView<Registe
         IEnumerable<SiloAddress> participants,
         IEnumerable<string> resources,
         IEnumerable<KeyValuePair<string, SiloAddress>> assignments,
-        ImmutableArray<ClusterServicePartitionAssignment> ringAssignments = default)
+        ImmutableArray<ClusterServicePartitionAssignment> ringAssignments = default,
+        IEnumerable<KeyValuePair<string, RingRange>>? resourceRanges = null)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(id.Revision, 1);
         ArgumentNullException.ThrowIfNull(configuration);
         ArgumentNullException.ThrowIfNull(participants);
         ArgumentNullException.ThrowIfNull(resources);
         ArgumentNullException.ThrowIfNull(assignments);
-        if (predecessor is { } previous && (id.CompareTo(previous) <= 0 || previous.Revision == 0))
+        if (predecessor is { } previous && (id.CompareTo(previous) <= 0 || previous.Revision < 1))
         {
             throw new ArgumentException("The authoritative predecessor must be an earlier published view.", nameof(predecessor));
         }
@@ -136,11 +141,48 @@ internal sealed class RegisteredClusterServiceView : IClusterServiceView<Registe
         ResourceOwners = forward.ToFrozenDictionary(StringComparer.Ordinal);
         OwnerResources = owners.ToFrozenDictionary(static entry => entry.Key, static entry => entry.Value.ToFrozenSet(StringComparer.Ordinal));
         Resources = catalog.Order(StringComparer.Ordinal).ToImmutableArray();
+        var ranges = new Dictionary<string, RingRange>(StringComparer.Ordinal);
+        foreach (var entry in resourceRanges ?? [])
+        {
+            if (entry.Key is null || !ranges.TryAdd(entry.Key, entry.Value))
+            {
+                throw new ArgumentException("Each ring resource requires a unique service-scoped identity.", nameof(resourceRanges));
+            }
+        }
+
+        var resourcePartitions = new Dictionary<string, ClusterServicePartitionAssignment>(StringComparer.Ordinal);
+        var resourceByPartition = new Dictionary<(SiloAddress, int), string>();
         if (!ringAssignments.IsDefault)
         {
             Topology = new(Participants, configuration.PartitionsPerSilo, ringAssignments);
             RingAssignments = ringAssignments.OrderBy(static assignment => assignment.Range.Start).ToImmutableArray();
+            if (ranges.Count != ResourceOwners.Count || ranges.Count != RingAssignments.Length)
+            {
+                throw new ArgumentException("Stable resource identities must cover the ring assignments exactly once.", nameof(resourceRanges));
+            }
+
+            var partitionsByRange = RingAssignments.ToDictionary(static assignment => assignment.Range);
+            foreach (var entry in ranges)
+            {
+                if (!ResourceOwners.TryGetValue(entry.Key, out var owner)
+                    || !partitionsByRange.Remove(entry.Value, out var partition)
+                    || !owner.Equals(partition.SiloAddress))
+                {
+                    throw new ArgumentException("Every stable ring resource must identify its assigned owner's exact range.", nameof(resourceRanges));
+                }
+
+                resourcePartitions.Add(entry.Key, partition);
+                resourceByPartition.Add((partition.SiloAddress, partition.PartitionIndex), entry.Key);
+            }
         }
+        else if (ranges.Count != 0)
+        {
+            throw new ArgumentException("Resource ranges require an explicit ring assignment.", nameof(resourceRanges));
+        }
+
+        ResourceRanges = ranges.ToFrozenDictionary(StringComparer.Ordinal);
+        ResourcePartitions = resourcePartitions.ToFrozenDictionary(StringComparer.Ordinal);
+        _resourceByPartition = resourceByPartition.ToFrozenDictionary();
     }
 
     public RegisteredServiceViewId Id { get; }
@@ -152,10 +194,29 @@ internal sealed class RegisteredClusterServiceView : IClusterServiceView<Registe
     public FrozenDictionary<string, SiloAddress> ResourceOwners { get; }
     public FrozenDictionary<SiloAddress, FrozenSet<string>> OwnerResources { get; }
     public ImmutableArray<ClusterServicePartitionAssignment> RingAssignments { get; }
+    /// <summary>Associates each stable ring resource identity with its geometry in this publication.</summary>
+    public FrozenDictionary<string, RingRange> ResourceRanges { get; }
+    /// <summary>Resolves a stable ring identity to the current owner's topology slot.</summary>
+    public FrozenDictionary<string, ClusterServicePartitionAssignment> ResourcePartitions { get; }
     public ClusterServiceTopology? Topology { get; }
 
     public FrozenSet<string> GetOwnedResources(SiloAddress silo) =>
         OwnerResources.TryGetValue(silo, out var resources) ? resources : EmptyResources;
+
+    /// <summary>Uses ordered topology lookup followed by the immutable slot-to-resource index.</summary>
+    public bool TryGetRingResource(uint hashCode, [NotNullWhen(true)] out string? resource, [NotNullWhen(true)] out SiloAddress? owner)
+    {
+        if (Topology is { } topology && topology.TryGetOwner(hashCode, out var partition))
+        {
+            resource = _resourceByPartition[(partition.SiloAddress, partition.PartitionIndex)];
+            owner = partition.SiloAddress;
+            return true;
+        }
+
+        resource = null;
+        owner = null;
+        return false;
+    }
 
     public bool TryGetPredecessor(out RegisteredServiceViewId predecessor)
     {
@@ -171,6 +232,8 @@ internal sealed class RegisteredClusterServiceView : IClusterServiceView<Registe
         && Participants.SequenceEqual(other.Participants)
         && Resources.SequenceEqual(other.Resources)
         && ResourceOwners.All(entry => other.ResourceOwners.TryGetValue(entry.Key, out var owner) && owner.Equals(entry.Value))
+        && ResourceRanges.Count == other.ResourceRanges.Count
+        && ResourceRanges.All(entry => other.ResourceRanges.TryGetValue(entry.Key, out var range) && range.Equals(entry.Value))
         && RingAssignments.IsDefault == other.RingAssignments.IsDefault
         && (RingAssignments.IsDefault || RingAssignments.SequenceEqual(other.RingAssignments));
 
