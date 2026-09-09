@@ -1,3 +1,4 @@
+using System.Reflection;
 using CsCheck;
 using Orleans.Runtime.ClusterServices;
 using Orleans.Runtime.GrainDirectory;
@@ -17,643 +18,578 @@ public sealed class PartitionTransitionCoordinatorTests
     private static readonly ClusterServiceViewId View2 = new(0, new(2));
 
     [Fact]
-    public async Task InboundTransition_BlocksTargetViewUntilStateAndFenceAreInstalled()
+    public async Task Acquisition_BlocksUntilStateAndFenceAreInstalled()
     {
-        var coordinator = new PartitionTransitionCoordinator();
-        var transition = coordinator.BeginInbound(Range, View1, View2);
+        var transitions = new DirectoryTransitions();
+        var acquisition = new DirectoryAcquisition(Range, View1, View2);
+        transitions.Add(Range, acquisition);
 
-        Assert.False(coordinator.IsBlocked(Range, View1));
-        Assert.True(coordinator.TryGetBlockingTransition(Range, View2, out var wait));
+        Assert.Equal(Range, acquisition.Range);
+        Assert.Equal(View1, acquisition.PreviousView);
+        Assert.Equal(View2, acquisition.TargetView);
+        Assert.Equal(AcquisitionPhase.AwaitingState, acquisition.Phase);
+        Assert.False(transitions.TryGetBlockingTransition(Range, View1, out _));
+        Assert.True(transitions.TryGetBlockingTransition(Range, View2, out var wait));
+        Assert.Same(acquisition.Completion, wait);
+        Assert.Throws<InvalidOperationException>(acquisition.Complete);
+        Assert.Throws<InvalidOperationException>(() => acquisition.MarkFenced(new(ClusterServiceFencingMode.External, 42)));
+        Assert.Null(acquisition.Fence);
+        Assert.Equal(TransitionGateStatus.Pending, acquisition.Status);
         Assert.False(wait.IsCompleted);
-        Assert.Throws<InvalidOperationException>(transition.Complete);
 
-        transition.MarkStateInstalled();
-        transition.MarkFenced(new(ClusterServiceFencingMode.External, 42));
-        transition.Complete();
+        acquisition.MarkStateInstalled();
+        Assert.Equal(AcquisitionPhase.StateInstalled, acquisition.Phase);
+        Assert.Throws<InvalidOperationException>(acquisition.MarkStateInstalled);
+        Assert.Throws<InvalidOperationException>(acquisition.Complete);
+        Assert.Equal(TransitionGateStatus.Pending, acquisition.Status);
+        Assert.False(wait.IsCompleted);
+
+        var fence = new ClusterServiceFence(ClusterServiceFencingMode.External, 42);
+        acquisition.MarkFenced(fence);
+        Assert.Equal(AcquisitionPhase.Fenced, acquisition.Phase);
+        Assert.Equal(fence, acquisition.Fence);
+        Assert.Throws<InvalidOperationException>(() => acquisition.MarkFenced(new(ClusterServiceFencingMode.External, 43)));
+        Assert.Equal(fence, acquisition.Fence);
+        Assert.True(acquisition.IsBlocking);
+        acquisition.Complete();
 
         await wait;
-        Assert.Equal(PartitionTransitionStage.Completed, transition.Stage);
-        Assert.Equal(new ClusterServiceFence(ClusterServiceFencingMode.External, 42), transition.Fence);
-        Assert.False(coordinator.IsBlocked(Range, View2));
+        Assert.Equal(TransitionGateStatus.Completed, acquisition.Status);
+        Assert.False(acquisition.IsBlocking);
+        Assert.False(transitions.TryGetBlockingTransition(Range, View2, out var released));
+        Assert.Same(Task.CompletedTask, released);
+        Assert.Throws<InvalidOperationException>(acquisition.Complete);
+        Assert.Throws<InvalidOperationException>(acquisition.MarkStateInstalled);
+        Assert.Throws<InvalidOperationException>(() => acquisition.Fail(new Exception("too late")));
+        transitions.Prune();
     }
 
-    [Fact]
-    public async Task OutboundTransition_DrainsBeforeRetainingStateAndOpeningGate()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Release_DrainsBeforeOptionalRetentionAndCompletion(bool retain)
     {
-        var coordinator = new PartitionTransitionCoordinator();
-        var transition = coordinator.BeginOutbound(Range, View1, View2);
-        Assert.True(coordinator.TryGetBlockingTransition(Range, View2, out var wait));
-        Assert.Same(transition.Completion, wait);
+        var transitions = new DirectoryTransitions();
+        var release = new DirectoryRelease(Range, View1, View2);
+        transitions.Add(Range, release);
+        Assert.Equal(Range, release.Range);
+        Assert.Equal(View1, release.PreviousView);
+        Assert.Equal(ReleasePhase.Blocking, release.Phase);
+        Assert.Throws<InvalidOperationException>(release.MarkStateRetained);
+        Assert.Throws<InvalidOperationException>(release.Complete);
+        Assert.Equal(TransitionGateStatus.Pending, release.Status);
 
-        transition.MarkDrained();
-
-        Assert.Equal(PartitionTransitionStage.Drained, transition.Stage);
-        Assert.True(coordinator.IsBlocked(Range, View2));
-        Assert.True(coordinator.TryGetBlockingTransition(Range, View2, out var drainedWait));
-        Assert.Same(transition.Completion, drainedWait);
+        release.MarkDrained();
+        Assert.Equal(ReleasePhase.Drained, release.Phase);
+        Assert.Throws<InvalidOperationException>(release.MarkDrained);
+        Assert.True(transitions.TryGetBlockingTransition(Range, View2, out var wait));
+        Assert.Same(release.Completion, wait);
         Assert.False(wait.IsCompleted);
-        Assert.False(transition.Completion.IsCompleted);
+        if (retain)
+        {
+            release.MarkStateRetained();
+            Assert.Equal(ReleasePhase.StateRetained, release.Phase);
+            Assert.Throws<InvalidOperationException>(release.MarkStateRetained);
+            Assert.False(wait.IsCompleted);
+            Assert.True(release.IsBlocking);
+        }
 
-        transition.MarkStateRetained();
-
-        Assert.Equal(PartitionTransitionStage.StateRetained, transition.Stage);
-        Assert.True(coordinator.IsBlocked(Range, View2));
-        Assert.True(coordinator.TryGetBlockingTransition(Range, View2, out var retainedWait));
-        Assert.Same(transition.Completion, retainedWait);
-        Assert.False(wait.IsCompleted);
-        Assert.False(transition.Completion.IsCompleted);
-
-        transition.Complete();
-
+        release.Complete();
         await wait;
-        Assert.Equal(PartitionTransitionStage.Completed, transition.Stage);
-        Assert.False(coordinator.IsBlocked(Range, View2));
+        Assert.Equal(TransitionGateStatus.Completed, release.Status);
+        Assert.False(release.IsBlocking);
+        Assert.Throws<InvalidOperationException>(release.MarkStateRetained);
+        Assert.False(transitions.TryGetBlockingTransition(Range, View2, out _));
     }
 
     [Fact]
-    public async Task AbortedTransition_CancelsWaitersAndRemovesGate()
+    public async Task Barrier_BlocksExactAndNewerViewsUntilCompletion()
     {
-        var coordinator = new PartitionTransitionCoordinator();
-        var transition = coordinator.BeginInbound(Range, View1, View2);
-        Assert.True(coordinator.TryGetBlockingTransition(Range, View2, out var wait));
+        var transitions = new DirectoryTransitions();
+        var barrier = new DirectoryBarrier(Range, View2);
+        transitions.Add(Range, barrier);
+        Assert.Equal(Range, barrier.Range);
+        Assert.False(transitions.TryGetBlockingTransition(Range, View1, out var preceding));
+        Assert.Same(Task.CompletedTask, preceding);
+        Assert.True(transitions.TryGetBlockingTransition(Range, View2, out var exact));
+        Assert.True(transitions.TryGetBlockingTransition(Range, new(0, new(3)), out var newer));
+        Assert.Same(barrier.Completion, exact);
+        Assert.Same(exact, newer);
 
-        transition.Abort(TestContext.Current.CancellationToken);
-
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => wait);
-        Assert.Equal(PartitionTransitionStage.Aborted, transition.Stage);
-        Assert.False(coordinator.IsBlocked(Range, View2));
+        barrier.Complete();
+        await exact;
+        Assert.Equal(TransitionGateStatus.Completed, barrier.Status);
+        Assert.False(transitions.TryGetBlockingTransition(Range, new(0, new(3)), out _));
     }
 
     [Fact]
-    public void OverlappingTransitions_InSameTargetViewAreRejected()
+    public void TypedRoles_ExcludeWrongRoleMethodsAndSealReadinessValidation()
     {
-        var coordinator = new PartitionTransitionCoordinator();
-        var original = coordinator.BeginInbound(Range, View1, View2);
+        var common = typeof(TransitionGate<ClusterServiceViewId>);
+        Assert.True(common.IsAbstract);
+        foreach (var method in new[] { "Complete", "MarkStateInstalled", "MarkFenced", "MarkDrained", "MarkStateRetained" })
+        {
+            Assert.Null(common.GetMethod(method));
+        }
 
-        Assert.Throws<InvalidOperationException>(() =>
-            coordinator.BeginOutbound(RingRange.Create(150, 250), View1, View2));
+        Assert.Null(common.GetProperty("PreviousView"));
+        Assert.Null(common.GetProperty("Failure"));
+        Assert.Null(typeof(OwnershipAcquisition<long>).GetMethod("MarkDrained"));
+        Assert.Null(typeof(OwnershipAcquisition<long>).GetMethod("MarkStateRetained"));
+        Assert.Null(typeof(OwnershipRelease<long>).GetMethod("MarkStateInstalled"));
+        Assert.Null(typeof(OwnershipRelease<long>).GetMethod("MarkFenced"));
+        Assert.Null(typeof(OwnershipRelease<long>).GetProperty("Fence"));
+        Assert.Null(typeof(ViewBarrier<long>).GetProperty("PreviousView"));
+        foreach (var method in new[] { "MarkStateInstalled", "MarkFenced", "MarkDrained", "MarkStateRetained" })
+        {
+            Assert.Null(typeof(ViewBarrier<long>).GetMethod(method));
+        }
 
-        Assert.Equal(PartitionTransitionStage.Blocking, original.Stage);
-        Assert.False(original.Completion.IsCompleted);
-        Assert.True(coordinator.TryGetBlockingTransition(Range, View2, out var completion));
-        Assert.Same(original.Completion, completion);
+        foreach (var role in new[] { typeof(OwnershipAcquisition<long>), typeof(OwnershipRelease<long>), typeof(ViewBarrier<long>) })
+        {
+            Assert.False(role.IsSealed);
+            Assert.False(role.GetMethod("Complete")!.IsVirtual);
+            var validation = role.GetMethod("ValidateCompletion", BindingFlags.Instance | BindingFlags.NonPublic)!;
+            Assert.True(validation.IsVirtual);
+            Assert.True(validation.IsFinal);
+            Assert.Equal(role, validation.DeclaringType);
+        }
+
+        Assert.True(typeof(DirectoryAcquisition).IsSealed);
+        Assert.True(typeof(DirectoryRelease).IsSealed);
+        Assert.True(typeof(DirectoryBarrier).IsSealed);
+        Assert.True(typeof(DirectoryTransitions).IsSealed);
     }
 
     [Fact]
-    public void CsCheck_ValidTransitionSequences_AlwaysReleaseTheirGate()
+    public void Constructors_RejectNonIncreasingViewsAndAcceptComparableReferenceIds()
+    {
+        Assert.Throws<ArgumentException>(() => new OwnershipAcquisition<long>(2, 2));
+        Assert.Throws<ArgumentException>(() => new OwnershipAcquisition<long>(2, 1));
+        Assert.Throws<ArgumentException>(() => new OwnershipRelease<long>(2, 2));
+        Assert.Throws<ArgumentException>(() => new OwnershipRelease<long>(2, 1));
+        Assert.Throws<ArgumentNullException>(() => new ViewBarrier<string>(null!));
+        Assert.Throws<ArgumentNullException>(() => new OwnershipAcquisition<string>(null!, "b"));
+        Assert.Throws<ArgumentNullException>(() => new OwnershipRelease<string>("a", null!));
+        var acquisition = new OwnershipAcquisition<string>("a", "b");
+        Assert.Equal("a", acquisition.PreviousView);
+        Assert.Equal("b", acquisition.TargetView);
+        Assert.Equal(TransitionGateStatus.Pending, new ViewBarrier<long>(0).Status);
+    }
+
+    [Fact]
+    public async Task CompletionValidationFailure_RemainsPendingThenFailsWithOriginalException()
+    {
+        var transitions = new DirectoryTransitions();
+        var acquisition = new DirectoryAcquisition(Range, View1, View2);
+        transitions.Add(Range, acquisition);
+        var failure = Assert.Throws<InvalidOperationException>(acquisition.Complete);
+        Assert.Equal(TransitionGateStatus.Pending, acquisition.Status);
+        Assert.False(acquisition.Completion.IsCompleted);
+        Assert.True(transitions.TryGetBlockingTransition(Range, View2, out var wait));
+
+        acquisition.Fail(failure);
+        Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() => wait));
+        Assert.Equal(TransitionGateStatus.Failed, acquisition.Status);
+        Assert.True(acquisition.IsBlocking);
+        transitions.Prune();
+        Assert.True(transitions.TryGetBlockingTransition(Range, View2, out var failed));
+        Assert.Same(wait, failed);
+        Assert.Throws<InvalidOperationException>(acquisition.MarkStateInstalled);
+        Assert.Throws<InvalidOperationException>(() => acquisition.MarkFenced(new(ClusterServiceFencingMode.External, 1)));
+        Assert.Throws<InvalidOperationException>(acquisition.Complete);
+        Assert.Throws<InvalidOperationException>(() => acquisition.Fail(new ArgumentException("replacement")));
+        Assert.Equal(AcquisitionPhase.AwaitingState, acquisition.Phase);
+        Assert.Null(acquisition.Fence);
+        Assert.Same(failure, Assert.Single(failed.Exception!.InnerExceptions));
+
+        transitions.AbortAll(TestContext.Current.CancellationToken);
+        Assert.Equal(TransitionGateStatus.Aborted, acquisition.Status);
+        Assert.False(acquisition.IsBlocking);
+        Assert.False(transitions.TryGetBlockingTransition(Range, View2, out _));
+        Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() => wait));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DirectoryShutdown_TransferFinallyCanAbortAgainWithoutReplacingCompletion(bool failBeforeShutdown)
+    {
+        var transitions = new DirectoryTransitions();
+        var acquisition = new DirectoryAcquisition(Range, View1, View2);
+        transitions.Add(Range, acquisition);
+        var completion = acquisition.Completion;
+        InvalidOperationException? failure = null;
+        if (failBeforeShutdown)
+        {
+            failure = Assert.Throws<InvalidOperationException>(acquisition.Complete);
+            Assert.Equal(TransitionGateStatus.Pending, acquisition.Status);
+            acquisition.Fail(failure);
+            transitions.Prune();
+            Assert.True(transitions.TryGetBlockingTransition(Range, View2, out var blocked));
+            Assert.Same(completion, blocked);
+        }
+
+        using var shutdown = new CancellationTokenSource();
+        shutdown.Cancel();
+        transitions.AbortAll(shutdown.Token);
+        Assert.Equal(TransitionGateStatus.Aborted, acquisition.Status);
+        Assert.False(transitions.TryGetBlockingTransition(Range, View2, out _));
+
+        acquisition.Abort();
+        transitions.Prune();
+        transitions.AbortAll(shutdown.Token);
+
+        Assert.Equal(TransitionGateStatus.Aborted, acquisition.Status);
+        Assert.False(acquisition.IsBlocking);
+        Assert.Same(completion, acquisition.Completion);
+        Assert.False(transitions.TryGetBlockingTransition(Range, View2, out var released));
+        Assert.Same(Task.CompletedTask, released);
+        Assert.Throws<InvalidOperationException>(acquisition.Complete);
+        if (failBeforeShutdown)
+        {
+            Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() => completion));
+        }
+        else
+        {
+            var cancellation = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => completion);
+            Assert.Equal(shutdown.Token, cancellation.CancellationToken);
+        }
+    }
+
+    [Fact]
+    public async Task FailedReleaseAndBarrier_CannotProgressOrReplaceOriginalFailure()
+    {
+        var release = new OwnershipRelease<long>(1, 2);
+        var barrier = new ViewBarrier<long>(2);
+        var failure = new ApplicationException("original");
+        release.MarkDrained();
+        release.Fail(failure);
+        barrier.Fail(failure);
+
+        Assert.Throws<InvalidOperationException>(release.MarkStateRetained);
+        Assert.Throws<InvalidOperationException>(release.MarkDrained);
+        Assert.Throws<InvalidOperationException>(release.Complete);
+        Assert.Equal(ReleasePhase.Drained, release.Phase);
+        Assert.Throws<InvalidOperationException>(barrier.Complete);
+        Assert.Throws<InvalidOperationException>(() => barrier.Fail(new Exception("replacement")));
+        Assert.Throws<ArgumentNullException>(() => new ViewBarrier<long>(1).Fail(null!));
+
+        foreach (var gate in new TransitionGate<long>[] { release, barrier })
+        {
+            Assert.Equal(TransitionGateStatus.Failed, gate.Status);
+            Assert.True(gate.IsBlocking);
+            Assert.Same(failure, await Assert.ThrowsAsync<ApplicationException>(() => gate.Completion));
+            gate.Abort();
+            gate.Abort();
+            Assert.Equal(TransitionGateStatus.Aborted, gate.Status);
+            Assert.False(gate.IsBlocking);
+            Assert.Same(failure, await Assert.ThrowsAsync<ApplicationException>(() => gate.Completion));
+        }
+    }
+
+    [Fact]
+    public async Task Abort_PreservesCanceledTokenAndDoesNotChangeCompletedGates()
+    {
+        using var source = new CancellationTokenSource();
+        source.Cancel();
+        var canceled = new ViewBarrier<long>(1);
+        canceled.Abort(source.Token);
+        var preserved = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => canceled.Completion);
+        Assert.Equal(source.Token, preserved.CancellationToken);
+        Assert.Equal(TransitionGateStatus.Aborted, canceled.Status);
+
+        using var activeSource = new CancellationTokenSource();
+        var synthesized = new OwnershipAcquisition<long>(1, 2);
+        synthesized.Abort(activeSource.Token);
+        var cancellation = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => synthesized.Completion);
+        Assert.True(cancellation.CancellationToken.IsCancellationRequested);
+        Assert.False(activeSource.IsCancellationRequested);
+        Assert.NotEqual(activeSource.Token, cancellation.CancellationToken);
+        Assert.Throws<InvalidOperationException>(synthesized.MarkStateInstalled);
+        Assert.Throws<InvalidOperationException>(synthesized.Complete);
+        Assert.Equal(AcquisitionPhase.AwaitingState, synthesized.Phase);
+
+        var completed = new ViewBarrier<long>(1);
+        completed.Complete();
+        completed.Abort(source.Token);
+        Assert.Equal(TransitionGateStatus.Completed, completed.Status);
+        await completed.Completion;
+    }
+
+    [Fact]
+    public async Task CallerCancellation_DoesNotCancelSharedProgressOrOtherWaiters()
+    {
+        var map = new RangeTransitionGateMap<long>();
+        var gate = new ViewBarrier<long>(2);
+        map.Add(Range, gate);
+        Assert.True(map.TryGetBlockingTransition(Range, 2, out var shared));
+        using var caller = new CancellationTokenSource();
+        var canceledWait = shared.WaitAsync(caller.Token);
+        var unaffectedWait = shared.WaitAsync(TestContext.Current.CancellationToken);
+        caller.Cancel();
+
+        var cancellation = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => canceledWait);
+        Assert.Equal(caller.Token, cancellation.CancellationToken);
+        Assert.Equal(TransitionGateStatus.Pending, gate.Status);
+        Assert.True(map.IsBlocked(Range, 2));
+        Assert.False(shared.IsCompleted);
+        Assert.False(unaffectedWait.IsCompleted);
+
+        gate.Complete();
+        await unaffectedWait;
+        Assert.True(shared.IsCompletedSuccessfully);
+        Assert.False(map.IsBlocked(Range, 2));
+    }
+
+    [Theory]
+    [InlineData("Fence", "Complete", false, TransitionGateStatus.Completed, AcquisitionPhase.Fenced, false, false)]
+    [InlineData("Complete", "Fence", false, TransitionGateStatus.Pending, AcquisitionPhase.Fenced, true, false)]
+    [InlineData("Fence", "Fail", false, TransitionGateStatus.Failed, AcquisitionPhase.Fenced, false, false)]
+    [InlineData("Fail", "Fence", false, TransitionGateStatus.Failed, AcquisitionPhase.StateInstalled, false, true)]
+    [InlineData("Fence", "Abort", false, TransitionGateStatus.Aborted, AcquisitionPhase.Fenced, false, false)]
+    [InlineData("Abort", "Fence", false, TransitionGateStatus.Aborted, AcquisitionPhase.StateInstalled, false, true)]
+    [InlineData("Complete", "Fail", true, TransitionGateStatus.Completed, AcquisitionPhase.Fenced, false, true)]
+    [InlineData("Fail", "Complete", true, TransitionGateStatus.Failed, AcquisitionPhase.Fenced, false, true)]
+    [InlineData("Complete", "Abort", true, TransitionGateStatus.Completed, AcquisitionPhase.Fenced, false, false)]
+    [InlineData("Abort", "Complete", true, TransitionGateStatus.Aborted, AcquisitionPhase.Fenced, false, true)]
+    [InlineData("Fail", "Abort", true, TransitionGateStatus.Aborted, AcquisitionPhase.Fenced, false, false)]
+    [InlineData("Abort", "Fail", true, TransitionGateStatus.Aborted, AcquisitionPhase.Fenced, false, true)]
+    public async Task Acquisition_ConcurrentOperationsSerializeAtTheGateLock(
+        string first,
+        string second,
+        bool initiallyFenced,
+        object expectedStatusValue,
+        object expectedPhaseValue,
+        bool firstRejected,
+        bool secondRejected)
+    {
+        var expectedStatus = (TransitionGateStatus)expectedStatusValue;
+        var expectedPhase = (AcquisitionPhase)expectedPhaseValue;
+        var gate = new ControlledAcquisition();
+        gate.MarkStateInstalled();
+        var fence = new ClusterServiceFence(ClusterServiceFencingMode.External, 42);
+        if (initiallyFenced)
+        {
+            gate.MarkFenced(fence);
+        }
+
+        var failure = new ApplicationException("concurrent failure");
+        Action Operation(string name) => name switch
+        {
+            "Fence" => () => gate.MarkFenced(fence),
+            "Complete" => gate.Complete,
+            "Fail" => () => gate.Fail(failure),
+            "Abort" => () => gate.Abort(),
+            _ => throw new InvalidOperationException(name)
+        };
+
+        var (firstError, contender) = gate.RunBeforeContender(Operation(first), Operation(second));
+        var secondError = await contender.WaitAsync(TestContext.Current.CancellationToken);
+        AssertRejection(firstRejected, firstError);
+        AssertRejection(secondRejected, secondError);
+        Assert.Equal(expectedStatus, gate.Status);
+        Assert.Equal(expectedPhase, gate.Phase);
+        Assert.Equal(expectedPhase is AcquisitionPhase.Fenced ? fence : (ClusterServiceFence?)null, gate.Fence);
+        Assert.Equal(expectedStatus is TransitionGateStatus.Pending or TransitionGateStatus.Failed, gate.IsBlocking);
+        if (first == "Fail" || second == "Fail" && !secondRejected)
+        {
+            Assert.Same(failure, await Assert.ThrowsAsync<ApplicationException>(() => gate.Completion));
+        }
+        else if (expectedStatus is TransitionGateStatus.Aborted)
+        {
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => gate.Completion);
+        }
+        else
+        {
+            Assert.Equal(expectedStatus is TransitionGateStatus.Completed, gate.Completion.IsCompletedSuccessfully);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Release_ConcurrentDrainAndCompletionValidateUnderTheSameLock(bool drainFirst)
+    {
+        var gate = new ControlledRelease();
+        var first = drainFirst ? (Action)gate.MarkDrained : gate.Complete;
+        var second = drainFirst ? (Action)gate.Complete : gate.MarkDrained;
+        var (firstError, contender) = gate.RunBeforeContender(first, second);
+        var secondError = await contender.WaitAsync(TestContext.Current.CancellationToken);
+
+        Assert.Null(secondError);
+        AssertRejection(!drainFirst, firstError);
+        Assert.Equal(ReleasePhase.Drained, gate.Phase);
+        Assert.Equal(drainFirst ? TransitionGateStatus.Completed : TransitionGateStatus.Pending, gate.Status);
+        Assert.Equal(drainFirst, gate.Completion.IsCompletedSuccessfully);
+        if (!drainFirst)
+        {
+            gate.Complete();
+        }
+
+        await gate.Completion;
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task Acquisition_ConcurrentInstallAndTerminationCannotReopenGate(bool terminateFirst, bool abort)
+    {
+        var gate = new ControlledAcquisition();
+        var failure = new ApplicationException("install race");
+        Action terminate = abort ? () => gate.Abort() : () => gate.Fail(failure);
+        var (firstError, contender) = gate.RunBeforeContender(
+            terminateFirst ? terminate : gate.MarkStateInstalled,
+            terminateFirst ? gate.MarkStateInstalled : terminate);
+
+        Assert.Null(firstError);
+        AssertRejection(terminateFirst, await contender.WaitAsync(TestContext.Current.CancellationToken));
+        Assert.Equal(terminateFirst ? AcquisitionPhase.AwaitingState : AcquisitionPhase.StateInstalled, gate.Phase);
+        Assert.Equal(abort ? TransitionGateStatus.Aborted : TransitionGateStatus.Failed, gate.Status);
+        Assert.Equal(!abort, gate.IsBlocking);
+        if (abort)
+        {
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => gate.Completion);
+        }
+        else
+        {
+            Assert.Same(failure, await Assert.ThrowsAsync<ApplicationException>(() => gate.Completion));
+        }
+    }
+
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(false, false, true)]
+    [InlineData(false, true, false)]
+    [InlineData(false, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(true, false, true)]
+    [InlineData(true, true, false)]
+    [InlineData(true, true, true)]
+    public async Task Release_ConcurrentPhaseAndTerminationCannotReopenGate(bool retain, bool terminateFirst, bool abort)
+    {
+        var gate = new ControlledRelease();
+        if (retain)
+        {
+            gate.MarkDrained();
+        }
+
+        var failure = new ApplicationException("release race");
+        Action advance = retain ? gate.MarkStateRetained : gate.MarkDrained;
+        Action terminate = abort ? () => gate.Abort() : () => gate.Fail(failure);
+        var (firstError, contender) = gate.RunBeforeContender(
+            terminateFirst ? terminate : advance,
+            terminateFirst ? advance : terminate);
+        Assert.Null(firstError);
+        AssertRejection(terminateFirst, await contender.WaitAsync(TestContext.Current.CancellationToken));
+        var expectedPhase = retain
+            ? terminateFirst ? ReleasePhase.Drained : ReleasePhase.StateRetained
+            : terminateFirst ? ReleasePhase.Blocking : ReleasePhase.Drained;
+        Assert.Equal(expectedPhase, gate.Phase);
+        Assert.Equal(abort ? TransitionGateStatus.Aborted : TransitionGateStatus.Failed, gate.Status);
+        Assert.Equal(!abort, gate.IsBlocking);
+        if (abort)
+        {
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => gate.Completion);
+        }
+        else
+        {
+            Assert.Same(failure, await Assert.ThrowsAsync<ApplicationException>(() => gate.Completion));
+        }
+    }
+
+    [Fact]
+    public void CsCheck_ValidTypedSequencesAlwaysReleaseTheirGate()
     {
         Gen.Int.Array[32].Sample(
-            choices => VerifyValidSequences(choices),
+            choices =>
+            {
+                var map = new RangeTransitionGateMap<long>();
+                var version = 1L;
+                foreach (var choice in choices)
+                {
+                    var previous = version++;
+                    if ((choice & 1) == 0)
+                    {
+                        var acquisition = new OwnershipAcquisition<long>(previous, version);
+                        map.Add(Range, acquisition);
+                        acquisition.MarkStateInstalled();
+                        acquisition.MarkFenced(new(ClusterServiceFencingMode.External, version));
+                        Assert.True(map.IsBlocked(Range, version));
+                        acquisition.Complete();
+                        Assert.Equal(TransitionGateStatus.Completed, acquisition.Status);
+                    }
+                    else
+                    {
+                        var release = new OwnershipRelease<long>(previous, version);
+                        map.Add(Range, release);
+                        release.MarkDrained();
+                        if ((choice & 2) != 0)
+                        {
+                            release.MarkStateRetained();
+                        }
+
+                        Assert.True(map.IsBlocked(Range, version));
+                        release.Complete();
+                        Assert.Equal(TransitionGateStatus.Completed, release.Status);
+                    }
+
+                    Assert.False(map.IsBlocked(Range, version));
+                }
+            },
             seed: "cluster-service-transition-v1",
             iter: 100,
             threads: 1,
             print: static choices => $"choices=[{string.Join(',', choices)}]");
     }
 
-    private static void VerifyValidSequences(int[] choices)
+    private sealed class ControlledAcquisition() : OwnershipAcquisition<long>(1, 2)
     {
-        var coordinator = new PartitionTransitionCoordinator();
-        var version = 1L;
-        foreach (var choice in choices)
+        public (Exception? FirstError, Task<Exception?> Contender) RunBeforeContender(Action first, Action second) =>
+            RunBeforeContenderCore(SyncRoot, first, second);
+    }
+
+    private static void AssertRejection(bool rejected, Exception? exception)
+    {
+        if (rejected)
         {
-            var previous = new ClusterServiceViewId(0, new(version));
-            var current = new ClusterServiceViewId(0, new(++version));
-            PartitionTransition transition;
-            if ((choice & 1) == 0)
+            Assert.IsType<InvalidOperationException>(exception);
+        }
+        else
+        {
+            Assert.Null(exception);
+        }
+    }
+
+    private sealed class ControlledRelease() : OwnershipRelease<long>(1, 2)
+    {
+        public (Exception? FirstError, Task<Exception?> Contender) RunBeforeContender(Action first, Action second) =>
+            RunBeforeContenderCore(SyncRoot, first, second);
+    }
+
+    private static (Exception? FirstError, Task<Exception?> Contender) RunBeforeContenderCore(
+        object syncRoot,
+        Action first,
+        Action second)
+    {
+        var started = new ManualResetEventSlim();
+        lock (syncRoot)
+        {
+            var contender = Task.Run(() =>
             {
-                transition = coordinator.BeginInbound(Range, previous, current);
-                transition.MarkStateInstalled();
-                transition.MarkFenced(new(ClusterServiceFencingMode.External, version));
-            }
-            else
-            {
-                transition = coordinator.BeginOutbound(Range, previous, current);
-                transition.MarkDrained();
-                if ((choice & 2) != 0)
+                using (started)
                 {
-                    transition.MarkStateRetained();
+                    started.Set();
+                    return Record.Exception(second);
                 }
-            }
-
-            Assert.True(coordinator.IsBlocked(Range, current));
-            transition.Complete();
-            Assert.Equal(PartitionTransitionStage.Completed, transition.Stage);
-            Assert.False(coordinator.IsBlocked(Range, current));
+            });
+            Assert.True(started.Wait(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken),
+                "The contender must be armed while the first operation holds the gate lock.");
+            var firstError = Record.Exception(first);
+            Assert.False(contender.IsCompleted);
+            return (firstError, contender);
         }
-    }
-
-    [Fact]
-    public async Task TwoCoordinators_BlockAdvanceAbortAndCompleteIndependently()
-    {
-        var rangeA = RingRange.Create(100, 200);
-        var rangeB = RingRange.Create(300, 400);
-        var coordinatorA = new PartitionTransitionCoordinator();
-        var coordinatorB = new PartitionTransitionCoordinator();
-        var transitionA = coordinatorA.BeginInbound(rangeA, View1, View2);
-        var transitionB = coordinatorB.BeginOutbound(rangeB, View1, View2);
-        Assert.True(coordinatorA.TryGetBlockingTransition(rangeA, View2, out var waitA));
-        Assert.True(coordinatorB.TryGetBlockingTransition(rangeB, View2, out var waitB));
-
-        transitionA.MarkStateInstalled();
-        Assert.Equal(PartitionTransitionStage.Blocking, transitionB.Stage);
-        Assert.True(coordinatorB.IsBlocked(rangeB, View2));
-        Assert.False(waitB.IsCompleted);
-
-        transitionA.MarkFenced(new(ClusterServiceFencingMode.External, 101));
-        transitionA.Complete();
-        await waitA;
-        Assert.Equal(PartitionTransitionStage.Completed, transitionA.Stage);
-        Assert.Equal(PartitionTransitionStage.Blocking, transitionB.Stage);
-        Assert.True(coordinatorB.IsBlocked(rangeB, View2));
-        Assert.False(waitB.IsCompleted);
-
-        var abortedA = coordinatorA.BeginOutbound(rangeA, View1, View2);
-        Assert.True(coordinatorA.IsBlocked(rangeA, View2));
-        abortedA.Abort(TestContext.Current.CancellationToken);
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => abortedA.Completion);
-        Assert.Equal(PartitionTransitionStage.Aborted, abortedA.Stage);
-        Assert.Equal(PartitionTransitionStage.Blocking, transitionB.Stage);
-        Assert.True(coordinatorB.IsBlocked(rangeB, View2));
-        Assert.False(waitB.IsCompleted);
-
-        transitionB.MarkDrained();
-        transitionB.Complete();
-        await waitB;
-        Assert.Equal(PartitionTransitionStage.Completed, transitionB.Stage);
-        Assert.False(coordinatorB.IsBlocked(rangeB, View2));
-    }
-
-    [Fact]
-    public void InvalidStageAndDirectionActions_AreRejectedWithoutStateOrBlockingChanges()
-    {
-        var inboundCoordinator = new PartitionTransitionCoordinator();
-        var inbound = inboundCoordinator.BeginInbound(Range, View1, View2);
-        AssertRejectedWithoutMutation(inboundCoordinator, inbound, inbound.MarkDrained);
-        AssertRejectedWithoutMutation(inboundCoordinator, inbound, inbound.MarkStateRetained);
-        AssertRejectedWithoutMutation(
-            inboundCoordinator,
-            inbound,
-            () => inbound.MarkFenced(new(ClusterServiceFencingMode.External, 11)));
-        AssertRejectedWithoutMutation(inboundCoordinator, inbound, inbound.Complete);
-        inbound.MarkStateInstalled();
-        AssertRejectedWithoutMutation(inboundCoordinator, inbound, inbound.MarkStateInstalled);
-        AssertRejectedWithoutMutation(inboundCoordinator, inbound, inbound.MarkDrained);
-        AssertRejectedWithoutMutation(inboundCoordinator, inbound, inbound.Complete);
-        inbound.MarkFenced(new(ClusterServiceFencingMode.TimedSafetyLease, 12));
-        AssertRejectedWithoutMutation(inboundCoordinator, inbound, inbound.MarkStateInstalled);
-        AssertRejectedWithoutMutation(
-            inboundCoordinator,
-            inbound,
-            () => inbound.MarkFenced(new(ClusterServiceFencingMode.External, 13)));
-        inbound.Complete();
-
-        var outboundCoordinator = new PartitionTransitionCoordinator();
-        var outbound = outboundCoordinator.BeginOutbound(Range, View1, View2);
-        AssertRejectedWithoutMutation(outboundCoordinator, outbound, outbound.MarkStateInstalled);
-        AssertRejectedWithoutMutation(
-            outboundCoordinator,
-            outbound,
-            () => outbound.MarkFenced(new(ClusterServiceFencingMode.External, 21)));
-        AssertRejectedWithoutMutation(outboundCoordinator, outbound, outbound.MarkStateRetained);
-        AssertRejectedWithoutMutation(outboundCoordinator, outbound, outbound.Complete);
-        outbound.MarkDrained();
-        AssertRejectedWithoutMutation(outboundCoordinator, outbound, outbound.MarkDrained);
-        AssertRejectedWithoutMutation(outboundCoordinator, outbound, outbound.MarkStateInstalled);
-        outbound.MarkStateRetained();
-        AssertRejectedWithoutMutation(outboundCoordinator, outbound, outbound.MarkStateRetained);
-        outbound.Complete();
-
-        var barrierCoordinator = new PartitionTransitionCoordinator();
-        var barrier = barrierCoordinator.BeginBarrier(Range, View1);
-        AssertRejectedWithoutMutation(barrierCoordinator, barrier, barrier.MarkDrained);
-        AssertRejectedWithoutMutation(barrierCoordinator, barrier, barrier.MarkStateRetained);
-        AssertRejectedWithoutMutation(barrierCoordinator, barrier, barrier.MarkStateInstalled);
-        AssertRejectedWithoutMutation(
-            barrierCoordinator,
-            barrier,
-            () => barrier.MarkFenced(new(ClusterServiceFencingMode.MembershipView, 31)));
-        barrier.Complete();
-
-        Assert.Equal(PartitionTransitionStage.Completed, inbound.Stage);
-        Assert.Equal(PartitionTransitionStage.Completed, outbound.Stage);
-        Assert.Equal(PartitionTransitionStage.Completed, barrier.Stage);
-    }
-
-    [Fact]
-    public void Begin_RejectsEmptyAndNonIncreasingViewsWithoutInstallingGate()
-    {
-        var coordinator = new PartitionTransitionCoordinator();
-        var equalVersion = View1;
-        var olderVersion = new ClusterServiceViewId(0, new(0));
-
-        Assert.Throws<ArgumentException>(() => coordinator.BeginInbound(RingRange.Empty, View1, View2));
-        Assert.Throws<ArgumentException>(() => coordinator.BeginInbound(Range, View1, equalVersion));
-        Assert.Throws<ArgumentException>(() => coordinator.BeginOutbound(Range, View1, olderVersion));
-
-        Assert.False(coordinator.IsBlocked(Range, View1));
-        Assert.False(coordinator.IsBlocked(Range, View2));
-        Assert.False(coordinator.TryGetBlockingTransition(Range, View2, out var completion));
-        Assert.Same(Task.CompletedTask, completion);
-    }
-
-    [Fact]
-    public void WrapAroundRangeAndRequestVersion_BlockOnlyIntersectingEqualOrNewerRequests()
-    {
-        var coordinator = new PartitionTransitionCoordinator();
-        var wrapped = RingRange.Create(300, 100);
-        var highOverlap = RingRange.Create(350, 400);
-        var lowOverlap = RingRange.Create(0, 50);
-        var disjoint = RingRange.Create(150, 250);
-        var transition = coordinator.BeginInbound(wrapped, View1, View2);
-
-        Assert.False(coordinator.IsBlocked(highOverlap, View1));
-        Assert.True(coordinator.IsBlocked(highOverlap, View2));
-        Assert.True(coordinator.IsBlocked(lowOverlap, new(0, new(3))));
-        Assert.False(coordinator.IsBlocked(disjoint, new(0, new(3))));
-        Assert.False(coordinator.TryGetBlockingTransition(disjoint, new(0, new(3)), out var completed));
-        Assert.Same(Task.CompletedTask, completed);
-        Assert.True(coordinator.TryGetBlockingTransition(lowOverlap, View2, out var blocking));
-        Assert.Same(transition.Completion, blocking);
-        Assert.False(blocking.IsCompleted);
-
-        transition.Abort(TestContext.Current.CancellationToken);
-
-        Assert.False(coordinator.IsBlocked(highOverlap, View2));
-        Assert.True(transition.Completion.IsCanceled);
-    }
-
-    [Fact]
-    public void CsCheck_CoordinatorsPreservePerPartitionRangeAndVersionIsolation()
-    {
-        Gen.Int.Array[24].Sample(
-            VerifyCoordinatorIsolationHistory,
-            seed: "partition-transition-isolation-v1",
-            iter: 100,
-            threads: 1,
-            print: PrintIsolationHistory);
-    }
-
-    private static void AssertRejectedWithoutMutation(
-        PartitionTransitionCoordinator coordinator,
-        PartitionTransition transition,
-        Action action)
-    {
-        var expectedStage = transition.Stage;
-        var expectedFence = transition.Fence;
-        var expectedFailure = transition.Failure;
-        Assert.True(coordinator.TryGetBlockingTransition(
-            transition.Range,
-            transition.TargetView,
-            out var expectedCompletion));
-        Assert.Same(transition.Completion, expectedCompletion);
-
-        Assert.Throws<InvalidOperationException>(action);
-
-        Assert.Equal(expectedStage, transition.Stage);
-        Assert.Equal(expectedFence, transition.Fence);
-        Assert.Same(expectedFailure, transition.Failure);
-        Assert.True(coordinator.TryGetBlockingTransition(
-            transition.Range,
-            transition.TargetView,
-            out var actualCompletion));
-        Assert.Same(expectedCompletion, actualCompletion);
-        Assert.False(actualCompletion.IsCompleted);
-    }
-
-    private static void VerifyCoordinatorIsolationHistory(int[] choices)
-    {
-        var inputA = new RangeInput(3_000_000_000, 500_000_000);
-        var inputB = new RangeInput(1_000_000_000, 2_000_000_000);
-        var rangeA = RingRange.Create(inputA.Start, inputA.End);
-        var rangeB = RingRange.Create(inputB.Start, inputB.End);
-        var coordinatorA = new PartitionTransitionCoordinator();
-        var coordinatorB = new PartitionTransitionCoordinator();
-        var transitionA = coordinatorA.BeginInbound(rangeA, CreateView(4), CreateView(5));
-        var transitionB = coordinatorB.BeginOutbound(rangeB, CreateView(6), CreateView(7));
-
-        foreach (var choice in choices)
-        {
-            var operation = unchecked((uint)choice) % 6;
-            var stageA = transitionA.Stage;
-            var stageB = transitionB.Stage;
-            switch (operation)
-            {
-                case 0 when stageA == PartitionTransitionStage.Blocking:
-                    transitionA.MarkStateInstalled();
-                    break;
-                case 0 when stageA == PartitionTransitionStage.StateInstalled:
-                    transitionA.MarkFenced(new(ClusterServiceFencingMode.External, choice));
-                    break;
-                case 0 when stageA == PartitionTransitionStage.Fenced:
-                    transitionA.Complete();
-                    break;
-                case 1 when stageA is not (PartitionTransitionStage.Completed or PartitionTransitionStage.Aborted):
-                    transitionA.Abort();
-                    break;
-                case 2 when stageB == PartitionTransitionStage.Blocking:
-                    transitionB.MarkDrained();
-                    break;
-                case 2 when stageB == PartitionTransitionStage.Drained:
-                    transitionB.MarkStateRetained();
-                    break;
-                case 2 when stageB == PartitionTransitionStage.StateRetained:
-                    transitionB.Complete();
-                    break;
-                case 3 when stageB is not (PartitionTransitionStage.Completed or PartitionTransitionStage.Aborted):
-                    transitionB.Abort();
-                    break;
-            }
-
-            if (operation <= 1)
-            {
-                Assert.Equal(stageB, transitionB.Stage);
-            }
-            else if (operation <= 3)
-            {
-                Assert.Equal(stageA, transitionA.Stage);
-            }
-
-            var raw = unchecked((uint)choice);
-            var queryInput = new RangeInput(
-                raw * 2_654_435_761u,
-                System.Numerics.BitOperations.RotateLeft(raw ^ 0xA5A5_A5A5u, 13));
-            var query = RingRange.Create(queryInput.Start, queryInput.End);
-            var requestVersion = new ClusterServiceViewId(0, new(raw % 10));
-            var expectedA = IsActive(transitionA.Stage)
-                && requestVersion.Version.Value >= 5
-                && RingRangeIntersectionOracle(inputA, queryInput);
-            var expectedB = IsActive(transitionB.Stage)
-                && requestVersion.Version.Value >= 7
-                && RingRangeIntersectionOracle(inputB, queryInput);
-
-            Assert.Equal(expectedA, coordinatorA.IsBlocked(query, requestVersion));
-            Assert.Equal(expectedB, coordinatorB.IsBlocked(query, requestVersion));
-            Assert.Equal(IsActive(transitionA.Stage), !transitionA.Completion.IsCompleted);
-            Assert.Equal(IsActive(transitionB.Stage), !transitionB.Completion.IsCompleted);
-        }
-    }
-
-    private static bool IsActive(PartitionTransitionStage stage) =>
-        stage is not (PartitionTransitionStage.Completed or PartitionTransitionStage.Aborted);
-
-    private static bool RingRangeIntersectionOracle(RangeInput left, RangeInput right)
-    {
-        Span<LinearSegment> leftSegments = stackalloc LinearSegment[2];
-        Span<LinearSegment> rightSegments = stackalloc LinearSegment[2];
-        var leftCount = Linearize(left, leftSegments);
-        var rightCount = Linearize(right, rightSegments);
-        for (var i = 0; i < leftCount; i++)
-        {
-            for (var j = 0; j < rightCount; j++)
-            {
-                if (leftSegments[i].Start <= rightSegments[j].End
-                    && rightSegments[j].Start <= leftSegments[i].End)
-                {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
-
-    private static int Linearize(RangeInput input, Span<LinearSegment> segments)
-    {
-        if (input.Start == input.End)
-        {
-            if (input.Start == 0)
-            {
-                return 0;
-            }
-
-            segments[0] = new(0, uint.MaxValue);
-            return 1;
-        }
-
-        if (input.Start < input.End)
-        {
-            segments[0] = new(input.Start + 1, input.End);
-            return 1;
-        }
-
-        var count = 0;
-        if (input.Start < uint.MaxValue)
-        {
-            segments[count++] = new(input.Start + 1, uint.MaxValue);
-        }
-
-        segments[count++] = new(0, input.End);
-        return count;
-    }
-
-    private static string PrintIsolationHistory(int[] choices) =>
-        $"history=[{string.Join(
-            "; ",
-            choices.Select(static choice =>
-            {
-                var raw = unchecked((uint)choice);
-                var queryStart = raw * 2_654_435_761u;
-                var queryEnd = System.Numerics.BitOperations.RotateLeft(raw ^ 0xA5A5_A5A5u, 13);
-                return $"op={raw % 6},query=({queryStart},{queryEnd}],version={raw % 10}";
-            }))}]";
-
-    private static ClusterServiceViewId CreateView(long version) => new(0, new(version));
-
-    private readonly record struct RangeInput(uint Start, uint End);
-
-    private readonly record struct LinearSegment(uint Start, uint End);
-
-    [Fact]
-    public async Task Fail_PreservesExactFailureFaultsCompletionAndKeepsGateUntilAbort()
-    {
-        var coordinator = new PartitionTransitionCoordinator();
-        var transition = coordinator.BeginBarrier(Range, View2);
-        var failure = new InvalidOperationException("deterministic transition failure");
-        var completion = transition.Completion;
-
-        transition.Fail(failure);
-
-        Assert.Same(failure, transition.Failure);
-        Assert.Equal(PartitionTransitionStage.Failed, transition.Stage);
-        Assert.Same(completion, transition.Completion);
-        Assert.True(completion.IsFaulted);
-        Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() => completion));
-        Assert.True(coordinator.TryGetBlockingTransition(Range, View2, out var blocked));
-        Assert.Same(completion, blocked);
-
-        var repeatedFailure = new ArgumentException("must not replace the first failure");
-        var rejection = Assert.Throws<InvalidOperationException>(() => transition.Fail(repeatedFailure));
-
-        Assert.Equal("Transition stage 'Failed' cannot fail.", rejection.Message);
-        Assert.Same(failure, transition.Failure);
-        Assert.Equal(PartitionTransitionStage.Failed, transition.Stage);
-        Assert.Same(completion, transition.Completion);
-        Assert.True(completion.IsFaulted);
-        Assert.True(coordinator.TryGetBlockingTransition(Range, View2, out blocked));
-        Assert.Same(completion, blocked);
-
-        var completionRejection = Assert.Throws<InvalidOperationException>(transition.Complete);
-
-        Assert.Equal("A barrier transition must remain blocked until completion.", completionRejection.Message);
-        Assert.Same(failure, transition.Failure);
-        Assert.Equal(PartitionTransitionStage.Failed, transition.Stage);
-        Assert.True(coordinator.IsBlocked(Range, View2));
-
-        transition.Abort(TestContext.Current.CancellationToken);
-
-        Assert.Equal(PartitionTransitionStage.Aborted, transition.Stage);
-        Assert.Same(failure, transition.Failure);
-        Assert.Same(completion, transition.Completion);
-        Assert.True(completion.IsFaulted);
-        Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() => completion));
-        Assert.False(coordinator.IsBlocked(Range, View2));
-        Assert.False(coordinator.TryGetBlockingTransition(Range, View2, out var released));
-        Assert.Same(Task.CompletedTask, released);
-    }
-
-    [Theory]
-    [InlineData(
-        (int)PartitionTransitionDirection.Inbound,
-        "An inbound transition must install state and establish fencing before activation.")]
-    [InlineData(
-        (int)PartitionTransitionDirection.Outbound,
-        "An outbound transition must drain operations before completion.")]
-    public void Complete_RejectsFailedInboundAndOutboundWithoutReleasingGate(
-        int directionValue,
-        string expectedMessage)
-    {
-        var direction = (PartitionTransitionDirection)directionValue;
-        var coordinator = new PartitionTransitionCoordinator();
-        var transition = direction == PartitionTransitionDirection.Inbound
-            ? coordinator.BeginInbound(Range, View1, View2)
-            : coordinator.BeginOutbound(Range, View1, View2);
-        var failure = new InvalidOperationException($"failed {direction}");
-
-        transition.Fail(failure);
-        var rejection = Assert.Throws<InvalidOperationException>(transition.Complete);
-
-        Assert.Equal(expectedMessage, rejection.Message);
-        Assert.Same(failure, transition.Failure);
-        Assert.Equal(PartitionTransitionStage.Failed, transition.Stage);
-        Assert.True(transition.Completion.IsFaulted);
-        Assert.Same(failure, Assert.Single(transition.Completion.Exception!.InnerExceptions));
-        Assert.True(coordinator.TryGetBlockingTransition(Range, View2, out var blocked));
-        Assert.Same(transition.Completion, blocked);
-
-        transition.Abort(TestContext.Current.CancellationToken);
-        Assert.False(coordinator.IsBlocked(Range, View2));
-    }
-
-    [Fact]
-    public async Task Begin_AllowsIndependentDisjointSameTargetAndOverlappingDifferentTargetTransitions()
-    {
-        var coordinator = new PartitionTransitionCoordinator();
-        var firstRange = RingRange.Create(100, 200);
-        var disjointRange = RingRange.Create(300, 400);
-        var overlappingRange = RingRange.Create(150, 250);
-        var firstOnlyRange = RingRange.Create(100, 150);
-        var overlapOnlyRange = RingRange.Create(200, 250);
-        var view3 = CreateView(3);
-
-        var first = coordinator.BeginBarrier(firstRange, View2);
-        var sameTargetDisjoint = coordinator.BeginBarrier(disjointRange, View2);
-        var differentTargetOverlapping = coordinator.BeginBarrier(overlappingRange, view3);
-
-        Assert.NotSame(first.Completion, sameTargetDisjoint.Completion);
-        Assert.NotSame(first.Completion, differentTargetOverlapping.Completion);
-        Assert.NotSame(sameTargetDisjoint.Completion, differentTargetOverlapping.Completion);
-        Assert.True(coordinator.TryGetBlockingTransition(firstOnlyRange, View2, out var firstGate));
-        Assert.Same(first.Completion, firstGate);
-        Assert.True(coordinator.TryGetBlockingTransition(disjointRange, View2, out var disjointGate));
-        Assert.Same(sameTargetDisjoint.Completion, disjointGate);
-        Assert.True(coordinator.TryGetBlockingTransition(overlapOnlyRange, view3, out var overlappingGate));
-        Assert.Same(differentTargetOverlapping.Completion, overlappingGate);
-
-        first.Complete();
-        await firstGate;
-
-        Assert.True(first.Completion.IsCompletedSuccessfully);
-        Assert.False(sameTargetDisjoint.Completion.IsCompleted);
-        Assert.False(differentTargetOverlapping.Completion.IsCompleted);
-        Assert.False(coordinator.IsBlocked(firstOnlyRange, View2));
-        Assert.True(coordinator.IsBlocked(disjointRange, View2));
-        Assert.True(coordinator.IsBlocked(overlapOnlyRange, view3));
-
-        sameTargetDisjoint.Complete();
-        await disjointGate;
-
-        Assert.True(sameTargetDisjoint.Completion.IsCompletedSuccessfully);
-        Assert.False(differentTargetOverlapping.Completion.IsCompleted);
-        Assert.False(coordinator.IsBlocked(disjointRange, View2));
-        Assert.True(coordinator.IsBlocked(overlapOnlyRange, view3));
-
-        differentTargetOverlapping.Complete();
-        await overlappingGate;
-
-        Assert.True(differentTargetOverlapping.Completion.IsCompletedSuccessfully);
-        Assert.False(coordinator.IsBlocked(overlapOnlyRange, view3));
-    }
-
-    [Fact]
-    public async Task Abort_PreservesCanceledTokenAndSynthesizesCanceledTokenForNonCanceledInput()
-    {
-        var coordinator = new PartitionTransitionCoordinator();
-        using var canceledSource = new CancellationTokenSource();
-        canceledSource.Cancel();
-        var canceledToken = canceledSource.Token;
-        var canceledTransition = coordinator.BeginBarrier(Range, View1);
-
-        canceledTransition.Abort(canceledToken);
-        var preserved = await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => canceledTransition.Completion);
-
-        Assert.Equal(canceledToken, preserved.CancellationToken);
-        Assert.True(preserved.CancellationToken.IsCancellationRequested);
-        Assert.Equal(PartitionTransitionStage.Aborted, canceledTransition.Stage);
-        Assert.False(coordinator.IsBlocked(Range, View1));
-
-        using var activeSource = new CancellationTokenSource();
-        var activeToken = activeSource.Token;
-        var synthesizedTransition = coordinator.BeginBarrier(Range, View2);
-
-        synthesizedTransition.Abort(activeToken);
-        var synthesized = await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => synthesizedTransition.Completion);
-
-        Assert.False(activeToken.IsCancellationRequested);
-        Assert.True(synthesized.CancellationToken.IsCancellationRequested);
-        Assert.NotEqual(activeToken, synthesized.CancellationToken);
-        Assert.Equal(PartitionTransitionStage.Aborted, synthesizedTransition.Stage);
-        Assert.False(coordinator.IsBlocked(Range, View2));
-    }
-
-    [Fact]
-    public async Task Barrier_BlocksExactAndNewerVersionsButNotPrecedingVersionUntilCompletion()
-    {
-        var coordinator = new PartitionTransitionCoordinator();
-        var barrier = coordinator.BeginBarrier(Range, View2);
-        var newerVersion = new ClusterServiceViewId(0, new(3));
-
-        Assert.False(coordinator.IsBlocked(Range, View1));
-        Assert.False(coordinator.TryGetBlockingTransition(Range, View1, out var precedingGate));
-        Assert.Same(Task.CompletedTask, precedingGate);
-        Assert.True(coordinator.IsBlocked(Range, View2));
-        Assert.True(coordinator.TryGetBlockingTransition(Range, View2, out var exactGate));
-        Assert.Same(barrier.Completion, exactGate);
-        Assert.True(coordinator.IsBlocked(Range, newerVersion));
-        Assert.True(coordinator.TryGetBlockingTransition(Range, newerVersion, out var newerGate));
-        Assert.Same(barrier.Completion, newerGate);
-        Assert.False(exactGate.IsCompleted);
-
-        barrier.Complete();
-        await exactGate;
-
-        Assert.True(barrier.Completion.IsCompletedSuccessfully);
-        Assert.Equal(PartitionTransitionStage.Completed, barrier.Stage);
-        Assert.False(coordinator.IsBlocked(Range, View1));
-        Assert.False(coordinator.IsBlocked(Range, View2));
-        Assert.False(coordinator.IsBlocked(Range, newerVersion));
-        Assert.False(coordinator.TryGetBlockingTransition(Range, newerVersion, out var releasedGate));
-        Assert.Same(Task.CompletedTask, releasedGate);
     }
 }

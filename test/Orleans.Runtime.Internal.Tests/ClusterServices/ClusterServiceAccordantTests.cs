@@ -13,464 +13,214 @@ namespace UnitTests.ClusterServices;
 public sealed class ClusterServiceAccordantTests
 {
     [Fact]
-    public async Task Accordant_PartitionTransitionStateMachine_CoversInboundOutboundAndAbortPaths()
+    public async Task Accordant_TypedOwnershipStateMachine_CoversAcquisitionReleaseBarrierFailureAndAbort()
     {
-        var spec = new TransitionBehavioralSpec();
-        var initialState = TransitionModelState.Create();
-        var coverage = new TransitionExecutionCoverage();
-        var testCases = spec.GenerateTests(
-                initialState,
-                spec.CreateInputSet(),
-                new TestGenerationOptions
-                {
-                    MaxDepth = 5,
-                    SequentialTestCaseAlgorithm = SequentialTestCaseAlgorithms.CreateTransitionCoverage(maxSequenceLength: 7),
-                    ShouldApply = (input, state) => TransitionBehavioralSpec.CanApply(
-                        (TransitionRequest)input.Request,
-                        (TransitionModelState)state)
-                })
-            .ToList();
+        var coverage = await Run(validCommandsOnly: true, maxDepth: 5, sequenceLength: 7);
+        foreach (var kind in Enum.GetValues<GateOperationKind>())
+        {
+            if (kind is not GateOperationKind.BeginNonIncreasingView)
+            {
+                Assert.Contains(kind, coverage.Executed);
+            }
+        }
+
+        Assert.Contains(GateModelRole.Acquisition, coverage.CompletedRoles);
+        Assert.Contains(GateModelRole.Release, coverage.CompletedRoles);
+        Assert.Contains(GateModelRole.Barrier, coverage.CompletedRoles);
+        Assert.Contains(GateModelRole.Acquisition, coverage.FailedRoles);
+        Assert.Contains(GateModelRole.Release, coverage.FailedRoles);
+        Assert.Contains(GateModelRole.Barrier, coverage.FailedRoles);
+        Assert.True(coverage.AbortedFailedGate);
+    }
+
+    [Fact]
+    public async Task Accordant_InvalidCommandsAndRangeViewProbes_PreserveStateOnRejection()
+    {
+        var coverage = await Run(validCommandsOnly: false, maxDepth: 3, sequenceLength: 4);
+        foreach (var kind in new[]
+        {
+            GateOperationKind.BeginNonIncreasingView,
+            GateOperationKind.Install,
+            GateOperationKind.Fence,
+            GateOperationKind.Drain,
+            GateOperationKind.Retain,
+            GateOperationKind.Complete,
+            GateOperationKind.Fail,
+            GateOperationKind.Abort,
+            GateOperationKind.BeginAcquisition,
+            GateOperationKind.BeginRelease,
+            GateOperationKind.BeginBarrier
+        })
+        {
+            Assert.Contains(kind, coverage.Rejected);
+        }
+
+        Assert.Contains(GateOperationKind.ProbeOlderOverlap, coverage.Executed);
+        Assert.Contains(GateOperationKind.ProbeEqualOverlap, coverage.Executed);
+        Assert.Contains(GateOperationKind.ProbeNewerOverlap, coverage.Executed);
+        Assert.Contains(GateOperationKind.ProbeNewerDisjoint, coverage.Executed);
+    }
+
+    private static async Task<GateExecutionCoverage> Run(bool validCommandsOnly, int maxDepth, int sequenceLength)
+    {
+        var spec = new GateBehavioralSpec();
+        var initial = GateModelState.Create();
+        var coverage = new GateExecutionCoverage();
+        var cases = spec.GenerateTests(
+            initial,
+            spec.CreateInputSet(),
+            new TestGenerationOptions
+            {
+                MaxDepth = maxDepth,
+                SequentialTestCaseAlgorithm = SequentialTestCaseAlgorithms.CreateTransitionCoverage(sequenceLength),
+                ShouldApply = (input, state) => !validCommandsOnly
+                    || GateModel.CanApply(((GateRequest)input.Request).Kind, (GateModelState)state)
+            }).ToList();
         var context = spec.CreateTestingContext();
         context.RequestPrinter = request => request?.ToString() ?? "<null>";
         context.ResponsePrinter = response => response?.ToString() ?? "<null>";
         var results = await spec.RunTests(
             context,
-            initialState,
-            testCases,
+            initial,
+            cases,
             new TestExecutionOptions
             {
                 StopOnFirstFailure = true,
-                BeforeEach = info => info.Context.Register(new TransitionExecutionHarness(coverage))
+                BeforeEach = info => info.Context.Register(new GateExecutionHarness(coverage))
             });
         var failure = results.FirstOrDefault(result => !result.Success);
-
-        Assert.NotEmpty(testCases);
-        Assert.True(
-            failure is null && results.All(result => result.Success),
-            $"cases={testCases.Count}; failure={failure?.LastFailureMessage}");
-        Assert.Contains(TransitionOperationKind.BeginInbound, coverage.ExecutedKinds);
-        Assert.Contains(TransitionOperationKind.Install, coverage.ExecutedKinds);
-        Assert.Contains(TransitionOperationKind.Fence, coverage.ExecutedKinds);
-        Assert.Contains(TransitionOperationKind.BeginOutbound, coverage.ExecutedKinds);
-        Assert.Contains(TransitionOperationKind.Drain, coverage.ExecutedKinds);
-        Assert.Contains(TransitionOperationKind.Retain, coverage.ExecutedKinds);
-        Assert.Contains(TransitionOperationKind.Complete, coverage.ExecutedKinds);
-        Assert.Contains(TransitionOperationKind.Abort, coverage.ExecutedKinds);
-        Assert.Contains(TransitionOperationKind.Validate, coverage.ExecutedKinds);
-        Assert.Contains(TransitionExecutionPath.InboundInstall, coverage.ExecutedPaths);
-        Assert.Contains(TransitionExecutionPath.InboundFence, coverage.ExecutedPaths);
-        Assert.Contains(TransitionExecutionPath.InboundComplete, coverage.ExecutedPaths);
-        Assert.Contains(TransitionExecutionPath.OutboundDrain, coverage.ExecutedPaths);
-        Assert.Contains(TransitionExecutionPath.OutboundRetain, coverage.ExecutedPaths);
-        Assert.Contains(TransitionExecutionPath.OutboundComplete, coverage.ExecutedPaths);
-        Assert.Contains(TransitionExecutionPath.Abort, coverage.ExecutedPaths);
-    }
-
-    private sealed class TransitionBehavioralSpec : Spec<TransitionModelState>
-    {
-        private readonly TransitionOperation _operation = new();
-
-        public TransitionBehavioralSpec() => Add(_operation);
-
-        public InputSet CreateInputSet()
-        {
-            var result = new InputSet();
-            foreach (var operation in Enum.GetValues<TransitionOperationKind>())
-            {
-                result.Add(_operation.With(new TransitionRequest(operation), operation.ToString()));
-            }
-
-            return result;
-        }
-
-        public static bool CanApply(TransitionRequest request, TransitionModelState state) =>
-            request.Kind switch
-            {
-                TransitionOperationKind.BeginInbound or TransitionOperationKind.BeginOutbound => !state.Active,
-                TransitionOperationKind.Install =>
-                    state.Active
-                    && state.Direction == (int)PartitionTransitionDirection.Inbound
-                    && state.Stage == (int)PartitionTransitionStage.Blocking,
-                TransitionOperationKind.Fence =>
-                    state.Active
-                    && state.Direction == (int)PartitionTransitionDirection.Inbound
-                    && state.Stage == (int)PartitionTransitionStage.StateInstalled,
-                TransitionOperationKind.Drain =>
-                    state.Active
-                    && state.Direction == (int)PartitionTransitionDirection.Outbound
-                    && state.Stage == (int)PartitionTransitionStage.Blocking,
-                TransitionOperationKind.Retain =>
-                    state.Active
-                    && state.Direction == (int)PartitionTransitionDirection.Outbound
-                    && state.Stage == (int)PartitionTransitionStage.Drained,
-                TransitionOperationKind.Complete =>
-                    state.Active
-                    && (state.Stage == (int)PartitionTransitionStage.Fenced
-                        || state.Direction == (int)PartitionTransitionDirection.Outbound
-                        && state.Stage is (int)PartitionTransitionStage.Drained or (int)PartitionTransitionStage.StateRetained),
-                TransitionOperationKind.Abort => state.Active,
-                _ => true
-            };
-    }
-
-    private sealed class TransitionOperation()
-        : Operation<TransitionRequest, TransitionResponse, TransitionModelState>("Transition")
-    {
-        public override ExpectedOutcomes Apply(TransitionRequest request, TransitionModelState state)
-        {
-            var expected = Predict(request, state);
-            return Expect.That(response =>
-                    response == expected
-                        ? ValidationResult.Valid()
-                        : ValidationResult.Invalid($"request={request}; expected={expected}; actual={response}"))
-                .ThenState(next => ApplyModel(request, next));
-        }
-
-        public override Task<TransitionResponse> ExecuteAsync(TestingContext context, TransitionRequest request) =>
-            Task.FromResult(context.Get<TransitionExecutionHarness>().Execute(request));
-    }
-
-    private sealed class TransitionExecutionHarness(TransitionExecutionCoverage coverage)
-    {
-        private static readonly RingRange Range = RingRange.Create(100, 200);
-        private readonly PartitionTransitionCoordinator _coordinator = new();
-        private PartitionTransition? _transition;
-        private PartitionTransitionStage _lastStage = PartitionTransitionStage.Completed;
-        private long _version = 1;
-
-        public TransitionResponse Execute(TransitionRequest request)
-        {
-            coverage.Observe(request.Kind);
-            switch (request.Kind)
-            {
-                case TransitionOperationKind.BeginInbound:
-                    _transition = _coordinator.BeginInbound(Range, CreateView(_version), CreateView(++_version));
-                    break;
-                case TransitionOperationKind.BeginOutbound:
-                    _transition = _coordinator.BeginOutbound(Range, CreateView(_version), CreateView(++_version));
-                    break;
-                case TransitionOperationKind.Install:
-                    _transition!.MarkStateInstalled();
-                    coverage.Observe(TransitionExecutionPath.InboundInstall);
-                    break;
-                case TransitionOperationKind.Fence:
-                    _transition!.MarkFenced(new(ClusterServiceFencingMode.External, _version));
-                    coverage.Observe(TransitionExecutionPath.InboundFence);
-                    break;
-                case TransitionOperationKind.Drain:
-                    _transition!.MarkDrained();
-                    coverage.Observe(TransitionExecutionPath.OutboundDrain);
-                    break;
-                case TransitionOperationKind.Retain:
-                    _transition!.MarkStateRetained();
-                    coverage.Observe(TransitionExecutionPath.OutboundRetain);
-                    break;
-                case TransitionOperationKind.Complete:
-                    var direction = _transition!.Direction;
-                    _transition!.Complete();
-                    coverage.Observe(direction == PartitionTransitionDirection.Inbound
-                        ? TransitionExecutionPath.InboundComplete
-                        : TransitionExecutionPath.OutboundComplete);
-                    _lastStage = _transition.Stage;
-                    _transition = null;
-                    break;
-                case TransitionOperationKind.Abort:
-                    _transition!.Abort();
-                    coverage.Observe(TransitionExecutionPath.Abort);
-                    _lastStage = PartitionTransitionStage.Aborted;
-                    _transition = null;
-                    break;
-            }
-
-            var active = _transition is not null;
-            var stage = active ? _transition!.Stage : _lastStage;
-            return new(
-                active,
-                active && _coordinator.IsBlocked(Range, CreateView(_version)),
-                (int)stage,
-                _version);
-        }
-
-        private static ClusterServiceViewId CreateView(long version) => new(0, new(version));
-    }
-
-    private static TransitionResponse Predict(TransitionRequest request, TransitionModelState state)
-    {
-        var active = state.Active;
-        var direction = state.Direction;
-        var stage = state.Stage;
-        var version = state.Version;
-        switch (request.Kind)
-        {
-            case TransitionOperationKind.BeginInbound:
-                active = true;
-                direction = (int)PartitionTransitionDirection.Inbound;
-                stage = (int)PartitionTransitionStage.Blocking;
-                version++;
-                break;
-            case TransitionOperationKind.BeginOutbound:
-                active = true;
-                direction = (int)PartitionTransitionDirection.Outbound;
-                stage = (int)PartitionTransitionStage.Blocking;
-                version++;
-                break;
-            case TransitionOperationKind.Install:
-                stage = (int)PartitionTransitionStage.StateInstalled;
-                break;
-            case TransitionOperationKind.Fence:
-                stage = (int)PartitionTransitionStage.Fenced;
-                break;
-            case TransitionOperationKind.Drain:
-                stage = (int)PartitionTransitionStage.Drained;
-                break;
-            case TransitionOperationKind.Retain:
-                stage = (int)PartitionTransitionStage.StateRetained;
-                break;
-            case TransitionOperationKind.Complete:
-                active = false;
-                stage = (int)PartitionTransitionStage.Completed;
-                break;
-            case TransitionOperationKind.Abort:
-                active = false;
-                stage = (int)PartitionTransitionStage.Aborted;
-                break;
-        }
-
-        return new(active, active, stage, version);
-    }
-
-    private static void ApplyModel(TransitionRequest request, TransitionModelState state)
-    {
-        var response = Predict(request, state);
-        state.Active = response.Active;
-        state.Stage = response.Stage;
-        state.Version = response.Version;
-        if (request.Kind == TransitionOperationKind.BeginInbound)
-        {
-            state.Direction = (int)PartitionTransitionDirection.Inbound;
-        }
-        else if (request.Kind == TransitionOperationKind.BeginOutbound)
-        {
-            state.Direction = (int)PartitionTransitionDirection.Outbound;
-        }
-    }
-
-    private enum TransitionOperationKind
-    {
-        BeginInbound,
-        Install,
-        Fence,
-        Complete,
-        BeginOutbound,
-        Drain,
-        Retain,
-        Abort,
-        Validate
-    }
-
-    private enum TransitionExecutionPath
-    {
-        InboundInstall,
-        InboundFence,
-        InboundComplete,
-        OutboundDrain,
-        OutboundRetain,
-        OutboundComplete,
-        Abort
-    }
-
-    private sealed class TransitionExecutionCoverage
-    {
-        public HashSet<TransitionOperationKind> ExecutedKinds { get; } = [];
-
-        public HashSet<TransitionExecutionPath> ExecutedPaths { get; } = [];
-
-        public void Observe(TransitionOperationKind kind) => ExecutedKinds.Add(kind);
-
-        public void Observe(TransitionExecutionPath path) => ExecutedPaths.Add(path);
-    }
-
-    private sealed record TransitionRequest(TransitionOperationKind Kind)
-    {
-        public override string ToString() => Kind.ToString();
-    }
-
-    private sealed record TransitionResponse(bool Active, bool Blocked, int Stage, long Version);
-
-    [Fact]
-    public async Task Accordant_InvalidCommandsAndRangeVersionProbes_PreserveStateOnRejection()
-    {
-        var spec = new RejectionTransitionBehavioralSpec();
-        var initialState = RejectionTransitionModelState.Create();
-        var testCases = spec.GenerateTests(
-                initialState,
-                spec.CreateInputSet(),
-                new TestGenerationOptions
-                {
-                    MaxDepth = 2,
-                    SequentialTestCaseAlgorithm = SequentialTestCaseAlgorithms.CreateTransitionCoverage(maxSequenceLength: 3)
-                })
-            .ToList();
-        var coverage = new RejectionTransitionCoverage();
-        var context = spec.CreateTestingContext();
-        context.RequestPrinter = request => request?.ToString() ?? "<null-request>";
-        context.ResponsePrinter = response => response?.ToString() ?? "<null-response>";
-        var results = await spec.RunTests(
-            context,
-            initialState,
-            testCases,
-            new TestExecutionOptions
-            {
-                StopOnFirstFailure = true,
-                BeforeEach = info =>
-                {
-                    info.Context.Register(coverage);
-                    info.Context.Register(new RejectionTransitionHarness());
-                }
-            });
-        var failure = results.FirstOrDefault(result => !result.Success);
-
-        Assert.NotEmpty(testCases);
-        Assert.True(
-            failure is null && results.All(result => result.Success),
-            $"cases={testCases.Count}; failure={failure?.LastFailureMessage}; log={failure?.LogFilePath}");
-        Assert.Contains(RejectionTransitionOperationKind.BeginNonIncreasingView, coverage.RejectedKinds);
-        Assert.Contains(RejectionTransitionOperationKind.Install, coverage.RejectedKinds);
-        Assert.Contains(RejectionTransitionOperationKind.Fence, coverage.RejectedKinds);
-        Assert.Contains(RejectionTransitionOperationKind.Drain, coverage.RejectedKinds);
-        Assert.Contains(RejectionTransitionOperationKind.Retain, coverage.RejectedKinds);
-        Assert.Contains(RejectionTransitionOperationKind.Complete, coverage.RejectedKinds);
-        Assert.Contains(RejectionTransitionOperationKind.Abort, coverage.RejectedKinds);
-        Assert.Contains(RejectionTransitionOperationKind.BeginInbound, coverage.RejectedKinds);
-        Assert.Contains(RejectionTransitionOperationKind.BeginOutbound, coverage.RejectedKinds);
-        Assert.Contains(RejectionTransitionOperationKind.ProbeOlderOverlap, coverage.ExecutedKinds);
-        Assert.Contains(RejectionTransitionOperationKind.ProbeEqualOverlap, coverage.ExecutedKinds);
-        Assert.Contains(RejectionTransitionOperationKind.ProbeNewerOverlap, coverage.ExecutedKinds);
-        Assert.Contains(RejectionTransitionOperationKind.ProbeNewerDisjoint, coverage.ExecutedKinds);
+        Assert.NotEmpty(cases);
+        Assert.True(failure is null && results.All(result => result.Success),
+            $"cases={cases.Count}; failure={failure?.LastFailureMessage}; log={failure?.LogFilePath}");
+        return coverage;
     }
 }
 
-[State]
-internal partial class TransitionModelState : State
+internal sealed class GateBehavioralSpec : Spec<GateModelState>
 {
-    public bool Active { get; set; }
+    private readonly GateOperation _operation = new();
 
-    public int Direction { get; set; }
-
-    public int Stage { get; set; }
-
-    public long Version { get; set; }
-
-    public static TransitionModelState Create() =>
-        new()
-        {
-            Stage = (int)PartitionTransitionStage.Completed,
-            Version = 1
-        };
-}
-
-internal sealed class RejectionTransitionBehavioralSpec : Spec<RejectionTransitionModelState>
-{
-    private readonly RejectionTransitionOperation _operation = new();
-
-    public RejectionTransitionBehavioralSpec() => Add(_operation);
+    public GateBehavioralSpec() => Add(_operation);
 
     public InputSet CreateInputSet()
     {
-        var result = new InputSet();
-        foreach (var kind in Enum.GetValues<RejectionTransitionOperationKind>())
+        var inputs = new InputSet();
+        foreach (var kind in Enum.GetValues<GateOperationKind>())
         {
-            result.Add(_operation.With(new(kind), kind.ToString()));
+            inputs.Add(_operation.With(new(kind), kind.ToString()));
         }
 
-        return result;
+        return inputs;
     }
 }
 
-internal sealed class RejectionTransitionOperation()
-    : Operation<RejectionTransitionRequest, RejectionTransitionResponse, RejectionTransitionModelState>(
-        "Invalid transition and probe")
+internal sealed class GateOperation() : Operation<GateRequest, GateResponse, GateModelState>("Typed ownership gate")
 {
-    public override ExpectedOutcomes Apply(
-        RejectionTransitionRequest request,
-        RejectionTransitionModelState state)
+    public override ExpectedOutcomes Apply(GateRequest request, GateModelState state)
     {
-        var expected = RejectionTransitionModel.Predict(request, state);
-        return Expect.That(response =>
-                response == expected
-                    ? ValidationResult.Valid()
-                    : ValidationResult.Invalid(
-                        $"request={request}; expected={expected}; actual={response}; "
-                        + $"before=(active={state.Active},direction={state.Direction},stage={state.Stage})"))
-            .ThenState(next => RejectionTransitionModel.Apply(request, next));
+        var expected = GateModel.Predict(request.Kind, state);
+        return Expect.That(response => response == expected
+                ? ValidationResult.Valid()
+                : ValidationResult.Invalid($"request={request}; expected={expected}; actual={response}"))
+            .ThenState(next => GateModel.Apply(request.Kind, next));
     }
 
-    public override Task<RejectionTransitionResponse> ExecuteAsync(
-        TestingContext context,
-        RejectionTransitionRequest request)
-    {
-        var response = context.Get<RejectionTransitionHarness>().Execute(request);
-        context.Get<RejectionTransitionCoverage>().Observe(request.Kind, response.Accepted);
-        return Task.FromResult(response);
-    }
+    public override Task<GateResponse> ExecuteAsync(TestingContext context, GateRequest request) =>
+        Task.FromResult(context.Get<GateExecutionHarness>().Execute(request.Kind));
 }
 
-internal sealed class RejectionTransitionHarness
+internal sealed class GateExecutionHarness(GateExecutionCoverage coverage)
 {
-    private static readonly RingRange TransitionRange = RingRange.Create(100, 200);
-    private static readonly RingRange DisjointRange = RingRange.Create(300, 400);
-    private static readonly ClusterServiceViewId PreviousView = new(0, new(1));
-    private static readonly ClusterServiceViewId TargetView = new(0, new(2));
-    private readonly PartitionTransitionCoordinator _coordinator = new();
-    private PartitionTransition? _transition;
+    private static readonly RingRange Range = RingRange.Create(100, 200);
+    private static readonly RingRange Disjoint = RingRange.Create(300, 400);
+    private readonly RangeTransitionGateMap<long> _map = new();
+    private readonly ApplicationException _failure = new("accordant failure");
+    private TransitionGate<long>? _gate;
 
-    public RejectionTransitionResponse Execute(RejectionTransitionRequest request)
+    public GateResponse Execute(GateOperationKind kind)
     {
         var accepted = true;
-        bool? probeBlocked = null;
+        bool? probe = null;
+        coverage.Executed.Add(kind);
         try
         {
-            switch (request.Kind)
+            switch (kind)
             {
-                case RejectionTransitionOperationKind.BeginInbound:
-                    RepeatBegin(PartitionTransitionDirection.Inbound);
+                case GateOperationKind.BeginAcquisition:
+                {
+                    var acquisition = new OwnershipAcquisition<long>(1, 2);
+                    _map.Add(Range, acquisition);
+                    _gate = acquisition;
                     break;
-                case RejectionTransitionOperationKind.BeginOutbound:
-                    RepeatBegin(PartitionTransitionDirection.Outbound);
+                }
+                case GateOperationKind.BeginRelease:
+                {
+                    var release = new OwnershipRelease<long>(1, 2);
+                    _map.Add(Range, release);
+                    _gate = release;
                     break;
-                case RejectionTransitionOperationKind.BeginNonIncreasingView:
-                    _transition = _coordinator.BeginInbound(TransitionRange, TargetView, PreviousView);
+                }
+                case GateOperationKind.BeginBarrier:
+                {
+                    var barrier = new ViewBarrier<long>(2);
+                    _map.Add(Range, barrier);
+                    _gate = barrier;
                     break;
-                case RejectionTransitionOperationKind.Install:
-                    GetTransition().MarkStateInstalled();
+                }
+                case GateOperationKind.BeginNonIncreasingView:
+                    _ = new OwnershipAcquisition<long>(2, 1);
                     break;
-                case RejectionTransitionOperationKind.Fence:
-                    GetTransition().MarkFenced(new(ClusterServiceFencingMode.External, 42));
+                case GateOperationKind.Install when _gate is OwnershipAcquisition<long> acquisition:
+                    acquisition.MarkStateInstalled();
                     break;
-                case RejectionTransitionOperationKind.Drain:
-                    GetTransition().MarkDrained();
+                case GateOperationKind.Fence when _gate is OwnershipAcquisition<long> acquisition:
+                    acquisition.MarkFenced(new(ClusterServiceFencingMode.External, 42));
                     break;
-                case RejectionTransitionOperationKind.Retain:
-                    GetTransition().MarkStateRetained();
+                case GateOperationKind.Drain when _gate is OwnershipRelease<long> release:
+                    release.MarkDrained();
                     break;
-                case RejectionTransitionOperationKind.Complete:
-                    GetTransition().Complete();
+                case GateOperationKind.Retain when _gate is OwnershipRelease<long> release:
+                    release.MarkStateRetained();
                     break;
-                case RejectionTransitionOperationKind.Abort:
-                    GetTransition().Abort();
+                case GateOperationKind.Complete:
+                    switch (_gate)
+                    {
+                        case OwnershipAcquisition<long> acquisition: acquisition.Complete(); break;
+                        case OwnershipRelease<long> release: release.Complete(); break;
+                        case ViewBarrier<long> barrier: barrier.Complete(); break;
+                        default: throw new InvalidOperationException("No gate has begun.");
+                    }
+
+                    coverage.CompletedRoles.Add(Role);
+                    _map.Prune();
                     break;
-                case RejectionTransitionOperationKind.ProbeOlderOverlap:
-                    probeBlocked = _coordinator.IsBlocked(TransitionRange, PreviousView);
+                case GateOperationKind.Fail:
+                    GetGate().Fail(_failure);
+                    coverage.FailedRoles.Add(Role);
                     break;
-                case RejectionTransitionOperationKind.ProbeEqualOverlap:
-                    probeBlocked = _coordinator.IsBlocked(TransitionRange, TargetView);
+                case GateOperationKind.Abort:
+                    var gate = GetGate();
+                    coverage.AbortedFailedGate |= gate.Status is TransitionGateStatus.Failed;
+                    gate.Abort();
+                    _map.Prune();
                     break;
-                case RejectionTransitionOperationKind.ProbeNewerOverlap:
-                    probeBlocked = _coordinator.IsBlocked(TransitionRange, new(0, new(3)));
+                case GateOperationKind.Prune:
+                    _map.Prune();
                     break;
-                case RejectionTransitionOperationKind.ProbeNewerDisjoint:
-                    probeBlocked = _coordinator.IsBlocked(DisjointRange, new(0, new(3)));
+                case GateOperationKind.ProbeOlderOverlap:
+                    probe = _map.IsBlocked(Range, 1);
                     break;
+                case GateOperationKind.ProbeEqualOverlap:
+                    probe = _map.IsBlocked(Range, 2);
+                    break;
+                case GateOperationKind.ProbeNewerOverlap:
+                    probe = _map.IsBlocked(Range, 3);
+                    break;
+                case GateOperationKind.ProbeNewerDisjoint:
+                    probe = _map.IsBlocked(Disjoint, 3);
+                    break;
+                default:
+                    throw new InvalidOperationException("This role does not expose the requested operation.");
             }
         }
         catch (InvalidOperationException)
@@ -482,222 +232,224 @@ internal sealed class RejectionTransitionHarness
             accepted = false;
         }
 
-        var active = _transition is not null
-            && _transition.Stage is not (PartitionTransitionStage.Completed or PartitionTransitionStage.Aborted);
-        return new(
-            accepted,
-            active,
-            active && _coordinator.IsBlocked(TransitionRange, TargetView),
-            probeBlocked,
-            (int)(_transition?.Direction ?? PartitionTransitionDirection.Barrier),
-            (int)(_transition?.Stage ?? PartitionTransitionStage.Completed),
-            _transition?.Fence);
+        if (!accepted)
+        {
+            coverage.Rejected.Add(kind);
+        }
+
+        var status = _gate?.Status ?? TransitionGateStatus.Completed;
+        var phase = _gate switch
+        {
+            OwnershipAcquisition<long> acquisition => (int)acquisition.Phase,
+            OwnershipRelease<long> release => (int)release.Phase,
+            _ => 0
+        };
+        var taskState = _gate?.Completion switch
+        {
+            { IsFaulted: true } task => ReferenceEquals(_failure, Assert.Single(task.Exception!.InnerExceptions))
+                ? GateTaskState.Failed
+                : throw new InvalidOperationException("The original exception was replaced."),
+            { IsCanceled: true } => GateTaskState.Canceled,
+            { IsCompletedSuccessfully: true } => GateTaskState.Completed,
+            null => GateTaskState.Completed,
+            _ => GateTaskState.Pending
+        };
+        return new(accepted, (int)Role, (int)status, phase, _map.IsBlocked(Range, 2),
+            _gate is OwnershipAcquisition<long> { Fence: not null }, (int)taskState, probe);
     }
 
-    private PartitionTransition GetTransition() =>
-        _transition ?? throw new InvalidOperationException("No transition has begun.");
+    private TransitionGate<long> GetGate() => _gate ?? throw new InvalidOperationException("No gate has begun.");
 
-    private static void RepeatBegin(PartitionTransitionDirection direction)
+    private GateModelRole Role => _gate switch
     {
-        var coordinator = new PartitionTransitionCoordinator();
-        if (direction == PartitionTransitionDirection.Inbound)
-        {
-            _ = coordinator.BeginInbound(TransitionRange, PreviousView, TargetView);
-            _ = coordinator.BeginInbound(TransitionRange, PreviousView, TargetView);
-        }
-        else
-        {
-            _ = coordinator.BeginOutbound(TransitionRange, PreviousView, TargetView);
-            _ = coordinator.BeginOutbound(TransitionRange, PreviousView, TargetView);
-        }
-    }
+        OwnershipAcquisition<long> => GateModelRole.Acquisition,
+        OwnershipRelease<long> => GateModelRole.Release,
+        ViewBarrier<long> => GateModelRole.Barrier,
+        _ => GateModelRole.None
+    };
 }
 
-internal static class RejectionTransitionModel
+internal static class GateModel
 {
-    public static RejectionTransitionResponse Predict(
-        RejectionTransitionRequest request,
-        RejectionTransitionModelState state)
+    public static bool CanApply(GateOperationKind kind, GateModelState state)
     {
-        var accepted = CanApply(request.Kind, state);
-        var active = state.Active;
-        var direction = state.Direction;
-        var stage = state.Stage;
-        ClusterServiceFence? fence = state.HasFence
-            ? new((ClusterServiceFencingMode)state.FenceMode, state.FenceToken)
-            : null;
-        bool? probeBlocked = null;
+        var role = (GateModelRole)state.Role;
+        var status = (TransitionGateStatus)state.Status;
+        var pending = role is not GateModelRole.None && status is TransitionGateStatus.Pending;
+        return kind switch
+        {
+            GateOperationKind.BeginAcquisition or GateOperationKind.BeginRelease or GateOperationKind.BeginBarrier =>
+                role is GateModelRole.None || status is TransitionGateStatus.Completed or TransitionGateStatus.Aborted,
+            GateOperationKind.BeginNonIncreasingView => false,
+            GateOperationKind.Install => pending && role is GateModelRole.Acquisition && state.Phase == (int)AcquisitionPhase.AwaitingState,
+            GateOperationKind.Fence => pending && role is GateModelRole.Acquisition && state.Phase == (int)AcquisitionPhase.StateInstalled,
+            GateOperationKind.Drain => pending && role is GateModelRole.Release && state.Phase == (int)ReleasePhase.Blocking,
+            GateOperationKind.Retain => pending && role is GateModelRole.Release && state.Phase == (int)ReleasePhase.Drained,
+            GateOperationKind.Complete => pending && (role is GateModelRole.Barrier
+                || role is GateModelRole.Acquisition && state.Phase == (int)AcquisitionPhase.Fenced
+                || role is GateModelRole.Release && state.Phase is (int)ReleasePhase.Drained or (int)ReleasePhase.StateRetained),
+            GateOperationKind.Fail => pending,
+            GateOperationKind.Abort => role is not GateModelRole.None,
+            _ => true
+        };
+    }
+
+    public static GateResponse Predict(GateOperationKind kind, GateModelState state)
+    {
+        var accepted = CanApply(kind, state);
+        var role = state.Role;
+        var status = state.Status;
+        var phase = state.Phase;
+        var fence = state.HasFence;
+        var taskState = state.TaskState;
+        bool? probe = null;
         if (accepted)
         {
-            switch (request.Kind)
+            switch (kind)
             {
-                case RejectionTransitionOperationKind.BeginInbound:
-                    active = true;
-                    direction = (int)PartitionTransitionDirection.Inbound;
-                    stage = (int)PartitionTransitionStage.Blocking;
-                    fence = null;
+                case GateOperationKind.BeginAcquisition:
+                case GateOperationKind.BeginRelease:
+                case GateOperationKind.BeginBarrier:
+                    role = (int)(kind switch
+                    {
+                        GateOperationKind.BeginAcquisition => GateModelRole.Acquisition,
+                        GateOperationKind.BeginRelease => GateModelRole.Release,
+                        _ => GateModelRole.Barrier
+                    });
+                    status = (int)TransitionGateStatus.Pending;
+                    taskState = (int)GateTaskState.Pending;
+                    phase = 0;
+                    fence = false;
                     break;
-                case RejectionTransitionOperationKind.BeginOutbound:
-                    active = true;
-                    direction = (int)PartitionTransitionDirection.Outbound;
-                    stage = (int)PartitionTransitionStage.Blocking;
-                    fence = null;
+                case GateOperationKind.Install:
+                    phase = (int)AcquisitionPhase.StateInstalled;
                     break;
-                case RejectionTransitionOperationKind.Install:
-                    stage = (int)PartitionTransitionStage.StateInstalled;
+                case GateOperationKind.Fence:
+                    phase = (int)AcquisitionPhase.Fenced;
+                    fence = true;
                     break;
-                case RejectionTransitionOperationKind.Fence:
-                    stage = (int)PartitionTransitionStage.Fenced;
-                    fence = new(ClusterServiceFencingMode.External, 42);
+                case GateOperationKind.Drain:
+                    phase = (int)ReleasePhase.Drained;
                     break;
-                case RejectionTransitionOperationKind.Drain:
-                    stage = (int)PartitionTransitionStage.Drained;
+                case GateOperationKind.Retain:
+                    phase = (int)ReleasePhase.StateRetained;
                     break;
-                case RejectionTransitionOperationKind.Retain:
-                    stage = (int)PartitionTransitionStage.StateRetained;
+                case GateOperationKind.Complete:
+                    status = (int)TransitionGateStatus.Completed;
+                    taskState = (int)GateTaskState.Completed;
                     break;
-                case RejectionTransitionOperationKind.Complete:
-                    active = false;
-                    stage = (int)PartitionTransitionStage.Completed;
+                case GateOperationKind.Fail:
+                    status = (int)TransitionGateStatus.Failed;
+                    taskState = (int)GateTaskState.Failed;
                     break;
-                case RejectionTransitionOperationKind.Abort:
-                    active = false;
-                    stage = (int)PartitionTransitionStage.Aborted;
+                case GateOperationKind.Abort:
+                    if (status is (int)TransitionGateStatus.Pending or (int)TransitionGateStatus.Failed)
+                    {
+                        status = (int)TransitionGateStatus.Aborted;
+                        if (taskState == (int)GateTaskState.Pending)
+                        {
+                            taskState = (int)GateTaskState.Canceled;
+                        }
+                    }
+
                     break;
-                case RejectionTransitionOperationKind.ProbeOlderOverlap:
-                case RejectionTransitionOperationKind.ProbeNewerDisjoint:
-                    probeBlocked = false;
+                case GateOperationKind.ProbeOlderOverlap:
+                case GateOperationKind.ProbeNewerDisjoint:
+                    probe = false;
                     break;
-                case RejectionTransitionOperationKind.ProbeEqualOverlap:
-                case RejectionTransitionOperationKind.ProbeNewerOverlap:
-                    probeBlocked = active;
+                case GateOperationKind.ProbeEqualOverlap:
+                case GateOperationKind.ProbeNewerOverlap:
+                    probe = role != (int)GateModelRole.None
+                        && status is (int)TransitionGateStatus.Pending or (int)TransitionGateStatus.Failed;
                     break;
             }
         }
 
-        return new(
-            accepted,
-            active,
-            active,
-            probeBlocked,
-            direction,
-            stage,
-            fence);
+        var blocked = role != (int)GateModelRole.None
+            && status is (int)TransitionGateStatus.Pending or (int)TransitionGateStatus.Failed;
+        return new(accepted, role, status, phase, blocked, fence, taskState, probe);
     }
 
-    public static void Apply(RejectionTransitionRequest request, RejectionTransitionModelState state)
+    public static void Apply(GateOperationKind kind, GateModelState state)
     {
-        var response = Predict(request, state);
-        state.Active = response.Active;
-        state.Direction = response.Direction;
-        state.Stage = response.Stage;
-        state.HasFence = response.Fence.HasValue;
-        state.FenceMode = (int)(response.Fence?.Mode ?? default);
-        state.FenceToken = response.Fence?.Token ?? default;
-    }
-
-    private static bool CanApply(
-        RejectionTransitionOperationKind kind,
-        RejectionTransitionModelState state) =>
-        kind switch
-        {
-            RejectionTransitionOperationKind.BeginInbound
-                or RejectionTransitionOperationKind.BeginOutbound => false,
-            RejectionTransitionOperationKind.BeginNonIncreasingView => false,
-            RejectionTransitionOperationKind.Install =>
-                state.Active
-                && state.Direction == (int)PartitionTransitionDirection.Inbound
-                && state.Stage == (int)PartitionTransitionStage.Blocking,
-            RejectionTransitionOperationKind.Fence =>
-                state.Active
-                && state.Direction == (int)PartitionTransitionDirection.Inbound
-                && state.Stage == (int)PartitionTransitionStage.StateInstalled,
-            RejectionTransitionOperationKind.Drain =>
-                state.Active
-                && state.Direction == (int)PartitionTransitionDirection.Outbound
-                && state.Stage == (int)PartitionTransitionStage.Blocking,
-            RejectionTransitionOperationKind.Retain =>
-                state.Active
-                && state.Direction == (int)PartitionTransitionDirection.Outbound
-                && state.Stage == (int)PartitionTransitionStage.Drained,
-            RejectionTransitionOperationKind.Complete =>
-                state.Active
-                && (state.Direction == (int)PartitionTransitionDirection.Inbound
-                    && state.Stage == (int)PartitionTransitionStage.Fenced
-                    || state.Direction == (int)PartitionTransitionDirection.Outbound
-                    && state.Stage is (int)PartitionTransitionStage.Drained
-                        or (int)PartitionTransitionStage.StateRetained),
-            RejectionTransitionOperationKind.Abort => state.Active,
-            _ => true
-        };
-}
-
-internal sealed class RejectionTransitionCoverage
-{
-    public HashSet<RejectionTransitionOperationKind> ExecutedKinds { get; } = [];
-
-    public HashSet<RejectionTransitionOperationKind> RejectedKinds { get; } = [];
-
-    public void Observe(RejectionTransitionOperationKind kind, bool accepted)
-    {
-        ExecutedKinds.Add(kind);
-        if (!accepted)
-        {
-            RejectedKinds.Add(kind);
-        }
+        var next = Predict(kind, state);
+        state.Role = next.Role;
+        state.Status = next.Status;
+        state.Phase = next.Phase;
+        state.HasFence = next.HasFence;
+        state.TaskState = next.TaskState;
     }
 }
 
-internal enum RejectionTransitionOperationKind
+internal enum GateOperationKind
 {
-    BeginInbound,
-    BeginOutbound,
+    BeginAcquisition,
+    BeginRelease,
+    BeginBarrier,
     BeginNonIncreasingView,
     Install,
     Fence,
     Drain,
     Retain,
     Complete,
+    Fail,
     Abort,
+    Prune,
     ProbeOlderOverlap,
     ProbeEqualOverlap,
     ProbeNewerOverlap,
     ProbeNewerDisjoint
 }
 
-internal sealed record RejectionTransitionRequest(RejectionTransitionOperationKind Kind)
+internal enum GateModelRole
 {
-    public override string ToString() => $"kind={Kind}";
+    None,
+    Acquisition,
+    Release,
+    Barrier
 }
 
-internal sealed record RejectionTransitionResponse(
+internal enum GateTaskState
+{
+    Pending,
+    Completed,
+    Failed,
+    Canceled
+}
+
+internal sealed class GateExecutionCoverage
+{
+    public HashSet<GateOperationKind> Executed { get; } = [];
+    public HashSet<GateOperationKind> Rejected { get; } = [];
+    public HashSet<GateModelRole> CompletedRoles { get; } = [];
+    public HashSet<GateModelRole> FailedRoles { get; } = [];
+    public bool AbortedFailedGate { get; set; }
+}
+
+internal sealed record GateRequest(GateOperationKind Kind);
+
+internal sealed record GateResponse(
     bool Accepted,
-    bool Active,
+    int Role,
+    int Status,
+    int Phase,
     bool Blocked,
-    bool? ProbeBlocked,
-    int Direction,
-    int Stage,
-    ClusterServiceFence? Fence);
+    bool HasFence,
+    int TaskState,
+    bool? ProbeBlocked);
 
 [State]
-internal partial class RejectionTransitionModelState : State
+internal partial class GateModelState : State
 {
-    public bool Active { get; set; }
-
-    public int Direction { get; set; }
-
-    public int Stage { get; set; }
-
+    public int Role { get; set; }
+    public int Status { get; set; }
+    public int Phase { get; set; }
     public bool HasFence { get; set; }
+    public int TaskState { get; set; }
 
-    public int FenceMode { get; set; }
-
-    public long FenceToken { get; set; }
-
-    public static RejectionTransitionModelState Create() =>
-        new()
-        {
-            Direction = (int)PartitionTransitionDirection.Barrier,
-            Stage = (int)PartitionTransitionStage.Completed
-        };
+    public static GateModelState Create() => new()
+    {
+        Status = (int)TransitionGateStatus.Completed,
+        TaskState = (int)GateTaskState.Completed
+    };
 }

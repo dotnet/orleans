@@ -1,0 +1,389 @@
+using System.Collections.Immutable;
+using Orleans.Runtime;
+using Orleans.Runtime.ClusterServices;
+using Orleans.Runtime.GrainDirectory;
+using TestExtensions;
+using Xunit;
+
+namespace UnitTests.ClusterServices;
+
+[TestArea("Runtime"), TestCategory("BVT"), TestSuite("BVT"), TestProvider("None")]
+public sealed class RegisteredClusterServiceViewProviderTests
+{
+    [Fact]
+    public async Task InitialAbsenceIsUnavailableAndLaterPublicationInitializesTheProvider()
+    {
+        var register = new TestServiceViewRegister();
+        var membership = new TestServiceMembership();
+        await using var provider = Create(register, membership);
+        Assert.False(provider.TryGetCurrentView(out _));
+        await Assert.ThrowsAsync<ClusterServiceViewUnavailableException>(() => provider.RefreshAsync(TestContext.Current.CancellationToken).AsTask());
+
+        var view = await Publish(provider, TestServiceMembership.A);
+
+        Assert.NotNull(view);
+        Assert.Equal(1, view.Id.Revision);
+        Assert.False(view.TryGetPredecessor(out _));
+        Assert.Same(view, await provider.RefreshAsync(TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task MappingAndParticipationChangeAtomicallyWithFixedMembershipAcrossObservers()
+    {
+        var register = new TestServiceViewRegister();
+        var membership = new TestServiceMembership();
+        await using var writer = Create(register, membership);
+        await using var reader = Create(register, membership);
+        var first = await Publish(writer, TestServiceMembership.A, [TestServiceMembership.B, TestServiceMembership.A]);
+        var observed = await reader.RefreshAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(new[] { TestServiceMembership.A, TestServiceMembership.B }, observed.Participants);
+        Assert.Same(membership.CurrentSnapshot, membership.InitialSnapshot);
+
+        var second = await Publish(writer, TestServiceMembership.B, [TestServiceMembership.B]);
+        observed = await reader.RefreshAtLeastAsync(second.Id, TestContext.Current.CancellationToken);
+
+        Assert.Equal(first.Id, observed.Predecessor);
+        Assert.Equal(first.MembershipWatermark, observed.MembershipWatermark);
+        Assert.Equal(new[] { TestServiceMembership.B }, observed.Participants);
+        Assert.Equal(TestServiceMembership.B, observed.ResourceOwners[TestServiceMembership.Resource]);
+        Assert.Empty(observed.GetOwnedResources(TestServiceMembership.A));
+        Assert.Equal([TestServiceMembership.Resource], observed.GetOwnedResources(TestServiceMembership.B));
+        Assert.True(second.HasSameContent(observed));
+        Assert.Same(membership.InitialSnapshot, membership.CurrentSnapshot);
+    }
+
+    [Fact]
+    public async Task ConcurrentWritersHaveOneCasWinnerAndRecordTheActualPredecessor()
+    {
+        var register = new TestServiceViewRegister();
+        var membership = new TestServiceMembership();
+        await using var firstWriter = Create(register, membership);
+        await using var secondWriter = Create(register, membership);
+        var initial = await Publish(firstWriter, TestServiceMembership.A);
+        var releaseReads = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var bothRead = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var reads = 0;
+        register.AfterRead = async () =>
+        {
+            if (Interlocked.Increment(ref reads) == 2)
+            {
+                bothRead.SetResult();
+            }
+
+            await releaseReads.Task;
+        };
+        var first = Publish(firstWriter, TestServiceMembership.B).AsTask();
+        var second = Publish(secondWriter, TestServiceMembership.A).AsTask();
+        await bothRead.Task.WaitAsync(TestContext.Current.CancellationToken);
+        releaseReads.SetResult();
+        var results = await Task.WhenAll(first, second);
+        var winner = Assert.Single(results, static result => result is not null)!;
+
+        Assert.Single(results, static result => result is null);
+        Assert.Equal(initial.Id, winner.Predecessor);
+        Assert.Equal(initial.Id.Revision + 1, winner.Id.Revision);
+        Assert.Same(winner, register.Current.View);
+        Assert.Equal(2, register.SuccessfulWrites);
+    }
+
+    [Fact]
+    public async Task SkippedReadsExposeAuthoritativePredecessorRatherThanLastObservation()
+    {
+        var register = new TestServiceViewRegister();
+        var membership = new TestServiceMembership();
+        await using var writer = Create(register, membership);
+        await using var reader = Create(register, membership);
+        var first = await Publish(writer, TestServiceMembership.A);
+        await reader.RefreshAsync(TestContext.Current.CancellationToken);
+        var skipped = await Publish(writer, TestServiceMembership.B);
+        var latest = await Publish(writer, TestServiceMembership.A);
+
+        var observed = await reader.RefreshAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(latest.Id, observed.Id);
+        Assert.Equal(skipped.Id, observed.Predecessor);
+        Assert.NotEqual(first.Id, observed.Predecessor);
+        Assert.Equal(first.ResourceOwners[TestServiceMembership.Resource], observed.ResourceOwners[TestServiceMembership.Resource]);
+        Assert.Same(observed, await reader.RefreshAsync(TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task MinimumRefreshDoesNotReturnAnOlderViewAndCancellationIsCallerLocal()
+    {
+        var register = new TestServiceViewRegister();
+        await using var provider = Create(register, new());
+        var first = await Publish(provider, TestServiceMembership.A);
+        var minimum = new RegisteredServiceViewId(first.Id.ServiceId, first.Id.AuthorityId, 2);
+        using var cancellation = new CancellationTokenSource();
+        var cancelled = provider.RefreshAtLeastAsync(minimum, cancellation.Token).AsTask();
+        var pending = provider.RefreshAtLeastAsync(minimum, TestContext.Current.CancellationToken).AsTask();
+        Assert.False(pending.IsCompleted);
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => cancelled);
+        Assert.False(pending.IsCompleted);
+
+        var next = await Publish(provider, TestServiceMembership.B);
+
+        Assert.Equal(next.Id, (await pending).Id);
+        Assert.True(provider.TryGetCurrentView(out _));
+    }
+
+    [Fact]
+    public async Task DisposalTerminatesPendingRefreshAndSubscribers()
+    {
+        var register = new TestServiceViewRegister();
+        var provider = Create(register, new());
+        var first = await Publish(provider, TestServiceMembership.A);
+        await using var stream = provider.ViewUpdates.GetAsyncEnumerator(TestContext.Current.CancellationToken);
+        Assert.True(await stream.MoveNextAsync());
+        var next = stream.MoveNextAsync().AsTask();
+        var pending = provider.RefreshAtLeastAsync(new(first.Id.ServiceId, first.Id.AuthorityId, 99), TestContext.Current.CancellationToken).AsTask();
+
+        await provider.DisposeAsync();
+
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => pending);
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => next);
+        Assert.False(provider.TryGetCurrentView(out _));
+        await provider.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task RegisterFailureTerminatesRefreshAndStreamWithOriginalException()
+    {
+        var register = new TestServiceViewRegister();
+        await using var provider = Create(register, new());
+        var first = await Publish(provider, TestServiceMembership.A);
+        await using var stream = provider.ViewUpdates.GetAsyncEnumerator(TestContext.Current.CancellationToken);
+        Assert.True(await stream.MoveNextAsync());
+        var next = stream.MoveNextAsync().AsTask();
+        var pending = provider.RefreshAtLeastAsync(new(first.Id.ServiceId, first.Id.AuthorityId, 99), TestContext.Current.CancellationToken).AsTask();
+        var failure = new IOException("Authority is unreachable.");
+        register.Failure = failure;
+
+        Assert.Same(failure, await Assert.ThrowsAsync<IOException>(() => provider.RefreshAsync(TestContext.Current.CancellationToken).AsTask()));
+        Assert.Same(failure, await Assert.ThrowsAsync<IOException>(() => pending));
+        Assert.Same(failure, await Assert.ThrowsAsync<IOException>(() => next));
+        Assert.False(provider.TryGetCurrentView(out _));
+    }
+
+    [Theory]
+    [InlineData("authority")]
+    [InlineData("service")]
+    [InlineData("deleted")]
+    [InlineData("regressed")]
+    [InlineData("content")]
+    [InlineData("recreated")]
+    public async Task ChangedAuthorityDeletionRollbackAndConflictingIdentityRequireBootstrap(string change)
+    {
+        var register = new TestServiceViewRegister();
+        await using var provider = Create(register, new());
+        var first = await Publish(provider, TestServiceMembership.A);
+        var second = await Publish(provider, TestServiceMembership.B);
+        await provider.RefreshAsync(TestContext.Current.CancellationToken);
+        var replacement = change switch
+        {
+            "authority" => MakeView(2, TestServiceMembership.B, authority: "replacement"),
+            "service" => MakeView(2, TestServiceMembership.B, service: "other"),
+            "deleted" => null,
+            "regressed" => first,
+            "content" => MakeView(second.Id.Revision, TestServiceMembership.A, predecessor: first.Id),
+            "recreated" => second,
+            _ => throw new InvalidOperationException()
+        };
+        register.Replace(replacement);
+
+        await Assert.ThrowsAsync<ClusterServiceAuthorityException>(() => provider.RefreshAsync(TestContext.Current.CancellationToken).AsTask());
+
+        Assert.False(provider.TryGetCurrentView(out _));
+    }
+
+    [Fact]
+    public async Task LivenessRefreshDoesNotRewriteTheAuthoritativeDeadOwner()
+    {
+        var register = new TestServiceViewRegister();
+        var membership = new TestServiceMembership();
+        await using var provider = Create(register, membership);
+        var first = await Publish(provider, TestServiceMembership.A);
+        membership.SetStatus(TestServiceMembership.A, SiloStatus.Dead);
+
+        await provider.RefreshLivenessAsync(TestContext.Current.CancellationToken);
+        var current = await provider.RefreshAsync(TestContext.Current.CancellationToken);
+
+        Assert.Same(first, current);
+        Assert.False(provider.IsOwnerLive(TestServiceMembership.A, current.MembershipWatermark));
+        Assert.Equal(TestServiceMembership.A, current.ResourceOwners[TestServiceMembership.Resource]);
+        Assert.Equal(1, register.SuccessfulWrites);
+        var replacement = await Publish(provider, TestServiceMembership.B, [TestServiceMembership.B]);
+        Assert.Equal(first.Id.Revision + 1, replacement.Id.Revision);
+        Assert.Equal(TestServiceMembership.B, replacement.ResourceOwners[TestServiceMembership.Resource]);
+    }
+
+    [Fact]
+    public async Task PublicationRejectsNonmembersDeadAndIneligibleParticipants()
+    {
+        var register = new TestServiceViewRegister();
+        var membership = new TestServiceMembership();
+        await using var provider = new RegisteredClusterServiceViewProvider(
+            "service", "authority", register, membership, member => member.SiloAddress.Equals(TestServiceMembership.A), TimeSpan.FromDays(1));
+        await Assert.ThrowsAsync<ArgumentException>(() => Publish(provider, TestServiceMembership.B).AsTask());
+        var unknown = SiloAddress.FromParsableString("127.0.0.1:33333@9");
+        await Assert.ThrowsAsync<ArgumentException>(() => Publish(provider, unknown, [unknown]).AsTask());
+        membership.SetStatus(TestServiceMembership.A, SiloStatus.Dead);
+        await Assert.ThrowsAsync<ArgumentException>(() => Publish(provider, TestServiceMembership.A, [TestServiceMembership.A]).AsTask());
+        Assert.Equal(0, register.SuccessfulWrites);
+    }
+
+    [Fact]
+    public void ViewCopiesCanonicalIndexesAndRejectsDuplicateMissingOrUndeclaredAssignments()
+    {
+        var participants = new[] { TestServiceMembership.B, TestServiceMembership.A };
+        var resources = new[] { TestServiceMembership.Resource };
+        var assignments = new[] { KeyValuePair.Create(TestServiceMembership.Resource, TestServiceMembership.A) };
+        var view = new RegisteredClusterServiceView(new("service", "authority", 1), null, new(7), Configuration, participants, resources, assignments);
+        participants[0] = TestServiceMembership.A;
+        resources[0] = "changed";
+        assignments[0] = KeyValuePair.Create("changed", TestServiceMembership.B);
+
+        Assert.Equal(new[] { TestServiceMembership.A, TestServiceMembership.B }, view.Participants);
+        Assert.Equal([TestServiceMembership.Resource], view.Resources);
+        Assert.Equal(TestServiceMembership.A, view.ResourceOwners[TestServiceMembership.Resource]);
+        Assert.Equal([TestServiceMembership.Resource], view.GetOwnedResources(TestServiceMembership.A));
+        Assert.Throws<ArgumentException>(() => MakeInvalid([TestServiceMembership.Resource], []));
+        Assert.Throws<ArgumentException>(() => MakeInvalid([], [KeyValuePair.Create(TestServiceMembership.Resource, TestServiceMembership.A)]));
+        Assert.Throws<ArgumentException>(() => MakeInvalid([TestServiceMembership.Resource],
+            [KeyValuePair.Create(TestServiceMembership.Resource, TestServiceMembership.A), KeyValuePair.Create(TestServiceMembership.Resource, TestServiceMembership.B)]));
+
+        static RegisteredClusterServiceView MakeInvalid(string[] catalog, KeyValuePair<string, SiloAddress>[] mapping) =>
+            new(new("service", "authority", 1), null, new(7), Configuration,
+                [TestServiceMembership.A, TestServiceMembership.B], catalog, mapping);
+    }
+
+    [Fact]
+    public async Task ExplicitRingPublicationRejectsGapsOverlapAndIneligibleOwners()
+    {
+        var register = new TestServiceViewRegister();
+        await using var provider = Create(register, new());
+        foreach (var (participants, assignments) in new (SiloAddress[], ImmutableArray<ClusterServicePartitionAssignment>)[]
+        {
+            ([TestServiceMembership.A], [new(TestServiceMembership.A, 0, RingRange.Create(0, 100))]),
+            ([TestServiceMembership.A, TestServiceMembership.B], [new(TestServiceMembership.A, 0, RingRange.Create(0, 200)), new(TestServiceMembership.B, 0, RingRange.Create(100, 0))]),
+            ([TestServiceMembership.A], [new(TestServiceMembership.B, 0, RingRange.Full)])
+        })
+        {
+            await Assert.ThrowsAsync<ArgumentException>(() => provider.TryPublishAsync(
+                Configuration, participants, [], [], TestContext.Current.CancellationToken, assignments).AsTask());
+        }
+
+        var view = await provider.TryPublishAsync(
+            Configuration, [TestServiceMembership.A, TestServiceMembership.B], [], [], TestContext.Current.CancellationToken,
+            [new(TestServiceMembership.A, 0, RingRange.Create(0, 100)), new(TestServiceMembership.B, 0, RingRange.Create(100, 0))]);
+        Assert.NotNull(view);
+        Assert.NotNull(view.Topology);
+        Assert.Equal(2, view.RingAssignments.Length);
+        Assert.Equal(1, register.SuccessfulWrites);
+    }
+
+    [Fact]
+    public void IdentityOrderingNeverOrdersUnrelatedNamespaces()
+    {
+        var id = new RegisteredServiceViewId("service", "authority", 1);
+        Assert.True(id.CompareTo(new("service", "authority", 2)) < 0);
+        Assert.Throws<ClusterServiceAuthorityException>(() => id.CompareTo(new("other", "authority", 1)));
+        Assert.Throws<ClusterServiceAuthorityException>(() => id.CompareTo(new("service", "other", 1)));
+    }
+
+    internal static RegisteredServiceConfiguration Configuration { get; } = new(1, "qualified-resource-v1", "{\"concurrency\":1}");
+
+    internal static RegisteredClusterServiceViewProvider Create(TestServiceViewRegister register, TestServiceMembership membership) =>
+        new("service", "authority", register, membership, pollInterval: TimeSpan.FromDays(1));
+
+    internal static async ValueTask<RegisteredClusterServiceView> Publish(
+        RegisteredClusterServiceViewProvider provider, SiloAddress owner, SiloAddress[]? participants = null) =>
+        (await provider.TryPublishAsync(Configuration, participants ?? [TestServiceMembership.A, TestServiceMembership.B],
+            [TestServiceMembership.Resource], [KeyValuePair.Create(TestServiceMembership.Resource, owner)], TestContext.Current.CancellationToken))!;
+
+    internal static RegisteredClusterServiceView MakeView(
+        long revision, SiloAddress owner, RegisteredServiceViewId? predecessor = null, string service = "service", string authority = "authority") =>
+        new(new(service, authority, revision), predecessor, new(7), Configuration,
+            [TestServiceMembership.A, TestServiceMembership.B], [TestServiceMembership.Resource],
+            [KeyValuePair.Create(TestServiceMembership.Resource, owner)]);
+}
+
+internal sealed class TestServiceViewRegister : IClusterServiceViewRegister
+{
+    private readonly object _lock = new();
+    private ClusterServiceRegisterRead _current = new(null, null);
+    private int _writes;
+
+    public Func<Task>? AfterRead { get; set; }
+    public Exception? Failure { get; set; }
+    public int SuccessfulWrites => _writes;
+    public ClusterServiceRegisterRead Current => _current;
+
+    public async ValueTask<ClusterServiceRegisterRead> ReadAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (Failure is { } exception)
+        {
+            throw exception;
+        }
+
+        ClusterServiceRegisterRead read;
+        lock (_lock)
+        {
+            read = _current;
+        }
+
+        if (AfterRead is { } afterRead)
+        {
+            await afterRead().WaitAsync(cancellationToken);
+        }
+
+        return read;
+    }
+
+    public ValueTask<bool> TryWriteAsync(RegisteredClusterServiceView view, string? expectedToken, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        lock (_lock)
+        {
+            if (!StringComparer.Ordinal.Equals(_current.Token, expectedToken))
+            {
+                return ValueTask.FromResult(false);
+            }
+
+            _current = new(view, $"opaque-etag-{++_writes}");
+            return ValueTask.FromResult(true);
+        }
+    }
+
+    public void Replace(RegisteredClusterServiceView? view)
+    {
+        lock (_lock)
+        {
+            _current = new(view, view is null ? null : "replacement-etag");
+        }
+    }
+}
+
+internal sealed class TestServiceMembership : IClusterMembershipService
+{
+    public static SiloAddress A { get; } = SiloAddress.FromParsableString("127.0.0.1:11111@1");
+    public static SiloAddress B { get; } = SiloAddress.FromParsableString("127.0.0.1:22222@2");
+    public const string Resource = "namespace.servicebus.windows.net/hub/consumer-group/0";
+    public ClusterMembershipSnapshot InitialSnapshot { get; } = new(
+        ImmutableDictionary<SiloAddress, ClusterMember>.Empty.Add(A, new(A, SiloStatus.Active, "A")).Add(B, new(B, SiloStatus.Active, "B")), new(7));
+
+    public TestServiceMembership() => CurrentSnapshot = InitialSnapshot;
+    public ClusterMembershipSnapshot CurrentSnapshot { get; private set; }
+    public IAsyncEnumerable<ClusterMembershipSnapshot> MembershipUpdates => throw new NotSupportedException();
+    public Task<bool> TryKill(SiloAddress siloAddress) => throw new NotSupportedException();
+    public ValueTask Refresh(MembershipVersion minimumVersion = default, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return ValueTask.CompletedTask;
+    }
+
+    public void SetStatus(SiloAddress silo, SiloStatus status) =>
+        CurrentSnapshot = new(CurrentSnapshot.Members.SetItem(silo, new(silo, status, silo.ToParsableString())), new(CurrentSnapshot.Version.Value + 1));
+}

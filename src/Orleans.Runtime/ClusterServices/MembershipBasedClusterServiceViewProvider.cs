@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
 using Orleans.Internal;
 using Orleans.Runtime.Internal;
@@ -8,7 +9,8 @@ namespace Orleans.Runtime.ClusterServices;
 /// <summary>
 /// Derives service views from cluster membership and fixed assignment configuration.
 /// </summary>
-internal sealed partial class MembershipBasedClusterServiceViewProvider : IClusterServiceViewProvider
+internal sealed partial class MembershipBasedClusterServiceViewProvider
+    : IClusterServiceViewProvider<ClusterServiceViewId, MembershipBasedClusterServiceView>
 {
     private readonly IClusterMembershipService _clusterMembershipService;
     private readonly ClusterServiceConfiguration _configuration;
@@ -18,6 +20,7 @@ internal sealed partial class MembershipBasedClusterServiceViewProvider : IClust
     private readonly CancellationTokenSource _shutdownCts = new();
     private readonly AsyncEnumerable<MembershipBasedClusterServiceView> _viewUpdates;
     private readonly Task _runTask;
+    private MembershipBasedClusterServiceView _currentView;
 
     public MembershipBasedClusterServiceViewProvider(
         IClusterMembershipService clusterMembershipService,
@@ -34,7 +37,7 @@ internal sealed partial class MembershipBasedClusterServiceViewProvider : IClust
         _providerEpoch = providerEpoch;
         _logger = logger;
 
-        CurrentView = new(
+        _currentView = new(
             initialSnapshot ?? clusterMembershipService.CurrentSnapshot,
             configuration,
             getRingBoundaries,
@@ -43,32 +46,55 @@ internal sealed partial class MembershipBasedClusterServiceViewProvider : IClust
             CurrentView,
             static (previous, proposed) =>
                 proposed.Id > previous.Id,
-            update => CurrentView = update);
+            update => Volatile.Write(ref _currentView, update));
 
         using var _ = new ExecutionContextSuppressor();
         _runTask = Task.Run(ProcessMembershipUpdates);
     }
 
-    public MembershipBasedClusterServiceView CurrentView { get; private set; }
+    public MembershipBasedClusterServiceView CurrentView => Volatile.Read(ref _currentView);
 
-    public IAsyncEnumerable<MembershipBasedClusterServiceView> ViewUpdates => _viewUpdates;
+    public IAsyncEnumerable<MembershipBasedClusterServiceView> ViewUpdates => ReadUpdates();
+
+    private async IAsyncEnumerable<MembershipBasedClusterServiceView> ReadUpdates(
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        await foreach (var view in _viewUpdates.WithCancellation(cancellationToken))
+        {
+            yield return view;
+        }
+
+        await _runTask;
+    }
 
     public IClusterMembershipService ClusterMembershipService => _clusterMembershipService;
 
     public long ProviderEpoch => _providerEpoch;
 
-    ClusterServiceView IClusterServiceViewProvider.CurrentView => CurrentView;
+    public bool TryGetCurrentView(out MembershipBasedClusterServiceView view)
+    {
+        view = CurrentView;
+        return true;
+    }
 
-    IAsyncEnumerable<ClusterServiceView> IClusterServiceViewProvider.ViewUpdates => ViewUpdates;
+    public ValueTask<MembershipBasedClusterServiceView> RefreshAsync(CancellationToken cancellationToken) =>
+        RefreshViewAsync(null, cancellationToken);
 
-    async ValueTask<ClusterServiceView> IClusterServiceViewProvider.RefreshViewAsync(
-        ClusterServiceViewId? minimumView,
-        CancellationToken cancellationToken) => await RefreshViewAsync(minimumView, cancellationToken);
+    public ValueTask<MembershipBasedClusterServiceView> RefreshAtLeastAsync(
+        ClusterServiceViewId minimumView,
+        CancellationToken cancellationToken) => RefreshViewAsync(minimumView, cancellationToken);
 
     public async ValueTask<MembershipBasedClusterServiceView> RefreshViewAsync(
         ClusterServiceViewId? minimumView,
         CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (_shutdownCts.IsCancellationRequested)
+        {
+            await _runTask;
+            _shutdownCts.Token.ThrowIfCancellationRequested();
+        }
+
         if (minimumView is { } requestedView && requestedView.ProviderEpoch != _providerEpoch)
         {
             throw new InvalidOperationException(
@@ -81,53 +107,53 @@ internal sealed partial class MembershipBasedClusterServiceViewProvider : IClust
         }
 
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _shutdownCts.Token);
-        await _clusterMembershipService.Refresh(
-            minimumView is { } requested ? new MembershipVersion(requested.Version.Value) : default,
-            linkedCts.Token);
-        var requiredView = minimumView ?? new(_providerEpoch, new(_clusterMembershipService.CurrentSnapshot.Version.Value));
-        if (CurrentView.Id < requiredView)
+        try
         {
-            await foreach (var view in _viewUpdates.WithCancellation(linkedCts.Token))
+            await _clusterMembershipService.Refresh(
+                minimumView is { } requested ? new MembershipVersion(requested.Version.Value) : default,
+                linkedCts.Token);
+            var requiredView = minimumView ?? new(_providerEpoch, new(_clusterMembershipService.CurrentSnapshot.Version.Value));
+            if (CurrentView.Id < requiredView)
             {
-                if (view.Id >= requiredView)
+                await foreach (var view in _viewUpdates.WithCancellation(linkedCts.Token))
                 {
-                    return view;
+                    if (view.Id >= requiredView)
+                    {
+                        return view;
+                    }
                 }
+
+                throw new OperationCanceledException(
+                    "Cluster service membership updates completed before the requested view was published.",
+                    linkedCts.Token);
             }
 
-            throw new OperationCanceledException(
-                "Cluster service membership updates completed before the requested view was published.",
-                linkedCts.Token);
+            linkedCts.Token.ThrowIfCancellationRequested();
+            return CurrentView;
         }
-
-        return CurrentView;
+        catch (OperationCanceledException) when (_shutdownCts.IsCancellationRequested)
+        {
+            await _runTask;
+            throw;
+        }
     }
 
     private async Task ProcessMembershipUpdates()
     {
         try
         {
-            while (!_shutdownCts.IsCancellationRequested)
+            await foreach (var update in _clusterMembershipService.MembershipUpdates.WithCancellation(_shutdownCts.Token))
             {
-                try
-                {
-                    await foreach (var update in _clusterMembershipService.MembershipUpdates.WithCancellation(_shutdownCts.Token))
-                    {
-                        _viewUpdates.TryPublish(new(update, _configuration, _getRingBoundaries, _providerEpoch));
-                    }
-
-                    break;
-                }
-                catch (OperationCanceledException) when (_shutdownCts.IsCancellationRequested)
-                {
-                    break;
-                }
-                catch (Exception exception)
-                {
-                    LogErrorProcessingMembershipUpdates(_configuration.ServiceId, exception);
-                    await Task.Delay(TimeSpan.FromSeconds(1), _shutdownCts.Token);
-                }
+                _viewUpdates.TryPublish(new(update, _configuration, _getRingBoundaries, _providerEpoch));
             }
+        }
+        catch (OperationCanceledException) when (_shutdownCts.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception)
+        {
+            LogErrorProcessingMembershipUpdates(_configuration.ServiceId, exception);
+            throw;
         }
         finally
         {

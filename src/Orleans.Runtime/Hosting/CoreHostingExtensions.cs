@@ -165,7 +165,7 @@ namespace Orleans.Hosting
 
             // Distributed Grain Directory
             services.AddOptions<GrainDirectoryOptions>();
-            services.TryAddKeyedSingleton<IClusterServiceViewProvider>(
+            services.TryAddKeyedSingleton<IClusterServiceViewProvider<ClusterServiceViewId, MembershipBasedClusterServiceView>>(
                 DirectoryMembershipSnapshot.ServiceId,
                 static (sp, _) => new MembershipBasedClusterServiceViewProvider(
                     sp.GetRequiredService<ClusterMembershipService>(),
@@ -175,7 +175,7 @@ namespace Orleans.Hosting
                     sp.GetRequiredService<ILogger<MembershipBasedClusterServiceViewProvider>>(),
                     ClusterMembershipSnapshot.Default));
             services.TryAddSingleton(static sp => new DirectoryMembershipService(
-                sp.GetRequiredKeyedService<IClusterServiceViewProvider>(DirectoryMembershipSnapshot.ServiceId),
+                sp.GetRequiredKeyedService<IClusterServiceViewProvider<ClusterServiceViewId, MembershipBasedClusterServiceView>>(DirectoryMembershipSnapshot.ServiceId),
                 sp.GetRequiredService<IInternalGrainFactory>(),
                 sp.GetRequiredService<ILogger<DirectoryMembershipService>>()));
             if (!services.Contains(DirectoryDescriptor))

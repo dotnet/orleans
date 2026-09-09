@@ -16,43 +16,18 @@ namespace UnitTests.ClusterServices;
 public sealed class ClusterServiceViewTests
 {
     [Fact]
-    public void ProviderEpochOrdersBeforeProviderRevision()
+    public void RevisionsAreOrderedOnlyWithinTheirConfiguredAuthority()
     {
         var oldAuthority = new ClusterServiceViewId(1, new(long.MaxValue));
         var newAuthority = new ClusterServiceViewId(2, new(0));
         var nextRevision = new ClusterServiceViewId(2, new(1));
 
-        Assert.True(oldAuthority < newAuthority);
-        Assert.True(newAuthority > oldAuthority);
+        Assert.Throws<InvalidOperationException>(() => oldAuthority.CompareTo(newAuthority));
+        Assert.Throws<InvalidOperationException>(() => newAuthority.CompareTo(oldAuthority));
         Assert.True(newAuthority < nextRevision);
         Assert.Equal(newAuthority, new ClusterServiceViewId(2, new(0)));
         Assert.NotEqual(newAuthority, new ClusterServiceViewId(1, new(0)));
         Assert.Equal(0, newAuthority.CompareTo(new ClusterServiceViewId(2, new(0))));
-    }
-
-    [Fact]
-    public void AuthoritativePredecessorSupportsRevisionGapsAndProviderChanges()
-    {
-        var topology = EmptyTopology();
-        var previous = new MetadataView(new(1, new(50)), null, topology, "old");
-        var next = new MetadataView(new(1, new(100)), previous.Id, topology, "updated");
-        var newProvider = new MetadataView(new(2, new(0)), next.Id, topology, "new authority");
-
-        Assert.True(next.IsDirectSuccessorOf(previous));
-        Assert.True(newProvider.IsDirectSuccessorOf(next));
-        Assert.False(newProvider.IsDirectSuccessorOf(previous));
-        Assert.Same(topology, next.Topology);
-        Assert.Equal("updated", next.Configuration);
-        Assert.Equal("new authority", newProvider.Configuration);
-    }
-
-    [Fact]
-    public void UnknownPredecessorDoesNotImplyHandoffContinuity()
-    {
-        var previous = new MetadataView(new(1, new(50)), null, EmptyTopology(), "previous");
-        var next = new MetadataView(new(1, new(51)), null, previous.Topology, "next");
-
-        Assert.False(next.IsDirectSuccessorOf(previous));
     }
 
     [Fact]
@@ -66,6 +41,8 @@ public sealed class ClusterServiceViewTests
 
         Assert.Equal(new ClusterServiceViewId(7, new(10)), first.Id);
         Assert.True(next.IsDirectSuccessorOf(first));
+        Assert.True(next.TryGetPredecessor(out var predecessor));
+        Assert.Equal(first.Id, predecessor);
         Assert.False(skipped.IsDirectSuccessorOf(first));
         Assert.False(otherProvider.IsDirectSuccessorOf(first));
         Assert.Same(configuration, first.Configuration);
@@ -79,31 +56,35 @@ public sealed class ClusterServiceViewTests
 
         Assert.Equal(ClusterServiceViewVersion.MinValue, view.Id.Version);
         Assert.Null(view.PreviousViewId);
+        Assert.False(view.TryGetPredecessor(out _));
         Assert.Empty(view.Topology.Members);
     }
 
     [Fact]
-    public void ViewRejectsPredecessorFromItsOwnOrLaterPosition()
+    public void MembershipHandoffRequiresTheSameAgreedConfiguration()
     {
-        var id = new ClusterServiceViewId(2, new(5));
-
-        Assert.Throws<ArgumentException>(() => new MetadataView(id, id, EmptyTopology(), "same"));
-        Assert.Throws<ArgumentException>(() => new MetadataView(id, new(3, new(0)), EmptyTopology(), "later"));
+        var previous = new MembershipBasedClusterServiceView(Snapshot(5), new("orders", 1, "ring"), Boundaries);
+        var next = new MembershipBasedClusterServiceView(Snapshot(6), new("orders", 1, "ring"), Boundaries);
+        var changed = new MembershipBasedClusterServiceView(Snapshot(6), new("orders", 2, "ring"), Boundaries);
+        Assert.True(next.IsDirectSuccessorOf(previous));
+        Assert.False(changed.IsDirectSuccessorOf(previous));
     }
 
     [Fact]
-    public async Task TransitionOrderingUsesTheWholeProviderScopedIdentity()
+    public async Task TransitionOrderingUsesTheConfiguredAuthority()
     {
         var range = RingRange.Create(100, 200);
         var oldView = new ClusterServiceViewId(1, new(100));
-        var newView = new ClusterServiceViewId(2, new(0));
-        var coordinator = new PartitionTransitionCoordinator();
-        var transition = coordinator.BeginInbound(range, oldView, newView);
+        var newView = new ClusterServiceViewId(1, new(101));
+        var coordinator = new RangeTransitionGateMap<ClusterServiceViewId>();
+        var transition = new OwnershipAcquisition<ClusterServiceViewId>(oldView, newView);
+        coordinator.Add(range, transition);
 
         Assert.False(coordinator.IsBlocked(range, oldView));
         Assert.True(coordinator.TryGetBlockingTransition(range, newView, out var wait));
-        Assert.True(coordinator.IsBlocked(range, new(2, new(1))));
-        Assert.Throws<InvalidOperationException>(() => coordinator.BeginBarrier(range, newView));
+        Assert.True(coordinator.IsBlocked(range, new(1, new(102))));
+        Assert.Throws<InvalidOperationException>(() => coordinator.Add(range, new ViewBarrier<ClusterServiceViewId>(newView)));
+        Assert.Throws<InvalidOperationException>(() => coordinator.IsBlocked(range, new(2, new(0))));
 
         transition.MarkStateInstalled();
         transition.MarkFenced(new(ClusterServiceFencingMode.External, 42));
@@ -111,7 +92,7 @@ public sealed class ClusterServiceViewTests
 
         await wait;
         Assert.False(coordinator.IsBlocked(range, newView));
-        Assert.Throws<ArgumentException>(() => coordinator.BeginInbound(range, newView, oldView));
+        Assert.Throws<ArgumentException>(() => new OwnershipAcquisition<ClusterServiceViewId>(newView, oldView));
     }
 
     [Fact]
@@ -134,14 +115,4 @@ public sealed class ClusterServiceViewTests
     private static uint[] Boundaries(SiloAddress _, int count) =>
         Enumerable.Range(0, count).Select(value => (uint)value).ToArray();
 
-    private static ClusterServiceTopology EmptyTopology() => new([], 1, Boundaries);
-
-    private sealed class MetadataView(
-        ClusterServiceViewId id,
-        ClusterServiceViewId? previousViewId,
-        ClusterServiceTopology topology,
-        string configuration) : ClusterServiceView(id, previousViewId, topology)
-    {
-        public string Configuration { get; } = configuration;
-    }
 }

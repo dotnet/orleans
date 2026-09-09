@@ -245,7 +245,7 @@ public sealed class ClusterServiceMembershipTests
     }
 
     [Fact]
-    public async Task RefreshViewAsync_CurrentViewAtMinimumVersionDoesNotEnumerateUpdates()
+    public async Task RefreshViewAsync_CanceledCallerAtMinimumVersionRemainsCanceled()
     {
         await using var fixture = new ClusterServiceMembershipFixture();
         await fixture.Service.EnumeratorStarted;
@@ -256,7 +256,8 @@ public sealed class ClusterServiceMembershipTests
         var refresh = fixture.Membership.RefreshViewAsync(new(0, new(7)), cancellation.Token).AsTask();
 
         Assert.True(refresh.IsCompleted);
-        Assert.Same(current, await refresh);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => refresh);
+        Assert.Same(current, fixture.Membership.CurrentView);
         Assert.Empty(fixture.Service.RefreshCalls);
         Assert.False(fixture.Service.RefreshCompletion.Task.IsCompleted);
     }
@@ -298,9 +299,7 @@ public sealed class ClusterServiceMembershipTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
             () => fixture.Membership.RefreshViewAsync(new(0, new(5)), cancellation.Token).AsTask());
 
-        var call = Assert.Single(fixture.Service.RefreshCalls);
-        Assert.Equal(new MembershipVersion(5), call.MinimumVersion);
-        Assert.True(call.CancellationToken.IsCancellationRequested);
+        Assert.Empty(fixture.Service.RefreshCalls);
 
         var published = await PublishAndObserve(fixture, CreateSnapshot(6, CreateSilo(2)));
         Assert.Same(published, fixture.Membership.CurrentView);
@@ -354,6 +353,51 @@ public sealed class ClusterServiceMembershipTests
         fixture.Service.RefreshCompletion.SetException(failure);
 
         Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() => refresh));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ProviderFailureReachesPendingRefreshAndSubscribersWithTheOriginalException(bool refreshCompleted)
+    {
+        await using var fixture = new ClusterServiceMembershipFixture();
+        await fixture.Service.EnumeratorStarted;
+        await using var observer = fixture.Membership.ViewUpdates.GetAsyncEnumerator(TestContext.Current.CancellationToken);
+        Assert.True(await observer.MoveNextAsync());
+        var nextView = observer.MoveNextAsync().AsTask();
+        if (refreshCompleted)
+        {
+            fixture.Service.RefreshCompletion.SetResult();
+        }
+
+        var refresh = fixture.Membership.RefreshAtLeastAsync(new(0, new(5)), TestContext.Current.CancellationToken).AsTask();
+        var failure = new InvalidOperationException("Authoritative membership projection failed.");
+
+        fixture.Service.Complete(failure);
+
+        Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() => refresh));
+        Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() => nextView));
+        Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            fixture.Membership.RefreshAtLeastAsync(fixture.Membership.CurrentView.Id, TestContext.Current.CancellationToken).AsTask()));
+    }
+
+    [Fact]
+    public async Task CompletedProviderRejectsRefreshEvenWhenItsLastViewSatisfiesTheMinimum()
+    {
+        await using var fixture = new ClusterServiceMembershipFixture(CreateSnapshot(7, CreateSilo(1)));
+        await fixture.Service.EnumeratorStarted;
+        await using var observer = fixture.Membership.ViewUpdates.GetAsyncEnumerator(TestContext.Current.CancellationToken);
+        Assert.True(await observer.MoveNextAsync());
+        var terminated = observer.MoveNextAsync().AsTask();
+
+        fixture.Service.Complete();
+        Assert.False(await terminated);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            fixture.Membership.RefreshAtLeastAsync(new(0, new(7)), TestContext.Current.CancellationToken).AsTask());
+        Assert.True(fixture.Membership.TryGetCurrentView(out var last));
+        Assert.Equal(new ClusterServiceViewId(0, new(7)), last.Id);
+        Assert.Empty(fixture.Service.RefreshCalls);
     }
 
     [Fact]
@@ -585,9 +629,9 @@ public sealed class ClusterServiceMembershipTests
 
         public Task<bool> TryKill(SiloAddress siloAddress) => Task.FromResult(false);
 
-        public void Complete()
+        public void Complete(Exception? exception = null)
         {
-            if (!_updates.Writer.TryComplete())
+            if (!_updates.Writer.TryComplete(exception))
             {
                 throw new InvalidOperationException("The controlled membership update stream was already completed.");
             }

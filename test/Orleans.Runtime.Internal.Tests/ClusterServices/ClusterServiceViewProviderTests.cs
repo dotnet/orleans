@@ -25,21 +25,21 @@ public sealed class ClusterServiceViewProviderTests
     {
         using var membership = new MembershipSource();
         var services = new ServiceCollection();
-        services.AddKeyedSingleton<IClusterServiceViewProvider>("orders", (_, _) =>
+        services.AddKeyedSingleton<IClusterServiceViewProvider<ClusterServiceViewId, MembershipBasedClusterServiceView>>("orders", (_, _) =>
             CreateProvider(membership, "orders", partitions: 1, epoch: 3));
-        services.AddKeyedSingleton<IClusterServiceViewProvider>("jobs", (_, _) =>
+        services.AddKeyedSingleton<IClusterServiceViewProvider<ClusterServiceViewId, MembershipBasedClusterServiceView>>("jobs", (_, _) =>
             CreateProvider(membership, "jobs", partitions: 4, epoch: 7));
         await using var serviceProvider = services.BuildServiceProvider();
-        var orders = serviceProvider.GetRequiredKeyedService<IClusterServiceViewProvider>("orders");
-        var jobs = serviceProvider.GetRequiredKeyedService<IClusterServiceViewProvider>("jobs");
+        var orders = serviceProvider.GetRequiredKeyedService<IClusterServiceViewProvider<ClusterServiceViewId, MembershipBasedClusterServiceView>>("orders");
+        var jobs = serviceProvider.GetRequiredKeyedService<IClusterServiceViewProvider<ClusterServiceViewId, MembershipBasedClusterServiceView>>("jobs");
 
         Assert.NotSame(orders, jobs);
-        Assert.Same(orders, serviceProvider.GetRequiredKeyedService<IClusterServiceViewProvider>("orders"));
+        Assert.Same(orders, serviceProvider.GetRequiredKeyedService<IClusterServiceViewProvider<ClusterServiceViewId, MembershipBasedClusterServiceView>>("orders"));
         membership.Publish(Snapshot(5));
         var orderView = Assert.IsType<MembershipBasedClusterServiceView>(
-            await orders.RefreshViewAsync(new(3, new(5)), TestContext.Current.CancellationToken));
+            await orders.RefreshAtLeastAsync(new(3, new(5)), TestContext.Current.CancellationToken));
         var jobView = Assert.IsType<MembershipBasedClusterServiceView>(
-            await jobs.RefreshViewAsync(new(7, new(5)), TestContext.Current.CancellationToken));
+            await jobs.RefreshAtLeastAsync(new(7, new(5)), TestContext.Current.CancellationToken));
 
         Assert.Equal(new ClusterServiceViewId(3, new(5)), orderView.Id);
         Assert.Equal(new ClusterServiceViewId(7, new(5)), jobView.Id);
@@ -106,7 +106,7 @@ public sealed class ClusterServiceViewProviderTests
         try
         {
             var provider = Assert.IsType<MembershipBasedClusterServiceViewProvider>(
-                serviceProvider.GetRequiredKeyedService<IClusterServiceViewProvider>(DirectoryMembershipSnapshot.ServiceId));
+                serviceProvider.GetRequiredKeyedService<IClusterServiceViewProvider<ClusterServiceViewId, MembershipBasedClusterServiceView>>(DirectoryMembershipSnapshot.ServiceId));
             var directory = serviceProvider.GetRequiredService<DirectoryMembershipService>();
             Assert.Same(membership, directory.ClusterMembershipService);
             Assert.Equal(3, directory.PartitionsPerSilo);
@@ -124,7 +124,7 @@ public sealed class ClusterServiceViewProviderTests
             await serviceProvider.DisposeAsync();
         }
 
-        void RegisterProvider() => services.AddKeyedSingleton<IClusterServiceViewProvider>(
+        void RegisterProvider() => services.AddKeyedSingleton<IClusterServiceViewProvider<ClusterServiceViewId, MembershipBasedClusterServiceView>>(
             DirectoryMembershipSnapshot.ServiceId,
             (_, _) => CreateProvider(membership, DirectoryMembershipSnapshot.ServiceId, partitions: 3, epoch: 0));
     }
@@ -144,7 +144,7 @@ public sealed class ClusterServiceViewProviderTests
     [Fact]
     public void DirectoryRejectsAProviderWithoutTheMembershipDerivedWireMapping()
     {
-        var provider = Substitute.For<IClusterServiceViewProvider>();
+        var provider = Substitute.For<IClusterServiceViewProvider<ClusterServiceViewId, MembershipBasedClusterServiceView>>();
 
         var error = Assert.Throws<ArgumentException>(() => new DirectoryMembershipService(
             provider, null!, NullLogger<DirectoryMembershipService>.Instance));
@@ -153,23 +153,42 @@ public sealed class ClusterServiceViewProviderTests
     }
 
     [Fact]
-    public void ServiceViewsCarryTypedConfigurationBeyondTopology()
+    public async Task DirectoryProjectionFailureReachesRefreshAndSubscribers()
     {
-        var topology = new ClusterServiceTopology([], 1, Boundaries);
-        var oldView = new ConfiguredView(new(4, new(7)), null, topology, new(8, "old"));
-        var newView = new ConfiguredView(new(4, new(11)), oldView.Id, topology, new(16, "new"));
+        using var membership = new MembershipSource();
+        await using var provider = CreateProvider(membership, DirectoryMembershipSnapshot.ServiceId, 1, 0);
+        var factory = Substitute.For<IInternalGrainFactory>();
+        var failure = new InvalidOperationException("Partition reference construction failed.");
+        factory.GetSystemTarget<IGrainDirectoryPartition>(Arg.Any<GrainId>()).Returns(_ => throw failure);
+        await using var directory = new DirectoryMembershipService(provider, factory, NullLogger<DirectoryMembershipService>.Instance);
+        await using var updates = directory.ViewUpdates.GetAsyncEnumerator(TestContext.Current.CancellationToken);
+        Assert.True(await updates.MoveNextAsync());
+        var nextView = updates.MoveNextAsync().AsTask();
+        var refresh = directory.RefreshViewAsync(new(1), TestContext.Current.CancellationToken).AsTask();
+
+        membership.Publish(Snapshot(1));
+
+        Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() => refresh));
+        Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() => nextView));
+        Assert.Equal(MembershipVersion.MinValue, directory.CurrentView.Version);
+    }
+
+    [Fact]
+    public async Task ServiceViewsCarryConcreteConfigurationWithoutAUniversalTopology()
+    {
+        var oldView = new ConfiguredView(7, null, new(8, "old"));
+        var newView = new ConfiguredView(11, oldView.Id, new(16, "new"));
         var services = new ServiceCollection();
-        var provider = Substitute.For<IClusterServiceViewProvider>();
-        provider.CurrentView.Returns(newView);
-        services.AddKeyedSingleton("configured-service", provider);
+        services.AddKeyedSingleton<IClusterServiceViewProvider<int, ConfiguredView>>(
+            "configured-service", new ConfiguredViewProvider(newView));
         using var serviceProvider = services.BuildServiceProvider();
 
-        var current = Assert.IsType<ConfiguredView>(
-            serviceProvider.GetRequiredKeyedService<IClusterServiceViewProvider>("configured-service").CurrentView);
+        var current = await serviceProvider.GetRequiredKeyedService<IClusterServiceViewProvider<int, ConfiguredView>>("configured-service")
+            .RefreshAtLeastAsync(11, TestContext.Current.CancellationToken);
 
         Assert.Equal(new ServiceSettings(16, "new"), current.Configuration);
-        Assert.Same(oldView.Topology, current.Topology);
-        Assert.True(current.IsDirectSuccessorOf(oldView));
+        Assert.True(current.TryGetPredecessor(out var predecessor));
+        Assert.Equal(oldView.Id, predecessor);
     }
 
     private static MembershipBasedClusterServiceViewProvider CreateProvider(
@@ -184,13 +203,34 @@ public sealed class ClusterServiceViewProviderTests
 
     private sealed record ServiceSettings(int Concurrency, string Metadata);
 
-    private sealed class ConfiguredView(
-        ClusterServiceViewId id,
-        ClusterServiceViewId? previousView,
-        ClusterServiceTopology topology,
-        ServiceSettings configuration) : ClusterServiceView(id, previousView, topology)
+    private readonly record struct ConfiguredView(int Id, int? Previous, ServiceSettings Configuration) : IClusterServiceView<int>
     {
-        public ServiceSettings Configuration { get; } = configuration;
+        public bool TryGetPredecessor(out int predecessor)
+        {
+            predecessor = Previous.GetValueOrDefault();
+            return Previous.HasValue;
+        }
+    }
+
+    private sealed class ConfiguredViewProvider(ConfiguredView current) : IClusterServiceViewProvider<int, ConfiguredView>
+    {
+        public IAsyncEnumerable<ConfiguredView> ViewUpdates => throw new NotSupportedException();
+
+        public bool TryGetCurrentView(out ConfiguredView view)
+        {
+            view = current;
+            return true;
+        }
+
+        public ValueTask<ConfiguredView> RefreshAsync(CancellationToken cancellationToken) => ValueTask.FromResult(current);
+
+        public ValueTask<ConfiguredView> RefreshAtLeastAsync(int minimumView, CancellationToken cancellationToken)
+        {
+            Assert.True(current.Id >= minimumView);
+            return ValueTask.FromResult(current);
+        }
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 
     private sealed class MembershipSource : IClusterMembershipService, IDisposable

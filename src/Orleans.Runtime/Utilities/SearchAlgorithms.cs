@@ -44,7 +44,16 @@ internal static class SearchAlgorithms
         TCollection collection,
         Func<TCollection, int, TElement> getEntry,
         TKey key) where TElement : IComparable<TKey>
+        => RingRangeBinarySearch(length, collection, getEntry, key, out _);
+
+    public static int RingRangeBinarySearch<TCollection, TElement, TKey>(
+        int length,
+        TCollection collection,
+        Func<TCollection, int, TElement> getEntry,
+        TKey key,
+        out int probeCount) where TElement : IComparable<TKey>
     {
+        probeCount = 0;
         if (length == 0) return -1;
 
         var left = 0;
@@ -55,6 +64,7 @@ internal static class SearchAlgorithms
         {
             var mid = left + (right - left) / 2;
             entry = getEntry(collection, mid);
+            probeCount++;
             var comparison = entry.CompareTo(key);
 
             if (comparison == 0)
@@ -75,6 +85,7 @@ internal static class SearchAlgorithms
 
         // Try the last element.
         entry = getEntry(collection, length - 1);
+        probeCount++;
         if (entry.CompareTo(key) == 0)
         {
             return length - 1;
@@ -83,6 +94,7 @@ internal static class SearchAlgorithms
 #if DEBUG
         // Try the first element.
         entry = getEntry(collection, 0);
+        probeCount++;
         if (entry.CompareTo(key) == 0)
         {
             Debug.Fail("Sort order invariant violated.");
