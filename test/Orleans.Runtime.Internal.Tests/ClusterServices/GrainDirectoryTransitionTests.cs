@@ -21,6 +21,7 @@ namespace UnitTests.ClusterServices;
 public sealed class GrainDirectoryTransitionTests
 {
     [Theory]
+    [InlineData("LogDebugAcquiringRange")]
     [InlineData("LogDebugRecoveringActivations")]
     [InlineData("LogDebugCompletedTransferringEntries")]
     public async Task FailedAcquisitionKeepsRangeBlockedAndReportsFatalError(string failurePoint)
@@ -36,13 +37,15 @@ public sealed class GrainDirectoryTransitionTests
         Assert.Same(fixture.Logger.Failure, Assert.Single(fixture.FatalErrors));
     }
 
-    [Fact]
-    public async Task FailedReleaseAfterDrainKeepsRangeBlockedAndReportsFatalError()
+    [Theory]
+    [InlineData("LogDebugRelinquishingOwnership")]
+    [InlineData("LogDebugEncounteredNonContiguousUpdate")]
+    public async Task FailedReleaseKeepsRangeBlockedAndReportsFatalError(string failurePoint)
     {
         await using var fixture = new Fixture();
         await fixture.ApplyViewAsync(1, active: true);
         await fixture.WaitForRangeAsync();
-        fixture.Logger.FailurePoint = "LogDebugEncounteredNonContiguousUpdate";
+        fixture.Logger.FailurePoint = failurePoint;
 
         await fixture.ApplyViewAsync(3, active: false);
 

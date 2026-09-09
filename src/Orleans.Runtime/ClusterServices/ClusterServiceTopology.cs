@@ -18,7 +18,7 @@ internal sealed class ClusterServiceTopology
         int partitionsPerSilo,
         Func<SiloAddress, int, uint[]> getRingBoundaries)
     {
-        if (members.IsDefault)
+        if (members.IsDefault || members.Any(static member => member is null))
         {
             throw new ArgumentException("The member set must be initialized.", nameof(members));
         }
@@ -30,6 +30,14 @@ internal sealed class ClusterServiceTopology
         var sortedActiveMembers = members.ToBuilder();
 
         sortedActiveMembers.Sort(static (left, right) => left.CompareTo(right));
+        for (var index = 1; index < sortedActiveMembers.Count; index++)
+        {
+            if (sortedActiveMembers[index - 1].Equals(sortedActiveMembers[index]))
+            {
+                throw new ArgumentException("Participants must have unique silo identities.", nameof(members));
+            }
+        }
+
         var boundaries = ImmutableArray.CreateBuilder<(uint Hash, int MemberIndex, int PartitionIndex)>(
             partitionsPerSilo * sortedActiveMembers.Count);
         for (var memberIndex = 0; memberIndex < sortedActiveMembers.Count; memberIndex++)
@@ -75,11 +83,76 @@ internal sealed class ClusterServiceTopology
 
         _ringBoundaries = boundaries.ToImmutable();
         Members = sortedActiveMembers.ToImmutable();
+        _rangesByMemberPartition = CreateRangeIndex();
+        _rangesByMember = new RingRangeCollection[Members.Length];
+    }
 
+    /// <summary>
+    /// Indexes a complete, authoritative ring assignment over eligible participants.
+    /// Partition identities remain attached to their silo incarnation and partition index.
+    /// </summary>
+    public ClusterServiceTopology(
+        ImmutableArray<SiloAddress> members,
+        int partitionsPerSilo,
+        ImmutableArray<ClusterServicePartitionAssignment> assignments)
+    {
+        if (members.IsDefault || assignments.IsDefault || members.Any(static member => member is null))
+        {
+            throw new ArgumentException("Participants and assignments must be initialized.");
+        }
+
+        ArgumentOutOfRangeException.ThrowIfLessThan(partitionsPerSilo, 1);
+        PartitionCount = partitionsPerSilo;
+        Members = members.Sort(static (left, right) => left.CompareTo(right));
+        for (var index = 1; index < Members.Length; index++)
+        {
+            if (Members[index - 1].Equals(Members[index]))
+            {
+                throw new ArgumentException("Participants must have unique silo identities.", nameof(members));
+            }
+        }
+
+        if (Members.IsEmpty != assignments.IsEmpty)
+        {
+            throw new ArgumentException("A populated participant set requires a complete ring assignment.", nameof(assignments));
+        }
+
+        var ordered = assignments.Sort(static (left, right) => left.Range.Start.CompareTo(right.Range.Start));
+        var identities = new HashSet<(SiloAddress, int)>();
+        var boundaries = ImmutableArray.CreateBuilder<(uint Start, int MemberIndex, int PartitionIndex)>(ordered.Length);
+        for (var index = 0; index < ordered.Length; index++)
+        {
+            var assignment = ordered[index];
+            var memberIndex = TryGetMemberIndex(assignment.SiloAddress);
+            if (memberIndex < 0
+                || assignment.PartitionIndex < 0
+                || assignment.PartitionIndex >= partitionsPerSilo
+                || !identities.Add((assignment.SiloAddress, assignment.PartitionIndex)))
+            {
+                throw new ArgumentException("Each assignment requires a unique partition on an eligible participant.", nameof(assignments));
+            }
+
+            if (ordered.Length == 1 ? !assignment.Range.IsFull
+                : assignment.Range.IsEmpty || assignment.Range.IsFull
+                    || assignment.Range.End != ordered[(index + 1) % ordered.Length].Range.Start)
+            {
+                throw new ArgumentException("Assignments must cover the ring exactly once.", nameof(assignments));
+            }
+
+            boundaries.Add((assignment.Range.Start, memberIndex, assignment.PartitionIndex));
+        }
+
+        _ringBoundaries = boundaries.MoveToImmutable();
+        _rangesByMemberPartition = CreateRangeIndex();
+        _rangesByMember = new RingRangeCollection[Members.Length];
+    }
+
+    private ImmutableArray<ImmutableArray<RingRange>> CreateRangeIndex()
+    {
         var rangesByMemberPartition = new RingRange[Members.Length][];
         for (var memberIndex = 0; memberIndex < Members.Length; memberIndex++)
         {
-            rangesByMemberPartition[memberIndex] = new RingRange[partitionsPerSilo];
+            rangesByMemberPartition[memberIndex] = new RingRange[PartitionCount];
         }
 
         for (var index = 0; index < _ringBoundaries.Length; index++)
@@ -97,8 +170,7 @@ internal sealed class ClusterServiceTopology
             ranges.Add(ImmutableArray.CreateRange(rangesByMemberPartition[memberIndex]));
         }
 
-        _rangesByMemberPartition = ranges.ToImmutable();
-        _rangesByMember = new RingRangeCollection[Members.Length];
+        return ranges.ToImmutable();
     }
 
     public ImmutableArray<SiloAddress> Members { get; }
@@ -106,6 +178,67 @@ internal sealed class ClusterServiceTopology
     public int PartitionCount { get; }
 
     public RangeCollection RangeOwners => new(this);
+
+    /// <summary>
+    /// Visits each intersecting owner's full range once in ring order.
+    /// Partial queries perform a binary search followed by an output-sensitive walk.
+    /// </summary>
+    internal void VisitRangeOwners<TState>(
+        RingRange query,
+        Action<ClusterServicePartitionOwner, TState> visitor,
+        TState state) => VisitRangeOwners(query, visitor, state, out _);
+
+    internal void VisitRangeOwners<TState>(
+        RingRange query,
+        Action<ClusterServicePartitionOwner, TState> visitor,
+        TState state,
+        out int searchProbeCount)
+    {
+        ArgumentNullException.ThrowIfNull(visitor);
+        searchProbeCount = 0;
+        var count = _ringBoundaries.Length;
+        if (query.IsEmpty || count == 0)
+        {
+            return;
+        }
+
+        if (query.IsFull || count == 1)
+        {
+            for (var index = 0; index < count; index++)
+            {
+                visitor(GetOwner(index), state);
+            }
+
+            return;
+        }
+
+        var firstPoint = unchecked(query.Start + 1u);
+        var indexOfOwner = SearchAlgorithms.RingRangeBinarySearch(
+            count,
+            this,
+            static (topology, index) => topology.GetRangeCore(index),
+            firstPoint,
+            out searchProbeCount);
+        Debug.Assert(indexOfOwner >= 0);
+
+        var queryLength = unchecked(query.End - query.Start);
+        for (var visited = 0; visited < count; visited++)
+        {
+            var owner = GetOwner(indexOfOwner);
+            visitor(owner, state);
+
+            var distanceToBoundary = unchecked(owner.Range.End - query.Start);
+            if (distanceToBoundary == 0 || distanceToBoundary >= queryLength)
+            {
+                return;
+            }
+
+            if (++indexOfOwner == count)
+            {
+                indexOfOwner = 0;
+            }
+        }
+    }
 
     public RingRange GetRange(SiloAddress address, int partitionIndex)
     {
@@ -235,5 +368,10 @@ internal sealed class ClusterServiceTopology
 internal readonly record struct ClusterServicePartitionOwner(
     SiloAddress SiloAddress,
     int MemberIndex,
+    int PartitionIndex,
+    RingRange Range);
+
+internal readonly record struct ClusterServicePartitionAssignment(
+    SiloAddress SiloAddress,
     int PartitionIndex,
     RingRange Range);
