@@ -51,6 +51,7 @@ namespace Tester.StreamingTests
             bool waitForRetryTimeouts = false,
             CancellationToken cancellationToken = default)
         {
+            var hasDeliveryFailureCounter = getDeliveryFailureCount is not null;
             Guid streamGuid = Guid.NewGuid();
             var streamId = StreamId.Create(streamNamespace, streamGuid);
             int[] eventCount = { 0 };
@@ -72,7 +73,7 @@ namespace Tester.StreamingTests
             await ProduceEventsToClient(streamProviderName, streamGuid, streamNamespace, 10, eventCount, cancellationToken);
 
             // Wait for the dropped client's subscription to be removed after delivery fails.
-            if (waitForRetryTimeouts)
+            if (waitForRetryTimeouts && hasDeliveryFailureCounter)
             {
                 using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 cts.CancelAfter(_timeout);
