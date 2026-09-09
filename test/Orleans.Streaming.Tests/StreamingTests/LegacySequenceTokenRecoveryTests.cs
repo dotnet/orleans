@@ -91,6 +91,12 @@ public sealed class LegacySequenceTokenRecoveryTests
         LegacyTokenRecoveryFixture.AssertProviderIsolation(new IsolatedV2Token(500, 2));
     }
 
+    [Fact]
+    public void ExistingCustomContractWithoutExplicitDomain_RemainsIsolated()
+    {
+        LegacyTokenRecoveryFixture.AssertProviderIsolation(new ExistingProviderToken(500, 2, "provider"));
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -127,18 +133,54 @@ public sealed class LegacySequenceTokenRecoveryTests
     private sealed class CustomV1Token(long sequence, int index, string metadata) : EventSequenceToken(sequence, index)
     {
         public string Metadata { get; } = metadata;
+        protected override Type SequenceTokenCompatibilityDomain => typeof(EventSequenceToken);
     }
 
     private sealed class CustomV2Token(long sequence, int index, string metadata) : EventSequenceTokenV2(sequence, index)
     {
         public string Metadata { get; } = metadata;
+        protected override Type SequenceTokenCompatibilityDomain => typeof(EventSequenceToken);
     }
 
-    private sealed class OtherV2Token(long sequence, int index) : EventSequenceTokenV2(sequence, index);
+    private sealed class OtherV2Token(long sequence, int index) : EventSequenceTokenV2(sequence, index)
+    {
+        protected override Type SequenceTokenCompatibilityDomain => typeof(EventSequenceToken);
+    }
 
     private sealed class IsolatedV2Token(long sequence, int index) : EventSequenceTokenV2(sequence, index)
     {
         protected override Type SequenceTokenCompatibilityDomain => typeof(IsolatedV2Token);
+    }
+
+    private sealed class ExistingProviderToken(long sequence, int index, string provider) : EventSequenceTokenV2(sequence, index)
+    {
+        public override bool Equals(object? obj) => obj is StreamSequenceToken token && Equals(token);
+
+        public override bool Equals(StreamSequenceToken? other)
+            => other is ExistingProviderToken token
+                && token.SequenceNumber == SequenceNumber
+                && token.EventIndex == EventIndex
+                && token.Provider == Provider;
+
+        public override int CompareTo(StreamSequenceToken? other)
+        {
+            if (other is null)
+            {
+                return 1;
+            }
+
+            if (other is not ExistingProviderToken token)
+            {
+                throw new ArgumentOutOfRangeException(nameof(other));
+            }
+
+            var difference = string.CompareOrdinal(Provider, token.Provider);
+            return difference != 0 ? difference : base.CompareTo(token);
+        }
+
+        public override int GetHashCode() => HashCode.Combine(Provider, SequenceNumber, EventIndex);
+
+        private string Provider { get; } = provider;
     }
 }
 
@@ -279,6 +321,48 @@ public static class LegacyTokenRecoveryFixture
         Assert.Empty(observer.Tokens);
     }
 
+    public static void VerifyPurgedCursorRecovery(
+        StreamSequenceToken legacy,
+        Func<long, int, StreamSequenceToken> createToken)
+    {
+        var streamId = StreamId.Create("legacy-purged-recovery", Guid.NewGuid());
+        var cache = new PooledQueueCache(
+            new RecoveryDataAdapter(createToken),
+            NullLogger.Instance,
+            cacheMonitor: null,
+            cacheMonitorWriteInterval: null,
+            purgeMetadataInterval: TimeSpan.FromMinutes(1));
+        var now = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        Add(legacy.SequenceNumber, legacy.EventIndex);
+        cache.RemoveOldestMessage();
+        Add(legacy.SequenceNumber + 1, 0);
+
+        var result = cache.TryGetCursor(streamId, legacy);
+
+        Assert.Equal(QueueCacheCursorResultKind.Success, result.Kind);
+        Assert.Null(result.CacheMiss);
+        Assert.NotNull(result.Cursor);
+        Assert.Equal(
+            QueueCacheCursorMoveResultKind.Success,
+            cache.TryGetNextMessageWithResult(result.Cursor, out var message).Kind);
+        Assert.Equal(legacy.SequenceNumber + 1, message!.SequenceToken.SequenceNumber);
+
+        void Add(long sequence, int index)
+        {
+            cache.Add(
+            [
+                new CachedMessage
+                {
+                    StreamId = streamId,
+                    SequenceNumber = sequence,
+                    EventIndex = index,
+                    EnqueueTimeUtc = now,
+                    DequeueTimeUtc = now,
+                },
+            ], now);
+        }
+    }
+
     public static void AssertProviderIsolation(StreamSequenceToken provider)
     {
         StreamSequenceToken[] genericTokens =
@@ -309,8 +393,14 @@ public static class LegacyTokenRecoveryFixture
         Assert.Equal(2, new HashSet<StreamSequenceToken> { generic, provider }.Count);
     }
 
-    private sealed class InheritedV1Token(long sequence, int index) : EventSequenceToken(sequence, index);
-    private sealed class InheritedV2Token(long sequence, int index) : EventSequenceTokenV2(sequence, index);
+    private sealed class InheritedV1Token(long sequence, int index) : EventSequenceToken(sequence, index)
+    {
+        protected override Type SequenceTokenCompatibilityDomain => typeof(EventSequenceToken);
+    }
+    private sealed class InheritedV2Token(long sequence, int index) : EventSequenceTokenV2(sequence, index)
+    {
+        protected override Type SequenceTokenCompatibilityDomain => typeof(EventSequenceToken);
+    }
 
     private static object GetCursor(PooledQueueCache cache, StreamId streamId, StreamSequenceToken? token)
     {

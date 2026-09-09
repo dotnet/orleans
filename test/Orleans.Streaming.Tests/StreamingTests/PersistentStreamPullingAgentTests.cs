@@ -1043,7 +1043,10 @@ namespace UnitTests.StreamingTests
         }
 
         private sealed class DerivedEventSequenceTokenV2(long sequenceNumber, int eventIndex)
-            : EventSequenceTokenV2(sequenceNumber, eventIndex);
+            : EventSequenceTokenV2(sequenceNumber, eventIndex)
+        {
+            protected override Type SequenceTokenCompatibilityDomain => typeof(EventSequenceToken);
+        }
 
         private sealed class RecordingConsumer(StreamHandshakeToken? requestedToken = null) : IStreamConsumerExtension
         {

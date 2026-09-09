@@ -81,11 +81,11 @@ namespace Orleans.Providers.Streams.Common
         /// this token's numeric equality and ordering contract.
         /// </summary>
         /// <remarks>
-        /// Derived tokens which add position identity override this property and return a stable
-        /// type representing their contract. Tokens in the same domain compare by
-        /// <see cref="SequenceNumber"/> and <see cref="EventIndex"/>.
+        /// Derived tokens are isolated by default. A derived token which uses this complete numeric
+        /// contract overrides this property and returns <see cref="EventSequenceToken"/>. Tokens in
+        /// the same domain compare by <see cref="SequenceNumber"/> and <see cref="EventIndex"/>.
         /// </remarks>
-        protected virtual Type SequenceTokenCompatibilityDomain => typeof(EventSequenceToken);
+        protected virtual Type SequenceTokenCompatibilityDomain => GetType();
 
         internal Type GetSequenceTokenCompatibilityDomain() => SequenceTokenCompatibilityDomain;
 

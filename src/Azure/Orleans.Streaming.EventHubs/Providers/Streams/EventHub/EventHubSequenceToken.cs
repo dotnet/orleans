@@ -73,7 +73,11 @@ namespace Orleans.Streaming.EventHubs
         }
 
         /// <inheritdoc />
-        protected override Type SequenceTokenCompatibilityDomain => typeof(EventHubSequenceToken);
+        protected override Type SequenceTokenCompatibilityDomain
+            => GetType() is var type
+                && (type == typeof(EventHubSequenceToken) || type == typeof(EventHubSequenceTokenV2))
+                    ? typeof(EventHubSequenceToken)
+                    : type;
 
         internal override StreamSequenceToken NormalizeLegacyToken(StreamSequenceToken token)
         {

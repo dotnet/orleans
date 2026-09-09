@@ -79,12 +79,12 @@ Orleans recovers these saved positions according to the provider's token contrac
 
 | Token contract | Persisted positions supported during recovery |
 | --- | --- |
-| Generic V1/V2 and custom subclasses retaining the generic compatibility domain | Exact V1 and V2 positions compare with current tokens by sequence number and event index, with matching equality and hashes across the family. |
-| Event Hubs V1/V2 and custom subclasses retaining the Event Hubs compatibility domain | Exact V1 positions from the earlier inherited factory are normalized within Event Hubs recovery comparisons. The sequence number and event index identify the position; current delivered tokens retain their Event Hubs offset and custom metadata. |
+| Generic V1/V2 and custom subclasses explicitly selecting the generic compatibility domain | Exact V1 and V2 positions compare with current tokens by sequence number and event index, with matching equality and hashes across the family. |
+| Event Hubs V1/V2 and custom subclasses explicitly selecting the Event Hubs compatibility domain | Exact V1 positions from the earlier inherited factory are normalized within Event Hubs recovery comparisons. The sequence number and event index identify the position; current delivered tokens retain their Event Hubs offset and custom metadata. |
 | Kinesis | Persisted Kinesis tokens retain the numeric shard offset as the authoritative position, followed by event index, across receiver restarts. |
 | Redis | Persisted Redis tokens retain the entry ID, per-millisecond sequence number, and event index. |
 
-An ordinary custom token inherits its base family's compatibility domain and numeric identity; additional metadata is preserved on delivery. A custom token which adds position identity overrides `SequenceTokenCompatibilityDomain` with a stable type representing its contract and implements equality, ordering, and hashing consistently for that domain.
+Derived tokens are isolated by default, which preserves the identity contract of adapters compiled before this compatibility hook existed. A custom token which uses the complete generic numeric contract overrides `SequenceTokenCompatibilityDomain` to return `typeof(EventSequenceToken)`. Related token versions select the same stable domain type. A custom token which adds position identity keeps a distinct domain and implements equality, ordering, and hashing consistently for that domain.
 
 Event Hubs, Kinesis, and Redis each retain their provider-specific public equality contract. Event Hubs recovery uses a sequence-only token with an empty offset for a legacy position whose factory omitted the offset; offset-bearing tokens come from the current provider data. Keep stream identity and partition mapping stable when replaying persisted positions.
 

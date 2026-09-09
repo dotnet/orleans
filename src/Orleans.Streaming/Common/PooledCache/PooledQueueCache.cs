@@ -380,7 +380,7 @@ namespace Orleans.Providers.Streams.Common
             var oldestMessage = messageBlocks.Last!.Value.OldestMessage;
             if (oldestMessage.Compare(sequenceToken) <= 0
                 || lastPurgedToken.TryGetValue(streamId, out var entry)
-                    && sequenceToken.CompareTo(entry.Token) >= 0)
+                    && EventSequenceTokenCompatibility.Compare(sequenceToken, entry.Token) >= 0)
             {
                 cacheMiss = default;
                 return false;

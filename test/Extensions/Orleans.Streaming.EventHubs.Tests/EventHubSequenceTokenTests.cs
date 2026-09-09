@@ -130,6 +130,14 @@ public sealed class EventHubSequenceTokenTests
             CreateCustomToken(v2, 500, 2),
             LegacyTokenRecoveryFixture.LoadLegacyToken(v2: true));
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PurgedLegacyPosition_UsesEventHubRecoveryComparison(bool v2)
+        => LegacyTokenRecoveryFixture.VerifyPurgedCursorRecovery(
+            LegacyTokenRecoveryFixture.LoadLegacyToken(v2: false),
+            (sequence, index) => CreateCustomToken(v2, sequence, index));
+
     [Fact]
     public void CreateSequenceTokenForEventPreservesConcreteTypeAndOffset()
     {
@@ -168,6 +176,7 @@ public sealed class EventHubSequenceTokenTests
         : EventHubSequenceToken(eventHubOffset, sequenceNumber, eventIndex)
     {
         public string Metadata { get; } = "custom-metadata";
+        protected override Type SequenceTokenCompatibilityDomain => typeof(EventHubSequenceToken);
     }
 
     private sealed class CustomEventHubSequenceTokenV2(
@@ -177,6 +186,7 @@ public sealed class EventHubSequenceTokenTests
         : EventHubSequenceTokenV2(eventHubOffset, sequenceNumber, eventIndex)
     {
         public string Metadata { get; } = "custom-metadata";
+        protected override Type SequenceTokenCompatibilityDomain => typeof(EventHubSequenceToken);
     }
 
     private sealed class IsolatedEventHubSequenceToken(string offset, long sequence, int index)
