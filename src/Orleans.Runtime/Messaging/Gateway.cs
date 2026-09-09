@@ -655,19 +655,19 @@ namespace Orleans.Runtime.Messaging
 
             public void RejectRequest(Message request, SiloAddress deadSilo)
             {
+                Message? requestToReject;
                 bool requestTrackingStopped;
                 lock (_requestLock)
                 {
-                    if (_pendingRequests.TryRemove(request.Id, deadSilo, out var trackedRequest))
-                    {
-                        request = trackedRequest;
-                    }
-
+                    _pendingRequests.TryClaimForRejection(request, deadSilo, out requestToReject);
                     requestTrackingStopped = UnregisterRequestTrackingIfEmptyCore();
                 }
 
                 EmitRequestTrackingStopped(requestTrackingStopped);
-                RejectClaimedRequest(request, deadSilo);
+                if (requestToReject is not null)
+                {
+                    RejectClaimedRequest(requestToReject, deadSilo);
+                }
             }
 
             private void RejectClaimedRequest(Message request, SiloAddress deadSilo)
