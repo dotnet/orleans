@@ -106,6 +106,8 @@ Each successful proposal records the actual register predecessor. Polling reader
 
 A continuous move requests the predecessor's retained state after its release has drained. Missing continuity, including skipped A -> B -> A placement, selects recovery. The destination installs state and acquires an external fence before opening admission. Requests and snapshot replies are tied to a receiver identity and view, and the consumer rechecks those identities after waits. A delayed response therefore cannot populate a replacement receiver.
 
+Each receiver serializes state transformations. Canceling a queued caller leaves the executing transformation and shared acquisition intact. Consumer shutdown cancels queued and active cooperative operations, closes gates, and waits for their cleanup. A terminal provider failure cancels active authority reads and queued publication work, preserving the original failure for pending refreshes and subscribers.
+
 The reference consumer makes the service-specific recovery and effect boundary explicit. Its protocol implementation supplies the durable recovery source and enforces fencing at the recipient of writes or other effects. Transition failures retain their original fault and keep the resource gated through terminal shutdown.
 
 ### Configuration changes within a view stream
