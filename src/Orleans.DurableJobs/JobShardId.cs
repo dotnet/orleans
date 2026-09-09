@@ -8,7 +8,6 @@ internal readonly record struct JobShardId
 {
     private const string RootSegment = "jobs";
     private const string ShardsSegment = "shards";
-    private const string VersionSegment = "v2";
     private const string StartTimeFormat = "yyyyMMdd'T'HHmmssfffffff'Z'";
 
     public JobShardId(string value)
@@ -19,13 +18,13 @@ internal readonly record struct JobShardId
 
     public string Value { get; }
 
-    public static JournalId StoragePrefix => JournalId.Create(RootSegment, ShardsSegment, VersionSegment);
+    public static JournalId StoragePrefix => JournalId.Create(RootSegment, ShardsSegment);
 
     public static JobShardId New(DateTimeOffset startTime)
         => new($"{FormatStartTime(startTime)}-{Guid.NewGuid():N}");
 
     public static JournalId GetMaxJournalId(DateTimeOffset startTime)
-        => JournalId.Create(RootSegment, ShardsSegment, VersionSegment, $"{FormatStartTime(startTime)}~");
+        => JournalId.Create(RootSegment, ShardsSegment, $"{FormatStartTime(startTime)}~");
 
     private static string FormatStartTime(DateTimeOffset startTime)
         => startTime.UtcDateTime.ToString(StartTimeFormat, CultureInfo.InvariantCulture);
@@ -40,18 +39,17 @@ internal readonly record struct JobShardId
         }
 
         var segments = DecodeSegments(journalId.Value);
-        if (segments.Length != 4
+        if (segments.Length != 3
             || !string.Equals(segments[0], RootSegment, StringComparison.Ordinal)
-            || !string.Equals(segments[1], ShardsSegment, StringComparison.Ordinal)
-            || !string.Equals(segments[2], VersionSegment, StringComparison.Ordinal))
+            || !string.Equals(segments[1], ShardsSegment, StringComparison.Ordinal))
         {
             throw new ArgumentException($"Journal id '{journalId}' is not a DurableJobs shard journal id.", nameof(journalId));
         }
 
-        return new(segments[3]);
+        return new(segments[2]);
     }
 
-    public JournalId ToJournalId() => JournalId.Create(RootSegment, ShardsSegment, VersionSegment, Value);
+    public JournalId ToJournalId() => JournalId.Create(RootSegment, ShardsSegment, Value);
 
     public override string ToString() => Value;
 

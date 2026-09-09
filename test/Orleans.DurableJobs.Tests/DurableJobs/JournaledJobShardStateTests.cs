@@ -2,7 +2,6 @@ using System;
 using System.Linq;
 using System.Text.Json;
 using Orleans.DurableJobs;
-using Orleans.Journaling;
 using Orleans.Runtime;
 using Xunit;
 
@@ -187,7 +186,7 @@ public class JournaledJobShardStateTests
         Assert.StartsWith(expectedPrefix, second.Value);
         Assert.True(Guid.TryParseExact(first.Value[expectedPrefix.Length..], "N", out _));
         Assert.NotEqual(first, second);
-        Assert.Equal($"jobs/shards/v2/{first.Value}", first.ToJournalId().Value);
+        Assert.Equal($"jobs/shards/{first.Value}", first.ToJournalId().Value);
         Assert.Equal(first, JobShardId.FromJournalId(first.ToJournalId()));
         Assert.Equal(first, JobShardId.Parse(first.Value));
     }
@@ -224,15 +223,6 @@ public class JournaledJobShardStateTests
         Assert.True(StringComparer.Ordinal.Compare(
             JobShardId.New(DateTimeOffset.MaxValue).ToJournalId().Value,
             JobShardId.GetMaxJournalId(DateTimeOffset.MaxValue).Value) < 0);
-    }
-
-    [Fact]
-    public void JobShardId_TimeAddressableNamespaceIsDistinctFromPreviousAlphaFormat()
-    {
-        var previous = JournalId.Create("jobs", "shards", "previous-shard");
-
-        Assert.False(JobShardId.StoragePrefix.IsPrefixOf(previous));
-        Assert.Throws<ArgumentException>(() => JobShardId.FromJournalId(previous));
     }
 
     [Fact]

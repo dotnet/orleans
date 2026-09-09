@@ -116,7 +116,7 @@ The lookahead accepts non-negative durations; zero selects shards whose start ti
 before the current time. The check interval accepts durations from 1 to 4294967294 milliseconds.
 
 Shard journals use names such as
-`jobs/shards/v2/20260909T1200000000000Z-<unique-id>`. The fixed-width UTC start time
+`jobs/shards/20260909T1200000000000Z-<unique-id>`. The fixed-width UTC start time
 precedes the unique suffix, so ordinal name order is shard-start-time order. Each sweep
 lists the shard prefix with an inclusive `ListOptions.MaxId` bound covering the lookahead
 horizon. The range includes every earlier start time, including jobs overdue after a long
@@ -145,14 +145,6 @@ Shorter lookahead periods reduce early loading of recovered shards. Shorter chec
 increase sweep frequency and reduce the wait for newly inserted or newly eligible shards.
 The public `JobShardManager.AssignJobShardsAsync` method collects the same ordered discovery
 stream into its full-result list.
-
-### Alpha storage-format upgrade
-
-The time-addressable `jobs/shards/v2` namespace replaces the earlier
-`jobs/shards/<random-id>` layout. **Drain all outstanding Durable Jobs using the previous
-version before upgrading**, then deploy the new version to the cluster. The new namespace
-is the discovery boundary for this alpha format. Keep the previous deployment and its
-journals available until outstanding jobs have completed.
 
 ## Usage Examples
 
