@@ -235,7 +235,7 @@ internal sealed class KinesisRecoverableStreamDataAdapter(
         return CompareShardSequences(shardSequence, kinesisToken.ShardSequence);
     }
 
-    private static int CompareShardSequences(string left, string right)
+    internal static int CompareShardSequences(string left, string right)
     {
         var leftStart = 0;
         while (leftStart < left.Length && left[leftStart] == '0')

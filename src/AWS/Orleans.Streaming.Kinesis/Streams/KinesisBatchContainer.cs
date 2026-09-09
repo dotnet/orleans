@@ -116,7 +116,7 @@ namespace Orleans.Streaming.Kinesis
         IBatchContainer IQueueCacheBatchContainerFilter.FilterFrom(StreamSequenceToken inclusiveStartToken)
         {
             if (inclusiveStartToken is not KinesisSequenceToken token
-                || !string.Equals(token.ShardSequence, Token.ShardSequence, StringComparison.Ordinal)
+                || KinesisRecoverableStreamDataAdapter.CompareShardSequences(token.ShardSequence, Token.ShardSequence) != 0
                 || token.EventIndex <= 0)
             {
                 return this;
@@ -134,7 +134,7 @@ namespace Orleans.Streaming.Kinesis
         IBatchContainer? IQueueCacheBatchContainerFilter.FilterAfter(StreamSequenceToken exclusiveStartToken)
         {
             if (exclusiveStartToken is not KinesisSequenceToken token
-                || !string.Equals(token.ShardSequence, Token.ShardSequence, StringComparison.Ordinal))
+                || KinesisRecoverableStreamDataAdapter.CompareShardSequences(token.ShardSequence, Token.ShardSequence) != 0)
             {
                 return this;
             }
