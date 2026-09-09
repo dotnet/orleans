@@ -62,7 +62,7 @@ internal readonly struct RingRangeCollection : IEquatable<RingRangeCollection>, 
 
     public bool IsEmpty => Ranges.IsDefaultOrEmpty || Ranges.All(static r => r.IsEmpty);
 
-    public bool IsFull => !IsEmpty && Size == uint.MaxValue;
+    public bool IsFull => Size == uint.MaxValue;
 
     public uint Size
     {
