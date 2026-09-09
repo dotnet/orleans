@@ -60,7 +60,7 @@ internal readonly struct RingRangeCollection : IEquatable<RingRangeCollection>, 
 
     public bool IsDefault => Ranges.IsDefault;
 
-    public bool IsEmpty => Ranges.Length == 0 || Ranges.All(r => r.IsEmpty);
+    public bool IsEmpty => Ranges.IsDefaultOrEmpty || Ranges.All(static r => r.IsEmpty);
 
     public bool IsFull => !IsEmpty && Size == uint.MaxValue;
 
@@ -89,6 +89,11 @@ internal readonly struct RingRangeCollection : IEquatable<RingRangeCollection>, 
 
     public bool Contains(uint value)
     {
+        if (Ranges.IsDefaultOrEmpty)
+        {
+            return false;
+        }
+
         return SearchAlgorithms.RingRangeBinarySearch(
             Ranges.Length,
             Ranges,
@@ -152,10 +157,13 @@ internal readonly struct RingRangeCollection : IEquatable<RingRangeCollection>, 
         // Corresponding ranges in left and right have the same starting points.
         // The number of ranges in both 'Ranges' or 'previous.Ranges' is either zero or the configured number of ranges,
         // i.e., if both collections have more than zero ranges, the both have the same number of ranges.
-        if (Ranges.Length == previous.Ranges.Length)
+        var currentLength = Ranges.IsDefault ? 0 : Ranges.Length;
+        var previousLength = previous.Ranges.IsDefault ? 0 : previous.Ranges.Length;
+
+        if (currentLength == previousLength)
         {
-            var result = ImmutableArray.CreateBuilder<RingRange>(Ranges.Length);
-            for (var i = 0; i < Ranges.Length; i++)
+            var result = ImmutableArray.CreateBuilder<RingRange>(currentLength);
+            for (var i = 0; i < currentLength; i++)
             {
                 var c = Ranges[i];
                 var p = previous.Ranges[i];
@@ -179,14 +187,14 @@ internal readonly struct RingRangeCollection : IEquatable<RingRangeCollection>, 
         }
         else
         {
-            if (Ranges.Length > previous.Ranges.Length)
+            if (currentLength > previousLength)
             {
-                Debug.Assert(previous.Ranges.Length == 0);
+                Debug.Assert(previousLength == 0);
                 return this;
             }
             else
             {
-                Debug.Assert(Ranges.Length == 0 ^ previous.Ranges.Length == 0);
+                Debug.Assert(currentLength == 0 || previousLength == 0);
                 return Empty;
             }
         }
@@ -216,7 +224,7 @@ internal readonly struct RingRangeCollection : IEquatable<RingRangeCollection>, 
     public override int GetHashCode()
     {
         var result = new HashCode();
-        result.Add(Ranges.Length);
+        result.Add(Ranges.IsDefault ? 0 : Ranges.Length);
         if (!Ranges.IsDefaultOrEmpty)
         {
             foreach (var range in Ranges)
@@ -228,13 +236,13 @@ internal readonly struct RingRangeCollection : IEquatable<RingRangeCollection>, 
         return result.ToHashCode();
     }
 
-    public ImmutableArray<RingRange>.Enumerator GetEnumerator() => Ranges.GetEnumerator();
+    public ImmutableArray<RingRange>.Enumerator GetEnumerator() => Ranges.IsDefault ? default : Ranges.GetEnumerator();
 
     public override string ToString() => $"{this}";
     string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString();
 
     bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
-        => destination.TryWrite($"({Ranges.Length} subranges), {SizePercent:0.00}%", out charsWritten);
-    IEnumerator<RingRange> IEnumerable<RingRange>.GetEnumerator() => ((IEnumerable<RingRange>)Ranges).GetEnumerator();
-    IEnumerator IEnumerable.GetEnumerator() => ((IEnumerable)Ranges).GetEnumerator();
+        => destination.TryWrite($"({(Ranges.IsDefault ? 0 : Ranges.Length)} subranges), {SizePercent:0.00}%", out charsWritten);
+    IEnumerator<RingRange> IEnumerable<RingRange>.GetEnumerator() => Ranges.IsDefault ? Enumerable.Empty<RingRange>().GetEnumerator() : ((IEnumerable<RingRange>)Ranges).GetEnumerator();
+    IEnumerator IEnumerable.GetEnumerator() => ((IEnumerable<RingRange>)this).GetEnumerator();
 }

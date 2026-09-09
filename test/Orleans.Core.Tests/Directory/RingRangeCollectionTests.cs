@@ -1,5 +1,10 @@
+using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Linq;
+using CsCheck;
+using Orleans.Runtime;
 using Orleans.Runtime.GrainDirectory;
 using Xunit;
 
@@ -229,6 +234,223 @@ public sealed class RingRangeCollectionTests
         Span<char> shortBuffer = stackalloc char[1];
         Assert.False(((ISpanFormattable)collection).TryFormat(shortBuffer, out charsWritten, default, null));
         Assert.Equal(0, charsWritten);
+    }
+
+    internal static Gen<RingRangeCollection> GenRingRangeCollection =>
+        Gen.Select(Gen.UInt.Array[Gen.Int[0, 12]], Gen.Bool).Select(static (points, includeFull) =>
+        {
+            if (includeFull && points.Length == 0)
+            {
+                return Create(RingRange.Full);
+            }
+
+            Array.Sort(points);
+            var distinctPoints = points.Distinct().ToArray();
+            if (distinctPoints.Length < 2)
+            {
+                return RingRangeCollection.Empty;
+            }
+
+            var list = new List<RingRange>();
+            for (int i = 0; i < distinctPoints.Length - 1; i += 2)
+            {
+                var r = RingRange.Create(distinctPoints[i], distinctPoints[i + 1]);
+                if (!r.IsEmpty)
+                {
+                    list.Add(r);
+                }
+            }
+
+            if (list.Count > 1 && list[0].Intersects(list[^1]))
+            {
+                list.RemoveAt(list.Count - 1);
+            }
+
+            return Create(list.ToArray());
+        });
+
+    [Fact]
+    public void Create_NullArgument_ThrowsArgumentNullException()
+    {
+        Assert.Throws<ArgumentNullException>(() => RingRangeCollection.Create<List<RingRange>>(null!));
+    }
+
+    [Fact]
+    public void BoundaryValueAnalysis_DefaultAndEmptyCollections()
+    {
+        var defaultCol = default(RingRangeCollection);
+        Assert.True(defaultCol.IsDefault);
+        Assert.True(defaultCol.IsEmpty);
+        Assert.False(defaultCol.IsFull);
+        Assert.Equal(0u, defaultCol.Size);
+        Assert.Equal(0.0f, defaultCol.SizePercent);
+        Assert.False(defaultCol.Contains(0));
+        Assert.False(defaultCol.Contains(uint.MaxValue));
+        Assert.False(defaultCol.Intersects(RingRange.Full));
+        Assert.False(defaultCol.Intersects(RingRangeCollection.Empty));
+        Assert.True(defaultCol.Equals(RingRangeCollection.Empty));
+        Assert.Equal(defaultCol.GetHashCode(), RingRangeCollection.Empty.GetHashCode());
+
+        var emptyCol = RingRangeCollection.Empty;
+        Assert.False(emptyCol.IsDefault);
+        Assert.True(emptyCol.IsEmpty);
+        Assert.False(emptyCol.IsFull);
+        Assert.Equal(0u, emptyCol.Size);
+        Assert.Equal(0.0f, emptyCol.SizePercent);
+        Assert.False(emptyCol.Contains(0));
+        Assert.False(emptyCol.Intersects(RingRange.Full));
+    }
+
+    [Fact]
+    public void BoundaryValueAnalysis_FullCollection()
+    {
+        var fullCol = Create(RingRange.Full);
+        Assert.False(fullCol.IsDefault);
+        Assert.False(fullCol.IsEmpty);
+        Assert.True(fullCol.IsFull);
+        Assert.Equal(uint.MaxValue, fullCol.Size);
+        Assert.Equal(100.0f, fullCol.SizePercent);
+
+        uint[] samplePoints = [0, 1, 2, uint.MaxValue - 1, uint.MaxValue];
+        foreach (var p in samplePoints)
+        {
+            Assert.True(fullCol.Contains(p));
+        }
+
+        Assert.True(fullCol.Intersects(RingRange.Create(10, 20)));
+        Assert.True(fullCol.Intersects(Create(RingRange.Create(10, 20))));
+    }
+
+    [Fact]
+    public void BoundaryValueAnalysis_SizingAndOverflow()
+    {
+        // Combination of non-overlapping ranges that exactly equals uint.MaxValue
+        var half1 = RingRange.Create(0, 2_147_483_648u);
+        var half2 = RingRange.Create(2_147_483_648u, 0);
+
+        var fullCombined = Create(half1, half2);
+        Assert.True(fullCombined.IsFull);
+        Assert.Equal(uint.MaxValue, fullCombined.Size);
+    }
+
+    [Fact]
+    public void BoundaryValueAnalysis_DifferenceScenarios()
+    {
+        var c1 = Create(RingRange.Create(10, 20));
+        var c2 = Create(RingRange.Create(10, 20), RingRange.Create(30, 40));
+
+        // Difference when previous has fewer ranges (0 vs 1)
+        Assert.Equal(c1, c1.Difference(RingRangeCollection.Empty));
+
+        // Difference when current is empty vs non-empty previous (0 vs 1)
+        Assert.True(RingRangeCollection.Empty.Difference(c1).IsEmpty);
+    }
+
+    [Fact]
+    public void Property_Contains_MatchesIndividualRanges()
+    {
+        Gen.Select(GenRingRangeCollection, Gen.UInt).Sample((collection, point) =>
+        {
+            var expected = collection.Ranges.IsDefaultOrEmpty ? false : collection.Ranges.Any(r => r.Contains(point));
+            Assert.Equal(expected, collection.Contains(point));
+        });
+    }
+
+    [Fact]
+    public void Property_IntersectsRange_MatchesIndividualRanges()
+    {
+        Gen.Select(GenRingRangeCollection, RingRangeTests.GenRingRange).Sample((collection, range) =>
+        {
+            var actual = collection.Intersects(range);
+            if (collection.IsEmpty || range.IsEmpty)
+            {
+                Assert.False(actual);
+            }
+            else
+            {
+                var expected = collection.Contains(range.End) || collection.Ranges.Any(r => range.Contains(r.End));
+                Assert.Equal(expected, actual);
+            }
+        });
+    }
+
+    [Fact]
+    public void Property_IntersectsCollection_SymmetricAndMatchesRanges()
+    {
+        Gen.Select(GenRingRangeCollection, GenRingRangeCollection).Sample((c1, c2) =>
+        {
+            var actual1 = c1.Intersects(c2);
+            var actual2 = c2.Intersects(c1);
+
+            Assert.Equal(actual1, actual2);
+
+            if (c1.IsEmpty || c2.IsEmpty)
+            {
+                Assert.False(actual1);
+            }
+            else
+            {
+                var expected = c1.Ranges.Any(r1 => c2.Ranges.Any(r2 => r1.Intersects(r2)));
+                Assert.Equal(expected, actual1);
+            }
+        });
+    }
+
+    [Fact]
+    public void Property_SizeAndIsFull()
+    {
+        GenRingRangeCollection.Sample(collection =>
+        {
+            if (collection.IsEmpty)
+            {
+                Assert.Equal(0u, collection.Size);
+                Assert.False(collection.IsFull);
+            }
+            else
+            {
+                long expectedSum = 0;
+                foreach (var r in collection.Ranges)
+                {
+                    expectedSum += r.Size;
+                }
+
+                uint expectedSize = expectedSum >= uint.MaxValue ? uint.MaxValue : (uint)expectedSum;
+                Assert.Equal(expectedSize, collection.Size);
+                Assert.Equal(expectedSize == uint.MaxValue, collection.IsFull);
+            }
+        });
+    }
+
+    [Fact]
+    public void Property_EqualityAndHashing()
+    {
+        Gen.Select(GenRingRangeCollection, GenRingRangeCollection, GenRingRangeCollection).Sample((c1, c2, c3) =>
+        {
+            var c1Same = c1;
+            // Reflexivity
+            Assert.True(c1 == c1Same);
+            Assert.True(c1.Equals(c1));
+            Assert.True(c1.Equals((object)c1));
+            Assert.False(c1 != c1Same);
+
+            // Symmetry
+            Assert.Equal(c1 == c2, c2 == c1);
+            Assert.Equal(c1.Equals(c2), c2.Equals(c1));
+
+            // Transitivity
+            if (c1 == c2 && c2 == c3)
+            {
+                Assert.True(c1 == c3);
+            }
+
+            // HashCode consistency
+            if (c1 == c2)
+            {
+                Assert.Equal(c1.GetHashCode(), c2.GetHashCode());
+            }
+
+            Assert.Equal(c1 != c2, !(c1 == c2));
+        });
     }
 
     private static RingRangeCollection Create(params RingRange[] ranges) => RingRangeCollection.Create(ranges);
