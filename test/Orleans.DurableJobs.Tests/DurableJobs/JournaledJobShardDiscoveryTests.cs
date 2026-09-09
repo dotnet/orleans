@@ -55,7 +55,7 @@ public partial class JournaledJobShardManagerTests
         Assert.Equal(3, fixture.Catalog.YieldedIds);
         Assert.Equal(4, fixture.Catalog.MoveNextCalls);
         var request = Assert.Single(fixture.Catalog.Requests);
-        Assert.Equal(JobShardId.StoragePrefix, request.Prefix);
+        Assert.Equal(JobShardId.StoragePrefix.Value + "/", request.Prefix.Value);
         Assert.Equal(JobShardId.GetMaxJournalId(horizon.ToUniversalTime()), request.MaxId);
         Assert.Equal(1, fixture.Catalog.DisposeCalls);
     }
@@ -409,7 +409,7 @@ public partial class JournaledJobShardManagerTests
         Assert.Equal(1, fixture.Catalog.ListCalls);
         Assert.Equal(1, fixture.Catalog.DisposeCalls);
         var request = Assert.Single(fixture.Catalog.Requests);
-        Assert.Equal(JobShardId.StoragePrefix, request.Prefix);
+        Assert.Equal(JobShardId.StoragePrefix.Value + "/", request.Prefix.Value);
         Assert.Equal(JobShardId.GetMaxJournalId(fixture.Horizon), request.MaxId);
         var unboundedIdentityCount = PredecessorCount * (futureBuckets + 1);
         Assert.Equal(unboundedIdentityCount, fixture.Catalog.Ids.Count);

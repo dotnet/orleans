@@ -815,7 +815,7 @@ public partial class JournaledJobShardManagerTests
         public IAsyncEnumerable<JournalId> ListAsync(ListOptions? options = null, CancellationToken cancellationToken = default)
         {
             Assert.NotNull(options);
-            Assert.Equal(JobShardId.StoragePrefix, options.Prefix);
+            Assert.Equal(JobShardId.StoragePrefix.Value + "/", options.Prefix.Value);
             Assert.False(options.MaxId.IsDefault);
             ListCalls++;
             var prefix = options.Prefix;
@@ -829,7 +829,7 @@ public partial class JournaledJobShardManagerTests
             JournalId maxId,
             [EnumeratorCancellation] CancellationToken cancellationToken)
         {
-            var snapshot = Ids.Where(id => prefix.IsPrefixOf(id)
+            var snapshot = Ids.Where(id => id.Value.StartsWith(prefix.Value, StringComparison.Ordinal)
                 && StringComparer.Ordinal.Compare(id.Value, maxId.Value) <= 0).ToArray();
             try
             {

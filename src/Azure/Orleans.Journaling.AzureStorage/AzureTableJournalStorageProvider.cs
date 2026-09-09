@@ -61,10 +61,14 @@ internal sealed class AzureTableJournalStorageProvider : ILifecycleParticipant<I
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var prefix = options?.Prefix ?? default;
-        var maxId = options?.MaxId ?? default;
+        var range = new JournalCatalogRange(options);
+        if (range.IsEmpty)
+        {
+            yield break;
+        }
+
         var table = _tableClientProvider.GetTableClient();
-        var filter = GetCatalogFilter(prefix, maxId);
+        var filter = GetCatalogFilter(range);
         await foreach (var page in table.QueryAsync<TableEntity>(
             filter,
             maxPerPage: 1000,
@@ -76,8 +80,7 @@ internal sealed class AzureTableJournalStorageProvider : ILifecycleParticipant<I
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (TryGetJournalId(entity, out var journalId)
-                    && prefix.IsPrefixOf(journalId)
-                    && (maxId.IsDefault || string.CompareOrdinal(journalId.Value, maxId.Value) <= 0))
+                    && range.Contains(journalId.Value))
                 {
                     yield return journalId;
                 }
@@ -87,75 +90,54 @@ internal sealed class AzureTableJournalStorageProvider : ILifecycleParticipant<I
         cancellationToken.ThrowIfCancellationRequested();
     }
 
-    private static string GetCatalogFilter(JournalId prefix, JournalId maxId)
+    private string GetCatalogFilter(JournalCatalogRange range)
     {
-        var headers = TableClient.CreateQueryFilter($"RowKey eq {AzureTableJournalStorage.HeaderRowKey}");
-        if (prefix.IsDefault)
+        var filter = TableClient.CreateQueryFilter($"RowKey eq {AzureTableJournalStorage.HeaderRowKey}");
+        if (_options.UsesDefaultPartitionKey)
         {
-            // Legacy headers have no JournalId property. Without a prefix, their escaped partition
-            // keys cannot safely be range-filtered by an arbitrary ordinal JournalId bound.
-            return headers;
-        }
-
-        var descendantPrefix = prefix.Value + "/";
-        var descendantEnd = prefix.Value + "0";
-        var identities = TableClient.CreateQueryFilter(
-            $"(JournalId eq {prefix.Value} or (JournalId ge {descendantPrefix} and JournalId lt {descendantEnd}))");
-        if (!maxId.IsDefault)
-        {
-            identities += TableClient.CreateQueryFilter($" and JournalId le {maxId.Value}");
-        }
-
-        var partition = Uri.EscapeDataString(prefix.Value);
-        var legacyStart = partition + "%2F";
-        var legacyEnd = partition + "%2G";
-        var legacy = TableClient.CreateQueryFilter(
-            $"(PartitionKey eq {partition} or (PartitionKey ge {legacyStart} and PartitionKey lt {legacyEnd}))");
-        if (!maxId.IsDefault
-            && maxId.Value.StartsWith(descendantPrefix, StringComparison.Ordinal)
-            && IsUnescapedSuffix(maxId.Value.AsSpan(descendantPrefix.Length)))
-        {
-            // For a shared encoded prefix and an unreserved ASCII upper-bound suffix, escaping
-            // any lesser suffix can only move it earlier ('%' sorts before every unreserved char).
-            // This covers time-prefixed shard bounds without assuming general URI order preservation.
-            var legacyMax = Uri.EscapeDataString(maxId.Value);
-            legacy += TableClient.CreateQueryFilter($" and PartitionKey le {legacyMax}");
-        }
-
-        // The OR also preserves custom partition mappings with canonical JournalId properties.
-        // Table queries cannot test for an absent property, so the legacy arm can over-select.
-        return $"{headers} and (({identities}) or ({legacy}))";
-    }
-
-    private static bool IsUnescapedSuffix(ReadOnlySpan<char> value)
-    {
-        foreach (var character in value)
-        {
-            if (!char.IsAsciiLetterOrDigit(character) && character is not ('-' or '.' or '_' or '~'))
+            if (range.LowerBound is { } lowerBound)
             {
-                return false;
+                var lowerKey = AzureTableJournalStorageOptions.EncodePartitionKey(lowerBound);
+                filter += TableClient.CreateQueryFilter($" and PartitionKey ge {lowerKey}");
+            }
+
+            if (range.MaxId is { } maxId)
+            {
+                var upperKey = AzureTableJournalStorageOptions.EncodePartitionKey(maxId);
+                filter += TableClient.CreateQueryFilter($" and PartitionKey le {upperKey}");
+            }
+
+            if (range.Prefix is { } prefix)
+            {
+                // Encoded keys contain only 0..F, so G bounds every suffix of the encoded prefix.
+                var prefixEnd = AzureTableJournalStorageOptions.EncodePartitionKey(prefix) + "G";
+                filter += TableClient.CreateQueryFilter($" and PartitionKey lt {prefixEnd}");
+            }
+        }
+        else
+        {
+            if (range.LowerBound is { } lowerBound)
+            {
+                filter += TableClient.CreateQueryFilter($" and JournalId ge {lowerBound}");
+            }
+
+            if (range.UpperBound is { } upperBound)
+            {
+                filter += range.Contains(upperBound)
+                    ? TableClient.CreateQueryFilter($" and JournalId le {upperBound}")
+                    : TableClient.CreateQueryFilter($" and JournalId lt {upperBound}");
             }
         }
 
-        return true;
+        return filter;
     }
 
     private static bool TryGetJournalId(TableEntity entity, out JournalId journalId)
     {
-        if (entity.GetString(AzureTableJournalStorage.JournalIdPropertyName) is { } journalIdValue)
+        if (entity.TryGetValue(AzureTableJournalStorage.JournalIdPropertyName, out var value)
+            && value is string journalIdValue)
         {
             return TryParseJournalId(journalIdValue, out journalId);
-        }
-
-        // Legacy headers can only be listed when they use the reversible default partition mapping.
-        var decodedPartitionKey = Uri.UnescapeDataString(entity.PartitionKey);
-        if (TryParseJournalId(decodedPartitionKey, out journalId)
-            && string.Equals(
-                Uri.EscapeDataString(journalId.Value),
-                entity.PartitionKey,
-                StringComparison.Ordinal))
-        {
-            return true;
         }
 
         journalId = default;

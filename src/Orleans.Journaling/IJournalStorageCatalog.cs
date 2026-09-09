@@ -16,7 +16,7 @@ public interface IJournalStorageCatalog
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>Matching ids in provider traversal order.</returns>
     /// <remarks>
-    /// Options are snapshotted when enumeration begins. Both the prefix and inclusive upper bound apply.
+    /// Options are snapshotted when enumeration begins. The raw prefix and inclusive lower and upper bounds all apply.
     /// Results are not guaranteed to be sorted; callers requiring ordering must sort the selected ids.
     /// Providers fetch storage pages internally and yield matching ids
     /// as they are discovered. Advancing the enumerator can traverse multiple empty or filtered storage pages.
