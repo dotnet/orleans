@@ -10,10 +10,9 @@ namespace Orleans.Providers.Streams.Common
     /// </summary>
     /// <remarks>
     /// <see cref="EventSequenceToken"/> and <see cref="EventSequenceTokenV2"/> share a numeric
-    /// position contract with subclasses which retain the same
-    /// <see cref="SequenceTokenCompatibilityDomain"/>. This includes exact base tokens persisted
-    /// by earlier event-token factories. Subclasses which add position identity override that
-    /// domain together with equality, ordering, and hashing.
+    /// position contract. Derived tokens are isolated by default and can explicitly join that
+    /// contract through <see cref="SequenceTokenCompatibilityDomain"/>. This includes exact base
+    /// tokens persisted by earlier event-token factories.
     /// </remarks>
     [Serializable]
     [GenerateSerializer]

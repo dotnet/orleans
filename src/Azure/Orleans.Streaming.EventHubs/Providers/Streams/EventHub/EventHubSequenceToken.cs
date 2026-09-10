@@ -33,8 +33,8 @@ namespace Orleans.Streaming.EventHubs
     ///   and ordering of application layer events within an EventHub message.
     /// </summary>
     /// <remarks>
-    /// Event Hub token versions and subclasses which retain the Event Hubs compatibility domain
-    /// compare using the Event Hubs sequence number and event index.
+    /// Event Hub token versions and subclasses which explicitly select the Event Hubs
+    /// compatibility domain compare using the Event Hubs sequence number and event index.
     /// During recovery, Orleans interprets exact <see cref="EventSequenceToken"/> positions from
     /// the earlier inherited event-token factory in this provider's sequence-number space.
     /// Delivered event tokens preserve their concrete type and Event Hubs offset.
