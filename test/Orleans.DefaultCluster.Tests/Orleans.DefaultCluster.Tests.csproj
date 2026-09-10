@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\Orleans.Serialization\Orleans.Serialization.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.AdvancedReminders\Orleans.AdvancedReminders.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Serialization.FSharp\Orleans.Serialization.FSharp.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Orleans.Runtime.Tests\Orleans.Runtime.Tests.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Orleans.DurableJobs.Tests\Orleans.DurableJobs.Tests.csproj" />
