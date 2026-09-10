@@ -644,6 +644,30 @@ namespace Orleans.AdvancedReminders
         public System.Collections.Generic.IAsyncEnumerable<ReminderEntry> EnumerateOverdueAsync(System.TimeSpan overdueBy, int pageSize = 256, System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }
 
+    public sealed partial class ReminderManagementGrain : Grain, IReminderManagementGrain, IGrainWithIntegerKey, IGrain, Orleans.Runtime.IAddressable
+    {
+        [Microsoft.Extensions.DependencyInjection.ActivatorUtilitiesConstructor]
+        public ReminderManagementGrain(IReminderTable reminderTable, System.TimeProvider timeProvider) { }
+
+        public ReminderManagementGrain(IReminderTable reminderTable) { }
+
+        public System.Threading.Tasks.Task DeleteAsync(Orleans.Runtime.GrainId grainId, string name) { throw null; }
+
+        public System.Threading.Tasks.Task<ReminderManagementPage> ListAllAsync(int pageSize = 256, string? continuationToken = null) { throw null; }
+
+        public System.Threading.Tasks.Task<ReminderManagementPage> ListDueInRangeAsync(System.DateTime fromUtcInclusive, System.DateTime toUtcInclusive, int pageSize = 256, string? continuationToken = null) { throw null; }
+
+        public System.Threading.Tasks.Task<ReminderManagementPage> ListFilteredAsync(ReminderQueryFilter filter, int pageSize = 256, string? continuationToken = null) { throw null; }
+
+        public System.Threading.Tasks.Task<System.Collections.Generic.IEnumerable<ReminderEntry>> ListForGrainAsync(Orleans.Runtime.GrainId grainId) { throw null; }
+
+        public System.Threading.Tasks.Task<ReminderManagementPage> ListOverdueAsync(System.TimeSpan overdueBy, int pageSize = 256, string? continuationToken = null) { throw null; }
+
+        public System.Threading.Tasks.Task RepairAsync(Orleans.Runtime.GrainId grainId, string name) { throw null; }
+
+        public System.Threading.Tasks.Task SetActionAsync(Orleans.Runtime.GrainId grainId, string name, Runtime.MissedReminderAction action) { throw null; }
+    }
+
     public static partial class ReminderManagementGrainExtensions
     {
         public const long GrainKey = 0L;
@@ -893,6 +917,25 @@ namespace Orleans.AdvancedReminders.Timers
         System.Threading.Tasks.Task<System.Collections.Generic.List<IGrainReminder>> GetReminders(Orleans.Runtime.GrainId callingGrainId);
         System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(Orleans.Runtime.GrainId callingGrainId, string reminderName, ReminderSchedule schedule, Runtime.MissedReminderAction action);
         System.Threading.Tasks.Task UnregisterReminder(Orleans.Runtime.GrainId callingGrainId, IGrainReminder reminder);
+    }
+}
+
+namespace Orleans.Hosting
+{
+    public static partial class SiloBuilderReminderExtensions
+    {
+        public static void AddAdvancedReminders(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<AdvancedReminders.ReminderOptions> configureOptions) { }
+
+        public static void AddAdvancedReminders(this Microsoft.Extensions.DependencyInjection.IServiceCollection services) { }
+
+        public static ISiloBuilder AddAdvancedReminders(this ISiloBuilder builder, System.Action<AdvancedReminders.ReminderOptions> configureOptions) { throw null; }
+
+        public static ISiloBuilder AddAdvancedReminders(this ISiloBuilder builder) { throw null; }
+    }
+
+    public static partial class SiloBuilderReminderMemoryExtensions
+    {
+        public static ISiloBuilder UseInMemoryAdvancedReminderService(this ISiloBuilder builder) { throw null; }
     }
 }
 
@@ -1580,5 +1623,75 @@ namespace OrleansCodeGen.Orleans.AdvancedReminders.Runtime
     public sealed partial class Copier_ReminderException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.AdvancedReminders.Runtime.ReminderException, global::Orleans.Runtime.OrleansException>
     {
         public Copier_ReminderException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
+    }
+}
+
+namespace OrleansCodeGen.Orleans.DurableJobs
+{
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_Invokable_IDurableJobHandler_GrainReference_C5FF5E5E : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IDurableJobHandler_GrainReference_C5FF5E5E>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public Codec_Invokable_IDurableJobHandler_GrainReference_C5FF5E5E(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_IDurableJobHandler_GrainReference_C5FF5E5E instance) { }
+
+        public Invokable_IDurableJobHandler_GrainReference_C5FF5E5E ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, Invokable_IDurableJobHandler_GrainReference_C5FF5E5E instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IDurableJobHandler_GrainReference_C5FF5E5E value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_Invokable_IDurableJobHandler_GrainReference_C5FF5E5E : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IDurableJobHandler_GrainReference_C5FF5E5E>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public Copier_Invokable_IDurableJobHandler_GrainReference_C5FF5E5E(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public Invokable_IDurableJobHandler_GrainReference_C5FF5E5E DeepCopy(Invokable_IDurableJobHandler_GrainReference_C5FF5E5E original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.DurableJobs.IDurableJobHandler), "C5FF5E5E" })]
+    public sealed partial class Invokable_IDurableJobHandler_GrainReference_C5FF5E5E : global::Orleans.Runtime.TaskRequest
+    {
+        public global::Orleans.DurableJobs.IJobRunContext arg0;
+        public System.Threading.CancellationToken arg1;
+        public override bool IsCancellable { get { throw null; } }
+
+        public override void Dispose() { }
+
+        public override string GetActivityName() { throw null; }
+
+        public override object GetArgument(int index) { throw null; }
+
+        public override int GetArgumentCount() { throw null; }
+
+        public override System.Threading.CancellationToken GetCancellationToken() { throw null; }
+
+        public override string GetInterfaceName() { throw null; }
+
+        public override System.Type GetInterfaceType() { throw null; }
+
+        public override System.Reflection.MethodInfo GetMethod() { throw null; }
+
+        public override string GetMethodName() { throw null; }
+
+        public override object GetTarget() { throw null; }
+
+        protected override System.Threading.Tasks.Task InvokeInner() { throw null; }
+
+        public override void SetArgument(int index, object value) { }
+
+        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
+
+        public override bool TryCancel() { throw null; }
     }
 }
