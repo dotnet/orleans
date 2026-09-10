@@ -130,7 +130,7 @@ foreach ($number in $numbers) {
             } elseif ($PSCmdlet.ShouldProcess(
                 "$Repository#$number ($($result.HeadRepository):$($result.HeadBranch))",
                 "Update with rebase onto $BaseBranch ($($result.BehindBy) commits behind)")) {
-                $updateOutput = Invoke-Gh -Arguments @(
+                $null = Invoke-Gh -Arguments @(
                     'pr', 'update-branch', [string] $number, '--repo', "github.com/$Repository", '--rebase'
                 )
 
@@ -153,7 +153,7 @@ foreach ($number in $numbers) {
                 }
 
                 $result.Status = 'Updated'
-                $result.Message = ($updateOutput -join [Environment]::NewLine).Trim()
+                $result.Message = "Branch updated with rebase onto $BaseBranch."
             } else {
                 $result.Status = if ($WhatIfPreference) { 'Eligible' } else { 'Skipped' }
                 $result.Message = if ($WhatIfPreference) { 'Preview: ready for rebase.' } else { 'Update declined.' }
