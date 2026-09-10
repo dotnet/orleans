@@ -73,6 +73,10 @@ Ownership must be explicit. If the application supplies a keyed SDK client, the 
 
 The persistent stream provider illustrates staged lifecycle composition: it creates the adapter during initialization, starts pulling agents at the active stage, then stops agents before closing. See <xref:Orleans.Providers.Streams.Common.PersistentStreamProvider.Participate*?displayProperty=nameWithType> and its [implementation](https://github.com/dotnet/orleans/blob/main/src/Orleans.Streaming/PersistentStreams/PersistentStreamProvider.cs).
 
+Membership callers use the cancellation-aware overloads of <xref:Orleans.IMembershipTable> for initialization, reads, and writes. A provider can implement these overloads to forward cancellation to its backend. The default implementations cancel the caller's wait while the existing tokenless operation completes and its exceptions remain observed. A write can therefore commit after its caller cancels; conditional writes and table versions continue to govern subsequent updates.
+
+Shared membership refreshes live until the membership manager is disposed. Each caller owns its wait, while periodic maintenance and its queued cleanup requests stop with the silo lifecycle. This keeps membership reads available during shutdown.
+
 ## Testing a provider
 
 Contract tests should cover more than successful round trips:

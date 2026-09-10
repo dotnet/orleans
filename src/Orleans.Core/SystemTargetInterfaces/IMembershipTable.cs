@@ -4,6 +4,7 @@ using System.Collections.Immutable;
 using System.Linq;
 using System.Net;
 using System.Text.Json.Serialization;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
 using Orleans.Runtime;
@@ -13,6 +14,11 @@ namespace Orleans
     /// <summary>
     /// Interface for Membership Table.
     /// </summary>
+    /// <remarks>
+    /// Providers can override the cancellation-aware overloads to cancel their underlying operations.
+    /// The default implementations cancel the caller's wait while the tokenless operation completes,
+    /// and observe any exception from that operation.
+    /// </remarks>
     public interface IMembershipTable
     {
         /// <summary>
@@ -22,6 +28,17 @@ namespace Orleans
         /// <returns>A task representing the initialization operation.</returns>
         Task InitializeMembershipTable(bool tryInitTableVersion);
 
+        /// <inheritdoc cref="InitializeMembershipTable(bool)"/>
+        /// <param name="tryInitTableVersion">Whether to initialize the underlying table version.</param>
+        /// <param name="cancellationToken">A token which cancels the operation.</param>
+        async Task InitializeMembershipTable(bool tryInitTableVersion, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var operation = InitializeMembershipTable(tryInitTableVersion);
+            operation.Ignore();
+            await operation.WaitAsync(cancellationToken);
+        }
+
         /// <summary>
         /// Deletes all table entries of the given clusterId
         /// </summary>
@@ -29,12 +46,34 @@ namespace Orleans
         /// <returns>A task representing the deletion operation.</returns>
         Task DeleteMembershipTableEntries(string clusterId);
 
+        /// <inheritdoc cref="DeleteMembershipTableEntries(string)"/>
+        /// <param name="clusterId">The cluster whose entries are deleted.</param>
+        /// <param name="cancellationToken">A token which cancels the operation.</param>
+        async Task DeleteMembershipTableEntries(string clusterId, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var operation = DeleteMembershipTableEntries(clusterId);
+            operation.Ignore();
+            await operation.WaitAsync(cancellationToken);
+        }
+
         /// <summary>
         /// Delete all dead silo entries older than <paramref name="beforeDate"/>
         /// </summary>
         /// <param name="beforeDate">The exclusive upper bound for the last known update time of entries to delete.</param>
         /// <returns>A task representing the cleanup operation.</returns>
         Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate);
+
+        /// <inheritdoc cref="CleanupDefunctSiloEntries(DateTimeOffset)"/>
+        /// <param name="beforeDate">The exclusive upper bound for the last update time of entries to delete.</param>
+        /// <param name="cancellationToken">A token which cancels the operation.</param>
+        async Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var operation = CleanupDefunctSiloEntries(beforeDate);
+            operation.Ignore();
+            await operation.WaitAsync(cancellationToken);
+        }
 
         /// <summary>
         /// Atomically reads the Membership Table information about a given silo.
@@ -46,6 +85,17 @@ namespace Orleans
         /// TableVersion, read atomically.</returns>
         Task<MembershipTableData> ReadRow(SiloAddress key);
 
+        /// <inheritdoc cref="ReadRow(SiloAddress)"/>
+        /// <param name="key">The address of the silo to read.</param>
+        /// <param name="cancellationToken">A token which cancels the operation.</param>
+        async Task<MembershipTableData> ReadRow(SiloAddress key, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var operation = ReadRow(key);
+            operation.Ignore();
+            return await operation.WaitAsync(cancellationToken);
+        }
+
         /// <summary>
         /// Atomically reads the full content of the Membership Table.
         /// The returned MembershipTableData includes all MembershipEntry entry for all silos in the table and the 
@@ -54,6 +104,16 @@ namespace Orleans
         /// <returns>The membership information for a given table: MembershipTableData consisting multiple MembershipEntry entries and
         /// TableVersion, all read atomically.</returns>
         Task<MembershipTableData> ReadAll();
+
+        /// <inheritdoc cref="ReadAll()"/>
+        /// <param name="cancellationToken">A token which cancels the operation.</param>
+        async Task<MembershipTableData> ReadAll(CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var operation = ReadAll();
+            operation.Ignore();
+            return await operation.WaitAsync(cancellationToken);
+        }
 
         /// <summary>
         /// Atomically tries to insert (add) a new MembershipEntry for one silo and also update the TableVersion.
@@ -71,6 +131,18 @@ namespace Orleans
         /// <param name="tableVersion">The new TableVersion for this table, along with its etag.</param>
         /// <returns>True if the insert operation succeeded and false otherwise.</returns>
         Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion);
+
+        /// <inheritdoc cref="InsertRow(MembershipEntry, TableVersion)"/>
+        /// <param name="entry">The membership entry to insert.</param>
+        /// <param name="tableVersion">The new table version and its expected etag.</param>
+        /// <param name="cancellationToken">A token which cancels the operation.</param>
+        async Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var operation = InsertRow(entry, tableVersion);
+            operation.Ignore();
+            return await operation.WaitAsync(cancellationToken);
+        }
 
         /// <summary>
         /// Atomically tries to update the MembershipEntry for one silo and also update the TableVersion.
@@ -91,6 +163,19 @@ namespace Orleans
         /// <returns>True if the update operation succeeded and false otherwise.</returns>
         Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion);
 
+        /// <inheritdoc cref="UpdateRow(MembershipEntry, string, TableVersion)"/>
+        /// <param name="entry">The membership entry to update.</param>
+        /// <param name="etag">The expected etag of the membership entry.</param>
+        /// <param name="tableVersion">The new table version and its expected etag.</param>
+        /// <param name="cancellationToken">A token which cancels the operation.</param>
+        async Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var operation = UpdateRow(entry, etag, tableVersion);
+            operation.Ignore();
+            return await operation.WaitAsync(cancellationToken);
+        }
+
         /// <summary>
         /// Updates the IAmAlive part (column) of the MembershipEntry for this silo.
         /// This operation should only update the IAmAlive column and not change other columns.
@@ -104,6 +189,17 @@ namespace Orleans
         /// <param name="entry">The membership entry containing the updated <see cref="MembershipEntry.IAmAliveTime"/> value.</param>
         /// <returns>A task representing the update operation.</returns>
         Task UpdateIAmAlive(MembershipEntry entry);
+
+        /// <inheritdoc cref="UpdateIAmAlive(MembershipEntry)"/>
+        /// <param name="entry">The membership entry containing the updated liveness timestamp.</param>
+        /// <param name="cancellationToken">A token which cancels the operation.</param>
+        async Task UpdateIAmAlive(MembershipEntry entry, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var operation = UpdateIAmAlive(entry);
+            operation.Ignore();
+            await operation.WaitAsync(cancellationToken);
+        }
     }
 
     /// <summary>
