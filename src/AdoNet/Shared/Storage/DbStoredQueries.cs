@@ -4,6 +4,7 @@ using System.Data;
 using System.Linq;
 using System.Net;
 using System.Reflection;
+using System.Text;
 using Orleans.Runtime;
 
 #if CLUSTERING_ADONET
@@ -108,6 +109,48 @@ namespace Orleans.Tests.SqlUtils
 
 #if REMINDERS_ADONET || TESTER_SQLUTILS || ORLEANS_REMINDERS_PROVIDER
 
+#if ADVANCED_REMINDERS_ADONET
+        internal string AdvancedRemindersCountKey => queries[nameof(AdvancedRemindersCountKey)];
+
+        /// <summary>
+        /// A query template to read advanced reminder entries.
+        /// </summary>
+        internal string AdvancedRemindersReadReminderRowsKey => queries[nameof(AdvancedRemindersReadReminderRowsKey)];
+
+        /// <summary>
+        /// A query template to read advanced reminder entries with ranges.
+        /// </summary>
+        internal string AdvancedRemindersReadRangeRows1Key => queries[nameof(AdvancedRemindersReadRangeRows1Key)];
+
+        /// <summary>
+        /// A query template to read advanced reminder entries with ranges.
+        /// </summary>
+        internal string AdvancedRemindersReadRangeRows2Key => queries[nameof(AdvancedRemindersReadRangeRows2Key)];
+
+        internal string AdvancedRemindersReadRangeRows1PagedKey => queries[nameof(AdvancedRemindersReadRangeRows1PagedKey)];
+
+        internal string AdvancedRemindersReadRangeRows2PagedKey => queries[nameof(AdvancedRemindersReadRangeRows2PagedKey)];
+
+        /// <summary>
+        /// A query template to read an advanced reminder entry.
+        /// </summary>
+        internal string AdvancedRemindersReadReminderRowKey => queries[nameof(AdvancedRemindersReadReminderRowKey)];
+
+        /// <summary>
+        /// A query template to upsert an advanced reminder row.
+        /// </summary>
+        internal string AdvancedRemindersUpsertReminderRowKey => queries[nameof(AdvancedRemindersUpsertReminderRowKey)];
+
+        /// <summary>
+        /// A query template to delete an advanced reminder row.
+        /// </summary>
+        internal string AdvancedRemindersDeleteReminderRowKey => queries[nameof(AdvancedRemindersDeleteReminderRowKey)];
+
+        /// <summary>
+        /// A query template to delete all advanced reminder rows.
+        /// </summary>
+        internal string AdvancedRemindersDeleteReminderRowsKey => queries[nameof(AdvancedRemindersDeleteReminderRowsKey)];
+#else
         /// <summary>
         /// A query template to read reminder entries.
         /// </summary>
@@ -142,6 +185,7 @@ namespace Orleans.Tests.SqlUtils
         /// A query template to delete all reminder rows.
         /// </summary>
         internal string DeleteReminderRowsKey => queries[nameof(DeleteReminderRowsKey)];
+#endif
 
 #endif
 
@@ -211,7 +255,6 @@ namespace Orleans.Tests.SqlUtils
                     record.GetValue<string>("QueryText"));
             }
 
-
             internal static Tuple<MembershipEntry?, int> GetMembershipEntry(IDataRecord record)
             {
                 //TODO: This is a bit of hack way to check in the current version if there's membership data or not, but if there's a start time, there's member.            
@@ -264,13 +307,20 @@ namespace Orleans.Tests.SqlUtils
                 }
 
                 return (string)record.GetValue(pos);
-
             }
 
             internal static int GetVersion(IDataRecord record)
             {
-                return Convert.ToInt32(record.GetValue<object>(nameof(Version)));
+                return record.GetInt32(nameof(Version));
             }
+
+#if ADVANCED_REMINDERS_ADONET
+            internal static int? GetNullableVersion(IDataRecord record)
+            {
+                var ordinal = record.GetOrdinal(nameof(Columns.Version));
+                return record.IsDBNull(ordinal) ? null : record.GetInt32(ordinal);
+            }
+#endif
 
             internal static Uri GetGatewayUri(IDataRecord record)
             {
@@ -298,11 +348,14 @@ namespace Orleans.Tests.SqlUtils
         internal class Columns
         {
             private readonly IDbCommand command;
+            private readonly bool useBinaryReminderKeys;
+            private readonly DbType? reminderTimestampType;
 
-            internal Columns(IDbCommand cmd)
+            internal Columns(IDbCommand cmd, bool useBinaryReminderKeys = false, DbType? reminderTimestampType = null)
             {
                 command = cmd;
-
+                this.useBinaryReminderKeys = useBinaryReminderKeys;
+                this.reminderTimestampType = reminderTimestampType;
             }
 
             private void Add<T>(string paramName, T paramValue, DbType? dbType = null)
@@ -313,6 +366,19 @@ namespace Orleans.Tests.SqlUtils
             private void AddAddress(string name, IPAddress address)
             {
                 Add(name, address.ToString(), dbType: DbType.AnsiString);
+            }
+
+            private void AddReminderIdentity(string name, string value, DbType dbType = DbType.String)
+            {
+                if (useBinaryReminderKeys)
+                {
+                    // SQL text comparisons can ignore case, accents, or trailing spaces.
+                    Add(name, Encoding.Unicode.GetBytes(value), dbType: DbType.Binary);
+                }
+                else
+                {
+                    Add(name, value, dbType: dbType);
+                }
             }
 
             private void AddGrainHash(string name, uint grainHash)
@@ -328,6 +394,36 @@ namespace Orleans.Tests.SqlUtils
             internal int GatewayPort
             {
                 set { Add(nameof(GatewayPort), value); }
+            }
+
+            internal int PageSize
+            {
+                set { Add(nameof(PageSize), value); }
+            }
+
+            internal int Offset
+            {
+                set { Add(nameof(Offset), value); }
+            }
+
+            internal int HasCursor
+            {
+                set { Add(nameof(HasCursor), value); }
+            }
+
+            internal uint CursorHash
+            {
+                set { AddGrainHash(nameof(CursorHash), value); }
+            }
+
+            internal string CursorGrainId
+            {
+                set { AddReminderIdentity(nameof(CursorGrainId), value); }
+            }
+
+            internal string CursorReminderName
+            {
+                set { AddReminderIdentity(nameof(CursorReminderName), value); }
             }
 
             internal IPAddress GatewayAddress
@@ -404,7 +500,7 @@ namespace Orleans.Tests.SqlUtils
 
             internal DateTime StartTime
             {
-                set { Add(nameof(StartTime), value); }
+                set { Add(nameof(StartTime), value, dbType: reminderTimestampType); }
             }
 
             internal IPAddress Address
@@ -414,7 +510,7 @@ namespace Orleans.Tests.SqlUtils
 
             internal string ServiceId
             {
-                set { Add(nameof(ServiceId), value); }
+                set { AddReminderIdentity(nameof(ServiceId), value); }
             }
 
             internal string ClusterId
@@ -449,7 +545,7 @@ namespace Orleans.Tests.SqlUtils
 
             internal string GrainId
             {
-                set { Add(nameof(GrainId), value, dbType: DbType.AnsiString); }
+                set { AddReminderIdentity(nameof(GrainId), value, DbType.AnsiString); }
             }
 
             internal int GrainIdHash
@@ -459,7 +555,47 @@ namespace Orleans.Tests.SqlUtils
 
             internal string ReminderName
             {
-                set { Add(nameof(ReminderName), value); }
+                set { AddReminderIdentity(nameof(ReminderName), value); }
+            }
+
+            internal string CronExpression
+            {
+                set { Add(nameof(CronExpression), value, dbType: DbType.String); }
+            }
+
+            internal string CronTimeZoneId
+            {
+                set { Add(nameof(CronTimeZoneId), value, dbType: DbType.String); }
+            }
+
+            internal DateTime? NextDueUtc
+            {
+                set { Add(nameof(NextDueUtc), value, dbType: reminderTimestampType); }
+            }
+
+            internal DateTime? LastFireUtc
+            {
+                set { Add(nameof(LastFireUtc), value, dbType: reminderTimestampType); }
+            }
+
+            internal int Action
+            {
+                set { Add(nameof(Action), value); }
+            }
+
+            internal string ScheduleId
+            {
+                set { Add(nameof(ScheduleId), value, dbType: DbType.String); }
+            }
+
+            internal string JobId
+            {
+                set { Add(nameof(JobId), value, dbType: DbType.String); }
+            }
+
+            internal string JobShardId
+            {
+                set { Add(nameof(JobShardId), value, dbType: DbType.String); }
             }
 
             internal TimeSpan Period

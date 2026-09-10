@@ -312,6 +312,28 @@ public abstract class AdvancedReminderTableTestsBase : IAsyncLifetime, IClassFix
         Assert.Equal(TimeSpan.Zero, readReminder.Period);
     }
 
+    protected async Task ReminderTimestampPrecisionRoundTrip(long fractionalTicks)
+    {
+        var startAt = new DateTime(2026, 9, 7, 12, 0, 0, DateTimeKind.Utc).AddTicks(fractionalTicks);
+        var nextDueUtc = startAt.AddMinutes(5);
+        var lastFireUtc = startAt.AddMinutes(4);
+        var reminder = CreateReminder(MakeTestGrainReference(), "timestamp_precision");
+        reminder.StartAt = startAt;
+        reminder.NextDueUtc = nextDueUtc;
+        reminder.LastFireUtc = lastFireUtc;
+
+        await remindersTable.UpsertRow(reminder);
+        var stored = await remindersTable.ReadRow(reminder.GrainId, reminder.ReminderName);
+
+        Assert.NotNull(stored);
+        Assert.Equal(startAt, stored.StartAt);
+        Assert.Equal(nextDueUtc, stored.NextDueUtc);
+        Assert.Equal(lastFireUtc, stored.LastFireUtc);
+        Assert.Equal(DateTimeKind.Utc, stored.StartAt.Kind);
+        Assert.Equal(DateTimeKind.Utc, stored.NextDueUtc?.Kind);
+        Assert.Equal(DateTimeKind.Utc, stored.LastFireUtc?.Kind);
+    }
+
     protected async Task ReminderAdaptiveFieldsRoundTrip()
     {
         var reminder = CreateReminder(MakeTestGrainReference(), "adaptive_roundtrip");
