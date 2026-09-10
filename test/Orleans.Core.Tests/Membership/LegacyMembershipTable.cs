@@ -6,6 +6,8 @@ namespace NonSilo.Tests.Membership;
 // A concrete implementation ensures interface defaults run when the inner provider is a substitute.
 internal sealed class LegacyMembershipTable(IMembershipTable inner) : IMembershipTable
 {
+    public IMembershipTable Inner => inner;
+
     public Task InitializeMembershipTable(bool tryInitTableVersion) => inner.InitializeMembershipTable(tryInitTableVersion);
     public Task DeleteMembershipTableEntries(string clusterId) => inner.DeleteMembershipTableEntries(clusterId);
     public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) => inner.CleanupDefunctSiloEntries(beforeDate);
