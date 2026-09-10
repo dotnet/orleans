@@ -50,7 +50,7 @@ public class CallbackDataTests
         {
             Assert.Null(completion.Response);
             callback.DoCallback(new Message { BodyObject = Response.FromResult(42) });
-            Assert.Equal(42, completion.Response.GetResult<int>());
+            Assert.Equal(42, Assert.IsAssignableFrom<Response>(completion.Response).GetResult<int>());
         }
         else
         {
@@ -96,25 +96,25 @@ public class CallbackDataTests
         {
             case "response":
                 callback.DoCallback(new Message { BodyObject = Response.FromResult(42) });
-                Assert.Equal(42, completion.Response.GetResult<int>());
+                Assert.Equal(42, Assert.IsAssignableFrom<Response>(completion.Response).GetResult<int>());
                 break;
             case "acknowledgement":
                 callback.DoCallback(new Message { BodyObject = Response.FromException(new OperationCanceledException()) });
-                Assert.IsType<OperationCanceledException>(completion.Response.Exception);
+                Assert.IsType<OperationCanceledException>(Assert.IsAssignableFrom<Response>(completion.Response).Exception);
                 break;
             case "timeout":
                 timeProvider.Advance(TimeSpan.FromSeconds(2));
                 Assert.True(callback.IsExpired(timeProvider.GetTimestamp()));
                 callback.OnTimeout();
-                Assert.IsType<TimeoutException>(completion.Response.Exception);
+                Assert.IsType<TimeoutException>(Assert.IsAssignableFrom<Response>(completion.Response).Exception);
                 break;
             case "shutdown":
                 callback.OnHostShutdown();
-                Assert.IsType<SiloUnavailableException>(completion.Response.Exception);
+                Assert.IsType<SiloUnavailableException>(Assert.IsAssignableFrom<Response>(completion.Response).Exception);
                 break;
             case "silo failure":
                 callback.OnTargetSiloFail();
-                Assert.IsType<SiloUnavailableException>(completion.Response.Exception);
+                Assert.IsType<SiloUnavailableException>(Assert.IsAssignableFrom<Response>(completion.Response).Exception);
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(outcome));

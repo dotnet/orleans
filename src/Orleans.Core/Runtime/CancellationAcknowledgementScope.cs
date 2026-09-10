@@ -23,7 +23,10 @@ internal readonly struct CancellationAcknowledgementScope : IDisposable
     private CancellationAcknowledgementScope(bool enabled)
     {
         _previous = Current.Value;
-        Current.Value = enabled;
+        if (_previous != enabled)
+        {
+            Current.Value = enabled;
+        }
     }
 
     /// <summary>Enables cancellation acknowledgement waiting for calls initiated in this scope.</summary>
@@ -34,5 +37,11 @@ internal readonly struct CancellationAcknowledgementScope : IDisposable
 
     internal bool WaitForAcknowledgement => _previous;
 
-    public void Dispose() => Current.Value = _previous;
+    public void Dispose()
+    {
+        if (Current.Value != _previous)
+        {
+            Current.Value = _previous;
+        }
+    }
 }

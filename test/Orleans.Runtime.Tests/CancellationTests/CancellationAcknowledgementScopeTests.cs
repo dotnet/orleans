@@ -7,6 +7,19 @@ namespace Tester;
 public class CancellationAcknowledgementScopeTests
 {
     [Fact]
+    public void DefaultScopePreservesExecutionContext()
+    {
+        var previous = ExecutionContext.Capture();
+        using (var captured = CancellationAcknowledgementScope.Capture())
+        {
+            Assert.False(captured.WaitForAcknowledgement);
+            Assert.Same(previous, ExecutionContext.Capture());
+        }
+
+        Assert.Same(previous, ExecutionContext.Capture());
+    }
+
+    [Fact]
     public void NestedScopesRestorePreviousPolicy()
     {
         AssertPolicy(false);
@@ -36,14 +49,16 @@ public class CancellationAcknowledgementScopeTests
     {
         using (CancellationAcknowledgementScope.Enter())
         {
-            Assert.Throws<InvalidOperationException>(() =>
+            Assert.Throws<InvalidOperationException>(Invoke);
+            AssertPolicy(true);
+
+            static void Invoke()
             {
                 using var nested = CancellationAcknowledgementScope.Enter();
                 using var captured = CancellationAcknowledgementScope.Capture();
                 AssertPolicy(false);
                 throw new InvalidOperationException("Invocation failed synchronously");
-            });
-            AssertPolicy(true);
+            }
         }
 
         AssertPolicy(false);
