@@ -178,6 +178,15 @@ public static class ServiceCollectionExtensions
             [FromServices] IDashboardClient client,
             CancellationToken cancellationToken) =>
             await GetRemindersPage(page, client, jsonOptions, cancellationToken));
+        group.MapGet("/AdvancedReminders", async (
+            [FromServices] IDashboardClient client,
+            CancellationToken cancellationToken) =>
+            await GetAdvancedRemindersPage(1, client, jsonOptions, cancellationToken));
+        group.MapGet("/AdvancedReminders/{page:int}", async (
+            int page,
+            [FromServices] IDashboardClient client,
+            CancellationToken cancellationToken) =>
+            await GetAdvancedRemindersPage(page, client, jsonOptions, cancellationToken));
 
         group.MapGet("/HistoricalStats/{*path}", async (
             string path,
@@ -378,6 +387,27 @@ public static class ServiceCollectionExtensions
         {
             // If reminders are not configured, return empty response
             return Results.Json(new ReminderResponse { Reminders = [], Count = 0 }, jsonOptions);
+        }
+    }
+
+    private static async Task<IResult> GetAdvancedRemindersPage(
+        int page,
+        IDashboardClient client,
+        JsonSerializerOptions jsonOptions,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await client.GetAdvancedReminders(page, 50, cancellationToken);
+            return Results.Json(result.Value, jsonOptions);
+        }
+        catch (SiloUnavailableException)
+        {
+            return CreateUnavailableResult(true);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
     }
 

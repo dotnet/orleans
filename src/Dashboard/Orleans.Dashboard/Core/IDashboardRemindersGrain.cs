@@ -13,4 +13,10 @@ internal interface IDashboardRemindersGrain : IGrainWithIntegerKey
         int pageNumber,
         int pageSize,
         CancellationToken cancellationToken = default);
+
+    [Alias("GetAdvancedReminders")]
+    Task<Immutable<AdvancedReminderResponse>> GetAdvancedReminders(
+        int pageNumber,
+        int pageSize,
+        CancellationToken cancellationToken = default);
 }
