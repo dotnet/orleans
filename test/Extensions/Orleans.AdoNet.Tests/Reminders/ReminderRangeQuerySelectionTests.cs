@@ -1,4 +1,6 @@
-using Orleans.Reminders.AdoNet.Storage;
+extern alias ClassicRemindersAdoNet;
+
+using RelationalOrleansQueries = ClassicRemindersAdoNet::Orleans.Reminders.AdoNet.Storage.RelationalOrleansQueries;
 using Xunit;
 
 namespace UnitTests.RemindersTest;
