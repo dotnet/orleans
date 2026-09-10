@@ -36,16 +36,30 @@ public sealed class EncodedOffsetPooledQueueCacheTests
         var adapter = new EncodedOffsetDataAdapter();
         var cache = CreateCache(adapter);
         Add(cache, streamId, "010", "020");
-        var cursor = cache.GetCursor(streamId, new EncodedOffsetToken("030"));
+        var cursorResult = cache.TryGetCursor(streamId, new EncodedOffsetToken("030"));
+        Assert.Equal(QueueCacheCursorResultKind.Success, cursorResult.Kind);
+        Assert.Null(cursorResult.CacheMiss);
+        Assert.NotNull(cursorResult.Cursor);
+        var cursor = cursorResult.Cursor;
 
-        Assert.False(cache.TryGetNextMessage(cursor, out _));
+        var waiting = cache.TryGetNextMessageWithResult(cursor, out var message);
+        Assert.Equal(QueueCacheCursorMoveResultKind.NoData, waiting.Kind);
+        Assert.Null(waiting.CacheMiss);
+        Assert.Null(message);
         Assert.Equal(0, adapter.GetBatchContainerCallCount);
 
         Add(cache, streamId, "030");
 
-        Assert.True(cache.TryGetNextMessage(cursor, out var batch));
+        var next = cache.TryGetNextMessageWithResult(cursor, out message);
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, next.Kind);
+        Assert.Null(next.CacheMiss);
+        var batch = Assert.IsType<TestBatchContainer>(message);
+        Assert.Equal(streamId, batch.StreamId);
         Assert.Equal("030", Assert.IsType<EncodedOffsetToken>(batch.SequenceToken).Offset);
-        Assert.False(cache.TryGetNextMessage(cursor, out _));
+        var exhausted = cache.TryGetNextMessageWithResult(cursor, out message);
+        Assert.Equal(QueueCacheCursorMoveResultKind.NoData, exhausted.Kind);
+        Assert.Null(exhausted.CacheMiss);
+        Assert.Null(message);
         Assert.True(adapter.CompareCallCount > 0);
         Assert.Equal(1, adapter.GetBatchContainerCallCount);
     }
@@ -65,33 +79,77 @@ public sealed class EncodedOffsetPooledQueueCacheTests
         cache.Add(messages, DateTime.UnixEpoch);
         var requested = (defaultBlockSize - 1).ToString("D5", CultureInfo.InvariantCulture);
 
-        var cursor = cache.GetCursor(streamId, new EncodedOffsetToken(requested));
+        var cursorResult = cache.TryGetCursor(streamId, new EncodedOffsetToken(requested));
+        Assert.Equal(QueueCacheCursorResultKind.Success, cursorResult.Kind);
+        Assert.Null(cursorResult.CacheMiss);
+        Assert.NotNull(cursorResult.Cursor);
+        var cursor = cursorResult.Cursor;
 
-        Assert.True(cache.TryGetNextMessage(cursor, out var first));
+        var firstResult = cache.TryGetNextMessageWithResult(cursor, out var first);
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, firstResult.Kind);
+        Assert.Null(firstResult.CacheMiss);
+        Assert.NotNull(first);
+        Assert.Equal(streamId, first.StreamId);
         Assert.Equal(requested, Assert.IsType<EncodedOffsetToken>(first.SequenceToken).Offset);
-        Assert.True(cache.TryGetNextMessage(cursor, out var second));
+        var secondResult = cache.TryGetNextMessageWithResult(cursor, out var second);
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, secondResult.Kind);
+        Assert.Null(secondResult.CacheMiss);
+        Assert.NotNull(second);
+        Assert.Equal(streamId, second.StreamId);
         Assert.Equal(
             defaultBlockSize.ToString("D5", CultureInfo.InvariantCulture),
             Assert.IsType<EncodedOffsetToken>(second.SequenceToken).Offset);
         Assert.True(adapter.CompareCallCount >= 4);
+        Assert.Equal(2, adapter.GetBatchContainerCallCount);
     }
 
     [Fact]
-    public void Cursor_WhenExternalPositionWasPurgedThrowsCacheMiss()
+    public void Cursor_WhenExternalPositionWasPurgedReturnsCacheMiss()
     {
         var streamId = StreamId.Create("namespace", Guid.NewGuid());
         var adapter = new EncodedOffsetDataAdapter();
         var cache = CreateCache(adapter);
-        Add(cache, streamId, "010", "020");
-        var cursor = cache.GetCursor(streamId, new EncodedOffsetToken("010"));
+        Add(cache, streamId, "010", "020", "030");
+        var cursorResult = cache.TryGetCursor(streamId, new EncodedOffsetToken("010"));
+        Assert.Equal(QueueCacheCursorResultKind.Success, cursorResult.Kind);
+        Assert.Null(cursorResult.CacheMiss);
+        Assert.NotNull(cursorResult.Cursor);
         cache.RemoveOldestMessage();
 
-        var exception = Assert.Throws<QueueCacheMissException>(
-            () => cache.TryGetNextMessage(cursor, out _));
+        var result = cache.TryGetNextMessageWithResult(cursorResult.Cursor, out var message);
 
-        Assert.Equal(new EncodedOffsetToken("010").ToString(), exception.Requested);
-        Assert.Equal(new EncodedOffsetToken("020").ToString(), exception.Low);
-        Assert.Equal(new EncodedOffsetToken("020").ToString(), exception.High);
+        Assert.Equal(QueueCacheCursorMoveResultKind.CacheMiss, result.Kind);
+        Assert.Null(message);
+        var cacheMiss = Assert.NotNull(result.CacheMiss);
+        Assert.Equal("010", Assert.IsType<EncodedOffsetToken>(cacheMiss.RequestedToken).Offset);
+        Assert.Equal("020", Assert.IsType<EncodedOffsetToken>(cacheMiss.LowToken).Offset);
+        Assert.Equal("030", Assert.IsType<EncodedOffsetToken>(cacheMiss.HighToken).Offset);
+        Assert.Equal(new EncodedOffsetToken("010").ToString(), cacheMiss.Requested);
+        Assert.Equal(new EncodedOffsetToken("020").ToString(), cacheMiss.Low);
+        Assert.Equal(new EncodedOffsetToken("030").ToString(), cacheMiss.High);
+        Assert.Equal(0, adapter.GetBatchContainerCallCount);
+    }
+
+    [Fact]
+    public void Cursor_BeforeOldestExternalOffsetReturnsCacheMiss()
+    {
+        var streamId = StreamId.Create("namespace", Guid.NewGuid());
+        var adapter = new EncodedOffsetDataAdapter();
+        var cache = CreateCache(adapter);
+        Add(cache, streamId, "020", "030");
+        var requestedToken = new EncodedOffsetToken("010");
+
+        var result = cache.TryGetCursor(streamId, requestedToken);
+
+        Assert.Equal(QueueCacheCursorResultKind.CacheMiss, result.Kind);
+        Assert.Null(result.Cursor);
+        var cacheMiss = Assert.NotNull(result.CacheMiss);
+        Assert.Same(requestedToken, cacheMiss.RequestedToken);
+        Assert.Equal("020", Assert.IsType<EncodedOffsetToken>(cacheMiss.LowToken).Offset);
+        Assert.Equal("030", Assert.IsType<EncodedOffsetToken>(cacheMiss.HighToken).Offset);
+        Assert.Equal(requestedToken.ToString(), cacheMiss.Requested);
+        Assert.Equal(new EncodedOffsetToken("020").ToString(), cacheMiss.Low);
+        Assert.Equal(new EncodedOffsetToken("030").ToString(), cacheMiss.High);
         Assert.Equal(0, adapter.GetBatchContainerCallCount);
     }
 
