@@ -9,6 +9,7 @@ namespace Orleans.Runtime.MembershipService
             List<SiloAddress> gossipPartners,
             MembershipTableSnapshot snapshot,
             SiloAddress updatedSilo,
-            SiloStatus updatedStatus);
+            SiloStatus updatedStatus,
+            CancellationToken cancellationToken);
     }
 }

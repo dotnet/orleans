@@ -219,6 +219,35 @@ namespace NonSilo.Tests.Membership
         }
 
         [Fact]
+        public async Task MembershipAgent_Shutdown_PublishesTerminalStatusesWithLiveTokens()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            await this.lifecycle.OnStart(cancellationToken);
+            var statuses = new List<SiloStatus>();
+            this.membershipGossiper.GossipToRemoteSilos(
+                    Arg.Any<List<SiloAddress>>(),
+                    Arg.Any<MembershipTableSnapshot>(),
+                    Arg.Any<SiloAddress>(),
+                    Arg.Any<SiloStatus>(),
+                    Arg.Any<CancellationToken>())
+                .Returns(call =>
+                {
+                    var token = call.ArgAt<CancellationToken>(4);
+                    Assert.True(token.CanBeCanceled);
+                    Assert.False(token.IsCancellationRequested);
+                    statuses.Add(call.ArgAt<SiloStatus>(3));
+                    return Task.CompletedTask;
+                });
+            using var shutdown = new CancellationTokenSource();
+            shutdown.Cancel();
+
+            await StopLifecycle(cancellationToken, shutdown.Token);
+
+            Assert.Equal([SiloStatus.Stopping, SiloStatus.Dead], statuses);
+            Assert.Equal(SiloStatus.Dead, this.manager.CurrentStatus);
+        }
+
+        [Fact]
         public async Task MembershipAgent_UpdateIAmAlive()
         {
             var cancellationToken = TestContext.Current.CancellationToken;

@@ -153,7 +153,7 @@ namespace NonSilo.Tests.Membership
             Assert.Empty(testRig.TestAccessor.MonitoredSilos);
 
             lastVersion = testRig.TestAccessor.ObservedVersion;
-            await testRig.Manager.UpdateStatus(SiloStatus.Joining);
+            await testRig.Manager.UpdateStatus(SiloStatus.Joining, cancellationToken);
             await Until(() => testRig.TestAccessor.ObservedVersion > lastVersion, cancellationToken);
             await Until(() => testRig.TestAccessor.MonitoredSilos.Count == 3, cancellationToken);
 
@@ -285,7 +285,7 @@ namespace NonSilo.Tests.Membership
             var targetSilo = Silo("127.0.0.200:100@100");
             await this.membershipTable.InsertRow(Entry(targetSilo, SiloStatus.Active, now), this.membershipTable.Version.Next());
             await testRig.Manager.Refresh(cancellationToken: cancellationToken);
-            await testRig.Manager.UpdateStatus(SiloStatus.Active);
+            await testRig.Manager.UpdateStatus(SiloStatus.Active, cancellationToken);
             await testRig.Manager.Refresh(cancellationToken: cancellationToken);
 
             await Until(() => testRig.TestAccessor.MonitoredSilos.Count > 0, cancellationToken);
@@ -370,7 +370,7 @@ namespace NonSilo.Tests.Membership
             var targetSilo = Silo("127.0.0.200:100@100");
             await this.membershipTable.InsertRow(Entry(targetSilo, SiloStatus.Active, now), this.membershipTable.Version.Next());
             await testRig.Manager.Refresh(cancellationToken: cancellationToken);
-            await testRig.Manager.UpdateStatus(SiloStatus.Active);
+            await testRig.Manager.UpdateStatus(SiloStatus.Active, cancellationToken);
             await testRig.Manager.Refresh(cancellationToken: cancellationToken);
 
             await Until(() => testRig.TestAccessor.MonitoredSilos.Count > 0, cancellationToken);
@@ -479,7 +479,7 @@ namespace NonSilo.Tests.Membership
             // No silos should be monitored by this silo until it becomes active.
             Assert.Empty(testRig.TestAccessor.MonitoredSilos);
 
-            await testRig.Manager.UpdateStatus(SiloStatus.Active);
+            await testRig.Manager.UpdateStatus(SiloStatus.Active, cancellationToken);
 
             await Until(() => testRig.TestAccessor.ObservedVersion > lastVersion, cancellationToken);
             lastVersion = testRig.TestAccessor.ObservedVersion;
