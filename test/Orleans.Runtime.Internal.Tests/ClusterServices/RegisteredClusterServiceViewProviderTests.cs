@@ -86,6 +86,67 @@ public sealed class RegisteredClusterServiceViewProviderTests
         Assert.Equal(2, register.SuccessfulWrites);
     }
 
+    [Theory(Timeout = 30_000)]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PublicationRetainsItsOwnWriteTokenWhenAnotherWriterAdvancesBeforeTheReply(bool hasPredecessor)
+    {
+        var register = new TestServiceViewRegister();
+        await using var firstWriter = Create(register, new());
+        await using var secondWriter = Create(register, new());
+        if (hasPredecessor)
+        {
+            await Publish(firstWriter, TestServiceMembership.A);
+        }
+
+        var targetRevision = hasPredecessor ? 2 : 1;
+        var committed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var deliverReply = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        register.AfterWrite = view =>
+        {
+            if (view.Id.Revision != targetRevision)
+            {
+                return Task.CompletedTask;
+            }
+
+            committed.SetResult();
+            return deliverReply.Task;
+        };
+        var publication = Publish(firstWriter, TestServiceMembership.A).AsTask();
+        await committed.Task.WaitAsync(TestContext.Current.CancellationToken);
+        var advanced = await Publish(secondWriter, TestServiceMembership.B);
+        deliverReply.SetResult();
+        var published = await publication.WaitAsync(TestContext.Current.CancellationToken);
+        register.AfterWrite = null;
+        Assert.Equal(published.Id, advanced.Predecessor);
+        Assert.True(firstWriter.TryGetCurrentView(out var current));
+        Assert.Same(published, current);
+
+        register.Replace(published);
+
+        await Assert.ThrowsAsync<ClusterServiceAuthorityException>(() => Publish(firstWriter, TestServiceMembership.B).AsTask());
+        Assert.False(firstWriter.TryGetCurrentView(out _));
+        Assert.Equal(targetRevision + 1, register.SuccessfulWrites);
+    }
+
+    [Fact(Timeout = 30_000)]
+    public async Task RejectedPublicationPreservesItsObservedPredecessorHighWatermark()
+    {
+        var register = new TestServiceViewRegister();
+        await using var firstWriter = Create(register, new());
+        await using var secondWriter = Create(register, new());
+        var first = await Publish(firstWriter, TestServiceMembership.A);
+        await Publish(secondWriter, TestServiceMembership.B);
+        var unknown = SiloAddress.FromParsableString("127.0.0.1:33333@9");
+        await Assert.ThrowsAsync<ArgumentException>(() => Publish(firstWriter, unknown, [unknown]).AsTask());
+
+        register.Replace(first);
+
+        await Assert.ThrowsAsync<ClusterServiceAuthorityException>(() => firstWriter.RefreshAsync(TestContext.Current.CancellationToken).AsTask());
+        Assert.False(firstWriter.TryGetCurrentView(out _));
+        Assert.Equal(2, register.SuccessfulWrites);
+    }
+
     [Fact(Timeout = 30_000)]
     public async Task SkippedReadsExposeAuthoritativePredecessorRatherThanLastObservation()
     {
@@ -576,6 +637,7 @@ internal sealed class TestServiceViewRegister : IClusterServiceViewRegister
     private int _writes;
 
     public Func<Task>? AfterRead { get; set; }
+    public Func<RegisteredClusterServiceView, Task>? AfterWrite { get; set; }
     public Exception? Failure { get; set; }
     public int SuccessfulWrites => _writes;
     public ClusterServiceRegisterRead Current => _current;
@@ -602,19 +664,27 @@ internal sealed class TestServiceViewRegister : IClusterServiceViewRegister
         return read;
     }
 
-    public ValueTask<bool> TryWriteAsync(RegisteredClusterServiceView view, string? expectedToken, CancellationToken cancellationToken)
+    public async ValueTask<string?> TryWriteAsync(RegisteredClusterServiceView view, string? expectedToken, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        string token;
         lock (_lock)
         {
             if (!StringComparer.Ordinal.Equals(_current.Token, expectedToken))
             {
-                return ValueTask.FromResult(false);
+                return null;
             }
 
-            _current = new(view, $"opaque-etag-{++_writes}");
-            return ValueTask.FromResult(true);
+            token = $"opaque-etag-{++_writes}";
+            _current = new(view, token);
         }
+
+        if (AfterWrite is { } afterWrite)
+        {
+            await afterWrite(view).WaitAsync(cancellationToken);
+        }
+
+        return token;
     }
 
     public void Replace(RegisteredClusterServiceView? view)

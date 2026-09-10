@@ -24,12 +24,14 @@ public sealed class AzureBlobClusterServiceViewRegisterTests
         Assert.Null(absence.View);
         Assert.Null(absence.Token);
 
-        Assert.True(await register.TryWriteAsync(first, null, TestContext.Current.CancellationToken));
+        var writtenToken = await register.TryWriteAsync(first, null, TestContext.Current.CancellationToken);
+        Assert.NotNull(writtenToken);
         var read = await register.ReadAsync(TestContext.Current.CancellationToken);
 
         Assert.NotNull(read.View);
         Assert.True(first.HasSameContent(read.View));
         Assert.Equal("\"backend-1\"", read.Token);
+        Assert.Equal(writtenToken, read.Token);
         Assert.NotEqual(first.Id.Revision.ToString(), read.Token);
         Assert.Equal(first.GetOwnedResources(TestServiceMembership.A), read.View.GetOwnedResources(TestServiceMembership.A));
         Assert.Equal(new[] { "GET", "GET", "PUT", "GET" }, transport.Methods);
@@ -44,7 +46,7 @@ public sealed class AzureBlobClusterServiceViewRegisterTests
         var firstRegister = Create(transport);
         var secondRegister = Create(transport);
         var initial = RegisteredClusterServiceViewProviderTests.MakeView(1, TestServiceMembership.A);
-        Assert.True(await firstRegister.TryWriteAsync(initial, null, TestContext.Current.CancellationToken));
+        Assert.NotNull(await firstRegister.TryWriteAsync(initial, null, TestContext.Current.CancellationToken));
         var read = await firstRegister.ReadAsync(TestContext.Current.CancellationToken);
         var firstProposal = RegisteredClusterServiceViewProviderTests.MakeView(2, TestServiceMembership.B, initial.Id);
         var secondProposal = RegisteredClusterServiceViewProviderTests.MakeView(2, TestServiceMembership.A, initial.Id);
@@ -67,12 +69,12 @@ public sealed class AzureBlobClusterServiceViewRegisterTests
         transport.AfterGet = null;
         var winner = await firstRegister.ReadAsync(TestContext.Current.CancellationToken);
 
-        Assert.Single(results, static success => success);
-        Assert.Single(results, static success => !success);
-        Assert.True((results[0] ? firstProposal : secondProposal).HasSameContent(winner.View!));
+        Assert.Equal(winner.Token, Assert.Single(results, static token => token is not null));
+        Assert.Single(results, static token => token is null);
+        Assert.True((results[0] is not null ? firstProposal : secondProposal).HasSameContent(winner.View!));
         Assert.Equal(new[] { read.Token, read.Token }, transport.IfMatches);
         Assert.Equal("\"backend-2\"", winner.Token);
-        Assert.False(await secondRegister.TryWriteAsync(initial, null, TestContext.Current.CancellationToken));
+        Assert.Null(await secondRegister.TryWriteAsync(initial, null, TestContext.Current.CancellationToken));
     }
 
     [Theory(Timeout = 30_000)]
@@ -96,7 +98,7 @@ public sealed class AzureBlobClusterServiceViewRegisterTests
                 ? [KeyValuePair.Create("partition-0", RingRange.Full)]
                 : [KeyValuePair.Create("partition-0", RingRange.Create(0, 100)), KeyValuePair.Create("partition-1", RingRange.Create(100, 0))]);
 
-        Assert.True(await register.TryWriteAsync(view, null, TestContext.Current.CancellationToken));
+        Assert.NotNull(await register.TryWriteAsync(view, null, TestContext.Current.CancellationToken));
         var read = await register.ReadAsync(TestContext.Current.CancellationToken);
 
         Assert.NotNull(read.View);
@@ -128,7 +130,7 @@ public sealed class AzureBlobClusterServiceViewRegisterTests
     {
         using var transport = new BlobTransport();
         var original = Create(transport);
-        Assert.True(await original.TryWriteAsync(
+        Assert.NotNull(await original.TryWriteAsync(
             RegisteredClusterServiceViewProviderTests.MakeView(1, TestServiceMembership.A), null, TestContext.Current.CancellationToken));
         var replacement = new AzureBlobClusterServiceViewRegister(
             "service", "replacement", new("https://account.blob.core.windows.net/views/service"), Options(transport));
@@ -142,10 +144,10 @@ public sealed class AzureBlobClusterServiceViewRegisterTests
         using var transport = new BlobTransport();
         var register = Create(transport);
         var first = RegisteredClusterServiceViewProviderTests.MakeView(1, TestServiceMembership.A);
-        Assert.True(await register.TryWriteAsync(first, null, TestContext.Current.CancellationToken));
+        Assert.NotNull(await register.TryWriteAsync(first, null, TestContext.Current.CancellationToken));
         var previous = await register.ReadAsync(TestContext.Current.CancellationToken);
         var second = RegisteredClusterServiceViewProviderTests.MakeView(2, TestServiceMembership.B, first.Id);
-        Assert.True(await register.TryWriteAsync(second, previous.Token, TestContext.Current.CancellationToken));
+        Assert.NotNull(await register.TryWriteAsync(second, previous.Token, TestContext.Current.CancellationToken));
         var current = await register.ReadAsync(TestContext.Current.CancellationToken);
         var conflicting = RegisteredClusterServiceViewProviderTests.MakeView(2, TestServiceMembership.A, first.Id);
         var wrongPredecessor = RegisteredClusterServiceViewProviderTests.MakeView(3, TestServiceMembership.A, first.Id);

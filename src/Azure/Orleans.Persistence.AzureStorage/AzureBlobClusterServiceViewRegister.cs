@@ -96,7 +96,7 @@ internal sealed class AzureBlobClusterServiceViewRegister : IClusterServiceViewR
         }
     }
 
-    public async ValueTask<bool> TryWriteAsync(RegisteredClusterServiceView view, string? expectedToken, CancellationToken cancellationToken)
+    public async ValueTask<string?> TryWriteAsync(RegisteredClusterServiceView view, string? expectedToken, CancellationToken cancellationToken)
     {
         _namespace.CompareTo(view.Id);
         if ((expectedToken is null) != (view.Predecessor is null))
@@ -109,7 +109,7 @@ internal sealed class AzureBlobClusterServiceViewRegister : IClusterServiceViewR
         var expected = await ReadAsync(cancellationToken);
         if (!StringComparer.Ordinal.Equals(expectedToken, expected.Token))
         {
-            return false;
+            return null;
         }
 
         if (view.Predecessor != expected.View?.Id || view.Id.Revision != checked((expected.View?.Id.Revision ?? 0) + 1))
@@ -152,13 +152,13 @@ internal sealed class AzureBlobClusterServiceViewRegister : IClusterServiceViewR
         };
         try
         {
-            await _blob.UploadAsync(BinaryData.FromBytes(JsonSerializer.SerializeToUtf8Bytes(stored)), options, cancellationToken);
-            return true;
+            var response = await _blob.UploadAsync(BinaryData.FromBytes(JsonSerializer.SerializeToUtf8Bytes(stored)), options, cancellationToken);
+            return response.Value.ETag.ToString();
         }
         catch (RequestFailedException exception) when (exception.Status == 412
             || (exception.Status == 409 && exception.ErrorCode == BlobErrorCode.BlobAlreadyExists.ToString()))
         {
-            return false;
+            return null;
         }
     }
 
