@@ -354,9 +354,11 @@ public class CallbackDataTests
 
     private sealed class CancellableRequest : RequestBase
     {
+        private readonly object _target = new();
+
         public override bool IsCancellable => true;
         public override void Dispose() { }
-        public override object GetTarget() => throw new NotSupportedException();
+        public override object GetTarget() => _target;
         public override void SetTarget(ITargetHolder holder) => throw new NotSupportedException();
         public override ValueTask<Response> Invoke() => throw new NotSupportedException();
         public override string GetMethodName() => nameof(Invoke);
