@@ -97,7 +97,7 @@ Test the adapter against the real queue service, including:
 1. producer, receiver, and silo failure before and after acknowledgement;
 1. queue ownership moving between silos during membership changes;
 1. duplicate delivery and consumer idempotency;
-1. stable stream-to-partition mapping across restarts and upgrades; and
+1. stable stream-to-partition mapping across restarts and upgrades;
 1. sustained load beyond cache capacity to verify backpressure and queue retention; and
 1. sequence-token equality, ordering, and hashing in both comparison directions.
 

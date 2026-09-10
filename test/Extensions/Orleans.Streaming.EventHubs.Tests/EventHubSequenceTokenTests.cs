@@ -6,7 +6,7 @@ using Orleans.Streams;
 using UnitTests.StreamingTests;
 using Xunit;
 
-namespace UnitTests.Streaming;
+namespace ServiceBus.Tests;
 
 [TestSuite("BVT")]
 [TestProvider("None")]
