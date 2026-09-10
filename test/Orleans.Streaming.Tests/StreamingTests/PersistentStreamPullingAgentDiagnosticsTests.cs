@@ -158,6 +158,43 @@ public partial class PersistentStreamPullingAgentTests
             .UnregisterConsumer(subscriptionId, streamId, Arg.Any<CancellationToken>());
     }
 
+    [Fact]
+    public async Task ShutdownDrainsCleanupStartedByInFlightDelivery()
+    {
+        var streamId = new QualifiedStreamId("provider", StreamId.Create("shutdown-delivery", Guid.NewGuid()));
+        var subscriptionId = GuidId.GetGuidId(Guid.NewGuid());
+        var token = new EventSequenceTokenV2(1);
+        var cache = new ScriptedQueueCache();
+        cache.AddToCache([new TestBatchContainer(streamId.StreamId, token)]);
+        var (accessor, pubSub, streamData) = await CreateInitializedAgentWithStream(
+            streamId, token, cache, new StreamPullingAgentOptions());
+        var unavailable = Tester.ClientConnectionTests.ClientObserverRoutingTests.CreateUnavailableClientException();
+        var consumer = new BlockingUnavailableConsumer(unavailable);
+        var data = streamData.AddConsumer(subscriptionId, streamId, consumer, filterData: null, DateTime.UtcNow);
+        data.Cursor = cache.GetCacheCursor(streamId.StreamId, token);
+        data.IsRegistered = true;
+        var firstAttempt = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var attempts = 0;
+        pubSub.UnregisterConsumer(subscriptionId, streamId, Arg.Any<CancellationToken>()).Returns(_ =>
+            Interlocked.Increment(ref attempts) == 1 ? firstAttempt.Task : Task.CompletedTask);
+
+        var delivery = accessor.RunConsumerCursor(data);
+        await consumer.DeliveryStarted.Task.WaitAsync(
+            TimeSpan.FromSeconds(10),
+            TestContext.Current.CancellationToken);
+        var shutdown = accessor.Shutdown();
+
+        Assert.False(shutdown.IsCompleted);
+        consumer.FailDelivery();
+        await delivery.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        Assert.False(shutdown.IsCompleted);
+        firstAttempt.SetException(new InvalidOperationException("transient cleanup failure"));
+        await shutdown.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        _ = pubSub.Received(2)
+            .UnregisterConsumer(subscriptionId, streamId, Arg.Any<CancellationToken>());
+    }
+
     private sealed class UnavailableConsumer(ClientNotAvailableException exception) : IStreamConsumerExtension
     {
         public Task<StreamHandshakeToken?> DeliverImmutable(GuidId subscriptionId, QualifiedStreamId streamId, object item,
@@ -171,6 +208,39 @@ public partial class PersistentStreamPullingAgentTests
         public Task<StreamHandshakeToken?> DeliverBatch(GuidId subscriptionId, QualifiedStreamId streamId, IBatchContainer item,
             StreamHandshakeToken? handshakeToken, CancellationToken cancellationToken)
             => Task.FromException<StreamHandshakeToken?>(exception);
+
+        public Task CompleteStream(GuidId subscriptionId, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task ErrorInStream(GuidId subscriptionId, Exception error, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task<StreamHandshakeToken?> GetSequenceToken(GuidId subscriptionId, CancellationToken cancellationToken)
+            => Task.FromResult<StreamHandshakeToken?>(null);
+    }
+
+    private sealed class BlockingUnavailableConsumer(ClientNotAvailableException exception) : IStreamConsumerExtension
+    {
+        private readonly TaskCompletionSource<StreamHandshakeToken?> _delivery =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource DeliveryStarted { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public void FailDelivery() => _delivery.SetException(exception);
+
+        public Task<StreamHandshakeToken?> DeliverImmutable(GuidId subscriptionId, QualifiedStreamId streamId, object item,
+            StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken, CancellationToken cancellationToken)
+            => throw new NotSupportedException();
+
+        public Task<StreamHandshakeToken?> DeliverMutable(GuidId subscriptionId, QualifiedStreamId streamId, object item,
+            StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken, CancellationToken cancellationToken)
+            => throw new NotSupportedException();
+
+        public Task<StreamHandshakeToken?> DeliverBatch(GuidId subscriptionId, QualifiedStreamId streamId, IBatchContainer item,
+            StreamHandshakeToken? handshakeToken, CancellationToken cancellationToken)
+        {
+            DeliveryStarted.TrySetResult();
+            return _delivery.Task;
+        }
 
         public Task CompleteStream(GuidId subscriptionId, CancellationToken cancellationToken) => Task.CompletedTask;
 
