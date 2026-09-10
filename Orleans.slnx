@@ -49,6 +49,7 @@
     <Project Path="src/Orleans.CodeGenerator/Orleans.CodeGenerator.csproj" />
     <Project Path="src/Orleans.Core.Abstractions/Orleans.Core.Abstractions.csproj" />
     <Project Path="src/Orleans.Core/Orleans.Core.csproj" />
+    <Project Path="src/Orleans.AdvancedReminders/Orleans.AdvancedReminders.csproj" />
     <Project Path="src/Orleans.Durable/Orleans.Durable.csproj" />
     <Project Path="src/Orleans.Durable.Analyzers/Orleans.Durable.Analyzers.csproj" />
     <Project Path="src/Orleans.EventSourcing/Orleans.EventSourcing.csproj" />
