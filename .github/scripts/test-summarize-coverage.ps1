@@ -754,8 +754,13 @@ $attempt = if (Test-Path -LiteralPath $env:ORLEANS_RESTORE_ATTEMPT_FILE) {
 
 $attempt++
 Set-Content -LiteralPath $env:ORLEANS_RESTORE_ATTEMPT_FILE -Value $attempt
-if ($env:ORLEANS_RESTORE_FAILURE -eq 'metadata' -and $attempt -eq 1) {
+if ($env:ORLEANS_RESTORE_FAILURE -eq 'metadata-remote-source' -and $attempt -eq 1) {
     Write-Output "Failed to retrieve information about 'Aspire.AppHost.Sdk' from remote source 'https://feed/index.json'."
+    exit 1
+}
+
+if ($env:ORLEANS_RESTORE_FAILURE -eq 'metadata-configured-feed' -and $attempt -eq 1) {
+    Write-Output "Failed to retrieve information about 'Aspire.AppHost.Sdk' from the configured Azure DevOps feed."
     exit 1
 }
 
@@ -781,12 +786,14 @@ exit 0
         $previousFailure = $env:ORLEANS_RESTORE_FAILURE
         try {
             $env:ORLEANS_RESTORE_ATTEMPT_FILE = $attemptFile
-            $env:ORLEANS_RESTORE_FAILURE = 'metadata'
-            & $invokeRestoreScriptPath -RestoreCommand $fakeRestore
-            Assert-Equal 0 $LASTEXITCODE 'A transient metadata failure should succeed on retry.'
-            Assert-Equal 2 ([int] (Get-Content -Raw -LiteralPath $attemptFile)) 'The transient metadata restore attempt count differs.'
+            foreach ($failure in 'metadata-remote-source', 'metadata-configured-feed') {
+                $env:ORLEANS_RESTORE_FAILURE = $failure
+                & $invokeRestoreScriptPath -RestoreCommand $fakeRestore
+                Assert-Equal 0 $LASTEXITCODE "The $failure failure should succeed on retry."
+                Assert-Equal 2 ([int] (Get-Content -Raw -LiteralPath $attemptFile)) "The $failure restore attempt count differs."
+                Remove-Item -LiteralPath $attemptFile
+            }
 
-            Remove-Item -LiteralPath $attemptFile
             $env:ORLEANS_RESTORE_FAILURE = 'deterministic'
             & $invokeRestoreScriptPath -RestoreCommand $fakeRestore
             Assert-Equal 1 $LASTEXITCODE 'A deterministic restore failure should be preserved.'

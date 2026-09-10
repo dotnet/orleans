@@ -26,9 +26,6 @@ function Test-IsRemoteMetadataFailure {
     return $text.Contains(
         'Failed to retrieve information about ',
         [StringComparison]::Ordinal
-    ) -and $text.Contains(
-        ' from remote source ',
-        [StringComparison]::Ordinal
     )
 }
 
