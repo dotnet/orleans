@@ -173,21 +173,37 @@ namespace Orleans
 
     public partial interface IMembershipTable
     {
+        [Alias("7A519C2E")]
         System.Threading.Tasks.Task CleanupDefunctSiloEntries(System.DateTimeOffset beforeDate, System.Threading.CancellationToken cancellationToken = default);
+        [System.Obsolete("Use the overload accepting a CancellationToken instead.")]
         System.Threading.Tasks.Task CleanupDefunctSiloEntries(System.DateTimeOffset beforeDate);
+        [Alias("BF899C85")]
         System.Threading.Tasks.Task DeleteMembershipTableEntries(string clusterId, System.Threading.CancellationToken cancellationToken = default);
+        [System.Obsolete("Use the overload accepting a CancellationToken instead.")]
         System.Threading.Tasks.Task DeleteMembershipTableEntries(string clusterId);
+        [Alias("FB89E5E9")]
         System.Threading.Tasks.Task InitializeMembershipTable(bool tryInitTableVersion, System.Threading.CancellationToken cancellationToken = default);
+        [System.Obsolete("Use the overload accepting a CancellationToken instead.")]
         System.Threading.Tasks.Task InitializeMembershipTable(bool tryInitTableVersion);
+        [Alias("FEF3AC5A")]
         System.Threading.Tasks.Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion, System.Threading.CancellationToken cancellationToken = default);
+        [System.Obsolete("Use the overload accepting a CancellationToken instead.")]
         System.Threading.Tasks.Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion);
+        [System.Obsolete("Use the overload accepting a CancellationToken instead.")]
         System.Threading.Tasks.Task<MembershipTableData> ReadAll();
+        [Alias("00BCE16F")]
         System.Threading.Tasks.Task<MembershipTableData> ReadAll(System.Threading.CancellationToken cancellationToken = default);
+        [Alias("D851FB33")]
         System.Threading.Tasks.Task<MembershipTableData> ReadRow(Runtime.SiloAddress key, System.Threading.CancellationToken cancellationToken = default);
+        [System.Obsolete("Use the overload accepting a CancellationToken instead.")]
         System.Threading.Tasks.Task<MembershipTableData> ReadRow(Runtime.SiloAddress key);
+        [Alias("B1A52D2B")]
         System.Threading.Tasks.Task UpdateIAmAlive(MembershipEntry entry, System.Threading.CancellationToken cancellationToken = default);
+        [System.Obsolete("Use the overload accepting a CancellationToken instead.")]
         System.Threading.Tasks.Task UpdateIAmAlive(MembershipEntry entry);
+        [Alias("E06D3DBC")]
         System.Threading.Tasks.Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion, System.Threading.CancellationToken cancellationToken = default);
+        [System.Obsolete("Use the overload accepting a CancellationToken instead.")]
         System.Threading.Tasks.Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion);
     }
 
@@ -2880,7 +2896,6 @@ namespace OrleansCodeGen.Orleans
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.IMembershipTable), "00BCE16F" })]
     public sealed partial class Invokable_IMembershipTable_GrainReference_00BCE16F : global::Orleans.Runtime.TaskRequest<global::Orleans.MembershipTableData>
     {
         public override void Dispose() { }
@@ -2905,7 +2920,7 @@ namespace OrleansCodeGen.Orleans
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.IMembershipTable), "48907CC3" })]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.IMembershipTable), "FEF3AC5A" })]
     public sealed partial class Invokable_IMembershipTable_GrainReference_48907CC3 : global::Orleans.Runtime.TaskRequest<bool>
     {
         public global::Orleans.MembershipEntry arg0;
@@ -2945,7 +2960,7 @@ namespace OrleansCodeGen.Orleans
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.IMembershipTable), "5ABE2E68" })]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.IMembershipTable), "FB89E5E9" })]
     public sealed partial class Invokable_IMembershipTable_GrainReference_5ABE2E68 : global::Orleans.Runtime.TaskRequest
     {
         public bool arg0;
@@ -2984,7 +2999,7 @@ namespace OrleansCodeGen.Orleans
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.IMembershipTable), "649200ED" })]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.IMembershipTable), "BF899C85" })]
     public sealed partial class Invokable_IMembershipTable_GrainReference_649200ED : global::Orleans.Runtime.TaskRequest
     {
         public string arg0;
@@ -3023,7 +3038,6 @@ namespace OrleansCodeGen.Orleans
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.IMembershipTable), "7A519C2E" })]
     public sealed partial class Invokable_IMembershipTable_GrainReference_7A519C2E : global::Orleans.Runtime.TaskRequest
     {
         public System.DateTimeOffset arg0;
@@ -3055,7 +3069,6 @@ namespace OrleansCodeGen.Orleans
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.IMembershipTable), "B1A52D2B" })]
     public sealed partial class Invokable_IMembershipTable_GrainReference_B1A52D2B : global::Orleans.Runtime.TaskRequest
     {
         public global::Orleans.MembershipEntry arg0;
@@ -3087,7 +3100,7 @@ namespace OrleansCodeGen.Orleans
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.IMembershipTable), "BBA8368F" })]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.IMembershipTable), "E06D3DBC" })]
     public sealed partial class Invokable_IMembershipTable_GrainReference_BBA8368F : global::Orleans.Runtime.TaskRequest<bool>
     {
         public global::Orleans.MembershipEntry arg0;
@@ -3128,7 +3141,6 @@ namespace OrleansCodeGen.Orleans
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.IMembershipTable), "BF899C85" })]
     public sealed partial class Invokable_IMembershipTable_GrainReference_BF899C85 : global::Orleans.Runtime.TaskRequest
     {
         public string arg0;
@@ -3160,7 +3172,7 @@ namespace OrleansCodeGen.Orleans
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.IMembershipTable), "CE2B3B6B" })]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.IMembershipTable), "B1A52D2B" })]
     public sealed partial class Invokable_IMembershipTable_GrainReference_CE2B3B6B : global::Orleans.Runtime.TaskRequest
     {
         public global::Orleans.MembershipEntry arg0;
@@ -3199,7 +3211,7 @@ namespace OrleansCodeGen.Orleans
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.IMembershipTable), "D2BE1C56" })]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.IMembershipTable), "7A519C2E" })]
     public sealed partial class Invokable_IMembershipTable_GrainReference_D2BE1C56 : global::Orleans.Runtime.TaskRequest
     {
         public System.DateTimeOffset arg0;
@@ -3238,7 +3250,6 @@ namespace OrleansCodeGen.Orleans
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.IMembershipTable), "D851FB33" })]
     public sealed partial class Invokable_IMembershipTable_GrainReference_D851FB33 : global::Orleans.Runtime.TaskRequest<global::Orleans.MembershipTableData>
     {
         public global::Orleans.Runtime.SiloAddress arg0;
@@ -3270,7 +3281,6 @@ namespace OrleansCodeGen.Orleans
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.IMembershipTable), "E06D3DBC" })]
     public sealed partial class Invokable_IMembershipTable_GrainReference_E06D3DBC : global::Orleans.Runtime.TaskRequest<bool>
     {
         public global::Orleans.MembershipEntry arg0;
@@ -3304,7 +3314,7 @@ namespace OrleansCodeGen.Orleans
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.IMembershipTable), "E37A70AE" })]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.IMembershipTable), "D851FB33" })]
     public sealed partial class Invokable_IMembershipTable_GrainReference_E37A70AE : global::Orleans.Runtime.TaskRequest<global::Orleans.MembershipTableData>
     {
         public global::Orleans.Runtime.SiloAddress arg0;
@@ -3343,7 +3353,7 @@ namespace OrleansCodeGen.Orleans
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.IMembershipTable), "E92274A8" })]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.IMembershipTable), "00BCE16F" })]
     public sealed partial class Invokable_IMembershipTable_GrainReference_E92274A8 : global::Orleans.Runtime.TaskRequest<global::Orleans.MembershipTableData>
     {
         public System.Threading.CancellationToken arg0;
@@ -3381,7 +3391,6 @@ namespace OrleansCodeGen.Orleans
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.IMembershipTable), "FB89E5E9" })]
     public sealed partial class Invokable_IMembershipTable_GrainReference_FB89E5E9 : global::Orleans.Runtime.TaskRequest
     {
         public bool arg0;
@@ -3413,7 +3422,6 @@ namespace OrleansCodeGen.Orleans
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.IMembershipTable), "FEF3AC5A" })]
     public sealed partial class Invokable_IMembershipTable_GrainReference_FEF3AC5A : global::Orleans.Runtime.TaskRequest<bool>
     {
         public global::Orleans.MembershipEntry arg0;

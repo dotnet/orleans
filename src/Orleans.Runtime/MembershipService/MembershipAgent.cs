@@ -346,7 +346,7 @@ namespace Orleans.Runtime.MembershipService
                     // Terminal status publication owns a bounded cleanup lifetime.
                     using var cleanup = new CancellationTokenSource(TimeSpan.FromMinutes(1), this.timeProvider);
                     var cleanupToken = cleanup.Token;
-                    await Task.Run(() => this.BecomeDead(cleanupToken)).SuppressThrowing();
+                    await Task.Run(() => this.BecomeDead(cleanupToken), CancellationToken.None).SuppressThrowing();
                 }
 
                 lifecycle.Subscribe(
@@ -359,7 +359,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 async Task AfterRuntimeGrainServicesStart(CancellationToken ct)
                 {
-                    await Task.Run(() => this.BecomeJoining(ct));
+                    await Task.Run(() => this.BecomeJoining(ct), CancellationToken.None);
                 }
 
                 Task AfterRuntimeGrainServicesStop(CancellationToken ct) => Task.CompletedTask;
@@ -374,7 +374,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 async Task OnValidateInitialConnectivityStart(CancellationToken ct)
                 {
-                    await Task.Run(() => this.ValidateInitialConnectivity(ct));
+                    await Task.Run(() => this.ValidateInitialConnectivity(ct), CancellationToken.None);
                 }
 
                 Task OnValidateInitialConnectivityStop(CancellationToken ct) => Task.CompletedTask;
@@ -391,9 +391,9 @@ namespace Orleans.Runtime.MembershipService
 
                 async Task OnBecomeActiveStart(CancellationToken ct)
                 {
-                    await Task.Run(() => this.BecomeActive(ct));
+                    await Task.Run(() => this.BecomeActive(ct), CancellationToken.None);
                     var heartbeatToken = this.cancellation.Token;
-                    tasks.Add(Task.Run(() => this.UpdateIAmAlive(heartbeatToken)));
+                    tasks.Add(Task.Run(() => this.UpdateIAmAlive(heartbeatToken), CancellationToken.None));
                 }
 
                 async Task OnBecomeActiveStop(CancellationToken ct)
@@ -407,7 +407,7 @@ namespace Orleans.Runtime.MembershipService
                     {
                         if (ct.IsCancellationRequested)
                         {
-                            await Task.Run(() => this.BecomeStopping(cleanup.Token));
+                            await Task.Run(() => this.BecomeStopping(cleanup.Token), CancellationToken.None);
                         }
                         else
                         {
@@ -419,7 +419,7 @@ namespace Orleans.Runtime.MembershipService
                             if (ReferenceEquals(task, gracePeriod))
                             {
                                 LogWarningGracefulShutdownAborted(this.log);
-                                await Task.Run(() => this.BecomeStopping(cleanup.Token));
+                                await Task.Run(() => this.BecomeStopping(cleanup.Token), CancellationToken.None);
                             }
                             else
                             {

@@ -260,7 +260,7 @@ namespace Orleans.Runtime.MembershipService
             Task OnStart(CancellationToken ct)
             {
                 var shutdownToken = _shutdownCts.Token;
-                task = Task.Run(() => ProcessMembershipUpdates(shutdownToken));
+                task = Task.Run(() => ProcessMembershipUpdates(shutdownToken), CancellationToken.None);
                 return Task.CompletedTask;
             }
 
