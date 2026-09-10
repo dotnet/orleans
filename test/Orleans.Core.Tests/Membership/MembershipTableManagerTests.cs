@@ -1008,7 +1008,7 @@ namespace NonSilo.Tests.Membership
         {
             var readCompletion = new TaskCompletionSource<MembershipTableData>(TaskCreationOptions.RunContinuationsAsynchronously);
             var membershipTable = new LegacyMembershipTable(Substitute.For<IMembershipTable>());
-            membershipTable.ReadAll().Returns(readCompletion.Task);
+            membershipTable.ConfigureReadAll(readCompletion.Task);
             using var manager = this.CreateMembershipTableManager(membershipTable);
             using var cancellation = new CancellationTokenSource();
             var first = manager.Refresh(cancellationToken: cancellation.Token);
@@ -1031,7 +1031,7 @@ namespace NonSilo.Tests.Membership
         {
             var readCompletion = new TaskCompletionSource<MembershipTableData>(TaskCreationOptions.RunContinuationsAsynchronously);
             var membershipTable = new LegacyMembershipTable(Substitute.For<IMembershipTable>());
-            membershipTable.ReadAll().Returns(readCompletion.Task);
+            membershipTable.ConfigureReadAll(readCompletion.Task);
             using var manager = this.CreateMembershipTableManager(membershipTable);
             var refresh = manager.Refresh(cancellationToken: TestContext.Current.CancellationToken);
 
@@ -1049,12 +1049,12 @@ namespace NonSilo.Tests.Membership
             var cancellationToken = TestContext.Current.CancellationToken;
             var initial = await new InMemoryMembershipTable(new TableVersion(1, "1")).ReadAll();
             var membershipTable = new LegacyMembershipTable(Substitute.For<IMembershipTable>());
-            membershipTable.ReadAll().Returns(initial);
+            membershipTable.ConfigureReadAll(initial);
             using var manager = this.CreateMembershipTableManager(membershipTable);
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
             await this.lifecycle.OnStart(cancellationToken);
             var readCompletion = new TaskCompletionSource<MembershipTableData>(TaskCreationOptions.RunContinuationsAsynchronously);
-            membershipTable.ReadAll().Returns(readCompletion.Task);
+            membershipTable.ConfigureReadAll(readCompletion.Task);
             var refresh = manager.Refresh(cancellationToken: cancellationToken);
 
             await this.lifecycle.OnStop(cancellationToken);
@@ -1063,7 +1063,7 @@ namespace NonSilo.Tests.Membership
             await refresh;
             Assert.Equal(new MembershipVersion(2), manager.MembershipTableSnapshot.Version);
 
-            membershipTable.ReadAll().Returns(await new InMemoryMembershipTable(new TableVersion(3, "3")).ReadAll());
+            membershipTable.ConfigureReadAll(await new InMemoryMembershipTable(new TableVersion(3, "3")).ReadAll());
             await manager.Refresh(cancellationToken: cancellationToken);
             Assert.Equal(new MembershipVersion(3), manager.MembershipTableSnapshot.Version);
             this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
@@ -1074,14 +1074,14 @@ namespace NonSilo.Tests.Membership
         {
             var cancellationToken = TestContext.Current.CancellationToken;
             var membershipTable = new LegacyMembershipTable(Substitute.For<IMembershipTable>());
-            membershipTable.ReadAll().Returns(await new InMemoryMembershipTable(new TableVersion(1, "1")).ReadAll());
+            membershipTable.ConfigureReadAll(await new InMemoryMembershipTable(new TableVersion(1, "1")).ReadAll());
             var tick = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             using var manager = this.CreateMembershipTableManager(
                 membershipTable, timerFactory: new DelegateAsyncTimerFactory((_, _) => new DelegateAsyncTimer(_ => tick.Task)));
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
             await this.lifecycle.OnStart(cancellationToken);
             var stopping = new TaskCompletionSource<Task>(TaskCreationOptions.RunContinuationsAsynchronously);
-            membershipTable.ReadAll().Returns(_ =>
+            membershipTable.ConfigureReadAll(() =>
             {
                 stopping.SetResult(this.lifecycle.OnStop(cancellationToken));
                 return Task.FromException<MembershipTableData>(new InvalidOperationException("Provider failure during shutdown"));
@@ -1102,7 +1102,7 @@ namespace NonSilo.Tests.Membership
         {
             var cancellationToken = TestContext.Current.CancellationToken;
             var membershipTable = new LegacyMembershipTable(Substitute.For<IMembershipTable>());
-            membershipTable.ReadAll().Returns(await new InMemoryMembershipTable(new TableVersion(1, "1")).ReadAll());
+            membershipTable.ConfigureReadAll(await new InMemoryMembershipTable(new TableVersion(1, "1")).ReadAll());
             var clock = new BackoffTimeProvider();
             using var manager = this.CreateMembershipTableManager(
                 membershipTable, clock, new DelegateAsyncTimerFactory((_, _) => new DelegateAsyncTimer(_ => Task.FromResult(false))));
@@ -1110,7 +1110,7 @@ namespace NonSilo.Tests.Membership
             await this.lifecycle.OnStart(cancellationToken);
             var workerRead = new TaskCompletionSource<MembershipTableData>(TaskCreationOptions.RunContinuationsAsynchronously);
             var workerStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            membershipTable.ReadAll().Returns(_ =>
+            membershipTable.ConfigureReadAll(() =>
             {
                 workerStarted.TrySetResult();
                 return workerRead.Task;
@@ -1118,7 +1118,7 @@ namespace NonSilo.Tests.Membership
             await manager.TryKill(Silo("127.0.0.1:200@100"), cancellationToken);
             await workerStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
             var older = Silo("127.0.0.1:100@99");
-            membershipTable.ReadAll().Returns(await new InMemoryMembershipTable(
+            membershipTable.ConfigureReadAll(await new InMemoryMembershipTable(
                 new TableVersion(2, "2"), Entry(older, SiloStatus.Active, DateTimeOffset.UtcNow)).ReadAll());
             using var events = new DiagnosticEventCollector(MembershipEvents.ListenerName);
             var acknowledged = events.WaitForEventAsync(
@@ -1147,7 +1147,7 @@ namespace NonSilo.Tests.Membership
                 workerRead.SetException(new InvalidOperationException("Late worker read failure"));
             }
 
-            membershipTable.ReadAll().Returns(await new InMemoryMembershipTable(new TableVersion(3, "3")).ReadAll());
+            membershipTable.ConfigureReadAll(await new InMemoryMembershipTable(new TableVersion(3, "3")).ReadAll());
             await manager.Refresh(cancellationToken: cancellationToken);
             Assert.Equal(new MembershipVersion(3), manager.MembershipTableSnapshot.Version);
         }
@@ -1157,7 +1157,7 @@ namespace NonSilo.Tests.Membership
         {
             var readCompletion = new TaskCompletionSource<MembershipTableData>(TaskCreationOptions.RunContinuationsAsynchronously);
             var membershipTable = new LegacyMembershipTable(Substitute.For<IMembershipTable>());
-            membershipTable.ReadAll().Returns(readCompletion.Task);
+            membershipTable.ConfigureReadAll(readCompletion.Task);
             using var manager = this.CreateMembershipTableManager(membershipTable);
             using var cancellation = new CancellationTokenSource();
             var update = ((IMembershipManager)manager).UpdateLocalStatus(SiloStatus.Joining, cancellation.Token);
@@ -1176,9 +1176,9 @@ namespace NonSilo.Tests.Membership
         public async Task UpdateLocalStatus_Cancellation_LeavesProviderWriteRunning()
         {
             var membershipTable = new LegacyMembershipTable(Substitute.For<IMembershipTable>());
-            membershipTable.ReadAll().Returns(await new InMemoryMembershipTable(new TableVersion(1, "1")).ReadAll());
+            membershipTable.ConfigureReadAll(await new InMemoryMembershipTable(new TableVersion(1, "1")).ReadAll());
             var write = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-            membershipTable.InsertRow(Arg.Any<MembershipEntry>(), Arg.Any<TableVersion>()).Returns(write.Task);
+            membershipTable.ConfigureInsertRow(write.Task);
             using var manager = this.CreateMembershipTableManager(membershipTable);
             using var cancellation = new CancellationTokenSource();
             var update = ((IMembershipManager)manager).UpdateLocalStatus(SiloStatus.Joining, cancellation.Token);
@@ -1198,7 +1198,7 @@ namespace NonSilo.Tests.Membership
         {
             var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var membershipTable = new LegacyMembershipTable(Substitute.For<IMembershipTable>());
-            membershipTable.UpdateIAmAlive(Arg.Any<MembershipEntry>()).Returns(completion.Task);
+            membershipTable.ConfigureUpdateIAmAlive(completion.Task);
             using var manager = this.CreateMembershipTableManager(membershipTable);
             using var cancellation = new CancellationTokenSource();
             var update = ((IMembershipManager)manager).UpdateIAmAlive(cancellation.Token);
@@ -1254,7 +1254,7 @@ namespace NonSilo.Tests.Membership
         {
             var readCompletion = new TaskCompletionSource<MembershipTableData>(TaskCreationOptions.RunContinuationsAsynchronously);
             var membershipTable = new LegacyMembershipTable(Substitute.For<IMembershipTable>());
-            membershipTable.ReadAll().Returns(readCompletion.Task);
+            membershipTable.ConfigureReadAll(readCompletion.Task);
             using var manager = this.CreateMembershipTableManager(membershipTable);
             var refresh = manager.Refresh(cancellationToken: TestContext.Current.CancellationToken);
             using var cancellation = new CancellationTokenSource();
@@ -1352,10 +1352,10 @@ namespace NonSilo.Tests.Membership
             var cancellationToken = TestContext.Current.CancellationToken;
             var clock = new FakeTimeProvider();
             var backingTable = new LegacyMembershipTable(Substitute.For<IMembershipTable>());
-            backingTable.ReadAll().Returns(await new InMemoryMembershipTable(
+            backingTable.ConfigureReadAll(await new InMemoryMembershipTable(
                 new TableVersion(1, "1"), Entry(Silo("127.0.0.1:200@100"), SiloStatus.Active, DateTimeOffset.UtcNow)).ReadAll());
             var write = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-            backingTable.InsertRow(Arg.Any<MembershipEntry>(), Arg.Any<TableVersion>()).Returns(write.Task);
+            backingTable.ConfigureInsertRow(write.Task);
             using var manager = this.CreateMembershipTableManager(CreateSystemTargetBasedMembershipTable(backingTable), clock);
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
             await this.lifecycle.OnStart(cancellationToken);
