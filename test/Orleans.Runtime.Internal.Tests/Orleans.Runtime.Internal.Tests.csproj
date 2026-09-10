@@ -13,6 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Orleans.AdvancedReminders\Orleans.AdvancedReminders.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Azure\Orleans.Persistence.AzureStorage\Orleans.Persistence.AzureStorage.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Reminders.TestKit\Orleans.Reminders.TestKit.csproj" PrivateAssets="all" />
     <ProjectReference Include="$(SourceRoot)test\Orleans.Runtime.Tests\Orleans.Runtime.Tests.csproj" />
