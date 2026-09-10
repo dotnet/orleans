@@ -13,14 +13,7 @@ namespace Orleans.Streams
     {
         private const char KeySeparator = '-';
         private const string StorageProviderKeyPrefix = "__orleans_storage_provider__-";
-        private readonly IStreamCheckpointerGrain _grain;
-        private readonly GrainStreamQueueCheckpointerOptions _options;
-        private readonly object _lock = new();
-
-        private string _latestCheckpoint = string.Empty;
-        private string _persistedCheckpoint = string.Empty;
-        private Task _inProgressSave = Task.CompletedTask;
-        private DateTime? _throttleSavesUntilUtc;
+        private readonly StreamQueueCheckpointer _inner;
 
         /// <summary>
         /// Initializes a new instance with default options.
@@ -55,21 +48,17 @@ namespace Orleans.Streams
                     nameof(options));
             }
 
-            _grain = grain;
-            _options = options;
+            _inner = new StreamQueueCheckpointer(
+                new StreamCheckpointStoreAdapter(grain),
+                new StreamQueueCheckpointerOptions
+                {
+                    CheckpointComparer = options.CheckpointComparer,
+                    PersistInterval = options.PersistInterval,
+                });
         }
 
         /// <inheritdoc />
-        public bool CheckpointExists
-        {
-            get
-            {
-                lock (_lock)
-                {
-                    return !string.IsNullOrEmpty(_latestCheckpoint);
-                }
-            }
-        }
+        public bool CheckpointExists => _inner.CheckpointExists;
 
         /// <summary>
         /// Creates and initializes a grain-based checkpointer with default options.
@@ -182,17 +171,7 @@ namespace Orleans.Streams
         public Task<string> Load() => Load(CancellationToken.None);
 
         /// <inheritdoc />
-        public async Task<string> Load(CancellationToken cancellationToken)
-        {
-            var checkpoint = await _grain.Load(cancellationToken);
-            lock (_lock)
-            {
-                _latestCheckpoint = checkpoint;
-                _persistedCheckpoint = checkpoint;
-            }
-
-            return checkpoint;
-        }
+        public Task<string> Load(CancellationToken cancellationToken) => _inner.Load(cancellationToken);
 
         /// <inheritdoc />
         [Obsolete("Use the overload which accepts a CancellationToken.")]
@@ -201,121 +180,30 @@ namespace Orleans.Streams
 
         /// <inheritdoc />
         public void Update(string offset, DateTime utcNow, CancellationToken cancellationToken)
-        {
-            ArgumentNullException.ThrowIfNull(offset);
-            cancellationToken.ThrowIfCancellationRequested();
-
-            lock (_lock)
-            {
-                if (string.Equals(_latestCheckpoint, offset, StringComparison.Ordinal)
-                    || (_options.CheckpointComparer is { } comparer
-                        && !string.IsNullOrEmpty(_latestCheckpoint)
-                        && comparer.Compare(offset, _latestCheckpoint) <= 0))
-                {
-                    return;
-                }
-
-                _latestCheckpoint = offset;
-                if (_throttleSavesUntilUtc.HasValue && (_throttleSavesUntilUtc.Value > utcNow || !_inProgressSave.IsCompleted))
-                {
-                    return;
-                }
-
-                _throttleSavesUntilUtc = utcNow + _options.PersistInterval;
-                _inProgressSave = Save(offset, cancellationToken);
-                _inProgressSave.Ignore();
-            }
-        }
+            => _inner.Update(offset, utcNow, cancellationToken);
 
         /// <inheritdoc />
-        public async Task FlushAsync(CancellationToken cancellationToken)
+        public Task FlushAsync(CancellationToken cancellationToken)
+            => _inner.FlushAsync(cancellationToken);
+
+        private sealed class StreamCheckpointStoreAdapter(IStreamCheckpointerGrain grain) : IStreamCheckpointStore
         {
-            var retryingSave = false;
-            while (true)
+            public async ValueTask<StreamCheckpointStoreState> Load(CancellationToken cancellationToken)
             {
-                Task inProgressSave;
-                lock (_lock)
-                {
-                    inProgressSave = _inProgressSave;
-                }
-
-                if (retryingSave)
-                {
-                    await inProgressSave.WaitAsync(cancellationToken);
-                }
-                else
-                {
-                    try
-                    {
-                        await inProgressSave.WaitAsync(cancellationToken);
-                    }
-                    catch (Exception) when (!cancellationToken.IsCancellationRequested)
-                    {
-                    }
-
-                    cancellationToken.ThrowIfCancellationRequested();
-                }
-
-                lock (_lock)
-                {
-                    if (!ReferenceEquals(inProgressSave, _inProgressSave))
-                    {
-                        retryingSave = false;
-                        continue;
-                    }
-
-                    if (string.Equals(_persistedCheckpoint, _latestCheckpoint, StringComparison.Ordinal))
-                    {
-                        return;
-                    }
-
-                    _inProgressSave = Save(_latestCheckpoint, cancellationToken);
-                    retryingSave = true;
-                }
-            }
-        }
-
-        private async Task Save(string checkpoint, CancellationToken cancellationToken)
-        {
-            string expectedCheckpoint;
-            lock (_lock)
-            {
-                expectedCheckpoint = _persistedCheckpoint;
+                var checkpoint = await grain.Load(cancellationToken).ConfigureAwait(false);
+                return new(checkpoint, checkpoint);
             }
 
-            while (true)
+            public async ValueTask<StreamCheckpointStoreState> Update(
+                string checkpoint,
+                string expectedVersion,
+                CancellationToken cancellationToken)
             {
-                var persistedCheckpoint = await _grain.Update(
+                var persistedCheckpoint = await grain.Update(
                     checkpoint,
-                    expectedCheckpoint,
-                    cancellationToken);
-
-                lock (_lock)
-                {
-                    _persistedCheckpoint = persistedCheckpoint;
-                    if (string.Equals(persistedCheckpoint, checkpoint, StringComparison.Ordinal))
-                    {
-                        return;
-                    }
-
-                    if (_options.CheckpointComparer is not { } comparer)
-                    {
-                        _latestCheckpoint = persistedCheckpoint;
-                        return;
-                    }
-
-                    if (comparer.Compare(_latestCheckpoint, persistedCheckpoint) <= 0)
-                    {
-                        _latestCheckpoint = persistedCheckpoint;
-                    }
-
-                    if (comparer.Compare(checkpoint, persistedCheckpoint) <= 0)
-                    {
-                        return;
-                    }
-
-                    expectedCheckpoint = persistedCheckpoint;
-                }
+                    expectedVersion,
+                    cancellationToken).ConfigureAwait(false);
+                return new(persistedCheckpoint, persistedCheckpoint);
             }
         }
     }

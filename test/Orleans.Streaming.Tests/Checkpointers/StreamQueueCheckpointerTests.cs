@@ -74,6 +74,20 @@ public abstract class StreamQueueCheckpointerTests
         Assert.Equal(["20"], store.CompletedWrites);
     }
 
+    [Theory]
+    [InlineData("9", "10")]
+    [InlineData("99", "100")]
+    public async Task Update_AcrossNumericBoundary_PersistsCheckpoint(string persisted, string candidate)
+    {
+        var (checkpointer, store) = await CreateLoadedSubject(persisted);
+
+        checkpointer.Update(candidate, TestTimeUtc, CancellationToken.None);
+        await checkpointer.FlushAsync(CancellationToken.None);
+
+        Assert.Equal(candidate, store.PersistedCheckpoint);
+        Assert.Equal([candidate], store.CompletedWrites);
+    }
+
     [Fact]
     public async Task Update_WithinPersistInterval_ThrottlesWriteUntilFlush()
     {
