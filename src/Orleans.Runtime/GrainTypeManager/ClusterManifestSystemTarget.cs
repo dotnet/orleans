@@ -1,6 +1,8 @@
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Metadata;
+using Orleans.Runtime.Metadata;
 
 namespace Orleans.Runtime
 {
@@ -12,6 +14,8 @@ namespace Orleans.Runtime
         private readonly ClusterManifestUpdate? _noUpdate = default;
         private MembershipVersion _cachedMembershipVersion;
         private ClusterManifestUpdate? _cachedUpdate;
+        private MajorMinorVersion _cachedHashSummaryVersion;
+        private ClusterManifestHashSummary? _cachedHashSummary;
 
         public ClusterManifestSystemTarget(
             IClusterMembershipService clusterMembershipService,
@@ -29,6 +33,41 @@ namespace Orleans.Runtime
         {
             cancellationToken.ThrowIfCancellationRequested();
             return new(_clusterManifestProvider.Current);
+        }
+
+        public ValueTask<ClusterManifestHashSummary> GetClusterManifestHashSummary(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var manifest = _clusterManifestProvider.Current;
+
+            // Reuse the summary while the version is unchanged. Individual content hashes are cached by
+            // immutable manifest identity across versions and across silos with identical manifests.
+            if (_cachedHashSummary is null || manifest.Version != _cachedHashSummaryVersion)
+            {
+                var hashes = new Dictionary<SiloAddress, ManifestHash>();
+                foreach (var siloManifest in manifest.Silos)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    hashes[siloManifest.Key] = ManifestHashCalculator.ComputeHash(siloManifest.Value);
+                }
+
+                _cachedHashSummary = new ClusterManifestHashSummary(manifest.Version, hashes);
+                _cachedHashSummaryVersion = manifest.Version;
+            }
+
+            return new(_cachedHashSummary);
+        }
+
+        public ValueTask<ManifestHash> GetSiloManifestHash(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return new(ManifestHashCalculator.ComputeHash(_siloManifest));
+        }
+
+        public ValueTask<GrainManifest?> GetSiloManifestByHash(ManifestHash hash, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return new(hash == ManifestHashCalculator.ComputeHash(_siloManifest) ? _siloManifest : null);
         }
 
         public ValueTask<ClusterManifestUpdate?> GetClusterManifestUpdate(
