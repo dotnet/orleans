@@ -37,7 +37,7 @@ foreach ($line in [IO.File]::ReadAllLines($resolvedExpectedArtifacts)) {
     if ($coverageId -notmatch '^test_output_[A-Za-z0-9_.-]+$') {
         throw "Invalid coverage artifact identity '$coverageId'"
     }
-    if ($coverageId -cmatch '-attempt-[1-9][0-9]*(?:-retry)?$') {
+    if ($coverageId -match '-attempt-[1-9][0-9]*(?:-retry)?$') {
         throw "Coverage artifact identity '$coverageId' uses the reserved attempt suffix"
     }
     $artifactName = "coverage_$coverageId"

@@ -861,6 +861,15 @@ exit 0
     Invoke-Test 'rejects missing and unexpected coverage artifacts' {
         $testCase = New-TestCase
         $expectedArtifacts = Join-Path $testCase.Root 'expected.txt'
+        $reservedExpectedArtifacts = Join-Path $testCase.Root 'reserved-expected.txt'
+        [IO.File]::WriteAllText(
+            $reservedExpectedArtifacts,
+            'test_output_a-Attempt-1',
+            [Text.UTF8Encoding]::new($false)
+        )
+        Assert-Throws `
+            { Invoke-ArtifactValidator $testCase.ReportDirectory $reservedExpectedArtifacts } `
+            'uses the reserved attempt suffix'
         [IO.File]::WriteAllLines(
             $expectedArtifacts,
             @('test_output_a', 'test_output_B'),
@@ -1245,6 +1254,7 @@ exit 0
             'Each selected test job must publish its exact coverage report.'
         Assert-Equal 3 ([regex]::Matches($archiveTestResultsAction, 'uses: actions/upload-artifact@')).Count 'Coverage must have one distinct-name retry.'
         Assert-Equal 1 ([regex]::Matches($archiveTestResultsAction, 'run: Start-Sleep -Seconds 30')).Count 'Coverage upload retry delay count differs.'
+        Assert-Equal 3 ([regex]::Matches($archiveTestResultsAction, "if: steps\.archive-coverage\.outcome == 'failure'")).Count 'Coverage retry steps must depend only on the initial upload outcome.'
         Assert-Equal 0 ([regex]::Matches($archiveTestResultsAction, 'overwrite: true')).Count 'Artifact uploads must not replace an ambiguous partial upload.'
         Assert-Equal 2 ([regex]::Matches($archiveTestResultsAction, 'if-no-files-found: error')).Count 'Both coverage upload attempts must require the report.'
         Assert-Equal 2 ([regex]::Matches($archiveTestResultsAction, 'continue-on-error: true')).Count 'Only diagnostic upload and the initial coverage attempt may remain advisory.'
