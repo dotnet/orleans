@@ -35,7 +35,12 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="lastMessagePurged">The last message removed.</param>
         /// <param name="itemsPurged">The number of messages removed.</param>
         void OnPurgeCompleted(CachedMessage? lastMessagePurged, int itemsPurged)
-            => OnPurged?.Invoke(lastMessagePurged, null);
+        {
+            if (itemsPurged > 0)
+            {
+                OnPurged?.Invoke(lastMessagePurged, null);
+            }
+        }
     }
 
     /// <summary>

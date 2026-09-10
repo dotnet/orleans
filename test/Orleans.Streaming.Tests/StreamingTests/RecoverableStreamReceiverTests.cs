@@ -963,6 +963,32 @@ public sealed class RecoverableStreamReceiverTests
     }
 
     [Fact]
+    public void CacheProgress_WithoutRemovedMessagesDoesNotReportPurge()
+    {
+        var streamId = StreamId.Create("namespace", Guid.NewGuid());
+        var purgeNotifications = 0;
+        var evictionStrategy = new NoOpEvictionStrategy
+        {
+            OnPurged = (_, _) => purgeNotifications++,
+        };
+        var cache = new RecoverableStreamQueueCache<TestQueueMessage>(
+            100,
+            new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(4 * 1024)),
+            new TestDataAdapter(),
+            evictionStrategy,
+            NullLogger.Instance);
+        _ = cache.Add(
+            [new TestQueueMessage(streamId, 11, "payload")],
+            DateTime.UnixEpoch);
+
+        cache.UpdateDeliveryProgress(new EventSequenceTokenV2(10), DateTime.UtcNow);
+        cache.UpdateReplayProgress(new EventSequenceTokenV2(11), inclusive: false, DateTime.UtcNow);
+
+        Assert.Equal(0, purgeNotifications);
+        Assert.Equal(1, cache.ItemCount);
+    }
+
+    [Fact]
     public void Cache_UnlimitedFlowControlUsesConfiguredReadLimit()
     {
         var cache = new RecoverableStreamQueueCache<TestQueueMessage>(
