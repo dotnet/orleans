@@ -78,7 +78,9 @@ namespace Orleans.Runtime.Messaging
         {
             if (!msg.TargetGrain.IsClient()) return false;
             if (this.Gateway is Gateway gateway && gateway.TryDeliverToProxy(msg)
-                || this.hostedClient is HostedClient client && client.TryDispatchToClient(msg))
+                || !IsForwardedClientRequestUpdate(msg)
+                    && this.hostedClient is HostedClient client
+                    && client.TryDispatchToClient(msg))
             {
                 _messageObserver?.Invoke(msg);
                 return true;
@@ -527,9 +529,50 @@ namespace Orleans.Runtime.Messaging
             {
                 sendMessage = client.SendMessage;
             }
+            else if (IsForwardedClientRequest(message, _siloAddress))
+            {
+                sendMessage = SendForwardedClientRequest;
+            }
 
             ResendMessageImpl(message, forwardingAddress, sendMessage);
             return true;
+        }
+
+        internal static bool IsForwardedClientRequest(Message message, SiloAddress localSilo) =>
+            message.Direction == Message.Directions.Request
+            && message.SendingGrain.IsClient()
+            && message.SendingSilo is { } ingressGateway
+            && !ingressGateway.Matches(localSilo);
+
+        internal static bool IsForwardedClientRequestUpdate(Message message) =>
+            message.Direction == Message.Directions.Response
+            && message.Result == Message.ResponseTypes.Status
+            && message.BodyObject is SiloAddress
+            && message.ForwardCount > 0;
+
+        private void SendForwardedClientRequest(Message message, Connection? destination, Exception? exception)
+        {
+            if (destination is null)
+            {
+                var reason = exception is null
+                    ? "Target silo is known to be dead"
+                    : $"Exception while forwarding message: {exception}";
+                SendRejection(
+                    message,
+                    Message.RejectionTypes.Transient,
+                    reason,
+                    exception);
+                return;
+            }
+
+            var update = messageFactory.CreateResponseMessage(message);
+            update.Result = Message.ResponseTypes.Status;
+            update.BodyObject = _siloAddress;
+            update.ForwardCount = message.ForwardCount;
+            update.CacheInvalidationHeader = null;
+            update.RequestContextData = null;
+            SendMessage(update);
+            destination.Send(message);
         }
 
         private void ResendMessageImpl(
@@ -634,6 +677,10 @@ namespace Orleans.Runtime.Messaging
             {
                 this.messagingTrace.OnIncomingMessageAgentReceiveMessage(msg);
                 if (TryDeliverToProxy(msg))
+                {
+                    return;
+                }
+                else if (IsForwardedClientRequestUpdate(msg))
                 {
                     return;
                 }
