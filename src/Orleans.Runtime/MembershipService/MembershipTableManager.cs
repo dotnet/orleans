@@ -47,7 +47,13 @@ namespace Orleans.Runtime.MembershipService
         private readonly CancellationTokenSource _lifetimeCts = new();
 
         private readonly Task _suspectOrKillsListTask;
-        private readonly Channel<SuspectOrKillRequest> _trySuspectOrKillChannel = Channel.CreateBounded<SuspectOrKillRequest>(new BoundedChannelOptions(100) { FullMode = BoundedChannelFullMode.DropOldest });
+        private readonly Channel<SuspectOrKillRequest> _trySuspectOrKillChannel = Channel.CreateBounded<SuspectOrKillRequest>(
+            new BoundedChannelOptions(100) { FullMode = BoundedChannelFullMode.DropOldest },
+            static request =>
+            {
+                request.Completion?.TrySetException(new OrleansException(
+                    $"Membership cleanup request for {request.SiloAddress} was dropped because the request queue is full."));
+            });
 
         private MembershipState _state;
         private int _fatalTerminationTriggered;

@@ -1153,6 +1153,65 @@ namespace NonSilo.Tests.Membership
         }
 
         [Fact]
+        public async Task Refresh_QueueOverflowSettlesCleanupAcknowledgment()
+        {
+            await QueueOverflowSettlesCleanupAcknowledgment(retryWrite: false);
+        }
+
+        [Fact]
+        public async Task Refresh_RetryQueueOverflowSettlesCleanupAcknowledgment()
+        {
+            await QueueOverflowSettlesCleanupAcknowledgment(retryWrite: true);
+        }
+
+        private async Task QueueOverflowSettlesCleanupAcknowledgment(bool retryWrite)
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var membershipTable = new LegacyMembershipTable(Substitute.For<IMembershipTable>());
+            membershipTable.ConfigureReadAll(await new InMemoryMembershipTable(new TableVersion(1, "1")).ReadAll());
+            var clock = new BackoffTimeProvider();
+            using var manager = this.CreateMembershipTableManager(
+                membershipTable, clock, new DelegateAsyncTimerFactory((_, _) => new DelegateAsyncTimer(_ => Task.FromResult(false))));
+            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
+            await this.lifecycle.OnStart(cancellationToken);
+            var workerRead = new TaskCompletionSource<MembershipTableData>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var workerStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            membershipTable.ConfigureReadAll(() =>
+            {
+                workerStarted.TrySetResult();
+                return workerRead.Task;
+            });
+            await manager.TryKill(Silo("127.0.0.1:200@100"), cancellationToken);
+            await workerStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+            membershipTable.ConfigureReadAll(await new InMemoryMembershipTable(
+                new TableVersion(2, "2"), Entry(Silo("127.0.0.1:100@99"), SiloStatus.Active, DateTimeOffset.UtcNow)).ReadAll());
+
+            var refresh = manager.Refresh(cancellationToken: cancellationToken);
+            Assert.False(refresh.IsCompleted);
+            var writes = retryWrite ? 99 : 100;
+            for (var i = 0; i < writes; i++)
+            {
+                await manager.TryKill(Silo("127.0.0.1:300@100"), cancellationToken);
+            }
+
+            if (retryWrite)
+            {
+                Assert.False(refresh.IsCompleted);
+                workerRead.SetException(new InvalidOperationException("Retry the request after filling its queue"));
+                await clock.TimerCreated.Task.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+            }
+
+            await refresh.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+            Assert.Equal(new MembershipVersion(2), manager.MembershipTableSnapshot.Version);
+            await this.lifecycle.OnStop(cancellationToken).WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+            if (!retryWrite)
+            {
+                Assert.False(workerRead.Task.IsCompleted);
+                workerRead.SetException(new InvalidOperationException("Late worker read failure"));
+            }
+        }
+
+        [Fact]
         public async Task UpdateLocalStatus_Cancellation_StopsPendingReadWithoutRetry()
         {
             var readCompletion = new TaskCompletionSource<MembershipTableData>(TaskCreationOptions.RunContinuationsAsynchronously);
