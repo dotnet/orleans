@@ -1,7 +1,7 @@
 ---
 title: Operate and tune Orleans streams
 description: Apply backpressure, tune persistent providers, and observe Orleans streaming health.
-ms.date: 08/17/2026
+ms.date: 09/10/2026
 ms.topic: concept-article
 ---
 
@@ -48,6 +48,14 @@ Persistent providers expose common configuration through their stream configurat
 Provider-specific controls matter as much as common controls: <xref:Orleans.Configuration.AzureQueueOptions.QueueNames>, Event Hubs partitions and cache-pressure settings, Redis `ReadCount` and retention, NATS `BatchSize` and `PartitionCount`, and ADO.NET visibility, expiry, and dead-letter settings.
 
 Change one bottleneck at a time. More queues can increase parallelism but also broker cost, polling load, cache memory, and rebalance work. Reducing polling delay can lower latency while increasing empty reads.
+
+### Tune memory stream dequeue batches
+
+For each named memory stream provider, <xref:Orleans.Configuration.MemoryStreamCacheOptions.MaxAddCount> bounds the number of queue records requested in a single dequeue operation. The default is `100`, and options validation requires a value greater than zero. Configure it on the silo using <xref:Orleans.Hosting.MemoryStreamConfiguratorExtensions.ConfigureCache*> in the provider's `AddMemoryStreams` callback. For configuration-based provider registration, set `MaxAddCount` in the named memory provider's configuration section.
+
+Each record contains one published batch of events. A value such as `25` reduces the number of records combined into each queue-grain response, at the cost of more dequeue calls for the same throughput. Larger values amortize call overhead across more records and can increase serialization work, response size, and memory usage per call.
+
+The bound is measured in records. The aggregate byte size depends on the serialized payloads in those records, including all events in each published batch. Size producer batches and payloads so that a complete dequeue response fits the configured Orleans message-body limit. The queue grain removes records before its response is serialized; an oversized response can therefore lose those records when serialization fails. Tune the count alongside measured response sizes and queue lag.
 
 ## Observe health
 

@@ -27,6 +27,7 @@ namespace Orleans.Providers
         where TSerializer : class, IMemoryMessageBodySerializer
     {
         private readonly StreamCacheEvictionOptions cacheOptions;
+        private readonly MemoryStreamCacheOptions memoryCacheOptions;
         private readonly StreamStatisticOptions statisticOptions;
         private readonly HashRingStreamQueueMapperOptions queueMapperOptions;
         private readonly IGrainFactory grainFactory;
@@ -102,6 +103,7 @@ namespace Orleans.Providers
             this.logger = loggerFactory.CreateLogger<ILogger<MemoryAdapterFactory<TSerializer>>>();
             this.serializer = MemoryMessageBodySerializerFactory<TSerializer>.GetOrCreateSerializer(serviceProvider);
             this.orleansInstruments = serviceProvider.GetRequiredService<OrleansInstruments>();
+            this.memoryCacheOptions = serviceProvider.GetOptionsByName<MemoryStreamCacheOptions>(providerName);
 
             var nameBytes = BitConverter.IsLittleEndian ? MemoryMarshal.AsBytes(Name.AsSpan()) : Encoding.Unicode.GetBytes(Name);
             XxHash64.Hash(nameBytes, MemoryMarshal.AsBytes(MemoryMarshal.CreateSpan(ref _nameHash, 1)));
@@ -193,7 +195,7 @@ namespace Orleans.Providers
             var logger = this.loggerFactory.CreateLogger($"{typeof(MemoryPooledCache<TSerializer>).FullName}.{this.Name}.{queueId}");
             var cacheMonitorFactory = this.CacheMonitorFactory!; // Set during Init().
             var monitor = cacheMonitorFactory(new CacheMonitorDimensions(queueId.ToString(), this.blockPoolMonitorDimensions.BlockPoolId));
-            return new MemoryPooledCache<TSerializer>(bufferPool, purgePredicate, logger, this.serializer, monitor, this.statisticOptions.StatisticMonitorWriteInterval, this.cacheOptions.MetadataMinTimeInCache);
+            return new MemoryPooledCache<TSerializer>(bufferPool, purgePredicate, logger, this.serializer, monitor, this.statisticOptions.StatisticMonitorWriteInterval, this.cacheOptions.MetadataMinTimeInCache, this.memoryCacheOptions.MaxAddCount);
         }
 
         /// <inheritdoc />
