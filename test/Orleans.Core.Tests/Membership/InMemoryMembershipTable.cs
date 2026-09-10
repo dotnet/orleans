@@ -53,8 +53,12 @@ namespace NonSilo.Tests.Membership
             }
         }
 
-        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
+        [Obsolete("Use the overload accepting a CancellationToken instead.")]
+        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) => CleanupDefunctSiloEntries(beforeDate, CancellationToken.None);
+
+        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             this.OnCleanupDefunctSiloEntries?.Invoke(beforeDate);
             lock (this.tableLock)
             {
@@ -77,8 +81,12 @@ namespace NonSilo.Tests.Membership
             return Task.CompletedTask;
         }
 
-        public Task DeleteMembershipTableEntries(string clusterId)
+        [Obsolete("Use the overload accepting a CancellationToken instead.")]
+        public Task DeleteMembershipTableEntries(string clusterId) => DeleteMembershipTableEntries(clusterId, CancellationToken.None);
+
+        public Task DeleteMembershipTableEntries(string clusterId, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             lock (this.tableLock)
             {
                 this.calls.Add((nameof(DeleteMembershipTableEntries), clusterId));
@@ -87,8 +95,12 @@ namespace NonSilo.Tests.Membership
             return Task.CompletedTask;
         }
 
-        public Task InitializeMembershipTable(bool tryInitTableVersion)
+        [Obsolete("Use the overload accepting a CancellationToken instead.")]
+        public Task InitializeMembershipTable(bool tryInitTableVersion) => InitializeMembershipTable(tryInitTableVersion, CancellationToken.None);
+
+        public Task InitializeMembershipTable(bool tryInitTableVersion, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             lock (this.tableLock)
             {
                 this.calls.Add((nameof(InitializeMembershipTable), tryInitTableVersion));
@@ -97,8 +109,12 @@ namespace NonSilo.Tests.Membership
             return Task.CompletedTask;
         }
 
-        public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion)
+        [Obsolete("Use the overload accepting a CancellationToken instead.")]
+        public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => InsertRow(entry, tableVersion, CancellationToken.None);
+
+        public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             lock (this.tableLock)
             {
                 this.calls.Add((nameof(InsertRow), (entry, tableVersion)));
@@ -116,8 +132,12 @@ namespace NonSilo.Tests.Membership
             }
         }
 
-        public Task<MembershipTableData> ReadAll()
+        [Obsolete("Use the overload accepting a CancellationToken instead.")]
+        public Task<MembershipTableData> ReadAll() => ReadAll(CancellationToken.None);
+
+        public Task<MembershipTableData> ReadAll(CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             this.OnReadAll?.Invoke();
             lock (this.tableLock)
             {
@@ -129,8 +149,12 @@ namespace NonSilo.Tests.Membership
             }
         }
 
-        public Task<MembershipTableData> ReadRow(SiloAddress key)
+        [Obsolete("Use the overload accepting a CancellationToken instead.")]
+        public Task<MembershipTableData> ReadRow(SiloAddress key) => ReadRow(key, CancellationToken.None);
+
+        public Task<MembershipTableData> ReadRow(SiloAddress key, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             lock (this.tableLock)
             {
                 this.calls.Add((nameof(ReadRow), key));
@@ -141,8 +165,12 @@ namespace NonSilo.Tests.Membership
             }
         }
 
-        public Task UpdateIAmAlive(MembershipEntry entry)
+        [Obsolete("Use the overload accepting a CancellationToken instead.")]
+        public Task UpdateIAmAlive(MembershipEntry entry) => UpdateIAmAlive(entry, CancellationToken.None);
+
+        public Task UpdateIAmAlive(MembershipEntry entry, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             lock (this.tableLock)
             {
                 this.calls.Add((nameof(UpdateIAmAlive), entry));
@@ -154,8 +182,12 @@ namespace NonSilo.Tests.Membership
             }
         }
 
-        public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion)
+        [Obsolete("Use the overload accepting a CancellationToken instead.")]
+        public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => UpdateRow(entry, etag, tableVersion, CancellationToken.None);
+
+        public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             lock (this.tableLock)
             {
                 this.calls.Add((nameof(UpdateRow), (entry, etag, tableVersion)));

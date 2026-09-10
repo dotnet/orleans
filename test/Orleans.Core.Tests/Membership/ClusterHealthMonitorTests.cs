@@ -144,8 +144,8 @@ namespace NonSilo.Tests.Membership
             var lastVersion = testRig.TestAccessor.ObservedVersion;
             foreach (var entry in otherSilos)
             {
-                var table = await this.membershipTable.ReadAll();
-                Assert.True(await this.membershipTable.InsertRow(entry, table.Version.Next()));
+                var table = await this.membershipTable.ReadAll(cancellationToken);
+                Assert.True(await this.membershipTable.InsertRow(entry, table.Version.Next(), cancellationToken));
             }
 
             await testRig.Manager.Refresh(cancellationToken: cancellationToken);
@@ -283,7 +283,7 @@ namespace NonSilo.Tests.Membership
             await this.lifecycle.OnStart(cancellationToken);
 
             var targetSilo = Silo("127.0.0.200:100@100");
-            await this.membershipTable.InsertRow(Entry(targetSilo, SiloStatus.Active, now), this.membershipTable.Version.Next());
+            await this.membershipTable.InsertRow(Entry(targetSilo, SiloStatus.Active, now), this.membershipTable.Version.Next(), cancellationToken);
             await testRig.Manager.Refresh(cancellationToken: cancellationToken);
             await testRig.Manager.UpdateStatus(SiloStatus.Active, cancellationToken);
             await testRig.Manager.Refresh(cancellationToken: cancellationToken);
@@ -312,7 +312,7 @@ namespace NonSilo.Tests.Membership
             await Task.Delay(100, cancellationToken);
 
             // The silo should NOT be dead because the canary detected active connection traffic.
-            var table = await this.membershipTable.ReadAll();
+            var table = await this.membershipTable.ReadAll(cancellationToken);
             var entry = table.Members.SingleOrDefault(m => m.Item1.SiloAddress.Equals(targetSilo));
             Assert.NotNull(entry);
             Assert.NotEqual(SiloStatus.Dead, entry.Item1.Status);
@@ -368,7 +368,7 @@ namespace NonSilo.Tests.Membership
             await this.lifecycle.OnStart(cancellationToken);
 
             var targetSilo = Silo("127.0.0.200:100@100");
-            await this.membershipTable.InsertRow(Entry(targetSilo, SiloStatus.Active, now), this.membershipTable.Version.Next());
+            await this.membershipTable.InsertRow(Entry(targetSilo, SiloStatus.Active, now), this.membershipTable.Version.Next(), cancellationToken);
             await testRig.Manager.Refresh(cancellationToken: cancellationToken);
             await testRig.Manager.UpdateStatus(SiloStatus.Active, cancellationToken);
             await testRig.Manager.Refresh(cancellationToken: cancellationToken);
@@ -394,12 +394,12 @@ namespace NonSilo.Tests.Membership
 
             await Until(async () =>
             {
-                var snapshot = await this.membershipTable.ReadAll();
+                var snapshot = await this.membershipTable.ReadAll(cancellationToken);
                 return snapshot.Members.Any(m => m.Item1.SiloAddress.Equals(targetSilo) && m.Item1.Status == SiloStatus.Dead);
             }, cancellationToken);
 
             // Despite an active connection, the silo SHOULD be dead because the option is disabled.
-            var table = await this.membershipTable.ReadAll();
+            var table = await this.membershipTable.ReadAll(cancellationToken);
             var entry = table.Members.SingleOrDefault(m => m.Item1.SiloAddress.Equals(targetSilo));
             Assert.NotNull(entry);
             Assert.Equal(SiloStatus.Dead, entry.Item1.Status);
@@ -464,11 +464,11 @@ namespace NonSilo.Tests.Membership
             var lastVersion = testRig.TestAccessor.ObservedVersion;
 
             // Add the new silos
-            var table = await this.membershipTable.ReadAll();
+            var table = await this.membershipTable.ReadAll(cancellationToken);
             foreach (var entry in otherSilos)
             {
-                table = await this.membershipTable.ReadAll();
-                Assert.True(await this.membershipTable.InsertRow(entry, table.Version.Next()));
+                table = await this.membershipTable.ReadAll(cancellationToken);
+                Assert.True(await this.membershipTable.InsertRow(entry, table.Version.Next(), cancellationToken));
             }
 
             await testRig.Manager.Refresh(cancellationToken: cancellationToken);
@@ -569,7 +569,7 @@ namespace NonSilo.Tests.Membership
                 }
 
                 // Check that probes match the expected missed probes
-                table = await this.membershipTable.ReadAll();
+                table = await this.membershipTable.ReadAll(cancellationToken);
                 foreach (var siloMonitor in monitoredSilos)
                 {
                     Assert.Equal(expectedMissedProbes, ((SiloHealthMonitor.ITestAccessor)siloMonitor).MissedProbes);
@@ -594,7 +594,7 @@ namespace NonSilo.Tests.Membership
 
             if (enableIndirectProbes && numVotesForDeathDeclaration <= 2 || numVotesForDeathDeclaration == 1)
             {
-                table = await this.membershipTable.ReadAll();
+                table = await this.membershipTable.ReadAll(cancellationToken);
                 Assert.Equal(expectedNumProbedSilos, table.Members.Count(m => m.Item1.Status == SiloStatus.Dead));
 
                 // There is no more to test here, since all of the monitored silos have been killed.
@@ -697,14 +697,14 @@ namespace NonSilo.Tests.Membership
             var lastVersion = testRig.TestAccessor.ObservedVersion;
 
             // Add the new silos
-            var table = await this.membershipTable.ReadAll();
+            var table = await this.membershipTable.ReadAll(cancellationToken);
             foreach (var entry in otherSilos)
             {
-                table = await this.membershipTable.ReadAll();
-                Assert.True(await this.membershipTable.InsertRow(entry, table.Version.Next()));
+                table = await this.membershipTable.ReadAll(cancellationToken);
+                Assert.True(await this.membershipTable.InsertRow(entry, table.Version.Next(), cancellationToken));
             }
 
-            table = await this.membershipTable.ReadAll();
+            table = await this.membershipTable.ReadAll(cancellationToken);
             var joiningEntry = GetEntryFromTable(table, joiningSilo);
             var createdEntry = GetEntryFromTable(table, createdSilo);
 
@@ -722,22 +722,22 @@ namespace NonSilo.Tests.Membership
             // the joining and created silos should not be declared dead until the required number of votes.
             while (votesNeeded > 0)
             {
-                table = await this.membershipTable.ReadAll();
+                table = await this.membershipTable.ReadAll(cancellationToken);
                 joiningEntry = GetEntryFromTable(table, joiningSilo);
                 Assert.NotNull(joiningEntry);
                 joiningEntry.Item1.AddSuspector(otherSilos[0].SiloAddress, DateTime.UtcNow);
-                Assert.True(await this.membershipTable.UpdateRow(joiningEntry.Item1, joiningEntry.Item2, table.Version.Next()));
+                Assert.True(await this.membershipTable.UpdateRow(joiningEntry.Item1, joiningEntry.Item2, table.Version.Next(), cancellationToken));
 
-                table = await this.membershipTable.ReadAll();
+                table = await this.membershipTable.ReadAll(cancellationToken);
                 createdEntry = GetEntryFromTable(table, createdSilo);
                 Assert.NotNull(createdEntry);
                 createdEntry.Item1.AddSuspector(otherSilos[0].SiloAddress, DateTime.UtcNow);
-                Assert.True(await this.membershipTable.UpdateRow(createdEntry.Item1, createdEntry.Item2, table.Version.Next()));
+                Assert.True(await this.membershipTable.UpdateRow(createdEntry.Item1, createdEntry.Item2, table.Version.Next(), cancellationToken));
 
                 votesNeeded--;
             }
 
-            table = await this.membershipTable.ReadAll();
+            table = await this.membershipTable.ReadAll(cancellationToken);
             joiningEntry = GetEntryFromTable(table, joiningSilo);
             createdEntry = GetEntryFromTable(table, createdSilo);
             Assert.NotNull(joiningEntry);
@@ -774,7 +774,7 @@ namespace NonSilo.Tests.Membership
 
             lastVersion = testRig.TestAccessor.ObservedVersion;
 
-            table = await this.membershipTable.ReadAll();
+            table = await this.membershipTable.ReadAll(cancellationToken);
             joiningEntry = GetEntryFromTable(table, joiningSilo);
             createdEntry = GetEntryFromTable(table, createdSilo);
             Assert.NotNull(joiningEntry);

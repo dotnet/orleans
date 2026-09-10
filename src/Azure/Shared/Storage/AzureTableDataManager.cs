@@ -80,7 +80,7 @@ namespace Orleans.GrainDirectory.AzureStorage
 
             try
             {
-                TableServiceClient tableCreationClient = await GetCloudTableCreationClientAsync();
+                TableServiceClient tableCreationClient = await GetCloudTableCreationClientAsync(cancellationToken);
                 var table = tableCreationClient.GetTableClient(TableName);
                 var response = await table.CreateIfNotExistsAsync(cancellationToken);
                 var alreadyExisted = response.GetRawResponse().Status == (int)HttpStatusCode.Conflict;
@@ -249,17 +249,20 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// </summary>
         /// <param name="data">Data to be merged in the table.</param>
         /// <param name="eTag">ETag to apply.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>Value promise with new Etag for this data entry after completing this storage operation.</returns>
-        internal Task<string> MergeTableEntryAsync(T data, string eTag) => MergeTableEntryAsync(data, new ETag(eTag));
+        internal Task<string> MergeTableEntryAsync(T data, string eTag, CancellationToken cancellationToken = default) => MergeTableEntryAsync(data, new ETag(eTag), cancellationToken);
 
         /// <summary>
         /// Merges a data entry in the Azure table.
         /// </summary>
         /// <param name="data">Data to be merged in the table.</param>
         /// <param name="eTag">ETag to apply.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>Value promise with new Etag for this data entry after completing this storage operation.</returns>
-        internal async Task<string> MergeTableEntryAsync(T data, ETag eTag)
+        internal async Task<string> MergeTableEntryAsync(T data, ETag eTag, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             const string operation = "MergeTableEntry";
             var startTime = DateTime.UtcNow;
             LogTraceTableEntry(Logger, operation, data, TableName);
@@ -269,7 +272,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                 {
                     // Merge requires an ETag (which may be the '*' wildcard).
                     data.ETag = eTag;
-                    var opResult = await Table.UpdateEntityAsync(data, data.ETag, TableUpdateMode.Merge);
+                    var opResult = await Table.UpdateEntityAsync(data, data.ETag, TableUpdateMode.Merge, cancellationToken);
                     return opResult.Headers.ETag.GetValueOrDefault().ToString();
                 }
                 catch (Exception exc)
@@ -464,9 +467,11 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// Fails if the data does not already exist or if eTag does not match.
         /// </summary>
         /// <param name="collection">Data entries and their corresponding etags to be deleted from the table.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>Completion promise for this storage operation.</returns>
-        public async Task DeleteTableEntriesAsync(List<(T Entity, string ETag)> collection)
+        public async Task DeleteTableEntriesAsync(List<(T Entity, string ETag)> collection, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             const string operation = "DeleteTableEntries";
             var startTime = DateTime.UtcNow;
             LogTraceTableEntries(Logger, operation, new(collection), TableName);
@@ -496,7 +501,7 @@ namespace Orleans.GrainDirectory.AzureStorage
 
                 try
                 {
-                    _ = await Table.SubmitTransactionAsync(entityBatch);
+                    _ = await Table.SubmitTransactionAsync(entityBatch, cancellationToken);
                 }
                 catch (Exception exc)
                 {
@@ -608,8 +613,9 @@ namespace Orleans.GrainDirectory.AzureStorage
             }
         }
 
-        internal async Task CreateTableEntriesAsync(IReadOnlyCollection<T> collection)
+        internal async Task CreateTableEntriesAsync(IReadOnlyCollection<T> collection, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             const string operation = "CreateTableEntries";
             const int maxTransactionSize = 100;
             ArgumentNullException.ThrowIfNull(collection);
@@ -633,7 +639,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                         transaction.Add(new TableTransactionAction(TableTransactionActionType.Add, entry));
                     }
 
-                    await Table.SubmitTransactionAsync(transaction);
+                    await Table.SubmitTransactionAsync(transaction, cancellationToken);
                 }
                 catch (Exception exception)
                 {
@@ -650,8 +656,10 @@ namespace Orleans.GrainDirectory.AzureStorage
         internal async Task<(string CreatedEntryETag, string UpdatedEntryETag)> CreateAndUpdateTableEntriesAsync(
             T entryToCreate,
             (T Entity, string ETag) entryToUpdate,
-            (T First, T Second)? entriesToUpsert = null)
+            (T First, T Second)? entriesToUpsert = null,
+            CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             const string operation = "CreateAndUpdateTableEntries";
             ArgumentNullException.ThrowIfNull(entryToUpdate.Entity);
             string? entryToUpdateString = entryToUpdate.Entity.ToString();
@@ -674,7 +682,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                         transaction.Add(new TableTransactionAction(TableTransactionActionType.UpsertReplace, upserts.Second));
                     }
 
-                    var opResults = await Table.SubmitTransactionAsync(transaction);
+                    var opResults = await Table.SubmitTransactionAsync(transaction, cancellationToken);
 
                     //The batch results are returned in order of execution,
                     //see reference at https://msdn.microsoft.com/en-us/library/microsoft.windowsazure.storage.table.cloudtable.executebatch.aspx.
@@ -698,8 +706,10 @@ namespace Orleans.GrainDirectory.AzureStorage
         internal async Task<(string FirstEntryETag, string SecondEntryETag)> UpdateTableEntriesAsync(
             (T Entity, string ETag) firstEntry,
             (T Entity, string ETag) secondEntry,
-            (T First, T Second)? entriesToUpsert = null)
+            (T First, T Second)? entriesToUpsert = null,
+            CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             const string operation = "UpdateTableEntries";
             ArgumentNullException.ThrowIfNull(firstEntry.Entity);
             ArgumentNullException.ThrowIfNull(secondEntry.Entity);
@@ -729,7 +739,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                         entityBatch.Add(new TableTransactionAction(TableTransactionActionType.UpsertReplace, upserts.Second));
                     }
 
-                    var opResults = await Table.SubmitTransactionAsync(entityBatch);
+                    var opResults = await Table.SubmitTransactionAsync(entityBatch, cancellationToken);
 
                     //The batch results are returned in order of execution,
                     //see reference at https://msdn.microsoft.com/en-us/library/microsoft.windowsazure.storage.table.cloudtable.executebatch.aspx.
@@ -750,11 +760,16 @@ namespace Orleans.GrainDirectory.AzureStorage
             }
         }
 
-        private async ValueTask<TableServiceClient> GetCloudTableCreationClientAsync()
+        private async ValueTask<TableServiceClient> GetCloudTableCreationClientAsync(CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
-                return await options.CreateClient();
+                // TableServiceClient is not disposable. The factory can be supplied by
+                // applications and does not accept a token, so cancellation only bounds this wait.
+                var clientTask = options.CreateClient();
+                clientTask.Ignore();
+                return await clientTask.WaitAsync(cancellationToken);
             }
             catch (Exception exc)
             {

@@ -1,5 +1,7 @@
+using System.Reflection;
 using Orleans;
 using Orleans.Runtime;
+using Orleans.Serialization.Invocation;
 using TestExtensions;
 using Xunit;
 
@@ -22,6 +24,30 @@ public class MembershipTableCancellationTests
         nameof(IMembershipTable.UpdateRow),
         nameof(IMembershipTable.UpdateIAmAlive),
     };
+
+    [Theory]
+    [InlineData(nameof(IMembershipTable.InitializeMembershipTable), "FB89E5E9")]
+    [InlineData(nameof(IMembershipTable.DeleteMembershipTableEntries), "BF899C85")]
+    [InlineData(nameof(IMembershipTable.CleanupDefunctSiloEntries), "7A519C2E")]
+    [InlineData(nameof(IMembershipTable.ReadRow), "D851FB33")]
+    [InlineData(nameof(IMembershipTable.ReadAll), "00BCE16F")]
+    [InlineData(nameof(IMembershipTable.InsertRow), "FEF3AC5A")]
+    [InlineData(nameof(IMembershipTable.UpdateRow), "E06D3DBC")]
+    [InlineData(nameof(IMembershipTable.UpdateIAmAlive), "B1A52D2B")]
+    public void CancellationOverload_UsesLegacyWireIdentity(string methodName, string legacyId)
+    {
+        var method = Assert.Single(typeof(IMembershipTable).GetMethods(),
+            candidate => candidate.Name == methodName && candidate.GetParameters().LastOrDefault()?.ParameterType == typeof(CancellationToken));
+        Assert.Equal(legacyId, Assert.Single(method.GetCustomAttributes<AliasAttribute>()).Alias);
+        var invokableType = Assert.Single(typeof(IMembershipTable).Assembly.GetTypes(),
+            type => typeof(IInvokable).IsAssignableFrom(type)
+                && type.GetCustomAttributes<CompoundTypeAliasAttribute>().Any(
+                    alias => alias.Components.SequenceEqual(new object[] { "inv", typeof(GrainReference), typeof(IMembershipTable), legacyId })));
+        using var invokable = Assert.IsAssignableFrom<IInvokable>(Activator.CreateInstance(invokableType));
+        Assert.Equal(method, invokable.GetMethod());
+        Assert.True(invokable.IsCancellable);
+        Assert.Equal(typeof(IMembershipTable), invokable.GetInterfaceType());
+    }
 
     [Theory]
     [MemberData(nameof(Operations))]
@@ -159,19 +185,27 @@ public class MembershipTableCancellationTests
         public MembershipEntry Entry { get; } = new() { SiloAddress = SiloAddress.FromParsableString("127.0.0.1:100@100") };
         public MembershipTableData Data { get; } = new(new TableVersion(1, "version"));
 
+        [Obsolete("Use the overload accepting a CancellationToken instead.")]
         public Task InitializeMembershipTable(bool tryInitTableVersion) => Record(nameof(InitializeMembershipTable), tryInitTableVersion);
+        [Obsolete("Use the overload accepting a CancellationToken instead.")]
         public Task DeleteMembershipTableEntries(string clusterId) => Record(nameof(DeleteMembershipTableEntries), clusterId);
+        [Obsolete("Use the overload accepting a CancellationToken instead.")]
         public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) => Record(nameof(CleanupDefunctSiloEntries), beforeDate);
+        [Obsolete("Use the overload accepting a CancellationToken instead.")]
         public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => Record(nameof(InsertRow), entry, tableVersion);
+        [Obsolete("Use the overload accepting a CancellationToken instead.")]
         public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => Record(nameof(UpdateRow), entry, etag, tableVersion);
+        [Obsolete("Use the overload accepting a CancellationToken instead.")]
         public Task UpdateIAmAlive(MembershipEntry entry) => Record(nameof(UpdateIAmAlive), entry);
 
+        [Obsolete("Use the overload accepting a CancellationToken instead.")]
         public async Task<MembershipTableData> ReadRow(SiloAddress key)
         {
             await Record(nameof(ReadRow), key);
             return Data;
         }
 
+        [Obsolete("Use the overload accepting a CancellationToken instead.")]
         public async Task<MembershipTableData> ReadAll()
         {
             await Record(nameof(ReadAll));

@@ -50,13 +50,13 @@ namespace Tester.AzureUtils
             output.WriteLine("ClusterId={0} Generation={1}", this.clusterId, generation);
 
             output.WriteLine("Initializing SiloInstanceManager");
+            using var initializationCancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+            initializationCancellation.CancelAfter(SiloInstanceTableTestConstants.Timeout);
             manager = OrleansSiloInstanceManager.GetManager(
                 this.clusterId,
                 fixture.LoggerFactory,
-                new AzureStorageClusteringOptions { TableName = new AzureStorageClusteringOptions().TableName }.ConfigureTestDefaults())
-                .WaitAsync(
-                    SiloInstanceTableTestConstants.Timeout,
-                    TestContext.Current.CancellationToken)
+                new AzureStorageClusteringOptions { TableName = new AzureStorageClusteringOptions().TableName }.ConfigureTestDefaults(),
+                initializationCancellation.Token)
                 .GetAwaiter()
                 .GetResult();
         }
@@ -73,8 +73,7 @@ namespace Tester.AzureUtils
                 using var cleanupCancellation = new CancellationTokenSource(timeout);
                 try
                 {
-                    manager.DeleteTableEntries(this.clusterId)
-                        .WaitAsync(cleanupCancellation.Token)
+                    manager.DeleteTableEntries(this.clusterId, cleanupCancellation.Token)
                         .GetAwaiter()
                         .GetResult();
 
@@ -117,7 +116,7 @@ namespace Tester.AzureUtils
         public async Task SiloInstanceTable_Op_CleanDeadSiloInstance()
         {
             // Register a silo entry
-            await manager.TryCreateTableVersionEntryAsync();
+            await manager.TryCreateTableVersionEntryAsync(TestContext.Current.CancellationToken);
             this.generation = 0;
             await RegisterSiloInstance();
             // and mark it as dead
@@ -134,7 +133,7 @@ namespace Tester.AzureUtils
 
             await Task.Delay(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
 
-            await manager.CleanupDefunctSiloEntries(DateTime.Now - TimeSpan.FromSeconds(1));
+            await manager.CleanupDefunctSiloEntries(DateTime.Now - TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken);
 
             var entries = await manager.FindAllSiloEntries(TestContext.Current.CancellationToken);
             Assert.Equal(5, entries.Count);
@@ -153,10 +152,9 @@ namespace Tester.AzureUtils
         [Fact, TestCategory("Functional")]
         public async Task SiloInstanceTable_Op_CreateSiloEntryConditionally()
         {
-            bool didInsert = await manager.TryCreateTableVersionEntryAsync()
-                .WaitAsync(
-                    new AzureStoragePolicyOptions().OperationTimeout,
-                    TestContext.Current.CancellationToken);
+            using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+            cancellation.CancelAfter(new AzureStoragePolicyOptions().OperationTimeout);
+            bool didInsert = await manager.TryCreateTableVersionEntryAsync(cancellation.Token);
 
             Assert.True(didInsert, "Did insert");
             var before = await manager.ReadSingleTableEntryAsync(
@@ -235,7 +233,7 @@ namespace Tester.AzureUtils
         [Fact, TestCategory("Functional")]
         public async Task SiloInstanceTable_FindAllGatewayProxyEndpoints()
         {
-            await manager.TryCreateTableVersionEntryAsync();
+            await manager.TryCreateTableVersionEntryAsync(TestContext.Current.CancellationToken);
             await RegisterSiloInstance();
 
             var gateways = await manager.FindAllGatewayProxyEndpoints();

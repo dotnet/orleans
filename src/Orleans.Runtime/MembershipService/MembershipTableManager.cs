@@ -1063,9 +1063,9 @@ namespace Orleans.Runtime.MembershipService
 
             async Task OnRuntimeGrainServicesStart(CancellationToken ct)
             {
-                await Task.Run(() => this.Start(ct), ct);
+                await Task.Run(() => this.Start(ct));
                 var shutdownToken = _shutdownCts.Token;
-                tasks.Add(Task.Run(() => this.PeriodicallyRefreshMembershipTable(shutdownToken), shutdownToken));
+                tasks.Add(Task.Run(() => this.PeriodicallyRefreshMembershipTable(shutdownToken)));
             }
 
             async Task OnRuntimeGrainServicesStop(CancellationToken ct)

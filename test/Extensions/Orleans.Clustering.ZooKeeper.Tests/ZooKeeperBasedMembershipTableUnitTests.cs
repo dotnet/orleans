@@ -1,6 +1,7 @@
 using System;
 using System.Net;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -62,7 +63,7 @@ namespace UnitTests.MembershipTests
 
             var exception = Assert.Throws<ArgumentNullException>(() =>
             {
-                returnedTask = sut.InsertRow(null!, CreateTableVersion());
+                returnedTask = sut.InsertRow(null!, CreateTableVersion(), TestContext.Current.CancellationToken);
             });
 
             Assert.Equal("entry", exception.ParamName);
@@ -77,7 +78,7 @@ namespace UnitTests.MembershipTests
 
             var exception = Assert.Throws<ArgumentNullException>(() =>
             {
-                returnedTask = sut.InsertRow(CreateMembershipEntry(), null!);
+                returnedTask = sut.InsertRow(CreateMembershipEntry(), null!, TestContext.Current.CancellationToken);
             });
 
             Assert.Equal("tableVersion", exception.ParamName);
@@ -92,7 +93,7 @@ namespace UnitTests.MembershipTests
 
             var exception = Assert.Throws<ArgumentNullException>(() =>
             {
-                returnedTask = sut.InsertRow(null!, null!);
+                returnedTask = sut.InsertRow(null!, null!, TestContext.Current.CancellationToken);
             });
 
             Assert.Equal("entry", exception.ParamName);
@@ -107,7 +108,7 @@ namespace UnitTests.MembershipTests
 
             var exception = Assert.Throws<ArgumentNullException>(() =>
             {
-                returnedTask = sut.UpdateRow(null!, "17", CreateTableVersion());
+                returnedTask = sut.UpdateRow(null!, "17", CreateTableVersion(), TestContext.Current.CancellationToken);
             });
 
             Assert.Equal("entry", exception.ParamName);
@@ -122,7 +123,7 @@ namespace UnitTests.MembershipTests
 
             var exception = Assert.Throws<ArgumentNullException>(() =>
             {
-                returnedTask = sut.UpdateRow(CreateMembershipEntry(), "17", null!);
+                returnedTask = sut.UpdateRow(CreateMembershipEntry(), "17", null!, TestContext.Current.CancellationToken);
             });
 
             Assert.Equal("tableVersion", exception.ParamName);
@@ -137,7 +138,7 @@ namespace UnitTests.MembershipTests
 
             var exception = Assert.Throws<ArgumentNullException>(() =>
             {
-                returnedTask = sut.UpdateRow(CreateMembershipEntry(), null!, CreateTableVersion());
+                returnedTask = sut.UpdateRow(CreateMembershipEntry(), null!, CreateTableVersion(), TestContext.Current.CancellationToken);
             });
 
             Assert.Equal("etag", exception.ParamName);
@@ -152,7 +153,7 @@ namespace UnitTests.MembershipTests
 
             var exception = Assert.Throws<ArgumentNullException>(() =>
             {
-                returnedTask = sut.UpdateRow(null!, "17", null!);
+                returnedTask = sut.UpdateRow(null!, "17", null!, TestContext.Current.CancellationToken);
             });
 
             Assert.Equal("entry", exception.ParamName);
@@ -167,11 +168,44 @@ namespace UnitTests.MembershipTests
 
             var exception = Assert.Throws<ArgumentNullException>(() =>
             {
-                returnedTask = sut.UpdateIAmAlive(null!);
+                returnedTask = sut.UpdateIAmAlive(null!, TestContext.Current.CancellationToken);
             });
 
             Assert.Equal("entry", exception.ParamName);
             Assert.Null(returnedTask);
+        }
+
+        [Theory]
+        [InlineData(nameof(IMembershipTable.InitializeMembershipTable))]
+        [InlineData(nameof(IMembershipTable.DeleteMembershipTableEntries))]
+        [InlineData(nameof(IMembershipTable.CleanupDefunctSiloEntries))]
+        [InlineData(nameof(IMembershipTable.ReadRow))]
+        [InlineData(nameof(IMembershipTable.ReadAll))]
+        [InlineData(nameof(IMembershipTable.InsertRow))]
+        [InlineData(nameof(IMembershipTable.UpdateRow))]
+        [InlineData(nameof(IMembershipTable.UpdateIAmAlive))]
+        public async Task MembershipOperations_PreCanceledToken_DoesNotCreateClient(string operation)
+        {
+            var sut = CreateSut("127.0.0.1:invalid-port");
+            using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+            cancellation.Cancel();
+            var cancellationToken = cancellation.Token;
+            Func<Task> invoke = operation switch
+            {
+                nameof(IMembershipTable.InitializeMembershipTable) => () => sut.InitializeMembershipTable(true, cancellationToken),
+                nameof(IMembershipTable.DeleteMembershipTableEntries) => () => sut.DeleteMembershipTableEntries("cluster-a", cancellationToken),
+                nameof(IMembershipTable.CleanupDefunctSiloEntries) => () => sut.CleanupDefunctSiloEntries(DateTimeOffset.UnixEpoch, cancellationToken),
+                nameof(IMembershipTable.ReadRow) => () => sut.ReadRow(CreateSiloAddress(), cancellationToken),
+                nameof(IMembershipTable.ReadAll) => () => sut.ReadAll(cancellationToken),
+                nameof(IMembershipTable.InsertRow) => () => sut.InsertRow(CreateMembershipEntry(), CreateTableVersion(), cancellationToken),
+                nameof(IMembershipTable.UpdateRow) => () => sut.UpdateRow(CreateMembershipEntry(), "17", CreateTableVersion(), cancellationToken),
+                nameof(IMembershipTable.UpdateIAmAlive) => () => sut.UpdateIAmAlive(CreateMembershipEntry(), cancellationToken),
+                _ => throw new ArgumentOutOfRangeException(nameof(operation)),
+            };
+
+            var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(invoke);
+
+            Assert.Equal(cancellationToken, exception.CancellationToken);
         }
 
         [Theory]

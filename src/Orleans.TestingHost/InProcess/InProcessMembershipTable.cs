@@ -20,10 +20,21 @@ internal sealed class InProcessMembershipTable(string clusterId) : IMembershipTa
     public TimeSpan MaxStaleness => TimeSpan.Zero;
     public bool IsUpdatable => true;
 
-    public Task InitializeMembershipTable(bool tryInitTableVersion) => Task.CompletedTask;
+    [Obsolete("Use the overload accepting a CancellationToken instead.")]
+    public Task InitializeMembershipTable(bool tryInitTableVersion) => InitializeMembershipTable(tryInitTableVersion, CancellationToken.None);
 
-    public Task DeleteMembershipTableEntries(string clusterId)
+    public Task InitializeMembershipTable(bool tryInitTableVersion, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.CompletedTask;
+    }
+
+    [Obsolete("Use the overload accepting a CancellationToken instead.")]
+    public Task DeleteMembershipTableEntries(string clusterId) => DeleteMembershipTableEntries(clusterId, CancellationToken.None);
+
+    public Task DeleteMembershipTableEntries(string clusterId, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         if (string.Equals(_clusterId, clusterId, StringComparison.Ordinal))
         {
             _table.Clear();
@@ -32,22 +43,58 @@ internal sealed class InProcessMembershipTable(string clusterId) : IMembershipTa
         return Task.CompletedTask;
     }
 
-    public Task<MembershipTableData> ReadRow(SiloAddress key) => Task.FromResult(_table.Read(key));
+    [Obsolete("Use the overload accepting a CancellationToken instead.")]
+    public Task<MembershipTableData> ReadRow(SiloAddress key) => ReadRow(key, CancellationToken.None);
 
-    public Task<MembershipTableData> ReadAll() => Task.FromResult(_table.ReadAll());
-
-    public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => Task.FromResult(_table.Insert(entry, tableVersion));
-
-    public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => Task.FromResult(_table.Update(entry, etag, tableVersion));
-
-    public Task UpdateIAmAlive(MembershipEntry entry)
+    public Task<MembershipTableData> ReadRow(SiloAddress key, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(_table.Read(key));
+    }
+
+    [Obsolete("Use the overload accepting a CancellationToken instead.")]
+    public Task<MembershipTableData> ReadAll() => ReadAll(CancellationToken.None);
+
+    public Task<MembershipTableData> ReadAll(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(_table.ReadAll());
+    }
+
+    [Obsolete("Use the overload accepting a CancellationToken instead.")]
+    public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => InsertRow(entry, tableVersion, CancellationToken.None);
+
+    public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(_table.Insert(entry, tableVersion));
+    }
+
+    [Obsolete("Use the overload accepting a CancellationToken instead.")]
+    public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => UpdateRow(entry, etag, tableVersion, CancellationToken.None);
+
+    public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(_table.Update(entry, etag, tableVersion));
+    }
+
+    [Obsolete("Use the overload accepting a CancellationToken instead.")]
+    public Task UpdateIAmAlive(MembershipEntry entry) => UpdateIAmAlive(entry, CancellationToken.None);
+
+    public Task UpdateIAmAlive(MembershipEntry entry, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         _table.UpdateIAmAlive(entry);
         return Task.CompletedTask;
     }
 
-    public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
+    [Obsolete("Use the overload accepting a CancellationToken instead.")]
+    public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) => CleanupDefunctSiloEntries(beforeDate, CancellationToken.None);
+
+    public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         _table.CleanupDefunctSiloEntries(beforeDate);
         return Task.CompletedTask;
     }

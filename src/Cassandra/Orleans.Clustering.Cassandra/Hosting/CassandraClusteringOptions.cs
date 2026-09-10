@@ -48,17 +48,31 @@ public class CassandraClusteringOptions
     /// </summary>
     /// <param name="connectionString">The connection string.</param>
     /// <param name="keyspace">The keyspace.</param>
+    /// <remarks>The membership provider owns the created cluster and disposes it if initialization is canceled or the provider is disposed.</remarks>
     public void ConfigureClient(string connectionString, string keyspace = "orleans")
     {
         ArgumentException.ThrowIfNullOrEmpty(connectionString);
         ArgumentNullException.ThrowIfNull(keyspace);
+        OwnsSession = true;
         CreateSessionAsync = async sp =>
         {
             var c = Cluster.Builder().WithConnectionString(connectionString)
                 .Build();
 
-            var session = await c.ConnectAsync(keyspace).ConfigureAwait(false);
-            return session;
+            var connected = false;
+            try
+            {
+                var session = await c.ConnectAsync(keyspace).ConfigureAwait(false);
+                connected = true;
+                return session;
+            }
+            finally
+            {
+                if (!connected)
+                {
+                    c.Dispose();
+                }
+            }
         };
     }
 
@@ -66,12 +80,16 @@ public class CassandraClusteringOptions
     /// Configures the Cassandra client.
     /// </summary>
     /// <param name="configurationDelegate">The connection string.</param>
+    /// <remarks>Sessions returned by this delegate remain owned by the caller and are not disposed by the membership provider.</remarks>
     public void ConfigureClient(Func<IServiceProvider, Task<ISession>> configurationDelegate)
     {
         ArgumentNullException.ThrowIfNull(configurationDelegate);
+        OwnsSession = false;
         CreateSessionAsync = configurationDelegate;
     }
 
     [NotNull]
     internal Func<IServiceProvider, Task<ISession>> CreateSessionAsync { get; private set; } = default!;
+
+    internal bool OwnsSession { get; private set; }
 }

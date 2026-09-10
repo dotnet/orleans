@@ -121,7 +121,7 @@ namespace NonSilo.Tests.Membership
                         timerCall.Completion.TrySetResult(false);
                     }
                 }
-            }, CancellationToken.None).Ignore();
+            }).Ignore();
 
             await stopTask;
             _timerCalls.Writer.TryComplete();
@@ -186,7 +186,8 @@ namespace NonSilo.Tests.Membership
             var intermediary = Silo("127.0.0.1:1234@1234");
             await _membershipTable.InsertRow(
                 Entry(intermediary, SiloStatus.Active, DateTime.UtcNow),
-                _membershipTable.Version.Next());
+                _membershipTable.Version.Next(),
+                cancellationToken);
             await _membershipService.Refresh(cancellationToken: cancellationToken);
             _prober.ProbeIndirectly(default!, default!, default, default, cancellationToken).ReturnsForAnyArgs(new IndirectProbeResponse
             {
@@ -377,8 +378,8 @@ namespace NonSilo.Tests.Membership
             timerCall.Completion.TrySetResult(true);
 
             var otherSilo = Silo("127.0.0.1:1234@1234");
-            await _membershipTable.InsertRow(Entry(_monitor.TargetSiloAddress, SiloStatus.Active), _membershipTable.Version.Next());
-            await _membershipTable.InsertRow(Entry(otherSilo, SiloStatus.Joining), _membershipTable.Version.Next());
+            await _membershipTable.InsertRow(Entry(_monitor.TargetSiloAddress, SiloStatus.Active), _membershipTable.Version.Next(), cancellationToken);
+            await _membershipTable.InsertRow(Entry(otherSilo, SiloStatus.Joining), _membershipTable.Version.Next(), cancellationToken);
             await _membershipService.Refresh(cancellationToken: cancellationToken);
 
             // There is only one other active silo (the target silo), so an indirect probe cannot be performed.
@@ -389,8 +390,8 @@ namespace NonSilo.Tests.Membership
             Assert.Equal(0, probeResult.IntermediaryHealthDegradationScore);
 
             // Make the other silo active so that there is an intermediary to use for an indirect probe.
-            var etag = (await _membershipTable.ReadAll()).Members.Where(kv => kv.Item1.SiloAddress.Equals(otherSilo)).Single().Item2;
-            await _membershipTable.UpdateRow(Entry(otherSilo, SiloStatus.Active, iAmAliveTime: DateTime.UtcNow), etag, _membershipTable.Version.Next());
+            var etag = (await _membershipTable.ReadAll(cancellationToken)).Members.Where(kv => kv.Item1.SiloAddress.Equals(otherSilo)).Single().Item2;
+            await _membershipTable.UpdateRow(Entry(otherSilo, SiloStatus.Active, iAmAliveTime: DateTime.UtcNow), etag, _membershipTable.Version.Next(), cancellationToken);
             await _membershipService.Refresh(cancellationToken: cancellationToken);
 
             _prober.ClearReceivedCalls();
@@ -481,7 +482,8 @@ namespace NonSilo.Tests.Membership
             var staleSilo = Silo("127.0.0.1:3333@3333");
             await _membershipTable.InsertRow(
                 Entry(staleSilo, SiloStatus.Active, DateTime.UtcNow - TimeSpan.FromMinutes(30)),
-                _membershipTable.Version.Next());
+                _membershipTable.Version.Next(),
+                cancellationToken);
             _prober.ClearReceivedCalls();
 
             // Trigger another timer cycle which will now attempt an indirect probe.

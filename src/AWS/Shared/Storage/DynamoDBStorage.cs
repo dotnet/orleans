@@ -490,7 +490,17 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="conditionValues">Optional field/attribute values used in the conditional expression</param>
         /// <returns></returns>
         public Task PutEntryAsync(string tableName, Dictionary<string, AttributeValue> fields, string conditionExpression = "", Dictionary<string, AttributeValue>? conditionValues = null)
+            => PutEntryAsync(tableName, fields, CancellationToken.None, conditionExpression, conditionValues);
+
+        /// <summary>Creates or replaces an entry using the supplied cancellation token.</summary>
+        /// <param name="tableName">The table name.</param>
+        /// <param name="fields">The fields to write.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <param name="conditionExpression">The optional conditional expression.</param>
+        /// <param name="conditionValues">The conditional expression values.</param>
+        public Task PutEntryAsync(string tableName, Dictionary<string, AttributeValue> fields, CancellationToken cancellationToken, string conditionExpression = "", Dictionary<string, AttributeValue>? conditionValues = null)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             LogTraceCreatingTableEntry(_logger, tableName, new(fields));
 
             try
@@ -502,7 +512,7 @@ namespace Orleans.Transactions.DynamoDB
                 if (conditionValues != null && conditionValues.Keys.Count > 0)
                     request.ExpressionAttributeValues = conditionValues;
 
-                return _ddbClient.PutItemAsync(request);
+                return _ddbClient.PutItemAsync(request, cancellationToken);
             }
             catch (Exception exc)
             {
@@ -523,10 +533,25 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="extraExpressionValues">Additional field/attribute that will be used in the extraExpression</param>
         /// <remarks>The fields dictionary item values will be updated with the values returned from DynamoDB</remarks>
         /// <returns></returns>
-        public async Task UpsertEntryAsync(string tableName, Dictionary<string, AttributeValue> keys, Dictionary<string, AttributeValue> fields,
+        public Task UpsertEntryAsync(string tableName, Dictionary<string, AttributeValue> keys, Dictionary<string, AttributeValue> fields,
             string conditionExpression = "", Dictionary<string, AttributeValue>? conditionValues = null, string extraExpression = "",
             Dictionary<string, AttributeValue>? extraExpressionValues = null)
+            => UpsertEntryAsync(tableName, keys, fields, CancellationToken.None, conditionExpression, conditionValues, extraExpression, extraExpressionValues);
+
+        /// <summary>Creates or updates an entry using the supplied cancellation token.</summary>
+        /// <param name="tableName">The table name.</param>
+        /// <param name="keys">The entry keys.</param>
+        /// <param name="fields">The fields to write, updated with values returned by DynamoDB.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <param name="conditionExpression">The optional conditional expression.</param>
+        /// <param name="conditionValues">The conditional expression values.</param>
+        /// <param name="extraExpression">The additional update expression.</param>
+        /// <param name="extraExpressionValues">The additional expression values.</param>
+        public async Task UpsertEntryAsync(string tableName, Dictionary<string, AttributeValue> keys, Dictionary<string, AttributeValue> fields,
+            CancellationToken cancellationToken, string conditionExpression = "", Dictionary<string, AttributeValue>? conditionValues = null,
+            string extraExpression = "", Dictionary<string, AttributeValue>? extraExpressionValues = null)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             LogTraceUpsertingEntry(_logger, new(fields), new(keys), tableName);
 
             try
@@ -544,7 +569,7 @@ namespace Orleans.Transactions.DynamoDB
                 if (!string.IsNullOrWhiteSpace(conditionExpression))
                     request.ConditionExpression = conditionExpression;
 
-                var result = await _ddbClient.UpdateItemAsync(request);
+                var result = await _ddbClient.UpdateItemAsync(request, cancellationToken);
 
                 foreach (var key in result.Attributes.Keys)
                 {
@@ -664,7 +689,15 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="toDelete">List of key values for each entry that must be deleted in the batch</param>
         /// <returns></returns>
         public Task DeleteEntriesAsync(string tableName, IReadOnlyCollection<Dictionary<string, AttributeValue>> toDelete)
+            => DeleteEntriesAsync(tableName, toDelete, CancellationToken.None);
+
+        /// <summary>Deletes a batch of entries using the supplied cancellation token.</summary>
+        /// <param name="tableName">The table name.</param>
+        /// <param name="toDelete">The keys of the entries to delete.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        public Task DeleteEntriesAsync(string tableName, IReadOnlyCollection<Dictionary<string, AttributeValue>> toDelete, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             LogTraceDeletingTableEntries(_logger, tableName);
 
             if (toDelete == null) throw new ArgumentNullException(nameof(toDelete));
@@ -686,7 +719,7 @@ namespace Orleans.Transactions.DynamoDB
                     batch.Add(writeRequest);
                 }
                 request.RequestItems.Add(tableName, batch);
-                return _ddbClient.BatchWriteItemAsync(request);
+                return _ddbClient.BatchWriteItemAsync(request, cancellationToken);
             }
             catch (Exception exc)
             {
@@ -703,8 +736,18 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="keys">The table entry keys to search for</param>
         /// <param name="resolver">Function that will be called to translate the returned fields into a concrete type. This Function is only called if the result is != null</param>
         /// <returns>The object translated by the resolver function</returns>
-        public async Task<TResult?> ReadSingleEntryAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys, Func<Dictionary<string, AttributeValue>, TResult> resolver) where TResult : class
+        public Task<TResult?> ReadSingleEntryAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys, Func<Dictionary<string, AttributeValue>, TResult> resolver) where TResult : class
+            => ReadSingleEntryAsync(tableName, keys, resolver, CancellationToken.None);
+
+        /// <summary>Reads an entry using the supplied cancellation token.</summary>
+        /// <typeparam name="TResult">The result type.</typeparam>
+        /// <param name="tableName">The table name.</param>
+        /// <param name="keys">The entry keys.</param>
+        /// <param name="resolver">Converts the returned fields to the result.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        public async Task<TResult?> ReadSingleEntryAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys, Func<Dictionary<string, AttributeValue>, TResult> resolver, CancellationToken cancellationToken) where TResult : class
         {
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
                 var request = new GetItemRequest
@@ -714,7 +757,7 @@ namespace Orleans.Transactions.DynamoDB
                     ConsistentRead = true
                 };
 
-                var response = await _ddbClient.GetItemAsync(request);
+                var response = await _ddbClient.GetItemAsync(request, cancellationToken);
 
                 if (response.IsItemSet)
                 {
@@ -745,8 +788,23 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="lastEvaluatedKey">The primary key of the first item that this operation will evaluate. Use the value that was returned for LastEvaluatedKey in the previous operation</param>
         /// <param name="consistentRead">Determines the read consistency model. Note that if a GSI is used, this must be false.</param>
         /// <returns>The collection containing a list of objects translated by the resolver function and the LastEvaluatedKey for paged results</returns>
-        public async Task<(List<TResult> results, Dictionary<string, AttributeValue>? lastEvaluatedKey)> QueryAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys, string keyConditionExpression, Func<Dictionary<string, AttributeValue>, TResult> resolver, string indexName = "", bool scanIndexForward = true, Dictionary<string, AttributeValue>? lastEvaluatedKey = null, bool consistentRead = true) where TResult : class
+        public Task<(List<TResult> results, Dictionary<string, AttributeValue>? lastEvaluatedKey)> QueryAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys, string keyConditionExpression, Func<Dictionary<string, AttributeValue>, TResult> resolver, string indexName = "", bool scanIndexForward = true, Dictionary<string, AttributeValue>? lastEvaluatedKey = null, bool consistentRead = true) where TResult : class
+            => QueryAsync(tableName, keys, keyConditionExpression, resolver, CancellationToken.None, indexName, scanIndexForward, lastEvaluatedKey, consistentRead);
+
+        /// <summary>Queries a page of entries using the supplied cancellation token.</summary>
+        /// <typeparam name="TResult">The result type.</typeparam>
+        /// <param name="tableName">The table name.</param>
+        /// <param name="keys">The key condition values.</param>
+        /// <param name="keyConditionExpression">The expression filtering the keys.</param>
+        /// <param name="resolver">Converts each entry to the result type.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <param name="indexName">The optional secondary index name.</param>
+        /// <param name="scanIndexForward">Whether the index is read in ascending order.</param>
+        /// <param name="lastEvaluatedKey">The previous page's continuation key.</param>
+        /// <param name="consistentRead">Whether reads must be strongly consistent.</param>
+        public async Task<(List<TResult> results, Dictionary<string, AttributeValue>? lastEvaluatedKey)> QueryAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys, string keyConditionExpression, Func<Dictionary<string, AttributeValue>, TResult> resolver, CancellationToken cancellationToken, string indexName = "", bool scanIndexForward = true, Dictionary<string, AttributeValue>? lastEvaluatedKey = null, bool consistentRead = true) where TResult : class
         {
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
                 var request = new QueryRequest
@@ -769,7 +827,7 @@ namespace Orleans.Transactions.DynamoDB
                     request.IndexName = indexName;
                 }
 
-                var response = await _ddbClient.QueryAsync(request);
+                var response = await _ddbClient.QueryAsync(request, cancellationToken);
 
                 var resultList = new List<TResult>();
                 foreach (var item in response.Items)
@@ -797,17 +855,33 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="scanIndexForward">In case an index is used, show if the seek order is ascending (true) or descending (false)</param>
         /// <param name="consistentRead">Determines the read consistency model. Note that if a GSI is used, this must be false.</param>
         /// <returns>The collection containing a list of objects translated by the resolver function</returns>
-        public async Task<List<TResult>> QueryAllAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys,
+        public Task<List<TResult>> QueryAllAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys,
                 string keyConditionExpression, Func<Dictionary<string, AttributeValue>, TResult> resolver,
                 string indexName = "", bool scanIndexForward = true, bool consistentRead = true) where TResult : class
+            => QueryAllAsync(tableName, keys, keyConditionExpression, resolver, CancellationToken.None, indexName, scanIndexForward, consistentRead);
+
+        /// <summary>Queries all matching entries using the supplied cancellation token.</summary>
+        /// <typeparam name="TResult">The result type.</typeparam>
+        /// <param name="tableName">The table name.</param>
+        /// <param name="keys">The key condition values.</param>
+        /// <param name="keyConditionExpression">The expression filtering the keys.</param>
+        /// <param name="resolver">Converts each entry to the result type.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <param name="indexName">The optional secondary index name.</param>
+        /// <param name="scanIndexForward">Whether the index is read in ascending order.</param>
+        /// <param name="consistentRead">Whether reads must be strongly consistent.</param>
+        public async Task<List<TResult>> QueryAllAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys,
+                string keyConditionExpression, Func<Dictionary<string, AttributeValue>, TResult> resolver,
+                CancellationToken cancellationToken, string indexName = "", bool scanIndexForward = true, bool consistentRead = true) where TResult : class
         {
             List<TResult>? resultList = null;
             Dictionary<string, AttributeValue>? lastEvaluatedKey = null;
             do
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 List<TResult> results;
                 (results, lastEvaluatedKey) = await QueryAsync(tableName, keys, keyConditionExpression, resolver,
-                    indexName, scanIndexForward, lastEvaluatedKey, consistentRead);
+                    cancellationToken, indexName, scanIndexForward, lastEvaluatedKey, consistentRead);
                 if (resultList == null)
                 {
                     resultList = results;
@@ -935,8 +1009,18 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="keys">The table entry keys to search for</param>
         /// <param name="resolver">Function that will be called to translate the returned fields into a concrete type. This Function is only called if the result is != null</param>
         /// <returns>The object translated by the resolver function</returns>
-        public async Task<IEnumerable<TResult>> GetEntriesTxAsync<TResult>(string tableName, IEnumerable<Dictionary<string, AttributeValue>> keys, Func<Dictionary<string, AttributeValue>, TResult> resolver) where TResult : class
+        public Task<IEnumerable<TResult>> GetEntriesTxAsync<TResult>(string tableName, IEnumerable<Dictionary<string, AttributeValue>> keys, Func<Dictionary<string, AttributeValue>, TResult> resolver) where TResult : class
+            => GetEntriesTxAsync(tableName, keys, resolver, CancellationToken.None);
+
+        /// <summary>Transactionally reads entries using the supplied cancellation token.</summary>
+        /// <typeparam name="TResult">The result type.</typeparam>
+        /// <param name="tableName">The table name.</param>
+        /// <param name="keys">The keys of the entries to read.</param>
+        /// <param name="resolver">Converts each entry to the result type.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        public async Task<IEnumerable<TResult>> GetEntriesTxAsync<TResult>(string tableName, IEnumerable<Dictionary<string, AttributeValue>> keys, Func<Dictionary<string, AttributeValue>, TResult> resolver, CancellationToken cancellationToken) where TResult : class
         {
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
                 var request = new TransactGetItemsRequest
@@ -951,7 +1035,7 @@ namespace Orleans.Transactions.DynamoDB
                     }).ToList()
                 };
 
-                var response = await _ddbClient.TransactGetItemsAsync(request);
+                var response = await _ddbClient.TransactGetItemsAsync(request, cancellationToken);
 
                 return response.Responses.Where(r => r?.Item?.Count > 0).Select(r => resolver(r.Item!));
             }
@@ -971,7 +1055,17 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="conditionChecks">Any condition checks to be performed</param>
         /// <returns></returns>
         public Task WriteTxAsync(IEnumerable<Put>? puts = null, IEnumerable<Update>? updates = null, IEnumerable<Delete>? deletes = null, IEnumerable<ConditionCheck>? conditionChecks = null)
+            => WriteTxAsync(CancellationToken.None, puts, updates, deletes, conditionChecks);
+
+        /// <summary>Transactionally writes entries using the supplied cancellation token.</summary>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <param name="puts">The entries to put.</param>
+        /// <param name="updates">The updates to perform.</param>
+        /// <param name="deletes">The deletes to perform.</param>
+        /// <param name="conditionChecks">The conditions to check.</param>
+        public Task WriteTxAsync(CancellationToken cancellationToken, IEnumerable<Put>? puts = null, IEnumerable<Update>? updates = null, IEnumerable<Delete>? deletes = null, IEnumerable<ConditionCheck>? conditionChecks = null)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
                 var transactItems = new List<TransactWriteItem>();
@@ -997,7 +1091,7 @@ namespace Orleans.Transactions.DynamoDB
                     TransactItems = transactItems
                 };
 
-                return _ddbClient.TransactWriteItemsAsync(request);
+                return _ddbClient.TransactWriteItemsAsync(request, cancellationToken);
             }
             catch (Exception exc)
             {

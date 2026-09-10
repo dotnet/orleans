@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -38,8 +39,13 @@ namespace Orleans.Runtime.MembershipService
         }
 
         /// <inheritdoc />
-        public async Task InitializeMembershipTable(bool tryInitTableVersion)
+        [Obsolete("Use the overload accepting a CancellationToken instead.")]
+        public Task InitializeMembershipTable(bool tryInitTableVersion) => InitializeMembershipTable(tryInitTableVersion, CancellationToken.None);
+
+        /// <inheritdoc />
+        public async Task InitializeMembershipTable(bool tryInitTableVersion, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             LogTraceInitializeMembershipTable();
 
             //This initializes all of Orleans operational queries from the database using a well known view
@@ -47,14 +53,15 @@ namespace Orleans.Runtime.MembershipService
             orleansQueries = await RelationalOrleansQueries.CreateInstance(
                 clusteringTableOptions.Invariant,
                 clusteringTableOptions.ConnectionString,
-                clusteringTableOptions.DataSource);
+                clusteringTableOptions.DataSource,
+                cancellationToken);
 
             // even if I am not the one who created the table,
             // try to insert an initial table version if it is not already there,
             // so we always have a first table version row, before this silo starts working.
             if (tryInitTableVersion)
             {
-                var wasCreated = await InitTableAsync();
+                var wasCreated = await InitTableAsync(cancellationToken);
                 if (wasCreated)
                 {
                     LogInfoCreatedNewTableVersionRow();
@@ -63,12 +70,17 @@ namespace Orleans.Runtime.MembershipService
         }
 
         /// <inheritdoc />
-        public async Task<MembershipTableData> ReadRow(SiloAddress key)
+        [Obsolete("Use the overload accepting a CancellationToken instead.")]
+        public Task<MembershipTableData> ReadRow(SiloAddress key) => ReadRow(key, CancellationToken.None);
+
+        /// <inheritdoc />
+        public async Task<MembershipTableData> ReadRow(SiloAddress key, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             LogTraceReadRow(key);
             try
             {
-                return await orleansQueries.MembershipReadRowAsync(this.clusterId, key);
+                return await orleansQueries.MembershipReadRowAsync(this.clusterId, key, cancellationToken);
             }
             catch (Exception ex)
             {
@@ -78,12 +90,17 @@ namespace Orleans.Runtime.MembershipService
         }
 
         /// <inheritdoc />
-        public async Task<MembershipTableData> ReadAll()
+        [Obsolete("Use the overload accepting a CancellationToken instead.")]
+        public Task<MembershipTableData> ReadAll() => ReadAll(CancellationToken.None);
+
+        /// <inheritdoc />
+        public async Task<MembershipTableData> ReadAll(CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             LogTraceReadAll();
             try
             {
-                return await orleansQueries.MembershipReadAllAsync(this.clusterId);
+                return await orleansQueries.MembershipReadAllAsync(this.clusterId, cancellationToken);
             }
             catch (Exception ex)
             {
@@ -93,8 +110,13 @@ namespace Orleans.Runtime.MembershipService
         }
 
         /// <inheritdoc />
-        public async Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion)
+        [Obsolete("Use the overload accepting a CancellationToken instead.")]
+        public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => InsertRow(entry, tableVersion, CancellationToken.None);
+
+        /// <inheritdoc />
+        public async Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             LogTraceInsertRow(entry, tableVersion);
 
             //The "tableVersion" parameter should always exist when inserting a row as Init should
@@ -115,7 +137,7 @@ namespace Orleans.Runtime.MembershipService
 
             try
             {
-                return await orleansQueries.InsertMembershipRowAsync(this.clusterId, entry, tableVersion.VersionEtag);
+                return await orleansQueries.InsertMembershipRowAsync(this.clusterId, entry, tableVersion.VersionEtag, cancellationToken);
             }
             catch (Exception ex)
             {
@@ -125,8 +147,13 @@ namespace Orleans.Runtime.MembershipService
         }
 
         /// <inheritdoc />
-        public async Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion)
+        [Obsolete("Use the overload accepting a CancellationToken instead.")]
+        public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => UpdateRow(entry, etag, tableVersion, CancellationToken.None);
+
+        /// <inheritdoc />
+        public async Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             LogTraceUpdateRow(entry, etag, tableVersion);
 
             //The "tableVersion" parameter should always exist when updating a row as Init should
@@ -147,7 +174,7 @@ namespace Orleans.Runtime.MembershipService
 
             try
             {
-                return await orleansQueries.UpdateMembershipRowAsync(this.clusterId, entry, tableVersion.VersionEtag);
+                return await orleansQueries.UpdateMembershipRowAsync(this.clusterId, entry, tableVersion.VersionEtag, cancellationToken);
             }
             catch (Exception ex)
             {
@@ -157,8 +184,13 @@ namespace Orleans.Runtime.MembershipService
         }
 
         /// <inheritdoc />
-        public async Task UpdateIAmAlive(MembershipEntry entry)
+        [Obsolete("Use the overload accepting a CancellationToken instead.")]
+        public Task UpdateIAmAlive(MembershipEntry entry) => UpdateIAmAlive(entry, CancellationToken.None);
+
+        /// <inheritdoc />
+        public async Task UpdateIAmAlive(MembershipEntry entry, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             LogTraceUpdateIAmAlive(entry);
             if (entry == null)
             {
@@ -167,7 +199,7 @@ namespace Orleans.Runtime.MembershipService
             }
             try
             {
-                await orleansQueries.UpdateIAmAliveTimeAsync(this.clusterId, entry.SiloAddress, entry.IAmAliveTime);
+                await orleansQueries.UpdateIAmAliveTimeAsync(this.clusterId, entry.SiloAddress, entry.IAmAliveTime, cancellationToken);
             }
             catch (Exception ex)
             {
@@ -177,12 +209,17 @@ namespace Orleans.Runtime.MembershipService
         }
 
         /// <inheritdoc />
-        public async Task DeleteMembershipTableEntries(string clusterId)
+        [Obsolete("Use the overload accepting a CancellationToken instead.")]
+        public Task DeleteMembershipTableEntries(string clusterId) => DeleteMembershipTableEntries(clusterId, CancellationToken.None);
+
+        /// <inheritdoc />
+        public async Task DeleteMembershipTableEntries(string clusterId, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             LogTraceDeleteMembershipTableEntries(clusterId);
             try
             {
-                await orleansQueries.DeleteMembershipTableEntriesAsync(clusterId);
+                await orleansQueries.DeleteMembershipTableEntriesAsync(clusterId, cancellationToken);
             }
             catch (Exception ex)
             {
@@ -192,12 +229,17 @@ namespace Orleans.Runtime.MembershipService
         }
 
         /// <inheritdoc />
-        public async Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
+        [Obsolete("Use the overload accepting a CancellationToken instead.")]
+        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) => CleanupDefunctSiloEntries(beforeDate, CancellationToken.None);
+
+        /// <inheritdoc />
+        public async Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             LogTraceCleanupDefunctSiloEntries(beforeDate, clusterId);
             try
             {
-                await orleansQueries.CleanupDefunctSiloEntriesAsync(beforeDate, this.clusterId);
+                await orleansQueries.CleanupDefunctSiloEntriesAsync(beforeDate, this.clusterId, cancellationToken);
             }
             catch (Exception ex)
             {
@@ -206,11 +248,11 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        private async Task<bool> InitTableAsync()
+        private async Task<bool> InitTableAsync(CancellationToken cancellationToken)
         {
             try
             {
-                return await orleansQueries.InsertMembershipVersionRowAsync(this.clusterId);
+                return await orleansQueries.InsertMembershipVersionRowAsync(this.clusterId, cancellationToken);
             }
             catch (Exception ex)
             {

@@ -343,8 +343,8 @@ namespace NonSilo.Tests.Membership
             // Add the new silos
             foreach (var entry in otherSilos)
             {
-                var table = await this.membershipTable.ReadAll();
-                Assert.True(await this.membershipTable.InsertRow(entry, table.Version.Next()));
+                var table = await this.membershipTable.ReadAll(cancellationToken);
+                Assert.True(await this.membershipTable.InsertRow(entry, table.Version.Next(), cancellationToken));
             }
 
             Task onProbeResult(SiloHealthMonitor siloHealthMonitor, SiloHealthMonitor.ProbeResult probeResult) => Task.CompletedTask;
@@ -383,8 +383,8 @@ namespace NonSilo.Tests.Membership
 
             var staleSilo = Silo("127.0.0.200:100@100");
             var staleEntry = Entry(staleSilo, SiloStatus.Active, DateTime.UtcNow.Subtract(TimeSpan.FromHours(1)));
-            var table = await this.membershipTable.ReadAll();
-            Assert.True(await this.membershipTable.InsertRow(staleEntry, table.Version.Next()));
+            var table = await this.membershipTable.ReadAll(cancellationToken);
+            Assert.True(await this.membershipTable.InsertRow(staleEntry, table.Version.Next(), cancellationToken));
 
             var clusterHealthMonitorTestAccessor = (ClusterHealthMonitor.ITestAccessor)this.clusterHealthMonitor;
             clusterHealthMonitorTestAccessor.CreateMonitor = silo => new SiloHealthMonitor(
@@ -414,7 +414,7 @@ namespace NonSilo.Tests.Membership
 
             await started;
 
-            table = await this.membershipTable.ReadAll();
+            table = await this.membershipTable.ReadAll(cancellationToken);
             Assert.Equal(SiloStatus.Dead, table.Members.Single(member => member.Item1.SiloAddress.Equals(staleSilo)).Item1.Status);
             Assert.Equal(SiloStatus.Active, this.manager.CurrentStatus);
 
@@ -443,8 +443,8 @@ namespace NonSilo.Tests.Membership
             // Add the new silos
             foreach (var entry in otherSilos)
             {
-                var table = await this.membershipTable.ReadAll();
-                Assert.True(await this.membershipTable.InsertRow(entry, table.Version.Next()));
+                var table = await this.membershipTable.ReadAll(cancellationToken);
+                Assert.True(await this.membershipTable.InsertRow(entry, table.Version.Next(), cancellationToken));
             }
 
             this.remoteSiloProber.Probe(default!, default, cancellationToken).ReturnsForAnyArgs(Task.FromException(new Exception("no")));

@@ -142,7 +142,7 @@ namespace NonSilo.Tests.Membership
                 retainedDefunctEntry), cancellationToken);
             Assert.DoesNotContain(table.Calls, call => call.Method == nameof(IMembershipTable.ReadAll));
 
-            var updatedTable = await table.ReadAll();
+            var updatedTable = await table.ReadAll(cancellationToken);
             Assert.Single(updatedTable.Members, member => member.Item1.Status == SiloStatus.Dead);
             Assert.Contains(updatedTable.Members, member => member.Item1.SiloAddress.Equals(retainedDefunctSilo));
 
@@ -182,7 +182,7 @@ namespace NonSilo.Tests.Membership
                 newerAliveEntry,
                 recentlySuspectedEntry), cancellationToken);
 
-            var updatedTable = await table.ReadAll();
+            var updatedTable = await table.ReadAll(cancellationToken);
             Assert.Single(updatedTable.Members, member => member.Item1.Status == SiloStatus.Dead);
             Assert.Contains(updatedTable.Members, member => member.Item1.SiloAddress.Equals(recentlySuspectedSilo));
 

@@ -1,7 +1,10 @@
 using System.Net;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Orleans.AzureUtils;
 using Orleans.Clustering.AzureStorage;
+using Orleans.Configuration;
+using Orleans.Runtime.MembershipService;
 using Orleans.Storage;
 using Xunit;
 
@@ -15,6 +18,44 @@ public class AzureMembershipPaginationTests
 {
     private const string ClusterId = "membership-pagination-tests";
     private const string TableName = "MembershipPaginationTests";
+
+    [Theory]
+    [InlineData("Initialize")]
+    [InlineData("Delete")]
+    [InlineData("Cleanup")]
+    [InlineData("ReadRow")]
+    [InlineData("ReadAll")]
+    [InlineData("Insert")]
+    [InlineData("Update")]
+    [InlineData("Heartbeat")]
+    public async Task CanceledOperationsDoNotAccessStorage(string operation)
+    {
+        var table = new AzureBasedMembershipTable(
+            NullLoggerFactory.Instance,
+            Options.Create(new AzureStorageClusteringOptions()),
+            Options.Create(new ClusterOptions { ClusterId = ClusterId }));
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cancellation.Cancel();
+        var token = cancellation.Token;
+        var silo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 11111), 1);
+        var entry = new MembershipEntry { SiloAddress = silo };
+        var version = new TableVersion(1, "etag");
+
+        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => operation switch
+        {
+            "Initialize" => table.InitializeMembershipTable(true, token),
+            "Delete" => table.DeleteMembershipTableEntries(ClusterId, token),
+            "Cleanup" => table.CleanupDefunctSiloEntries(DateTimeOffset.MaxValue, token),
+            "ReadRow" => table.ReadRow(silo, token),
+            "ReadAll" => table.ReadAll(token),
+            "Insert" => table.InsertRow(entry, version, token),
+            "Update" => table.UpdateRow(entry, "etag", version, token),
+            "Heartbeat" => table.UpdateIAmAlive(entry, token),
+            _ => throw new ArgumentOutOfRangeException(nameof(operation))
+        });
+
+        Assert.Equal(token, exception.CancellationToken);
+    }
 
     [Fact]
     public async Task OnePageReadUsesOneQuery()
@@ -151,6 +192,42 @@ public class AzureMembershipPaginationTests
 
         var token = Assert.Single(storage.CancellationTokens);
         Assert.Equal(cancellation.Token, token);
+    }
+
+    [Fact]
+    public async Task CancellationStopsMembershipSnapshotRetries()
+    {
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var storage = new ScriptedMembershipTableReadStorage();
+        storage.AddQuery(() =>
+        {
+            cancellation.Cancel();
+            return Query(
+                true,
+                BoundaryVersion(SiloInstanceTableEntry.TABLE_VERSION_ROW_MIN, 1, "before"),
+                Version(2, "version"),
+                BoundaryVersion(SiloInstanceTableEntry.TABLE_VERSION_ROW_MAX, 2, "after"));
+        });
+
+        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => CreateManager(storage).FindAllSiloEntries(cancellation.Token));
+
+        Assert.Equal(cancellation.Token, exception.CancellationToken);
+        Assert.Equal(1, storage.QueryCount);
+    }
+
+    [Fact]
+    public async Task CanceledMembershipReadDoesNotQueryStorage()
+    {
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cancellation.Cancel();
+        var storage = new ScriptedMembershipTableReadStorage();
+
+        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => CreateManager(storage).FindAllSiloEntries(cancellation.Token));
+
+        Assert.Equal(cancellation.Token, exception.CancellationToken);
+        Assert.Equal(0, storage.QueryCount);
     }
 
     [Theory]

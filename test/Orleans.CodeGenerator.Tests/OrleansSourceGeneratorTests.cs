@@ -717,8 +717,10 @@ public interface IBasicGrain : IGrainWithIntegerKey
         Assert.Contains("\"6B0E24A1\"", generatedSource, StringComparison.Ordinal);
     }
 
-    [Fact]
-    public async Task CompatibilityOverload_UsesLegacyInvokerIdentityForOutboundCalls()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task CompatibilityOverload_UsesLegacyInvokerIdentityForOutboundCalls(bool aliasLegacyMethod)
     {
         var baseline = await CreateCompilation(
 @"using Orleans;
@@ -731,6 +733,7 @@ public interface IBasicGrain : IGrainWithIntegerKey
             "Baseline");
         var legacyMethod = Assert.Single(baseline.GetTypeByMetadataName("IBasicGrain")!.GetMembers().OfType<IMethodSymbol>());
         var legacyMethodId = GeneratedCodeUtilities.CreateHashedMethodId(legacyMethod);
+        var legacyAlias = aliasLegacyMethod ? "[Alias(\"Ping\")]" : string.Empty;
         var compilation = await CreateCompilation(
 $@"using Orleans;
 using Orleans.Runtime;
@@ -740,11 +743,14 @@ using System.Threading.Tasks;
 [GenerateMethodSerializers(typeof(GrainReference))]
 public interface IBasicGrain : IGrainWithIntegerKey
 {{
-    [Alias(""Ping"")]
+    {legacyAlias}
+    [System.Obsolete(""Use the cancellation overload."")]
     Task Ping(string value);
 
     [Alias(""{legacyMethodId}"")]
+#pragma warning disable CS0618
     Task Ping(string value, CancellationToken cancellationToken) => Ping(value);
+#pragma warning restore CS0618
 }}",
             "TestProject");
 
