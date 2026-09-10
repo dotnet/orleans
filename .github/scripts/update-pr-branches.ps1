@@ -9,7 +9,8 @@ behind and which GitHub reports as mergeable and rebaseable.
 GitHub CLI supplies the expected head SHA and GitHub enforces update permissions
 and conflict checks. Resolves BaseBranch from the repository's Git ref once per
 run and uses that snapshot to assess every PR and confirm each successful update.
-Emits one result object per pull request and fails after reporting any errors.
+Emits one result object per pull request and a final summary grouped by outcome,
+with merge and rebase conflicts first. Fails after reporting any errors.
 .EXAMPLE
 .\update-pr-branches.ps1 -WhatIf
 .EXAMPLE
@@ -31,10 +32,19 @@ $PSNativeCommandUseErrorActionPreference = $false
 function Invoke-Gh {
     param([string[]] $Arguments)
 
-    $output = & gh @Arguments 2>&1
-    if ($LASTEXITCODE -ne 0) {
+    $originalEncoding = [Console]::OutputEncoding
+    try {
+        # PowerShell decodes native output using the console encoding; gh emits UTF-8.
+        [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
+        $output = & gh @Arguments 2>&1
+        $exitCode = $LASTEXITCODE
+    } finally {
+        [Console]::OutputEncoding = $originalEncoding
+    }
+
+    if ($exitCode -ne 0) {
         throw [InvalidOperationException]::new(
-            "gh $($Arguments -join ' ') failed (exit $LASTEXITCODE): $($output -join [Environment]::NewLine)")
+            "gh $($Arguments -join ' ') failed (exit ${exitCode}): $($output -join [Environment]::NewLine)")
     }
 
     return $output
@@ -72,6 +82,32 @@ function Get-BehindCount {
 
     $comparison = Get-GitHubJson "repos/$Repository/compare/$BaseSha...${HeadSha}?per_page=1"
     return $comparison.behind_by
+}
+
+function Write-ResultSummary {
+    param([object[]] $Results)
+
+    $groups = [ordered]@{
+        MergeConflict = 'Merge conflicts'
+        RebaseConflict = 'Rebase conflicts'
+        Failed = 'Failed updates'
+        Eligible = 'Eligible for rebase (preview)'
+        Updated = 'Updated'
+        UpToDate = 'Up to date'
+        Skipped = 'Other skipped PRs'
+    }
+
+    Write-Host "`nResults summary"
+    foreach ($group in $groups.GetEnumerator()) {
+        $items = @($Results | Where-Object Status -eq $group.Key | Sort-Object Number)
+        Write-Host "`n$($group.Value): $($items.Count)"
+        foreach ($item in $items) {
+            Write-Host "  $($item.Url) - $($item.Title)"
+            if ($group.Key -in 'Failed', 'Skipped') {
+                Write-Host "    $($item.Message)"
+            }
+        }
+    }
 }
 
 $helpText = Invoke-Gh -Arguments @('pr', 'update-branch', '--help')
@@ -122,15 +158,17 @@ foreach ($number in $numbers) {
                 $result.Status = 'UpToDate'
                 $result.Message = "Branch contains this run's $BaseBranch snapshot."
             } elseif ($pull.mergeable -eq $false) {
+                $result.Status = 'MergeConflict'
                 $result.Message = 'GitHub reports merge conflicts.'
             } elseif ($pull.rebaseable -eq $false) {
+                $result.Status = 'RebaseConflict'
                 $result.Message = 'GitHub reports that rebase requires conflict resolution.'
             } elseif ($pull.mergeable -ne $true -or $pull.rebaseable -ne $true) {
                 $result.Message = 'GitHub is still calculating mergeability after five reads.'
             } elseif ($PSCmdlet.ShouldProcess(
                 "$Repository#$number ($($result.HeadRepository):$($result.HeadBranch))",
                 "Update with rebase onto $BaseBranch ($($result.BehindBy) commits behind)")) {
-                $null = Invoke-Gh -Arguments @(
+                $updateOutput = Invoke-Gh -Arguments @(
                     'pr', 'update-branch', [string] $number, '--repo', "github.com/$Repository", '--rebase'
                 )
 
@@ -153,7 +191,7 @@ foreach ($number in $numbers) {
                 }
 
                 $result.Status = 'Updated'
-                $result.Message = "Branch updated with rebase onto $BaseBranch."
+                $result.Message = ($updateOutput -join [Environment]::NewLine).Trim()
             } else {
                 $result.Status = if ($WhatIfPreference) { 'Eligible' } else { 'Skipped' }
                 $result.Message = if ($WhatIfPreference) { 'Preview: ready for rebase.' } else { 'Update declined.' }
@@ -171,9 +209,7 @@ foreach ($number in $numbers) {
 }
 
 Write-Host "Processed $($results.Count) pull requests in $Repository targeting $BaseBranch."
-foreach ($group in ($results | Group-Object Status | Sort-Object Name)) {
-    Write-Host "$($group.Name): $($group.Count)"
-}
+Write-ResultSummary -Results $results
 
 if (@($results | Where-Object Status -eq 'Failed').Count -gt 0) {
     throw 'One or more pull request updates failed. See the per-PR results above.'
