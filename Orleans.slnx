@@ -75,6 +75,7 @@
   </Folder>
   <Folder Name="/src/Extensions/AdoNet/">
     <Project Path="src/AdoNet/Orleans.Clustering.AdoNet/Orleans.Clustering.AdoNet.csproj" />
+    <Project Path="src/AdoNet/Orleans.AdvancedReminders.AdoNet/Orleans.AdvancedReminders.AdoNet.csproj" />
     <Project Path="src/AdoNet/Orleans.GrainDirectory.AdoNet/Orleans.GrainDirectory.AdoNet.csproj" />
     <Project Path="src/AdoNet/Orleans.Persistence.AdoNet/Orleans.Persistence.AdoNet.csproj" />
     <Project Path="src/AdoNet/Orleans.Reminders.AdoNet/Orleans.Reminders.AdoNet.csproj" />
