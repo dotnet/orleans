@@ -92,6 +92,7 @@
   </Folder>
   <Folder Name="/src/Extensions/AWS/">
     <Project Path="src/AWS/Orleans.Clustering.DynamoDB/Orleans.Clustering.DynamoDB.csproj" />
+    <Project Path="src/AWS/Orleans.AdvancedReminders.DynamoDB/Orleans.AdvancedReminders.DynamoDB.csproj" />
     <Project Path="src/AWS/Orleans.Durable.S3/Orleans.Durable.S3.csproj" />
     <Project Path="src/AWS/Orleans.Persistence.DynamoDB/Orleans.Persistence.DynamoDB.csproj" />
     <Project Path="src/AWS/Orleans.Reminders.DynamoDB/Orleans.Reminders.DynamoDB.csproj" />
