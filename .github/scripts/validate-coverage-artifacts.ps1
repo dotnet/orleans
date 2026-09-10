@@ -37,6 +37,9 @@ foreach ($line in [IO.File]::ReadAllLines($resolvedExpectedArtifacts)) {
     if ($coverageId -notmatch '^test_output_[A-Za-z0-9_.-]+$') {
         throw "Invalid coverage artifact identity '$coverageId'"
     }
+    if ($coverageId -match '-attempt-[1-9][0-9]*(?:-retry)?$') {
+        throw "Coverage artifact identity '$coverageId' uses the reserved attempt suffix"
+    }
     $artifactName = "coverage_$coverageId"
     if ($expected.ContainsKey($artifactName)) {
         throw "Duplicate coverage artifact identity '$coverageId'"
@@ -53,21 +56,34 @@ $manifestBytes = [Text.UTF8Encoding]::new($false).GetBytes($manifestText)
 $manifestSha256 = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($manifestBytes)).ToLowerInvariant()
 
 $actual = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+$selected = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal)
+$superseded = [Collections.Generic.List[string]]::new()
+$unexpectedArtifactNames = [Collections.Generic.List[string]]::new()
 $testedSha = $null
 foreach ($artifact in Get-ChildItem -LiteralPath $resolvedReportDirectory -Force) {
     Assert-NotReparsePoint $artifact.FullName
     if (-not $artifact.PSIsContainer) {
         throw "Unexpected file '$($artifact.Name)' in the coverage artifact directory"
     }
-    if (-not $actual.Add($artifact.Name)) {
-        throw "Coverage artifact '$($artifact.Name)' appears more than once"
+
+    $artifactName = $artifact.Name
+    $artifactAttempt = 0
+    $artifactIsRetry = $false
+    if ($artifact.Name -cmatch '^(?<name>.+)-attempt-(?<attempt>[1-9][0-9]*)(?<retry>-retry)?$') {
+        $artifactName = $Matches.name
+        if (-not [int]::TryParse($Matches.attempt, [ref] $artifactAttempt)) {
+            throw "Coverage artifact '$($artifact.Name)' has an invalid run attempt"
+        }
+        $artifactIsRetry = $Matches.ContainsKey('retry') -and $Matches.retry -eq '-retry'
     }
-    if (-not $expected.ContainsKey($artifact.Name)) {
+    [void] $actual.Add($artifactName)
+    if (-not $expected.ContainsKey($artifactName)) {
+        [void] $unexpectedArtifactNames.Add($artifact.Name)
         continue
     }
 
     $contents = @(Get-ChildItem -LiteralPath $artifact.FullName -Force)
-    $expectedReport = $expected[$artifact.Name]
+    $expectedReport = $expected[$artifactName]
     $coverageId = $expectedReport.Substring(0, $expectedReport.Length - '.cobertura.xml'.Length)
     $expectedMetadata = "$coverageId.coverage.json"
     $expectedContents = @($expectedMetadata, $expectedReport) | Sort-Object
@@ -96,7 +112,7 @@ foreach ($artifact in Get-ChildItem -LiteralPath $resolvedReportDirectory -Force
         throw "Coverage artifact '$($artifact.Name)' contains unexpected metadata fields"
     }
     if ($metadata.format_version -ne 1 -or
-        $metadata.artifact_name -ne $artifact.Name -or
+        $metadata.artifact_name -ne $artifactName -or
         $metadata.coverage_id -ne $coverageId -or
         $metadata.commit_sha -notmatch '^[0-9a-f]{40}$') {
         throw "Coverage artifact '$($artifact.Name)' contains inconsistent metadata"
@@ -106,10 +122,29 @@ foreach ($artifact in Get-ChildItem -LiteralPath $resolvedReportDirectory -Force
     } elseif ($testedSha -ne $metadata.commit_sha) {
         throw "Coverage artifacts reference multiple tested commits: '$testedSha' and '$($metadata.commit_sha)'"
     }
+
+    $existingArtifact = $null
+    if (-not $selected.TryGetValue($artifactName, [ref] $existingArtifact)) {
+        $selected.Add($artifactName, [pscustomobject]@{
+            Attempt = $artifactAttempt
+            IsRetry = $artifactIsRetry
+            Path = $artifact.FullName
+        })
+    } elseif ($artifactAttempt -gt $existingArtifact.Attempt -or
+        ($artifactAttempt -eq $existingArtifact.Attempt -and $artifactIsRetry -and -not $existingArtifact.IsRetry)) {
+        [void] $superseded.Add($existingArtifact.Path)
+        $selected[$artifactName] = [pscustomobject]@{
+            Attempt = $artifactAttempt
+            IsRetry = $artifactIsRetry
+            Path = $artifact.FullName
+        }
+    } else {
+        [void] $superseded.Add($artifact.FullName)
+    }
 }
 
 $missing = @($expected.Keys.Where({ -not $actual.Contains($_) }) | Sort-Object)
-$unexpected = @($actual.Where({ -not $expected.ContainsKey($_) }) | Sort-Object)
+$unexpected = @($unexpectedArtifactNames | Sort-Object)
 if ($missing.Count -gt 0 -or $unexpected.Count -gt 0) {
     $details = @()
     if ($missing.Count -gt 0) {
@@ -119,6 +154,11 @@ if ($missing.Count -gt 0 -or $unexpected.Count -gt 0) {
         $details += "Unexpected: $($unexpected -join ', ')"
     }
     throw "Coverage artifact set differs from the expected CI matrix. $($details -join ' ')"
+}
+
+foreach ($path in $superseded) {
+    # Aggregation recursively discovers reports, so retain only the selected run attempt.
+    Remove-Item -LiteralPath $path -Recurse -Force
 }
 
 $summary = [ordered]@{

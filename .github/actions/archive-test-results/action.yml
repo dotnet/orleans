@@ -47,10 +47,30 @@ runs:
          ConvertTo-Json |
          Set-Content -LiteralPath 'TestResults/${{ inputs.name }}.coverage.json' -Encoding utf8NoBOM
   - name: Archive coverage
+    id: archive-coverage
     if: inputs.coverage == 'true' && (github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)))
+    continue-on-error: true
     uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
     with:
-      name: coverage_${{ inputs.name }}
+      name: coverage_${{ inputs.name }}-attempt-${{ github.run_attempt }}
+      if-no-files-found: error
+      retention-days: ${{ github.event_name == 'push' && 7 || 1 }}
+      path: |
+        TestResults/${{ inputs.name }}.cobertura.xml
+        TestResults/${{ inputs.name }}.coverage.json
+  - name: Wait before retrying coverage upload
+    if: steps.archive-coverage.outcome == 'failure'
+    shell: pwsh
+    run: Start-Sleep -Seconds 30
+  - name: Report coverage upload retry
+    if: steps.archive-coverage.outcome == 'failure'
+    shell: pwsh
+    run: Write-Output '::warning title=Coverage artifact upload failed::Retrying the coverage upload under a distinct immutable artifact name.'
+  - name: Retry coverage upload
+    if: steps.archive-coverage.outcome == 'failure'
+    uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+    with:
+      name: coverage_${{ inputs.name }}-attempt-${{ github.run_attempt }}-retry
       if-no-files-found: error
       retention-days: ${{ github.event_name == 'push' && 7 || 1 }}
       path: |

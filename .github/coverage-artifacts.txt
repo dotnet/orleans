@@ -13,6 +13,7 @@ test_output_test-mariadb_net10.0
 test_output_test-nats_net10.0
 test_output_test-postgres_net10.0
 test_output_test-redis_net10.0
+test_output_test-s3_net10.0
 test_output_test-sqlite_net10.0
 test_output_test-sqlserver_net10.0
 test_output_test-sqs_net10.0
