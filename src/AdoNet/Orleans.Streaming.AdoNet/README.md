@@ -54,9 +54,11 @@ The provider stores each queue as an immutable, ordered stream partition. Its st
 - `FaultOnDeliveryFailure`: optionally fault a failing subscription while preserving the shared partition records.
 - `MaxMessagesPerRead`: bound each ordered storage read.
 - `CheckpointPersistInterval`: throttle durable checkpoint updates.
-- `RetentionPeriod`: retain checkpointed records for at least this period (one day by default). Fractional seconds round upward.
-- `MaximumRetentionPeriod`: optionally delete older records even when they are not checkpointed. This is a hard capacity ceiling and can create a diagnosed retention gap. Fractional seconds round upward.
-- `CleanupInterval` and `CleanupBatchSize`: bound cleanup frequency and work. Fractional cleanup intervals round upward.
+- `RetentionPeriod`: retain checkpointed records for at least this period (one day by default).
+- `MaximumRetentionPeriod`: optionally delete older records even when they are not checkpointed. This is a hard capacity ceiling and can create a diagnosed retention gap.
+- `CleanupInterval` and `CleanupBatchSize`: bound cleanup frequency and work.
+
+`RetentionPeriod`, `CleanupInterval`, and `MaximumRetentionPeriod` (when set) must be at least one second. For valid intervals, storage routines round fractional seconds upward to the next whole second.
 
 The partitioned stream provider resumes strictly after the durable, ownership-fenced queue checkpoint and can redeliver records after a crash without skipping uncheckpointed data. The checkpoint advances through the earliest contiguous position which is safe for every subscription, including unrelated partition records which quiet-stream cursors have scanned. Subscription starts attach to the live partition position. Partition state retains the next message identifier, so recovery detects a hard-retention gap even when the purge leaves no records.
 
