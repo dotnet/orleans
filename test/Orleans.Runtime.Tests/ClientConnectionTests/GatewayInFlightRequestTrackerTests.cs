@@ -135,6 +135,72 @@ public class GatewayInFlightRequestTrackerTests
     }
 
     [Fact]
+    public void ForwardingUpdateAdvancesDestinationAndAttempt()
+    {
+        var tracker = CreateTracker();
+        var request = CreateMessage(1, Message.Directions.Request, Silo1);
+        Assert.True(tracker.Track(request));
+
+        Assert.True(tracker.TryUpdateDestination(request.Id, Silo1, Silo2, forwardCount: 1, out var updatedTarget));
+
+        Assert.Equal(Silo2, updatedTarget);
+        Assert.Null(tracker.RemoveForSilo(Silo1));
+        var updated = Assert.Single(tracker.RemoveForSilo(Silo2)!);
+        Assert.Equal(1, updated.ForwardCount);
+        Assert.Equal(0, tracker.Count);
+    }
+
+    [Fact]
+    public void StaleForwardingUpdateDoesNotReplaceNewerDestination()
+    {
+        var tracker = CreateTracker();
+        var request = CreateMessage(1, Message.Directions.Request, Silo1);
+        request.ForwardCount = 2;
+        Assert.True(tracker.Track(request));
+
+        Assert.False(tracker.TryUpdateDestination(request.Id, Silo1, Silo2, forwardCount: 1, out _));
+
+        Assert.Null(tracker.RemoveForSilo(Silo2));
+        var current = Assert.Single(tracker.RemoveForSilo(Silo1)!);
+        Assert.Equal(2, current.ForwardCount);
+        Assert.Equal(0, tracker.Count);
+    }
+
+    [Fact]
+    public void OutOfOrderForwardingUpdatesApplyAsSourceMatchedChain()
+    {
+        var silo3 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 33333), 3);
+        var tracker = CreateTracker();
+        var request = CreateMessage(1, Message.Directions.Request, Silo1);
+        Assert.True(tracker.Track(request));
+
+        Assert.False(tracker.TryUpdateDestination(request.Id, Silo2, silo3, forwardCount: 2, out _));
+        Assert.True(tracker.TryUpdateDestination(request.Id, Silo1, Silo2, forwardCount: 1, out var updatedTarget));
+
+        Assert.Equal(silo3, updatedTarget);
+        Assert.Null(tracker.RemoveForSilo(Silo1));
+        Assert.Null(tracker.RemoveForSilo(Silo2));
+        var updated = Assert.Single(tracker.RemoveForSilo(silo3)!);
+        Assert.Equal(2, updated.ForwardCount);
+    }
+
+    [Fact]
+    public void ForwardingUpdateDoesNotReplaceDifferentSameIdOwner()
+    {
+        var tracker = CreateTracker();
+        var original = CreateMessage(1, Message.Directions.Request, Silo1);
+        var retry = CreateMessage(1, Message.Directions.Request, Silo2);
+        Assert.True(tracker.Track(original));
+        Assert.True(tracker.Track(retry));
+
+        Assert.False(tracker.TryUpdateDestination(original.Id, Silo1, Silo2, forwardCount: 1, out _));
+
+        var current = Assert.Single(tracker.RemoveForSilo(Silo2)!);
+        Assert.Equal(retry.Id, current.Id);
+        Assert.Equal(0, current.ForwardCount);
+    }
+
+    [Fact]
     public void RemovingOldDestinationDoesNotStealSameIdRetry()
     {
         var tracker = CreateTracker();
@@ -408,6 +474,23 @@ public class GatewayInFlightRequestTrackerTests
 
         Assert.True(MessageCenter.ShouldRouteResponseViaTargetSilo(response, Silo2));
         Assert.True(MessageCenter.CanDeliverToProxyLocally(response, Silo2, targetSiloIsDead: true));
+    }
+
+    [Fact]
+    public void RemoteSiloForwardingUsesGatewayTrackingUpdate()
+    {
+        var request = CreateMessage(1, Message.Directions.Request, Silo1);
+        request.SendingSilo = Silo2;
+        request.SendingGrain = ClientGrainId.Create().GrainId;
+        request.ForwardCount = 1;
+        var update = CreateResponse(request, Message.ResponseTypes.Status);
+        update.SendingSilo = request.TargetSilo;
+        update.BodyObject = Silo1;
+        update.ForwardCount = request.ForwardCount;
+
+        Assert.True(MessageCenter.IsForwardedClientRequest(request, Silo1));
+        Assert.True(MessageCenter.IsForwardedClientRequestUpdate(update));
+        Assert.False(MessageCenter.IsForwardedClientRequest(request, Silo2));
     }
 
     [Theory]

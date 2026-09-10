@@ -526,6 +526,14 @@ namespace Orleans.Runtime.Messaging
 
             public void SendResponse(Message message)
             {
+                if (MessageCenter.IsForwardedClientRequestUpdate(message)
+                    && message.BodyObject is SiloAddress forwardingSource
+                    && message.SendingSilo is { } forwardingTarget)
+                {
+                    UpdateForwardedRequest(message, forwardingSource, forwardingTarget);
+                    return;
+                }
+
                 bool requestTrackingStopped;
                 lock (_requestLock)
                 {
@@ -535,6 +543,36 @@ namespace Orleans.Runtime.Messaging
 
                 EmitRequestTrackingStopped(requestTrackingStopped);
                 SendSyntheticResponse(message);
+            }
+
+            private void UpdateForwardedRequest(
+                Message update,
+                SiloAddress forwardingSource,
+                SiloAddress forwardingTarget)
+            {
+                Message? requestToReject = null;
+                bool requestTrackingStopped;
+                lock (_requestLock)
+                {
+                    if (_pendingRequests.TryUpdateDestination(
+                            update.Id,
+                            forwardingSource,
+                            forwardingTarget,
+                            update.ForwardCount,
+                            out var updatedTarget)
+                        && _gateway.siloStatusOracle.IsDeadSilo(updatedTarget))
+                    {
+                        _pendingRequests.TryRemove(update.Id, out requestToReject);
+                    }
+
+                    requestTrackingStopped = UnregisterRequestTrackingIfEmptyCore();
+                }
+
+                EmitRequestTrackingStopped(requestTrackingStopped);
+                if (requestToReject is not null)
+                {
+                    RejectClaimedRequest(requestToReject, requestToReject.TargetSilo!);
+                }
             }
 
             private void SendSyntheticResponse(Message message)
