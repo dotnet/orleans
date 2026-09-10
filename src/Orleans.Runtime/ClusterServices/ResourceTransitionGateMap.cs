@@ -115,6 +115,7 @@ internal sealed class ResourceTransitionGateMap<TResourceId, TViewId>
 
     private void PruneCore()
     {
+        // Dictionary.Remove preserves active enumerators on our supported runtimes.
         foreach (var entry in _transitions)
         {
             entry.Value.RemoveAll(static gate => !gate.IsBlocking);
