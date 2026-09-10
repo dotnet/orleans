@@ -75,10 +75,16 @@ Memory persistence distributes records across cluster storage grains but isn't d
 | [Microsoft.Orleans.Reminders.DynamoDB](https://www.nuget.org/packages/Microsoft.Orleans.Reminders.DynamoDB) | Amazon DynamoDB reminders. |
 | [Microsoft.Orleans.Reminders.Firestore](https://www.nuget.org/packages/Microsoft.Orleans.Reminders.Firestore) | Google Cloud Firestore reminders. |
 | [Microsoft.Orleans.Reminders.Redis](https://www.nuget.org/packages/Microsoft.Orleans.Reminders.Redis) | Redis reminders. |
+| [Microsoft.Orleans.AdvancedReminders](https://www.nuget.org/packages/Microsoft.Orleans.AdvancedReminders) | One-shot, interval, and cron reminders backed by Durable Jobs. |
+| [Microsoft.Orleans.AdvancedReminders.AdoNet](https://www.nuget.org/packages/Microsoft.Orleans.AdvancedReminders.AdoNet) | ADO.NET advanced reminder definitions. |
+| [Microsoft.Orleans.AdvancedReminders.AzureStorage](https://www.nuget.org/packages/Microsoft.Orleans.AdvancedReminders.AzureStorage) | Azure Table advanced reminder definitions and Azure Blob durable jobs. |
+| [Microsoft.Orleans.AdvancedReminders.Cosmos](https://www.nuget.org/packages/Microsoft.Orleans.AdvancedReminders.Cosmos) | Azure Cosmos DB advanced reminder definitions. |
+| [Microsoft.Orleans.AdvancedReminders.DynamoDB](https://www.nuget.org/packages/Microsoft.Orleans.AdvancedReminders.DynamoDB) | Amazon DynamoDB advanced reminder definitions. |
+| [Microsoft.Orleans.AdvancedReminders.Redis](https://www.nuget.org/packages/Microsoft.Orleans.AdvancedReminders.Redis) | Redis advanced reminder definitions. |
 | [Microsoft.Orleans.DurableJobs](https://www.nuget.org/packages/Microsoft.Orleans.DurableJobs) | Distributed scheduling for durable one-time jobs. |
 | [Microsoft.Orleans.DurableJobs.AzureStorage](https://www.nuget.org/packages/Microsoft.Orleans.DurableJobs.AzureStorage) | Azure Blob Storage for durable jobs. |
 
-Use reminders for recurring durable callbacks and durable jobs for scheduled one-time work. Grain timers are activation-scoped and use the core runtime rather than a provider package.
+Use [classic reminders](../grains/timers-and-reminders.md#reminders) for recurring interval callbacks and [Advanced Reminders](../grains/advanced-reminders.md) for one-shot, interval, or cron callbacks with operational controls. Durable jobs schedule application-defined one-time work. Grain timers are activation-scoped and use the core runtime rather than a provider package.
 
 ## Streams and broadcast channels
 
