@@ -730,6 +730,75 @@ describe('external link audit', () => {
     expect(rateRequests).toBe(2);
   });
 
+  test('reports GitHub throttling without amplifying requests', async () => {
+    let requests = 0;
+    const result = await probeExternalTargets({
+      externalTargets: new Map([
+        [
+          'https://github.com/dotnet/orleans/edit/main/docs/README.md',
+          [{ relativeFile: 'guide.md', line: 5 }],
+        ],
+      ]),
+      retries: 1,
+      lookupImpl: publicLookup,
+      requestImpl: async () => {
+        requests += 1;
+        return response(403);
+      },
+    });
+
+    expect(result.failures).toEqual([]);
+    expect(result.warnings).toEqual([
+      expect.stringContaining('Transient external status 403'),
+    ]);
+    expect(requests).toBe(1);
+  });
+
+  test('uses the final host to classify redirected GitHub throttling', async () => {
+    let requests = 0;
+    const result = await probeExternalTargets({
+      externalTargets: new Map([
+        [
+          'https://public.example/github',
+          [{ relativeFile: 'guide.md', line: 5 }],
+        ],
+      ]),
+      retries: 0,
+      lookupImpl: publicLookup,
+      requestImpl: async (url) => {
+        requests += 1;
+        return url.hostname === 'github.com'
+          ? response(403)
+          : response(302, 'https://github.com/dotnet/orleans');
+      },
+    });
+
+    expect(result.failures).toEqual([]);
+    expect(result.warnings).toEqual([
+      expect.stringContaining('Transient external status 403'),
+    ]);
+    expect(requests).toBe(2);
+  });
+
+  test('fails definitive missing GitHub targets', async () => {
+    const result = await probeExternalTargets({
+      externalTargets: new Map([
+        [
+          'https://github.com/dotnet/orleans/blob/main/missing.md',
+          [{ relativeFile: 'guide.md', line: 5 }],
+        ],
+      ]),
+      retries: 0,
+      lookupImpl: publicLookup,
+      requestImpl: async () => response(404),
+    });
+
+    expect(result.warnings).toEqual([]);
+    expect(result.failures).toEqual([
+      expect.stringContaining('returned 404'),
+    ]);
+  });
+
   test('fails permanent DNS or TLS-style network errors', async () => {
     const error = new TypeError('fetch failed', {
       cause: Object.assign(new Error('not found'), { code: 'ENOTFOUND' }),
@@ -892,6 +961,7 @@ describe('external link audit', () => {
     );
     expect(options.headers).toEqual({
       Host: 'docs.example',
+      'User-Agent': 'dotnet-orleans-docs-link-audit/1.0 (+https://github.com/dotnet/orleans)',
       Range: 'bytes=0-0',
     });
     expect(options.servername).toBe('docs.example');
