@@ -6,6 +6,7 @@ using NSubstitute;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Core.Diagnostics;
+using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Runtime.MembershipService;
 using Orleans.Runtime.Scheduler;
