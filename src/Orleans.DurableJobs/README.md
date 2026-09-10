@@ -141,9 +141,11 @@ returned for the due range.
 
 The sweep owns its enumeration and selected identity set until completion. Storage errors
 propagate to the runtime's error reporting, and a later check starts a fresh sweep. Shards
-already delivered to the local manager continue through their execution lifecycle.
+already delivered to the local manager are tracked before cancellation is observed and
+continue through their execution lifecycle.
 Cancellation flows through listing, metadata, and journal operations. Shutdown cancels and
-awaits the active sweep, including enumeration disposal, then awaits running-shard cleanup.
+awaits the active sweep, including enumeration disposal, then awaits running-shard cleanup
+and disposes cached shards which remained inactive.
 
 Shorter lookahead periods reduce early loading of recovered shards. Shorter check intervals
 increase sweep frequency and reduce the wait for newly inserted or newly eligible shards.
