@@ -16,6 +16,7 @@ $azureBuildTemplatePath = Join-Path $PSScriptRoot '../../.azure/pipelines/templa
 $azureVariablesPath = Join-Path $PSScriptRoot '../../.azure/pipelines/templates/vars.yaml'
 $dotnetTestActionPath = Join-Path $PSScriptRoot '../actions/dotnet-test/action.yml'
 $invokeCoverageScriptPath = Join-Path $PSScriptRoot 'invoke-coverage.ps1'
+$invokeRestoreScriptPath = Join-Path $PSScriptRoot 'invoke-restore.ps1'
 $runTestsActionPath = Join-Path $PSScriptRoot '../actions/run-tests/action.yml'
 $selectCoverageBaselineScriptPath = Join-Path $PSScriptRoot 'select-coverage-baseline.ps1'
 $setupCoverageScriptPath = Join-Path $PSScriptRoot 'setup-coverage.ps1'
@@ -724,6 +725,83 @@ try {
             $setupTestEnvironmentAction `
             "inputs\.coverage == 'true'.*?github\.event_name == 'push'.*?github\.event\.repository\.default_branch" `
             'Selected current-main test jobs must install the coverage collector.'
+    }
+
+    Invoke-Test 'retries only remote metadata restore failures' {
+        $testCase = New-TestCase
+        $dotnetTestAction = Get-Content -Raw -LiteralPath $dotnetTestActionPath
+        $runTestsAction = Get-Content -Raw -LiteralPath $runTestsActionPath
+        $attemptFile = Join-Path $testCase.Root 'restore-attempt.txt'
+        $fakeRestore = Join-Path $testCase.Root 'fake-restore.ps1'
+        [IO.File]::WriteAllText(
+            $fakeRestore,
+            @'
+param(
+    [Parameter(ValueFromRemainingArguments)]
+    [string[]] $Command
+)
+
+if (($Command -join ' ') -cne 'restore Orleans.slnx') {
+    Write-Output "Unexpected restore command: $Command"
+    exit 2
+}
+
+$attempt = if (Test-Path -LiteralPath $env:ORLEANS_RESTORE_ATTEMPT_FILE) {
+    [int] (Get-Content -Raw -LiteralPath $env:ORLEANS_RESTORE_ATTEMPT_FILE)
+} else {
+    0
+}
+
+$attempt++
+Set-Content -LiteralPath $env:ORLEANS_RESTORE_ATTEMPT_FILE -Value $attempt
+if ($env:ORLEANS_RESTORE_FAILURE -eq 'metadata-remote-source' -and $attempt -eq 1) {
+    Write-Output "Failed to retrieve information about 'Aspire.AppHost.Sdk' from remote source 'https://feed/index.json'."
+    exit 1
+}
+
+if ($env:ORLEANS_RESTORE_FAILURE -eq 'metadata-configured-feed' -and $attempt -eq 1) {
+    Write-Output "Failed to retrieve information about 'Aspire.AppHost.Sdk' from the configured Azure DevOps feed."
+    exit 1
+}
+
+if ($env:ORLEANS_RESTORE_FAILURE -eq 'deterministic') {
+    Write-Output 'A deterministic restore failure occurred.'
+    exit 1
+}
+
+Write-Output 'Restore succeeded.'
+exit 0
+'@,
+            [Text.UTF8Encoding]::new($false)
+        )
+
+        Assert-Matches `
+            $dotnetTestAction `
+            '(?ms)^  - name: Restore\r?\n    shell: pwsh\r?\n    run: \./\.github/scripts/invoke-restore\.ps1\r?\n  - name: Prepare coverage report' `
+            'Restore must run inside the replaceable test action before coverage preparation.'
+        Assert-Equal 0 ([regex]::Matches($runTestsAction, '(?m)^  - name: Restore\r?$')).Count 'The test coordinator must not restore outside the replaceable test action.'
+        Assert-Equal 2 ([regex]::Matches($dotnetTestAction, '''--no-restore''| --no-restore ')).Count 'Both test launch paths must reuse the explicit restore.'
+
+        $previousAttemptFile = $env:ORLEANS_RESTORE_ATTEMPT_FILE
+        $previousFailure = $env:ORLEANS_RESTORE_FAILURE
+        try {
+            $env:ORLEANS_RESTORE_ATTEMPT_FILE = $attemptFile
+            foreach ($failure in 'metadata-remote-source', 'metadata-configured-feed') {
+                $env:ORLEANS_RESTORE_FAILURE = $failure
+                & $invokeRestoreScriptPath -RestoreCommand $fakeRestore
+                Assert-Equal 0 $LASTEXITCODE "The $failure failure should succeed on retry."
+                Assert-Equal 2 ([int] (Get-Content -Raw -LiteralPath $attemptFile)) "The $failure restore attempt count differs."
+                Remove-Item -LiteralPath $attemptFile
+            }
+
+            $env:ORLEANS_RESTORE_FAILURE = 'deterministic'
+            & $invokeRestoreScriptPath -RestoreCommand $fakeRestore
+            Assert-Equal 1 $LASTEXITCODE 'A deterministic restore failure should be preserved.'
+            Assert-Equal 1 ([int] (Get-Content -Raw -LiteralPath $attemptFile)) 'The deterministic restore attempt count differs.'
+        } finally {
+            $env:ORLEANS_RESTORE_ATTEMPT_FILE = $previousAttemptFile
+            $env:ORLEANS_RESTORE_FAILURE = $previousFailure
+        }
     }
 
     Invoke-Test 'retries only the uninitialized coverage handle failure' {
