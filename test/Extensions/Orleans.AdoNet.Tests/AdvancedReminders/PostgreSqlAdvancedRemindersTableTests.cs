@@ -1,0 +1,66 @@
+#nullable enable
+extern alias AdvancedRemindersAdoNet;
+
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.AdvancedReminders.Runtime.ReminderService;
+using Orleans.Tests.SqlUtils;
+using TestExtensions;
+using UnitTests.General;
+using Xunit;
+using AdoNetReminderTable = AdvancedRemindersAdoNet::Orleans.AdvancedReminders.Runtime.ReminderService.AdoNetReminderTable;
+using AdoNetReminderTableOptions = AdvancedRemindersAdoNet::Orleans.AdvancedReminders.AdoNet.AdoNetReminderTableOptions;
+using ClusterOptions = Orleans.Configuration.ClusterOptions;
+using LoggerFilterOptions = Microsoft.Extensions.Logging.LoggerFilterOptions;
+
+namespace UnitTests.AdvancedRemindersTest;
+
+[TestSuite("Functional")]
+[TestProvider("PostgreSql")]
+[TestArea("Reminders")]
+[TestCategory("Functional"), TestCategory("Reminders"), TestCategory("AdoNet"), TestCategory("PostgreSql")]
+public class PostgreSqlAdvancedRemindersTableTests : AdvancedReminderTableTestsBase
+{
+    public PostgreSqlAdvancedRemindersTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment)
+        : base(fixture, environment, CreateFilters())
+    {
+    }
+
+    private static LoggerFilterOptions CreateFilters()
+    {
+        var filters = new LoggerFilterOptions();
+        filters.AddFilter(nameof(PostgreSqlAdvancedRemindersTableTests), LogLevel.Trace);
+        return filters;
+    }
+
+    protected override Orleans.AdvancedReminders.IReminderTable CreateRemindersTable()
+    {
+        var options = new AdoNetReminderTableOptions
+        {
+            Invariant = GetAdoInvariant(),
+            ConnectionString = connectionStringFixture.ConnectionString,
+        };
+
+        return new AdoNetReminderTable(clusterOptions, Options.Create(options));
+    }
+
+    protected override string GetAdoInvariant() => AdoNetInvariants.InvariantNamePostgreSql;
+
+    protected override async Task<string> GetConnectionString()
+    {
+        var instance = await RelationalStorageForTesting.SetupInstance(GetAdoInvariant()!, testDatabaseName);
+        return instance.CurrentConnectionString;
+    }
+
+    [Fact]
+    public async Task RemindersTable_PostgreSql_DurableCronRoundTrip() => await ReminderCronRoundTrip();
+
+    [Fact]
+    public async Task RemindersTable_PostgreSql_DurableAdaptiveFieldsRoundTrip() => await ReminderAdaptiveFieldsRoundTrip();
+
+    [Fact]
+    public async Task RemindersTable_PostgreSql_UnspecifiedTimestampsRoundTrip() => await ReminderUnspecifiedTimestampsRoundTrip();
+
+    [Fact]
+    public async Task RemindersTable_PostgreSql_DurableCronTimeZoneRoundTrip() => await ReminderCronTimeZoneRoundTrip();
+}
