@@ -1,7 +1,9 @@
 using System;
 using System.Diagnostics.Metrics;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
@@ -13,6 +15,142 @@ namespace Tester;
 
 public class CallbackDataTests
 {
+    [TestSuite("BVT"), TestProvider("None")]
+    [Theory, TestCategory("BVT")]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void CancellationPolicyCombinesInvocationAndGlobalOptions(bool global, bool invocation)
+    {
+        using var serviceProvider = CreateServiceProvider();
+        using var cancellation = new CancellationTokenSource();
+        var completion = new TestResponseCompletionSource();
+        var manager = new TestCancellationManager();
+        var unregisterCount = 0;
+        var message = new Message { BodyObject = new CancellableRequest() };
+        var shared = new SharedCallbackData(
+            _ => unregisterCount++,
+            NullLogger<CallbackData>.Instance,
+            TimeProvider.System,
+            TimeSpan.FromSeconds(1),
+            cancelOnTimeout: false,
+            waitForCancellationAcknowledgement: global,
+            manager);
+        var callback = new CallbackData(shared, completion, message, CreateInstruments(serviceProvider), invocation);
+        callback.SubscribeForCancellation(cancellation.Token);
+
+        cancellation.Cancel();
+
+        Assert.Equal(1, manager.SignalCount);
+        Assert.Equal(message.Id, manager.MessageId);
+        Assert.Equal(!(global || invocation), callback.IsCompleted);
+        Assert.Equal(global || invocation ? 0 : 1, unregisterCount);
+        if (global || invocation)
+        {
+            Assert.Null(completion.Response);
+            callback.DoCallback(new Message { BodyObject = Response.FromResult(42) });
+            Assert.Equal(42, completion.Response.GetResult<int>());
+        }
+        else
+        {
+            Assert.Equal(cancellation.Token, Assert.IsType<OperationCanceledException>(completion.Response.Exception).CancellationToken);
+        }
+
+        Assert.Equal(1, completion.CompletionCount);
+    }
+
+    [TestSuite("BVT"), TestProvider("None")]
+    [Theory, TestCategory("BVT")]
+    [InlineData("response")]
+    [InlineData("acknowledgement")]
+    [InlineData("timeout")]
+    [InlineData("shutdown")]
+    [InlineData("silo failure")]
+    public void OptedInCancellationRetainsTerminalRuntimeOutcomes(string outcome)
+    {
+        using var serviceProvider = CreateServiceProvider();
+        using var cancellation = new CancellationTokenSource();
+        var timeProvider = new FakeTimeProvider();
+        var completion = new TestResponseCompletionSource();
+        var unregisterCount = 0;
+        var manager = new TestCancellationManager();
+        var shared = new SharedCallbackData(
+            _ => unregisterCount++,
+            NullLogger<CallbackData>.Instance,
+            timeProvider,
+            TimeSpan.FromSeconds(1),
+            cancelOnTimeout: false,
+            waitForCancellationAcknowledgement: false,
+            manager);
+        var callback = new CallbackData(
+            shared, completion, new Message { BodyObject = new CancellableRequest() },
+            CreateInstruments(serviceProvider), waitForCancellationAcknowledgement: true);
+        cancellation.Cancel();
+        callback.SubscribeForCancellation(cancellation.Token);
+        Assert.False(callback.IsCompleted);
+        Assert.Null(completion.Response);
+        Assert.Equal(1, manager.SignalCount);
+
+        switch (outcome)
+        {
+            case "response":
+                callback.DoCallback(new Message { BodyObject = Response.FromResult(42) });
+                Assert.Equal(42, completion.Response.GetResult<int>());
+                break;
+            case "acknowledgement":
+                callback.DoCallback(new Message { BodyObject = Response.FromException(new OperationCanceledException()) });
+                Assert.IsType<OperationCanceledException>(completion.Response.Exception);
+                break;
+            case "timeout":
+                timeProvider.Advance(TimeSpan.FromSeconds(2));
+                Assert.True(callback.IsExpired(timeProvider.GetTimestamp()));
+                callback.OnTimeout();
+                Assert.IsType<TimeoutException>(completion.Response.Exception);
+                break;
+            case "shutdown":
+                callback.OnHostShutdown();
+                Assert.IsType<SiloUnavailableException>(completion.Response.Exception);
+                break;
+            case "silo failure":
+                callback.OnTargetSiloFail();
+                Assert.IsType<SiloUnavailableException>(completion.Response.Exception);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(outcome));
+        }
+
+        Assert.True(callback.IsCompleted);
+        Assert.Equal(outcome is "response" or "acknowledgement" ? 0 : 1, unregisterCount);
+        callback.OnTimeout();
+        callback.OnHostShutdown();
+        Assert.Equal(1, completion.CompletionCount);
+        Assert.Equal(1, manager.SignalCount);
+    }
+
+    [TestSuite("BVT"), TestProvider("None")]
+    [Fact, TestCategory("BVT")]
+    public void ReusingRequestDoesNotRetainInvocationPolicy()
+    {
+        using var serviceProvider = CreateServiceProvider();
+        var request = new CancellableRequest();
+        var shared = CreateSharedCallbackData(_ => { }, TimeProvider.System, TimeSpan.FromSeconds(1));
+        foreach (var optedIn in new[] { true, false, true, false })
+        {
+            using var cancellation = new CancellationTokenSource();
+            var completion = new TestResponseCompletionSource();
+            var callback = new CallbackData(
+                shared, completion, new Message { BodyObject = request },
+                CreateInstruments(serviceProvider), optedIn);
+            callback.SubscribeForCancellation(cancellation.Token);
+            cancellation.Cancel();
+            Assert.Equal(!optedIn, callback.IsCompleted);
+            callback.OnHostShutdown();
+            Assert.Equal(1, completion.CompletionCount);
+            request.Dispose();
+        }
+    }
+
     [TestSuite("BVT")]
     [TestProvider("None")]
     [Fact, TestCategory("BVT")]
@@ -191,9 +329,41 @@ public class CallbackDataTests
     {
         public Response Response { get; private set; } = null!;
 
-        public void Complete(Response value) => Response = value;
+        public int CompletionCount { get; private set; }
 
-        public void Complete() => Response = Orleans.Serialization.Invocation.Response.Completed;
+        public void Complete(Response value)
+        {
+            Response = value;
+            CompletionCount++;
+        }
+
+        public void Complete() => Complete(Orleans.Serialization.Invocation.Response.Completed);
+    }
+
+    private sealed class TestCancellationManager : IGrainCallCancellationManager
+    {
+        public int SignalCount { get; private set; }
+        public CorrelationId MessageId { get; private set; }
+
+        public void SignalCancellation(SiloAddress? targetSilo, GrainId targetGrainId, GrainId sendingGrainId, CorrelationId messageId)
+        {
+            SignalCount++;
+            MessageId = messageId;
+        }
+    }
+
+    private sealed class CancellableRequest : RequestBase
+    {
+        public override bool IsCancellable => true;
+        public override void Dispose() { }
+        public override object GetTarget() => throw new NotSupportedException();
+        public override void SetTarget(ITargetHolder holder) => throw new NotSupportedException();
+        public override ValueTask<Response> Invoke() => throw new NotSupportedException();
+        public override string GetMethodName() => nameof(Invoke);
+        public override string GetInterfaceName() => nameof(CancellableRequest);
+        public override string GetActivityName() => nameof(CancellableRequest);
+        public override Type GetInterfaceType() => typeof(CancellableRequest);
+        public override MethodInfo GetMethod() => typeof(CancellableRequest).GetMethod(nameof(Invoke))!;
     }
 
     private sealed class HighFrequencyTimeProvider : TimeProvider
