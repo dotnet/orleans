@@ -232,6 +232,12 @@ namespace Orleans.Runtime.Messaging
                     }
                     else if (this.siloStatusOracle.IsDeadSilo(targetSilo))
                     {
+                        void RejectMessage()
+                        {
+                            this.messagingTrace.OnRejectSendMessageToDeadSilo(_siloAddress, msg);
+                            this.SendRejection(msg, Message.RejectionTypes.Transient, "Target silo is known to be dead", new SiloUnavailableException());
+                        }
+
                         // Do not try to establish
                         if (msg.Direction is Message.Directions.Request or Message.Directions.OneWay)
                         {
@@ -247,12 +253,6 @@ namespace Orleans.Runtime.Messaging
                         }
 
                         return;
-
-                        void RejectMessage()
-                        {
-                            this.messagingTrace.OnRejectSendMessageToDeadSilo(_siloAddress, msg);
-                            this.SendRejection(msg, Message.RejectionTypes.Transient, "Target silo is known to be dead", new SiloUnavailableException());
-                        }
                     }
                     else
                     {
@@ -557,6 +557,7 @@ namespace Orleans.Runtime.Messaging
                 var reason = exception is null
                     ? "Target silo is known to be dead"
                     : $"Exception while forwarding message: {exception}";
+                exception ??= new SiloUnavailableException();
                 SendRejection(
                     message,
                     Message.RejectionTypes.Transient,
