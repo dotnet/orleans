@@ -23,6 +23,7 @@ env:
   CONSUL_IMAGE: public.ecr.aws/hashicorp/consul:1.19
   DYNAMODB_IMAGE: amazon/dynamodb-local:latest
   ELASTICMQ_IMAGE: softwaremill/elasticmq-native:latest
+  MINIO_IMAGE: minio/minio:RELEASE.2025-09-07T16-13-09Z
   MINISTACK_IMAGE: ministackorg/ministack:1.4.11@sha256:8b05715b9effc23d998d4a4e0c0a0c4af7f9435f0ff076a30cf27a77326f14b1
   MSSQL_IMAGE: mcr.microsoft.com/mssql/server:2022-CU26-ubuntu-22.04@sha256:ba4c8329f48fb8f02e1416be6a930ebfd71268caee78aa985f3af4315e457c89
   NATS_IMAGE: nats:latest
@@ -587,6 +588,13 @@ jobs:
         framework: ["net8.0", "net10.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+    - name: Pre-pull S3 test images
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        bash .github/scripts/docker-pull-with-retry.sh "$TESTCONTAINERS_RYUK_IMAGE"
+        bash .github/scripts/docker-pull-with-retry.sh "$MINIO_IMAGE"
     - name: Test
       uses: ./.github/actions/run-tests
       with:
