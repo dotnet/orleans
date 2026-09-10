@@ -1,4 +1,6 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Providers.Streams.Common;
+using Orleans.Runtime;
 using Orleans.Streaming.EventHubs;
 using Orleans.Streams;
 using UnitTests.StreamingTests;
@@ -150,6 +152,86 @@ public sealed class EventHubSequenceTokenTests
         Assert.Equal(10, eventToken.SequenceNumber);
         Assert.Equal(2, eventToken.EventIndex);
         Assert.True(batchToken.CompareTo(eventToken) < 0);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void SimpleCache_RecoversLegacyPositionAndPreservesCurrentTokens(bool v2, bool waitForData)
+    {
+        IQueueCache cache = new SimpleQueueCache(10, NullLogger.Instance);
+        var streamId = StreamId.Create("legacy-simple-cache", Guid.NewGuid());
+        var legacy = LegacyTokenRecoveryFixture.LoadLegacyToken(v2: false);
+        StreamSequenceToken[] currentTokens =
+        [
+            CreateCustomToken(v2, 500, 1),
+            CreateCustomToken(v2, 500, 2),
+            CreateCustomToken(v2, 500, 3),
+            CreateCustomToken(v2, 501, 0),
+        ];
+        var messages = currentTokens.Select(token => (IBatchContainer)new TokenBatch(streamId, token)).ToList();
+        cache.AddToCache([new TokenBatch(streamId, CreateCustomToken(v2, 499, 0))]);
+        if (!waitForData)
+        {
+            cache.AddToCache(messages);
+        }
+
+        var result = cache.TryGetCacheCursor(streamId, legacy);
+
+        Assert.Equal(QueueCacheCursorResultKind.Success, result.Kind);
+        Assert.Null(result.CacheMiss);
+        using var cursor = Assert.IsAssignableFrom<IQueueCacheCursor>(result.Cursor);
+        if (waitForData)
+        {
+            Assert.Equal(QueueCacheCursorMoveResultKind.NoData, cursor.MoveNextWithResult().Kind);
+            cache.AddToCache(messages);
+            cursor.Refresh(currentTokens[0]);
+        }
+
+        foreach (var expected in currentTokens.Skip(1))
+        {
+            Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
+            var batch = cursor.GetCurrent(out var exception);
+            Assert.Null(exception);
+            Assert.NotNull(batch);
+            Assert.Same(expected, batch.SequenceToken);
+            AssertCustomMetadata(batch.SequenceToken, v2);
+        }
+
+        Assert.Equal(QueueCacheCursorMoveResultKind.NoData, cursor.MoveNextWithResult().Kind);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SimpleCache_ReportsCacheMissForEvictedLegacyPosition(bool v2)
+    {
+        IQueueCache cache = new SimpleQueueCache(10, NullLogger.Instance);
+        var streamId = StreamId.Create("legacy-simple-cache", Guid.NewGuid());
+        var legacy = LegacyTokenRecoveryFixture.LoadLegacyToken(v2: false);
+        var retained = CreateCustomToken(v2, 501, 0);
+        cache.AddToCache([new TokenBatch(streamId, retained)]);
+
+        var result = cache.TryGetCacheCursor(streamId, legacy);
+
+        Assert.Equal(QueueCacheCursorResultKind.CacheMiss, result.Kind);
+        Assert.Null(result.Cursor);
+        Assert.True(result.CacheMiss.HasValue);
+        Assert.Same(legacy, result.CacheMiss.Value.RequestedToken);
+        Assert.Same(retained, result.CacheMiss.Value.LowToken);
+        Assert.Same(retained, result.CacheMiss.Value.HighToken);
+        Assert.Throws<ArgumentOutOfRangeException>(() => cache.TryGetCacheCursor(
+            streamId, LegacyTokenRecoveryFixture.LoadLegacyToken(v2: true)));
+    }
+
+    private sealed class TokenBatch(StreamId streamId, StreamSequenceToken token) : IBatchContainer
+    {
+        public StreamId StreamId => streamId;
+        public StreamSequenceToken SequenceToken => token;
+        public bool ImportRequestContext() => false;
+        public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>() => throw new NotSupportedException();
     }
 
     private static EventHubSequenceToken CreateCustomToken(bool v2, long sequence, int index)
