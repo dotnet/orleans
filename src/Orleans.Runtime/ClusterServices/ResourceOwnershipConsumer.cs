@@ -21,6 +21,11 @@ internal interface IResourceOwnershipProtocol
 {
     ValueTask<ReadOnlyMemory<byte>> RecoverAsync(string resource, RegisteredServiceViewId targetView, CancellationToken cancellationToken);
     ValueTask<ResourceHandoffState> RequestHandoffAsync(SiloAddress source, ResourceHandoffRequest request, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Persists state under the recipient's ownership fence for <paramref name="previousView"/>.
+    /// A superseded writer's checkpoint must preserve the current owner's durable state.
+    /// </summary>
     ValueTask CheckpointAsync(string resource, ReadOnlyMemory<byte> state, RegisteredServiceViewId previousView, CancellationToken cancellationToken);
     ValueTask<ClusterServiceFence> AcquireFenceAsync(string resource, RegisteredServiceViewId targetView, CancellationToken cancellationToken);
 }
@@ -68,6 +73,7 @@ internal sealed class ResourceOwnershipConsumer : IAsyncDisposable
         lock (_lock)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
+            ValidateProviderView(view.Id);
             if (_view is { } installed && view.Id.CompareTo(installed.Id) <= 0)
             {
                 if (view.Id == installed.Id && installed.HasSameContent(view))
@@ -83,6 +89,9 @@ internal sealed class ResourceOwnershipConsumer : IAsyncDisposable
             var continuous = previous is not null && view.TryGetPredecessor(out var predecessor)
                 && predecessor == previous.Id && previous.Configuration == view.Configuration;
             var newOwned = view.GetOwnedResources(_local);
+            // Advancing the local view makes every earlier handoff target obsolete.
+            // In-flight releases keep their retained receiver alive through their own reference.
+            _retained.Clear();
             if (previous is not null)
             {
                 // Only local owned sets are traversed: O(oldOwned + newOwned), not a global product.
@@ -297,6 +306,7 @@ internal sealed class ResourceOwnershipConsumer : IAsyncDisposable
             lock (_lock)
             {
                 ObjectDisposedException.ThrowIf(_disposed, this);
+                ValidateProviderView(request.TargetView);
                 if (_view is { } current && current.Id.CompareTo(request.TargetView) >= 0)
                 {
                     retained = ValidateHandoff(request);
@@ -324,6 +334,7 @@ internal sealed class ResourceOwnershipConsumer : IAsyncDisposable
     private RetainedState ValidateHandoff(ResourceHandoffRequest request)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+        ValidateProviderView(request.TargetView);
         if (_view is null || _view.Id != request.TargetView
             || !_view.TryGetPredecessor(out var predecessor) || predecessor != request.PreviousView
             || !_view.ResourceOwners.TryGetValue(request.Resource, out var destination) || !destination.Equals(request.Destination)
@@ -349,6 +360,7 @@ internal sealed class ResourceOwnershipConsumer : IAsyncDisposable
         try
         {
             await WaitForPredecessorAsync(resource, gate.PreviousView);
+            EnsureCurrent(resource, receiver, target.Id);
             if (oldReceiver is { Ready: true })
             {
                 await DrainAsync(oldReceiver);
@@ -437,6 +449,7 @@ internal sealed class ResourceOwnershipConsumer : IAsyncDisposable
             // The target's outbound gate must not wait on itself.
             await WaitForPredecessorAsync(resource, gate.PreviousView);
             await DrainAsync(retained.Receiver);
+            ValidateProviderView(gate.TargetView);
             if (!retained.Receiver.Ready)
             {
                 throw new ClusterServiceViewUnavailableException($"No installed predecessor state exists for '{resource}' in '{gate.PreviousView}'.");
@@ -444,6 +457,7 @@ internal sealed class ResourceOwnershipConsumer : IAsyncDisposable
 
             gate.MarkDrained();
             await _protocol.CheckpointAsync(resource, retained.Receiver.State, gate.PreviousView, _shutdown.Token);
+            ValidateProviderView(gate.TargetView);
             gate.MarkStateRetained();
             gate.Complete();
             _gates.Prune(resource);
@@ -492,12 +506,24 @@ internal sealed class ResourceOwnershipConsumer : IAsyncDisposable
     private void ValidateOwnership(string resource, RegisteredServiceViewId view)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (!_provider.TryGetCurrentView(out _) || _view is null || _view.Id != view
+        ValidateProviderView(view);
+        if (_view is null || _view.Id != view
             || !_view.ResourceOwners.TryGetValue(resource, out var owner) || !owner.Equals(_local)
             || !_provider.IsOwnerLive(_local, _view.MembershipWatermark))
         {
             throw new ClusterServiceViewUnavailableException($"Resource '{resource}' is not available on '{_local}' in '{view}'.");
         }
+    }
+
+    private void ValidateProviderView(RegisteredServiceViewId view)
+    {
+        _provider.ValidateAuthority(view);
+        if (!_provider.TryGetCurrentView(out var current))
+        {
+            throw new ClusterServiceViewUnavailableException($"Service authority for '{view}' is unavailable.");
+        }
+
+        current.Id.CompareTo(view);
     }
 
     private void ValidateReceiver(string resource, Receiver receiver, RegisteredServiceViewId view)
@@ -546,6 +572,7 @@ internal sealed class ResourceOwnershipConsumer : IAsyncDisposable
             _shutdown.Cancel();
             _viewChanged.TrySetResult();
             _gates.AbortAll(_shutdown.Token);
+            _retained.Clear();
             work = _work.ToArray();
         }
 

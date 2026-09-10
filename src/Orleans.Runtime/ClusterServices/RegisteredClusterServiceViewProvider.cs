@@ -48,6 +48,8 @@ internal sealed class RegisteredClusterServiceViewProvider : IClusterServiceView
 
     public IAsyncEnumerable<RegisteredClusterServiceView> ViewUpdates => ReadUpdates();
 
+    internal void ValidateAuthority(RegisteredServiceViewId view) => _namespace.CompareTo(view);
+
     public bool TryGetCurrentView([MaybeNullWhen(false)] out RegisteredClusterServiceView view)
     {
         lock (_lock)
@@ -194,10 +196,14 @@ internal sealed class RegisteredClusterServiceViewProvider : IClusterServiceView
             }
         }
 
-        bool written;
+        string? token;
         try
         {
-            written = await _register.TryWriteAsync(proposed, read.Token, cancellationToken);
+            token = await _register.TryWriteAsync(proposed, read.Token, cancellationToken);
+            if (token is not null)
+            {
+                Install(new(proposed, token));
+            }
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -205,13 +211,7 @@ internal sealed class RegisteredClusterServiceViewProvider : IClusterServiceView
             throw;
         }
 
-        if (!written)
-        {
-            return null;
-        }
-
-        Install(proposed);
-        return proposed;
+        return token is null ? null : proposed;
     }
 
     private async ValueTask<RegisteredClusterServiceView> RefreshCoreAsync(RegisteredServiceViewId? minimum, CancellationToken cancellationToken)
@@ -285,7 +285,7 @@ internal sealed class RegisteredClusterServiceViewProvider : IClusterServiceView
                     throw new ClusterServiceViewUnavailableException($"Membership has not reached the watermark for '{view.Id}'.");
                 }
 
-                Install(view);
+                Install(read);
             }
         }
         catch (Exception exception) when (exception is not OperationCanceledException || !_shutdown.IsCancellationRequested)
@@ -307,7 +307,7 @@ internal sealed class RegisteredClusterServiceViewProvider : IClusterServiceView
             var view = read.View;
             if (view is null)
             {
-                if (_current is not null)
+                if (_current is not null || _lastRead?.View is not null)
                 {
                     throw new ClusterServiceAuthorityException($"Register '{_namespace}' was removed. Bootstrap a new authority namespace.");
                 }
@@ -316,10 +316,17 @@ internal sealed class RegisteredClusterServiceViewProvider : IClusterServiceView
             }
 
             _namespace.CompareTo(view.Id);
-            if (_lastRead is { View: { } previousRead } && view.Id == previousRead.Id
-                && !StringComparer.Ordinal.Equals(read.Token, _lastRead.Token))
+            if (_lastRead is { View: { } previousRead })
             {
-                throw new ClusterServiceAuthorityException($"Register '{view.Id}' was rewritten without a new revision. Explicit bootstrap is required.");
+                if (view.Id.CompareTo(previousRead.Id) < 0)
+                {
+                    throw new ClusterServiceAuthorityException($"Register '{view.Id}' regressed from observed '{previousRead.Id}'. Explicit bootstrap is required.");
+                }
+
+                if (view.Id == previousRead.Id && !StringComparer.Ordinal.Equals(read.Token, _lastRead.Token))
+                {
+                    throw new ClusterServiceAuthorityException($"Register '{view.Id}' was rewritten without a new revision. Explicit bootstrap is required.");
+                }
             }
 
             if (_current is { } current)
@@ -339,11 +346,12 @@ internal sealed class RegisteredClusterServiceViewProvider : IClusterServiceView
         }
     }
 
-    private void Install(RegisteredClusterServiceView view)
+    private void Install(ClusterServiceRegisterRead read)
     {
         lock (_lock)
         {
-            ThrowIfTerminated();
+            ValidateRead(read);
+            var view = read.View!;
             if (_current is { } current && view.Id.CompareTo(current.Id) <= 0)
             {
                 if (view.Id == current.Id && !view.HasSameContent(current))
