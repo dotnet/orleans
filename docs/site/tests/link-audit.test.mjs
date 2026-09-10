@@ -730,6 +730,77 @@ describe('external link audit', () => {
     expect(rateRequests).toBe(2);
   });
 
+  test('reports GitHub throttling without amplifying requests', async () => {
+    for (const status of [403, 429]) {
+      let requests = 0;
+      const result = await probeExternalTargets({
+        externalTargets: new Map([
+          [
+            'https://github.com/dotnet/orleans/edit/main/docs/README.md',
+            [{ relativeFile: 'guide.md', line: 5 }],
+          ],
+        ]),
+        retries: 1,
+        lookupImpl: publicLookup,
+        requestImpl: async () => {
+          requests += 1;
+          return response(status);
+        },
+      });
+
+      expect(result.failures).toEqual([]);
+      expect(result.warnings).toEqual([
+        expect.stringContaining(`Transient external status ${status}`),
+      ]);
+      expect(requests).toBe(1);
+    }
+  });
+
+  test('uses the final host to classify redirected GitHub throttling', async () => {
+    let requests = 0;
+    const result = await probeExternalTargets({
+      externalTargets: new Map([
+        [
+          'https://public.example/github',
+          [{ relativeFile: 'guide.md', line: 5 }],
+        ],
+      ]),
+      retries: 0,
+      lookupImpl: publicLookup,
+      requestImpl: async (url) => {
+        requests += 1;
+        return url.hostname === 'github.com'
+          ? response(403)
+          : response(302, 'https://github.com/dotnet/orleans');
+      },
+    });
+
+    expect(result.failures).toEqual([]);
+    expect(result.warnings).toEqual([
+      expect.stringContaining('Transient external status 403'),
+    ]);
+    expect(requests).toBe(2);
+  });
+
+  test('fails definitive missing GitHub targets', async () => {
+    const result = await probeExternalTargets({
+      externalTargets: new Map([
+        [
+          'https://github.com/dotnet/orleans/blob/main/missing.md',
+          [{ relativeFile: 'guide.md', line: 5 }],
+        ],
+      ]),
+      retries: 0,
+      lookupImpl: publicLookup,
+      requestImpl: async () => response(404),
+    });
+
+    expect(result.warnings).toEqual([]);
+    expect(result.failures).toEqual([
+      expect.stringContaining('returned 404'),
+    ]);
+  });
+
   test('fails permanent DNS or TLS-style network errors', async () => {
     const error = new TypeError('fetch failed', {
       cause: Object.assign(new Error('not found'), { code: 'ENOTFOUND' }),
@@ -905,6 +976,25 @@ describe('external link audit', () => {
           resolve();
         }
       });
+    });
+  });
+
+  test('identifies the probe only to GitHub', () => {
+    const options = createPinnedRequestOptions(
+      new URL('https://github.com/dotnet/orleans'),
+      {
+        method: 'HEAD',
+        destination: {
+          hostname: 'github.com',
+          address: '8.8.8.8',
+          family: 4,
+        },
+      },
+    );
+
+    expect(options.headers).toEqual({
+      Host: 'github.com',
+      'User-Agent': 'dotnet-orleans-docs-link-audit/1.0 (+https://github.com/dotnet/orleans)',
     });
   });
 

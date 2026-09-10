@@ -17,6 +17,9 @@ const contentRoute = `${deploymentBase}/docs`;
 const learnContentRoot = '/dotnet/orleans';
 const redirectStatuses = new Set([301, 302, 303, 307, 308]);
 const transientStatuses = new Set([408, 425, 429, 500, 502, 503, 504]);
+const throttlingStatusesByHost = new Map([
+  ['github.com', new Set([403, 429])],
+]);
 const headFallbackStatuses = new Set([405, 501]);
 const headFallbackStatusesByHost = new Map([
   ['azure.microsoft.com', new Set([404])],
@@ -990,6 +993,9 @@ export function createPinnedRequestOptions(url, { method, destination }) {
     autoSelectFamily: false,
     headers: {
       Host: url.host,
+      ...(url.hostname.toLowerCase() === 'github.com'
+        ? { 'User-Agent': 'dotnet-orleans-docs-link-audit/1.0 (+https://github.com/dotnet/orleans)' }
+        : {}),
       ...(method === 'GET' ? { Range: 'bytes=0-0' } : {}),
     },
     lookup: (_hostname, options, callback) => {
@@ -1117,6 +1123,20 @@ async function probeOnce(url, options) {
   return head;
 }
 
+function isHostThrottlingStatus(result) {
+  const hostname = new URL(result.finalUrl).hostname.toLowerCase();
+  return (
+    throttlingStatusesByHost.get(hostname)?.has(result.response.status) === true
+  );
+}
+
+function hasTransientStatus(result) {
+  return (
+    transientStatuses.has(result.response.status) ||
+    isHostThrottlingStatus(result)
+  );
+}
+
 export async function probeExternalTargets({
   externalTargets,
   allowlist = { urls: {} },
@@ -1186,7 +1206,10 @@ export async function probeExternalTargets({
             maxRedirects,
           });
           error = undefined;
-          if (!transientStatuses.has(result.response.status)) break;
+          if (
+            !transientStatuses.has(result.response.status) ||
+            isHostThrottlingStatus(result)
+          ) break;
         } catch (caught) {
           error = caught;
           if (!caught.transient) break;
@@ -1214,9 +1237,9 @@ export async function probeExternalTargets({
         }
       } else if (status === 404 || status === 410) {
         failures.push(`${url} (${provenance}): returned ${status}.`);
-      } else if (status >= 400 && !transientStatuses.has(status)) {
+      } else if (status >= 400 && !hasTransientStatus(result)) {
         failures.push(`${url} (${provenance}): returned ${status}; add a reasoned exact-URL allowlist entry only if the target cannot be probed reliably.`);
-      } else if (transientStatuses.has(status)) {
+      } else if (hasTransientStatus(result)) {
         warnings.push(`Transient external status ${status}: ${url} (${provenance}).`);
       }
     }
