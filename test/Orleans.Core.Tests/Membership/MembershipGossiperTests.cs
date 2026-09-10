@@ -24,12 +24,11 @@ public class MembershipGossiperTests
     [InlineData("Gossip")]
     [InlineData("Probe")]
     [InlineData("IndirectProbe")]
-    public async Task MembershipRpc_CallerCancellationBoundsWaitAndReachesRemote(string operation)
+    public async Task MembershipRpc_CallerCancellationReachesRemoteAndCompletesRequest(string operation)
     {
         using var rig = CreateTestRig();
         using var cancellation = new CancellationTokenSource();
         var requestStarted = new TaskCompletionSource<CancellationToken>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var response = new TaskCompletionSource<IndirectProbeResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
         rig.Remote.MembershipChangeNotification(Arg.Any<MembershipTableSnapshot>(), Arg.Any<CancellationToken>())
             .Returns(call => StartRequest(call.ArgAt<CancellationToken>(1)));
         rig.Remote.Ping(Arg.Any<int>(), Arg.Any<CancellationToken>())
@@ -45,13 +44,50 @@ public class MembershipGossiperTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
             () => request.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
         Assert.True(request.IsCanceled);
-        Assert.False(response.Task.IsCompleted);
-        response.SetException(new InvalidOperationException("Late membership RPC failure"));
 
-        Task<IndirectProbeResponse> StartRequest(CancellationToken token)
+        async Task<IndirectProbeResponse> StartRequest(CancellationToken token)
         {
             requestStarted.TrySetResult(token);
-            return response.Task;
+            await Task.Delay(Timeout.InfiniteTimeSpan, token);
+            throw new InvalidOperationException("The infinite delay completes by cancellation.");
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ScheduledOperation_CancellationPreservesCalleeResult(bool sameContext)
+    {
+        using var rig = CreateTestRig();
+        using var cancellation = new CancellationTokenSource();
+        var target = rig.ServiceProvider.GetRequiredService<MembershipSystemTarget>();
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Task<int>? operation = null;
+        if (sameContext)
+        {
+            await target.RunOrQueueTask(() =>
+            {
+                operation = target.RunOrQueueTask(CompleteOnCancellation, cancellation.Token);
+                return Task.CompletedTask;
+            });
+        }
+        else
+        {
+            operation = target.RunOrQueueTask(CompleteOnCancellation, cancellation.Token);
+        }
+
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        cancellation.Cancel();
+
+        Assert.NotNull(operation);
+        Assert.Equal(42, await operation.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
+        Assert.True(operation.IsCompletedSuccessfully);
+
+        async Task<int> CompleteOnCancellation(CancellationToken token)
+        {
+            started.SetResult();
+            await token.WhenCancelled();
+            return 42;
         }
     }
 

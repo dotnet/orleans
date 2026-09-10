@@ -218,7 +218,7 @@ namespace Orleans.Runtime.MembershipService
                 var timeout = this.clusterMembershipOptions.ProbeTimeout;
                 foreach (var silo in members)
                 {
-                    tasks.Add(ProbeSilo(this.siloProber, silo, timeout, this.log, cancellationToken));
+                    tasks.Add(ProbeSilo(this.siloProber, silo, timeout, this.timeProvider, this.log, cancellationToken));
                 }
 
                 try
@@ -242,15 +242,19 @@ namespace Orleans.Runtime.MembershipService
                 return failed;
             }
 
-            static async Task<bool> ProbeSilo(IRemoteSiloProber siloProber, SiloAddress silo, TimeSpan timeout, ILogger log, CancellationToken cancellationToken)
+            static async Task<bool> ProbeSilo(IRemoteSiloProber siloProber, SiloAddress silo, TimeSpan timeout, TimeProvider timeProvider, ILogger log, CancellationToken cancellationToken)
             {
                 Exception exception;
+                using var deadline = new CancellationTokenSource(timeout, timeProvider);
+                using var probeCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, deadline.Token);
                 try
                 {
-                    var probe = siloProber.Probe(silo, 0, cancellationToken);
-                    probe.Ignore();
-                    await probe.WaitAsync(timeout, cancellationToken);
+                    await siloProber.Probe(silo, 0, probeCancellation.Token);
                     return true;
+                }
+                catch (OperationCanceledException ex) when (deadline.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+                {
+                    exception = new TimeoutException($"The probe exceeded its timeout of {timeout}.", ex);
                 }
                 catch (OperationCanceledException)
                 {
@@ -342,9 +346,7 @@ namespace Orleans.Runtime.MembershipService
                     // Terminal status publication owns a bounded cleanup lifetime.
                     using var cleanup = new CancellationTokenSource(TimeSpan.FromMinutes(1), this.timeProvider);
                     var cleanupToken = cleanup.Token;
-                    var dead = Task.Run(() => this.BecomeDead(cleanupToken), cleanupToken);
-                    dead.Ignore();
-                    await dead.WaitAsync(cleanupToken).SuppressThrowing();
+                    await Task.Run(() => this.BecomeDead(cleanupToken), cleanupToken).SuppressThrowing();
                 }
 
                 lifecycle.Subscribe(

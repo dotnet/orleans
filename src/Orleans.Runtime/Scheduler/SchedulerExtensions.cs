@@ -47,42 +47,26 @@ namespace Orleans.Runtime.Scheduler
             return workItem.Task;
         }
 
-        internal static Task<TResult> RunOrQueueTask<TResult>(
+        internal static async Task<TResult> RunOrQueueTask<TResult>(
             this IGrainContext targetContext,
             Func<CancellationToken, Task<TResult>> taskFunc,
             CancellationToken cancellationToken)
         {
-            if (cancellationToken.IsCancellationRequested)
-            {
-                return Task.FromCanceled<TResult>(cancellationToken);
-            }
+            cancellationToken.ThrowIfCancellationRequested();
 
-            Task<TResult> task;
             var currentContext = RuntimeContext.Current;
             if (currentContext is not null && currentContext.Equals(targetContext))
             {
-                try
-                {
-                    task = taskFunc(cancellationToken);
-                }
-                catch (Exception exc)
-                {
-                    return Task.FromException<TResult>(exc);
-                }
-            }
-            else
-            {
-                var workItem = new AsyncClosureWorkItem<TResult>(() =>
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    return taskFunc(cancellationToken);
-                }, targetContext);
-                targetContext.Scheduler.QueueWorkItem(workItem);
-                task = workItem.Task;
+                return await taskFunc(cancellationToken);
             }
 
-            task.Ignore();
-            return task.WaitAsync(cancellationToken);
+            var workItem = new AsyncClosureWorkItem<TResult>(() =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return taskFunc(cancellationToken);
+            }, targetContext);
+            targetContext.Scheduler.QueueWorkItem(workItem);
+            return await workItem.Task;
         }
 
         internal static Task<TResult> RunOrQueueTaskResult<TResult>(this IGrainContext targetContext, Func<TResult> taskFunc)

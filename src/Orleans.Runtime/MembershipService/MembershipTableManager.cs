@@ -387,12 +387,20 @@ namespace Orleans.Runtime.MembershipService
                 {
                     // SystemTarget-based membership may not be accessible at this stage, so allow for one quick attempt to update
                     // the status before continuing regardless of the outcome.
-                    var updateTask = UpdateMyStatusTask(0, cancellationToken);
-                    updateTask.Ignore();
-                    await Task.WhenAny(
-                        Task.Delay(TimeSpan.FromMilliseconds(500), this.timeProvider, cancellationToken),
-                        updateTask).WaitAsync(cancellationToken);
-                    cancellationToken.ThrowIfCancellationRequested();
+                    using var timeout = new CancellationTokenSource(TimeSpan.FromMilliseconds(500), this.timeProvider);
+                    using var updateCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
+                    try
+                    {
+                        await UpdateMyStatusTask(0, updateCancellation.Token);
+                    }
+                    catch (OperationCanceledException) when (timeout.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+                    {
+                        LogWarningFailedToUpdateMyStatusDueToFailures(this.log, new TimeoutException("The terminal status update exceeded its 500 millisecond deadline."), myAddress, status, numCalls);
+                    }
+                    catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+                    {
+                        LogWarningFailedToUpdateMyStatusDueToFailures(this.log, exception, myAddress, status, numCalls);
+                    }
 
                     await this.GossipToOthers(this.myAddress, status, TimeSpan.FromMilliseconds(500), cancellationToken);
 

@@ -63,12 +63,10 @@ namespace Orleans.Runtime.MembershipService
         /// <param name="probeNumber">The probe number, for diagnostic purposes.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>The result of pinging the remote silo.</returns>
-        public Task ProbeRemoteSilo(SiloAddress remoteSilo, int probeNumber, CancellationToken cancellationToken)
+        public async Task ProbeRemoteSilo(SiloAddress remoteSilo, int probeNumber, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var task = this.RunOrQueueTask(() => ProbeInternal(remoteSilo, probeNumber, cancellationToken));
-            task.Ignore();
-            return task.WaitAsync(cancellationToken);
+            await this.RunOrQueueTask(() => ProbeInternal(remoteSilo, probeNumber, cancellationToken));
         }
 
         /// <summary>
@@ -103,23 +101,24 @@ namespace Orleans.Runtime.MembershipService
             var probeTimer = TimeProviderValueStopwatch.StartNew(_timeProvider);
             var succeeded = false;
             string? failureMessage = null;
+            using var timeout = new CancellationTokenSource(probeTimeout, _timeProvider);
+            using var probeCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
             try
             {
-                var probeTask = this.ProbeInternal(target, probeNumber, cancellationToken);
-                probeTask.Ignore();
                 try
                 {
-                    await probeTask.WaitAsync(probeTimeout, _timeProvider, cancellationToken);
+                    await this.ProbeInternal(target, probeNumber, probeCancellation.Token);
                 }
-                catch (TimeoutException exception)
+                catch (OperationCanceledException exception) when (timeout.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
                 {
-                    LogWarningRequestedProbeTimeoutExceeded(this.log, exception, probeTimeout);
-                    throw;
+                    var timeoutException = new TimeoutException($"The probe exceeded its timeout of {probeTimeout}.", exception);
+                    LogWarningRequestedProbeTimeoutExceeded(this.log, timeoutException, probeTimeout);
+                    throw timeoutException;
                 }
 
                 succeeded = true;
             }
-            catch (OperationCanceledException exception) when (exception.CancellationToken == cancellationToken)
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 throw;
             }
@@ -141,7 +140,7 @@ namespace Orleans.Runtime.MembershipService
             };
         }
 
-        public Task GossipToRemoteSilos(
+        public async Task GossipToRemoteSilos(
             List<SiloAddress> gossipPartners,
             MembershipTableSnapshot snapshot,
             SiloAddress updatedSilo,
@@ -161,9 +160,7 @@ namespace Orleans.Runtime.MembershipService
                 await Task.WhenAll(tasks);
             }
 
-            var task = this.RunOrQueueTask(Gossip);
-            task.Ignore();
-            return task.WaitAsync(cancellationToken);
+            await this.RunOrQueueTask(Gossip);
         }
 
         private async Task GossipToRemoteSilo(
@@ -179,9 +176,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var remoteOracle = this.grainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipServiceType, silo);
-                var task = remoteOracle.MembershipChangeNotification(snapshot, cancellationToken);
-                task.Ignore();
-                await task.WaitAsync(cancellationToken);
+                await remoteOracle.MembershipChangeNotification(snapshot, cancellationToken);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {

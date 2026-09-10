@@ -111,28 +111,51 @@ public class DeploymentLoadPublisherTests
     }
 
     [Fact]
-    public async Task RefreshClusterStatistics_Cancellation_PreservesStateAfterLateResponse()
+    public async Task PublishStatistics_CancellationPreservesNativeCompletion()
     {
         using var rig = CreateTestRig(TimeSpan.Zero);
         using var cancellation = new CancellationTokenSource();
-        // Queue the captured scheduler continuations before SetResult returns.
-        var response = new TaskCompletionSource<SiloRuntimeStatistics>();
         var requested = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        rig.Control.GetRuntimeStatistics(Arg.Any<CancellationToken>()).Returns(_ =>
-        {
-            requested.TrySetResult();
-            return response.Task;
-        });
-        var refresh = rig.Publisher.RefreshClusterStatistics(cancellation.Token);
+        rig.DirectTarget.UpdateRuntimeStatistics(
+            Arg.Any<SiloAddress>(), Arg.Any<SiloRuntimeStatistics>(), Arg.Any<CancellationToken>())
+            .Returns(async call =>
+            {
+                requested.SetResult();
+                await call.ArgAt<CancellationToken>(2).WhenCancelled();
+            });
+        var publication = rig.Publisher.PublishStatistics(cancellation.Token);
         await requested.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        cancellation.Cancel();
+        await publication.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        Assert.True(publication.IsCompletedSuccessfully);
+        Assert.Same(rig.Publisher.LocalRuntimeStatistics, rig.Publisher.PeriodicStatistics[rig.LocalSilo]);
+    }
+
+    [Fact]
+    public async Task RefreshClusterStatistics_Cancellation_CancelsNativeRequests()
+    {
+        using var rig = CreateTestRig(TimeSpan.Zero);
+        using var cancellation = new CancellationTokenSource();
+        var requested = new TaskCompletionSource<CancellationToken>(TaskCreationOptions.RunContinuationsAsynchronously);
+        rig.Control.GetRuntimeStatistics(Arg.Any<CancellationToken>()).Returns(call => ReadStatistics(call.ArgAt<CancellationToken>(0)));
+        var refresh = rig.Publisher.RefreshClusterStatistics(cancellation.Token);
+        var requestToken = await requested.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         cancellation.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
             () => refresh.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
-        response.SetResult(rig.InitialStatistics);
-        // Drain the same scheduler after both RPC continuations have completed.
-        await rig.Publisher.RunOrQueueTask(() => Task.CompletedTask);
+        Assert.Equal(cancellation.Token, requestToken);
+        Assert.True(requestToken.IsCancellationRequested);
         Assert.Empty(rig.Publisher.PeriodicStatistics);
+
+        async Task<SiloRuntimeStatistics> ReadStatistics(CancellationToken token)
+        {
+            requested.TrySetResult(token);
+            await Task.Delay(Timeout.InfiniteTimeSpan, token);
+            return rig.InitialStatistics;
+        }
     }
 
     [Fact]
