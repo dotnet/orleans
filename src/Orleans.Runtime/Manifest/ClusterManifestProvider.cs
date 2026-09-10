@@ -396,7 +396,7 @@ namespace Orleans.Runtime.Metadata
         {
             cancellationToken.ThrowIfCancellationRequested();
             var slots = _peerProbeSlots!;
-            if (!slots.Wait(0))
+            if (!slots.Wait(0, cancellationToken))
             {
                 LogDebugClusterManifestPeerProbeAtCapacity(peer);
                 return null;
