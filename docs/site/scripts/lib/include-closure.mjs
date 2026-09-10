@@ -26,7 +26,8 @@ function splitFrontmatterWithoutYaml(source) {
 }
 
 export async function collectIncludeTargets(markdownFiles, options = {}) {
-  const allowedRoot = options.allowedRoot ? await realpath(path.resolve(options.allowedRoot)) : undefined;
+  const allowedRoot = options.allowedRoot ? path.resolve(options.allowedRoot) : undefined;
+  const physicalAllowedRoot = allowedRoot ? await realpath(allowedRoot) : undefined;
   const onIssue = options.onIssue;
   const onTarget = options.onTarget;
   const readSource = options.readSource ?? ((filePath) => readFile(filePath, 'utf8'));
@@ -42,11 +43,11 @@ export async function collectIncludeTargets(markdownFiles, options = {}) {
     throw new Error(`${message} (${file}:${line})`);
   }
 
-  function isWithinAllowedRoot(filePath) {
-    if (!allowedRoot) {
+  function isWithinAllowedRoot(filePath, root = allowedRoot) {
+    if (!root) {
       return true;
     }
-    const relative = path.relative(allowedRoot, filePath);
+    const relative = path.relative(root, filePath);
     return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
   }
 
@@ -111,7 +112,7 @@ export async function collectIncludeTargets(markdownFiles, options = {}) {
         continue;
       }
       const target = await realpath(requestedTarget);
-      if (!isWithinAllowedRoot(target)) {
+      if (!isWithinAllowedRoot(target, physicalAllowedRoot)) {
         report(
           resolvedPath,
           bodyStartLine + index,
