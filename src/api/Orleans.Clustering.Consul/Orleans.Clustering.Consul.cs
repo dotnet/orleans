@@ -88,22 +88,49 @@ namespace Orleans.Runtime.Membership
     {
         public ConsulBasedMembershipTable(Microsoft.Extensions.Logging.ILogger<ConsulBasedMembershipTable> logger, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.ConsulClusteringOptions> membershipTableOptions, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.ClusterOptions> clusterOptions) { }
 
+        public System.Threading.Tasks.Task CleanupDefunctSiloEntries(System.DateTimeOffset beforeDate, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        [System.Obsolete("Use the overload accepting a CancellationToken instead.")]
         public System.Threading.Tasks.Task CleanupDefunctSiloEntries(System.DateTimeOffset beforeDate) { throw null; }
 
+        public System.Threading.Tasks.Task DeleteMembershipTableEntries(string clusterId, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        [System.Obsolete("Use the overload accepting a CancellationToken instead.")]
         public System.Threading.Tasks.Task DeleteMembershipTableEntries(string clusterId) { throw null; }
 
+        public System.Threading.Tasks.Task InitializeMembershipTable(bool tryInitTableVersion, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        [System.Obsolete("Use the overload accepting a CancellationToken instead.")]
         public System.Threading.Tasks.Task InitializeMembershipTable(bool tryInitTableVersion) { throw null; }
 
+        public System.Threading.Tasks.Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        [System.Obsolete("Use the overload accepting a CancellationToken instead.")]
         public System.Threading.Tasks.Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) { throw null; }
 
+        [System.Obsolete("Use the overload accepting a CancellationToken instead.")]
         public System.Threading.Tasks.Task<MembershipTableData> ReadAll() { throw null; }
 
+        public static System.Threading.Tasks.Task<MembershipTableData> ReadAll(Consul.IConsulClient consulClient, string clusterId, string? kvRootFolder, Microsoft.Extensions.Logging.ILogger logger, string? versionKey, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        [System.Obsolete("Use the overload accepting a CancellationToken instead.")]
         public static System.Threading.Tasks.Task<MembershipTableData> ReadAll(Consul.IConsulClient consulClient, string clusterId, string? kvRootFolder, Microsoft.Extensions.Logging.ILogger logger, string? versionKey) { throw null; }
 
+        public System.Threading.Tasks.Task<MembershipTableData> ReadAll(System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public System.Threading.Tasks.Task<MembershipTableData> ReadRow(SiloAddress siloAddress, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        [System.Obsolete("Use the overload accepting a CancellationToken instead.")]
         public System.Threading.Tasks.Task<MembershipTableData> ReadRow(SiloAddress siloAddress) { throw null; }
 
+        public System.Threading.Tasks.Task UpdateIAmAlive(MembershipEntry entry, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        [System.Obsolete("Use the overload accepting a CancellationToken instead.")]
         public System.Threading.Tasks.Task UpdateIAmAlive(MembershipEntry entry) { throw null; }
 
+        public System.Threading.Tasks.Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        [System.Obsolete("Use the overload accepting a CancellationToken instead.")]
         public System.Threading.Tasks.Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) { throw null; }
     }
 

@@ -480,8 +480,8 @@ internal sealed class OrleansQueries
     internal async Task<RowSet> ExecuteAsync(IStatement statement, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        statement.SetAutoPage(true);
         var rows = await AwaitAsync(Session.ExecuteAsync(statement), cancellationToken);
-        rows.AutoPage = false;
         return rows;
     }
 
@@ -497,15 +497,23 @@ internal sealed class OrleansQueries
 
     internal static async IAsyncEnumerable<Row> ReadRowsAsync(RowSet rows, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        // Automatic paging blocks synchronously inside enumeration and cannot observe cancellation.
-        rows.AutoPage = false;
+        // Consume buffered rows so that fetching each subsequent page stays on the cancellable await path.
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            foreach (var row in rows)
+            var available = rows.GetAvailableWithoutFetching();
+            using (var buffered = rows.GetEnumerator())
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                yield return row;
+                for (var i = 0; i < available; i++)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (!buffered.MoveNext())
+                    {
+                        break;
+                    }
+
+                    yield return buffered.Current;
+                }
             }
 
             if (rows.IsFullyFetched)

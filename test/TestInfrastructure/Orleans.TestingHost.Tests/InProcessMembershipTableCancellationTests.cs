@@ -36,8 +36,13 @@ public sealed class InProcessMembershipTableCancellationTests
         Assert.True(await table.InsertRow(entry, initial.Version.Next(), testToken));
         var before = await table.ReadAll(testToken);
         var row = Assert.Single(before.Members);
-        var changedEntry = entry.Copy();
-        changedEntry.IAmAliveTime = DateTime.UnixEpoch.AddMinutes(1);
+        var changedEntry = new MembershipEntry
+        {
+            SiloAddress = entry.SiloAddress,
+            Status = entry.Status,
+            StartTime = entry.StartTime,
+            IAmAliveTime = DateTime.UnixEpoch.AddMinutes(1),
+        };
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
 

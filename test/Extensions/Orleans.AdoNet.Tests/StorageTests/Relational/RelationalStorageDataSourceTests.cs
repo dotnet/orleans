@@ -44,7 +44,8 @@ public sealed class RelationalStorageDataSourceTests
             RelationalOrleansQueries.CreateInstance(
                 AdoNetInvariants.InvariantNameSqlLite,
                 connectionString: null,
-                dataSource));
+                dataSource,
+                TestContext.Current.CancellationToken));
 
         Assert.Contains("OrleansQuery", exception.Message, StringComparison.Ordinal);
         Assert.Equal(1, dataSource.OpenConnectionAsyncCallCount);
