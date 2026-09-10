@@ -1,0 +1,33 @@
+name: Generate membership cancellation API
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - src/Orleans.Core/SystemTargetInterfaces/IMembershipTable.cs
+      - .github/workflows/generate-membership-api.yml
+
+permissions:
+  contents: read
+
+jobs:
+  generate:
+    if: github.event.pull_request.number == 11237
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+      - uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7
+        with:
+          global-json-file: global.json
+      - name: Generate Core API
+        run: |
+          dotnet restore src\Orleans.Core\Orleans.Core.csproj --configfile .github\NuGet.GenAPI.Config -p:GenerateOrleansApiSource=true
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet build src\Orleans.Core\Orleans.Core.csproj --framework net8.0 --configuration Release --no-incremental --no-restore -p:GenerateOrleansApiSource=true /t:"Build;GenAPIGenerateReferenceAssemblySource"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: membership-cancellation-api
+          path: src/api/Orleans.Core/Orleans.Core.cs
+          if-no-files-found: error
+          retention-days: 1
