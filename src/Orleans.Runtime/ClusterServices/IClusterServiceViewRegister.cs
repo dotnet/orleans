@@ -28,5 +28,9 @@ internal sealed class ClusterServiceRegisterRead
 internal interface IClusterServiceViewRegister
 {
     ValueTask<ClusterServiceRegisterRead> ReadAsync(CancellationToken cancellationToken);
-    ValueTask<bool> TryWriteAsync(RegisteredClusterServiceView view, string? expectedToken, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Returns the token from the successful conditional write, or null when its condition failed.
+    /// </summary>
+    ValueTask<string?> TryWriteAsync(RegisteredClusterServiceView view, string? expectedToken, CancellationToken cancellationToken);
 }

@@ -46,18 +46,19 @@ public sealed class AzureBlobClusterServiceViewRegisterIntegrationTests : IAsync
         start.SetResult();
         var outcomes = await Task.WhenAll(first, second).WaitAsync(TestContext.Current.CancellationToken);
 
-        Assert.Single(outcomes, static success => success);
-        Assert.Single(outcomes, static success => !success);
+        var writtenToken = Assert.Single(outcomes, static token => token is not null);
+        Assert.Single(outcomes, static token => token is null);
         Assert.Equal(2, race.ConditionalWrites);
         Assert.Equal(1, race.FailedConditions);
         var persisted = await CreateRegister().ReadAsync(TestContext.Current.CancellationToken);
         Assert.NotNull(persisted.View);
-        Assert.True((outcomes[0] ? firstProposal : secondProposal).HasSameContent(persisted.View));
+        Assert.True((outcomes[0] is not null ? firstProposal : secondProposal).HasSameContent(persisted.View));
+        Assert.Equal(writtenToken, persisted.Token);
         Assert.Null(persisted.View.Predecessor);
         Assert.False(string.IsNullOrWhiteSpace(persisted.Token));
         var properties = await _container.GetBlobClient(BlobName).GetPropertiesAsync(cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(properties.Value.ETag.ToString(), persisted.Token);
-        Assert.False(await CreateRegister().TryWriteAsync(outcomes[0] ? secondProposal : firstProposal, null, TestContext.Current.CancellationToken));
+        Assert.Null(await CreateRegister().TryWriteAsync(outcomes[0] is not null ? secondProposal : firstProposal, null, TestContext.Current.CancellationToken));
         var reopened = await CreateRegister().ReadAsync(TestContext.Current.CancellationToken);
         Assert.Equal(persisted.Token, reopened.Token);
         Assert.True(persisted.View.HasSameContent(reopened.View!));
@@ -68,7 +69,7 @@ public sealed class AzureBlobClusterServiceViewRegisterIntegrationTests : IAsync
     {
         await _container.CreateAsync(cancellationToken: TestContext.Current.CancellationToken);
         var initial = RegisteredClusterServiceViewProviderTests.MakeView(1, TestServiceMembership.A);
-        Assert.True(await CreateRegister().TryWriteAsync(initial, null, TestContext.Current.CancellationToken));
+        Assert.NotNull(await CreateRegister().TryWriteAsync(initial, null, TestContext.Current.CancellationToken));
         var previous = await CreateRegister().ReadAsync(TestContext.Current.CancellationToken);
         var firstProposal = RegisteredClusterServiceViewProviderTests.MakeView(2, TestServiceMembership.B, initial.Id);
         var secondProposal = RegisteredClusterServiceViewProviderTests.MakeView(2, TestServiceMembership.A, initial.Id);
@@ -81,17 +82,17 @@ public sealed class AzureBlobClusterServiceViewRegisterIntegrationTests : IAsync
         var outcomes = await Task.WhenAll(first, second).WaitAsync(TestContext.Current.CancellationToken);
         var winner = await CreateRegister().ReadAsync(TestContext.Current.CancellationToken);
 
-        Assert.Single(outcomes, static success => success);
-        Assert.Single(outcomes, static success => !success);
+        Assert.Equal(winner.Token, Assert.Single(outcomes, static token => token is not null));
+        Assert.Single(outcomes, static token => token is null);
         Assert.Equal(2, race.ConditionalWrites);
         Assert.Equal(1, race.FailedConditions);
         Assert.NotNull(winner.View);
-        Assert.True((outcomes[0] ? firstProposal : secondProposal).HasSameContent(winner.View));
+        Assert.True((outcomes[0] is not null ? firstProposal : secondProposal).HasSameContent(winner.View));
         Assert.Equal(initial.Id, winner.View.Predecessor);
         Assert.NotEqual(previous.Token, winner.Token);
-        Assert.False(await CreateRegister().TryWriteAsync(firstProposal, previous.Token, TestContext.Current.CancellationToken));
+        Assert.Null(await CreateRegister().TryWriteAsync(firstProposal, previous.Token, TestContext.Current.CancellationToken));
         Assert.Equal(winner.Token, (await CreateRegister().ReadAsync(TestContext.Current.CancellationToken)).Token);
-        var conflicting = outcomes[0] ? secondProposal : firstProposal;
+        var conflicting = outcomes[0] is not null ? secondProposal : firstProposal;
         await Assert.ThrowsAsync<ClusterServiceAuthorityException>(() =>
             CreateRegister().TryWriteAsync(conflicting, winner.Token, TestContext.Current.CancellationToken).AsTask());
         var wrongPredecessor = RegisteredClusterServiceViewProviderTests.MakeView(3, TestServiceMembership.A, initial.Id);
@@ -118,11 +119,10 @@ public sealed class AzureBlobClusterServiceViewRegisterIntegrationTests : IAsync
         await using var provider = new RegisteredClusterServiceViewProvider(
             "service", "authority", CreateRegister(), new TestServiceMembership(), pollInterval: TimeSpan.FromDays(1));
         var original = await RegisteredClusterServiceViewProviderTests.Publish(provider, TestServiceMembership.A);
-        await provider.RefreshAsync(TestContext.Current.CancellationToken);
         var previous = await CreateRegister().ReadAsync(TestContext.Current.CancellationToken);
 
         await _container.GetBlobClient(BlobName).DeleteAsync(cancellationToken: TestContext.Current.CancellationToken);
-        Assert.True(await CreateRegister().TryWriteAsync(original, null, TestContext.Current.CancellationToken));
+        Assert.NotNull(await CreateRegister().TryWriteAsync(original, null, TestContext.Current.CancellationToken));
         var recreated = await CreateRegister().ReadAsync(TestContext.Current.CancellationToken);
 
         Assert.NotEqual(previous.Token, recreated.Token);
@@ -148,7 +148,7 @@ public sealed class AzureBlobClusterServiceViewRegisterIntegrationTests : IAsync
         return options;
     }
 
-    private static async Task<bool> WriteAfterStart(
+    private static async Task<string?> WriteAfterStart(
         IClusterServiceViewRegister register,
         RegisteredClusterServiceView view,
         string? expectedToken,
