@@ -1,7 +1,7 @@
+using System.Reflection;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
-using System.Reflection;
 using Xunit;
 
 namespace UnitTests.OrleansRuntime.Streams
