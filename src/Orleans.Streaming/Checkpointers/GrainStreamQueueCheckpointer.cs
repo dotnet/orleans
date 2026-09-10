@@ -178,47 +178,8 @@ namespace Orleans.Streams
         public Task Reset() => Reset(CancellationToken.None);
 
         /// <inheritdoc />
-        public async Task Reset(CancellationToken cancellationToken)
-        {
-            Task resetTask;
-            lock (_lock)
-            {
-                var inProgressSave = _inProgressSave;
-                _latestCheckpoint = string.Empty;
-                _throttleSavesUntilUtc = DateTime.MaxValue;
-                resetTask = _inProgressSave = ResetCore(inProgressSave, cancellationToken);
-            }
-
-            try
-            {
-                await resetTask;
-            }
-            catch
-            {
-                lock (_lock)
-                {
-                    if (ReferenceEquals(resetTask, _inProgressSave))
-                    {
-                        _latestCheckpoint = _persistedCheckpoint;
-                        _throttleSavesUntilUtc = null;
-                        _inProgressSave = Task.CompletedTask;
-                    }
-                }
-
-                throw;
-            }
-
-            lock (_lock)
-            {
-                if (ReferenceEquals(resetTask, _inProgressSave))
-                {
-                    _latestCheckpoint = string.Empty;
-                    _persistedCheckpoint = string.Empty;
-                    _throttleSavesUntilUtc = null;
-                    _inProgressSave = Task.CompletedTask;
-                }
-            }
-        }
+        public Task Reset(CancellationToken cancellationToken)
+            => _inner.Reset(cancellationToken);
 
         /// <inheritdoc />
         [Obsolete("Use the overload which accepts a CancellationToken.")]
@@ -251,31 +212,6 @@ namespace Orleans.Streams
                     expectedVersion,
                     cancellationToken).ConfigureAwait(false);
                 return new(persistedCheckpoint, persistedCheckpoint);
-            }
-        }
-
-        private async Task ResetCore(Task inProgressSave, CancellationToken cancellationToken)
-        {
-            await inProgressSave.WaitAsync(cancellationToken);
-
-            string expectedCheckpoint;
-            lock (_lock)
-            {
-                expectedCheckpoint = _persistedCheckpoint;
-            }
-
-            while (true)
-            {
-                var persistedCheckpoint = await _grain.Update(
-                    string.Empty,
-                    expectedCheckpoint,
-                    cancellationToken);
-                if (string.IsNullOrEmpty(persistedCheckpoint))
-                {
-                    return;
-                }
-
-                expectedCheckpoint = persistedCheckpoint;
             }
         }
     }
