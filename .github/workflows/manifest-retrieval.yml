@@ -1,0 +1,76 @@
+name: Manifest retrieval
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/manifest-retrieval.yml'
+      - 'src/Orleans.Core/Manifest/**'
+      - 'src/Orleans.Core/OrleansContracts.txt'
+      - 'src/Orleans.Runtime/Manifest/**'
+      - 'src/Orleans.Runtime/GrainTypeManager/ClusterManifestSystemTarget.cs'
+      - 'src/Orleans.Runtime/Configuration/Options/ClusterManifestOptions.cs'
+      - 'src/Orleans.Runtime/Hosting/DefaultSiloServices.cs'
+      - 'src/api/Orleans.Core/**'
+      - 'src/api/Orleans.Runtime/**'
+      - 'test/Orleans.Core.Tests/Manifest/**'
+      - 'test/Orleans.Runtime.Internal.Tests/Manifest/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: manifest-retrieval-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  focused-tests:
+    name: Manifest tests (${{ matrix.framework }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        framework: [net8.0, net10.0]
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
+        with:
+          global-json-file: global.json
+          dotnet-version: |
+            8.0.x
+            10.0.x
+      - name: Provider tests
+        run: dotnet test --project test/Orleans.Core.Tests/Orleans.Core.Tests.csproj --framework ${{ matrix.framework }} --filter-class "*ClusterManifestProviderTests" --minimum-expected-tests 1
+      - name: Hash and wire contract tests
+        run: dotnet test --project test/Orleans.Runtime.Internal.Tests/Orleans.Runtime.Internal.Tests.csproj --framework ${{ matrix.framework }} --filter-class "*ManifestHash*" --minimum-expected-tests 1
+
+  generate-api:
+    name: Manifest API artifact
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
+        with:
+          global-json-file: global.json
+      - name: Generate affected API surfaces
+        shell: pwsh
+        env:
+          CI: false
+        run: |
+          foreach ($project in @('src/Orleans.Core/Orleans.Core.csproj', 'src/Orleans.Runtime/Orleans.Runtime.csproj')) {
+            dotnet restore $project --configfile .github/NuGet.GenAPI.Config -p:GenerateOrleansApiSource=true
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            dotnet build $project --framework net8.0 --configuration Release --no-incremental --no-restore -p:GenerateOrleansApiSource=true '/t:Build;GenAPIGenerateReferenceAssemblySource'
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: manifest-api
+          path: |
+            src/api/Orleans.Core/Orleans.Core.cs
+            src/api/Orleans.Runtime/Orleans.Runtime.cs
+          if-no-files-found: error
+          retention-days: 7

@@ -337,6 +337,7 @@ namespace Orleans.Hosting
             services.ConfigureFormatter<ConnectionOptions>();
             services.ConfigureFormatter<SiloMessagingOptions>();
             services.ConfigureFormatter<ClusterMembershipOptions>();
+            services.ConfigureFormatter<ClusterManifestOptions>();
             services.ConfigureFormatter<GrainDirectoryOptions>();
             services.ConfigureFormatter<ActivationCountBasedPlacementOptions>();
             services.ConfigureFormatter<ResourceOptimizedPlacementOptions>();

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
@@ -13,6 +14,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Gets the current cluster manifest.
         /// </summary>
+        /// <param name="cancellationToken">The token used to cancel the request.</param>
         /// <returns>The current cluster manifest.</returns>
         [Alias("40D39F85")]
         ValueTask<ClusterManifest> GetClusterManifest(CancellationToken cancellationToken = default);
@@ -20,9 +22,90 @@ namespace Orleans.Runtime
         /// <summary>
         /// Gets an updated cluster manifest if newer than the provided <paramref name="previousVersion"/>.
         /// </summary>
+        /// <param name="previousVersion">The last observed manifest version.</param>
+        /// <param name="cancellationToken">The token used to cancel the request.</param>
         /// <returns>The current cluster manifest, or <see langword="null"/> if it is not newer than the provided version.</returns>
         [Alias("4EFCA109")]
         ValueTask<ClusterManifestUpdate?> GetClusterManifestUpdate(MajorMinorVersion previousVersion, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Gets a hash summary for the current cluster manifest.
+        /// </summary>
+        /// <param name="cancellationToken">The token used to cancel the request.</param>
+        /// <returns>The current cluster manifest hash summary.</returns>
+        [Alias("25AE6E4A")]
+        ValueTask<ClusterManifestHashSummary> GetClusterManifestHashSummary(CancellationToken cancellationToken);
+
+        /// <summary>
+        /// Gets the hash of the local silo manifest.
+        /// </summary>
+        /// <param name="cancellationToken">The token used to cancel the request.</param>
+        /// <returns>The hash of the local silo manifest.</returns>
+        [Alias("3D9B7FE6")]
+        ValueTask<ManifestHash> GetSiloManifestHash(CancellationToken cancellationToken);
+
+        /// <summary>
+        /// Gets the local silo manifest if the provided hash matches it.
+        /// </summary>
+        /// <param name="hash">The expected manifest hash.</param>
+        /// <param name="cancellationToken">The token used to cancel the request.</param>
+        /// <returns>The local silo manifest, or <see langword="null"/> if the hash does not match.</returns>
+        [Alias("93B8854F")]
+        ValueTask<GrainManifest?> GetSiloManifestByHash(ManifestHash hash, CancellationToken cancellationToken);
+    }
+
+    /// <summary>
+    /// Identifies a manifest by its canonical content hash.
+    /// </summary>
+    [GenerateSerializer, Immutable]
+    internal readonly struct ManifestHash : System.IEquatable<ManifestHash>
+    {
+        public ManifestHash(string value)
+        {
+            Value = value;
+        }
+
+        [Id(0)]
+        public string Value { get; }
+
+        public bool Equals(ManifestHash other) => string.Equals(Value, other.Value, System.StringComparison.Ordinal);
+
+        public override bool Equals(object? obj) => obj is ManifestHash other && Equals(other);
+
+        public override int GetHashCode() => System.StringComparer.Ordinal.GetHashCode(Value ?? string.Empty);
+
+        public override string ToString() => Value ?? string.Empty;
+
+        public static bool operator ==(ManifestHash left, ManifestHash right) => left.Equals(right);
+
+        public static bool operator !=(ManifestHash left, ManifestHash right) => !left.Equals(right);
+    }
+
+    /// <summary>
+    /// Represents a hash summary for a cluster manifest.
+    /// </summary>
+    [GenerateSerializer, Immutable]
+    internal sealed class ClusterManifestHashSummary
+    {
+        public ClusterManifestHashSummary(
+            MajorMinorVersion version,
+            Dictionary<SiloAddress, ManifestHash> siloManifestHashes)
+        {
+            Version = version;
+            SiloManifestHashes = siloManifestHashes.ToImmutableDictionary();
+        }
+
+        /// <summary>
+        /// Gets the cluster manifest version.
+        /// </summary>
+        [Id(0)]
+        public MajorMinorVersion Version { get; }
+
+        /// <summary>
+        /// Gets the manifest hash for each silo.
+        /// </summary>
+        [Id(1)]
+        public ImmutableDictionary<SiloAddress, ManifestHash> SiloManifestHashes { get; }
     }
 
     /// <summary>
