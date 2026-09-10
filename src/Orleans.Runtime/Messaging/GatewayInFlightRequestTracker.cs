@@ -7,6 +7,8 @@ namespace Orleans.Runtime.Messaging
     internal sealed class GatewayInFlightRequestTracker(TimeProvider timeProvider, TimeSpan responseTimeout)
     {
         private Dictionary<CorrelationId, TrackedRequest>? _requests;
+        // Updates can cross different silo connections, so later forwarding hops can arrive before earlier ones.
+        private Dictionary<CorrelationId, List<ForwardingUpdate>>? _forwardingUpdates;
 
         internal int Count => _requests?.Count ?? 0;
 
@@ -43,6 +45,7 @@ namespace Orleans.Runtime.Messaging
 
             _requests ??= [];
             _requests[request.Id] = trackedRequest;
+            _forwardingUpdates?.Remove(request.Id);
             return true;
         }
 
@@ -53,13 +56,74 @@ namespace Orleans.Runtime.Messaging
                 return false;
             }
 
-            return _requests?.Remove(response.Id) is true;
+            if (_requests?.Remove(response.Id) is true)
+            {
+                _forwardingUpdates?.Remove(response.Id);
+                return true;
+            }
+
+            return false;
+        }
+
+        internal bool TryUpdateDestination(
+            CorrelationId requestId,
+            SiloAddress sourceSilo,
+            SiloAddress targetSilo,
+            int forwardCount,
+            out SiloAddress updatedTargetSilo)
+        {
+            updatedTargetSilo = null!;
+            if (_requests is not { } requests || !requests.TryGetValue(requestId, out var trackedRequest))
+            {
+                return false;
+            }
+
+            if (forwardCount <= trackedRequest.ForwardCount)
+            {
+                return false;
+            }
+
+            _forwardingUpdates ??= [];
+            if (!_forwardingUpdates.TryGetValue(requestId, out var updates))
+            {
+                _forwardingUpdates[requestId] = updates = [];
+            }
+
+            updates.RemoveAll(update => update.ForwardCount == forwardCount);
+            updates.Add(new(sourceSilo, targetSilo, forwardCount));
+
+            var updated = false;
+            // Apply only the contiguous forwarding chain rooted at the destination which this tracker owns.
+            while (updates.FindIndex(
+                update => update.ForwardCount == trackedRequest.ForwardCount + 1
+                    && update.SourceSilo.Equals(trackedRequest.TargetSilo)) is var index
+                && index >= 0)
+            {
+                var update = updates[index];
+                updates.RemoveAt(index);
+                trackedRequest = trackedRequest with
+                {
+                    TargetSilo = update.TargetSilo,
+                    ForwardCount = update.ForwardCount,
+                };
+                requests[requestId] = trackedRequest;
+                updated = true;
+            }
+
+            if (updates.Count == 0)
+            {
+                _forwardingUpdates.Remove(requestId);
+            }
+
+            updatedTargetSilo = trackedRequest.TargetSilo;
+            return updated;
         }
 
         internal bool TryRemove(CorrelationId requestId, out Message request)
         {
             if (_requests?.Remove(requestId, out var trackedRequest) is true)
             {
+                _forwardingUpdates?.Remove(requestId);
                 request = CreateRequest(trackedRequest);
                 return true;
             }
@@ -79,6 +143,7 @@ namespace Orleans.Runtime.Messaging
             if (targetSilo.Equals(trackedRequest.TargetSilo))
             {
                 requests.Remove(request.Id);
+                _forwardingUpdates?.Remove(request.Id);
                 requestToReject = CreateRequest(trackedRequest);
                 return true;
             }
@@ -87,6 +152,7 @@ namespace Orleans.Runtime.Messaging
             if (request.ForwardCount > trackedRequest.ForwardCount)
             {
                 requests.Remove(request.Id);
+                _forwardingUpdates?.Remove(request.Id);
                 requestToReject = request;
                 return true;
             }
@@ -122,6 +188,7 @@ namespace Orleans.Runtime.Messaging
                 foreach (var id in ids)
                 {
                     requests.Remove(id);
+                    _forwardingUpdates?.Remove(id);
                 }
             }
 
@@ -150,11 +217,16 @@ namespace Orleans.Runtime.Messaging
                 foreach (var id in expired)
                 {
                     requests.Remove(id);
+                    _forwardingUpdates?.Remove(id);
                 }
             }
         }
 
-        internal void Clear() => _requests?.Clear();
+        internal void Clear()
+        {
+            _requests?.Clear();
+            _forwardingUpdates?.Clear();
+        }
 
         private Message CreateRequest(TrackedRequest request)
         {
@@ -199,5 +271,10 @@ namespace Orleans.Runtime.Messaging
             long StartTimestamp,
             bool HasTimeToLive,
             TimeSpan RetentionPeriod);
+
+        private readonly record struct ForwardingUpdate(
+            SiloAddress SourceSilo,
+            SiloAddress TargetSilo,
+            int ForwardCount);
     }
 }
