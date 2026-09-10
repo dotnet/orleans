@@ -6,6 +6,8 @@
     <Description>Real-time monitoring and visualization dashboard for Microsoft Orleans showing grain statistics, performance metrics, and cluster health.</Description>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <!-- AdvancedReminders is pre-release, so suppress the stable-to-pre-release dependency warning. -->
+    <NoWarn>$(NoWarn);NU5104</NoWarn>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RootNamespace>Orleans.Dashboard</RootNamespace>
   </PropertyGroup>
@@ -26,6 +28,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Orleans.Dashboard.Abstractions\Orleans.Dashboard.Abstractions.csproj" />
+    <ProjectReference Include="..\..\Orleans.AdvancedReminders\Orleans.AdvancedReminders.csproj" />
     <ProjectReference Include="..\..\Orleans.Reminders\Orleans.Reminders.csproj" />
     <ProjectReference Include="..\..\Orleans.Runtime\Orleans.Runtime.csproj" />
     <ProjectReference Include="..\..\Orleans.Sdk\Orleans.Sdk.csproj" />
