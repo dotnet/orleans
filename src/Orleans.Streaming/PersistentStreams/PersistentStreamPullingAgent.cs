@@ -37,6 +37,7 @@ namespace Orleans.Streams
         private readonly StreamInstruments? _streamInstruments;
         private readonly TimeProvider _timeProvider;
         private readonly CancellationTokenSource _shutdownCancellation = new();
+        private readonly HashSet<Task> _activeConsumerCursorTasks = [];
         private readonly HashSet<Task> _pendingUnavailableConsumerUnregistrations = [];
         internal readonly QueueId QueueId;
 
@@ -143,7 +144,7 @@ namespace Orleans.Streams
             => GetRecoveryCursor(consumerData);
 
         Task ITestAccessor.RunConsumerCursor(StreamConsumerData consumerData)
-            => this.RunOrQueueTask(() => RunConsumerCursor(consumerData));
+            => this.RunOrQueueTask(() => TrackConsumerCursor(consumerData));
 
         Task<IReadOnlyDictionary<QualifiedStreamId, StreamConsumerCollection>> ITestAccessor.GetPubSubCache()
             => this.RunOrQueueTaskResult(() => (IReadOnlyDictionary<QualifiedStreamId, StreamConsumerCollection>)new Dictionary<QualifiedStreamId, StreamConsumerCollection>(pubSubCache));
@@ -269,6 +270,20 @@ namespace Orleans.Streams
 
             await _activePumpTask.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
 
+            // Drain registrations before consumer deliveries since a completing registration can
+            // start a cursor after the queue pump has stopped.
+            var inFlightRegistrations = pubSubCache.Values
+                .Select(v => v.RegistrationTask)
+                .OfType<Task>()
+                .ToList();
+            if (inFlightRegistrations.Count > 0)
+            {
+                await Task.WhenAll(inFlightRegistrations)
+                    .ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
+            }
+
+            await DrainConsumerCursors(cancellationToken);
+
             // Final delivery progress scan so the receiver has the latest watermark
             // before FlushAsync persists the checkpoint.
             NotifyDeliveryProgress();
@@ -291,19 +306,6 @@ namespace Orleans.Streams
             {
                 // Just ignore this exception and proceed as if Shutdown has succeeded.
                 // We already logged individual exceptions for individual calls to Shutdown. No need to log again.
-            }
-
-            // Drain any in-progress background registration tasks before proceeding.
-            // Setting timer = null above makes IsShutdown = true, which causes registrations
-            // to stop retrying, so these tasks will complete quickly.
-            var inFlightRegistrations = pubSubCache.Values
-                .Select(v => v.RegistrationTask)
-                .OfType<Task>()
-                .ToList();
-            if (inFlightRegistrations.Count > 0)
-            {
-                await Task.WhenAll(inFlightRegistrations)
-                    .ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
             }
 
             try
@@ -387,7 +389,7 @@ namespace Orleans.Streams
                 data.IsRegistered = true;
                 StreamingEvents.EmitSubscriptionAttached(streamProviderName, streamId.StreamId, subscriptionId.Guid, streamConsumer, Silo);
                 if (data.State == StreamConsumerDataState.Inactive)
-                    RunConsumerCursor(data).Ignore(); // Start delivering events if not actively doing so
+                    TrackConsumerCursor(data).Ignore(); // Start delivering events if not actively doing so
             }
         }
 
@@ -1351,7 +1353,7 @@ namespace Orleans.Streams
                     if (consumerData.State == StreamConsumerDataState.Inactive)
                     {
                         // wake up inactive consumers
-                        RunConsumerCursor(consumerData, cancellationToken).Ignore();
+                        TrackConsumerCursor(consumerData, cancellationToken).Ignore();
                     }
                 }
                 else
@@ -1596,6 +1598,40 @@ namespace Orleans.Streams
                 LogErrorRunConsumerCursor(exc);
                 consumerData.State = StreamConsumerDataState.Inactive;
                 throw;
+            }
+        }
+
+        private Task TrackConsumerCursor(
+            StreamConsumerData consumerData,
+            CancellationToken cancellationToken = default)
+        {
+            var task = RunConsumerCursor(consumerData, cancellationToken);
+            _activeConsumerCursorTasks.Add(task);
+            RemoveWhenComplete(task).Ignore();
+            return task;
+
+            async Task RemoveWhenComplete(Task pending)
+            {
+                await pending.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
+                _activeConsumerCursorTasks.Remove(pending);
+            }
+        }
+
+        private async Task DrainConsumerCursors(CancellationToken cancellationToken)
+        {
+            while (_activeConsumerCursorTasks.Count > 0)
+            {
+                var active = Task.WhenAll(_activeConsumerCursorTasks);
+                try
+                {
+                    await active.WaitAsync(cancellationToken);
+                }
+                catch (Exception) when (!cancellationToken.IsCancellationRequested)
+                {
+                    // RunConsumerCursor logs its failure before propagating it.
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
             }
         }
 
