@@ -540,6 +540,8 @@ namespace Orleans.Providers.Streams.Common
 
         public void Add(CachedMessage message) { }
 
+        public int GetIndexOfFirstMessageLessThanOrEqualTo(Orleans.Streams.StreamSequenceToken token, ICacheDataAdapter dataAdapter) { throw null; }
+
         public int GetIndexOfFirstMessageLessThanOrEqualTo(Orleans.Streams.StreamSequenceToken token) { throw null; }
 
         public Orleans.Streams.StreamSequenceToken GetNewestSequenceToken(ICacheDataAdapter dataAdapter) { throw null; }
@@ -719,6 +721,7 @@ namespace Orleans.Providers.Streams.Common
 
     public partial interface ICacheDataAdapter
     {
+        int Compare(ref CachedMessage cachedMessage, Orleans.Streams.StreamSequenceToken token);
         Orleans.Streams.IBatchContainer GetBatchContainer(ref CachedMessage cachedMessage);
         Orleans.Streams.StreamSequenceToken GetSequenceToken(ref CachedMessage cachedMessage);
     }

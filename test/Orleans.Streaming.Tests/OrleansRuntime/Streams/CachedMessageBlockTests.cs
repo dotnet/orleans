@@ -147,12 +147,12 @@ namespace UnitTests.OrleansRuntime.Streams
                 last++;
                 sequenceNumber += 2;
             }
-            Assert.Equal(block.OldestMessageIndex, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceTokenV2(0)));
-            Assert.Equal(block.OldestMessageIndex, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceTokenV2(1)));
-            Assert.Equal(block.NewestMessageIndex, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceTokenV2(sequenceNumber - 2)));
-            Assert.Equal(block.NewestMessageIndex - 1, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceTokenV2(sequenceNumber - 3)));
-            Assert.Equal(50, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceTokenV2(sequenceNumber / 2)));
-            Assert.Equal(50, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceTokenV2(sequenceNumber / 2 + 1)));
+            AssertIndex(block, dataAdapter, block.OldestMessageIndex, new EventSequenceTokenV2(0));
+            AssertIndex(block, dataAdapter, block.OldestMessageIndex, new EventSequenceTokenV2(1));
+            AssertIndex(block, dataAdapter, block.NewestMessageIndex, new EventSequenceTokenV2(sequenceNumber - 2));
+            AssertIndex(block, dataAdapter, block.NewestMessageIndex - 1, new EventSequenceTokenV2(sequenceNumber - 3));
+            AssertIndex(block, dataAdapter, 50, new EventSequenceTokenV2(sequenceNumber / 2));
+            AssertIndex(block, dataAdapter, 50, new EventSequenceTokenV2(sequenceNumber / 2 + 1));
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
@@ -241,6 +241,16 @@ namespace UnitTests.OrleansRuntime.Streams
             Assert.Equal(last, block.NewestMessageIndex);
 
             Assert.True(block.GetSequenceToken(last, dataAdapter).Equals(message.SequenceToken));
+        }
+
+        private static void AssertIndex(
+            CachedMessageBlock block,
+            ICacheDataAdapter dataAdapter,
+            int expected,
+            StreamSequenceToken token)
+        {
+            Assert.Equal(expected, block.GetIndexOfFirstMessageLessThanOrEqualTo(token));
+            Assert.Equal(expected, block.GetIndexOfFirstMessageLessThanOrEqualTo(token, dataAdapter));
         }
 
         private void RemoveAndCheck(CachedMessageBlock block, int first, int last)
