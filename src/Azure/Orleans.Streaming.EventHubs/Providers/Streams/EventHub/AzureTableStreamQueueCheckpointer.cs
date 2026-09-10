@@ -23,6 +23,8 @@ public partial class AzureTableStreamQueueCheckpointer : IStreamQueueCheckpointe
     private DateTime? _throttleSavesUntilUtc;
     private string _latestCheckpoint = string.Empty;
     private string _persistedCheckpoint = string.Empty;
+    private int _pendingResetCount;
+    private long _updateGeneration;
 
     private AzureTableStreamQueueCheckpointer(
         AzureTableStreamCheckpointerOptions options,
@@ -165,49 +167,47 @@ public partial class AzureTableStreamQueueCheckpointer : IStreamQueueCheckpointe
     public Task Reset() => Reset(CancellationToken.None);
 
     /// <inheritdoc />
-    public async Task Reset(CancellationToken cancellationToken)
+    public Task Reset(CancellationToken cancellationToken)
     {
         Task resetTask;
-        Task inProgressSave;
-        string latestCheckpoint;
-        DateTime? throttleSavesUntilUtc;
         lock (_lock)
         {
-            inProgressSave = _inProgressSave;
-            latestCheckpoint = _latestCheckpoint;
-            throttleSavesUntilUtc = _throttleSavesUntilUtc;
-            _latestCheckpoint = string.Empty;
+            _pendingResetCount++;
             _throttleSavesUntilUtc = DateTime.MaxValue;
-            resetTask = _inProgressSave = ResetCore(inProgressSave, cancellationToken);
+            resetTask = _inProgressSave = RunReset(
+                _inProgressSave,
+                _latestCheckpoint,
+                _updateGeneration,
+                cancellationToken);
+            resetTask.Ignore();
         }
 
+        return resetTask.WaitAsync(cancellationToken);
+    }
+
+    private async Task RunReset(
+        Task inProgressSave,
+        string enqueuedCheckpoint,
+        long updateGeneration,
+        CancellationToken cancellationToken)
+    {
         try
         {
-            await resetTask;
+            await ResetCore(
+                inProgressSave,
+                enqueuedCheckpoint,
+                updateGeneration,
+                cancellationToken);
         }
-        catch
+        finally
         {
             lock (_lock)
             {
-                if (ReferenceEquals(resetTask, _inProgressSave))
+                _pendingResetCount--;
+                if (_pendingResetCount == 0)
                 {
-                    _latestCheckpoint = latestCheckpoint;
-                    _throttleSavesUntilUtc = throttleSavesUntilUtc;
-                    _inProgressSave = inProgressSave;
+                    _throttleSavesUntilUtc = null;
                 }
-            }
-
-            throw;
-        }
-
-        lock (_lock)
-        {
-            if (ReferenceEquals(resetTask, _inProgressSave))
-            {
-                _latestCheckpoint = string.Empty;
-                _persistedCheckpoint = string.Empty;
-                _throttleSavesUntilUtc = null;
-                _inProgressSave = Task.CompletedTask;
             }
         }
     }
@@ -219,15 +219,30 @@ public partial class AzureTableStreamQueueCheckpointer : IStreamQueueCheckpointe
 
         lock (_lock)
         {
-            if (string.Equals(_latestCheckpoint, offset, StringComparison.Ordinal)
-                || (_checkpointComparer is { } comparer
+            if (string.Equals(_latestCheckpoint, offset, StringComparison.Ordinal))
+            {
+                if (string.Equals(_persistedCheckpoint, offset, StringComparison.Ordinal)
+                    || !_inProgressSave.IsCompleted
+                    || (_throttleSavesUntilUtc.HasValue && _throttleSavesUntilUtc.Value > utcNow))
+                {
+                    return;
+                }
+
+                _throttleSavesUntilUtc = utcNow + _persistInterval;
+                _inProgressSave = Save(offset, CancellationToken.None);
+                _inProgressSave.Ignore();
+                return;
+            }
+
+            if (_checkpointComparer is { } comparer
                     && !string.IsNullOrEmpty(_latestCheckpoint)
-                    && comparer.Compare(offset, _latestCheckpoint) <= 0))
+                    && comparer.Compare(offset, _latestCheckpoint) <= 0)
             {
                 return;
             }
 
             _latestCheckpoint = offset;
+            _updateGeneration++;
             _entity.Offset = offset;
             if (!_inProgressSave.IsCompleted
                 || (_throttleSavesUntilUtc.HasValue && _throttleSavesUntilUtc.Value > utcNow))
@@ -284,6 +299,7 @@ public partial class AzureTableStreamQueueCheckpointer : IStreamQueueCheckpointe
                 }
 
                 _inProgressSave = Save(_latestCheckpoint, cancellationToken);
+                _inProgressSave.Ignore();
                 retryingSave = true;
             }
         }
@@ -300,22 +316,77 @@ public partial class AzureTableStreamQueueCheckpointer : IStreamQueueCheckpointe
         }
     }
 
-    private async Task ResetCore(Task inProgressSave, CancellationToken cancellationToken)
+    private async Task ResetCore(
+        Task inProgressSave,
+        string enqueuedCheckpoint,
+        long updateGeneration,
+        CancellationToken cancellationToken)
     {
         try
         {
-            await inProgressSave.WaitAsync(cancellationToken);
+            await inProgressSave;
         }
-        catch (Exception) when (!cancellationToken.IsCancellationRequested)
+        catch
         {
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        var entity = CreateWriteEntity(string.Empty);
-        await _dataManager.UpsertTableEntryAsync(entity, cancellationToken);
+
+        string rollbackCheckpoint;
         lock (_lock)
         {
-            _entity.Offset = string.Empty;
+            if (_updateGeneration <= updateGeneration)
+            {
+                rollbackCheckpoint = _latestCheckpoint;
+                _latestCheckpoint = string.Empty;
+            }
+            else
+            {
+                rollbackCheckpoint = enqueuedCheckpoint;
+            }
+        }
+
+        try
+        {
+            var entity = CreateWriteEntity(string.Empty);
+            await _dataManager.UpsertTableEntryAsync(entity, cancellationToken);
+            lock (_lock)
+            {
+                _persistedCheckpoint = string.Empty;
+                if (string.IsNullOrEmpty(_latestCheckpoint))
+                {
+                    _entity.Offset = string.Empty;
+                }
+            }
+        }
+        catch
+        {
+            lock (_lock)
+            {
+                RestoreLatestCheckpoint(rollbackCheckpoint);
+            }
+
+            throw;
+        }
+    }
+
+    private void RestoreLatestCheckpoint(string latestCheckpoint)
+    {
+        if (_checkpointComparer is { } comparer
+            && !string.IsNullOrEmpty(_latestCheckpoint)
+            && !string.IsNullOrEmpty(latestCheckpoint))
+        {
+            if (comparer.Compare(_latestCheckpoint, latestCheckpoint) < 0)
+            {
+                _latestCheckpoint = latestCheckpoint;
+            }
+
+            return;
+        }
+
+        if (string.IsNullOrEmpty(_latestCheckpoint))
+        {
+            _latestCheckpoint = latestCheckpoint;
         }
     }
 
