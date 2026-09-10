@@ -2208,7 +2208,7 @@ namespace Orleans.Streams
         public System.Threading.Tasks.ValueTask<string> Update(string offset, string expectedCheckpoint, System.Threading.CancellationToken cancellationToken) { throw null; }
     }
 
-    public readonly partial struct StreamCheckpointStoreState
+    public readonly partial struct StreamCheckpointStoreState : System.IEquatable<StreamCheckpointStoreState>
     {
         private readonly object _dummy;
         private readonly int _dummyPrimitive;
@@ -2217,6 +2217,16 @@ namespace Orleans.Streams
         public string Checkpoint { get { throw null; } }
 
         public string Version { get { throw null; } }
+
+        public readonly bool Equals(StreamCheckpointStoreState other) { throw null; }
+
+        public override readonly bool Equals(object? obj) { throw null; }
+
+        public override readonly int GetHashCode() { throw null; }
+
+        public static bool operator ==(StreamCheckpointStoreState left, StreamCheckpointStoreState right) { throw null; }
+
+        public static bool operator !=(StreamCheckpointStoreState left, StreamCheckpointStoreState right) { throw null; }
     }
 
     [GenerateSerializer]

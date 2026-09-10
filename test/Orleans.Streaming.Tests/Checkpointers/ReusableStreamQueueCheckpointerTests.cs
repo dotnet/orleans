@@ -15,6 +15,17 @@ public sealed class ReusableStreamQueueCheckpointerTests : StreamQueueCheckpoint
 {
     protected override OffsetRegressionPolicy RegressionPolicy => OffsetRegressionPolicy.Ignore;
 
+    [Fact]
+    public void StreamCheckpointStoreState_UsesValueEquality()
+    {
+        var state = new StreamCheckpointStoreState("10", "version-1");
+
+        Assert.Equal(state, new StreamCheckpointStoreState("10", "version-1"));
+        Assert.True(state == new StreamCheckpointStoreState("10", "version-1"));
+        Assert.False(state != new StreamCheckpointStoreState("10", "version-1"));
+        Assert.NotEqual(state, new StreamCheckpointStoreState("20", "version-1"));
+    }
+
     protected override Task<IStreamQueueCheckpointer<string>> CreateCheckpointer(
         ControllableCheckpointStore store)
         => Task.FromResult<IStreamQueueCheckpointer<string>>(

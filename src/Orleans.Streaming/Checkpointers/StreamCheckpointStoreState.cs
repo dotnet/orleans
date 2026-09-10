@@ -5,7 +5,7 @@ namespace Orleans.Streams;
 /// <summary>
 /// Represents a persisted stream checkpoint and its backend version.
 /// </summary>
-public readonly struct StreamCheckpointStoreState
+public readonly struct StreamCheckpointStoreState : IEquatable<StreamCheckpointStoreState>
 {
     /// <summary>
     /// Initializes a new instance of the <see cref="StreamCheckpointStoreState"/> struct.
@@ -29,4 +29,20 @@ public readonly struct StreamCheckpointStoreState
     /// Gets the backend version or entity tag.
     /// </summary>
     public string Version { get; }
+
+    /// <inheritdoc />
+    public bool Equals(StreamCheckpointStoreState other)
+        => string.Equals(Checkpoint, other.Checkpoint, StringComparison.Ordinal)
+        && string.Equals(Version, other.Version, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj)
+        => obj is StreamCheckpointStoreState other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => HashCode.Combine(Checkpoint, Version);
+
+    public static bool operator ==(StreamCheckpointStoreState left, StreamCheckpointStoreState right) => left.Equals(right);
+
+    public static bool operator !=(StreamCheckpointStoreState left, StreamCheckpointStoreState right) => !left.Equals(right);
 }
