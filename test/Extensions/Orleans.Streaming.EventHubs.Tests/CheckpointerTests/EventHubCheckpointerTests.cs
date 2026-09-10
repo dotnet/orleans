@@ -948,6 +948,32 @@ public class EventHubCheckpointerTests
     }
 
     [TestSuite("BVT")]
+    [Fact, TestCategory("BVT")]
+    public void Update_WhenLatestCheckpointIsNotPersisted_RetriesSave()
+    {
+        var checkpointer = CreateUninitializedCheckpointer();
+        SetField(checkpointer, "_latestCheckpoint", "20");
+        SetField(checkpointer, "_persistedCheckpoint", string.Empty);
+        var previousSave = GetField(checkpointer, "_inProgressSave");
+
+        checkpointer.Update("20", new DateTime(2026, 1, 2, 3, 4, 5, DateTimeKind.Utc));
+
+        Assert.NotSame(previousSave, GetField(checkpointer, "_inProgressSave"));
+    }
+
+    [TestSuite("BVT")]
+    [Fact, TestCategory("BVT")]
+    public void AzureTableCheckpointer_FailedResetRejectsRegressedConcurrentUpdate()
+    {
+        var checkpointer = CreateUninitializedCheckpointer();
+        SetField(checkpointer, "_latestCheckpoint", "50");
+
+        InvokeRestoreLatestCheckpoint(checkpointer, "100");
+
+        Assert.Equal("100", GetLatestOffset(checkpointer));
+    }
+
+    [TestSuite("BVT")]
     [Theory, TestCategory("BVT")]
     [InlineData("", "provider_service")]
     [InlineData("EventHubCheckpoints_", "EventHubCheckpoints_provider_service")]
@@ -1266,6 +1292,17 @@ public class EventHubCheckpointerTests
             BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(method);
         return method.Invoke(checkpointer, [offset])!;
+    }
+
+    private static void InvokeRestoreLatestCheckpoint(
+        AzureTableStreamQueueCheckpointer checkpointer,
+        string offset)
+    {
+        var method = typeof(AzureTableStreamQueueCheckpointer).GetMethod(
+            "RestoreLatestCheckpoint",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        method.Invoke(checkpointer, [offset]);
     }
 
     private static string GetEntityProperty(object entity, string propertyName)
