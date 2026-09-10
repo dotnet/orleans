@@ -158,7 +158,7 @@ function isPathWithin(root, target) {
 }
 
 async function resolveCodeSource({ requestedSource, sourcePath, sourceLine, allowedRoots }) {
-  const roots = allowedRoots.map((root) => path.resolve(root));
+  const roots = await Promise.all(allowedRoots.map((root) => realpath(root)));
   const boundary = roots.join(', ');
   const context = `${sourcePath}:${sourceLine}`;
   if (path.isAbsolute(requestedSource)) {
@@ -221,12 +221,28 @@ function escapeHtml(value) {
 async function pathExists(filePath) {
   try {
     await access(filePath);
-    if (process.platform === 'win32') {
-      return (await realpath(filePath)) === path.resolve(filePath);
+    let current = path.resolve(filePath);
+    while (current !== path.parse(current).root) {
+      const parent = path.dirname(current);
+      if (!(await readdir(parent)).includes(path.basename(current))) {
+        return false;
+      }
+      current = parent;
     }
     return true;
   } catch {
     return false;
+  }
+}
+
+async function resolveDocumentPath(sourcePath) {
+  try {
+    return await realpath(sourcePath);
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+    // In-memory Markdown has no file yet, but its containing directory can be
+    // reached through an alias such as macOS /var or a linked documentation root.
+    return path.join(await realpath(path.dirname(sourcePath)), path.basename(sourcePath));
   }
 }
 
@@ -489,12 +505,7 @@ async function expandIncludesInternal(source, sourcePath, stack, includeRoot, co
 
 export async function expandIncludes(source, sourcePath, includeRoot = path.dirname(sourcePath)) {
   const resolvedRoot = await realpath(includeRoot);
-  let resolvedSource;
-  try {
-    resolvedSource = await realpath(sourcePath);
-  } catch {
-    resolvedSource = path.resolve(sourcePath);
-  }
+  const resolvedSource = await resolveDocumentPath(sourcePath);
   if (!isWithinRoot(resolvedRoot, resolvedSource)) {
     throw new Error(`Documentation source '${resolvedSource}' is outside ${resolvedRoot}.`);
   }
@@ -1528,12 +1539,7 @@ export async function convertDocfxMarkdown({
   const { metadata, body: originalBody, bodyStartLine } = splitFrontmatter(source);
   const metadataTitle = typeof metadata.title === 'string' ? metadata.title : inferTitle(sourcePath);
   const resolvedIncludeRoot = await realpath(includeRoot);
-  let resolvedSourcePath;
-  try {
-    resolvedSourcePath = await realpath(sourcePath);
-  } catch {
-    resolvedSourcePath = path.resolve(sourcePath);
-  }
+  const resolvedSourcePath = await resolveDocumentPath(sourcePath);
   if (!isWithinRoot(resolvedIncludeRoot, resolvedSourcePath)) {
     throw new Error(`Documentation source '${resolvedSourcePath}' is outside ${resolvedIncludeRoot}.`);
   }
