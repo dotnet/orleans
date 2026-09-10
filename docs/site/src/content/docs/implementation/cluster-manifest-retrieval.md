@@ -31,7 +31,7 @@ When more than one active silo's manifest is missing, the enabled provider also 
 
 Each probe has a one-second deadline shared by its hash-summary and manifest-update requests. Cached hashes can satisfy missing entries directly; otherwise the provider requests a complete update from the peer and verifies each candidate against the summary's hash. Successfully repaired entries are published immediately, including partial repairs. Direct requests for those entries are removed from the required completion set, allowing the remaining successful fetches to advance the manifest independently.
 
-The provider permits at most three outstanding peer probes across retries. A timed-out probe retains its slot until the underlying RPC completes, including when the peer takes longer to acknowledge cancellation. Direct retrieval continues while all slots are occupied. Late probe failures are observed and logged, and completion makes the slot available again.
+The provider permits at most three outstanding peer probes across retries. These calls use acknowledgement-aware cancellation: the one-second deadline signals the peer and ends the provider's wait, while the RPC callback retains its slot until a response, a transport failure, shutdown, or the finite system response timeout retires the call. Direct retrieval continues while all slots are occupied. Late probe failures are observed and logged, and callback completion makes the slot available again. This bounds observable RPC lifetimes; a transport timeout reports an unknown remote outcome, so a peer may still be executing the request.
 
 ## Compatibility, rollout, and rollback
 

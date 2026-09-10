@@ -409,7 +409,7 @@ namespace Orleans.Runtime.Metadata
             try
             {
                 var remoteManifestProvider = _grainFactory!.GetSystemTarget<IClusterManifestSystemTarget>(Constants.ManifestProviderType, peer);
-                var summaryTask = remoteManifestProvider.GetClusterManifestHashSummary(probeToken).AsTask();
+                var summaryTask = InvokePeerRequest(remoteManifestProvider.GetClusterManifestHashSummary, probeToken);
                 probeTask = summaryTask;
                 var summary = await summaryTask
                     .WaitAsync(probeToken);
@@ -426,7 +426,9 @@ namespace Orleans.Runtime.Metadata
 
                 // No per-peer manifest body is retained, so request a complete update instead of synthesizing a
                 // baseline from the local provider's version.
-                var updateTask = remoteManifestProvider.GetClusterManifestUpdate(MajorMinorVersion.MinValue, probeToken).AsTask();
+                var updateTask = InvokePeerRequest(
+                    token => remoteManifestProvider.GetClusterManifestUpdate(MajorMinorVersion.MinValue, token),
+                    probeToken);
                 probeTask = updateTask;
                 var update = await updateTask
                     .WaitAsync(probeToken);
@@ -457,7 +459,7 @@ namespace Orleans.Runtime.Metadata
             {
                 if (probeTask is { IsCompleted: false })
                 {
-                    // Keep the slot until the RPC settles, even if the peer ignores cancellation.
+                    // Keep the slot until a response or the transport retires the RPC, even after cancellation.
                     // This bounds outstanding requests across retries and observes late failures.
                     probeTask.ContinueWith(
                         task =>
@@ -478,6 +480,12 @@ namespace Orleans.Runtime.Metadata
                     slots.Release();
                 }
             }
+        }
+
+        private static Task<T> InvokePeerRequest<T>(Func<CancellationToken, ValueTask<T>> request, CancellationToken cancellationToken)
+        {
+            using var scope = CancellationAcknowledgementScope.Enter();
+            return request(cancellationToken).AsTask();
         }
 
         private sealed record PeerManifestProbeResult(
