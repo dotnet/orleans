@@ -243,8 +243,21 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
         }
         finally
         {
-            // Include final activations and retain failures from tasks which already left the running set.
-            await Task.WhenAll(runningShards.Concat(_runningShards.Values));
+            try
+            {
+                // Include final activations and retain failures from tasks which already left the running set.
+                await Task.WhenAll(runningShards.Concat(_runningShards.Values));
+            }
+            finally
+            {
+                // Running tasks remove their shards before completing; the remaining shards never activated.
+                foreach (var shard in _shardCache.Values)
+                {
+                    TryRemoveWritableShard(shard);
+                    _shardCache.TryRemove(shard.Id, out _);
+                    await DisposeShardAsync(shard);
+                }
+            }
         }
 
         LogStopped(_logger);
@@ -438,14 +451,15 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
         var assignedCount = 0;
         await foreach (var shard in _shardManager.DiscoverJobShardsAsync(now.Add(_options.ShardLoadLookaheadPeriod), budget, cancellationToken))
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            assignedCount++;
+            // Take responsibility for yielded resources before observing cancellation.
             if (_shardCache.TryAdd(shard.Id, shard))
             {
                 newClaimsThisCycle++;
                 _totalClaimedShards++;
             }
 
+            cancellationToken.ThrowIfCancellationRequested();
+            assignedCount++;
             if (!_runningShards.ContainsKey(shard.Id))
             {
                 TryActivateShard(shard);
@@ -577,16 +591,21 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
             TryRemoveWritableShard(shard);
             _shardCache.TryRemove(shard.Id, out _);
 
-            try
-            {
-                await shard.DisposeAsync();
-            }
-            catch (Exception ex)
-            {
-                LogErrorDisposingShard(_logger, ex, shard.Id);
-            }
+            await DisposeShardAsync(shard);
 
             _runningShards.TryRemove(shard.Id, out _);
+        }
+    }
+
+    private async ValueTask DisposeShardAsync(IJobShard shard)
+    {
+        try
+        {
+            await shard.DisposeAsync();
+        }
+        catch (Exception ex)
+        {
+            LogErrorDisposingShard(_logger, ex, shard.Id);
         }
     }
 
