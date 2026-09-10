@@ -22,7 +22,7 @@ public abstract class AdvancedReminderTableTestsBase : IAsyncLifetime, IClassFix
     protected readonly IOptions<ClusterOptions> clusterOptions;
     protected readonly ConnectionStringFixture connectionStringFixture;
 
-    private readonly AdvancedReminderTable remindersTable;
+    protected readonly AdvancedReminderTable remindersTable;
 
     protected const string testDatabaseName = "OrleansAdvancedReminderTest";
 
