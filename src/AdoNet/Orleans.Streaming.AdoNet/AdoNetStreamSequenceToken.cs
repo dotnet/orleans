@@ -6,6 +6,12 @@ namespace Orleans.Streaming.AdoNet;
 [GenerateSerializer]
 internal sealed class AdoNetStreamSequenceToken : EventSequenceTokenV2, IPartitionedStreamSequenceToken
 {
+    [NonSerialized]
+    private string? _providerIdentity;
+
+    [NonSerialized]
+    private string? _position;
+
     public AdoNetStreamSequenceToken(
         string serviceId,
         string providerId,
@@ -17,6 +23,8 @@ internal sealed class AdoNetStreamSequenceToken : EventSequenceTokenV2, IPartiti
         ServiceId = serviceId;
         ProviderId = providerId;
         QueueId = queueId;
+        _providerIdentity = GetProviderIdentity(serviceId, providerId);
+        _position = sequenceNumber.ToString(System.Globalization.CultureInfo.InvariantCulture);
     }
 
     public AdoNetStreamSequenceToken()
@@ -33,23 +41,21 @@ internal sealed class AdoNetStreamSequenceToken : EventSequenceTokenV2, IPartiti
     public string QueueId { get; } = null!;
 
     string? IPartitionedStreamSequenceToken.ProviderIdentity
-        => GetProviderIdentity(ServiceId, ProviderId);
+        => ProviderIdentity;
 
     string? IPartitionedStreamSequenceToken.PartitionIdentity => QueueId;
 
     string IPartitionedStreamSequenceToken.Position
-        => SequenceNumber.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        => Position;
 
     public override bool Equals(StreamSequenceToken? other)
         => other is IPartitionedStreamSequenceToken token
             && string.Equals(
-                GetProviderIdentity(ServiceId, ProviderId),
+                ProviderIdentity,
                 token.ProviderIdentity,
                 StringComparison.Ordinal)
             && string.Equals(QueueId, token.PartitionIdentity, StringComparison.Ordinal)
-            && ComparePositions(
-                SequenceNumber.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                token.Position) == 0
+            && ComparePositions(Position, token.Position) == 0
             && EventIndex == ((StreamSequenceToken)token).EventIndex;
 
     public override bool Equals(object? obj)
@@ -64,7 +70,7 @@ internal sealed class AdoNetStreamSequenceToken : EventSequenceTokenV2, IPartiti
 
         if (other is not IPartitionedStreamSequenceToken token
             || !string.Equals(
-                GetProviderIdentity(ServiceId, ProviderId),
+                ProviderIdentity,
                 token.ProviderIdentity,
                 StringComparison.Ordinal)
             || !string.Equals(QueueId, token.PartitionIdentity, StringComparison.Ordinal))
@@ -72,22 +78,25 @@ internal sealed class AdoNetStreamSequenceToken : EventSequenceTokenV2, IPartiti
             throw new ArgumentOutOfRangeException(nameof(other));
         }
 
-        var difference = ComparePositions(
-            SequenceNumber.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            token.Position);
+        var difference = ComparePositions(Position, token.Position);
         return difference != 0 ? difference : EventIndex.CompareTo(((StreamSequenceToken)token).EventIndex);
     }
 
     public override int GetHashCode()
         => HashCode.Combine(
-            GetProviderIdentity(ServiceId, ProviderId),
+            ProviderIdentity,
             QueueId,
-            GetPositionHashCode(
-                SequenceNumber.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+            GetPositionHashCode(Position),
             EventIndex);
 
     internal static string GetProviderIdentity(string serviceId, string providerId)
         => $"{serviceId.Length}:{serviceId}{providerId}";
+
+    private string ProviderIdentity
+        => _providerIdentity ??= GetProviderIdentity(ServiceId, ProviderId);
+
+    private string Position
+        => _position ??= SequenceNumber.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
     private static int ComparePositions(string left, string right)
     {
