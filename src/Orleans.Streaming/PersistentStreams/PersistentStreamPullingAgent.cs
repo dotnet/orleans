@@ -1000,9 +1000,25 @@ namespace Orleans.Streams
                         return false;
                     }
 
-                    if (earliest is null || IsBefore(current, earliest))
+                    if (earliest is null)
                     {
                         earliest = current;
+                        continue;
+                    }
+
+                    try
+                    {
+                        if (IsBefore(current, earliest))
+                        {
+                            earliest = current;
+                        }
+                    }
+                    catch (ArgumentOutOfRangeException exception) when (exception.ParamName == "other")
+                    {
+                        LogWarningIncompatibleDeliveryProgress(
+                            new(QueueId), consumer.SubscriptionId, consumer.StreamId, current, earliest, exception);
+                        earliest = null;
+                        return false;
                     }
                 }
             }
@@ -1856,6 +1872,18 @@ namespace Orleans.Streams
             Message = "Failed to add subscription for stream {StreamId}."
         )]
         private partial void LogWarningFailedToAddSubscription(QualifiedStreamId streamId, Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Retaining the previous delivery watermark for queue {Queue}: subscription {SubscriptionId} on stream {StreamId} has token {Token} incompatible with {OtherToken}."
+        )]
+        private partial void LogWarningIncompatibleDeliveryProgress(
+            QueueIdLogRecord queue,
+            GuidId subscriptionId,
+            QualifiedStreamId streamId,
+            StreamSequenceToken token,
+            StreamSequenceToken otherToken,
+            Exception exception);
 
         [LoggerMessage(
             Level = LogLevel.Warning,

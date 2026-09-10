@@ -1016,9 +1016,9 @@ namespace UnitTests.StreamingTests
                 {
                 }
 
-                public IBatchContainer GetCurrent(out Exception exception)
+                public IBatchContainer? GetCurrent(out Exception? exception)
                 {
-                    exception = null!;
+                    exception = null;
                     return messages[index];
                 }
 
@@ -2819,6 +2819,62 @@ namespace UnitTests.StreamingTests
 
             Assert.Equal(earliestConsumer.LastProcessedToken, Assert.Single(queueCache.DeliveryProgressTokens));
         }
+
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
+        [Theory, TestCategory("BVT"), TestCategory("Streaming")]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task Shutdown_PreservesCheckpointForIncompatibleTokens(bool providerTokenFirst)
+        {
+            var pubSub = Substitute.For<IStreamPubSub>();
+            pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
+                .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
+
+            var queueId = QueueId.GetQueueId("queue", 0u, 0u);
+            var receiver = Substitute.For<IQueueAdapterReceiver>();
+            receiver.Shutdown(Arg.Any<TimeSpan>(), Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);
+            var queueCache = new RecordingQueueCache();
+            var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
+            queueAdapterCache.CreateQueueCache(queueId).Returns(queueCache);
+            var streamId = new QualifiedStreamId("provider", StreamId.Create("namespace", Guid.NewGuid()));
+            var agent = CreateAgent(pubSub, queueId, receiver, queueAdapterCache);
+            var accessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
+            await InitializeAgent(agent);
+            await accessor.RegisterStream(streamId, new EventSequenceTokenV2(1), DateTime.UtcNow);
+            var streamData = (await accessor.GetPubSubCache()).Single().Value;
+            Assert.Null(streamData.RegistrationTask);
+            queueCache.ClearDeliveryProgress();
+
+            StreamSequenceToken[] tokens = [new EventSequenceTokenV2(10), new IsolatedProviderToken(20)];
+            if (providerTokenFirst)
+            {
+                Array.Reverse(tokens);
+            }
+
+            foreach (var token in tokens)
+            {
+                var consumer = streamData.AddConsumer(
+                    GuidId.GetGuidId(Guid.NewGuid()),
+                    streamId,
+                    streamConsumer: null!,
+                    filterData: null,
+                    now: DateTime.UtcNow);
+                consumer.IsRegistered = true;
+                consumer.LastProcessedToken = token;
+            }
+
+            await accessor.Shutdown();
+
+            Assert.Empty(queueCache.DeliveryProgressTokens);
+            Assert.Equal(0, queueCache.DeliveryProgressCallCount);
+            await receiver.Received(1).Shutdown(Arg.Any<TimeSpan>(), Arg.Any<CancellationToken>());
+            await pubSub.Received(1).UnregisterProducer(streamId, Arg.Any<GrainId>(), Arg.Any<CancellationToken>());
+            Assert.Empty(await accessor.GetPubSubCache());
+        }
+
+        private sealed class IsolatedProviderToken(long sequenceNumber) : EventSequenceTokenV2(sequenceNumber);
 
         [TestSuite("BVT")]
         [TestProvider("None")]
