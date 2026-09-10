@@ -731,27 +731,29 @@ describe('external link audit', () => {
   });
 
   test('reports GitHub throttling without amplifying requests', async () => {
-    let requests = 0;
-    const result = await probeExternalTargets({
-      externalTargets: new Map([
-        [
-          'https://github.com/dotnet/orleans/edit/main/docs/README.md',
-          [{ relativeFile: 'guide.md', line: 5 }],
-        ],
-      ]),
-      retries: 1,
-      lookupImpl: publicLookup,
-      requestImpl: async () => {
-        requests += 1;
-        return response(403);
-      },
-    });
+    for (const status of [403, 429]) {
+      let requests = 0;
+      const result = await probeExternalTargets({
+        externalTargets: new Map([
+          [
+            'https://github.com/dotnet/orleans/edit/main/docs/README.md',
+            [{ relativeFile: 'guide.md', line: 5 }],
+          ],
+        ]),
+        retries: 1,
+        lookupImpl: publicLookup,
+        requestImpl: async () => {
+          requests += 1;
+          return response(status);
+        },
+      });
 
-    expect(result.failures).toEqual([]);
-    expect(result.warnings).toEqual([
-      expect.stringContaining('Transient external status 403'),
-    ]);
-    expect(requests).toBe(1);
+      expect(result.failures).toEqual([]);
+      expect(result.warnings).toEqual([
+        expect.stringContaining(`Transient external status ${status}`),
+      ]);
+      expect(requests).toBe(1);
+    }
   });
 
   test('uses the final host to classify redirected GitHub throttling', async () => {
@@ -961,7 +963,6 @@ describe('external link audit', () => {
     );
     expect(options.headers).toEqual({
       Host: 'docs.example',
-      'User-Agent': 'dotnet-orleans-docs-link-audit/1.0 (+https://github.com/dotnet/orleans)',
       Range: 'bytes=0-0',
     });
     expect(options.servername).toBe('docs.example');
@@ -975,6 +976,25 @@ describe('external link audit', () => {
           resolve();
         }
       });
+    });
+  });
+
+  test('identifies the probe only to GitHub', () => {
+    const options = createPinnedRequestOptions(
+      new URL('https://github.com/dotnet/orleans'),
+      {
+        method: 'HEAD',
+        destination: {
+          hostname: 'github.com',
+          address: '8.8.8.8',
+          family: 4,
+        },
+      },
+    );
+
+    expect(options.headers).toEqual({
+      Host: 'github.com',
+      'User-Agent': 'dotnet-orleans-docs-link-audit/1.0 (+https://github.com/dotnet/orleans)',
     });
   });
 

@@ -17,8 +17,8 @@ const contentRoute = `${deploymentBase}/docs`;
 const learnContentRoot = '/dotnet/orleans';
 const redirectStatuses = new Set([301, 302, 303, 307, 308]);
 const transientStatuses = new Set([408, 425, 429, 500, 502, 503, 504]);
-const transientStatusesByHost = new Map([
-  ['github.com', new Set([403])],
+const throttlingStatusesByHost = new Map([
+  ['github.com', new Set([403, 429])],
 ]);
 const headFallbackStatuses = new Set([405, 501]);
 const headFallbackStatusesByHost = new Map([
@@ -993,7 +993,9 @@ export function createPinnedRequestOptions(url, { method, destination }) {
     autoSelectFamily: false,
     headers: {
       Host: url.host,
-      'User-Agent': 'dotnet-orleans-docs-link-audit/1.0 (+https://github.com/dotnet/orleans)',
+      ...(url.hostname.toLowerCase() === 'github.com'
+        ? { 'User-Agent': 'dotnet-orleans-docs-link-audit/1.0 (+https://github.com/dotnet/orleans)' }
+        : {}),
       ...(method === 'GET' ? { Range: 'bytes=0-0' } : {}),
     },
     lookup: (_hostname, options, callback) => {
@@ -1121,11 +1123,17 @@ async function probeOnce(url, options) {
   return head;
 }
 
-function hasTransientStatus(result) {
+function isHostThrottlingStatus(result) {
   const hostname = new URL(result.finalUrl).hostname.toLowerCase();
   return (
+    throttlingStatusesByHost.get(hostname)?.has(result.response.status) === true
+  );
+}
+
+function hasTransientStatus(result) {
+  return (
     transientStatuses.has(result.response.status) ||
-    transientStatusesByHost.get(hostname)?.has(result.response.status) === true
+    isHostThrottlingStatus(result)
   );
 }
 
@@ -1198,7 +1206,10 @@ export async function probeExternalTargets({
             maxRedirects,
           });
           error = undefined;
-          if (!transientStatuses.has(result.response.status)) break;
+          if (
+            !transientStatuses.has(result.response.status) ||
+            isHostThrottlingStatus(result)
+          ) break;
         } catch (caught) {
           error = caught;
           if (!caught.transient) break;
