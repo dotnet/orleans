@@ -78,7 +78,7 @@ foreach ($artifact in Get-ChildItem -LiteralPath $resolvedReportDirectory -Force
     }
     [void] $actual.Add($artifactName)
     if (-not $expected.ContainsKey($artifactName)) {
-        $unexpectedArtifactNames.Add($artifact.Name)
+        [void] $unexpectedArtifactNames.Add($artifact.Name)
         continue
     }
 
@@ -132,14 +132,14 @@ foreach ($artifact in Get-ChildItem -LiteralPath $resolvedReportDirectory -Force
         })
     } elseif ($artifactAttempt -gt $existingArtifact.Attempt -or
         ($artifactAttempt -eq $existingArtifact.Attempt -and $artifactIsRetry -and -not $existingArtifact.IsRetry)) {
-        $superseded.Add($existingArtifact.Path)
+        [void] $superseded.Add($existingArtifact.Path)
         $selected[$artifactName] = [pscustomobject]@{
             Attempt = $artifactAttempt
             IsRetry = $artifactIsRetry
             Path = $artifact.FullName
         }
     } else {
-        $superseded.Add($artifact.FullName)
+        [void] $superseded.Add($artifact.FullName)
     }
 }
 

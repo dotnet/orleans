@@ -852,8 +852,8 @@ exit 0
             '(?s)Verify tested commit.*?parents -notcontains \$env:HEAD_SHA.*?Download covered source' `
             'The trusted reporter must bind the recorded merge commit to the triggering pull request head.'
         Assert-Equal 0 ([regex]::Matches($workflow, 'name: Checkout covered source')).Count 'The privileged reporter must not check out untrusted pull request code.'
-        Assert-Equal 22 $expectedArtifacts.Count 'Expected coverage artifact count differs.'
-        Assert-Equal 22 (@($expectedArtifacts | Sort-Object -Unique)).Count 'Expected coverage artifact identities must be unique.'
+        Assert-Equal 23 $expectedArtifacts.Count 'Expected coverage artifact count differs.'
+        Assert-Equal 23 (@($expectedArtifacts | Sort-Object -Unique)).Count 'Expected coverage artifact identities must be unique.'
         Assert-Equal 0 (@($expectedArtifacts | Where-Object { $_ -notmatch 'net10\.0$' })).Count 'Coverage artifacts must target .NET 10.'
         Assert-Equal 0 (@($expectedArtifacts | Where-Object { $_ -match 'macos|windows' })).Count 'Coverage artifacts must target Linux.'
     }
@@ -910,7 +910,9 @@ exit 0
             [Text.UTF8Encoding]::new($false)
         )
         Write-ArtifactMetadata $firstArtifact 'test_output_a'
-        Invoke-ArtifactValidator $testCase.ReportDirectory $expectedArtifacts | Out-Null
+        $validatorOutput = @(Invoke-ArtifactValidator $testCase.ReportDirectory $expectedArtifacts)
+        Assert-Equal 1 $validatorOutput.Count 'Artifact validation must not emit collection indices.'
+        Assert-Equal 'Validated 2 coverage artifacts.' $validatorOutput[0] 'Artifact validation output differs.'
         Assert-Equal $false (Test-Path -LiteralPath $firstArtifact) 'A legacy canonical artifact must yield to an attempt-qualified artifact.'
         Assert-Equal $true (Test-Path -LiteralPath $firstRetryArtifact) 'The attempt-qualified artifact must remain available for aggregation.'
 
