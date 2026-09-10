@@ -114,6 +114,39 @@ public class AdoNetBatchContainerTests(TestEnvironmentFixture fixture)
     }
 
     [Fact]
+    public void AdoNetToken_RepeatedComparisonAndIdentityAccessDoNotAllocate()
+    {
+        var serializer = fixture.Serializer.GetSerializer<AdoNetStreamSequenceToken>();
+        var original = new AdoNetStreamSequenceToken("service", "provider", "queue", 42, 3);
+        var left = Assert.IsType<AdoNetStreamSequenceToken>(
+            serializer.Deserialize(serializer.SerializeToArray(original)));
+        var right = new AdoNetStreamSequenceToken("service", "provider", "queue", 42, 3);
+        var partitioned = (IPartitionedStreamSequenceToken)left;
+
+        _ = partitioned.ProviderIdentity;
+        _ = partitioned.Position;
+        _ = left.Equals(right);
+        _ = left.CompareTo(right);
+        _ = left.GetHashCode();
+
+        var result = 0;
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var i = 0; i < 1_000; i++)
+        {
+            result += partitioned.ProviderIdentity!.Length;
+            result += partitioned.Position.Length;
+            result += left.Equals(right) ? 1 : 0;
+            result += left.CompareTo(right);
+            result += left.GetHashCode();
+        }
+
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        Assert.NotEqual(0, result);
+        Assert.Equal(0L, allocated);
+    }
+
+    [Fact]
     public void AdoNetBatchContainer_ToMessagePayload_CreatesPayload()
     {
         // arrange
