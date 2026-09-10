@@ -56,6 +56,37 @@ namespace NonSilo.Tests.Membership
         }
 
         [Fact]
+        public async Task MembershipTableCleanupAgent_ForwardsShutdownTokenToNativeProvider()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var options = new ClusterMembershipOptions { DefunctSiloCleanupPeriod = TimeSpan.FromMinutes(90), MaxDefunctSiloEntries = null };
+            var membershipManager = new TestMembershipManager();
+            var table = Substitute.For<IMembershipTable>();
+            var requested = new TaskCompletionSource<CancellationToken>(TaskCreationOptions.RunContinuationsAsynchronously);
+            Task cleanup = Task.CompletedTask;
+            table.CleanupDefunctSiloEntries(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(call =>
+            {
+                var token = call.ArgAt<CancellationToken>(1);
+                cleanup = Task.Delay(Timeout.InfiniteTimeSpan, token);
+                requested.SetResult(token);
+                return cleanup;
+            });
+            using var cleanupAgent = this.CreateCleanupAgent(options, table, membershipManager);
+            var lifecycle = new SiloLifecycleSubject(this.loggerFactory.CreateLogger<SiloLifecycleSubject>());
+            ((ILifecycleParticipant<ISiloLifecycle>)cleanupAgent).Participate(lifecycle);
+            await lifecycle.OnStart(cancellationToken);
+            membershipManager.Publish(Snapshot(Entry(this.localSilo, SiloStatus.Active, this.timeProvider.GetUtcNow())));
+            var cleanupToken = await requested.Task.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+
+            await lifecycle.OnStop(cancellationToken).WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+
+            Assert.True(cleanupToken.IsCancellationRequested);
+            Assert.True(cleanup.IsCanceled);
+            var call = Assert.Single(table.ReceivedCalls());
+            Assert.Equal(2, call.GetArguments().Length);
+        }
+
+        [Fact]
         public async Task MembershipTableCleanupAgent_NonFirstActiveSilo_DoesNotCleanup()
         {
             var cancellationToken = TestContext.Current.CancellationToken;
@@ -247,7 +278,7 @@ namespace NonSilo.Tests.Membership
 
         private MembershipTableCleanupAgent CreateCleanupAgent(
             ClusterMembershipOptions options,
-            InMemoryMembershipTable table,
+            IMembershipTable table,
             IMembershipManager membershipManager)
         {
             return new MembershipTableCleanupAgent(
