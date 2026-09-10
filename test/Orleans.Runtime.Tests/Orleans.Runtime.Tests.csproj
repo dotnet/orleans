@@ -27,5 +27,6 @@
     <ProjectReference Include="$(SourceRoot)src\Orleans.Sdk\Orleans.Sdk.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Serialization.SystemTextJson\Orleans.Serialization.SystemTextJson.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.BroadcastChannel\Orleans.BroadcastChannel.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Orleans.Testing.Reminders\Orleans.Testing.Reminders.csproj" />
   </ItemGroup>
 </Project>
