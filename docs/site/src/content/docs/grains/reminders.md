@@ -74,8 +74,6 @@ The reminder table is part of silo startup. Provider availability and consistenc
 
 Grains implementing <xref:Orleans.IGrainBase> directly use the same <xref:Orleans.GrainReminderExtensions> APIs. Inject <xref:Orleans.Timers.IReminderRegistry> when infrastructure code needs lower-level access through the current grain context.
 
-See [POCO grains](../migration-guide.md#poco-grains-and-igrainbase) for the interface-only grain model.
-
 ## Troubleshoot reminders
 
 | Observed behavior | Runtime behavior and action |

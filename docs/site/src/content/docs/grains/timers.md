@@ -64,8 +64,6 @@ The callback's <xref:System.Threading.CancellationToken> signals timer disposal 
 
 Grains implementing <xref:Orleans.IGrainBase> directly use <xref:Orleans.GrainBaseExtensions.RegisterGrainTimer*>. Inject <xref:Orleans.Timers.ITimerRegistry> when infrastructure code needs lower-level registration through the current <xref:Orleans.Runtime.IGrainContext>.
 
-See [POCO grains](../migration-guide.md#poco-grains-and-igrainbase) for the interface-only grain model.
-
 ## Troubleshoot grain timers
 
 | Observed behavior | Runtime behavior and action |

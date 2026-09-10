@@ -33,10 +33,6 @@ Before changing packages, record the following compatibility contract:
 
 See [Upgrade deployment and rollback](migration/deployment-and-rollback.md) before choosing a deployment strategy.
 
-## POCO grains and <xref:Orleans.IGrainBase> <a name="poco-grains-and-igrainbase"></a>
-
-POCO grains remain supported. A grain that doesn't inherit from <xref:Orleans.Grain> implements <xref:Orleans.IGrainBase> and receives its <xref:Orleans.Runtime.IGrainContext> through dependency injection. This also enables grain extension methods such as timers, reminders, streaming, deactivation, and migration.
-
 ## Package version policy
 
 Keep all `Microsoft.Orleans.*` packages on the same 10.x patch. For solutions that use NuGet Central Package Management, declare the versions in `Directory.Packages.props` and omit versions from project-level `PackageReference` items. Don't copy old provider dependency versions from migration examples; select a current version that is supported by your target runtime and provider.
