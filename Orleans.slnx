@@ -93,6 +93,7 @@
   <Folder Name="/src/Extensions/Azure/">
     <Project Path="src/Azure/Orleans.Clustering.AzureStorage/Orleans.Clustering.AzureStorage.csproj" />
     <Project Path="src/Azure/Orleans.Clustering.Cosmos/Orleans.Clustering.Cosmos.csproj" />
+    <Project Path="src/Azure/Orleans.AdvancedReminders.AzureStorage/Orleans.AdvancedReminders.AzureStorage.csproj" />
     <Project Path="src/Azure/Orleans.GrainDirectory.AzureStorage/Orleans.GrainDirectory.AzureStorage.csproj" />
     <Project Path="src/Azure/Orleans.Journaling.AzureStorage/Orleans.Journaling.AzureStorage.csproj" />
     <Project Path="src/Azure/Orleans.Persistence.AzureStorage/Orleans.Persistence.AzureStorage.csproj" />
