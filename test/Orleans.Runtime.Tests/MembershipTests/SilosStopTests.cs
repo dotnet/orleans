@@ -99,9 +99,11 @@ namespace UnitTests.MembershipTests
                     await HostedCluster.KillSiloAsync(
                         HostedCluster.SecondarySilos[0],
                         TestContext.Current.CancellationToken);
+                    await HostedCluster.WaitForLivenessToStabilizeAsync(didKill: true)
+                        .WaitAsync(TestContext.Current.CancellationToken);
 
                     await Assert.ThrowsAsync<SiloUnavailableException>(
-                        () => promise.WaitAsync(TimeSpan.FromSeconds(20), TestContext.Current.CancellationToken));
+                        () => promise.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
                     Assert.Equal(0, gateway.TrackedRequestClientCount);
                 }
                 finally
