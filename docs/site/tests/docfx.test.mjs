@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readFile, symlink, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, realpath, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
@@ -21,7 +21,7 @@ function escapeRegExp(value) {
 }
 
 async function temporaryDirectory() {
-  const directory = await mkdtemp(path.join(os.tmpdir(), 'orleans-docfx-'));
+  const directory = await realpath(await mkdtemp(path.join(os.tmpdir(), 'orleans-docfx-')));
   temporaryDirectories.push(directory);
   return directory;
 }
@@ -989,7 +989,12 @@ describe('DocFX conversion', () => {
     );
   });
 
-  test('rejects image directives whose path casing does not match', async () => {
+  test.each([
+    ['source', 'media/Image.png'],
+    ['source', 'Media/image.png'],
+    ['lightbox', 'media/Image.png'],
+    ['lightbox', 'Media/image.png'],
+  ])('rejects image %s directives whose path casing does not match: %s', async (attribute, target) => {
     const directory = await temporaryDirectory();
     await mkdir(path.join(directory, 'media'));
     await writeFile(path.join(directory, 'media', 'image.png'), '');
@@ -997,11 +1002,50 @@ describe('DocFX conversion', () => {
 
     await expect(
       convertDocfxMarkdown({
-        source:
-          '---\ntitle: Image\n---\n:::image type="content" source="media/Image.png" alt-text="Image":::',
+        source: `---\ntitle: Image\n---\n:::image type="content" source="${attribute === 'source' ? target : 'media/image.png'}"${attribute === 'lightbox' ? ` lightbox="${target}"` : ''} alt-text="Image":::`,
         sourcePath,
       }),
     ).rejects.toThrow("does not exist with that exact path");
+  });
+
+  test('converts in-memory Markdown and snippets through a directory alias', async () => {
+    const directory = await temporaryDirectory();
+    const contentRoot = path.join(directory, 'content');
+    const aliasRoot = path.join(directory, 'linked-content');
+    await mkdir(path.join(contentRoot, 'media'), { recursive: true });
+    await writeFile(path.join(contentRoot, 'media', 'image.png'), '');
+    await writeFile(path.join(contentRoot, 'Example.cs'), 'public class Example {}');
+    await symlink(contentRoot, aliasRoot, 'junction');
+
+    const converted = await convertDocfxMarkdown({
+      source: [
+        '---',
+        'title: Aliased guide',
+        '---',
+        ':::image type="content" source="media/image.png" alt-text="Image":::',
+        ':::code language="csharp" source="Example.cs":::',
+      ].join('\n'),
+      sourcePath: path.join(aliasRoot, 'guide.md'),
+      sourceRoot: aliasRoot,
+      includeRoot: aliasRoot,
+    });
+
+    expect(converted).toContain('![Image](media/image.png)');
+    expect(converted).toContain('public class Example {}');
+  });
+
+  test('collects includes through an aliased content root', async () => {
+    const directory = await temporaryDirectory();
+    const contentRoot = path.join(directory, 'content');
+    const aliasRoot = path.join(directory, 'linked-content');
+    await mkdir(contentRoot);
+    await writeFile(path.join(contentRoot, 'guide.md'), '[!INCLUDE [note](note.md)]\n');
+    await writeFile(path.join(contentRoot, 'note.md'), 'Included note.\n');
+    await symlink(contentRoot, aliasRoot, 'junction');
+
+    const targets = await collectIncludeTargets([path.join(aliasRoot, 'guide.md')], aliasRoot);
+
+    expect([...targets]).toEqual([path.join(contentRoot, 'note.md')]);
   });
 
   test('converts long escaped xref labels without regex backtracking', async () => {
