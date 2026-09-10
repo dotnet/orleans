@@ -189,26 +189,26 @@ internal sealed class GateExecutionHarness(GateExecutionCoverage coverage)
             switch (kind)
             {
                 case GateOperationKind.BeginAcquisition:
-                {
-                    var acquisition = new OwnershipAcquisition<long>(1, 2);
-                    _map.Add(Range, acquisition);
-                    _gate = acquisition;
-                    break;
-                }
+                    {
+                        var acquisition = new OwnershipAcquisition<long>(1, 2);
+                        _map.Add(Range, acquisition);
+                        _gate = acquisition;
+                        break;
+                    }
                 case GateOperationKind.BeginRelease:
-                {
-                    var release = new OwnershipRelease<long>(1, 2);
-                    _map.Add(Range, release);
-                    _gate = release;
-                    break;
-                }
+                    {
+                        var release = new OwnershipRelease<long>(1, 2);
+                        _map.Add(Range, release);
+                        _gate = release;
+                        break;
+                    }
                 case GateOperationKind.BeginBarrier:
-                {
-                    var barrier = new ViewBarrier<long>(2);
-                    _map.Add(Range, barrier);
-                    _gate = barrier;
-                    break;
-                }
+                    {
+                        var barrier = new ViewBarrier<long>(2);
+                        _map.Add(Range, barrier);
+                        _gate = barrier;
+                        break;
+                    }
                 case GateOperationKind.BeginNonIncreasingView:
                     _ = new OwnershipAcquisition<long>(2, 1);
                     break;
