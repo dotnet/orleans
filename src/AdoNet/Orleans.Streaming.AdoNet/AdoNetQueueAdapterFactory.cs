@@ -132,7 +132,7 @@ internal class AdoNetQueueAdapterFactory : IQueueAdapterFactory, IQueueAdapterCa
     public IQueueAdapterCache GetQueueAdapterCache() => this;
 
     public IQueueCache CreateQueueCache(QueueId queueId)
-        => ((_adapter as IQueueAdapterCache) ?? throw new InvalidOperationException("The ADO.NET stream adapter must be created before its queue cache."))
+        => ((Volatile.Read(ref _adapter) as IQueueAdapterCache) ?? throw new InvalidOperationException("The ADO.NET stream adapter must be created before its queue cache."))
             .CreateQueueCache(queueId);
 
     public IStreamQueueMapper GetStreamQueueMapper() => _streamQueueMapper;
