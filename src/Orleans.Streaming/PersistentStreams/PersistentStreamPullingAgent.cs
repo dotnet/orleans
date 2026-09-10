@@ -284,9 +284,12 @@ namespace Orleans.Streams
 
             await DrainConsumerCursors(cancellationToken);
 
-            // Final delivery progress scan so the receiver has the latest watermark
-            // before FlushAsync persists the checkpoint.
-            NotifyDeliveryProgress();
+            // Registrations drained during shutdown can exit before discovering subscribers.
+            // Preserve their checkpoint barrier even after their tasks have completed.
+            if (inFlightRegistrations.Count == 0)
+            {
+                NotifyDeliveryProgress();
+            }
 
             this.queueCache = null;
 

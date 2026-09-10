@@ -3123,13 +3123,20 @@ namespace UnitTests.StreamingTests
         [TestSuite("BVT")]
         [TestProvider("None")]
         [TestArea("Streaming")]
-        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
-        public async Task Shutdown_SkipsDeliveryProgressForPendingRegistrations()
+        [Theory, TestCategory("BVT"), TestCategory("Streaming")]
+        [InlineData(false, false)]
+        [InlineData(false, true)]
+        [InlineData(true, false)]
+        [InlineData(true, true)]
+        public async Task Shutdown_SkipsDeliveryProgressForPendingRegistrations(bool registrationFails, bool hasRegisteredStream)
         {
             var registration = new TaskCompletionSource<ISet<PubSubSubscriptionState>>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var registeredStreamId = new QualifiedStreamId("provider", StreamId.Create("namespace", Guid.NewGuid()));
             var pubSub = Substitute.For<IStreamPubSub>();
             pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
-                .ReturnsForAnyArgs(_ => registration.Task);
+                .ReturnsForAnyArgs(call => call.ArgAt<QualifiedStreamId>(0).Equals(registeredStreamId)
+                    ? Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>())
+                    : registration.Task);
 
             var queueId = QueueId.GetQueueId("queue", 0u, 0u);
             var streamId = StreamId.Create("namespace", Guid.NewGuid());
@@ -3155,26 +3162,68 @@ namespace UnitTests.StreamingTests
             var testAccessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
             await InitializeAgent(agent);
 
+            if (hasRegisteredStream)
+            {
+                await testAccessor.RegisterStream(registeredStreamId, new EventSequenceTokenV2(20), DateTime.UtcNow);
+                var registeredStream = (await testAccessor.GetPubSubCache())[registeredStreamId];
+                var consumer = registeredStream.AddConsumer(
+                    GuidId.GetGuidId(Guid.NewGuid()),
+                    registeredStreamId,
+                    streamConsumer: null!,
+                    filterData: null,
+                    now: DateTime.UtcNow);
+                consumer.IsRegistered = true;
+                consumer.LastProcessedToken = new EventSequenceTokenV2(20);
+            }
+
             // First tick: pump reads messages and kicks off a cold stream registration.
             await testAccessor.RunQueuePump(queueId, TestContext.Current.CancellationToken);
 
             // Verify the cache has the pending stream registered.
             var cache = await testAccessor.GetPubSubCache();
-            Assert.Single(cache);
-            var (_, streamData) = cache.Single();
+            Assert.Equal(hasRegisteredStream ? 2 : 1, cache.Count);
+            var streamData = cache[new QualifiedStreamId("provider", streamId)];
             Assert.NotNull(streamData.RegistrationTask);
             Assert.False(streamData.RegistrationTask.IsCompleted, "Registration should still be in progress");
 
             queueCache.ClearDeliveryProgress();
             var shutdownTask = testAccessor.Shutdown();
-            await receiverShutdownStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            try
+            {
+                // A queued accessor turn observes shutdown after it has started draining registration.
+                await testAccessor.GetPubSubCache().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+                Assert.False(shutdownTask.IsCompleted);
+                Assert.False(receiverShutdownStarted.Task.IsCompleted);
+                Assert.Empty(queueCache.DeliveryProgressTokens);
+                Assert.Equal(0, queueCache.DeliveryProgressCallCount);
 
+                if (registrationFails)
+                {
+                    registration.SetException(new InvalidOperationException("Producer registration failed during shutdown."));
+                }
+                else
+                {
+                    registration.SetResult(new HashSet<PubSubSubscriptionState>
+                    {
+                        new PubSubSubscriptionState(
+                            GuidId.GetGuidId(Guid.NewGuid()),
+                            new QualifiedStreamId("provider", streamId),
+                            GrainId.Create("consumer", Guid.NewGuid().ToString())),
+                    });
+                }
+            }
+            finally
+            {
+                registration.TrySetResult(new HashSet<PubSubSubscriptionState>());
+                await shutdownTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            }
+
+            Assert.True(receiverShutdownStarted.Task.IsCompletedSuccessfully);
+            Assert.Null(streamData.RegistrationTask);
+            Assert.False(streamData.StreamRegistered);
             Assert.Empty(queueCache.DeliveryProgressTokens);
             Assert.Equal(0, queueCache.DeliveryProgressCallCount);
-
-            // Complete registration so shutdown can proceed cleanly.
-            registration.SetResult(new HashSet<PubSubSubscriptionState>());
-            await shutdownTask;
+            await receiver.Received(1).Shutdown(Arg.Any<TimeSpan>(), Arg.Any<CancellationToken>());
         }
 
         [TestSuite("BVT")]
