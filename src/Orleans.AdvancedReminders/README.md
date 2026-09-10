@@ -144,7 +144,7 @@ public static class DeadlineRegistration
 
 ### One-shot completion and verification
 
-After a successful callback, the service removes the one-shot definition and schedules no next occurrence. A stale delivery after that removal does nothing. Registering the same name again deliberately creates a new occurrence. With the default failure policy, a callback exception is logged and the one-shot is removed; configure `MaximumDeliveryAttempts` if a failing callback should retry.
+After a successful callback, the service removes the one-shot definition and schedules no next occurrence. A stale delivery after that removal does nothing. Registering the same name again deliberately creates a new occurrence. The default `ReminderRetryPolicy.Limited(3)` retries a failing occurrence and removes the registration when delivery still fails on the third dequeue. Select `NoRetries` to complete a failing one-shot immediately, or `UntilSuccess` to retain it for delayed delivery until success or explicit removal.
 
 The delivery regression `OneShotReminder_DoesNotRepeatAfterCompletion` covers relative delay, UTC `DateTime`, and nonzero-offset `DateTimeOffset`: it delivers the reminder, advances the clock by 30 days, and redelivers the old job as both an ordinary delivery and a retry. It asserts one callback, one original scheduled job, one removal, and no remaining registration. Separate missed-occurrence and retry tests cover skipped/notify one-shots, overdue immediate delivery, callback failures, and replacement from a callback. These checks verify completion behavior; they do not turn at-least-once delivery into exactly-once business effects.
 
@@ -286,7 +286,7 @@ public static class ReminderPolicies
     {
         options.MinimumReminderPeriod = TimeSpan.FromMinutes(1);
         options.MissedReminderGracePeriod = TimeSpan.FromMinutes(2);
-        options.MaximumDeliveryAttempts = 3;
+        options.DeliveryRetryPolicy = ReminderRetryPolicy.Limited(3);
         options.DeleteReminderWhenGrainTypeIsUnavailable = false;
     });
 }
@@ -294,9 +294,45 @@ public static class ReminderPolicies
 
 `InitializationTimeout` bounds service initialization and defaults to five minutes.
 
-By default `MaximumDeliveryAttempts` is `null`: callback exceptions are logged, recurring schedules continue, and one-shots are removed. A positive value retries the failing occurrence through Durable Jobs and removes the reminder if delivery still fails at that dequeue count. The Durable Jobs retry policy must allow at least that many attempts. This is a dequeue-count safety limit, not an exact callback-exception count.
+`DeliveryRetryPolicy` is one immutable policy. Its default is `ReminderRetryPolicy.Limited(3)`, including the initial attempt. Choose the behavior explicitly:
+
+| Policy | Behavior after a delivery failure |
+| --- | --- |
+| `ReminderRetryPolicy.NoRetries` | Log the failure, advance a recurring schedule, or remove a one-shot. |
+| `ReminderRetryPolicy.Limited(attempts)` | Retry the same Durable Job occurrence and remove the registration if delivery still fails at the configured dequeue count. |
+| `ReminderRetryPolicy.UntilSuccess` | Retain the failed work and schedule delayed deliveries until success or explicit removal. |
+
+`Limited` requires a positive attempt count; zero and negative counts are rejected when constructing the policy. Its count is a Durable Jobs dequeue-count safety limit, not an exact callback-exception count. Configure the backend retry policy to allow at least as many attempts. Configuration binding accepts the strings `NoRetries`, `Limited(3)`, and `UntilSuccess` for the `DeliveryRetryPolicy` property.
+
+For a recurring reminder, `NoRetries` advances after a failed tick, while `Limited(1)` removes the registration after its first failed delivery. Both allow the initial callback; the policy determines what happens after failure.
 
 `DeleteReminderWhenGrainTypeIsUnavailable` defaults to `false`. Enabling it deletes a due reminder only after a stable, complete cluster manifest shows no active silo declaring its grain type. A grain type can be temporarily absent during deployment, so enable this only when absence means retirement in your deployment policy.
+
+### Retain failed deliveries
+
+Select `ReminderRetryPolicy.UntilSuccess` when scheduled work must survive delivery failures, including failures before the recipient enters its callback:
+
+```csharp
+using Orleans.AdvancedReminders;
+using Orleans.Hosting;
+
+public static class RetainedReminderDelivery
+{
+    public static void Configure(ISiloBuilder silo) => silo.AddAdvancedReminders(options =>
+    {
+        options.DeliveryRetryPolicy = ReminderRetryPolicy.UntilSuccess;
+        options.MinimumReminderPeriod = TimeSpan.FromMinutes(1);
+    });
+}
+```
+
+With `UntilSuccess`, each failure persists a fresh occurrence and schedules a new Durable Job after `MinimumReminderPeriod`, measured from completion of the failed delivery. The new job has its own dequeue count, so repeated failures can outlive the backend's per-job retry limit. Monitor repeated errors and overdue work; persistent failure continues until success or explicit removal.
+
+One-shots preserve the original `StartAt` deadline and move `NextDueUtc` to the retry time. Successful delivery removes them. Interval and cron schedules retain their logical `NextDueUtc` while the native job waits for its retry time. After success, they advance to the next future slot on the original interval anchor or cron calendar, coalescing elapsed slots.
+
+Recovery repairs a missing handle and rotates the occurrence identity to fence orphaned jobs; retained recurring work receives another delayed attempt. An attempted occurrence remains retryable after the missed grace period expires. `Skip` and `Notify` still apply to an initial occurrence which was never attempted. Request cancellation leaves the occurrence unchanged, and registration replacement or removal wins over a late callback result.
+
+Use `ReminderRetryPolicy.Limited(attempts)` when delivery must stop at a configured attempt limit. Make business effects idempotent using a stable application work identifier across attempts: each retained retry has a new job ID, and a lost response can cause delivery to repeat after an effect committed.
 
 ## Inspect, repair, and delete reminders
 
@@ -323,12 +359,20 @@ public static class ReminderAdministration
 
 Pass the returned continuation token to the same query for the next page. Management also supports `ListAllAsync`, `ListForGrainAsync`, `ListDueInRangeAsync`, `SetActionAsync`, `RepairAsync`, and `DeleteAsync`. Filters include grain type, schedule kind, missed policy, due bounds, and due/overdue/missed/upcoming status. Due-range management bounds are inclusive UTC timestamps. `EnumerateFilteredAsync` provides asynchronous iteration over matching pages.
 
-Pages use stable storage-hash-bucket order, not global due-time order, and do not represent a snapshot across concurrent changes. Grain-type filtering is bounded but still scans storage. `RepairAsync` recalculates the next due time; it is not a force-fire API. The Orleans Dashboard also exposes advanced reminder inspection and management.
+Pages use stable storage-hash-bucket order, not global due-time order, and do not represent a snapshot across concurrent changes. Grain-type filtering is bounded but still scans storage. `RepairAsync` recalculates the next due time; it is not a force-fire API. The Orleans Dashboard also exposes advanced reminder inspection and management. It displays the store's total registration count, cached for 30 seconds across page requests. The count and page follow the provider's read consistency and can change during concurrent writes. ADO.NET deployments created with an earlier script must add its `AdvancedRemindersCountKey` query to `OrleansQuery` before upgrading.
 
 ## Delivery and recovery
 
 Definitions record the schedule, missed policy, next due time, and occurrence identity. Durable Jobs holds the scheduled delivery. Far-future occurrences are scheduled immediately; recurring schedules expand one occurrence at a time. Recovery repairs incomplete job handles through bounded reminder-table pages. It does not inspect Durable Jobs journals or replace its time/silo partitioning, batching, and retries.
 
-Callbacks may update or unregister their own reminder. The dispatcher rechecks registration identity after the callback so that completing an old occurrence cannot overwrite its replacement. Neither successful scheduling nor a passing cron query promises exact wall-clock callback execution during outages or load.
+A normal dispatcher turn prepares each delivery and admits one callback at a time for its recipient. The callback is awaited outside that normal turn, allowing independent recipient turns to update or unregister reminders without waiting on their own queued callback. A normal completion turn rechecks the original ETag and schedule identity so an old occurrence cannot overwrite its replacement. Each attempt chooses its admission token before preparation, so cancellation or a lost preparation reply can release only that attempt without advancing its occurrence. Cancellation observed before callback dispatch prevents that callback from starting. Neither successful scheduling nor a passing cron query promises exact wall-clock callback execution during outages or load.
+
+Replacing or unregistering a reminder commits its definition change before attempting to cancel the previous durable job. This includes administrative mutations and changed attribute declarations. This cleanup is best-effort and waits at most five seconds, including when the job backend ignores request cancellation. A failed or timed-out cleanup is logged; it does not undo the committed change or prevent subsequent dispatcher requests. Any stale occurrence remains fenced by the persisted schedule identity.
+
+Reminder-table reads in the service, dispatcher, management grain, and recovery scan have a one-minute timeout. Dispatcher reads also honor request cancellation. A late read response is discarded and cannot resume the abandoned mutation. A failed recovery page leaves its hash range incomplete so the next heartbeat retries that range.
+
+Creating a durable job also has a one-minute timeout and honors cancellation even when the backend ignores the token. The committed definition remains pending if scheduling fails. Recovery rotates its occurrence identity before rescheduling, so a job created by an abandoned scheduling request is harmless. Recovery bounds each dispatcher repair to one minute, and the silo's shutdown token bounds the wait for the reminder provider to stop.
+
+Reminder-table writes remain awaited until the provider finishes, preserving the dispatcher's single-writer ordering across a commit. Configure storage SDK request deadlines for those writes; stopping observation alone cannot prevent a late write from overwriting a newer registration. Callback execution uses Orleans messaging deadlines, and cancellation cannot forcibly stop application callback code.
 
 For the full walkthrough and operational reference, see the [Advanced Reminders documentation](../../docs/site/src/content/docs/grains/advanced-reminders.md).

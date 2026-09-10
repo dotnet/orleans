@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, realpath, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
@@ -18,7 +18,7 @@ import {
 const temporaryDirectories = [];
 
 async function documentationFixture() {
-  const repositoryRoot = await mkdtemp(path.join(os.tmpdir(), 'orleans-source-quality-'));
+  const repositoryRoot = await realpath(await mkdtemp(path.join(os.tmpdir(), 'orleans-source-quality-')));
   temporaryDirectories.push(repositoryRoot);
   const siteRoot = path.join(repositoryRoot, 'docs', 'site');
   const sourceRoot = path.join(siteRoot, 'src', 'content', 'docs');
