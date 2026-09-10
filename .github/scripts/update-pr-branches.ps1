@@ -9,19 +9,25 @@ behind and which GitHub reports as mergeable and rebaseable.
 GitHub CLI supplies the expected head SHA and GitHub enforces update permissions
 and conflict checks. Resolves BaseBranch from the repository's Git ref once per
 run and uses that snapshot to assess every PR and confirm each successful update.
-Emits one result object per pull request and a final summary grouped by outcome,
-with merge and rebase conflicts first. After processing branches, reads review
-threads and submitted reviews using GitHub GraphQL. The Review property contains
-unresolved threads (including outdated threads), code suggestion counts, and the
-latest Copilot review's state, overview recommendation, URL, and reviewed commit.
-Recommendations are extracted from Copilot's Markdown overview heading; the full
-review body is included for context. Fails after reporting update or review errors.
+Processes each PR's branch update and review feedback together, then prints a
+compact summary grouped by branch, review, and CI status, ordered by mergeability.
+Current, conflict-free PRs with approval recommended and passing checks appear
+first; PRs needing updates, review, CI completion, changes, or conflict resolution
+follow. Lists PR numbers, titles, PR links, and status icons. Use -Verbose for
+diagnostics and individual thread locations. Returns exit code 1 on failures.
+Use -PassThru to emit full result objects. Their Review property contains unresolved
+threads (including outdated threads), code suggestion counts, and the latest
+Copilot review's state, overview recommendation, URL, reviewed commit, and body.
+Review.Checks contains GitHub's aggregate check state and counts for the head commit.
+Recommendations are extracted from Copilot's Markdown overview heading.
 .EXAMPLE
 .\update-pr-branches.ps1 -WhatIf
 .EXAMPLE
 .\update-pr-branches.ps1
 .EXAMPLE
-.\update-pr-branches.ps1 -WhatIf | ConvertTo-Json -Depth 12 | Set-Content pr-review-report.json
+.\update-pr-branches.ps1 -WhatIf -Verbose
+.EXAMPLE
+.\update-pr-branches.ps1 -WhatIf -PassThru | ConvertTo-Json -Depth 12 | Set-Content pr-review-report.json
 #>
 [CmdletBinding(SupportsShouldProcess)]
 param(
@@ -29,7 +35,9 @@ param(
     [string] $Repository = 'dotnet/orleans',
 
     [ValidateNotNullOrEmpty()]
-    [string] $BaseBranch = 'main'
+    [string] $BaseBranch = 'main',
+
+    [switch] $PassThru
 )
 
 Set-StrictMode -Version Latest
@@ -109,7 +117,23 @@ query($owner: String!, $name: String!, $number: Int!, $endCursor: String) {
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) {
       headRefOid
+      mergeable
       reviewDecision
+      commits(last: 1) {
+        nodes {
+          commit {
+            oid
+            statusCheckRollup {
+              state
+              contexts {
+                totalCount
+                checkRunCountsByState { count state }
+                statusContextCountsByState { count state }
+              }
+            }
+          }
+        }
+      }
       reviewThreads(first: 100, after: $endCursor) {
         nodes {
           id isResolved isOutdated path line
@@ -220,106 +244,261 @@ query($owner: String!, $name: String!, $number: Int!, $endCursor: String) {
         $copilotSuggestionCount += $thread.CopilotSuggestionCount
     }
 
+    $commit = $pull.commits.nodes[0].commit
+    $rollup = $commit.statusCheckRollup
+    $checks = [pscustomobject]@{
+        CommitSha = $commit.oid
+        State = 'NONE'
+        Total = 0
+        Passed = 0
+        Pending = 0
+        Failed = 0
+        Skipped = 0
+        CountsByState = @()
+    }
+    if ($null -ne $rollup) {
+        $checks.State = $rollup.state
+        $checks.Total = $rollup.contexts.totalCount
+        $checks.CountsByState = @(
+            @($rollup.contexts.checkRunCountsByState) + @($rollup.contexts.statusContextCountsByState) |
+                Where-Object count -gt 0
+        )
+        foreach ($count in $checks.CountsByState) {
+            switch -Regex ($count.state) {
+                '^SUCCESS$' { $checks.Passed += $count.count }
+                '^(EXPECTED|PENDING|QUEUED|WAITING|IN_PROGRESS)$' { $checks.Pending += $count.count }
+                '^(ACTION_REQUIRED|CANCELLED|ERROR|FAILURE|STALE|STARTUP_FAILURE|TIMED_OUT)$' { $checks.Failed += $count.count }
+                '^(NEUTRAL|SKIPPED)$' { $checks.Skipped += $count.count }
+            }
+        }
+    }
+
     return [pscustomobject]@{
         HeadSha = $pull.headRefOid
+        Mergeable = $pull.mergeable
         Decision = $pull.reviewDecision
         UnresolvedThreadCount = $threads.Count
         CopilotUnresolvedThreadCount = @($threads | Where-Object IsCopilot).Count
         CopilotSuggestionCount = $copilotSuggestionCount
         UnresolvedThreads = $threads
         CopilotReview = $copilot
+        Checks = $checks
     }
 }
 
-function Write-ReviewSummary {
-    param([object[]] $Results)
+function Get-MergeabilityGroup {
+    param([object] $Result)
 
-    $available = @($Results | Where-Object ReviewStatus -eq 'Available' | Sort-Object Number)
-    $unresolved = @($available | Where-Object { $_.Review.UnresolvedThreadCount -gt 0 })
-    Write-Host "`nPRs with unresolved review threads: $($unresolved.Count)"
-    foreach ($item in $unresolved) {
-        Write-Host "  $($item.Url) - $($item.Title)"
-        Write-Host "    Threads: $($item.Review.UnresolvedThreadCount); Copilot threads: $($item.Review.CopilotUnresolvedThreadCount); Copilot code suggestions: $($item.Review.CopilotSuggestionCount)"
-        foreach ($thread in $item.Review.UnresolvedThreads) {
-            $location = $thread.Path
-            if ($null -ne $thread.Line) {
-                $location += ":$($thread.Line)"
+    $blockingRank = 0
+    $branchRank, $branch = switch ($Result.Status) {
+        'Updated' { 0; 'Updated' }
+        'UpToDate' { 0; 'Up to date' }
+        'Eligible' { 1; 'Behind (rebase available)' }
+        'RebaseConflict' { 2; 'Rebase conflicts'; $blockingRank = 1 }
+        'MergeConflict' { 3; 'Merge conflicts'; $blockingRank = 1 }
+        'Skipped' { 4; 'Skipped'; $blockingRank = 2 }
+        'Failed' { 5; 'Update failed'; $blockingRank = 2 }
+    }
+
+    $reviewRank = 1
+    $reviewLabel = 'Review needed'
+    $checksRank = 4
+    $checksLabel = 'Checks unavailable'
+    $checksText = '? CI unavailable'
+    if ($Result.ReviewStatus -eq 'Failed') {
+        $blockingRank = 2
+        $reviewRank = 5
+        $reviewLabel = 'Review lookup failed'
+    } else {
+        $review = $Result.Review
+        $copilot = $review.CopilotReview
+        $checks = $review.Checks
+        $checksRank, $checksLabel, $checksText = switch ($checks.State) {
+            'SUCCESS' { 0; 'Checks passing'; "`u{2713} CI $($checks.Total)" }
+            { $_ -in 'PENDING', 'EXPECTED' } { 1; 'Checks pending'; "`u{23F3} CI $($checks.Pending) pending" }
+            'NONE' { 2; 'No checks'; '? CI none' }
+            { $_ -in 'FAILURE', 'ERROR' } {
+                3; 'Checks failed'
+                $text = "`u{2717} CI $($checks.Failed) failed"
+                if ($checks.Pending -gt 0) {
+                    $text += ", $($checks.Pending) pending"
+                }
+                $text
             }
-            $author = if ($null -ne $thread.Author) { $thread.Author } else { 'Deleted author' }
-            $outdated = if ($thread.IsOutdated) { '; outdated diff' } else { '' }
-            Write-Host "    $($thread.Url) - $author; $location; suggestions: $($thread.SuggestionCount)$outdated"
+        }
+        if ($Result.Status -ne 'Failed' -and $Result.HeadSha -ne $review.HeadSha) {
+            $blockingRank = 2
+            $branchRank = 4
+            $branch = 'Branch changed; rerun needed'
+        } elseif ($Result.Status -notin 'Failed', 'Skipped') {
+            if ($review.Mergeable -eq 'CONFLICTING') {
+                $blockingRank = 1
+                $branchRank = 3
+                $branch = 'Merge conflicts'
+            } elseif ($review.Mergeable -eq 'UNKNOWN' -and $blockingRank -eq 0) {
+                $blockingRank = 2
+                $branch += '; mergeability unknown'
+            }
+        }
+
+        if ($review.Decision -eq 'CHANGES_REQUESTED' -or
+            ($null -ne $copilot -and $copilot.State -eq 'CHANGES_REQUESTED')) {
+            $reviewRank = 4
+            $reviewLabel = 'Changes requested'
+        } elseif ($null -ne $copilot -and $copilot.State -ne 'DISMISSED' -and $copilot.Recommendation -match 'Changes recommended') {
+            $reviewRank = 4
+            $reviewLabel = 'Changes recommended'
+        } elseif ($null -ne $copilot -and $copilot.State -ne 'DISMISSED' -and $copilot.Recommendation -match 'Needs a closer look') {
+            $reviewRank = 3
+            $reviewLabel = 'Needs a closer look'
+        } elseif ($review.Decision -eq 'APPROVED') {
+            $reviewRank = 0
+            $reviewLabel = 'Approved'
+        } elseif ($null -ne $copilot -and $copilot.IsCurrentHead -and $copilot.State -ne 'DISMISSED' -and
+            ($copilot.State -eq 'APPROVED' -or $copilot.Recommendation -match 'Approval recommended')) {
+            $reviewRank = 0
+            $reviewLabel = 'Approval recommended'
+        } elseif ($null -eq $copilot) {
+            $reviewLabel = 'No Copilot review'
+        } elseif (-not $copilot.IsCurrentHead) {
+            $reviewLabel = 'Review needs refresh'
+        } else {
+            $reviewLabel = 'Review needed'
+        }
+
+        if ($review.UnresolvedThreadCount -gt 0 -and $reviewRank -lt 2) {
+            $reviewRank = 2
+            $reviewLabel += '; unresolved threads'
         }
     }
 
-    $reviewed = @($available | Where-Object { $null -ne $_.Review.CopilotReview })
-    Write-Host "`nLatest submitted Copilot reviews: $($reviewed.Count)"
-    foreach ($item in $reviewed) {
-        $review = $item.Review.CopilotReview
-        $recommendation = if ($null -ne $review.Recommendation) { $review.Recommendation } else { 'Overview heading unavailable; see review' }
-        $commitStatus = if ($review.IsCurrentHead) { 'current head' } else { 'earlier or unavailable commit' }
-        Write-Host "  $($item.Url) - $($item.Title)"
-        Write-Host "    $recommendation; GitHub review state: $($review.State); $commitStatus"
-        Write-Host "    $($review.Url)"
+    $tier = if ($blockingRank -eq 2) {
+        4
+    } elseif ($blockingRank -eq 1) {
+        3
+    } elseif ($reviewRank -ge 2 -or $checksRank -eq 3) {
+        2
+    } elseif ($branchRank -gt 0 -or $reviewRank -gt 0 -or $checksRank -gt 0) {
+        1
+    } else {
+        0
+    }
+    $branchIcon = switch ($branchRank) {
+        0 { "`u{2713}" }
+        1 { "`u{2193}" }
+        { $_ -in 2, 3 } { "`u{26A0}" }
+        default { '?' }
+    }
+    $reviewIcon = switch ($reviewRank) {
+        0 { "`u{2713}" }
+        1 { '?' }
+        { $_ -in 2, 3 } { "`u{26A0}" }
+        4 { "`u{2717}" }
+        5 { '?' }
+    }
+    if ($blockingRank -eq 2) {
+        $branchIcon = '?'
     }
 
-    Write-Host "`nPRs with no submitted Copilot review: $($available.Count - $reviewed.Count)"
-    foreach ($item in ($available | Where-Object { $null -eq $_.Review.CopilotReview })) {
-        Write-Host "  $($item.Url) - $($item.Title)"
-    }
-
-    $failed = @($Results | Where-Object ReviewStatus -eq 'Failed' | Sort-Object Number)
-    Write-Host "`nReview reporting failures: $($failed.Count)"
-    foreach ($item in $failed) {
-        Write-Host "  $($item.Url) - $($item.ReviewError)"
+    return [pscustomobject]@{
+        Name = "$branch; $reviewLabel; $checksLabel"
+        Tier = $tier
+        ChecksRank = $checksRank
+        ReviewRank = $reviewRank
+        BranchRank = $branchRank
+        Icons = "$branchIcon branch | $reviewIcon review | $checksText"
+        Result = $Result
     }
 }
 
 function Write-ResultSummary {
     param([object[]] $Results)
 
-    $groups = [ordered]@{
-        MergeConflict = 'Merge conflicts'
-        RebaseConflict = 'Rebase conflicts'
-        Failed = 'Failed updates'
-        Eligible = 'Eligible for rebase (preview)'
-        Updated = 'Updated'
-        UpToDate = 'Up to date'
-        Skipped = 'Other skipped PRs'
+    $unresolved = @($Results | Where-Object { $_.ReviewStatus -eq 'Available' -and $_.Review.UnresolvedThreadCount -gt 0 })
+    Write-Host "`nMergeability: $($Results.Count) PRs, $($unresolved.Count) with unresolved threads"
+    Write-Host "  `u{1F4AC} = unresolved threads; * = review of an earlier or unavailable commit."
+    $ranked = @($Results | ForEach-Object { Get-MergeabilityGroup -Result $_ })
+    $groups = $ranked | Group-Object Name | Sort-Object `
+        @{ Expression = { $_.Group[0].Tier } }, `
+        @{ Expression = { $_.Group[0].ChecksRank } }, `
+        @{ Expression = { $_.Group[0].ReviewRank } }, `
+        @{ Expression = { $_.Group[0].BranchRank } }, Name
+    foreach ($group in $groups) {
+        Write-Host "`n$($group.Name) ($($group.Count))"
+        foreach ($rankedItem in ($group.Group | Sort-Object { $_.Result.Number })) {
+            $item = $rankedItem.Result
+            $icons = $rankedItem.Icons
+            if ($item.ReviewStatus -eq 'Available') {
+                if ($null -ne $item.Review.CopilotReview -and -not $item.Review.CopilotReview.IsCurrentHead) {
+                    $icons += ' *'
+                }
+                if ($item.Review.UnresolvedThreadCount -gt 0) {
+                    $icons += " | `u{1F4AC}$($item.Review.UnresolvedThreadCount)"
+                }
+            }
+            Write-Host "  #$($item.Number) $($item.Title) | $icons | $($item.Url)"
+        }
     }
 
-    Write-Host "`nResults summary"
-    foreach ($group in $groups.GetEnumerator()) {
-        $items = @($Results | Where-Object Status -eq $group.Key | Sort-Object Number)
-        Write-Host "`n$($group.Value): $($items.Count)"
-        foreach ($item in $items) {
-            Write-Host "  $($item.Url) - $($item.Title)"
-            if ($group.Key -in 'Failed', 'Skipped') {
-                Write-Host "    $($item.Message)"
+    foreach ($item in ($Results | Sort-Object Number)) {
+        Write-Verbose "#$($item.Number) - $($item.Title); $($item.Status): $($item.Message)"
+        if ($item.ReviewStatus -eq 'Failed') {
+            Write-Verbose $item.ReviewError
+        } else {
+            Write-Verbose "PR review decision: $($item.Review.Decision); Copilot code suggestions: $($item.Review.CopilotSuggestionCount)"
+            $checks = $item.Review.Checks
+            Write-Verbose "Checks: $($checks.State); $($checks.Passed) passed, $($checks.Pending) pending, $($checks.Failed) failed, $($checks.Skipped) skipped."
+            if ($null -ne $item.Review.CopilotReview) {
+                Write-Verbose "GitHub review state: $($item.Review.CopilotReview.State); reviewed commit: $($item.Review.CopilotReview.CommitSha)"
+            }
+            foreach ($thread in $item.Review.UnresolvedThreads) {
+                $location = $thread.Path
+                if ($null -ne $thread.Line) {
+                    $location += ":$($thread.Line)"
+                }
+                $author = if ($null -ne $thread.Author) { $thread.Author } else { 'Deleted author' }
+                $outdated = if ($thread.IsOutdated) { '; outdated diff' } else { '' }
+                Write-Verbose "$author; $location; suggestions: $($thread.SuggestionCount)$outdated"
             }
         }
     }
 }
 
-$helpText = Invoke-Gh -Arguments @('pr', 'update-branch', '--help')
-if (($helpText -join [Environment]::NewLine) -notmatch '--rebase') {
-    throw 'Install a GitHub CLI version which supports gh pr update-branch --rebase.'
+if (-not (Get-Command gh -CommandType Application -ErrorAction SilentlyContinue)) {
+    Write-Host 'GitHub CLI (gh) is required.'
+    exit 1
 }
 
-$encodedBase = [Uri]::EscapeDataString($BaseBranch)
-$baseRef = Get-GitHubJson "repos/$Repository/git/ref/heads/$encodedBase"
-$baseSha = $baseRef.object.sha
-Write-Host "Using $Repository branch $BaseBranch at $baseSha as this run's baseline."
-$numbers = @(Invoke-Gh -Arguments @(
-    'api', '--hostname', 'github.com', '--method', 'GET', '--paginate',
-    "repos/$Repository/pulls?state=open&base=$encodedBase&per_page=100", '--jq', '.[].number'
-))
+try {
+    $helpText = Invoke-Gh -Arguments @('pr', 'update-branch', '--help')
+    if (($helpText -join [Environment]::NewLine) -notmatch '--rebase') {
+        throw [InvalidOperationException]::new('Install a GitHub CLI version which supports gh pr update-branch --rebase.')
+    }
+
+    $encodedBase = [Uri]::EscapeDataString($BaseBranch)
+    $baseRef = Get-GitHubJson "repos/$Repository/git/ref/heads/$encodedBase"
+    $baseSha = $baseRef.object.sha
+    Write-Host "$Repository ($BaseBranch)"
+    Write-Verbose "Using base snapshot $baseSha."
+    $pullRequests = @(Invoke-Gh -Arguments @(
+        'api', '--hostname', 'github.com', '--method', 'GET', '--paginate',
+        "repos/$Repository/pulls?state=open&base=$encodedBase&per_page=100", '--jq', '.[] | {number, title}'
+    ) | ForEach-Object { $_ | ConvertFrom-Json })
+} catch [InvalidOperationException] {
+    Write-Host 'Unable to initialize PR processing. Use -Verbose for diagnostics.'
+    Write-Verbose $_.Exception.Message
+    exit 1
+}
 $results = [Collections.Generic.List[object]]::new()
 
-foreach ($number in $numbers) {
+foreach ($pullRequest in $pullRequests) {
+    $number = $pullRequest.number
+    Write-Progress -Id 1 -Activity 'Updating PR branches and reading reviews' `
+        -Status "#$number ($($results.Count + 1)/$($pullRequests.Count))" -PercentComplete (100 * $results.Count / $pullRequests.Count)
     $result = [pscustomobject][ordered]@{
         Number = [int] $number
         Url = "https://github.com/$Repository/pull/$number"
-        Title = $null
+        Title = $pullRequest.title
         HeadRepository = $null
         HeadBranch = $null
         BaseSha = $baseSha
@@ -358,6 +537,9 @@ foreach ($number in $numbers) {
                 $result.Message = 'GitHub reports that rebase requires conflict resolution.'
             } elseif ($pull.mergeable -ne $true -or $pull.rebaseable -ne $true) {
                 $result.Message = 'GitHub is still calculating mergeability after five reads.'
+            } elseif ($WhatIfPreference) {
+                $result.Status = 'Eligible'
+                $result.Message = 'Preview: ready for rebase.'
             } elseif ($PSCmdlet.ShouldProcess(
                 "$Repository#$number ($($result.HeadRepository):$($result.HeadBranch))",
                 "Update with rebase onto $BaseBranch ($($result.BehindBy) commits behind)")) {
@@ -386,38 +568,32 @@ foreach ($number in $numbers) {
                 $result.Status = 'Updated'
                 $result.Message = ($updateOutput -join [Environment]::NewLine).Trim()
             } else {
-                $result.Status = if ($WhatIfPreference) { 'Eligible' } else { 'Skipped' }
-                $result.Message = if ($WhatIfPreference) { 'Preview: ready for rebase.' } else { 'Update declined.' }
+                $result.Message = 'Update declined.'
             }
         }
     } catch [InvalidOperationException] {
         $result.Status = 'Failed'
         $result.Message = $_.Exception.Message
-        Write-Warning "#${number}: $($result.Message)"
     }
 
-    Write-Host "#${number}: $($result.Status) - $($result.Message)"
-    $results.Add($result)
-}
-
-Write-Host "`nCollecting review feedback for $($results.Count) pull requests."
-foreach ($result in $results) {
     try {
         $result.Review = Get-ReviewReport -Number $result.Number
         $result.ReviewStatus = 'Available'
     } catch [InvalidOperationException] {
         $result.ReviewStatus = 'Failed'
         $result.ReviewError = $_.Exception.Message
-        Write-Warning "#$($result.Number): $($result.ReviewError)"
     }
 
-    $result
+    $results.Add($result)
+    if ($PassThru) {
+        $result
+    }
 }
 
-Write-Host "Processed $($results.Count) pull requests in $Repository targeting $BaseBranch."
+Write-Progress -Id 1 -Activity 'Updating PR branches and reading reviews' -Completed
 Write-ResultSummary -Results $results
-Write-ReviewSummary -Results $results
 
 if (@($results | Where-Object { $_.Status -eq 'Failed' -or $_.ReviewStatus -eq 'Failed' }).Count -gt 0) {
-    throw 'One or more pull request updates or review queries failed. See the per-PR results above.'
+    Write-Host "`nSome operations failed. Use -Verbose for diagnostics or -PassThru for full results."
+    exit 1
 }
