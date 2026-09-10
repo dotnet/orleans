@@ -1,5 +1,6 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Providers;
 
@@ -24,6 +25,16 @@ namespace Orleans.Hosting
         {
             configurator.Configure<HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = numOfQueues));
         }
+
+        /// <summary>
+        /// Configures cache options for a named memory stream provider.
+        /// </summary>
+        /// <param name="configurator">The configuration builder.</param>
+        /// <param name="configureOptions">The configuration delegate.</param>
+        public static void ConfigureCache(this ISiloMemoryStreamConfigurator configurator, Action<OptionsBuilder<MemoryStreamCacheOptions>> configureOptions)
+        {
+            configurator.Configure(configureOptions);
+        }
     }
 
     /// <summary>
@@ -47,7 +58,14 @@ namespace Orleans.Hosting
             string name, Action<Action<IServiceCollection>> configureServicesDelegate)
             : base(name, configureServicesDelegate, MemoryAdapterFactory<TSerializer>.Create)
         {
-            this.ConfigureDelegate(services => services.ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name));
+            this.ConfigureDelegate(services => services
+                .ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name)
+                .ConfigureNamedOptionForLogging<MemoryStreamCacheOptions>(name));
+            this.Configure<MemoryStreamCacheOptions>(options => options
+                .Validate(
+                    static value => value.MaxAddCount > 0,
+                    $"{nameof(MemoryStreamCacheOptions.MaxAddCount)} must be greater than zero.")
+                .ValidateOnStart());
         }
     }
 

@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Hosting;
 using Orleans.Providers;
@@ -11,7 +12,8 @@ internal sealed class MemoryStreamProviderBuilder : IProviderBuilder<ISiloBuilde
 {
     public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
     {
-        builder.AddMemoryStreams(name!); // Streaming providers are configured from named subsections.
+        // Streaming providers are configured from named subsections.
+        builder.AddMemoryStreams(name!, stream => stream.ConfigureCache(options => options.Bind(configurationSection)));
     }
 
     public void Configure(IClientBuilder builder, string? name, IConfigurationSection configurationSection)

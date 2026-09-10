@@ -30,6 +30,8 @@ Kafka and Azure Service Bus aren't built-in Orleans stream providers. Integrate 
 
 Register memory streams with <xref:Orleans.Hosting.SiloBuilderMemoryStreamExtensions.AddMemoryStreams*>. They use silo memory for queues and cache, so events don't survive cluster loss. Rewind works only while the relevant event remains in the live in-memory cache. Use this provider for local development, tests, and workloads where loss is explicitly acceptable.
 
+See [Tune memory stream dequeue batches](streaming-operations.md#tune-memory-stream-dequeue-batches) to configure per-provider batch counts and balance call overhead against response size.
+
 ## Azure Queue Storage
 
 <a id="azure-queue-aq-stream-provider"></a>

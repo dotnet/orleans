@@ -90,6 +90,12 @@ namespace Orleans.Configuration
         public System.TimeSpan LeaseRenewPeriod { get { throw null; } set { } }
     }
 
+    public partial class MemoryStreamCacheOptions
+    {
+        public const int DefaultMaxAddCount = 100;
+        public int MaxAddCount { get { throw null; } set { } }
+    }
+
     public partial class SimpleQueueCacheOptions
     {
         public const int DEFAULT_CACHE_SIZE = 4096;
@@ -230,6 +236,8 @@ namespace Orleans.Hosting
 
     public static partial class MemoryStreamConfiguratorExtensions
     {
+        public static void ConfigureCache(this ISiloMemoryStreamConfigurator configurator, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.MemoryStreamCacheOptions>> configureOptions) { }
+
         public static void ConfigurePartitioning(this IMemoryStreamConfigurator configurator, int numOfQueues = 8) { }
     }
 
@@ -450,6 +458,8 @@ namespace Orleans.Providers
 
     public partial class MemoryPooledCache<TSerializer> : Orleans.Streams.IQueueCache, Orleans.Streams.IQueueFlowController, Streams.Common.ICacheDataAdapter where TSerializer : class, IMemoryMessageBodySerializer
     {
+        public MemoryPooledCache(Streams.Common.IObjectPool<Streams.Common.FixedSizeBuffer> bufferPool, Streams.Common.TimePurgePredicate purgePredicate, Microsoft.Extensions.Logging.ILogger logger, TSerializer serializer, Streams.Common.ICacheMonitor? cacheMonitor, System.TimeSpan? monitorWriteInterval, System.TimeSpan? purgeMetadataInterval, int maxAddCount) { }
+
         public MemoryPooledCache(Streams.Common.IObjectPool<Streams.Common.FixedSizeBuffer> bufferPool, Streams.Common.TimePurgePredicate purgePredicate, Microsoft.Extensions.Logging.ILogger logger, TSerializer serializer, Streams.Common.ICacheMonitor? cacheMonitor, System.TimeSpan? monitorWriteInterval, System.TimeSpan? purgeMetadataInterval) { }
 
         public void AddToCache(System.Collections.Generic.IList<Orleans.Streams.IBatchContainer> messages) { }

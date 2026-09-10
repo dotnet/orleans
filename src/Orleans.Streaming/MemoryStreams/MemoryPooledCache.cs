@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using Microsoft.Extensions.Logging;
+using Orleans.Configuration;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -20,6 +21,7 @@ namespace Orleans.Providers
         private readonly TSerializer serializer;
         private readonly IEvictionStrategy evictionStrategy;
         private readonly PooledQueueCache cache;
+        private readonly int maxAddCount;
 
         private FixedSizeBuffer? currentBuffer;
 
@@ -41,7 +43,34 @@ namespace Orleans.Providers
             ICacheMonitor? cacheMonitor,
             TimeSpan? monitorWriteInterval,
             TimeSpan? purgeMetadataInterval)
+            : this(bufferPool, purgePredicate, logger, serializer, cacheMonitor, monitorWriteInterval, purgeMetadataInterval, MemoryStreamCacheOptions.DefaultMaxAddCount)
         {
+        }
+
+        /// <summary>
+        /// Creates a pooled cache for a memory stream provider with a configured dequeue record limit.
+        /// </summary>
+        /// <param name="bufferPool">The buffer pool.</param>
+        /// <param name="purgePredicate">The purge predicate.</param>
+        /// <param name="logger">The logger.</param>
+        /// <param name="serializer">The serializer.</param>
+        /// <param name="cacheMonitor">The cache monitor.</param>
+        /// <param name="monitorWriteInterval">The monitor write interval.</param>
+        /// <param name="purgeMetadataInterval">The interval between cache purge metadata updates.</param>
+        /// <param name="maxAddCount">The positive maximum number of queue records requested in each dequeue operation.</param>
+        /// <exception cref="ArgumentOutOfRangeException"><paramref name="maxAddCount"/> is zero or negative.</exception>
+        public MemoryPooledCache(
+            IObjectPool<FixedSizeBuffer> bufferPool,
+            TimePurgePredicate purgePredicate,
+            ILogger logger,
+            TSerializer serializer,
+            ICacheMonitor? cacheMonitor,
+            TimeSpan? monitorWriteInterval,
+            TimeSpan? purgeMetadataInterval,
+            int maxAddCount)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxAddCount);
+            this.maxAddCount = maxAddCount;
             this.bufferPool = bufferPool;
             this.serializer = serializer;
             this.cache = new PooledQueueCache(this, logger, cacheMonitor, monitorWriteInterval, purgeMetadataInterval);
@@ -179,7 +208,7 @@ namespace Orleans.Providers
         /// <inheritdoc/>
         public int GetMaxAddCount()
         {
-            return 100;
+            return maxAddCount;
         }
 
         /// <inheritdoc/>
