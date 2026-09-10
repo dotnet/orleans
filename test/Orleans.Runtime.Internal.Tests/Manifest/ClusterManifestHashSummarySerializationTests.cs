@@ -11,6 +11,7 @@ using Xunit;
 
 namespace UnitTests.Manifest;
 
+[TestSuite("BVT"), TestProvider("None")]
 [TestCategory("BVT"), TestCategory("Serialization")]
 public sealed class ClusterManifestHashSummarySerializationTests
 {
