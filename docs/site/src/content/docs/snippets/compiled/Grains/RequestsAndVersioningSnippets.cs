@@ -240,7 +240,7 @@ namespace Documentation.Grains.ReadScaling
         [property: Id(1)] string Recommendation);
 
     // <single_writer_interleaved_readers>
-public interface IProductRecommendations
+public interface IProductRecommendationService
 {
     ValueTask<string> GetRecommendation(string productId);
 }
@@ -254,7 +254,7 @@ public interface IProductGrain : IGrainWithStringKey
 }
 
 public sealed class ProductGrain(
-    IProductRecommendations recommendations)
+    IProductRecommendationService recommendations)
     : Grain, IProductGrain
 {
     private ProductSnapshot _snapshot =
