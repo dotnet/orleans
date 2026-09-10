@@ -304,10 +304,15 @@ namespace Orleans.Runtime.MembershipService
                         overrideDelayPeriod = default;
                         runningFailures = 0;
                     }
-                    catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                    {
+                        throw;
+                    }
+                    catch (Exception exception)
                     {
                         runningFailures += 1;
                         LogWarningFailedToRefreshMembershipTable(this.log, exception, runningFailures);
+                        cancellationToken.ThrowIfCancellationRequested();
 
                         overrideDelayPeriod = ComputeMembershipBackoffDelay(runningFailures);
                     }
@@ -646,18 +651,20 @@ namespace Orleans.Runtime.MembershipService
 
             LogDebugCleanupTableEntriesAboutToDeclareDead(this.log, silosToDeclareDead.Count, Utils.EnumerableToString(silosToDeclareDead.Select(tuple => tuple.Item1)));
 
+            // A shared read can outlive maintenance, which owns the worker acknowledging cleanup.
+            using var cleanupCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _shutdownCts.Token);
             var completions = new List<Task>(silosToDeclareDead.Count);
             foreach (var siloData in silosToDeclareDead)
             {
                 var (request, completion) = SuspectOrKillRequest.CreateAcknowledgedKillRequest(siloData.Item1.SiloAddress);
-                await _trySuspectOrKillChannel.Writer.WaitToWriteAsync(cancellationToken);
+                await _trySuspectOrKillChannel.Writer.WaitToWriteAsync(cleanupCancellation.Token);
                 if (_trySuspectOrKillChannel.Writer.TryWrite(request))
                 {
                     completions.Add(completion);
                 }
             }
 
-            await WaitForOperation(Task.WhenAll(completions), cancellationToken);
+            await WaitForOperation(Task.WhenAll(completions), cleanupCancellation.Token);
             return true;
         }
 
@@ -794,60 +801,72 @@ namespace Orleans.Runtime.MembershipService
                 EXP_BACKOFF_STEP);
             var runningFailureCount = 0;
             var reader = _trySuspectOrKillChannel.Reader;
-            while (await reader.WaitToReadAsync(cancellationToken))
+            try
+            {
+                while (await reader.WaitToReadAsync(cancellationToken))
+                {
+                    while (reader.TryRead(out var request))
+                    {
+                        var publishCompletion = false;
+                        var success = false;
+                        Exception? exception = null;
+
+                        try
+                        {
+                            if (runningFailureCount > 0)
+                            {
+                                await Task.Delay(backoff.Next(runningFailureCount), this.timeProvider, cancellationToken);
+                            }
+
+                            switch (request.Type)
+                            {
+                                case MembershipEvents.SuspectOrKillRequestType.Kill:
+                                    success = await InnerTryKill(request.SiloAddress, cancellationToken);
+                                    break;
+                                case MembershipEvents.SuspectOrKillRequestType.SuspectOrKill:
+                                    success = await InnerTryToSuspectOrKill(request.SiloAddress, request.OtherSilo, cancellationToken);
+                                    break;
+                            }
+
+                            publishCompletion = true;
+                            runningFailureCount = 0;
+                            request.Completion?.TrySetResult();
+                        }
+                        catch (OperationCanceledException cancellationException) when (cancellationToken.IsCancellationRequested)
+                        {
+                            request.Completion?.TrySetCanceled(cancellationToken);
+                            this.PublishSuspectOrKillRequestCompletion(request, success: false, cancellationException);
+                            throw;
+                        }
+                        catch (Exception ex)
+                        {
+                            runningFailureCount += 1;
+                            LogErrorProcessingSuspectOrKillLists(this.log, ex, runningFailureCount);
+                            if (request.Completion is not null)
+                            {
+                                publishCompletion = true;
+                                exception = ex;
+                                request.Completion.TrySetException(ex);
+                            }
+                            else
+                            {
+                                await _trySuspectOrKillChannel.Writer.WriteAsync(request, cancellationToken);
+                            }
+                        }
+
+                        if (publishCompletion)
+                        {
+                            this.PublishSuspectOrKillRequestCompletion(request, success, exception);
+                        }
+                    }
+                }
+            }
+            finally
             {
                 while (reader.TryRead(out var request))
                 {
-                    var publishCompletion = false;
-                    var success = false;
-                    Exception? exception = null;
-
-                    if (runningFailureCount > 0)
-                    {
-                        await Task.Delay(backoff.Next(runningFailureCount), cancellationToken);
-                    }
-
-                    try
-                    {
-                        switch (request.Type)
-                        {
-                            case MembershipEvents.SuspectOrKillRequestType.Kill:
-                                success = await InnerTryKill(request.SiloAddress, cancellationToken);
-                                break;
-                            case MembershipEvents.SuspectOrKillRequestType.SuspectOrKill:
-                                success = await InnerTryToSuspectOrKill(request.SiloAddress, request.OtherSilo, cancellationToken);
-                                break;
-                        }
-
-                        publishCompletion = true;
-                        runningFailureCount = 0;
-                        request.Completion?.TrySetResult();
-                    }
-                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-                    {
-                        request.Completion?.TrySetCanceled(cancellationToken);
-                        throw;
-                    }
-                    catch (Exception ex)
-                    {
-                        runningFailureCount += 1;
-                        LogErrorProcessingSuspectOrKillLists(this.log, ex, runningFailureCount);
-                        if (request.Completion is not null)
-                        {
-                            publishCompletion = true;
-                            exception = ex;
-                            request.Completion.TrySetException(ex);
-                        }
-                        else
-                        {
-                            await _trySuspectOrKillChannel.Writer.WriteAsync(request, cancellationToken);
-                        }
-                    }
-
-                    if (publishCompletion)
-                    {
-                        this.PublishSuspectOrKillRequestCompletion(request, success, exception);
-                    }
+                    request.Completion?.TrySetCanceled(cancellationToken);
+                    this.PublishSuspectOrKillRequestCompletion(request, success: false, new OperationCanceledException(cancellationToken));
                 }
             }
         }

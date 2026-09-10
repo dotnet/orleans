@@ -248,6 +248,39 @@ namespace NonSilo.Tests.Membership
         }
 
         [Fact]
+        public async Task MembershipAgent_HeartbeatFaultDuringStop_RemainsRecoverable()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var lifecycle = new SiloLifecycleSubject(this.loggerFactory.CreateLogger<SiloLifecycleSubject>());
+            var membershipManager = Substitute.For<IMembershipManager>();
+            membershipManager.CurrentSnapshot.Returns(this.manager.MembershipTableSnapshot);
+            membershipManager.LocalSiloStatus.Returns(SiloStatus.Active);
+            var tick = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var agent = new MembershipAgent(
+                membershipManager, this.localSiloDetails, this.fatalErrorHandler, this.clusterMembershipOptions,
+                this.loggerFactory.CreateLogger<MembershipAgent>(),
+                new DelegateAsyncTimerFactory((_, _) => new DelegateAsyncTimer(_ => tick.Task)),
+                this.remoteSiloProber, TimeProvider.System);
+            ((ILifecycleParticipant<ISiloLifecycle>)agent).Participate(lifecycle);
+            await lifecycle.OnStart(cancellationToken);
+            var stopping = new TaskCompletionSource<Task>(TaskCreationOptions.RunContinuationsAsynchronously);
+            CancellationToken heartbeatToken = default;
+            membershipManager.UpdateIAmAlive(Arg.Any<CancellationToken>()).Returns(call =>
+            {
+                heartbeatToken = call.ArgAt<CancellationToken>(0);
+                stopping.SetResult(lifecycle.OnStop(cancellationToken));
+                return Task.FromException(new InvalidOperationException("Provider failure during shutdown"));
+            });
+
+            tick.SetResult(true);
+            var stop = await stopping.Task.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+            await stop.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+
+            Assert.True(heartbeatToken.IsCancellationRequested);
+            this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
+        }
+
+        [Fact]
         public async Task MembershipAgent_UpdateIAmAlive()
         {
             var cancellationToken = TestContext.Current.CancellationToken;

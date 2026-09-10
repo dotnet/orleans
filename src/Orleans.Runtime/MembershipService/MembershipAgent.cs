@@ -89,10 +89,15 @@ namespace Orleans.Runtime.MembershipService
                         overrideDelayPeriod = default;
                         runningFailures = 0;
                     }
-                    catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                    {
+                        throw;
+                    }
+                    catch (Exception exception)
                     {
                         runningFailures += 1;
                         LogWarningFailedToUpdateTableEntryForThisSilo(exception);
+                        cancellationToken.ThrowIfCancellationRequested();
 
                         overrideDelayPeriod = BackoffComputation.ComputeBackoffDelay(
                             runningFailures,

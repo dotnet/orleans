@@ -1070,6 +1070,89 @@ namespace NonSilo.Tests.Membership
         }
 
         [Fact]
+        public async Task PeriodicRefresh_ProviderFaultDuringStop_RemainsRecoverable()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var membershipTable = Substitute.For<IMembershipTable>();
+            membershipTable.ReadAll().Returns(await new InMemoryMembershipTable(new TableVersion(1, "1")).ReadAll());
+            var tick = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var manager = this.CreateMembershipTableManager(
+                membershipTable, timerFactory: new DelegateAsyncTimerFactory((_, _) => new DelegateAsyncTimer(_ => tick.Task)));
+            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
+            await this.lifecycle.OnStart(cancellationToken);
+            var stopping = new TaskCompletionSource<Task>(TaskCreationOptions.RunContinuationsAsynchronously);
+            membershipTable.ReadAll().Returns(_ =>
+            {
+                stopping.SetResult(this.lifecycle.OnStop(cancellationToken));
+                return Task.FromException<MembershipTableData>(new InvalidOperationException("Provider failure during shutdown"));
+            });
+
+            tick.SetResult(true);
+            var stop = await stopping.Task.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+            await stop.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+
+            this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
+            Assert.Equal(new MembershipVersion(1), manager.MembershipTableSnapshot.Version);
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task Refresh_MaintenanceStop_SettlesQueuedAndBackoffCleanupAcknowledgments(bool duringBackoff)
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var membershipTable = Substitute.For<IMembershipTable>();
+            membershipTable.ReadAll().Returns(await new InMemoryMembershipTable(new TableVersion(1, "1")).ReadAll());
+            var clock = new BackoffTimeProvider();
+            using var manager = this.CreateMembershipTableManager(
+                membershipTable, clock, new DelegateAsyncTimerFactory((_, _) => new DelegateAsyncTimer(_ => Task.FromResult(false))));
+            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
+            await this.lifecycle.OnStart(cancellationToken);
+            var workerRead = new TaskCompletionSource<MembershipTableData>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var workerStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            membershipTable.ReadAll().Returns(_ =>
+            {
+                workerStarted.TrySetResult();
+                return workerRead.Task;
+            });
+            await manager.TryKill(Silo("127.0.0.1:200@100"), cancellationToken);
+            await workerStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+            var older = Silo("127.0.0.1:100@99");
+            membershipTable.ReadAll().Returns(await new InMemoryMembershipTable(
+                new TableVersion(2, "2"), Entry(older, SiloStatus.Active, DateTimeOffset.UtcNow)).ReadAll());
+            using var events = new DiagnosticEventCollector(MembershipEvents.ListenerName);
+            var acknowledged = events.WaitForEventAsync(
+                nameof(MembershipEvents.SuspectOrKillRequestCompleted),
+                evt => evt.Payload is MembershipEvents.SuspectOrKillRequestCompleted completed
+                    && completed.ObserverSiloAddress.Equals(this.localSilo) && completed.SiloAddress.Equals(older),
+                TimeSpan.FromSeconds(10), cancellationToken);
+
+            var refresh = manager.Refresh(cancellationToken: cancellationToken);
+            Assert.False(refresh.IsCompleted);
+            if (duringBackoff)
+            {
+                workerRead.SetException(new InvalidOperationException("Worker failure before acknowledged cleanup"));
+                await clock.TimerCreated.Task.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+            }
+
+            await this.lifecycle.OnStop(cancellationToken).WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+            await refresh.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+            var completed = Assert.IsType<MembershipEvents.SuspectOrKillRequestCompleted>((await acknowledged).Payload);
+            Assert.False(completed.Success);
+            Assert.IsAssignableFrom<OperationCanceledException>(completed.Exception);
+            Assert.Equal(new MembershipVersion(2), manager.MembershipTableSnapshot.Version);
+            if (!duringBackoff)
+            {
+                Assert.False(workerRead.Task.IsCompleted);
+                workerRead.SetException(new InvalidOperationException("Late worker read failure"));
+            }
+
+            membershipTable.ReadAll().Returns(await new InMemoryMembershipTable(new TableVersion(3, "3")).ReadAll());
+            await manager.Refresh(cancellationToken: cancellationToken);
+            Assert.Equal(new MembershipVersion(3), manager.MembershipTableSnapshot.Version);
+        }
+
+        [Fact]
         public async Task UpdateLocalStatus_Cancellation_StopsPendingReadWithoutRetry()
         {
             var readCompletion = new TaskCompletionSource<MembershipTableData>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -1304,9 +1387,24 @@ namespace NonSilo.Tests.Membership
             return new SystemTargetBasedMembershipTable(services, this.loggerFactory.CreateLogger<SystemTargetBasedMembershipTable>());
         }
 
+        private sealed class BackoffTimeProvider : FakeTimeProvider
+        {
+            public TaskCompletionSource TimerCreated { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+            {
+                var timer = base.CreateTimer(callback, state, dueTime, period);
+                TimerCreated.TrySetResult();
+                return timer;
+            }
+        }
+
         private static SiloAddress Silo(string value) => SiloAddress.FromParsableString(value);
 
-        private MembershipTableManager CreateMembershipTableManager(IMembershipTable membershipTable, TimeProvider? timeProvider = null)
+        private MembershipTableManager CreateMembershipTableManager(
+            IMembershipTable membershipTable,
+            TimeProvider? timeProvider = null,
+            IAsyncTimerFactory? timerFactory = null)
         {
             return new MembershipTableManager(
                 localSiloDetails: this.localSiloDetails,
@@ -1315,7 +1413,7 @@ namespace NonSilo.Tests.Membership
                 fatalErrorHandler: this.fatalErrorHandler,
                 gossiper: this.membershipGossiper,
                 log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
-                timerFactory: new AsyncTimerFactory(this.loggerFactory),
+                timerFactory: timerFactory ?? new AsyncTimerFactory(this.loggerFactory),
                 siloLifecycle: this.lifecycle,
                 timeProvider: timeProvider ?? TimeProvider.System);
         }
