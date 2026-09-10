@@ -400,7 +400,7 @@ namespace UnitTests.MembershipTests
         }
 
         [Fact, TestCategory("Liveness")]
-        public async Task ForwardedDeadSiloRequestReplacesStaleDestinationTracking()
+        public async Task ForwardingUpdateToDeadSiloReplacesStaleDestinationTracking()
         {
             var primaryServices = ((InProcessSiloHandle)HostedCluster.Primary!).ServiceProvider;
             var gateway = primaryServices.GetRequiredService<MessageCenter>().Gateway!;
@@ -426,6 +426,18 @@ namespace UnitTests.MembershipTests
                 TargetGrain = original.TargetGrain,
                 ForwardCount = original.ForwardCount + 1,
             };
+            var forwardingUpdate = new Message
+            {
+                Id = forwarded.Id,
+                Direction = Message.Directions.Response,
+                Result = Message.ResponseTypes.Status,
+                TargetSilo = original.SendingSilo,
+                TargetGrain = original.SendingGrain,
+                SendingSilo = forwarded.TargetSilo,
+                SendingGrain = forwarded.TargetGrain,
+                BodyObject = original.TargetSilo,
+                ForwardCount = forwarded.ForwardCount,
+            };
             Assert.True(gateway.TryGetClientState(original, out var client));
             client.SendRequest(original, destination);
             Assert.Same(original, Assert.Single(destination.Messages));
@@ -444,7 +456,7 @@ namespace UnitTests.MembershipTests
                 TimeSpan.FromSeconds(30),
                 TestContext.Current.CancellationToken);
 
-            client.RejectRequest(forwarded, deadSilo.SiloAddress);
+            client.SendResponse(forwardingUpdate);
 
             var rejected = Assert.IsType<GatewayEvents.DeadSiloRequestRejected>((await rejectionTask).Payload);
             Assert.Equal(deadSilo.SiloAddress, rejected.Rejection.SendingSilo);
