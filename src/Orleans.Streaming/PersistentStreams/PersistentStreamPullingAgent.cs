@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Internal;
+using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Runtime.Internal;
 using Orleans.Runtime.Scheduler;
@@ -538,7 +539,7 @@ namespace Orleans.Streams
                     throw new QueueCacheCursorContractException("A successful cursor move did not produce a current item.");
                 }
 
-                var comparison = batch.SequenceToken.CompareTo(token);
+                var comparison = EventSequenceTokenCompatibility.Compare(batch.SequenceToken, token);
                 if (comparison >= 0)
                 {
                     pendingBatch = comparison > 0 ? batch : null;
@@ -999,9 +1000,25 @@ namespace Orleans.Streams
                         return false;
                     }
 
-                    if (earliest is null || IsBefore(current, earliest))
+                    if (earliest is null)
                     {
                         earliest = current;
+                        continue;
+                    }
+
+                    try
+                    {
+                        if (IsBefore(current, earliest))
+                        {
+                            earliest = current;
+                        }
+                    }
+                    catch (ArgumentOutOfRangeException exception) when (exception.ParamName == "other")
+                    {
+                        LogWarningIncompatibleDeliveryProgress(
+                            new(QueueId), consumer.SubscriptionId, consumer.StreamId, current, earliest, exception);
+                        earliest = null;
+                        return false;
                     }
                 }
             }
@@ -1010,10 +1027,7 @@ namespace Orleans.Streams
         }
 
         private static bool IsBefore(StreamSequenceToken current, StreamSequenceToken other)
-        {
-            var difference = current.SequenceNumber.CompareTo(other.SequenceNumber);
-            return difference < 0 || difference == 0 && current.EventIndex < other.EventIndex;
-        }
+            => EventSequenceTokenCompatibility.Compare(current, other) < 0;
 
         private void RegisterStream(
             QualifiedStreamId streamId,
@@ -1858,6 +1872,18 @@ namespace Orleans.Streams
             Message = "Failed to add subscription for stream {StreamId}."
         )]
         private partial void LogWarningFailedToAddSubscription(QualifiedStreamId streamId, Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Retaining the previous delivery watermark for queue {Queue}: subscription {SubscriptionId} on stream {StreamId} has token {Token} incompatible with {OtherToken}."
+        )]
+        private partial void LogWarningIncompatibleDeliveryProgress(
+            QueueIdLogRecord queue,
+            GuidId subscriptionId,
+            QualifiedStreamId streamId,
+            StreamSequenceToken token,
+            StreamSequenceToken otherToken,
+            Exception exception);
 
         [LoggerMessage(
             Level = LogLevel.Warning,

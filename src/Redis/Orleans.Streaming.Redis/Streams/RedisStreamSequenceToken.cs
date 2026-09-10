@@ -48,12 +48,16 @@ internal sealed class RedisStreamSequenceToken : EventSequenceTokenV2
     [JsonProperty]
     public long RedisSequenceNumber { get; private set; }
 
+    /// <inheritdoc />
+    protected override Type SequenceTokenCompatibilityDomain => typeof(RedisStreamSequenceToken);
+
     /// <summary>
     /// Creates a token for an event within the same Redis entry.
     /// </summary>
     /// <param name="eventIndex">The event index within the Orleans batch.</param>
     /// <returns>A token for the specified event.</returns>
-    public new RedisStreamSequenceToken CreateSequenceTokenForEvent(int eventIndex) => new(EntryId, SequenceNumber, RedisSequenceNumber, eventIndex);
+    public override RedisStreamSequenceToken CreateSequenceTokenForEvent(int eventIndex)
+        => new(EntryId, SequenceNumber, RedisSequenceNumber, eventIndex);
 
     /// <inheritdoc />
     public override bool Equals(StreamSequenceToken? other)
@@ -73,22 +77,27 @@ internal sealed class RedisStreamSequenceToken : EventSequenceTokenV2
             return 1;
         }
 
+        if (other is not RedisStreamSequenceToken token)
+        {
+            throw new ArgumentOutOfRangeException(nameof(other));
+        }
+
         var difference = SequenceNumber.CompareTo(other.SequenceNumber);
         if (difference != 0)
         {
             return difference;
         }
 
-        if (other is RedisStreamSequenceToken token)
+        difference = RedisSequenceNumber.CompareTo(token.RedisSequenceNumber);
+        if (difference != 0)
         {
-            difference = RedisSequenceNumber.CompareTo(token.RedisSequenceNumber);
-            if (difference != 0)
-            {
-                return difference;
-            }
+            return difference;
         }
 
-        return EventIndex.CompareTo(other.EventIndex);
+        difference = EventIndex.CompareTo(other.EventIndex);
+        return difference != 0
+            ? difference
+            : string.CompareOrdinal(EntryId, token.EntryId);
     }
 
     /// <inheritdoc />

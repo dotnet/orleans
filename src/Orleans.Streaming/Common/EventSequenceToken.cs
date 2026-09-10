@@ -8,6 +8,12 @@ namespace Orleans.Providers.Streams.Common
     /// <summary>
     /// Stream sequence token that tracks sequence number and event index
     /// </summary>
+    /// <remarks>
+    /// <see cref="EventSequenceToken"/> and <see cref="EventSequenceTokenV2"/> share a numeric
+    /// position contract. Derived tokens are isolated by default and can explicitly join that
+    /// contract through <see cref="SequenceTokenCompatibilityDomain"/>. This includes exact base
+    /// tokens persisted by earlier event-token factories.
+    /// </remarks>
     [Serializable]
     [GenerateSerializer]
     public class EventSequenceToken : StreamSequenceToken
@@ -61,24 +67,42 @@ namespace Orleans.Providers.Streams.Common
         /// Creates a sequence token for a specific event in the current batch.
         /// </summary>
         /// <param name="eventInd">The event index, for events which are part of a batch.</param>
-        /// <returns>The sequence token.</returns>
-        public EventSequenceToken CreateSequenceTokenForEvent(int eventInd)
+        /// <returns>A token with the same concrete runtime type and position metadata, targeting the specified event.</returns>
+        public virtual EventSequenceToken CreateSequenceTokenForEvent(int eventInd)
         {
-            return new EventSequenceToken(SequenceNumber, eventInd);
+            var result = (EventSequenceToken)MemberwiseClone();
+            result.EventIndex = eventInd;
+            return result;
         }
+
+        /// <summary>
+        /// Gets the compatibility domain used to determine which event sequence tokens share
+        /// this token's numeric equality and ordering contract.
+        /// </summary>
+        /// <remarks>
+        /// Derived tokens are isolated by default. A derived token which uses this complete numeric
+        /// contract overrides this property and returns <see cref="EventSequenceToken"/>. Tokens in
+        /// the same domain compare by <see cref="SequenceNumber"/> and <see cref="EventIndex"/>.
+        /// </remarks>
+        protected virtual Type SequenceTokenCompatibilityDomain => GetType();
+
+        internal Type GetSequenceTokenCompatibilityDomain() => SequenceTokenCompatibilityDomain;
+
+        internal virtual StreamSequenceToken NormalizeLegacyToken(StreamSequenceToken token) => token;
 
         /// <inheritdoc />
         public override bool Equals(object? obj)
         {
-            return Equals(obj as EventSequenceToken);
+            return obj is StreamSequenceToken token && Equals(token);
         }
 
         /// <inheritdoc />
         public override bool Equals(StreamSequenceToken? other)
         {
-            var token = other as EventSequenceToken;
-            return token != null && (token.SequenceNumber == SequenceNumber &&
-                                     token.EventIndex == EventIndex);
+            return other is not null
+                && EventSequenceTokenCompatibility.IsCompatibleNumericToken(this, other)
+                && other.SequenceNumber == SequenceNumber
+                && other.EventIndex == EventIndex;
         }
 
         /// <inheritdoc />
@@ -87,12 +111,11 @@ namespace Orleans.Providers.Streams.Common
             if (other == null)
                 return 1;
 
-            var token = other as EventSequenceToken;
-            if (token == null)
+            if (!EventSequenceTokenCompatibility.IsCompatibleNumericToken(this, other))
                 throw new ArgumentOutOfRangeException(nameof(other));
 
-            int difference = SequenceNumber.CompareTo(token.SequenceNumber);
-            return difference != 0 ? difference : EventIndex.CompareTo(token.EventIndex);
+            int difference = SequenceNumber.CompareTo(other.SequenceNumber);
+            return difference != 0 ? difference : EventIndex.CompareTo(other.EventIndex);
         }
 
         /// <inheritdoc />

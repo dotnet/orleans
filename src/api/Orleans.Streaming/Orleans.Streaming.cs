@@ -657,9 +657,11 @@ namespace Orleans.Providers.Streams.Common
         [Newtonsoft.Json.JsonProperty]
         public override long SequenceNumber { get { throw null; } protected set { } }
 
+        protected virtual System.Type SequenceTokenCompatibilityDomain { get { throw null; } }
+
         public override int CompareTo(Orleans.Streams.StreamSequenceToken? other) { throw null; }
 
-        public EventSequenceToken CreateSequenceTokenForEvent(int eventInd) { throw null; }
+        public virtual EventSequenceToken CreateSequenceTokenForEvent(int eventInd) { throw null; }
 
         public override bool Equals(Orleans.Streams.StreamSequenceToken? other) { throw null; }
 
@@ -687,9 +689,11 @@ namespace Orleans.Providers.Streams.Common
         [Newtonsoft.Json.JsonProperty]
         public override long SequenceNumber { get { throw null; } protected set { } }
 
+        protected virtual System.Type SequenceTokenCompatibilityDomain { get { throw null; } }
+
         public override int CompareTo(Orleans.Streams.StreamSequenceToken? other) { throw null; }
 
-        public EventSequenceTokenV2 CreateSequenceTokenForEvent(int eventInd) { throw null; }
+        public virtual EventSequenceTokenV2 CreateSequenceTokenForEvent(int eventInd) { throw null; }
 
         public override bool Equals(Orleans.Streams.StreamSequenceToken? other) { throw null; }
 

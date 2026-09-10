@@ -275,7 +275,7 @@ namespace Orleans.Providers.Streams.Common
             sequenceToken = sequenceToken ?? cachedMessages.First?.Value?.SequenceToken!; // cachedMessages.Count > 0 here (checked above), so First/Value/SequenceToken are guaranteed non-null.
 
             // If sequenceToken is too new to be in cache, unset token, and wait for more data.
-            if (sequenceToken.Newer(cachedMessages.First!.Value.SequenceToken)) // cachedMessages.Count > 0 here (checked above), so First is guaranteed non-null.
+            if (EventSequenceTokenCompatibility.Compare(sequenceToken, cachedMessages.First!.Value.SequenceToken) > 0) // cachedMessages.Count > 0 here (checked above), so First is guaranteed non-null.
             {
                 UnsetCursor(cursor, sequenceToken);
                 return null;
@@ -283,7 +283,7 @@ namespace Orleans.Providers.Streams.Common
 
             LinkedListNode<SimpleQueueCacheItem> lastMessage = cachedMessages.Last!; // cachedMessages.Count > 0 here (checked above), so Last is guaranteed non-null.
             // Check to see if offset is too old to be in cache
-            if (sequenceToken.Older(lastMessage.Value.SequenceToken))
+            if (EventSequenceTokenCompatibility.Compare(sequenceToken, lastMessage.Value.SequenceToken) < 0)
             {
                 return CreateCacheMissInfo(sequenceToken);
             }
@@ -293,14 +293,14 @@ namespace Orleans.Providers.Streams.Common
             // Find first message at or below offset
             // Events are ordered from newest to oldest, so iterate from start of list until we hit a node at a previous offset, or the end.
             LinkedListNode<SimpleQueueCacheItem>? node = cachedMessages.First;
-            while (node != null && node.Value.SequenceToken.Newer(sequenceToken))
+            while (node != null && EventSequenceTokenCompatibility.Compare(node.Value.SequenceToken, sequenceToken) > 0)
             {
                 // did we get to the end?
                 if (node.Next == null) // node is the last message
                     break;
 
                 // if sequenceId is between the two, take the higher
-                if (node.Next.Value.SequenceToken.Older(sequenceToken))
+                if (EventSequenceTokenCompatibility.Compare(node.Next.Value.SequenceToken, sequenceToken) < 0)
                     break;
 
                 node = node.Next;
@@ -336,7 +336,7 @@ namespace Orleans.Providers.Streams.Common
         {
             if (sequenceToken is null
                 || cachedMessages.Count == 0
-                || !sequenceToken.Older(cachedMessages.Last!.Value.SequenceToken))
+                || EventSequenceTokenCompatibility.Compare(sequenceToken, cachedMessages.Last!.Value.SequenceToken) >= 0)
             {
                 cacheMiss = default;
                 return false;
