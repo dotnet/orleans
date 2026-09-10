@@ -47,8 +47,7 @@ public interface IRecoverableStreamQueueCache<TQueueMessage> : IQueueCache, IDis
     void UpdateReplayProgress(
         StreamSequenceToken token,
         bool inclusive,
-        DateTime utcNow)
-        => UpdateDeliveryProgress(inclusive ? token : null, utcNow);
+        DateTime utcNow);
 
     /// <summary>
     /// Registers a stream whose cursor needs purge metadata while replay is active.

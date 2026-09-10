@@ -138,8 +138,6 @@ public abstract class AdoNetClientStreamTests : TestClusterPerTest
             AdoNetStreamProviderName,
             StreamNamespace,
             _output,
-            getDeliveryFailureCount: null,
-            waitForRetryTimeouts: true,
             cancellationToken: cancellationToken);
     }
 }
