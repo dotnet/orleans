@@ -265,7 +265,7 @@ namespace Orleans
             MessageCenter!.SendMessage(message);
         }
 
-        public void SendRequest(GrainReference target, IInvokable request, IResponseCompletionSource? context, InvokeMethodOptions options)
+        public void SendRequest(GrainReference target, IInvokable request, IResponseCompletionSource? context, InvokeMethodOptions options, bool waitForCancellationAcknowledgement)
         {
             ThrowIfDisposed();
             var cancellationToken = request.GetCancellationToken();
@@ -295,7 +295,7 @@ namespace Orleans
 
             if (!oneWay)
             {
-                var callbackData = new CallbackData(this.sharedCallbackData, context!, message, _applicationRequestInstruments);
+                var callbackData = new CallbackData(this.sharedCallbackData, context!, message, _applicationRequestInstruments, waitForCancellationAcknowledgement);
                 if (Volatile.Read(ref _isStopping) != 0)
                 {
                     callbackData.OnHostShutdown();
