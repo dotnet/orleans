@@ -55,6 +55,15 @@ namespace Orleans.Streams
         public bool HasDeliveryProgressError;
         [NonSerialized]
         public StreamSequenceToken? UnconfirmedDeliveryToken;
+        // Unlike LastToken, this anchor must survive later fallback deliveries and handshake responses.
+        [NonSerialized]
+        public StreamHandshakeToken? DeliveryRecoveryToken;
+        [NonSerialized]
+        public IQueueCacheCursor? DeliveryRecoveryCursor;
+        [NonSerialized]
+        public bool HasObservedRecoveryStart;
+        [NonSerialized]
+        public long CursorVersion;
 
         public StreamConsumerData(GuidId subscriptionId, QualifiedStreamId streamId, IStreamConsumerExtension streamConsumer, string? filterData)
         {
@@ -66,10 +75,17 @@ namespace Orleans.Streams
 
         internal void SafeDisposeCursor(ILogger logger)
         {
+            CursorVersion++;
             IsCaughtUp = false;
             PendingBatch = null;
             if (Cursor is { } cursor)
             {
+                if (ReferenceEquals(DeliveryRecoveryCursor, cursor))
+                {
+                    DeliveryRecoveryCursor = null;
+                    HasObservedRecoveryStart = false;
+                }
+
                 Cursor = null;
                 // kill cursor activity and ensure it does not start again on this consumer data.
                 try
