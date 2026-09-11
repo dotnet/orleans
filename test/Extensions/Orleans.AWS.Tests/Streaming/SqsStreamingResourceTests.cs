@@ -339,10 +339,32 @@ public sealed class SqsStreamingResourceTests
                 PartitionCount = 2,
             });
 
-        Assert.Equal(["sqs-0", "sqs-1"], resource.Queues.Select(queue => queue.Resource.Name));
+        Assert.Equal(
+            ["sqs-3973e022-0", "sqs-3973e022-1"],
+            resource.Queues.Select(queue => queue.Resource.Name));
         Assert.Equal(
             ["orders-service---0", "orders-service---1"],
             GetQueues(resource).Select(queue => queue.QueueName));
+    }
+
+    [Fact]
+    public void AddSqsStreaming_NormalizedResourceNamesRemainDistinct()
+    {
+        var builder = CreateBuilder();
+        var aws = builder.AddAWSSDKConfig().WithRegion(RegionEndpoint.USEast1);
+        var orleans = builder.AddOrleans("cluster").WithDevelopmentClustering();
+        var hyphenated = orleans.AddSqsStreaming(
+            "orders-primary",
+            aws,
+            new SqsStreamingOptions { ServiceId = ServiceId });
+        var underscored = orleans.AddSqsStreaming(
+            "orders_primary",
+            aws,
+            new SqsStreamingOptions { ServiceId = ServiceId });
+
+        Assert.Equal("cluster-orders-primary-sqs", hyphenated.Stack.Resource.Name);
+        Assert.StartsWith("cluster-orders-primary-sqs-", underscored.Stack.Resource.Name);
+        Assert.NotEqual(hyphenated.Stack.Resource.Name, underscored.Stack.Resource.Name);
     }
 
     [Fact]
