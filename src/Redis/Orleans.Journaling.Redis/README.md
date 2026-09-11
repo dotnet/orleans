@@ -62,8 +62,6 @@ Storage errors and cancellation propagate without provider-level retries, restar
 
 Keys have the form `<keyPrefix>:journal:{<SHA256(keyName)>}:<Uri.EscapeDataString(keyName)>:metadata` or the same base with a `:data` suffix. The reversible key name is outside the existing SHA-256 hash tag, preserving Redis Cluster colocation of each journal's data and metadata for atomic Lua operations. URI encoding preserves literal percent signs, separators, Unicode, and Redis glob characters in journal ids; the scan pattern also escapes glob characters in the configured key prefix.
 
-This alpha layout replaces the hash-only key layout. There is no legacy-key discovery, decoder, or migration path; use a fresh key prefix when changing layouts.
-
 ## Documentation
 
 - [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)
