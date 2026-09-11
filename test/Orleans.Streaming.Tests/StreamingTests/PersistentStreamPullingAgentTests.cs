@@ -230,7 +230,7 @@ namespace UnitTests.StreamingTests
         [TestProvider("None")]
         [TestArea("Streaming")]
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
-        public async Task RegisterStream_RemovesCacheEntryWhenProducerRegistrationTerminates()
+        public async Task RegisterStream_RetainsCacheEntryWhenProducerRegistrationTerminates()
         {
             var queueId = QueueId.GetQueueId("queue", 0u, 0u);
             var streamId = new QualifiedStreamId("provider", StreamId.Create("namespace", Guid.NewGuid()));
@@ -240,7 +240,12 @@ namespace UnitTests.StreamingTests
 
             await testAccessor.RegisterStream(streamId, new EventSequenceTokenV2(1), DateTime.UtcNow);
 
-            Assert.Empty(await testAccessor.GetPubSubCache());
+            var stream = Assert.Single(await testAccessor.GetPubSubCache());
+            Assert.Equal(streamId, stream.Key);
+            Assert.False(stream.Value.StreamRegistered);
+            Assert.NotNull(stream.Value.RegistrationTask);
+            Assert.True(stream.Value.RegistrationTask.IsCompleted);
+            Assert.Equal(1, Assert.IsType<EventSequenceTokenV2>(stream.Value.RegistrationStartToken).SequenceNumber);
         }
 
         [TestSuite("BVT")]
@@ -400,7 +405,8 @@ namespace UnitTests.StreamingTests
             IQueueAdapterCache? queueAdapterCache = null,
             TimeProvider? timeProvider = null,
             StreamPullingAgentOptions? options = null,
-            IStreamFilter? streamFilter = null)
+            IStreamFilter? streamFilter = null,
+            IBackoffProvider? deliveryBackoff = null)
         {
             var siloAddress = SiloAddress.New(IPAddress.Loopback, 11111, 1);
             var localSiloDetails = Substitute.For<ILocalSiloDetails>();
@@ -443,7 +449,7 @@ namespace UnitTests.StreamingTests
                 queueAdapter,
                 queueAdapterCache!,
                 new NoOpStreamDeliveryFailureHandler(),
-                new FixedBackoff(TimeSpan.FromMilliseconds(1)),
+                deliveryBackoff ?? new FixedBackoff(TimeSpan.FromMilliseconds(1)),
                 new FixedBackoff(TimeSpan.FromMilliseconds(1)),
                 timeProvider ?? TimeProvider.System,
                 shared);
@@ -956,6 +962,8 @@ namespace UnitTests.StreamingTests
                 }
             }
 
+            public void PurgeOldest() => cache.RemoveOldestMessage();
+
             private sealed class CacheDataAdapter : ICacheDataAdapter
             {
                 public IBatchContainer GetBatchContainer(ref CachedMessage cachedMessage)
@@ -1057,11 +1065,14 @@ namespace UnitTests.StreamingTests
             private readonly TaskCompletionSource<bool> releaseDelivery = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
             public TaskCompletionSource<bool> Delivered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            public List<IBatchContainer> DeliveredBatches { get; } = new();
             public List<StreamSequenceToken> DeliveredTokens { get; } = new();
             public List<StreamHandshakeToken?> DeliveredHandshakeTokens { get; } = new();
             public List<Exception> Errors { get; } = new();
             public Queue<StreamHandshakeToken?> DeliveryResponses { get; } = new();
             public StreamHandshakeToken? HandshakeResponse { get; set; } = requestedToken;
+            public Exception? DeliveryException { get; set; }
+            public int HandshakeCount { get; private set; }
 
             public Task<StreamHandshakeToken?> DeliverImmutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken, CancellationToken cancellationToken)
                 => throw new NotSupportedException();
@@ -1071,10 +1082,16 @@ namespace UnitTests.StreamingTests
 
             public async Task<StreamHandshakeToken?> DeliverBatch(GuidId subscriptionId, QualifiedStreamId streamId, IBatchContainer item, StreamHandshakeToken? handshakeToken, CancellationToken cancellationToken)
             {
+                DeliveredBatches.Add(item);
                 DeliveredTokens.Add(item.SequenceToken);
                 DeliveredHandshakeTokens.Add(handshakeToken);
                 Delivered.TrySetResult(true);
                 await releaseDelivery.Task;
+                if (DeliveryException is { } exception)
+                {
+                    throw exception;
+                }
+
                 return DeliveryResponses.TryDequeue(out var response) ? response : null;
             }
 
@@ -1086,7 +1103,11 @@ namespace UnitTests.StreamingTests
                 return Task.CompletedTask;
             }
 
-            public Task<StreamHandshakeToken?> GetSequenceToken(GuidId subscriptionId, CancellationToken cancellationToken) => Task.FromResult(HandshakeResponse);
+            public Task<StreamHandshakeToken?> GetSequenceToken(GuidId subscriptionId, CancellationToken cancellationToken)
+            {
+                HandshakeCount++;
+                return Task.FromResult(HandshakeResponse);
+            }
 
             public void ReleaseDelivery() => releaseDelivery.TrySetResult(true);
         }
@@ -2828,10 +2849,13 @@ namespace UnitTests.StreamingTests
                 GuidId.GetGuidId(Guid.NewGuid()), failedId, GrainId.Create("test", Guid.NewGuid().ToString()));
             var pubSub = Substitute.For<IStreamPubSub>();
             pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
-                .ReturnsForAnyArgs(call =>
-                    Task.FromResult<ISet<PubSubSubscriptionState>>(call.ArgAt<QualifiedStreamId>(0).Equals(failedId)
+                .ReturnsForAnyArgs(call => !subscriberAttachment
+                    ? Task.FromException<ISet<PubSubSubscriptionState>>(new InvalidOperationException("Injected registration failure."))
+                    : Task.FromResult<ISet<PubSubSubscriptionState>>(call.ArgAt<QualifiedStreamId>(0).Equals(failedId)
                         ? new HashSet<PubSubSubscriptionState> { subscription }
                         : new HashSet<PubSubSubscriptionState>()));
+            var backoff = Substitute.For<IBackoffProvider>();
+            backoff.Next(Arg.Any<int>()).Returns(_ => throw new OperationCanceledException("Injected registration retry cancellation."));
             var queueId = QueueId.GetQueueId("queue", 0u, 0u);
             var queueCache = new RecordingQueueCache();
             var adapterCache = Substitute.For<IQueueAdapterCache>();
@@ -2844,9 +2868,9 @@ namespace UnitTests.StreamingTests
                     new TestBatchContainer(otherId.StreamId, new EventSequenceTokenV2(200))
                 ]));
 
-            // Missing pubsub terminates registration. A missing RuntimeClient fails attachment
-            // before a consumer record exists, after producer registration has succeeded.
-            var agent = CreateAgent(subscriberAttachment ? pubSub : null, queueId, receiver, adapterCache);
+            // Canceling the retry wait terminates registration. A missing RuntimeClient fails
+            // attachment before a consumer record exists, after producer registration succeeds.
+            var agent = CreateAgent(pubSub, queueId, receiver, adapterCache, deliveryBackoff: backoff);
             var accessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
             await InitializeAgent(agent);
             Assert.True(await accessor.ReadFromQueue(queueId, receiver, 1000));
@@ -2857,24 +2881,25 @@ namespace UnitTests.StreamingTests
             {
                 Assert.True(streams[failedId].StreamRegistered);
                 Assert.Equal(0, streams[failedId].Count);
+                var pendingRegistration = streams[failedId].RegistrationTask;
+                Assert.NotNull(pendingRegistration);
+                Assert.True(pendingRegistration.IsCompleted);
             }
             else
             {
-                Assert.Empty(await accessor.GetPubSubCache());
+                var retainedStreams = await accessor.GetPubSubCache();
+                Assert.True(retainedStreams.ContainsKey(failedId));
+                Assert.All(retainedStreams.Values, stream =>
+                {
+                    Assert.False(stream.StreamRegistered);
+                    Assert.NotNull(stream.RegistrationTask);
+                    Assert.True(stream.RegistrationTask.IsCompleted);
+                });
             }
 
             await accessor.Shutdown();
 
-            if (unknownPosition)
-            {
-                Assert.Empty(queueCache.DeliveryProgressTokens);
-            }
-            else
-            {
-                var checkpoint = Assert.Single(queueCache.DeliveryProgressTokens);
-                Assert.NotNull(checkpoint);
-                Assert.Equal(100, checkpoint.SequenceNumber);
-            }
+            Assert.Empty(queueCache.DeliveryProgressTokens);
         }
 
         [TestSuite("BVT")]
@@ -2934,6 +2959,115 @@ namespace UnitTests.StreamingTests
             Assert.NotNull(checkpoint);
             Assert.Equal(10, checkpoint.SequenceNumber);
             await receiver.Received(2).GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>());
+        }
+
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
+        [Theory, TestCategory("BVT"), TestCategory("Streaming")]
+        [InlineData(false, false)]
+        [InlineData(false, true)]
+        [InlineData(true, false)]
+        [InlineData(true, true)]
+        public async Task Recovery_InitialGroupedFailureRequiresFirstBatchForInclusiveReplay(
+            bool purgeFirstBatch, bool explicitEarliestRequest)
+        {
+            var pubSub = Substitute.For<IStreamPubSub>();
+            pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
+                .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
+            var queueId = QueueId.GetQueueId("queue", 0u, 0u);
+            var streamId = new QualifiedStreamId("provider", StreamId.Create("namespace", Guid.NewGuid()));
+            var firstToken = new EventSequenceTokenV2(10);
+            var lastToken = new EventSequenceTokenV2(20);
+            var queueCache = new PurgeablePooledQueueCache(retainPurgeMetadata: true);
+            var adapterCache = Substitute.For<IQueueAdapterCache>();
+            adapterCache.CreateQueueCache(queueId).Returns(queueCache);
+            var receiver = Substitute.For<IQueueAdapterReceiver>();
+            receiver.GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(
+                Task.FromResult<IList<IBatchContainer>>(
+                [
+                    new TestBatchContainer(streamId.StreamId, firstToken),
+                    new TestBatchContainer(streamId.StreamId, lastToken),
+                ]),
+                Task.FromResult<IList<IBatchContainer>>([]));
+            var observer = new RecordingConsumer(explicitEarliestRequest
+                ? StreamHandshakeToken.CreateStartPositionToken(StreamSubscriptionStartPosition.EarliestAvailable)
+                : null)
+            {
+                DeliveryException = new InvalidOperationException("Injected grouped delivery failure."),
+            };
+            observer.ReleaseDelivery();
+            var agent = CreateAgent(pubSub, queueId, receiver, adapterCache,
+                options: new StreamPullingAgentOptions
+                {
+                    BatchContainerBatchSize = 2,
+                    InitialSubscriptionStartPosition = explicitEarliestRequest
+                        ? StreamSubscriptionStartPosition.Latest
+                        : StreamSubscriptionStartPosition.EarliestAvailable,
+                    MaxEventDeliveryTime = TimeSpan.FromMilliseconds(100),
+                },
+                deliveryBackoff: new FixedBackoff(TimeSpan.FromMilliseconds(150)));
+            var accessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
+            await InitializeAgent(agent);
+            await accessor.RegisterStream(streamId, new EventSequenceTokenV2(0), DateTime.UtcNow);
+            Assert.True(await accessor.ReadFromQueue(queueId, receiver, 1000));
+            var consumer = (await accessor.GetPubSubCache()).Single().Value.AddConsumer(
+                GuidId.GetGuidId(SubscriptionMarker.MarkAsExplicitSubscriptionId(Guid.NewGuid())),
+                streamId, observer, null, DateTime.UtcNow);
+            Assert.True(await accessor.DoHandshakeWithConsumer(consumer, cacheToken: null));
+            consumer.IsRegistered = true;
+            Assert.Null(consumer.LastProcessedToken);
+            Assert.False(consumer.HasDeliveryProgressError);
+
+            await accessor.RunConsumerCursor(consumer).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            Assert.NotEmpty(observer.DeliveredBatches);
+            Assert.All(observer.DeliveredBatches, batch => Assert.Equal(new[] { 10L, 20L },
+                Assert.IsType<BatchContainerBatch>(batch).BatchContainers.Select(item => item.SequenceToken.SequenceNumber)));
+            Assert.True(consumer.HasDeliveryProgressError);
+            Assert.Equal(firstToken, Assert.IsType<StartToken>(consumer.DeliveryRecoveryToken).Token);
+            Assert.Null(consumer.LastProcessedToken);
+            Assert.Equal(lastToken, consumer.UnconfirmedDeliveryToken);
+            Assert.Equal(StreamConsumerDataState.Inactive, consumer.State);
+
+            if (purgeFirstBatch)
+            {
+                queueCache.PurgeOldest();
+                var acceptedOldPosition = queueCache.TryGetCacheCursor(streamId.StreamId, firstToken);
+                Assert.Equal(QueueCacheCursorResultKind.Success, acceptedOldPosition.Kind);
+                using var probe = Assert.IsAssignableFrom<IQueueCacheCursor>(acceptedOldPosition.Cursor);
+                Assert.Equal(QueueCacheCursorMoveResultKind.Success, probe.MoveNextWithResult().Kind);
+                Assert.Equal(20, Assert.IsType<TestBatchContainer>(probe.GetCurrent(out _)).SequenceToken.SequenceNumber);
+            }
+
+            observer.DeliveryException = null;
+            observer.DeliveredBatches.Clear();
+            await accessor.RunQueuePump(queueId, TestContext.Current.CancellationToken);
+            Assert.NotEmpty(observer.DeliveredBatches);
+            Assert.All(observer.DeliveredBatches, batch => Assert.Equal(
+                purgeFirstBatch ? [20L] : new[] { 10L, 20L },
+                Assert.IsType<BatchContainerBatch>(batch).BatchContainers.Select(item => item.SequenceToken.SequenceNumber)));
+            Assert.Equal(purgeFirstBatch, consumer.HasDeliveryProgressError);
+            Assert.Equal(!purgeFirstBatch, consumer.IsCaughtUp);
+            if (purgeFirstBatch)
+            {
+                Assert.Equal(firstToken, Assert.IsType<StartToken>(consumer.DeliveryRecoveryToken).Token);
+                Assert.Null(consumer.LastProcessedToken);
+            }
+            else
+            {
+                Assert.Null(consumer.DeliveryRecoveryToken);
+                Assert.Equal(lastToken, consumer.LastProcessedToken);
+            }
+
+            await accessor.Shutdown();
+            if (purgeFirstBatch)
+            {
+                Assert.Empty(queueCache.DeliveryProgressTokens);
+            }
+            else
+            {
+                Assert.Equal(lastToken, Assert.Single(queueCache.DeliveryProgressTokens));
+            }
         }
 
         [TestSuite("BVT")]
@@ -3027,10 +3161,19 @@ namespace UnitTests.StreamingTests
             }
 
             failedCursor.Received(1).MoveNextWithResult();
-            Assert.True(consumer.HasDeliveryProgressError);
-            Assert.False(consumer.IsCaughtUp);
+            var recoveredInitially = !unknownPosition && progressKind != "rewind";
+            Assert.Equal(!recoveredInitially, consumer.HasDeliveryProgressError);
+            Assert.Equal(recoveredInitially, consumer.IsCaughtUp);
             Assert.Equal(StreamConsumerDataState.Inactive, consumer.State);
-            Assert.Same(safeToken, consumer.LastProcessedToken);
+            if (recoveredInitially)
+            {
+                Assert.Equal(progressKind == "reattach" ? 300 : 200,
+                    Assert.IsType<EventSequenceTokenV2>(consumer.LastProcessedToken).SequenceNumber);
+            }
+            else
+            {
+                Assert.Same(safeToken, consumer.LastProcessedToken);
+            }
             Assert.Equal(0, consumer.PendingHandshakes);
             if (progressKind == "filter")
             {
@@ -3048,15 +3191,24 @@ namespace UnitTests.StreamingTests
                 Assert.All(observer.DeliveredTokens, token => Assert.Same(laterToken, token));
             }
 
-            // A delivery-token rewind retains the first newer batch on current providers.
-            // Accepting its redelivery must still not erase the earlier cursor failure.
+            // A later rewind cursor is not proof of replay from the original safe anchor.
+            // The next pump must retry that anchor before releasing the error.
             Assert.Null(consumer.UnconfirmedDeliveryToken);
 
             if (expireStream)
             {
                 timeProvider.Advance(TimeSpan.FromDays(1));
                 Assert.False(await accessor.ReadFromQueue(queueId, receiver, 1000));
-                Assert.Empty(await accessor.GetPubSubCache());
+                if (unknownPosition)
+                {
+                    Assert.Same(stream, Assert.Single(await accessor.GetPubSubCache()).Value);
+                    Assert.True(consumer.HasDeliveryProgressError);
+                }
+                else
+                {
+                    Assert.False(consumer.HasDeliveryProgressError);
+                    Assert.Empty(await accessor.GetPubSubCache());
+                }
             }
 
             await accessor.Shutdown();
@@ -3069,7 +3221,7 @@ namespace UnitTests.StreamingTests
             {
                 var checkpoint = Assert.Single(queueCache.DeliveryProgressTokens);
                 Assert.NotNull(checkpoint);
-                Assert.Equal(10, checkpoint.SequenceNumber);
+                Assert.Equal(recoveredInitially || expireStream ? 200 : 10, checkpoint.SequenceNumber);
             }
         }
 
@@ -3144,7 +3296,11 @@ namespace UnitTests.StreamingTests
             {
                 timeProvider.Advance(TimeSpan.FromDays(1));
                 Assert.False(await accessor.ReadFromQueue(queueId, receiver, 1000));
-                Assert.Empty(await accessor.GetPubSubCache());
+                var retainedStream = Assert.Single(await accessor.GetPubSubCache());
+                Assert.Equal(streamId, retainedStream.Key);
+                Assert.True(retainedStream.Value.Contains(consumer.SubscriptionId));
+                Assert.True(consumer.HasDeliveryProgressError);
+                Assert.Same(attemptedToken, consumer.UnconfirmedDeliveryToken);
             }
 
             await accessor.Shutdown();
@@ -3252,7 +3408,8 @@ namespace UnitTests.StreamingTests
                 if (!recoveryIssued)
                 {
                     recoveryIssued = true;
-                    return QueueCacheCursorResult<IQueueCacheCursor>.FromCursor(recoveryCursor);
+                    return QueueCacheCursorResult<IQueueCacheCursor>.FromCursor(
+                        reattach ? new EmptyQueueCacheCursor() : recoveryCursor);
                 }
 
                 if (call.ArgAt<StreamSequenceToken?>(1)?.SequenceNumber == earlierToken.SequenceNumber)
@@ -3282,7 +3439,14 @@ namespace UnitTests.StreamingTests
             Assert.True(consumer.HasDeliveryProgressError);
             Assert.False(consumer.IsCaughtUp);
             Assert.Equal(StreamConsumerDataState.Inactive, consumer.State);
-            Assert.Same(attemptedToken, Assert.Single(observer.DeliveredTokens));
+            if (reattach)
+            {
+                Assert.Empty(observer.DeliveredTokens);
+            }
+            else
+            {
+                Assert.Same(attemptedToken, Assert.Single(observer.DeliveredTokens));
+            }
             await accessor.Shutdown();
 
             if (unknownPosition || tokenKind == "explicit" || reattach && tokenKind == "implicit")
@@ -3370,21 +3534,50 @@ namespace UnitTests.StreamingTests
             Assert.True(await accessor.ReadFromQueue(queueId, receiver, 1000));
             Assert.True(idleConsumer.IsCaughtUp);
             Assert.Equal(1, Assert.Single(idleObserver.DeliveredTokens).SequenceNumber);
-            Assert.Same(accountingError, await Assert.ThrowsAsync<InvalidOperationException>(
-                () => accessor.ReadFromQueue(queueId, receiver, 1000)));
-            streams = await accessor.GetPubSubCache();
-            Assert.False(streams.ContainsKey(failedId));
-            Assert.False(streams.ContainsKey(tailId));
-            await pubSub.DidNotReceive().RegisterProducer(failedId, Arg.Any<GrainId>(), Arg.Any<CancellationToken>());
-            Assert.True(await accessor.ReadFromQueue(queueId, receiver, 1000));
-            Assert.True(activeConsumer.IsCaughtUp);
-            Assert.Equal(200, Assert.Single(activeObserver.DeliveredTokens).SequenceNumber);
-            await accessor.Shutdown();
+            if (failCacheAdd)
+            {
+                Assert.Same(accountingError, await Assert.ThrowsAsync<InvalidOperationException>(
+                    () => accessor.ReadFromQueue(queueId, receiver, 1000)));
+            }
+            else
+            {
+                Assert.True(await accessor.ReadFromQueue(queueId, receiver, 1000));
+            }
 
-            var checkpoint = Assert.Single(backingCache.DeliveryProgressTokens);
-            Assert.NotNull(checkpoint);
-            Assert.True(checkpoint.SequenceNumber <= 100,
-                $"Fetched position 100 was never accounted for, but shutdown advanced to {checkpoint.SequenceNumber}.");
+            streams = await accessor.GetPubSubCache();
+            await Task.WhenAll(streams.Values.Select(stream => stream.RegistrationTask ?? Task.CompletedTask))
+                .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            if (failCacheAdd)
+            {
+                Assert.False(streams.ContainsKey(failedId));
+                Assert.False(streams.ContainsKey(tailId));
+            }
+            else
+            {
+                Assert.True(streams.ContainsKey(failedId));
+                Assert.Equal(includeUnreadTail, streams.ContainsKey(tailId));
+                var pendingRegistration = streams[failedId].RegistrationTask;
+                Assert.NotNull(pendingRegistration);
+                Assert.True(pendingRegistration.IsCompleted);
+                Assert.False(streams[failedId].StreamRegistered);
+                Assert.Equal(100, Assert.IsType<EventSequenceTokenV2>(streams[failedId].RegistrationStartToken).SequenceNumber);
+            }
+
+            await pubSub.DidNotReceive().RegisterProducer(failedId, Arg.Any<GrainId>(), Arg.Any<CancellationToken>());
+            Assert.Equal(failCacheAdd, await accessor.ReadFromQueue(queueId, receiver, 1000));
+            if (failCacheAdd)
+            {
+                Assert.True(activeConsumer.IsCaughtUp);
+                Assert.Equal(200, Assert.Single(activeObserver.DeliveredTokens).SequenceNumber);
+            }
+            else
+            {
+                Assert.Empty(activeObserver.DeliveredTokens);
+                await receiver.Received(2).GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>());
+            }
+
+            await accessor.Shutdown();
+            Assert.Empty(backingCache.DeliveryProgressTokens);
 
             StreamConsumerData AddConsumer(QualifiedStreamId streamId, RecordingConsumer observer)
             {
@@ -3394,6 +3587,742 @@ namespace UnitTests.StreamingTests
                 consumer.IsRegistered = true;
                 consumer.LastProcessedToken = new EventSequenceTokenV2(0);
                 consumer.Cursor = backingCache.GetCacheCursor(streamId.StreamId, null);
+                return consumer;
+            }
+        }
+
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
+        [Theory, TestCategory("BVT"), TestCategory("Streaming")]
+        [InlineData("delivery", "throw", false)]
+        [InlineData("delivery", "acquire-miss", false)]
+        [InlineData("delivery", "advance-miss", false)]
+        [InlineData("implicit", "throw", false)]
+        [InlineData("implicit", "acquire-miss", false)]
+        [InlineData("implicit", "advance-miss", false)]
+        [InlineData("explicit", "throw", false)]
+        [InlineData("explicit", "acquire-miss", false)]
+        [InlineData("delivery", "throw", true)]
+        [InlineData("delivery", "acquire-miss", true)]
+        [InlineData("delivery", "advance-miss", true)]
+        [InlineData("implicit", "throw", true)]
+        [InlineData("implicit", "acquire-miss", true)]
+        [InlineData("implicit", "advance-miss", true)]
+        [InlineData("explicit", "throw", true)]
+        [InlineData("explicit", "acquire-miss", true)]
+        [InlineData("delivery", "none", false)]
+        [InlineData("implicit", "none", false)]
+        [InlineData("explicit", "none", false)]
+        [InlineData("delivery", "none", true)]
+        [InlineData("implicit", "none", true)]
+        [InlineData("explicit", "none", true)]
+        public async Task Shutdown_PreservesReplayAfterHandshakeFallback(string tokenKind, string failureMode, bool reattach)
+        {
+            var registration = new TaskCompletionSource<ISet<PubSubSubscriptionState>>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var pubSub = Substitute.For<IStreamPubSub>();
+            pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
+                .ReturnsForAnyArgs(_ => registration.Task);
+            var queueId = QueueId.GetQueueId("queue", 0u, 0u);
+            var streamId = new QualifiedStreamId("provider", StreamId.Create("namespace", Guid.NewGuid()));
+            var latestToken = new EventSequenceTokenV2(200);
+            var requestedPosition = new EventSequenceTokenV2(tokenKind == "explicit" ? 50 : 100);
+            var requestedToken = tokenKind == "delivery"
+                ? StreamHandshakeToken.CreateDeliveyToken(requestedPosition)
+                : StreamHandshakeToken.CreateStartToken(requestedPosition);
+            var latestBatch = new TestBatchContainer(streamId.StreamId, latestToken);
+            var acquisitionError = new InvalidOperationException("Injected handshake cursor acquisition failure.");
+            var missingCursor = Substitute.For<IQueueCacheCursor>();
+            missingCursor.MoveNextWithResult().Returns(QueueCacheCursorMoveResult.FromCacheMiss(new("requested", "low", "high")));
+            var queueCache = Substitute.For<IQueueCache>();
+            var requestedCursorCount = 0;
+            queueCache.TryGetCacheCursor(Arg.Any<StreamId>(), Arg.Any<StreamSequenceToken?>()).Returns(call =>
+            {
+                if (call.ArgAt<StreamSequenceToken?>(1)?.SequenceNumber == requestedPosition.SequenceNumber)
+                {
+                    requestedCursorCount++;
+                    switch (failureMode)
+                    {
+                        case "throw":
+                            throw acquisitionError;
+                        case "acquire-miss":
+                            return QueueCacheCursorResult<IQueueCacheCursor>.FromCacheMiss(new("requested", "low", "high"));
+                        case "advance-miss":
+                            return QueueCacheCursorResult<IQueueCacheCursor>.FromCursor(missingCursor);
+                    }
+                }
+
+                return QueueCacheCursorResult<IQueueCacheCursor>.FromCursor(
+                    new ScriptedQueueCursor([latestBatch], streamId.StreamId, null));
+            });
+            var progress = new List<StreamSequenceToken?>();
+            queueCache.When(cache => cache.UpdateDeliveryProgress(Arg.Any<StreamSequenceToken?>(), Arg.Any<DateTime>()))
+                .Do(call => progress.Add(call.ArgAt<StreamSequenceToken?>(0)));
+            var adapterCache = Substitute.For<IQueueAdapterCache>();
+            adapterCache.CreateQueueCache(queueId).Returns(queueCache);
+            var receiver = Substitute.For<IQueueAdapterReceiver>();
+            receiver.GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
+                .Returns(Task.FromResult<IList<IBatchContainer>>([latestBatch]));
+            var agent = CreateAgent(pubSub, queueId, receiver, adapterCache);
+            var accessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
+            await InitializeAgent(agent);
+            Assert.True(await accessor.ReadFromQueue(queueId, receiver, 1000));
+            var stream = (await accessor.GetPubSubCache()).Single().Value;
+            var registrationTask = stream.RegistrationTask;
+            Assert.NotNull(registrationTask);
+            Assert.False(registrationTask.IsCompleted);
+            var subscriptionId = tokenKind == "implicit"
+                ? SubscriptionMarker.MarkAsImplictSubscriptionId(Guid.NewGuid())
+                : SubscriptionMarker.MarkAsExplicitSubscriptionId(Guid.NewGuid());
+            Assert.Equal(tokenKind == "implicit", SubscriptionMarker.IsImplicitSubscription(subscriptionId));
+            var observer = new RecordingConsumer(reattach ? null : requestedToken);
+            observer.ReleaseDelivery();
+            var consumer = stream.AddConsumer(
+                GuidId.GetGuidId(subscriptionId), streamId, observer, null, DateTime.UtcNow);
+            Assert.False(consumer.IsRegistered);
+            Assert.False(consumer.HasDeliveryProgressError);
+
+            // The real initial-registration path finds this consumer instead of resolving a grain reference.
+            registration.SetResult(new HashSet<PubSubSubscriptionState>
+            {
+                new(consumer.SubscriptionId, streamId, GrainId.Create("test", "existing-subscriber")),
+            });
+            await registrationTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            if (reattach)
+            {
+                Assert.True(consumer.IsCaughtUp);
+                Assert.False(consumer.HasDeliveryProgressError);
+                Assert.Equal(latestToken, consumer.LastProcessedToken);
+                observer.DeliveredTokens.Clear();
+                observer.HandshakeResponse = requestedToken;
+                await agent.RunOrQueueTask(() => agent.AddSubscriber(
+                    consumer.SubscriptionId, streamId, GrainId.Create("test", "existing-subscriber"), null,
+                    TestContext.Current.CancellationToken));
+            }
+
+            Assert.True(stream.StreamRegistered);
+            Assert.True(consumer.IsRegistered);
+            Assert.Equal(0, consumer.PendingHandshakes);
+            Assert.True(requestedCursorCount >= 1);
+            Assert.Equal(StreamConsumerDataState.Inactive, consumer.State);
+            Assert.NotEmpty(observer.DeliveredTokens);
+            Assert.All(observer.DeliveredTokens, token => Assert.Same(latestToken, token));
+            if (failureMode == "throw")
+            {
+                Assert.Contains(acquisitionError, observer.Errors);
+            }
+            else if (failureMode == "advance-miss")
+            {
+                missingCursor.Received().MoveNextWithResult();
+            }
+
+            await accessor.Shutdown();
+
+            if (failureMode == "none")
+            {
+                Assert.False(consumer.HasDeliveryProgressError);
+                Assert.Equal(latestToken, Assert.Single(progress));
+            }
+            else
+            {
+                if (tokenKind == "delivery")
+                {
+                    Assert.Equal(requestedPosition, Assert.Single(progress));
+                    Assert.Equal(requestedPosition, consumer.LastProcessedToken);
+                }
+                else
+                {
+                    Assert.Empty(progress);
+                    Assert.Null(consumer.LastProcessedToken);
+                }
+
+                Assert.True(consumer.HasDeliveryProgressError);
+            }
+        }
+
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
+        [Theory, TestCategory("BVT"), TestCategory("Streaming")]
+        [InlineData(false, false, false)]
+        [InlineData(false, true, false)]
+        [InlineData(true, false, false)]
+        [InlineData(true, true, false)]
+        [InlineData(false, false, true)]
+        [InlineData(false, true, true)]
+        [InlineData(true, false, true)]
+        [InlineData(true, true, true)]
+        public async Task Shutdown_PreservesReplayAfterUnorderedRead(bool separateReads, bool unknownFirst, bool nullContainer)
+        {
+            var pubSub = Substitute.For<IStreamPubSub>();
+            pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
+                .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
+            var queueId = QueueId.GetQueueId("queue", 0u, 0u);
+            var knownId = StreamId.Create("namespace", Guid.NewGuid());
+            var unknownId = StreamId.Create("namespace", Guid.NewGuid());
+            var knownToken = new EventSequenceTokenV2(200);
+            IBatchContainer knownBatch = new TestBatchContainer(knownId, knownToken);
+            IBatchContainer unknownBatch = nullContainer ? null! : new TestBatchContainer(unknownId, null!);
+            var firstBatch = unknownFirst ? unknownBatch : knownBatch;
+            var secondBatch = unknownFirst ? knownBatch : unknownBatch;
+            var queueCache = new RecordingQueueCache();
+            var adapterCache = Substitute.For<IQueueAdapterCache>();
+            adapterCache.CreateQueueCache(queueId).Returns(queueCache);
+            var receiver = Substitute.For<IQueueAdapterReceiver>();
+            receiver.GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(
+                Task.FromResult<IList<IBatchContainer>>(separateReads ? [firstBatch] : [firstBatch, secondBatch]),
+                Task.FromResult<IList<IBatchContainer>>([secondBatch]));
+            var agent = CreateAgent(pubSub, queueId, receiver, adapterCache);
+            var accessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
+            await InitializeAgent(agent);
+
+            await ReadAndFinishRegistration();
+            if (separateReads)
+            {
+                await ReadAndFinishRegistration();
+            }
+
+            var streams = await accessor.GetPubSubCache();
+            Assert.Equal(nullContainer ? 1 : 2, streams.Count);
+            Assert.All(streams.Values, stream =>
+            {
+                Assert.True(stream.StreamRegistered);
+                Assert.Null(stream.RegistrationTask);
+                Assert.Equal(0, stream.Count);
+            });
+            await accessor.Shutdown();
+
+            if (nullContainer)
+            {
+                Assert.Equal(knownToken, Assert.Single(queueCache.DeliveryProgressTokens));
+            }
+            else
+            {
+                Assert.Empty(queueCache.DeliveryProgressTokens);
+            }
+
+            async Task ReadAndFinishRegistration()
+            {
+                Assert.True(await accessor.ReadFromQueue(queueId, receiver, 1000));
+                var pendingStreams = await accessor.GetPubSubCache();
+                await Task.WhenAll(pendingStreams.Values.Select(stream => stream.RegistrationTask ?? Task.CompletedTask))
+                    .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            }
+        }
+
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
+        [Theory, TestCategory("BVT"), TestCategory("Streaming")]
+        [InlineData("exact", 1)]
+        [InlineData("exact", 2)]
+        [InlineData("fallback", 1)]
+        [InlineData("fallback", 2)]
+        [InlineData("empty", 1)]
+        [InlineData("empty", 2)]
+        public async Task Recovery_OnlyAcknowledgedExactReplayReleasesProgress(string replayKind, int batchSize)
+        {
+            var pubSub = Substitute.For<IStreamPubSub>();
+            pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
+                .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
+            var queueId = QueueId.GetQueueId("queue", 0u, 0u);
+            var streamId = new QualifiedStreamId("provider", StreamId.Create("namespace", Guid.NewGuid()));
+            var queueCache = new PurgeablePooledQueueCache();
+            var adapterCache = Substitute.For<IQueueAdapterCache>();
+            adapterCache.CreateQueueCache(queueId).Returns(queueCache);
+            var receiver = Substitute.For<IQueueAdapterReceiver>();
+            receiver.GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(
+                Task.FromResult<IList<IBatchContainer>>([new TestBatchContainer(streamId.StreamId, new EventSequenceTokenV2(100))]),
+                Task.FromResult<IList<IBatchContainer>>([new TestBatchContainer(streamId.StreamId, new EventSequenceTokenV2(replayKind == "fallback" ? 500 : 200))]));
+            var agent = CreateAgent(pubSub, queueId, receiver, adapterCache,
+                options: new StreamPullingAgentOptions { BatchContainerBatchSize = batchSize });
+            var accessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
+            await InitializeAgent(agent);
+            await accessor.RegisterStream(streamId, new EventSequenceTokenV2(100), DateTime.UtcNow);
+            var observer = new RecordingConsumer();
+            observer.ReleaseDelivery();
+            var consumer = (await accessor.GetPubSubCache()).Single().Value.AddConsumer(
+                GuidId.GetGuidId(SubscriptionMarker.MarkAsExplicitSubscriptionId(Guid.NewGuid())),
+                streamId, observer, null, DateTime.UtcNow);
+            consumer.IsRegistered = true;
+            consumer.Cursor = queueCache.GetCacheCursor(streamId.StreamId, null);
+            Assert.True(await accessor.ReadFromQueue(queueId, receiver, 1000));
+            Assert.Equal(100, Assert.IsType<EventSequenceTokenV2>(consumer.LastProcessedToken).SequenceNumber);
+            Assert.False(consumer.HasDeliveryProgressError);
+
+            var failedCursor = Substitute.For<IQueueCacheCursor>();
+            var cursorError = new InvalidOperationException("Injected cursor failure after acknowledged position 100.");
+            if (replayKind == "fallback")
+            {
+                failedCursor.MoveNextWithResult().Returns(QueueCacheCursorMoveResult.FromCacheMiss(new("200", "500", "500")));
+            }
+            else
+            {
+                failedCursor.MoveNextWithResult().Returns(_ => throw cursorError);
+            }
+            consumer.Cursor = failedCursor;
+            if (replayKind != "exact")
+            {
+                queueCache.AddToCache([new TestBatchContainer(streamId.StreamId, new EventSequenceTokenV2(200))]);
+                queueCache.Purge();
+            }
+
+            if (replayKind == "empty")
+            {
+                await accessor.RunConsumerCursor(consumer);
+            }
+            else
+            {
+                Assert.True(await accessor.ReadFromQueue(queueId, receiver, 1000));
+            }
+
+            if (replayKind == "fallback")
+            {
+                failedCursor.Received(1).MoveNextWithResult();
+                Assert.Empty(observer.Errors);
+            }
+            else
+            {
+                Assert.Contains(cursorError, observer.Errors);
+            }
+            Assert.Equal(StreamConsumerDataState.Inactive, consumer.State);
+            var caughtUp = consumer.IsCaughtUp;
+            await accessor.Shutdown();
+            var expectedCheckpoint = replayKind == "exact" ? 200 : 100;
+            Assert.Equal(expectedCheckpoint, Assert.IsType<EventSequenceTokenV2>(Assert.Single(queueCache.DeliveryProgressTokens)).SequenceNumber);
+            Assert.Equal(replayKind != "exact", consumer.HasDeliveryProgressError);
+            Assert.Equal(replayKind == "exact", caughtUp);
+            Assert.Equal(
+                replayKind == "empty" ? [100L] : new[] { 100L, replayKind == "fallback" ? 500L : 200L },
+                observer.DeliveredTokens.Select(token => token.SequenceNumber));
+        }
+
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
+        [Theory, TestCategory("BVT"), TestCategory("Streaming")]
+        [InlineData(false, false)]
+        [InlineData(false, true)]
+        [InlineData(true, false)]
+        [InlineData(true, true)]
+        public async Task Recovery_ExplicitStartSurvivesFallbackAndIdleCleanup(bool cleanupBeforeRecovery, bool cleanupAfterRecovery)
+        {
+            var registration = new TaskCompletionSource<ISet<PubSubSubscriptionState>>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var pubSub = Substitute.For<IStreamPubSub>();
+            pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
+                .ReturnsForAnyArgs(_ => registration.Task);
+            var queueId = QueueId.GetQueueId("queue", 0u, 0u);
+            var streamId = new QualifiedStreamId("provider", StreamId.Create("namespace", Guid.NewGuid()));
+            var timeProvider = new FakeTimeProvider();
+            var backingCache = new PurgeablePooledQueueCache();
+            backingCache.AddToCache(
+            [
+                new TestBatchContainer(streamId.StreamId, new EventSequenceTokenV2(50)),
+                new TestBatchContainer(streamId.StreamId, new EventSequenceTokenV2(100)),
+            ]);
+            var queueCache = Substitute.For<IQueueCache>();
+            queueCache.GetMaxAddCount().Returns(1000);
+            queueCache.When(cache => cache.AddToCache(Arg.Any<IList<IBatchContainer>>()))
+                .Do(call => backingCache.AddToCache(call.Arg<IList<IBatchContainer>>()));
+            var failEarlierCursor = true;
+            queueCache.TryGetCacheCursor(Arg.Any<StreamId>(), Arg.Any<StreamSequenceToken?>()).Returns(call =>
+            {
+                var token = call.ArgAt<StreamSequenceToken?>(1);
+                if (failEarlierCursor && token?.SequenceNumber == 50)
+                {
+                    return QueueCacheCursorResult<IQueueCacheCursor>.FromCacheMiss(new("50", "100", "500"));
+                }
+
+                return backingCache.TryGetCacheCursor(call.ArgAt<StreamId>(0), token);
+            });
+            queueCache.When(cache => cache.UpdateDeliveryProgress(Arg.Any<StreamSequenceToken?>(), Arg.Any<DateTime>()))
+                .Do(call => backingCache.UpdateDeliveryProgress(call.ArgAt<StreamSequenceToken?>(0), call.Arg<DateTime>()));
+            var adapterCache = Substitute.For<IQueueAdapterCache>();
+            adapterCache.CreateQueueCache(queueId).Returns(queueCache);
+            var receiver = Substitute.For<IQueueAdapterReceiver>();
+            receiver.GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(
+                Task.FromResult<IList<IBatchContainer>>([new TestBatchContainer(streamId.StreamId, new EventSequenceTokenV2(500))]),
+                Task.FromResult<IList<IBatchContainer>>([]));
+            var agent = CreateAgent(pubSub, queueId, receiver, adapterCache, timeProvider);
+            var accessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
+            await InitializeAgent(agent);
+            Assert.True(await accessor.ReadFromQueue(queueId, receiver, 1000));
+            var stream = (await accessor.GetPubSubCache()).Single().Value;
+            var registrationTask = stream.RegistrationTask;
+            Assert.NotNull(registrationTask);
+            var observer = new RecordingConsumer(StreamHandshakeToken.CreateStartToken(new EventSequenceTokenV2(50)));
+            observer.ReleaseDelivery();
+            var consumer = stream.AddConsumer(
+                GuidId.GetGuidId(SubscriptionMarker.MarkAsExplicitSubscriptionId(Guid.NewGuid())),
+                streamId, observer, null, timeProvider.GetUtcNow().UtcDateTime);
+            registration.SetResult(new HashSet<PubSubSubscriptionState>
+            {
+                new(consumer.SubscriptionId, streamId, GrainId.Create("test", "existing-subscriber")),
+            });
+            await registrationTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            Assert.True(consumer.HasDeliveryProgressError);
+            Assert.Null(consumer.LastProcessedToken);
+            Assert.Equal(500, Assert.Single(observer.DeliveredTokens).SequenceNumber);
+            Assert.Equal(500, Assert.IsType<EventSequenceTokenV2>(Assert.IsType<DeliveryToken>(consumer.LastToken).Token).SequenceNumber);
+            if (cleanupBeforeRecovery)
+            {
+                timeProvider.Advance(TimeSpan.FromDays(1));
+                await accessor.RunQueuePump(queueId, TestContext.Current.CancellationToken);
+                Assert.True((await accessor.GetPubSubCache()).ContainsKey(streamId), "Unfulfilled inclusive replay must survive inactivity cleanup.");
+            }
+
+            observer.DeliveredTokens.Clear();
+            failEarlierCursor = false;
+            await accessor.RunQueuePump(queueId, TestContext.Current.CancellationToken);
+            Assert.Equal(new[] { 50L, 100L, 500L }, observer.DeliveredTokens.Select(token => token.SequenceNumber));
+            Assert.False(consumer.HasDeliveryProgressError);
+            Assert.True(consumer.IsCaughtUp);
+            if (cleanupAfterRecovery)
+            {
+                timeProvider.Advance(TimeSpan.FromDays(1));
+                await accessor.RunQueuePump(queueId, TestContext.Current.CancellationToken);
+                Assert.Empty(await accessor.GetPubSubCache());
+            }
+
+            await accessor.Shutdown();
+            Assert.Equal(500, Assert.IsType<EventSequenceTokenV2>(Assert.Single(backingCache.DeliveryProgressTokens)).SequenceNumber);
+        }
+
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
+        [Theory, TestCategory("BVT"), TestCategory("Streaming")]
+        [InlineData("delivery", false, false, 1)]
+        [InlineData("delivery", false, true, 2)]
+        [InlineData("delivery", true, false, 2)]
+        [InlineData("delivery", true, true, 1)]
+        [InlineData("start", false, false, 2)]
+        [InlineData("start", false, true, 1)]
+        [InlineData("start", true, false, 1)]
+        [InlineData("start", true, true, 2)]
+        [InlineData("none", false, false, 1)]
+        [InlineData("none", false, false, 2)]
+        public async Task Recovery_StaleCallbackCannotAcknowledgeReattachedCursor(
+            string tokenKind, bool reuseCursor, bool lateRewind, int batchSize)
+        {
+            var pubSub = Substitute.For<IStreamPubSub>();
+            pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
+                .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
+            var queueId = QueueId.GetQueueId("queue", 0u, 0u);
+            var streamId = new QualifiedStreamId("provider", StreamId.Create("namespace", Guid.NewGuid()));
+            var attemptedToken = new EventSequenceTokenV2(200);
+            var earlierToken = new EventSequenceTokenV2(50);
+            var batch = new TestBatchContainer(streamId.StreamId, attemptedToken);
+            var oldCursor = Substitute.For<IQueueCacheCursor>();
+            oldCursor.MoveNextWithResult().Returns(QueueCacheCursorMoveResult.Success, QueueCacheCursorMoveResult.NoData);
+            oldCursor.GetCurrent(out _).Returns(batch);
+            IQueueCacheCursor reboundCursor = reuseCursor ? oldCursor : new EmptyQueueCacheCursor();
+            var queueCache = Substitute.For<IQueueCache>();
+            var failEarlierRequest = true;
+            queueCache.TryGetCacheCursor(Arg.Any<StreamId>(), Arg.Any<StreamSequenceToken?>()).Returns(call =>
+            {
+                if (failEarlierRequest && call.ArgAt<StreamSequenceToken?>(1)?.SequenceNumber == 50)
+                {
+                    return QueueCacheCursorResult<IQueueCacheCursor>.FromCacheMiss(new("50", "100", "200"));
+                }
+
+                return QueueCacheCursorResult<IQueueCacheCursor>.FromCursor(reboundCursor);
+            });
+            var progress = new List<StreamSequenceToken?>();
+            queueCache.When(cache => cache.UpdateDeliveryProgress(Arg.Any<StreamSequenceToken?>(), Arg.Any<DateTime>()))
+                .Do(call => progress.Add(call.ArgAt<StreamSequenceToken?>(0)));
+            var adapterCache = Substitute.For<IQueueAdapterCache>();
+            adapterCache.CreateQueueCache(queueId).Returns(queueCache);
+            var receiver = Substitute.For<IQueueAdapterReceiver>();
+            receiver.GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
+                .Returns(Task.FromResult<IList<IBatchContainer>>([batch]));
+            var agent = CreateAgent(pubSub, queueId, receiver, adapterCache,
+                options: new StreamPullingAgentOptions { BatchContainerBatchSize = batchSize });
+            var accessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
+            await InitializeAgent(agent);
+            await accessor.RegisterStream(streamId, new EventSequenceTokenV2(100), DateTime.UtcNow);
+            Assert.True(await accessor.ReadFromQueue(queueId, receiver, 1000));
+            var observer = new RecordingConsumer();
+            if (lateRewind)
+            {
+                observer.DeliveryResponses.Enqueue(StreamHandshakeToken.CreateDeliveyToken(new EventSequenceTokenV2(400)));
+            }
+
+            var consumer = (await accessor.GetPubSubCache()).Single().Value.AddConsumer(
+                GuidId.GetGuidId(SubscriptionMarker.MarkAsExplicitSubscriptionId(Guid.NewGuid())),
+                streamId, observer, null, DateTime.UtcNow);
+            consumer.IsRegistered = true;
+            consumer.LastProcessedToken = new EventSequenceTokenV2(100);
+            consumer.LastToken = StreamHandshakeToken.CreateDeliveyToken(consumer.LastProcessedToken);
+            consumer.Cursor = oldCursor;
+            var delivery = accessor.RunConsumerCursor(consumer);
+            try
+            {
+                await observer.Delivered.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+                Assert.False(delivery.IsCompleted);
+                Assert.Equal(100, Assert.IsType<EventSequenceTokenV2>(consumer.LastProcessedToken).SequenceNumber);
+                Assert.False(consumer.HasDeliveryProgressError);
+                if (tokenKind != "none")
+                {
+                    observer.HandshakeResponse = tokenKind == "start"
+                        ? StreamHandshakeToken.CreateStartToken(earlierToken)
+                        : StreamHandshakeToken.CreateDeliveyToken(earlierToken);
+                    await Reattach();
+                    Assert.True(consumer.HasDeliveryProgressError);
+
+                    // Rebind an exact-but-empty recovery cursor while the old delivery is still blocked.
+                    // Some providers recycle the same cursor object, so identity alone cannot identify the callback.
+                    failEarlierRequest = false;
+                    await Reattach();
+                    Assert.Same(reboundCursor, consumer.Cursor);
+                    Assert.Same(reboundCursor, consumer.DeliveryRecoveryCursor);
+                    Assert.Equal(reuseCursor, ReferenceEquals(oldCursor, consumer.Cursor));
+                    Assert.True(consumer.HasDeliveryProgressError);
+                    Assert.Equal(0, consumer.PendingHandshakes);
+                    Assert.Same(observer.HandshakeResponse, consumer.LastToken);
+                }
+
+                observer.ReleaseDelivery();
+                await delivery.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+                Assert.Same(attemptedToken, Assert.Single(observer.DeliveredTokens));
+                Assert.Equal(StreamConsumerDataState.Inactive, consumer.State);
+                if (tokenKind == "none")
+                {
+                    Assert.False(consumer.HasDeliveryProgressError);
+                    Assert.True(consumer.IsCaughtUp);
+                    Assert.Null(consumer.UnconfirmedDeliveryToken);
+                    Assert.Equal(200, Assert.IsType<EventSequenceTokenV2>(consumer.LastProcessedToken).SequenceNumber);
+                    Assert.Equal(200, Assert.IsType<EventSequenceTokenV2>(
+                        Assert.IsType<DeliveryToken>(consumer.LastToken).Token).SequenceNumber);
+                }
+                else
+                {
+                    Assert.True(consumer.HasDeliveryProgressError);
+                    Assert.False(consumer.IsCaughtUp);
+                    Assert.Same(observer.HandshakeResponse, consumer.LastToken);
+                    Assert.Equal(earlierToken, consumer.DeliveryRecoveryToken?.Token);
+                    Assert.Same(attemptedToken, consumer.UnconfirmedDeliveryToken);
+                    Assert.Equal(tokenKind == "start" ? null : earlierToken, consumer.LastProcessedToken);
+                }
+
+                await accessor.Shutdown();
+                if (tokenKind == "start")
+                {
+                    Assert.Empty(progress);
+                }
+                else
+                {
+                    Assert.Equal(tokenKind == "none" ? 200 : 50,
+                        Assert.IsType<EventSequenceTokenV2>(Assert.Single(progress)).SequenceNumber);
+                }
+            }
+            finally
+            {
+                observer.ReleaseDelivery();
+            }
+
+            Task Reattach() => agent.RunOrQueueTask(() => agent.AddSubscriber(
+                consumer.SubscriptionId, streamId, GrainId.Create("test", "reattached-subscriber"), null,
+                TestContext.Current.CancellationToken));
+        }
+
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public async Task Recovery_RetriesCanceledRegistrationFromOriginalCachedPosition()
+        {
+            var firstRegistration = new TaskCompletionSource<ISet<PubSubSubscriptionState>>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var pubSub = Substitute.For<IStreamPubSub>();
+            var queueId = QueueId.GetQueueId("queue", 0u, 0u);
+            var streamId = new QualifiedStreamId("provider", StreamId.Create("namespace", Guid.NewGuid()));
+            var subscriptionId = GuidId.GetGuidId(SubscriptionMarker.MarkAsExplicitSubscriptionId(Guid.NewGuid()));
+            var subscriptions = new HashSet<PubSubSubscriptionState>
+            {
+                new(subscriptionId, streamId, GrainId.Create("test", "existing-subscriber")),
+            };
+            pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
+                .ReturnsForAnyArgs(_ => firstRegistration.Task, _ => Task.FromResult<ISet<PubSubSubscriptionState>>(subscriptions));
+            var backoff = Substitute.For<IBackoffProvider>();
+            // Cancel the first attempt's retry wait, without stopping the agent.
+            var cancelFirstWait = true;
+            backoff.Next(Arg.Any<int>()).Returns(_ =>
+            {
+                if (cancelFirstWait)
+                {
+                    cancelFirstWait = false;
+                    throw new OperationCanceledException("Transient registration retry cancellation.");
+                }
+
+                return TimeSpan.Zero;
+            });
+            var queueCache = new PurgeablePooledQueueCache();
+            var adapterCache = Substitute.For<IQueueAdapterCache>();
+            adapterCache.CreateQueueCache(queueId).Returns(queueCache);
+            var receiver = Substitute.For<IQueueAdapterReceiver>();
+            receiver.GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(
+                Task.FromResult<IList<IBatchContainer>>(
+                [
+                    new TestBatchContainer(streamId.StreamId, new EventSequenceTokenV2(100)),
+                    new TestBatchContainer(streamId.StreamId, new EventSequenceTokenV2(200)),
+                ]),
+                Task.FromResult<IList<IBatchContainer>>([]));
+            var agent = CreateAgent(pubSub, queueId, receiver, adapterCache, deliveryBackoff: backoff);
+            var accessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
+            await InitializeAgent(agent);
+            Assert.True(await accessor.ReadFromQueue(queueId, receiver, 1000));
+            var stream = (await accessor.GetPubSubCache()).Single().Value;
+            var firstTask = stream.RegistrationTask;
+            Assert.NotNull(firstTask);
+            var observer = new RecordingConsumer();
+            observer.ReleaseDelivery();
+            stream.AddConsumer(subscriptionId, streamId, observer, null, DateTime.UtcNow);
+            firstRegistration.SetException(new InvalidOperationException("Transient pubsub registration failure."));
+            await firstTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+            await accessor.RunQueuePump(queueId, TestContext.Current.CancellationToken);
+            var streams = await accessor.GetPubSubCache();
+            await Task.WhenAll(streams.Values.Select(value => value.RegistrationTask ?? Task.CompletedTask))
+                .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await pubSub.Received(2).RegisterProducer(streamId, Arg.Any<GrainId>(), Arg.Any<CancellationToken>());
+            Assert.Equal(new[] { 100L, 200L }, observer.DeliveredTokens.Select(token => token.SequenceNumber));
+            Assert.Equal(1, observer.HandshakeCount);
+            await accessor.Shutdown();
+            Assert.Equal(200, Assert.IsType<EventSequenceTokenV2>(Assert.Single(queueCache.DeliveryProgressTokens)).SequenceNumber);
+        }
+
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public async Task Recovery_RetriesOnlyFailedInitialAttachmentsWithoutNewMessages()
+        {
+            var registration = new TaskCompletionSource<ISet<PubSubSubscriptionState>>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var pubSub = Substitute.For<IStreamPubSub>();
+            pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken).ReturnsForAnyArgs(_ => registration.Task);
+            var queueId = QueueId.GetQueueId("queue", 0u, 0u);
+            var streamId = new QualifiedStreamId("provider", StreamId.Create("namespace", Guid.NewGuid()));
+            var failedId = GuidId.GetGuidId(SubscriptionMarker.MarkAsExplicitSubscriptionId(Guid.NewGuid()));
+            var healthyId = GuidId.GetGuidId(SubscriptionMarker.MarkAsExplicitSubscriptionId(Guid.NewGuid()));
+            var queueCache = new PurgeablePooledQueueCache();
+            var adapterCache = Substitute.For<IQueueAdapterCache>();
+            adapterCache.CreateQueueCache(queueId).Returns(queueCache);
+            var receiver = Substitute.For<IQueueAdapterReceiver>();
+            receiver.GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(
+                Task.FromResult<IList<IBatchContainer>>(
+                [
+                    new TestBatchContainer(streamId.StreamId, new EventSequenceTokenV2(100)),
+                    new TestBatchContainer(streamId.StreamId, new EventSequenceTokenV2(200)),
+                ]),
+                Task.FromResult<IList<IBatchContainer>>([]));
+            var agent = CreateAgent(pubSub, queueId, receiver, adapterCache);
+            var accessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
+            await InitializeAgent(agent);
+            Assert.True(await accessor.ReadFromQueue(queueId, receiver, 1000));
+            var stream = (await accessor.GetPubSubCache()).Single().Value;
+            var firstTask = stream.RegistrationTask;
+            Assert.NotNull(firstTask);
+            var healthy = new RecordingConsumer();
+            healthy.ReleaseDelivery();
+            stream.AddConsumer(healthyId, streamId, healthy, null, DateTime.UtcNow);
+            registration.SetResult(new HashSet<PubSubSubscriptionState>
+            {
+                new(failedId, streamId, GrainId.Create("test", "initially-unavailable-subscriber")),
+                new(healthyId, streamId, GrainId.Create("test", "healthy-subscriber")),
+            });
+            await firstTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            Assert.Equal(1, healthy.HandshakeCount);
+            Assert.Equal(new[] { 100L, 200L }, healthy.DeliveredTokens.Select(token => token.SequenceNumber));
+            // The first attachment failed resolving its reference. Make it available for the retry.
+            var recovered = new RecordingConsumer();
+            recovered.ReleaseDelivery();
+            stream.AddConsumer(failedId, streamId, recovered, null, DateTime.UtcNow);
+            await accessor.RunQueuePump(queueId, TestContext.Current.CancellationToken);
+            var streams = await accessor.GetPubSubCache();
+            await Task.WhenAll(streams.Values.Select(value => value.RegistrationTask ?? Task.CompletedTask))
+                .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+            Assert.Equal(1, recovered.HandshakeCount);
+            Assert.Equal(new[] { 100L, 200L }, recovered.DeliveredTokens.Select(token => token.SequenceNumber));
+            Assert.Equal(1, healthy.HandshakeCount);
+            Assert.Equal(new[] { 100L, 200L }, healthy.DeliveredTokens.Select(token => token.SequenceNumber));
+            await accessor.Shutdown();
+            Assert.Equal(200, Assert.IsType<EventSequenceTokenV2>(Assert.Single(queueCache.DeliveryProgressTokens)).SequenceNumber);
+        }
+
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
+        [Theory, TestCategory("BVT"), TestCategory("Streaming")]
+        [InlineData(false, false)]
+        [InlineData(false, true)]
+        [InlineData(true, false)]
+        [InlineData(true, true)]
+        public async Task Recovery_RemovingConsumerReleasesOnlyItsReplayConstraint(bool faultFirstConsumer, bool removeSecondConsumer)
+        {
+            var pubSub = Substitute.For<IStreamPubSub>();
+            pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
+                .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
+            var queueId = QueueId.GetQueueId("queue", 0u, 0u);
+            var streamId = new QualifiedStreamId("provider", StreamId.Create("namespace", Guid.NewGuid()));
+            var queueCache = new RecordingQueueCache();
+            var adapterCache = Substitute.For<IQueueAdapterCache>();
+            adapterCache.CreateQueueCache(queueId).Returns(queueCache);
+            var receiver = Substitute.For<IQueueAdapterReceiver>();
+            receiver.GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(
+                Task.FromResult<IList<IBatchContainer>>([new TestBatchContainer(streamId.StreamId, new EventSequenceTokenV2(200))]));
+            var agent = CreateAgent(pubSub, queueId, receiver, adapterCache);
+            var accessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
+            await InitializeAgent(agent);
+            await accessor.RegisterStream(streamId, new EventSequenceTokenV2(0), DateTime.UtcNow);
+            Assert.True(await accessor.ReadFromQueue(queueId, receiver, 1000));
+            var stream = (await accessor.GetPubSubCache()).Single().Value;
+            var firstObserver = new RecordingConsumer();
+            firstObserver.ReleaseDelivery();
+            var first = AddConsumer(firstObserver, 100);
+            var second = AddConsumer(new RecordingConsumer(), 150);
+            await accessor.RunConsumerCursor(first);
+            await accessor.RunConsumerCursor(second);
+            Assert.True(first.HasDeliveryProgressError);
+            Assert.True(second.HasDeliveryProgressError);
+            if (faultFirstConsumer)
+            {
+                firstObserver.HandshakeResponse = new UnknownHandshakeToken();
+                await agent.RunOrQueueTask(() => agent.AddSubscriber(
+                    first.SubscriptionId, streamId, GrainId.Create("test", "faulted-subscriber"), null,
+                    TestContext.Current.CancellationToken));
+                await pubSub.Received(1).FaultSubscription(streamId, first.SubscriptionId, Arg.Any<CancellationToken>());
+            }
+            else
+            {
+                await agent.RunOrQueueTask(() => agent.RemoveSubscriber(
+                    first.SubscriptionId, streamId, TestContext.Current.CancellationToken));
+            }
+
+            Assert.False(stream.Contains(first.SubscriptionId));
+            Assert.True(stream.Contains(second.SubscriptionId));
+            Assert.True(second.HasDeliveryProgressError);
+            if (removeSecondConsumer)
+            {
+                await agent.RunOrQueueTask(() => agent.RemoveSubscriber(
+                    second.SubscriptionId, streamId, TestContext.Current.CancellationToken));
+            }
+
+            await accessor.Shutdown();
+            Assert.Equal(removeSecondConsumer ? 200 : 150,
+                Assert.IsType<EventSequenceTokenV2>(Assert.Single(queueCache.DeliveryProgressTokens)).SequenceNumber);
+
+            StreamConsumerData AddConsumer(RecordingConsumer observer, long safePosition)
+            {
+                var consumer = stream.AddConsumer(
+                    GuidId.GetGuidId(SubscriptionMarker.MarkAsExplicitSubscriptionId(Guid.NewGuid())),
+                    streamId, observer, null, DateTime.UtcNow);
+                consumer.IsRegistered = true;
+                consumer.LastProcessedToken = new EventSequenceTokenV2(safePosition);
+                consumer.LastToken = StreamHandshakeToken.CreateDeliveyToken(consumer.LastProcessedToken);
+                var cursor = Substitute.For<IQueueCacheCursor>();
+                cursor.MoveNextWithResult().Returns(_ => throw new InvalidOperationException("Injected unresolved cursor failure."));
+                consumer.Cursor = cursor;
                 return consumer;
             }
         }
