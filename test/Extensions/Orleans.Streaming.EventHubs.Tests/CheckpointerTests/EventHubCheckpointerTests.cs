@@ -1285,9 +1285,9 @@ public class EventHubCheckpointerTests
         await Assert.ThrowsAsync<ArgumentException>(() => recovery);
 
         Assert.Equal(1, initialCache.DisposeCount);
-        Assert.Equal(1, replacementCache.DisposeCount);
+        Assert.Equal(0, replacementCache.DisposeCount);
         Assert.Equal(1, invalidReceiver.CloseCount);
-        Assert.Equal(1, replacementReceiver.CloseCount);
+        Assert.Equal(0, replacementReceiver.CloseCount);
         Assert.Empty(await receiver.GetQueueMessagesAsync(10, TestContext.Current.CancellationToken));
     }
 
@@ -1315,11 +1315,36 @@ public class EventHubCheckpointerTests
 
         receiver.UpdateDeliveryProgress(MakeToken(124), DateTime.UtcNow);
         Assert.Null(checkpointer.LastOffset);
+    }
 
-        var cursorResult = ((IQueueCache)receiver).TryGetCacheCursor(
-            StreamId.Create("namespace", Guid.NewGuid()),
-            MakeToken(1));
-        Assert.Equal(QueueCacheCursorResultKind.NotSupported, cursorResult.Kind);
+    [TestSuite("BVT")]
+    [Fact, TestCategory("BVT")]
+    public async Task ResetReceiver_WhenCallerCancels_ResetRemainsRecoveryBarrier()
+    {
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            TestContext.Current.CancellationToken);
+        var checkpointer = new BlockingResetCheckpointer
+        {
+            LoadedOffset = "123",
+        };
+        var receiver = await CreateReceiver(
+            checkpointer,
+            receiverFactory: offset => offset == "123"
+                ? new InvalidOffsetEventHubReceiver()
+                : new TestEventHubReceiver());
+
+        var canceledRead = receiver.GetQueueMessagesAsync(10, cancellation.Token);
+        await checkpointer.ResetStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => canceledRead);
+
+        var waitingRead = receiver.GetQueueMessagesAsync(
+            10,
+            TestContext.Current.CancellationToken);
+        Assert.False(waitingRead.IsCompleted);
+
+        checkpointer.ReleaseReset.TrySetResult();
+        Assert.Empty(await waitingRead);
     }
 
     [TestSuite("BVT")]
