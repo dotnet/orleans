@@ -24,6 +24,7 @@ namespace Orleans.Runtime
     public sealed class SiloAddress :
         IEquatable<SiloAddress>,
         IComparable<SiloAddress>,
+        IComparable,
         ISpanFormattable,
         IParsable<SiloAddress>,
         IUtf8SpanParsable<SiloAddress>
@@ -565,6 +566,14 @@ namespace Orleans.Runtime
             if (comp != 0) return comp;
 
             return IPAddressComparer.Instance.Compare(Endpoint.Address, other.Endpoint.Address);
+        }
+
+        int IComparable.CompareTo(object? obj)
+        {
+            if (obj is null) return 1;
+            return obj is SiloAddress other
+                ? CompareTo(other)
+                : throw new ArgumentException($"Object must be of type {nameof(SiloAddress)}.", nameof(obj));
         }
     }
 
