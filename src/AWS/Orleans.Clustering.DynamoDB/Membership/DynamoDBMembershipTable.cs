@@ -161,11 +161,9 @@ namespace Orleans.Clustering.DynamoDB
                     toDelete.Add(record.GetKeys());
                 }
 
-                foreach (var batch in toDelete.BatchIEnumerable(MAX_BATCH_SIZE))
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    await storage.DeleteEntriesAsync(this.options.TableName, batch, cancellationToken);
-                }
+                // Capture synchronous cancellation as a task so every started batch remains owned by WhenAll.
+                await Task.WhenAll(toDelete.BatchIEnumerable(MAX_BATCH_SIZE)
+                    .Select(async batch => await storage.DeleteEntriesAsync(this.options.TableName, batch, cancellationToken)));
             }
             catch (Exception exc)
             {
@@ -584,11 +582,8 @@ namespace Orleans.Clustering.DynamoDB
                 var records = await this.storage.QueryAllAsync(this.options.TableName, keys, filter, item => new SiloInstanceRecord(item), cancellationToken);
                 var defunctRecordKeys = records.Where(r => SiloIsDefunct(r, beforeDate)).Select(r => r.GetKeys());
 
-                foreach (var batch in defunctRecordKeys.BatchIEnumerable(MAX_BATCH_SIZE))
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    await this.storage.DeleteEntriesAsync(this.options.TableName, batch, cancellationToken);
-                }
+                await Task.WhenAll(defunctRecordKeys.BatchIEnumerable(MAX_BATCH_SIZE)
+                    .Select(async batch => await this.storage.DeleteEntriesAsync(this.options.TableName, batch, cancellationToken)));
             }
             catch (Exception exc)
             {

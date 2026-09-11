@@ -245,11 +245,8 @@ namespace Orleans.AzureUtils
             }
             else
             {
-                foreach (var batch in entriesList.BatchIEnumerable(this.storagePolicyOptions.MaxBulkUpdateRows))
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    await storage.DeleteTableEntriesAsync(batch, cancellationToken);
-                }
+                await Task.WhenAll(entriesList.BatchIEnumerable(this.storagePolicyOptions.MaxBulkUpdateRows)
+                    .Select(batch => storage.DeleteTableEntriesAsync(batch, cancellationToken)));
             }
         }
 

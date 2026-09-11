@@ -80,11 +80,8 @@ internal partial class FirestoreMembershipTable : IMembershipTable
             .Where(entity => GetEffectiveUpdateTime(entity) < beforeDate)
             .ToArray();
 
-        foreach (var chunk in defunctEntries.Chunk(FirestoreDataManager.MaxBatchSize))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            await this._storage.DeleteEntities(chunk, cancellationToken);
-        }
+        await Task.WhenAll(defunctEntries.Chunk(FirestoreDataManager.MaxBatchSize)
+            .Select(chunk => this._storage.DeleteEntities(chunk, cancellationToken)));
     }
 
     [Obsolete("Use ReadRowAsync instead.")]
