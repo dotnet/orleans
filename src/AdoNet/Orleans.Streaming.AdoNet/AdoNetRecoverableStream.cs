@@ -144,6 +144,19 @@ internal sealed partial class AdoNetRecoverableStream(
                 cleanup.ActiveReplayWatermark);
         }
 
+        var firstRead = messages.Count > 0 ? messages[0].MessageId : (long?)null;
+        if (firstRead is { } firstMessageId
+            && firstMessageId > _readOffset + 1
+            && cleanup.EarliestMessageId is { } earliestMessageId
+            && earliestMessageId > _readOffset + 1)
+        {
+            var failure = new DataNotAvailableException(
+                $"ADO.NET stream partition '{serviceId}/{providerId}/{queueId}' lost unread retained records after "
+                + $"message {_readOffset}: the first available message is {firstMessageId}.");
+            var retainedFailure = Interlocked.CompareExchange(ref _retentionFailure, failure, comparand: null) ?? failure;
+            throw retainedFailure;
+        }
+
         var readThrough = messages.Count > 0 ? messages[^1].MessageId : _readOffset;
         if (cleanup.HardDeletedThroughMessageId is { } hardDeletedThrough
             && hardDeletedThrough > readThrough)
@@ -437,6 +450,14 @@ internal sealed partial class AdoNetRecoverableStream(
                     exception);
             }
             ThrowForReplayStatus(page.Lease, _readerId, _readOffset);
+            if (page.Messages.Count > 0
+                && page.Messages[0].MessageId > _readOffset + 1)
+            {
+                throw new DataNotAvailableException(
+                    $"ADO.NET replay reader '{_readerId}' lost retained records after message {_readOffset}: "
+                    + $"the first available message is {page.Messages[0].MessageId}.");
+            }
+
             var isAtTail = page.Lease.TailMessageId is not { } tail
                 || page.Messages.Count == 0 && _readOffset >= tail
                 || page.Messages.Count > 0 && page.Messages[^1].MessageId >= tail;
