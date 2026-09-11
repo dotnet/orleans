@@ -46,11 +46,7 @@ namespace Orleans.Tests.SqlUtils
         {
             ArgumentNullException.ThrowIfNull(selector);
             cancellationToken.ThrowIfCancellationRequested();
-            return storage.ReadAsync(query, parameterProvider, (record, i, token) =>
-            {
-                token.ThrowIfCancellationRequested();
-                return Task.FromResult(selector(record));
-            }, cancellationToken: cancellationToken);
+            return storage.ReadAsync(query, parameterProvider, (record, i, token) => Task.FromResult(selector(record)), cancellationToken: cancellationToken);
         }
 
         /// <summary>

@@ -78,7 +78,6 @@ internal sealed class CassandraClusteringTable : IMembershipTable, IDisposable
                 await queries.EnsureClusterVersionExistsAsync(_options.InitializeRetryMaxDelay, _identifier, cancellationToken);
             }
 
-            cancellationToken.ThrowIfCancellationRequested();
             _session = session;
             _ownsSession = ownsSession;
             _queries = queries;

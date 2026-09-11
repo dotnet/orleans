@@ -119,6 +119,29 @@ public sealed class RedisMembershipTableCancellationTests
     }
 
     [Fact]
+    public async Task Initialize_CompletedStorageWork_PublishesConnectionAfterCancellation()
+    {
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var database = Substitute.For<IDatabase>();
+        database.HashSetAsync(Arg.Any<RedisKey>(), Arg.Any<RedisValue>(), Arg.Any<RedisValue>(), When.NotExists)
+            .Returns(Task.FromResult(true));
+        database.KeyExpireAsync(Arg.Any<RedisKey>(), Arg.Any<TimeSpan?>()).Returns(_ =>
+        {
+            cancellation.Cancel();
+            return Task.FromResult(true);
+        });
+        var muxer = Substitute.For<IConnectionMultiplexer>();
+        muxer.GetDatabase(Arg.Any<int>(), Arg.Any<object>()).Returns(database);
+        using var table = CreateTable(_ => Task.FromResult((muxer, true)));
+
+        await table.InitializeMembershipTable(true, cancellation.Token);
+
+        Assert.True(cancellation.IsCancellationRequested);
+        Assert.True(table.IsInitialized);
+        await muxer.DidNotReceive().DisposeAsync();
+    }
+
+    [Fact]
     public async Task ReadRow_CanceledDuringTransaction_DoesNotReturnSuccess()
     {
         var execution = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);

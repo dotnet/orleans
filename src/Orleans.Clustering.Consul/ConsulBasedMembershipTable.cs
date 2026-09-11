@@ -309,7 +309,6 @@ namespace Orleans.Runtime.Membership
 
             foreach (var entry in allRegistrations)
             {
-                cancellationToken.ThrowIfCancellationRequested();
                 if (entry.Registration.IAmAliveTime < beforeDate && entry.Registration.Status != SiloStatus.Active)
                 {
                     await _consulClient.KV.DeleteTree(entry.RegistrationKey, cancellationToken);

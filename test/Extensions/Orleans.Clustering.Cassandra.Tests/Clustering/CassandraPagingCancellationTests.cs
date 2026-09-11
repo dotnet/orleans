@@ -28,10 +28,11 @@ public class CassandraPagingCancellationTests
     }
 
     [Fact]
-    public async Task ReadRowsAsync_CancellationStopsBufferedEnumeration()
+    public async Task ReadRowsAsync_CancellationAfterFetch_PreservesBufferedRows()
     {
         var first = new Row();
-        var rows = new BufferedOnlyRowSet(first, new Row());
+        var second = new Row();
+        var rows = new BufferedOnlyRowSet(first, second);
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         await using var enumerator = OrleansQueries.ReadRowsAsync(rows, cancellation.Token).GetAsyncEnumerator(cancellation.Token);
         Assert.True(await enumerator.MoveNextAsync());
@@ -39,8 +40,21 @@ public class CassandraPagingCancellationTests
 
         cancellation.Cancel();
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => enumerator.MoveNextAsync().AsTask());
-        Assert.Equal(1, rows.GetAvailableWithoutFetching());
+        Assert.True(await enumerator.MoveNextAsync());
+        Assert.Same(second, enumerator.Current);
+        Assert.False(await enumerator.MoveNextAsync());
+        Assert.Equal(0, rows.GetAvailableWithoutFetching());
+    }
+
+    [Fact]
+    public async Task AwaitAsync_CompletedOperations_PreserveResults()
+    {
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var completed = Task.FromResult(42);
+        cancellation.Cancel();
+
+        Assert.Equal(42, await OrleansQueries.AwaitAsync(completed, cancellation.Token));
+        await OrleansQueries.AwaitAsync(Task.CompletedTask, cancellation.Token);
     }
 
     private sealed class BufferedOnlyRowSet : RowSet

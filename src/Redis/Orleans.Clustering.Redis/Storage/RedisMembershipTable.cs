@@ -66,10 +66,10 @@ namespace Orleans.Clustering.Redis
             var initialized = false;
             try
             {
-                cancellationToken.ThrowIfCancellationRequested();
                 var db = muxer.GetDatabase();
                 if (tryInitTableVersion)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     await AwaitAsync(db.HashSetAsync(_clusterKey, TableVersionKey, SerializeVersion(DefaultTableVersion), When.NotExists), cancellationToken);
 
                     if (_redisOptions.EntryExpiry is { } expiry)
@@ -79,7 +79,6 @@ namespace Orleans.Clustering.Redis
                     }
                 }
 
-                cancellationToken.ThrowIfCancellationRequested();
                 _muxer = muxer;
                 _muxerIsShared = isShared;
                 _db = db;
@@ -283,10 +282,10 @@ namespace Orleans.Clustering.Redis
             var entries = await ReadAll(cancellationToken);
             foreach (var (entry, _) in entries.Members)
             {
-                cancellationToken.ThrowIfCancellationRequested();
                 if (entry.Status != SiloStatus.Active
                     && new DateTime(Math.Max(entry.IAmAliveTime.Ticks, entry.StartTime.Ticks), DateTimeKind.Utc) < beforeDate)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     await AwaitAsync(_db.HashDeleteAsync(_clusterKey, entry.SiloAddress.ToString()), cancellationToken);
                 }
             }
@@ -296,9 +295,7 @@ namespace Orleans.Clustering.Redis
         private static async Task<T> AwaitAsync<T>(Task<T> operation, CancellationToken cancellationToken)
         {
             operation.Ignore();
-            var result = await operation.WaitAsync(cancellationToken).ConfigureAwait(false);
-            cancellationToken.ThrowIfCancellationRequested();
-            return result;
+            return await operation.WaitAsync(cancellationToken).ConfigureAwait(false);
         }
 
         public void Dispose()

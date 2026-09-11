@@ -299,7 +299,6 @@ namespace Orleans.AzureUtils
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 query = await membershipTableReadStorage.ReadAllTableEntriesForPartitionAsync(DeploymentId, cancellationToken);
-                cancellationToken.ThrowIfCancellationRequested();
                 var tableVersion = ValidateAllSiloEntries(query.Entries);
                 if (CanAcceptSnapshot(query, tableVersion))
                 {

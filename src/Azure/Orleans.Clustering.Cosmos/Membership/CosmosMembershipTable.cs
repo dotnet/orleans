@@ -95,7 +95,6 @@ internal partial class CosmosMembershipTable : IMembershipTable
 
             foreach (var silo in silos)
             {
-                cancellationToken.ThrowIfCancellationRequested();
                 batch = batch.DeleteItem(silo.Id);
             }
 
@@ -147,7 +146,6 @@ internal partial class CosmosMembershipTable : IMembershipTable
 
             foreach (var silo in silos)
             {
-                cancellationToken.ThrowIfCancellationRequested();
                 batch = batch.DeleteItem(silo.Id);
             }
 
@@ -365,8 +363,7 @@ internal partial class CosmosMembershipTable : IMembershipTable
     {
         try
         {
-            // A configured factory can return a shared client. Retain its task for retries rather
-            // than disposing a late result or publishing it after the initialization was canceled.
+            // A configured factory can return a shared client. Retain its task so retries reuse it.
             if (_clientTask is { IsCompleted: true, IsCompletedSuccessfully: false })
             {
                 _clientTask = null;
@@ -374,9 +371,7 @@ internal partial class CosmosMembershipTable : IMembershipTable
 
             var clientTask = _clientTask ??= _options.CreateClient!(_serviceProvider).AsTask();
             clientTask.Ignore();
-            var client = await clientTask.WaitAsync(cancellationToken).ConfigureAwait(false);
-            cancellationToken.ThrowIfCancellationRequested();
-            _client = client;
+            _client = await clientTask.WaitAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

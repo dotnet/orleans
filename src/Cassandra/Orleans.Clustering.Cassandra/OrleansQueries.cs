@@ -500,13 +500,11 @@ internal sealed class OrleansQueries
         // Consume buffered rows so that fetching each subsequent page stays on the cancellable await path.
         while (true)
         {
-            cancellationToken.ThrowIfCancellationRequested();
             var available = rows.GetAvailableWithoutFetching();
             using (var buffered = rows.GetEnumerator())
             {
                 for (var i = 0; i < available; i++)
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
                     if (!buffered.MoveNext())
                     {
                         break;
@@ -530,16 +528,13 @@ internal sealed class OrleansQueries
     internal static async Task<T> AwaitAsync<T>(Task<T> operation, CancellationToken cancellationToken)
     {
         operation.Ignore();
-        var result = await operation.WaitAsync(cancellationToken).ConfigureAwait(false);
-        cancellationToken.ThrowIfCancellationRequested();
-        return result;
+        return await operation.WaitAsync(cancellationToken).ConfigureAwait(false);
     }
 
     internal static async Task AwaitAsync(Task operation, CancellationToken cancellationToken)
     {
         operation.Ignore();
         await operation.WaitAsync(cancellationToken).ConfigureAwait(false);
-        cancellationToken.ThrowIfCancellationRequested();
     }
 
     private static string? GetSuspectTimesString(MembershipEntry entry) =>

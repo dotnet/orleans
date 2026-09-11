@@ -217,6 +217,24 @@ public class AzureMembershipPaginationTests
     }
 
     [Fact]
+    public async Task CompletedMembershipRead_PreservesSnapshotAfterCancellation()
+    {
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var storage = new ScriptedMembershipTableReadStorage();
+        storage.AddQuery(() =>
+        {
+            cancellation.Cancel();
+            return FencedQuery(2, Silo("silo-2", "s2"));
+        });
+
+        var result = await CreateManager(storage).FindAllSiloEntries(cancellation.Token);
+
+        Assert.True(cancellation.IsCancellationRequested);
+        Assert.Equal(["silo-2", SiloInstanceTableEntry.TABLE_VERSION_ROW], result.Select(entry => entry.Entity.RowKey));
+        Assert.Equal(1, storage.QueryCount);
+    }
+
+    [Fact]
     public async Task CanceledMembershipReadDoesNotQueryStorage()
     {
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);

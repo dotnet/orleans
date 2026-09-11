@@ -152,6 +152,8 @@ namespace Orleans.Runtime.MembershipService
             if (snapshot.Version == MembershipVersion.MinValue)
                 throw new ArgumentException("Cannot call RefreshFromSnapshot with Version == MembershipVersion.MinValue");
 
+            cancellationToken.ThrowIfCancellationRequested();
+
             // Check if a refresh is underway
             var pending = this.pendingRefresh;
             if (pending != null && !pending.IsCompleted)
@@ -159,7 +161,6 @@ namespace Orleans.Runtime.MembershipService
                 await pending.WaitAsync(cancellationToken);
             }
 
-            cancellationToken.ThrowIfCancellationRequested();
             LogInformationReceivedClusterMembershipSnapshot(this.log, snapshot);
 
             this.TryProcessMembershipUpdate(MembershipTableSnapshot.Update, snapshot, nameof(RefreshFromSnapshot));

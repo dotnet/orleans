@@ -327,7 +327,6 @@ namespace Orleans.Runtime.Membership
             }
             catch (KeeperException e)
             {
-                cancellationToken.ThrowIfCancellationRequested();
                 //these exceptions are thrown when the transaction fails to commit due to semantical reasons
                 if (e is KeeperException.NodeExistsException || e is KeeperException.NoNodeException ||
                     e is KeeperException.BadVersionException)
@@ -366,12 +365,10 @@ namespace Orleans.Runtime.Membership
         private static async Task<T> UsingZookeeper<T>(Func<ZooKeeper, Task<T>> zkMethod, string deploymentConnectionString, ZooKeeperWatcher watcher, CancellationToken cancellationToken, bool canBeReadOnly = false)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var operation = ZooKeeper.Using(deploymentConnectionString, ZOOKEEPER_SESSION_TIMEOUT, watcher, async zk =>
+            var operation = ZooKeeper.Using(deploymentConnectionString, ZOOKEEPER_SESSION_TIMEOUT, watcher, zk =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var result = await zkMethod(zk);
-                cancellationToken.ThrowIfCancellationRequested();
-                return result;
+                return zkMethod(zk);
             }, canBeReadOnly);
 
             // ZooKeeperNetEx is tokenless. Keep the client alive until pending requests and
@@ -383,11 +380,10 @@ namespace Orleans.Runtime.Membership
         private async Task UsingZookeeper(string connectString, Func<ZooKeeper, Task> zkMethod, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var operation = ZooKeeper.Using(connectString, ZOOKEEPER_SESSION_TIMEOUT, watcher, async zk =>
+            var operation = ZooKeeper.Using(connectString, ZOOKEEPER_SESSION_TIMEOUT, watcher, zk =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                await zkMethod(zk);
-                cancellationToken.ThrowIfCancellationRequested();
+                return zkMethod(zk);
             });
 
             operation.Ignore();
@@ -458,7 +454,6 @@ namespace Orleans.Runtime.Membership
 
                 foreach (var (entry, _) in rows)
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
                     if (entry.Status != SiloStatus.Active
                         && Math.Max(entry.IAmAliveTime.Ticks, entry.StartTime.Ticks) < beforeDate.Ticks)
                     {

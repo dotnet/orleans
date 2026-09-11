@@ -75,6 +75,8 @@ The persistent stream provider illustrates staged lifecycle composition: it crea
 
 Membership callers use the cancellation-aware overloads of <xref:Orleans.IMembershipTable> for initialization, reads, and writes. Built-in providers forward tokens to backend APIs which support cancellation and bound waits on tokenless SDK operations while observing late faults. Custom providers can implement the cancellation-aware overloads directly; their default implementations adapt existing tokenless providers by canceling the caller's wait while the operation completes. Tokenless overloads remain as obsolete compatibility entry points. Cancellation can race with a committed write, so conditional writes and table versions continue to govern subsequent updates.
 
+Return completed backend results, and observe cancellation before starting further I/O. Mapping an already-returned result preserves that operation's outcome.
+
 Shared membership refreshes live until the membership manager is disposed. Each caller owns its wait, while periodic maintenance and its queued cleanup requests stop with the silo lifecycle. This keeps membership reads available during shutdown.
 
 Membership table RPCs retain their existing operation aliases and application-argument payloads, with cancellation propagated separately. During rolling upgrades, each receiver uses its implementation's cancellation behavior.

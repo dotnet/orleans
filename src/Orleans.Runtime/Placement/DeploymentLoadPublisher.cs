@@ -203,7 +203,6 @@ namespace Orleans.Runtime
             {
                 var statistics = await _grainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlType, silo)
                     .GetRuntimeStatistics(cancellationToken);
-                cancellationToken.ThrowIfCancellationRequested();
                 UpdateRuntimeStatisticsInternal(silo, statistics);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
