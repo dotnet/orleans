@@ -198,6 +198,14 @@ public class AdoNetBatchContainerTests(TestEnvironmentFixture fixture)
 
         Assert.Equal(streamId, cached.StreamId);
         Assert.Equal("42", adapter.GetOffset(ref cached));
+        Assert.True(adapter.TryGetOffset(
+            new PartitionedStreamSequenceToken(
+                AdoNetStreamSequenceToken.GetProviderIdentity("service", "provider"),
+                "queue",
+                "42",
+                sequenceNumber: 999),
+            out var normalizedOffset));
+        Assert.Equal("42", normalizedOffset);
         var batch = Assert.IsType<AdoNetBatchContainer>(adapter.GetBatchContainer(ref cached));
         Assert.Equal(streamId, batch.StreamId);
         Assert.Equal([new TestModel(1)], batch.GetEvents<TestModel>().Select(item => item.Item1));

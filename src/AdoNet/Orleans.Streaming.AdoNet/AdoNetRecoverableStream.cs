@@ -650,7 +650,7 @@ internal sealed class AdoNetRecoverableStreamDataAdapter(
     {
         if (TryNormalizeToken(token, out var adoNetToken))
         {
-            offset = token.SequenceNumber.ToString(CultureInfo.InvariantCulture);
+            offset = adoNetToken.SequenceNumber.ToString(CultureInfo.InvariantCulture);
             return true;
         }
 

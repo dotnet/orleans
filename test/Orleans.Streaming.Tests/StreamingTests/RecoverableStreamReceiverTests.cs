@@ -262,6 +262,32 @@ public sealed class RecoverableStreamReceiverTests
     }
 
     [Fact]
+    public async Task Replay_LaterCursorHandsOffAtItsOwnStartAfterEarlierLiveBoundary()
+    {
+        var streamId = StreamId.Create("namespace", Guid.NewGuid());
+        var history = Enumerable.Range(1, 8)
+            .Select(sequence => new TestQueueMessage(streamId, sequence, $"target-{sequence}"))
+            .ToArray();
+        var receiver = CreateReplayReceiver(
+            history[4..],
+            new TestReplaySourceFactory(history),
+            new TestCheckpointer(string.Empty));
+        await receiver.Initialize(TimeSpan.FromSeconds(5));
+        using var first = Assert.IsAssignableFrom<IAsyncQueueCacheCursor>(
+            receiver.GetCacheCursor(streamId, new EventSequenceTokenV2(1)));
+        Assert.Equal(
+            QueueCacheCursorMoveNextResult.ItemAvailable,
+            await first.MoveNextAsync(CancellationToken.None));
+        using var later = receiver.GetCacheCursor(streamId, new EventSequenceTokenV2(6));
+
+        _ = await receiver.GetQueueMessagesAsync(10, CancellationToken.None);
+        var delivered = await ReadAll(later);
+
+        Assert.Equal([6, 7, 8], delivered);
+        await receiver.Shutdown(TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
     public async Task Replay_PendingReadyCursorBypassesFutureHeadWithoutOpeningAnotherReader()
     {
         var streamId = StreamId.Create("namespace", Guid.NewGuid());
