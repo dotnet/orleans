@@ -66,6 +66,7 @@ namespace Orleans.Streaming.EventHubs
         private Dictionary<Cursor, RecoveredCursorProgress>? recoveredCursorProgress;
         private readonly HashSet<Cursor> cursors = new(ReferenceEqualityComparer.Instance);
         private HashSet<Cursor>? recoveryPendingCursors;
+        private Task? recoveryTask;
 
         // Receiver life cycle
         private int receiverState = ReceiverShutdown;
@@ -247,6 +248,12 @@ namespace Orleans.Streaming.EventHubs
                 return new List<IBatchContainer>();
             }
 
+            var recoveryTask = Volatile.Read(ref this.recoveryTask);
+            if (recoveryTask is not null)
+            {
+                await recoveryTask.WaitAsync(cancellationToken);
+            }
+
             // if receiver initialization failed, retry
             if (this.receiver == null)
             {
@@ -258,13 +265,21 @@ namespace Orleans.Streaming.EventHubs
                     return new List<IBatchContainer>();
                 }
             }
+
+            var receiver = Volatile.Read(ref this.receiver);
+            if (Volatile.Read(ref this.receiverState) != ReceiverRunning || receiver is null)
+            {
+                return new List<IBatchContainer>();
+            }
+
+            var cache = Volatile.Read(ref this.cache);
             var watch = Stopwatch.StartNew();
             List<EventData>? messages;
             try
             {
 
                 // Receivers built against older Orleans versions can still return null.
-                messages = (await this.receiver.ReceiveAsync(
+                messages = (await receiver.ReceiveAsync(
                     maxCount,
                     ReceiveTimeout,
                     cancellationToken))?.ToList();
@@ -317,12 +332,14 @@ namespace Orleans.Streaming.EventHubs
             List<StreamPosition> messageStreamPositions;
             lock (this.cacheLock)
             {
-                if (this.cache is null)
+                if (!ReferenceEquals(receiver, this.receiver)
+                    || !ReferenceEquals(cache, this.cache)
+                    || cache is null)
                 {
                     return batches;
                 }
 
-                messageStreamPositions = this.cache.Add(messages, dequeueTimeUtc);
+                messageStreamPositions = cache.Add(messages, dequeueTimeUtc);
             }
 
             foreach (var streamPosition in messageStreamPositions)
@@ -339,39 +356,57 @@ namespace Orleans.Streaming.EventHubs
 
         private async Task ResetReceiver(CancellationToken cancellationToken)
         {
-            IStreamQueueCheckpointer<string> checkpointer;
+            Task? existingRecovery;
+            TaskCompletionSource? recoveryCompletion = null;
+            IStreamQueueCheckpointer<string>? checkpointer = null;
+            IEventHubQueueCache? cache = null;
+            IEventHubReceiver? receiver = null;
             lock (this.cacheLock)
             {
-                checkpointer = this.checkpointer!;
-                this.recoveryCache = null;
-                this.recoveredCursorProgress = new Dictionary<Cursor, RecoveredCursorProgress>(ReferenceEqualityComparer.Instance);
-                this.recoveryPendingCursors = new HashSet<Cursor>(this.cursors, ReferenceEqualityComparer.Instance);
+                existingRecovery = this.recoveryTask;
+                if (existingRecovery is null)
+                {
+                    recoveryCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+                    this.recoveryTask = recoveryCompletion.Task;
+                    checkpointer = this.checkpointer!;
+                    this.recoveryCache = null;
+                    this.recoveredCursorProgress = new Dictionary<Cursor, RecoveredCursorProgress>(ReferenceEqualityComparer.Instance);
+                    this.recoveryPendingCursors = new HashSet<Cursor>(this.cursors, ReferenceEqualityComparer.Instance);
+                    cache = this.cache;
+                    this.cache = null;
+                    this.flowController = new(MaxMessagesPerRead);
+                    receiver = Interlocked.Exchange(ref this.receiver, null);
+                }
+            }
+
+            if (existingRecovery is not null)
+            {
+                await existingRecovery.WaitAsync(cancellationToken);
+                return;
+            }
+
+            var exceptions = new List<Exception>();
+            var resetSucceeded = false;
+            try
+            {
+                await checkpointer!.Reset(cancellationToken);
+                this.receiverUsesCheckpoint = false;
+                resetSucceeded = true;
+            }
+            catch (Exception exception)
+            {
+                exceptions.Add(exception);
             }
 
             try
             {
-                await checkpointer.Reset(cancellationToken);
+                cache?.Dispose();
             }
-            catch
+            catch (Exception exception)
             {
-                lock (this.cacheLock)
-                {
-                    this.recoveryCache = null;
-                    this.recoveredCursorProgress = null;
-                    this.recoveryPendingCursors = null;
-                }
-
-                throw;
+                exceptions.Add(exception);
             }
 
-            IEventHubReceiver? receiver;
-            lock (this.cacheLock)
-            {
-                this.receiverUsesCheckpoint = false;
-                receiver = Interlocked.Exchange(ref this.receiver, null);
-            }
-
-            var exceptions = new List<Exception>();
             try
             {
                 if (receiver is not null)
@@ -386,31 +421,36 @@ namespace Orleans.Streaming.EventHubs
                 exceptions.Add(exception);
             }
 
-            if (cancellationToken.IsCancellationRequested)
+            if (exceptions.Count == 0 && !cancellationToken.IsCancellationRequested)
             {
-                if (exceptions.Count > 0)
+                try
                 {
-                    LogWarningFailedToRecoverFromInvalidCheckpoint(
-                        this.settings.Hub.EventHubName,
-                        this.settings.Partition,
-                        exceptions[0]);
+                    await Initialize(cancellationToken);
+                }
+                catch (Exception exception)
+                {
+                    exceptions.Add(exception);
+                }
+            }
+
+            lock (this.cacheLock)
+            {
+                if (!resetSucceeded)
+                {
+                    this.recoveryCache = null;
+                    this.recoveredCursorProgress = null;
+                    this.recoveryPendingCursors = null;
                 }
 
-                cancellationToken.ThrowIfCancellationRequested();
+                if (ReferenceEquals(this.recoveryTask, recoveryCompletion!.Task))
+                {
+                    this.recoveryTask = null;
+                }
+
+                recoveryCompletion.TrySetResult();
             }
 
-            try
-            {
-                await Initialize(cancellationToken);
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch (Exception exception)
-            {
-                exceptions.Add(exception);
-            }
+            cancellationToken.ThrowIfCancellationRequested();
 
             if (exceptions.Count == 1)
             {
@@ -454,7 +494,20 @@ namespace Orleans.Streaming.EventHubs
         [Obsolete("Use IQueueCache.TryGetCacheCursor instead.")]
         public IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken? token)
         {
-            return new Cursor(this, streamId, token);
+            lock (this.cacheLock)
+            {
+                var cache = this.cache
+                    ?? throw new InvalidOperationException("The Event Hub receiver is recovering.");
+#pragma warning disable CS0618 // Preserve the exact legacy exception and cursor behavior.
+                var cursor = cache.GetCursor(streamId, token);
+#pragma warning restore CS0618
+                return new Cursor(
+                    this,
+                    streamId,
+                    cache,
+                    cursor,
+                    ReferenceEquals(cache, this.recoveryCache) ? token : null);
+            }
         }
 
         QueueCacheCursorResult<IQueueCacheCursor> IQueueCache.TryGetCacheCursor(
@@ -463,7 +516,12 @@ namespace Orleans.Streaming.EventHubs
         {
             lock (this.cacheLock)
             {
-                var cache = this.cache!;
+                var cache = this.cache;
+                if (cache is null)
+                {
+                    return QueueCacheCursorResult<IQueueCacheCursor>.NotSupported;
+                }
+
                 return WrapCursorResult(
                     streamId,
                     cache,
@@ -478,7 +536,12 @@ namespace Orleans.Streaming.EventHubs
         {
             lock (this.cacheLock)
             {
-                var cache = this.cache!;
+                var cache = this.cache;
+                if (cache is null)
+                {
+                    return QueueCacheCursorResult<IQueueCacheCursor>.NotSupported;
+                }
+
                 return WrapCursorResult(
                     streamId,
                     cache,
