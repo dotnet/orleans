@@ -129,9 +129,9 @@ public class SqlServerStorageForTestingTests
         {
             try
             {
-                reconnectAttempt.TrySetResult();
                 await using var connection = new SqlConnection(connectionString);
                 await connection.OpenAsync(cancellationToken);
+                reconnectAttempt.TrySetResult();
                 await using var command = connection.CreateCommand();
                 command.CommandText = "SELECT 1";
                 while (!cancellationToken.IsCancellationRequested)
