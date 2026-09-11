@@ -206,7 +206,7 @@ namespace Orleans.Runtime
                 cancellationToken.ThrowIfCancellationRequested();
                 UpdateRuntimeStatisticsInternal(silo, statistics);
             }
-            catch (OperationCanceledException exception) when (exception.CancellationToken == cancellationToken)
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 throw;
             }

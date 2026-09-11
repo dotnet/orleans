@@ -134,12 +134,15 @@ public class DeploymentLoadPublisherTests
         Assert.Same(rig.Publisher.LocalRuntimeStatistics, rig.Publisher.PeriodicStatistics[rig.LocalSilo]);
     }
 
-    [Fact]
-    public async Task RefreshClusterStatistics_Cancellation_CancelsNativeRequests()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RefreshClusterStatistics_Cancellation_CancelsNativeRequests(bool useLinkedReceiverToken)
     {
         using var rig = CreateTestRig(TimeSpan.Zero);
         using var cancellation = new CancellationTokenSource();
         var requested = new TaskCompletionSource<CancellationToken>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var startedRequests = 0;
         rig.Control.GetRuntimeStatistics(Arg.Any<CancellationToken>()).Returns(call => ReadStatistics(call.ArgAt<CancellationToken>(0)));
         var refresh = rig.Publisher.RefreshClusterStatistics(cancellation.Token);
         var requestToken = await requested.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
@@ -153,8 +156,13 @@ public class DeploymentLoadPublisherTests
 
         async Task<SiloRuntimeStatistics> ReadStatistics(CancellationToken token)
         {
-            requested.TrySetResult(token);
-            await Task.Delay(Timeout.InfiniteTimeSpan, token);
+            using var receiverCancellation = CancellationTokenSource.CreateLinkedTokenSource(token);
+            if (Interlocked.Increment(ref startedRequests) == 2)
+            {
+                requested.TrySetResult(token);
+            }
+
+            await Task.Delay(Timeout.InfiniteTimeSpan, useLinkedReceiverToken ? receiverCancellation.Token : token);
             return rig.InitialStatistics;
         }
     }
