@@ -1,0 +1,153 @@
+name: Dissemination evidence
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+    paths:
+      - '.github/workflows/dissemination-evidence.yml'
+      - '.github/scripts/dissemination-evidence.ps1'
+      - 'test/Dissemination.IntegrationHarness/**'
+      - 'src/Orleans.Runtime/Dissemination/**'
+      - 'src/Orleans.Runtime/MembershipService/**'
+      - 'src/Orleans.Runtime/Placement/DeploymentLoadPublisher.cs'
+      - 'src/Orleans.Runtime/Configuration/Options/DeploymentLoadPublisherOptions.cs'
+      - 'src/Orleans.Runtime/Hosting/DefaultSiloServices.cs'
+      - 'src/Orleans.Core/SystemTargetInterfaces/IDisseminationSystemTarget.cs'
+      - 'src/Orleans.Core/SystemTargetInterfaces/IDeploymentLoadPublisher.cs'
+      - 'src/Orleans.Core/SystemTargetInterfaces/IMembershipTable.cs'
+      - 'src/Orleans.Core/Configuration/Options/ClusterMembershipOptions.cs'
+      - 'src/Orleans.Core/Configuration/Options/DisseminationOptions.cs'
+  merge_group:
+    types: [checks_requested]
+  workflow_dispatch:
+    inputs:
+      scale:
+        description: 'Also run the larger controlled off/on scaling comparison'
+        type: boolean
+        default: false
+      sizes:
+        description: 'Comma-separated process counts (3..32, maximum six sizes)'
+        type: string
+        default: '4,8,16'
+      iterations:
+        description: 'Publication rounds per scenario (3..200)'
+        type: number
+        default: 10
+      repetitions:
+        description: 'Paired off/on repetitions (1..5)'
+        type: number
+        default: 1
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dissemination-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+  DOTNET_NOLOGO: true
+
+jobs:
+  version-skew:
+    name: Pinned-binary upgrade, rollback and recovery
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+      - name: Isolated pre-dissemination checkout
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          repository: dotnet/orleans
+          ref: 6739589254b746a8790cf53524e6abe372bb53d4
+          path: .dissemination-baseline
+          persist-credentials: false
+      - uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
+        with:
+          global-json-file: global.json
+      - name: Build isolated binaries and run bounded merge-gate checks
+        shell: pwsh
+        run: ./.github/scripts/dissemination-evidence.ps1 -Mode Gate
+      - name: Preserve gate results and complete process evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: dissemination-gate-evidence
+          retention-days: 14
+          path: |
+            Artifacts/DisseminationEvidence/results
+            Artifacts/DisseminationEvidence/*.binlog
+      - name: Preserve reproducible binary pair
+        if: success()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: dissemination-binaries
+          retention-days: 7
+          path: Artifacts/DisseminationEvidence/bin
+
+  bounded-cost:
+    name: Bounded original, default-off and enabled costs
+    needs: version-skew
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
+        with:
+          global-json-file: global.json
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: dissemination-binaries
+          path: Artifacts/DisseminationEvidence/bin
+      - name: Measure bounded original, default-off and supported-enabled paths
+        shell: pwsh
+        run: ./.github/scripts/dissemination-evidence.ps1 -Mode Cost -SkipBuild
+      - name: Preserve the automatic PR cost evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: dissemination-bounded-cost-evidence
+          retention-days: 14
+          path: Artifacts/DisseminationEvidence/results/Cost
+
+  scaling:
+    name: Larger controlled dissemination cost comparison
+    if: github.event_name == 'workflow_dispatch' && inputs.scale
+    needs: [version-skew, bounded-cost]
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
+        with:
+          global-json-file: global.json
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: dissemination-binaries
+          path: Artifacts/DisseminationEvidence/bin
+      - name: Measure stable, churn and partition windows on all three paths
+        shell: pwsh
+        env:
+          EVIDENCE_SIZES: ${{ inputs.sizes || '4,8,16' }}
+          EVIDENCE_ITERATIONS: ${{ inputs.iterations || 10 }}
+          EVIDENCE_REPETITIONS: ${{ inputs.repetitions || 1 }}
+        run: |
+          ./.github/scripts/dissemination-evidence.ps1 -Mode Scale -SkipBuild `
+            -Sizes $env:EVIDENCE_SIZES `
+            -Iterations ([int]$env:EVIDENCE_ITERATIONS) `
+            -Repetitions ([int]$env:EVIDENCE_REPETITIONS)
+      - name: Preserve raw cost windows, per-node load and failure evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: dissemination-scale-evidence
+          retention-days: 30
+          path: Artifacts/DisseminationEvidence/results
