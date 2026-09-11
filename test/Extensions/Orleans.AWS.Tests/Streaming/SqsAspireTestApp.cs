@@ -36,7 +36,7 @@ internal sealed class SqsAspireTestApp : IAsyncDisposable
     public DistributedApplicationModel Model
         => _application.Services.GetRequiredService<DistributedApplicationModel>();
 
-    public static async Task<SqsAspireTestApp> CreateAsync(
+    public static Task<SqsAspireTestApp> CreateAsync(
         string providerName,
         IEnumerable<(string Key, string? Value)> providerValues,
         IEnumerable<(string Key, string? Value)>? rootValues = null,
@@ -84,12 +84,13 @@ internal sealed class SqsAspireTestApp : IAsyncDisposable
             .WithReference(orleans.AsClient());
         var application = builder.Build();
 
-        return new SqsAspireTestApp(
-            application,
-            silo.Resource,
-            client.Resource,
-            providerName,
-            serviceId);
+        return Task.FromResult(
+            new SqsAspireTestApp(
+                application,
+                silo.Resource,
+                client.Resource,
+                providerName,
+                serviceId));
     }
 
     public Task<IReadOnlyDictionary<string, string?>> GetSiloEnvironmentAsync()
