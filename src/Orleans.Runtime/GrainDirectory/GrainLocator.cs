@@ -54,6 +54,26 @@ namespace Orleans.Runtime.GrainDirectory
 
         public bool TryLookupInCache(GrainId grainId, [NotNullWhen(true)] out GrainAddress? address) => GetGrainLocator(grainId.Type).TryLookupInCache(grainId, out address);
 
+        internal bool TryGetCacheEntry(
+            GrainId grainId,
+            SiloAddress siloAddress,
+            [NotNullWhen(true)] out GrainDirectoryCacheEntry? entry)
+        {
+            var grainLocator = GetGrainLocator(grainId.Type);
+            return grainLocator switch
+            {
+                CachedGrainLocator cached => cached.TryGetCacheEntry(grainId, siloAddress, out entry),
+                DhtGrainLocator dht => dht.TryGetCacheEntry(grainId, siloAddress, out entry),
+                _ => ReturnFalse(out entry),
+            };
+
+            static bool ReturnFalse(out GrainDirectoryCacheEntry? result)
+            {
+                result = null;
+                return false;
+            }
+        }
+
         public void InvalidateCache(GrainId grainId) => GetGrainLocator(grainId.Type).InvalidateCache(grainId);
 
         public void InvalidateCache(GrainAddress address) => GetGrainLocator(address.GrainId.Type).InvalidateCache(address);

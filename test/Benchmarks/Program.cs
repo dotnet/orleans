@@ -231,6 +231,26 @@ internal class Program
         {
             AdaptivePingBenchmark.RunAllScenariosAsync().GetAwaiter().GetResult();
         },
+        ["DeterministicPing_All"] = _ =>
+        {
+            AdaptivePingBenchmark.RunDeterministicMatrixAsync().GetAwaiter().GetResult();
+        },
+        ["DeterministicPing_HostedClient"] = _ =>
+        {
+            AdaptivePingBenchmark.RunDeterministicScenarioAsync(AdaptivePingBenchmark.BenchmarkMode.HostedClient, numSilos: 1).GetAwaiter().GetResult();
+        },
+        ["DeterministicPing_ClientToOneSilo"] = _ =>
+        {
+            AdaptivePingBenchmark.RunDeterministicScenarioAsync(AdaptivePingBenchmark.BenchmarkMode.ExternalClient, numSilos: 1).GetAwaiter().GetResult();
+        },
+        ["DeterministicPing_ClientToTwoSilos"] = _ =>
+        {
+            AdaptivePingBenchmark.RunDeterministicScenarioAsync(AdaptivePingBenchmark.BenchmarkMode.ExternalClient, numSilos: 2).GetAwaiter().GetResult();
+        },
+        ["DeterministicPing_SiloToSilo"] = _ =>
+        {
+            AdaptivePingBenchmark.RunDeterministicScenarioAsync(AdaptivePingBenchmark.BenchmarkMode.SiloToSilo, numSilos: 2).GetAwaiter().GetResult();
+        },
         ["ConcurrentPing_OneSilo_Forever"] = _ =>
         {
             new PingBenchmark(numSilos: 1, startClient: true).PingConcurrentForever().GetAwaiter().GetResult();
