@@ -40,11 +40,21 @@ namespace Orleans.Streams
         public bool StartPositionIsProviderDefault;
 
         /// <summary>
-        /// The sequence token of the last batch processed (delivered or filtered) by this subscription.
-        /// Used by the pulling agent's periodic scan to compute the delivery-based checkpoint watermark.
+        /// The last proven-safe delivery position for this subscription.
+        /// Cannot advance after an unresolved delivery or cursor error, but earlier replay requests can lower it.
         /// </summary>
         [NonSerialized]
         public StreamSequenceToken? LastProcessedToken;
+
+        // Inactive also describes interrupted delivery, so it does not prove that the cursor drained.
+        [NonSerialized]
+        public bool IsCaughtUp;
+        [NonSerialized]
+        public int PendingHandshakes;
+        [NonSerialized]
+        public bool HasDeliveryProgressError;
+        [NonSerialized]
+        public StreamSequenceToken? UnconfirmedDeliveryToken;
 
         public StreamConsumerData(GuidId subscriptionId, QualifiedStreamId streamId, IStreamConsumerExtension streamConsumer, string? filterData)
         {
@@ -56,6 +66,7 @@ namespace Orleans.Streams
 
         internal void SafeDisposeCursor(ILogger logger)
         {
+            IsCaughtUp = false;
             PendingBatch = null;
             if (Cursor is { } cursor)
             {
