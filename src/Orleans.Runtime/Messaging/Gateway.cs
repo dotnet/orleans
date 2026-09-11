@@ -133,7 +133,7 @@ namespace Orleans.Runtime.Messaging
                 }
                 catch (Exception exception)
                 {
-                    LogErrorGatewayMaintenanceError(logger, exception);
+                    LogErrorRequestMaintenanceError(logger, exception);
                 }
             }
         }
@@ -878,6 +878,12 @@ namespace Orleans.Runtime.Messaging
             Message = "Error performing gateway maintenance"
         )]
         private static partial void LogErrorGatewayMaintenanceError(ILogger logger, Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Error performing gateway request maintenance"
+        )]
+        private static partial void LogErrorRequestMaintenanceError(ILogger logger, Exception exception);
 
         [LoggerMessage(
             EventId = (int)ErrorCode.GatewayClientOpenedSocket,
