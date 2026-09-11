@@ -67,6 +67,7 @@ namespace Orleans.Streaming.EventHubs
         private readonly HashSet<Cursor> cursors = new(ReferenceEqualityComparer.Instance);
         private HashSet<Cursor>? recoveryPendingCursors;
         private Task? recoveryTask;
+        private readonly SemaphoreSlim initializationLock = new(1, 1);
         private readonly SemaphoreSlim receiverCloseLock = new(1, 1);
         private readonly SemaphoreSlim shutdownLock = new(1, 1);
         private IEventHubReceiver? receiverPendingClose;
@@ -130,15 +131,9 @@ namespace Orleans.Streaming.EventHubs
         public async Task Initialize(TimeSpan timeout)
         {
             LogInfoInitializingEventHubPartition(this.settings.Hub.EventHubName, this.settings.Partition);
-
-            // if receiver was already running, do nothing
-            if (ReceiverRunning == Interlocked.Exchange(ref this.receiverState, ReceiverRunning))
-            {
-                return;
-            }
-
+            Interlocked.Exchange(ref this.receiverState, ReceiverRunning);
             using var cancellation = new CancellationTokenSource(timeout);
-            await Initialize(cancellation.Token);
+            await EnsureInitialized(cancellation.Token);
         }
 
         /// <summary>
@@ -146,7 +141,56 @@ namespace Orleans.Streaming.EventHubs
         ///  it will be retried when messages are requested
         /// </summary>
         /// <returns></returns>
-        private async Task Initialize(CancellationToken cancellationToken)
+        private async Task EnsureInitialized(CancellationToken cancellationToken)
+        {
+            while (true)
+            {
+                Task? recoveryTask;
+                lock (this.cacheLock)
+                {
+                    if (this.receiverState != ReceiverRunning || this.receiver is not null)
+                    {
+                        return;
+                    }
+
+                    recoveryTask = this.recoveryTask;
+                }
+
+                if (recoveryTask is not null)
+                {
+                    await recoveryTask.WaitAsync(cancellationToken);
+                    continue;
+                }
+
+                await this.initializationLock.WaitAsync(cancellationToken);
+                try
+                {
+                    lock (this.cacheLock)
+                    {
+                        if (this.receiverState != ReceiverRunning || this.receiver is not null)
+                        {
+                            return;
+                        }
+
+                        recoveryTask = this.recoveryTask;
+                    }
+
+                    if (recoveryTask is null)
+                    {
+                        await InitializeCore(cancellationToken);
+                        return;
+                    }
+                }
+                finally
+                {
+                    this.initializationLock.Release();
+                }
+
+                await recoveryTask.WaitAsync(cancellationToken);
+            }
+        }
+
+        private async Task InitializeCore(CancellationToken cancellationToken)
         {
             var watch = Stopwatch.StartNew();
             IEventHubQueueCache? cache = null;
@@ -268,7 +312,7 @@ namespace Orleans.Streaming.EventHubs
             if (this.receiver == null)
             {
                 LogWarningRetryingInitializationOfEventHubPartition(this.settings.Hub.EventHubName, this.settings.Partition);
-                await Initialize(cancellationToken);
+                await EnsureInitialized(cancellationToken);
                 if (this.receiver == null)
                 {
                     // should not get here, should throw instead, but just incase.
@@ -303,11 +347,19 @@ namespace Orleans.Streaming.EventHubs
                 this.monitor?.TrackRead(false, watch.Elapsed, ex);
                 LogWarningFailedToReadFromEventHubPartition(this.settings.Hub.EventHubName, this.settings.Partition, ex);
 
-                if (this.receiverUsesCheckpoint && IsInvalidOffsetException(ex))
+                bool shouldRecover;
+                lock (this.cacheLock)
+                {
+                    shouldRecover = this.receiverState == ReceiverRunning
+                        && ReferenceEquals(receiver, this.receiver)
+                        && this.receiverUsesCheckpoint;
+                }
+
+                if (shouldRecover && IsInvalidOffsetException(ex))
                 {
                     try
                     {
-                        await ResetReceiver(cancellationToken);
+                        await ResetReceiver(receiver, cancellationToken);
                     }
                     catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                     {
@@ -364,18 +416,38 @@ namespace Orleans.Streaming.EventHubs
             && exception.Message.StartsWith("The supplied offset", StringComparison.OrdinalIgnoreCase)
             && exception.Message.Contains(" is invalid.", StringComparison.OrdinalIgnoreCase);
 
-        private async Task ResetReceiver(CancellationToken cancellationToken)
+        private async Task ResetReceiver(
+            IEventHubReceiver failedReceiver,
+            CancellationToken cancellationToken)
         {
             Task? existingRecovery;
-            TaskCompletionSource? recoveryCompletion = null;
-            IStreamQueueCheckpointer<string>? checkpointer = null;
-            IEventHubQueueCache? cache = null;
-            IEventHubReceiver? receiver = null;
             lock (this.cacheLock)
             {
                 existingRecovery = this.recoveryTask;
-                if (existingRecovery is null)
+            }
+
+            if (existingRecovery is not null)
+            {
+                await existingRecovery.WaitAsync(cancellationToken);
+                return;
+            }
+
+            await this.initializationLock.WaitAsync(cancellationToken);
+            TaskCompletionSource? recoveryCompletion = null;
+            var resetSucceeded = false;
+            var exceptions = new List<Exception>();
+            try
+            {
+                IStreamQueueCheckpointer<string> checkpointer;
+                IEventHubQueueCache? cache;
+                lock (this.cacheLock)
                 {
+                    if (this.receiverState != ReceiverRunning
+                        || !ReferenceEquals(failedReceiver, this.receiver))
+                    {
+                        return;
+                    }
+
                     recoveryCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
                     this.recoveryTask = recoveryCompletion.Task;
                     checkpointer = this.checkpointer!;
@@ -385,91 +457,86 @@ namespace Orleans.Streaming.EventHubs
                     cache = this.cache;
                     this.cache = null;
                     this.flowController = new(MaxMessagesPerRead);
-                    receiver = Interlocked.Exchange(ref this.receiver, null);
-                    if (receiver is not null)
-                    {
-                        this.receiverPendingClose = receiver;
-                        this.receiverCloseTask = null;
-                    }
+                    this.receiverPendingClose = Interlocked.Exchange(ref this.receiver, null);
+                    this.receiverCloseTask = null;
                 }
-            }
 
-            if (existingRecovery is not null)
-            {
-                await existingRecovery.WaitAsync(cancellationToken);
-                return;
-            }
-
-            var exceptions = new List<Exception>();
-            var resetSucceeded = false;
-            try
-            {
-                await checkpointer!.Reset(cancellationToken);
-                this.receiverUsesCheckpoint = false;
-                resetSucceeded = true;
-            }
-            catch (Exception exception)
-            {
-                exceptions.Add(exception);
-            }
-
-            try
-            {
-                cache?.Dispose();
-            }
-            catch (Exception exception)
-            {
-                exceptions.Add(exception);
-            }
-
-            try
-            {
-                await ClosePendingReceiverWithTimeout();
-            }
-            catch (Exception exception)
-            {
-                exceptions.Add(exception);
-            }
-
-            if (exceptions.Count == 0 && !cancellationToken.IsCancellationRequested)
-            {
                 try
                 {
-                    await Initialize(cancellationToken);
+                    await checkpointer.Reset(cancellationToken);
+                    this.receiverUsesCheckpoint = false;
+                    resetSucceeded = true;
                 }
                 catch (Exception exception)
                 {
                     exceptions.Add(exception);
                 }
-            }
 
-            lock (this.cacheLock)
-            {
-                if (!resetSucceeded)
+                try
                 {
-                    this.recoveryCache = null;
-                    this.recoveredCursorProgress = null;
-                    this.recoveryPendingCursors = null;
+                    cache?.Dispose();
+                }
+                catch (Exception exception)
+                {
+                    exceptions.Add(exception);
                 }
 
-                if (ReferenceEquals(this.recoveryTask, recoveryCompletion!.Task))
+                try
                 {
-                    this.recoveryTask = null;
+                    await ClosePendingReceiverWithTimeout();
+                }
+                catch (Exception exception)
+                {
+                    exceptions.Add(exception);
                 }
 
-                recoveryCompletion.TrySetResult();
+                if (exceptions.Count == 0 && !cancellationToken.IsCancellationRequested)
+                {
+                    try
+                    {
+                        await InitializeCore(cancellationToken);
+                    }
+                    catch (Exception exception)
+                    {
+                        exceptions.Add(exception);
+                    }
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (exceptions.Count == 1)
+                {
+                    ExceptionDispatchInfo.Capture(exceptions[0]).Throw();
+                }
+
+                if (exceptions.Count > 1)
+                {
+                    throw new AggregateException(exceptions);
+                }
             }
-
-            cancellationToken.ThrowIfCancellationRequested();
-
-            if (exceptions.Count == 1)
+            finally
             {
-                ExceptionDispatchInfo.Capture(exceptions[0]).Throw();
-            }
+                if (recoveryCompletion is not null)
+                {
+                    lock (this.cacheLock)
+                    {
+                        if (!resetSucceeded)
+                        {
+                            this.recoveryCache = null;
+                            this.recoveredCursorProgress = null;
+                            this.recoveryPendingCursors = null;
+                        }
 
-            if (exceptions.Count > 1)
-            {
-                throw new AggregateException(exceptions);
+                        if (ReferenceEquals(this.recoveryTask, recoveryCompletion.Task))
+                        {
+                            this.recoveryTask = null;
+                        }
+
+                        recoveryCompletion.TrySetResult();
+                    }
+                }
+
+                this.initializationLock.Release();
             }
         }
 
@@ -907,8 +974,16 @@ namespace Orleans.Streaming.EventHubs
 
             public IBatchContainer? GetCurrent(out Exception? exception)
             {
-                exception = null;
-                return this.current;
+                lock (this.owner.cacheLock)
+                {
+                    exception = null;
+                    if (!ReferenceEquals(this.cache, this.owner.cache))
+                    {
+                        this.current = null;
+                    }
+
+                    return this.current;
+                }
             }
 
             [Obsolete("Use MoveNextWithResult instead.")]
