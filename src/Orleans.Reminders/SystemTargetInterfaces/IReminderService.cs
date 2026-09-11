@@ -84,6 +84,15 @@ namespace Orleans
         Task UnregisterReminder(IGrainReminder reminder, CancellationToken cancellationToken) => UnregisterReminder(reminder);
 
         /// <summary>
+        /// Reconciles a completed reminder mutation on the current owner, following a bounded number of topology redirects.
+        /// </summary>
+        /// <param name="grainId">The grain identity.</param>
+        /// <param name="reminderName">The reminder name.</param>
+        /// <param name="remainingHops">The remaining topology redirects.</param>
+        /// <returns><see langword="true"/> when an owner reconciled the mutation; otherwise <see langword="false"/>.</returns>
+        Task<bool> ReconcileReminder(GrainId grainId, string reminderName, int remainingHops);
+
+        /// <summary>
         /// Gets the reminder registered to the specified grain with the provided name.
         /// </summary>
         /// <param name="grainId">A reference to the grain which the reminder is registered on.</param>

@@ -19,12 +19,15 @@ namespace Orleans.Runtime.ReminderService
     internal sealed partial class LocalReminderService : GrainService, IReminderService, ILifecycleParticipant<ISiloLifecycle>, IGrainServiceRangeChangeQueue
     {
         private const int InitialReadRetryCountBeforeFastFailForUpdates = 2;
+        private const int MissingReminderPointReadConcurrency = 16;
+        private const int MutationNotificationMaxHops = 3;
         private static readonly TimeSpan InitialReadMaxWaitTimeForUpdates = TimeSpan.FromSeconds(20);
         private static readonly TimeSpan InitialReadRetryPeriod = TimeSpan.FromSeconds(30);
         private static readonly TimeSpan MinimumReminderDueTime = TimeSpan.FromMilliseconds(1);
         private readonly ILogger logger;
         private readonly ReminderOptions reminderOptions;
         private readonly Dictionary<ReminderIdentity, LocalReminderData> localReminders = new();
+        private readonly Dictionary<ReminderIdentity, MutationReconciliationState> mutationReconciliations = new();
         private readonly IReminderTable reminderTable;
         private readonly TaskCompletionSource<bool> startedTask;
         private readonly IAsyncTimer listRefreshTimer; // timer that refreshes our list of reminders to reflect global reminder table
@@ -33,6 +36,9 @@ namespace Orleans.Runtime.ReminderService
         private readonly SiloStatusListenerManager _siloStatusListenerManager;
         private readonly TimeProvider _timeProvider;
         private readonly ReminderInstruments _reminderInstruments;
+        private readonly IConsistentRingProvider _ringProvider;
+        private readonly IInternalGrainFactory _grainFactory;
+        private readonly GrainType _reminderServiceGrainType;
         private long localTableSequence;
         // The test barrier reads this state off-scheduler so it remains observable while the service is busy.
         private readonly object _reconciliationLock = new();
@@ -54,6 +60,7 @@ namespace Orleans.Runtime.ReminderService
             IOptions<ReminderOptions> reminderOptions,
             IConsistentRingProvider ringProvider,
             SiloStatusListenerManager siloStatusListenerManager,
+            IInternalGrainFactory grainFactory,
             [FromKeyedServices(ReminderTimeProviderNames.Reminders)] TimeProvider timeProvider,
             ReminderInstruments reminderInstruments,
             SystemTargetShared shared)
@@ -69,6 +76,11 @@ namespace Orleans.Runtime.ReminderService
             this.reminderTable = reminderTable;
             _timeProvider = timeProvider;
             _reminderInstruments = reminderInstruments;
+            _ringProvider = ringProvider;
+            _grainFactory = grainFactory;
+            _reminderServiceGrainType = SystemTargetGrainId.CreateGrainServiceGrainType(
+                GrainInterfaceUtils.GetGrainClassTypeCode(typeof(IReminderService)),
+                null);
             _reminderInstruments.RegisterActiveRemindersObserve(() => localReminders.Count);
             startedTask = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             this.logger = shared.LoggerFactory.CreateLogger<LocalReminderService>();
@@ -241,10 +253,14 @@ namespace Orleans.Runtime.ReminderService
             if (newEtag != null)
             {
                 entry.ETag = newEtag;
-                // A request can arrive on a stale owner. Persist it here, but let the current owner load it.
-                if (RingRange.InRange(grainId))
+                if (_siloStatusListenerManager.HasProcessedCurrentMembershipVersion)
                 {
-                    ReconcileLocalReminder(entry, _timeProvider.GetUtcNow().UtcDateTime);
+                    var reconciliation = ReserveMutationReconciliation(grainId, reminderName);
+                    await ReconcilePersistedReminder(
+                        grainId,
+                        reminderName,
+                        ReminderEvents.LocalReminderStopReason.RemovedFromTable,
+                        reconciliation);
                 }
 
                 LogDebugRegisterReminder(entry, localTableSequence);
@@ -294,18 +310,12 @@ namespace Orleans.Runtime.ReminderService
 
             if (success)
             {
-                var key = new ReminderIdentity(grainId, reminderName);
-                if (localReminders.TryGetValue(key, out var localRem))
-                {
-                    RequestLocalReminderRemoval(key, localRem, ReminderEvents.LocalReminderStopReason.Unregistered);
-                    LogStoppedReminder(reminder);
-                    if (logger.IsEnabled(LogLevel.Trace)) PrintReminders($"After removing {reminder}.");
-                }
-                else
-                {
-                    AddLocalReminderTombstone(key, ReminderEvents.LocalReminderStopReason.Unregistered);
-                    LogRemovedReminderFromTable(reminder);
-                }
+                var reconciliation = ReserveMutationReconciliation(grainId, reminderName);
+                await ReconcilePersistedReminder(
+                    grainId,
+                    reminderName,
+                    ReminderEvents.LocalReminderStopReason.Unregistered,
+                    reconciliation);
                 ReminderEvents.EmitUnregistered(grainId, reminderName, Silo);
             }
             else
@@ -377,9 +387,8 @@ namespace Orleans.Runtime.ReminderService
             var tasks = new List<Task>();
             RemoveOutOfRangeReminders(tasks);
 
-            // Refreshes use even sequence values. Local writes use the following odd value, so they can supersede
-            // this snapshot without advancing the refresh generation. A newer refresh advances by two and causes
-            // all older refresh results to be discarded.
+            // Reserve a refresh generation. Local mutations advance this sequence and supersede ordinary snapshots;
+            // a later refresh advances it again and causes older ordinary refresh results to be discarded.
             var cachedSequence = localTableSequence += 2;
             var rangeSerialNumberCopy = RangeSerialNumber;
             LogTraceRingRange(RingRange, RangeSerialNumber, localReminders.Count);
@@ -424,6 +433,32 @@ namespace Orleans.Runtime.ReminderService
                     + $"ringRange={RingRange}, reconciliationGeneration={reconciliationGeneration}, "
                     + $"reconciliationCompleted={reconciliationTask.IsCompleted}";
             }
+        }
+
+        internal async Task<IGrainReminder> TestOnlyRegisterOrUpdateReminder(
+            GrainId grainId,
+            string reminderName,
+            TimeSpan dueTime,
+            TimeSpan period)
+        {
+            IGrainReminder? result = null;
+            await this.QueueTask(async () => result = await RegisterOrUpdateReminder(grainId, reminderName, dueTime, period));
+            return result!;
+        }
+
+        internal Task TestOnlyUnregisterReminder(IGrainReminder reminder)
+            => this.QueueTask(() => UnregisterReminder(reminder));
+
+        internal async Task<ReminderEntry?> TestOnlyGetLocalReminder(GrainId grainId, string reminderName)
+        {
+            ReminderEntry? result = null;
+            await this.QueueTask(() =>
+            {
+                var key = new ReminderIdentity(grainId, reminderName);
+                result = localReminders.TryGetValue(key, out var reminder) ? reminder.Entry : null;
+                return Task.CompletedTask;
+            });
+            return result;
         }
 
         private void RemoveOutOfRangeReminders(List<Task> removedReminderTasks)
@@ -644,7 +679,10 @@ namespace Orleans.Runtime.ReminderService
             }
         }
 
-        private async Task ReadAndReconcileRange(ISingleRange range, int rangeSerialNumberCopy, long cachedSequence)
+        private async Task ReadAndReconcileRange(
+            ISingleRange range,
+            int rangeSerialNumberCopy,
+            long cachedSequence)
         {
             CheckRuntimeContext();
 
@@ -657,7 +695,7 @@ namespace Orleans.Runtime.ReminderService
                 ReminderTableData? table = await reminderTable.ReadRows(
                     range.Begin,
                     range.End,
-                    StoppedCancellationTokenSource.Token); // get all reminders, even the ones we already have
+                    StoppedCancellationTokenSource.Token);
 
                 if (cachedSequence < localTableSequence)
                 {
@@ -687,12 +725,46 @@ namespace Orleans.Runtime.ReminderService
                     }
                 }
 
+                foreach (var entry in table.Reminders)
+                {
+                    if (range.InRange(entry.GrainId))
+                    {
+                        remindersNotInTable.Remove(new(entry.GrainId, entry.ReminderName));
+                    }
+                }
+
+                var stronglyConfirmedRows = new Dictionary<ReminderIdentity, ReminderEntry?>();
+                foreach (var batch in remindersNotInTable.BatchIEnumerable(MissingReminderPointReadConcurrency))
+                {
+                    if (cachedSequence < localTableSequence || rangeSerialNumberCopy < RangeSerialNumber)
+                    {
+                        return;
+                    }
+
+                    var reads = batch.Select(async key =>
+                        (Key: key, Entry: await reminderTable.ReadRow(key.GrainId, key.ReminderName)));
+                    foreach (var result in await Task.WhenAll(reads))
+                    {
+                        stronglyConfirmedRows[result.Key] = result.Entry;
+                    }
+                }
+
+                if (cachedSequence < localTableSequence || rangeSerialNumberCopy < RangeSerialNumber)
+                {
+                    return;
+                }
+
                 LogDebugReadRemindersFromTable(range, table.Reminders.Count, localTableSequence, cachedSequence);
                 var tasks = new List<Task>();
                 // Use one timestamp for the entire snapshot so every row is evaluated against the same loading window.
                 var now = _timeProvider.GetUtcNow().UtcDateTime;
                 foreach (var entry in table.Reminders)
                 {
+                    if (!range.InRange(entry.GrainId))
+                    {
+                        continue;
+                    }
+
                     var key = new ReminderIdentity(entry.GrainId, entry.ReminderName);
                     remindersNotInTable.Remove(key);
                     ReconcileTableEntry(entry, cachedSequence, now, tasks);
@@ -704,6 +776,12 @@ namespace Orleans.Runtime.ReminderService
                 // return are no longer ours to schedule.
                 foreach (var key in remindersNotInTable)
                 {
+                    if (stronglyConfirmedRows[key] is { } persistedEntry)
+                    {
+                        ReconcileTableEntry(persistedEntry, cachedSequence, now, tasks);
+                        continue;
+                    }
+
                     if (!localReminders.TryGetValue(key, out var reminder))
                     {
                         continue;
@@ -822,6 +900,196 @@ namespace Orleans.Runtime.ReminderService
                 // The updated schedule is durable, but its next tick is too distant to justify retaining a
                 // local task. Keep a stopped sequence-bearing entry until a newer refresh observes this write.
                 AddLocalReminderTombstone(entry, ReminderEvents.LocalReminderStopReason.OutsideLoadingWindow);
+            }
+        }
+
+        private async Task ReconcilePersistedReminder(
+            GrainId grainId,
+            string reminderName,
+            ReminderEvents.LocalReminderStopReason removalReason,
+            (ReminderIdentity Key, MutationReconciliationState State, long Sequence) reconciliation)
+        {
+            try
+            {
+                if (!IsLatestMutationReconciliation(reconciliation))
+                {
+                    return;
+                }
+
+                var owner = _ringProvider.GetPrimaryTargetSilo(grainId.GetUniformHashCode());
+                if (owner is null)
+                {
+                    return;
+                }
+
+                if (!owner.Equals(Silo))
+                {
+                    if (!await TryNotifyReminderOwner(owner, grainId, reminderName, MutationNotificationMaxHops))
+                    {
+                        LogWarningOwnerNotificationIncomplete(grainId, reminderName);
+                    }
+
+                    return;
+                }
+
+                var persistedEntry = await reminderTable.ReadRow(grainId, reminderName);
+                if (!IsLatestMutationReconciliation(reconciliation))
+                {
+                    return;
+                }
+
+                owner = _ringProvider.GetPrimaryTargetSilo(grainId.GetUniformHashCode());
+                if (owner is null)
+                {
+                    return;
+                }
+
+                if (!owner.Equals(Silo))
+                {
+                    if (!await TryNotifyReminderOwner(owner, grainId, reminderName, MutationNotificationMaxHops))
+                    {
+                        LogWarningOwnerNotificationIncomplete(grainId, reminderName);
+                    }
+
+                    return;
+                }
+
+                if (persistedEntry is not null)
+                {
+                    ReconcileLocalReminder(persistedEntry, _timeProvider.GetUtcNow().UtcDateTime);
+                    return;
+                }
+
+                if (localReminders.TryGetValue(reconciliation.Key, out var localReminder))
+                {
+                    RequestLocalReminderRemoval(reconciliation.Key, localReminder, removalReason);
+                }
+                else
+                {
+                    AddLocalReminderTombstone(reconciliation.Key, removalReason);
+                }
+            }
+
+            finally
+            {
+                CompleteMutationReconciliation(reconciliation);
+            }
+        }
+
+        public async Task<bool> ReconcileReminder(
+            GrainId grainId,
+            string reminderName,
+            int remainingHops)
+        {
+            if (remainingHops < 0)
+            {
+                return false;
+            }
+
+            var owner = _ringProvider.GetPrimaryTargetSilo(grainId.GetUniformHashCode());
+            if (owner is null)
+            {
+                return false;
+            }
+
+            if (!owner.Equals(Silo))
+            {
+                return remainingHops > 0
+                    && await TryNotifyReminderOwner(owner, grainId, reminderName, remainingHops - 1);
+            }
+
+            var reconciliation = ReserveMutationReconciliation(grainId, reminderName);
+            try
+            {
+                var persistedEntry = await reminderTable.ReadRow(grainId, reminderName);
+                if (!IsLatestMutationReconciliation(reconciliation))
+                {
+                    return true;
+                }
+
+                owner = _ringProvider.GetPrimaryTargetSilo(grainId.GetUniformHashCode());
+                if (owner is null)
+                {
+                    return false;
+                }
+
+                if (!owner.Equals(Silo))
+                {
+                    return remainingHops > 0
+                        && await TryNotifyReminderOwner(owner, grainId, reminderName, remainingHops - 1);
+                }
+
+                if (persistedEntry is not null)
+                {
+                    ReconcileLocalReminder(persistedEntry, _timeProvider.GetUtcNow().UtcDateTime);
+                }
+                else if (localReminders.TryGetValue(reconciliation.Key, out var localReminder))
+                {
+                    RequestLocalReminderRemoval(
+                        reconciliation.Key,
+                        localReminder,
+                        ReminderEvents.LocalReminderStopReason.RemovedFromTable);
+                }
+                else
+                {
+                    AddLocalReminderTombstone(
+                        reconciliation.Key,
+                        ReminderEvents.LocalReminderStopReason.RemovedFromTable);
+                }
+
+                return true;
+            }
+            finally
+            {
+                CompleteMutationReconciliation(reconciliation);
+            }
+        }
+
+        private async Task<bool> TryNotifyReminderOwner(
+            SiloAddress owner,
+            GrainId grainId,
+            string reminderName,
+            int remainingHops)
+        {
+            try
+            {
+                var serviceId = SystemTargetGrainId.CreateGrainServiceGrainId(_reminderServiceGrainType, owner);
+                var service = _grainFactory.GetSystemTarget<IReminderService>(serviceId);
+                return await service.ReconcileReminder(grainId, reminderName, remainingHops);
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
+        private (ReminderIdentity Key, MutationReconciliationState State, long Sequence) ReserveMutationReconciliation(
+            GrainId grainId,
+            string reminderName)
+        {
+            var key = new ReminderIdentity(grainId, reminderName);
+            if (!mutationReconciliations.TryGetValue(key, out var state))
+            {
+                state = new();
+                mutationReconciliations.Add(key, state);
+            }
+
+            state.PendingCount++;
+            state.LatestSequence = ++localTableSequence;
+            return (key, state, state.LatestSequence);
+        }
+
+        private static bool IsLatestMutationReconciliation(
+            (ReminderIdentity Key, MutationReconciliationState State, long Sequence) reconciliation)
+            => reconciliation.State.LatestSequence == reconciliation.Sequence;
+
+        private void CompleteMutationReconciliation(
+            (ReminderIdentity Key, MutationReconciliationState State, long Sequence) reconciliation)
+        {
+            reconciliation.State.PendingCount--;
+            if (reconciliation.State.PendingCount == 0)
+            {
+                mutationReconciliations.Remove(reconciliation.Key);
             }
         }
 
@@ -1004,8 +1272,6 @@ namespace Orleans.Runtime.ReminderService
                 if (!RingRange.InRange(grainId))
                 {
                     LogWarningNotResponsible(debugInfo, grainId, RingRange);
-                    // For now, we still let the caller proceed without throwing an exception... the periodical mechanism will take care of reminders being registered at the wrong silo
-                    // otherwise, we can either reject the request, or re-route the request
                 }
             }
         }
@@ -1538,6 +1804,13 @@ namespace Orleans.Runtime.ReminderService
             private readonly record struct ScheduledTick(long ScheduleVersion, DateTime TickTime);
         }
 
+        private sealed class MutationReconciliationState
+        {
+            public long LatestSequence { get; set; }
+
+            public int PendingCount { get; set; }
+        }
+
         private readonly struct ReminderIdentity(GrainId grainId, string reminderName) : IEquatable<ReminderIdentity>
         {
             public readonly GrainId GrainId = grainId;
@@ -1798,6 +2071,12 @@ namespace Orleans.Runtime.ReminderService
             Message = "I shouldn't have received request '{Request}' for {GrainId}. It is not in my responsibility range: {Range}"
         )]
         private partial void LogWarningNotResponsible(string request, GrainId grainId, IRingRange range);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Could not confirm owner reconciliation after mutating reminder {ReminderName} for grain {GrainId}; discovery remains subject to provider convergence."
+        )]
+        private partial void LogWarningOwnerNotificationIncomplete(GrainId grainId, string reminderName);
 
         [LoggerMessage(
             Level = LogLevel.Warning,

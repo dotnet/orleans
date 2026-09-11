@@ -16,6 +16,10 @@ namespace Orleans.Configuration
         private const string UseProvisionedThroughputPropertyName = "UseProvisionedThroughput";
         private const string CreateIfNotExistsPropertyName = "CreateIfNotExists";
         private const string UpdateIfExistsPropertyName = "UpdateIfExists";
+        private const string TableNamePropertyName = "TableName";
+        private const string V2TableNamePropertyName = "V2TableName";
+        private const string TableModePropertyName = "TableMode";
+        private const string MigrationPageSizePropertyName = "MigrationPageSize";
 
         /// <summary>
         /// Configures this instance using the provided connection string.
@@ -87,6 +91,41 @@ namespace Orleans.Configuration
                 if (value.Length == 2 && !string.IsNullOrWhiteSpace(value[1]))
                     options.UpdateIfExists = bool.Parse(value[1]);
             }
+
+            var tableNameConfig = FindParameter(parameters, TableNamePropertyName);
+            if (!string.IsNullOrWhiteSpace(tableNameConfig))
+            {
+                var value = tableNameConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
+                if (value.Length == 2 && !string.IsNullOrWhiteSpace(value[1]))
+                    options.TableName = value[1];
+            }
+
+            var v2TableNameConfig = FindParameter(parameters, V2TableNamePropertyName);
+            if (!string.IsNullOrWhiteSpace(v2TableNameConfig))
+            {
+                var value = v2TableNameConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
+                if (value.Length == 2 && !string.IsNullOrWhiteSpace(value[1]))
+                    options.V2TableName = value[1];
+            }
+
+            var tableModeConfig = FindParameter(parameters, TableModePropertyName);
+            if (!string.IsNullOrWhiteSpace(tableModeConfig))
+            {
+                var value = tableModeConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
+                if (value.Length == 2 && !string.IsNullOrWhiteSpace(value[1]))
+                    options.TableMode = Enum.Parse<DynamoDBReminderTableMode>(value[1], ignoreCase: true);
+            }
+
+            var migrationPageSizeConfig = FindParameter(parameters, MigrationPageSizePropertyName);
+            if (!string.IsNullOrWhiteSpace(migrationPageSizeConfig))
+            {
+                var value = migrationPageSizeConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
+                if (value.Length == 2 && !string.IsNullOrWhiteSpace(value[1]))
+                    options.MigrationPageSize = int.Parse(value[1]);
+            }
         }
+
+        private static string? FindParameter(string[] parameters, string name)
+            => Array.Find(parameters, parameter => parameter.StartsWith($"{name}=", StringComparison.OrdinalIgnoreCase));
     }
 }
