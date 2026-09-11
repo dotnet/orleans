@@ -3003,7 +3003,7 @@ namespace Orleans.Runtime
     [System.Text.Json.Serialization.JsonConverter(typeof(SiloAddressConverter))]
     [System.Diagnostics.DebuggerDisplay("SiloAddress {ToString()}")]
     [SuppressReferenceTracking]
-    public sealed partial class SiloAddress : System.IEquatable<SiloAddress>, System.IComparable<SiloAddress>, System.ISpanFormattable, System.IFormattable, System.IParsable<SiloAddress>, System.IUtf8SpanParsable<SiloAddress>
+    public sealed partial class SiloAddress : System.IEquatable<SiloAddress>, System.IComparable<SiloAddress>, System.IComparable, System.ISpanFormattable, System.IFormattable, System.IParsable<SiloAddress>, System.IUtf8SpanParsable<SiloAddress>
     {
         internal SiloAddress() { }
 
@@ -3050,6 +3050,8 @@ namespace Orleans.Runtime
         static SiloAddress System.IParsable<SiloAddress>.Parse(string value, System.IFormatProvider? provider) { throw null; }
 
         public static SiloAddress Parse(string value) { throw null; }
+
+        int System.IComparable.CompareTo(object? obj) { throw null; }
 
         string System.IFormattable.ToString(string? format, System.IFormatProvider? formatProvider) { throw null; }
 
