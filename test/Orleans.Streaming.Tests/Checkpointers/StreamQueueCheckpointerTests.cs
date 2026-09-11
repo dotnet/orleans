@@ -188,7 +188,6 @@ public abstract class StreamQueueCheckpointerTests
         blockedReset.SetResult();
         await firstReset;
         await Assert.ThrowsAsync<InvalidOperationException>(() => secondReset);
-        await checkpointer.FlushAsync(CancellationToken.None);
 
         Assert.True(checkpointer.CheckpointExists);
         Assert.Equal([NoCheckpoint, NoCheckpoint, "20"], store.WriteAttempts);
@@ -256,6 +255,23 @@ public abstract class StreamQueueCheckpointerTests
         Assert.Equal(["20", NoCheckpoint, "30"], store.WriteAttempts);
         Assert.Equal(["20", NoCheckpoint, "30"], store.CompletedWrites);
         Assert.Equal("30", store.PersistedCheckpoint);
+    }
+
+    [Fact]
+    public async Task Reset_WhenUpdateArrivesDuringReset_PersistsBeforeReturning()
+    {
+        var (checkpointer, store) = await CreateLoadedSubject("10");
+        var blockedReset = store.BlockNextWrite();
+        var reset = checkpointer.Reset(CancellationToken.None);
+        await store.WaitForWriteAttempts(1);
+
+        checkpointer.Update("20", TestTimeUtc, CancellationToken.None);
+        blockedReset.SetResult();
+        await reset;
+
+        Assert.Equal([NoCheckpoint, "20"], store.WriteAttempts);
+        Assert.Equal([NoCheckpoint, "20"], store.CompletedWrites);
+        Assert.Equal("20", store.PersistedCheckpoint);
     }
 
     [Fact]

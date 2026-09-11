@@ -143,6 +143,10 @@ namespace Orleans.Streaming.EventHubs
         private async Task Initialize(CancellationToken cancellationToken)
         {
             var watch = Stopwatch.StartNew();
+            IEventHubQueueCache? cache = null;
+            IEventHubReceiver? receiver = null;
+            var installed = false;
+            var failures = new List<Exception>();
             try
             {
                 var checkpointer = await this.checkpointerFactory(
@@ -155,36 +159,78 @@ namespace Orleans.Streaming.EventHubs
                     offset = EventHubConstants.StartOfStream;
                 }
 
-                var cache = this.cacheFactory(this.settings.Partition, checkpointer, this.loggerFactory);
+                cache = this.cacheFactory(this.settings.Partition, checkpointer, this.loggerFactory);
                 var flowController = new AggregatedQueueFlowController(MaxMessagesPerRead)
                 {
                     cache,
                     LoadShedQueueFlowController.CreateAsPercentOfLoadSheddingLimit(this.loadSheddingOptions, environmentStatisticsProvider)
                 };
+                receiver = this.eventHubReceiverFactory(this.settings, offset, this.logger);
+                cancellationToken.ThrowIfCancellationRequested();
 
                 lock (this.cacheLock)
                 {
-                    this.cache?.Dispose();
-                    this.checkpointer = checkpointer;
-                    this.cache = cache;
-                    this.flowController = flowController;
-                    if (this.recoveredCursorProgress is not null)
+                    if (this.receiverState == ReceiverRunning)
                     {
-                        this.recoveryCache = cache;
+                        this.cache?.Dispose();
+                        this.checkpointer = checkpointer;
+                        this.cache = cache;
+                        this.flowController = flowController;
+                        this.receiverUsesCheckpoint = receiverUsesCheckpoint;
+                        this.receiver = receiver;
+                        if (this.recoveredCursorProgress is not null)
+                        {
+                            this.recoveryCache = cache;
+                        }
+
+                        installed = true;
                     }
                 }
-
-                this.receiverUsesCheckpoint = receiverUsesCheckpoint;
-                this.receiver = this.eventHubReceiverFactory(this.settings, offset, this.logger);
-                watch.Stop();
-                this.monitor?.TrackInitialization(true, watch.Elapsed, null);
             }
             catch (Exception ex)
             {
-                watch.Stop();
-                this.monitor?.TrackInitialization(false, watch.Elapsed, ex);
-                throw;
+                failures.Add(ex);
             }
+
+            if (!installed)
+            {
+                try
+                {
+                    cache?.Dispose();
+                }
+                catch (Exception exception)
+                {
+                    failures.Add(exception);
+                }
+
+                try
+                {
+                    if (receiver is not null)
+                    {
+                        using var cleanupCancellation = new CancellationTokenSource(ReceiveTimeout);
+                        await receiver.CloseAsync(cleanupCancellation.Token)
+                            .WaitAsync(cleanupCancellation.Token);
+                    }
+                }
+                catch (Exception exception)
+                {
+                    failures.Add(exception);
+                }
+            }
+
+            watch.Stop();
+            if (failures.Count == 0)
+            {
+                this.monitor?.TrackInitialization(true, watch.Elapsed, null);
+                return;
+            }
+
+            var failure = failures.Count == 1
+                ? failures[0]
+                : new AggregateException(failures);
+            this.monitor?.TrackInitialization(false, watch.Elapsed, failure);
+            ExceptionDispatchInfo.Capture(failure).Throw();
+            throw new UnreachableException();
         }
 
         [Obsolete("Use the overload which accepts a CancellationToken.")]
@@ -318,23 +364,39 @@ namespace Orleans.Streaming.EventHubs
                 throw;
             }
 
-            this.receiverUsesCheckpoint = false;
-            var receiver = Interlocked.Exchange(ref this.receiver, null);
+            IEventHubReceiver? receiver;
+            lock (this.cacheLock)
+            {
+                this.receiverUsesCheckpoint = false;
+                receiver = Interlocked.Exchange(ref this.receiver, null);
+            }
+
             var exceptions = new List<Exception>();
             try
             {
                 if (receiver is not null)
                 {
-                    await receiver.CloseAsync(cancellationToken);
+                    using var cleanupCancellation = new CancellationTokenSource(ReceiveTimeout);
+                    await receiver.CloseAsync(cleanupCancellation.Token)
+                        .WaitAsync(cleanupCancellation.Token);
                 }
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                throw;
             }
             catch (Exception exception)
             {
                 exceptions.Add(exception);
+            }
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                if (exceptions.Count > 0)
+                {
+                    LogWarningFailedToRecoverFromInvalidCheckpoint(
+                        this.settings.Hub.EventHubName,
+                        this.settings.Partition,
+                        exceptions[0]);
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
             }
 
             try
@@ -454,9 +516,13 @@ namespace Orleans.Streaming.EventHubs
             if (earliestSubscriptionToken is IEventHubPartitionLocation location
                 && long.TryParse(location.EventHubOffset, NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
             {
-                IStreamQueueCheckpointer<string>? checkpointer;
                 lock (this.cacheLock)
                 {
+                    if (this.receiverState != ReceiverRunning)
+                    {
+                        return;
+                    }
+
                     if (this.recoveredCursorProgress is { } recoveredProgress)
                     {
                         if (this.recoveryPendingCursors is { Count: > 0 }
@@ -472,10 +538,11 @@ namespace Orleans.Streaming.EventHubs
                         this.recoveryPendingCursors = null;
                     }
 
-                    checkpointer = this.checkpointer;
+                    this.checkpointer?.Update(
+                        location.EventHubOffset,
+                        utcNow,
+                        CancellationToken.None);
                 }
-
-                checkpointer?.Update(location.EventHubOffset, utcNow, CancellationToken.None);
             }
         }
 
@@ -523,9 +590,12 @@ namespace Orleans.Streaming.EventHubs
             try
             {
                 // if receiver was already shutdown, do nothing
-                if (ReceiverShutdown == Interlocked.Exchange(ref this.receiverState, ReceiverShutdown))
+                lock (this.cacheLock)
                 {
-                    return;
+                    if (ReceiverShutdown == Interlocked.Exchange(ref this.receiverState, ReceiverShutdown))
+                    {
+                        return;
+                    }
                 }
 
                 LogInfoStoppingReadingFromEventHubPartition(this.settings.Hub.EventHubName, this.settings.Partition);

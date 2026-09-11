@@ -169,24 +169,31 @@ public partial class AzureTableStreamQueueCheckpointer : IStreamQueueCheckpointe
     /// <inheritdoc />
     public Task Reset(CancellationToken cancellationToken)
     {
-        Task resetTask;
+        var completion = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
         lock (_lock)
         {
             _pendingResetCount++;
             _throttleSavesUntilUtc = DateTime.MaxValue;
-            resetTask = _inProgressSave = RunReset(
+            var inProgressSave = _inProgressSave;
+            _inProgressSave = completion.Task;
+            RunReset(
+                completion,
+                inProgressSave,
                 _inProgressSave,
                 _latestCheckpoint,
                 _updateGeneration,
-                cancellationToken);
-            resetTask.Ignore();
+                cancellationToken).Ignore();
+            completion.Task.Ignore();
         }
 
-        return resetTask.WaitAsync(cancellationToken);
+        return completion.Task.WaitAsync(cancellationToken);
     }
 
     private async Task RunReset(
+        TaskCompletionSource completion,
         Task inProgressSave,
+        Task resetTask,
         string enqueuedCheckpoint,
         long updateGeneration,
         CancellationToken cancellationToken)
@@ -198,17 +205,97 @@ public partial class AzureTableStreamQueueCheckpointer : IStreamQueueCheckpointe
                 enqueuedCheckpoint,
                 updateGeneration,
                 cancellationToken);
+
+            while (true)
+            {
+                string checkpoint;
+                lock (_lock)
+                {
+                    if (!ReferenceEquals(resetTask, _inProgressSave)
+                        || string.Equals(_persistedCheckpoint, _latestCheckpoint, StringComparison.Ordinal))
+                    {
+                        CompleteReset();
+                        completion.TrySetResult();
+                        return;
+                    }
+
+                    checkpoint = _latestCheckpoint;
+                }
+
+                await Save(checkpoint, cancellationToken);
+            }
         }
-        finally
+        catch (OperationCanceledException exception)
+        {
+            await CompleteFailedReset(
+                completion,
+                resetTask,
+                exception,
+                canceled: true);
+        }
+        catch (Exception exception)
+        {
+            await CompleteFailedReset(
+                completion,
+                resetTask,
+                exception,
+                canceled: false);
+        }
+    }
+
+    private async Task CompleteFailedReset(
+        TaskCompletionSource completion,
+        Task resetTask,
+        Exception resetFailure,
+        bool canceled)
+    {
+        try
+        {
+            while (true)
+            {
+                string checkpoint;
+                lock (_lock)
+                {
+                    if (!ReferenceEquals(resetTask, _inProgressSave)
+                        || string.Equals(_persistedCheckpoint, _latestCheckpoint, StringComparison.Ordinal))
+                    {
+                        CompleteReset();
+                        if (canceled)
+                        {
+                            completion.TrySetCanceled(
+                                ((OperationCanceledException)resetFailure).CancellationToken);
+                        }
+                        else
+                        {
+                            completion.TrySetException(resetFailure);
+                        }
+
+                        return;
+                    }
+
+                    checkpoint = _latestCheckpoint;
+                }
+
+                await Save(checkpoint, CancellationToken.None);
+            }
+        }
+        catch (Exception persistenceFailure)
         {
             lock (_lock)
             {
-                _pendingResetCount--;
-                if (_pendingResetCount == 0)
-                {
-                    _throttleSavesUntilUtc = null;
-                }
+                CompleteReset();
+                completion.TrySetException(
+                    new AggregateException(resetFailure, persistenceFailure));
             }
+        }
+    }
+
+    private void CompleteReset()
+    {
+        _pendingResetCount--;
+        if (_pendingResetCount == 0)
+        {
+            _throttleSavesUntilUtc = null;
         }
     }
 
