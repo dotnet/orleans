@@ -212,10 +212,10 @@ namespace ServiceBus.Tests.EvictionStrategyTests
 
             this.receiver1 = new EventHubAdapterReceiver(this.ehSettings, this.CacheFactory, this.CheckPointerFactory, NullLoggerFactory.Instance,
                 new DefaultEventHubReceiverMonitor(monitorDimensions, this.instruments), new LoadSheddingOptions(), environmentStatisticsProvider,
-                static (_, _, _) => NoOpEventHubReceiver.Instance);
+                static (_, _, _) => new NoOpEventHubReceiver());
             this.receiver2 = new EventHubAdapterReceiver(this.ehSettings, this.CacheFactory, this.CheckPointerFactory, NullLoggerFactory.Instance,
                 new DefaultEventHubReceiverMonitor(monitorDimensions, this.instruments), new LoadSheddingOptions(), environmentStatisticsProvider,
-                static (_, _, _) => NoOpEventHubReceiver.Instance);
+                static (_, _, _) => new NoOpEventHubReceiver());
             await Task.WhenAll(
                 this.receiver1.Initialize(this.timeOut),
                 this.receiver2.Initialize(this.timeOut));
@@ -277,8 +277,6 @@ namespace ServiceBus.Tests.EvictionStrategyTests
 
         private sealed class NoOpEventHubReceiver : IEventHubReceiver
         {
-            public static NoOpEventHubReceiver Instance { get; } = new();
-
             public Task<IEnumerable<EventData>> ReceiveAsync(int maxCount, TimeSpan waitTime)
                 => Task.FromResult<IEnumerable<EventData>>([]);
 
