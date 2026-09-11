@@ -281,7 +281,7 @@ public class AdoNetRecoverableStreamTests
                     (nameof(AdoNetStreamMessage.ServiceId), "service"),
                     (nameof(AdoNetStreamMessage.ProviderId), "provider"),
                     (nameof(AdoNetStreamMessage.QueueId), "queue"),
-                    (nameof(AdoNetStreamMessage.MessageId), 10L),
+                    (nameof(AdoNetStreamMessage.MessageId), 1L),
                     (nameof(AdoNetStreamMessage.StreamIdBytes), new byte[] { 1 }),
                     (nameof(AdoNetStreamMessage.StreamNamespaceLength), 0),
                     (nameof(AdoNetStreamMessage.CreatedOn), DateTime.UtcNow),
@@ -323,6 +323,65 @@ public class AdoNetRecoverableStreamTests
     }
 
     [Fact]
+    public async Task Read_HardRetentionBeforeFirstReturnedMessagePermanentlyFaultsSource()
+    {
+        var storage = new CapturingRelationalStorage
+        {
+            ReadRecords =
+            [
+                Record(
+                    (nameof(AdoNetStreamMessage.ServiceId), "service"),
+                    (nameof(AdoNetStreamMessage.ProviderId), "provider"),
+                    (nameof(AdoNetStreamMessage.QueueId), "queue"),
+                    (nameof(AdoNetStreamMessage.MessageId), 3L),
+                    (nameof(AdoNetStreamMessage.StreamIdBytes), new byte[] { 1 }),
+                    (nameof(AdoNetStreamMessage.StreamNamespaceLength), 0),
+                    (nameof(AdoNetStreamMessage.CreatedOn), DateTime.UtcNow),
+                    (nameof(AdoNetStreamMessage.Payload), new byte[] { 2 })),
+            ],
+            CleanupRecords =
+            [
+                Record(
+                    (nameof(AdoNetStreamCleanupResult.Ran), true),
+                    (nameof(AdoNetStreamCleanupResult.DeletedCount), 0),
+                    (nameof(AdoNetStreamCleanupResult.DeletedThroughMessageId), null),
+                    (nameof(AdoNetStreamCleanupResult.HardDeletedCount), 0),
+                    (nameof(AdoNetStreamCleanupResult.HardDeletedFromMessageId), null),
+                    (nameof(AdoNetStreamCleanupResult.HardDeletedThroughMessageId), null),
+                    (nameof(AdoNetStreamCleanupResult.Checkpoint), 0L),
+                    (nameof(AdoNetStreamCleanupResult.ActiveReplayWatermark), null),
+                    (nameof(AdoNetStreamCleanupResult.EarliestMessageId), 3L),
+                    (nameof(AdoNetStreamCleanupResult.TailMessageId), 3L)),
+            ],
+        };
+        storage.LiveMessages.AddRange(
+        [
+            new("service", "provider", "queue", 1, [1], 0, DateTime.UtcNow, []),
+            new("service", "provider", "queue", 2, [1], 0, DateTime.UtcNow, []),
+            new("service", "provider", "queue", 3, [1], 0, DateTime.UtcNow, []),
+        ]);
+        var source = new AdoNetRecoverableStream(
+            "service",
+            "provider",
+            "queue",
+            new AdoNetStreamOptions { MaxMessagesPerRead = 10 },
+            CreateQueries(storage),
+            NullLogger.Instance);
+
+        _ = await source.Load(TestContext.Current.CancellationToken);
+        var first = await Assert.ThrowsAsync<DataNotAvailableException>(
+            () => source.Read(10, TestContext.Current.CancellationToken));
+        var readsAfterFailure = storage.ReadCallCount;
+        var second = await Assert.ThrowsAsync<DataNotAvailableException>(
+            () => source.Read(10, TestContext.Current.CancellationToken));
+
+        Assert.Same(first, second);
+        Assert.Contains("lost unread retained records after message 0", first.Message);
+        Assert.Contains("first available message is 3", first.Message);
+        Assert.Equal(readsAfterFailure, storage.ReadCallCount);
+    }
+
+    [Fact]
     public async Task MessagesAddFailed_AfterHardDeletionPermanentlyFaultsSource()
     {
         var storage = new CapturingRelationalStorage
@@ -333,7 +392,7 @@ public class AdoNetRecoverableStreamTests
                     (nameof(AdoNetStreamMessage.ServiceId), "service"),
                     (nameof(AdoNetStreamMessage.ProviderId), "provider"),
                     (nameof(AdoNetStreamMessage.QueueId), "queue"),
-                    (nameof(AdoNetStreamMessage.MessageId), 10L),
+                    (nameof(AdoNetStreamMessage.MessageId), 1L),
                     (nameof(AdoNetStreamMessage.StreamIdBytes), new byte[] { 1 }),
                     (nameof(AdoNetStreamMessage.StreamNamespaceLength), 0),
                     (nameof(AdoNetStreamMessage.CreatedOn), DateTime.UtcNow),
@@ -343,15 +402,15 @@ public class AdoNetRecoverableStreamTests
             [
                 Record(
                     (nameof(AdoNetStreamCleanupResult.Ran), true),
-                    (nameof(AdoNetStreamCleanupResult.DeletedCount), 10),
-                    (nameof(AdoNetStreamCleanupResult.DeletedThroughMessageId), 10L),
-                    (nameof(AdoNetStreamCleanupResult.HardDeletedCount), 10),
+                    (nameof(AdoNetStreamCleanupResult.DeletedCount), 1),
+                    (nameof(AdoNetStreamCleanupResult.DeletedThroughMessageId), 1L),
+                    (nameof(AdoNetStreamCleanupResult.HardDeletedCount), 1),
                     (nameof(AdoNetStreamCleanupResult.HardDeletedFromMessageId), 1L),
-                    (nameof(AdoNetStreamCleanupResult.HardDeletedThroughMessageId), 10L),
+                    (nameof(AdoNetStreamCleanupResult.HardDeletedThroughMessageId), 1L),
                     (nameof(AdoNetStreamCleanupResult.Checkpoint), 0L),
                     (nameof(AdoNetStreamCleanupResult.ActiveReplayWatermark), null),
-                    (nameof(AdoNetStreamCleanupResult.EarliestMessageId), 11L),
-                    (nameof(AdoNetStreamCleanupResult.TailMessageId), 11L)),
+                    (nameof(AdoNetStreamCleanupResult.EarliestMessageId), 2L),
+                    (nameof(AdoNetStreamCleanupResult.TailMessageId), 2L)),
             ],
         };
         var source = new AdoNetRecoverableStream(
@@ -422,6 +481,48 @@ public class AdoNetRecoverableStreamTests
             Assert.IsType<long>(
                 storage.Parameters[nameof(DbStoredQueries.UpdateStreamReplayLeaseKey)][nameof(DbStoredQueries.Columns.Watermark)]));
         Assert.Equal(1, storage.CallCounts[nameof(DbStoredQueries.ReleaseStreamReplayLeaseKey)]);
+    }
+
+    [Fact]
+    public async Task ReplaySource_GapBeforeFirstReturnedMessageSurfacesDataNotAvailable()
+    {
+        var storage = new CapturingRelationalStorage();
+        storage.LiveMessages.Add(new(
+            "service",
+            "provider",
+            "queue",
+            1,
+            [1],
+            0,
+            DateTime.UtcNow,
+            []));
+        storage.ReplayMessages.Add(new(
+            "service",
+            "provider",
+            "queue",
+            3,
+            [1],
+            0,
+            DateTime.UtcNow,
+            []));
+        var source = new AdoNetRecoverableStream(
+            "service",
+            "provider",
+            "queue",
+            new AdoNetStreamOptions(),
+            CreateQueries(storage),
+            NullLogger.Instance);
+        _ = await source.Load(TestContext.Current.CancellationToken);
+        await using var replay = await ((IRecoverableStreamReplaySourceFactory<AdoNetStreamMessage>)source).Create(
+            StreamId.Create("namespace", Guid.NewGuid()),
+            new AdoNetStreamSequenceToken("service", "provider", "queue", 2),
+            TestContext.Current.CancellationToken);
+
+        var exception = await Assert.ThrowsAsync<DataNotAvailableException>(
+            async () => await replay.Read(10, TestContext.Current.CancellationToken));
+
+        Assert.Contains("lost retained records after message 1", exception.Message);
+        Assert.Contains("first available message is 3", exception.Message);
     }
 
     [Fact]
