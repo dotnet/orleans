@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using Amazon.CDK;
@@ -62,7 +63,7 @@ public static partial class OrleansSqsStreamingExtensions
         var validatedOptions = ValidateAndCopy(name, awsSdkConfig, options);
         ValidateServiceId(orleansService, validatedOptions.ServiceId, allowUnset: true);
 
-        var resourceName = NormalizeResourceName($"{orleansService.Name}-{name}-sqs");
+        var resourceName = CreateResourceName($"{orleansService.Name}-{name}-sqs");
         var stack = orleansService.Builder.AddAWSCDKStack(resourceName).WithReference(awsSdkConfig);
         var queues = CreateQueues(stack, name, validatedOptions);
         var resource = new SqsStreamingResource(
@@ -147,7 +148,7 @@ public static partial class OrleansSqsStreamingExtensions
             var queueName = queueNames[index];
             result.Add(
                 stack.AddSQSQueue(
-                    $"{NormalizeResourceName(providerName)}-{index}",
+                    $"{CreateResourceName(providerName)}-{index}",
                     new QueueProps
                     {
                         QueueName = queueName,
@@ -223,6 +224,18 @@ public static partial class OrleansSqsStreamingExtensions
 
         var normalized = result.ToString().Trim('-');
         return normalized.Length == 0 ? "sqs" : normalized;
+    }
+
+    private static string CreateResourceName(string value)
+    {
+        var normalized = NormalizeResourceName(value);
+        if (string.Equals(normalized, value.ToLowerInvariant(), StringComparison.Ordinal))
+        {
+            return normalized;
+        }
+
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(value));
+        return $"{normalized}-{Convert.ToHexString(hash.AsSpan(0, 4)).ToLowerInvariant()}";
     }
 
     internal static void ValidateServiceId(
