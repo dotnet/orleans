@@ -145,6 +145,11 @@ namespace Orleans.Streaming.EventHubs
         {
             while (true)
             {
+                if (Volatile.Read(ref this.receiverPendingClose) is not null)
+                {
+                    await ClosePendingReceiverWithTimeout().WaitAsync(cancellationToken);
+                }
+
                 Task? recoveryTask;
                 lock (this.cacheLock)
                 {
@@ -165,6 +170,7 @@ namespace Orleans.Streaming.EventHubs
                 await this.initializationLock.WaitAsync(cancellationToken);
                 try
                 {
+                    bool hasPendingClose;
                     lock (this.cacheLock)
                     {
                         if (this.receiverState != ReceiverRunning || this.receiver is not null)
@@ -173,6 +179,13 @@ namespace Orleans.Streaming.EventHubs
                         }
 
                         recoveryTask = this.recoveryTask;
+                        hasPendingClose = this.receiverPendingClose is not null;
+                    }
+
+                    if (hasPendingClose)
+                    {
+                        await ClosePendingReceiverWithTimeout().WaitAsync(cancellationToken);
+                        continue;
                     }
 
                     if (recoveryTask is null)
@@ -257,9 +270,20 @@ namespace Orleans.Streaming.EventHubs
                 {
                     if (receiver is not null)
                     {
-                        using var cleanupCancellation = new CancellationTokenSource(ReceiveTimeout);
-                        await receiver.CloseAsync(cleanupCancellation.Token)
-                            .WaitAsync(cleanupCancellation.Token);
+                        lock (this.cacheLock)
+                        {
+                            if (this.receiverPendingClose is not null
+                                && !ReferenceEquals(this.receiverPendingClose, receiver))
+                            {
+                                throw new InvalidOperationException(
+                                    "A previous Event Hub receiver is still pending cleanup.");
+                            }
+
+                            this.receiverPendingClose = receiver;
+                            this.receiverCloseTask = null;
+                        }
+
+                        await ClosePendingReceiverWithTimeout();
                     }
                 }
                 catch (Exception exception)

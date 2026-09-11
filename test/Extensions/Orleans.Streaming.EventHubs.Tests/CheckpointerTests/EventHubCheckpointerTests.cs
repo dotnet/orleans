@@ -788,6 +788,93 @@ public class EventHubCheckpointerTests
 
     [TestSuite("BVT")]
     [Fact, TestCategory("BVT")]
+    public async Task Initialize_WhenCleanupFails_RetriesCloseBeforeCreatingReplacement()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var failedReceiver = new RetryingCloseEventHubReceiver();
+        var replacementReceiver = new TestEventHubReceiver();
+        var receiverCreations = 0;
+        var receiver = await CreateReceiver(
+            new TestCheckpointer(),
+            receiverFactory: _ =>
+            {
+                if (Interlocked.Increment(ref receiverCreations) == 1)
+                {
+                    cancellation.Cancel();
+                    return failedReceiver;
+                }
+
+                return replacementReceiver;
+            },
+            initialize: false);
+
+        await Assert.ThrowsAsync<AggregateException>(
+            () => InvokeInitialize(receiver, cancellation.Token));
+
+        Assert.Equal(1, failedReceiver.CloseCount);
+        Assert.Equal(1, receiverCreations);
+
+        await receiver.Initialize(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(2, failedReceiver.CloseCount);
+        Assert.Equal(2, receiverCreations);
+    }
+
+    [TestSuite("BVT")]
+    [Fact, TestCategory("BVT")]
+    public async Task Initialize_WaitingCallerDrainsFailedCleanupBeforeCreatingReplacement()
+    {
+        var checkpointer = new TestCheckpointer();
+        var firstCancellation = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var receiverFactoryStarted = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        using var releaseReceiverFactory = new ManualResetEventSlim();
+        var failedReceiver = new RetryingCloseEventHubReceiver();
+        var replacementReceiver = new TestEventHubReceiver();
+        var checkpointerFactoryCalls = 0;
+        var receiverCreations = 0;
+        var receiver = await CreateReceiver(
+            checkpointer,
+            receiverFactory: _ =>
+            {
+                if (Interlocked.Increment(ref receiverCreations) == 1)
+                {
+                    receiverFactoryStarted.TrySetResult();
+                    releaseReceiverFactory.Wait(TestContext.Current.CancellationToken);
+                    return failedReceiver;
+                }
+
+                return replacementReceiver;
+            },
+            checkpointerFactory: cancellationToken =>
+            {
+                if (Interlocked.Increment(ref checkpointerFactoryCalls) == 1)
+                {
+                    _ = cancellationToken.Register(() => firstCancellation.TrySetResult());
+                }
+
+                return Task.FromResult<IStreamQueueCheckpointer<string>>(checkpointer);
+            },
+            initialize: false);
+
+        var first = Task.Run(
+            () => receiver.Initialize(TimeSpan.FromMilliseconds(50)),
+            TestContext.Current.CancellationToken);
+        await receiverFactoryStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+        var second = receiver.Initialize(TimeSpan.FromSeconds(5));
+        await firstCancellation.Task.WaitAsync(TestContext.Current.CancellationToken);
+        releaseReceiverFactory.Set();
+
+        await Assert.ThrowsAsync<AggregateException>(() => first);
+        await second;
+
+        Assert.Equal(2, failedReceiver.CloseCount);
+        Assert.Equal(2, receiverCreations);
+    }
+
+    [TestSuite("BVT")]
+    [Fact, TestCategory("BVT")]
     public async Task GetQueueMessagesAsync_TreatsNullReceiverResultAsEmpty()
     {
         var cache = new TestEventHubQueueCache();
