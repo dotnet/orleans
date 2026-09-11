@@ -1,0 +1,164 @@
+{
+  "schema": 1,
+  "purpose": "Executable real-binary compatibility/recovery gates and controlled load evidence, not a microbenchmark or a performance claim.",
+  "entrypoint": ".github/scripts/dissemination-evidence.ps1",
+  "workflow": ".github/workflows/dissemination-evidence.yml",
+  "automaticPrTrigger": "pull_request and merge_group run both the pinned-binary version-skew gate and measured bounded original-legacy, current-default-off and current-enabled-supported costs. The bounded job reuses published binaries, needs no label or workflow_dispatch registration, and has a 25-minute hard limit.",
+  "controlledScaleTrigger": "Larger runs require workflow_dispatch with scale=true after the workflow is registered on the default branch. No pull_request_target or write permission.",
+  "sliceInventory": [
+    ".github/scripts/dissemination-evidence.ps1",
+    ".github/workflows/dissemination-evidence.yml",
+    "test/Dissemination.IntegrationHarness/methodology.json",
+    "test/Dissemination.IntegrationHarness/Shared/Protocol.cs",
+    "test/Dissemination.IntegrationHarness/Silo/ControlTarget.cs",
+    "test/Dissemination.IntegrationHarness/Silo/Dissemination.Silo.csproj",
+    "test/Dissemination.IntegrationHarness/Silo/FileMembershipTable.cs",
+    "test/Dissemination.IntegrationHarness/Silo/NewRuntime.cs",
+    "test/Dissemination.IntegrationHarness/Silo/Observation.cs",
+    "test/Dissemination.IntegrationHarness/Silo/Program.cs",
+    "test/Dissemination.IntegrationHarness/Tests/Dissemination.IntegrationHarness.Tests.csproj",
+    "test/Dissemination.IntegrationHarness/Tests/MeasurementTests.cs",
+    "test/Dissemination.IntegrationHarness/Tests/ProcessCluster.cs",
+    "test/Dissemination.IntegrationHarness/Tests/ScalingTests.cs",
+    "test/Dissemination.IntegrationHarness/Tests/VersionSkewTests.cs"
+  ],
+  "runtimeDependencies": {
+    "build": "Existing Orleans.TestingHost project, repository code generation, net10.0 SDK, existing MTP/xUnit packages; controller uses the installed ASP.NET Core shared framework for instrumentation tests.",
+    "bothBinaries": "TestClusterHostFactory; IMembershipTable; IMembershipManager.CurrentSnapshot/Refresh; DeploymentLoadPublisher.PeriodicStatistics; IInternalGrainFactory/SystemTarget/SystemTargetShared; stable test-only aliased control RPCs.",
+    "reflectionSeams": "DeploymentLoadPublisher.PublishStatistics(CancellationToken) and its IDisposable _publishTimer field, verified against the pinned source and current source. Publication, timer pause and deliberate cache-loss injection run on the publisher scheduler. Pausing disposes the timer and retains its reference for normal lifecycle cleanup.",
+    "lifecycleSignature": "GatedMembershipGossiper compiles against the original no-token IMembershipGossiper method for Old, and the required CancellationToken method on the current dissemination top for New.",
+    "newOnly": "DisseminationOptions and namespace options; IDisseminationService/IDisseminationSystemTarget; MembershipDisseminationNamespace and DeploymentLoadStatisticsDisseminationNamespace; DisseminationMembership topology and bounded repair contracts. Enabled recovery hosts register a test-only incoming-call filter which gates only PushBroadcast, never ExchangeAntiEntropy.",
+    "diagnostics": "Existing Microsoft.Orleans.Dissemination ValueApply event, Microsoft.Orleans messaging/dissemination meters, and System.Net.Sockets counters. No additional production diagnostic API is required.",
+    "notRequired": "No cluster-manifest hash RPC, and no direct access to notification locks, tombstone bookkeeping or dedup internals.",
+    "pendingProviderApi": "The candidate FileMembershipTable still targets the confirmed pinned/current interface. Token-bearing provider implementations and the conditional legacy bridge will be updated after the provider owner confirms the new API shape; no prospective overload signatures are assumed."
+  },
+  "baseline": {
+    "repository": "dotnet/orleans",
+    "commit": "6739589254b746a8790cf53524e6abe372bb53d4",
+    "build": "Separate CI checkout. Only Silo and Shared test sources are copied into it. Its runtime source tree must be pristine and must lack dissemination.",
+    "identity": "Independent publish directory and dotnet OS process per node. Assert PID, runtime SHA256, assembly name/version, informational commit, MVID difference, and presence/absence of the dissemination target. Every loaded Orleans assembly must match its published SHA/version and live in that process's binary directory; Runtime, Core, Core.Abstractions and Serialization must all be present.",
+    "assemblyVersion": "Numeric assembly versions can legitimately be equal. They are checked against build manifests, not falsely required to differ.",
+    "controller": "MTP/xUnit controller references no Orleans assembly. The separate silo executable reuses the existing Orleans.Runtime.Tests friend identity."
+  },
+  "featureBoundary": {
+    "initialLifecycleBaseCommit": "789e8cc27394b78e9a04887409a4fcec965b1b4f",
+    "new": "Build the current dissemination top, including its main-based lifecycle-prerequisite commits.",
+    "old": "Always build the exact pinned pre-feature main commit; do not apply the lifecycle prerequisite or dissemination patches to it.",
+    "manifestHashRpc": "No test uses a cluster-manifest hash RPC. Binary manifest.json files and local DLL SHA256 checks only attest which assemblies each OS process loaded; they are unrelated to the excluded manifest-hash feature.",
+    "compatibility": "Probe the actual IDisseminationSystemTarget RPC on an old process, then require a fresh exact production load sample through legacy delivery while that process remains unconfirmed.",
+    "sliceOwnership": "All harness and CI files belong to the dissemination/evidence slice. The current dissemination top inherits the lifecycle and scoped-RPC prerequisites and applies load updates on the publisher scheduler while preserving default-off notification behavior. The pinned old source retains its original runtime implementation."
+  },
+  "infrastructure": {
+    "hosting": "Existing TestClusterHostFactory, SystemTarget and code generation; OS process orchestration follows StandaloneSiloHandle without its single-binary configuration assumption.",
+    "membership": "Small JSON provider with inter-process exclusive file locking, atomic replacement, version/row ETags, heartbeat-only updates and per-node frozen read snapshots.",
+    "control": "Stable aliased Orleans system-target Echo and Hold RPCs with required CancellationToken parameters. Local test commands use redirected stdin/stdout, not an exposed control server.",
+    "partition": "Abort existing real silo connections and reject new inbound/outbound connections at connection middleware. Cost recovery drains captured middleware and connection-close tasks at both endpoints, including unidentified inbound handshakes, before reopening and confirming acknowledged control RPCs.",
+    "scope": "One machine, loopback TCP, real serializer/transport, real membership/load namespaces. Liveness failure detection is disabled to keep partition repair distinct from membership eviction."
+  },
+  "gates": [
+    {
+      "test": "PartitionHealing_ConfirmsTransportBeforeSinglePublicationRound",
+      "assertions": "Repeat three partition/heal cycles on pinned old, current default-off and current enabled binaries. The first cycle proves an acknowledged control probe fails during the partition; remaining cycles publish and heal immediately. Healing retires old connections at both endpoints while the isolated endpoint rejects new handshakes, then bidirectional control RPCs confirm each exact remote PID. Full load snapshots must converge after one production publication per node with automatic publishers paused."
+    },
+    {
+      "test": "PinnedBinaries_RollForward_MixedEnablement_AndRollback",
+      "assertions": "Three pinned old processes are replaced one at a time by one default-disabled and two enabled new processes, then rolled back to pinned old processes. Exact load state equality and stable cross-process RPC PID identity are checked at each stage. Unsupported old IDisseminationSystemTarget RPC failures cannot be inferred from timeouts and must be followed by fresh exact load-state delivery to the still-unconfirmed old process. Disabled new nodes return explicit namespace-unsupported and retain legacy delivery. Enabled peers confirm support. Disabled nodes have no dissemination sends, applies or outgoing anti-entropy."
+    },
+    {
+      "test": "PartitionHistoryAndHeartbeat_RequireDisseminationProvenance",
+      "assertions": "Freeze central-table reads and suppress legacy membership gossip on all nodes. Close the test-only native PushBroadcast incoming-call gate on every node and await all previously admitted PushBroadcast invocations before creating the history gap. Probe the actual RPC to verify rejection. Keep ExchangeAntiEntropy enabled. Isolate one real process while the production membership namespace sees 40 actual table versions. Its 32-entry history must miss the receiver baseline and produce FromVersion=0. Heal transport and require exact full membership state plus Applied provenance while every tree gate stays closed with unchanged admitted-call counts. Keep those gates closed for same-version heartbeat and missing-load full repair. Disabling anti-entropy cannot be rescued by pending/retried/rematerialized tree sends.",
+      "nonClaims": "TTL expiry is not queue expiry and is not used as a tree-drain proof. FromVersion=0 alone does not prove anti-entropy. Legacy gossip, central-table reads and all newly admitted PushBroadcast calls are excluded throughout these assertions."
+    },
+    {
+      "test": "RuntimeStatisticsComparison_ObservesPublicReadonlyFieldMutation",
+      "assertions": "Execute a mutation probe inside both the pinned old and current OS processes using the real EnvironmentStatistics type. Changing only RawCpuUsagePercentage must change the shared comparison representation; every reflected public instance field must be present."
+    },
+    {
+      "test": "RequiredCancellationAndPartitionedShutdown_AreBounded",
+      "assertions": "Start a required-token RPC from the sender's system-target scheduler, retain its CTS across commands, and wait for an explicit receiver snapshot proving one pending started call with a live uncanceled token before issuing cancellation. Invoke CancelAsync, await the actual raw RPC task using an independent command deadline, then require exactly one receiver-observed cancellation and no pending server call. Save start/cancel timestamps and raw-task status; do not accept only cancellation of a local WaitAsync. A partitioned dissemination sender must shut down without controller kill inside 35 seconds."
+    }
+  ],
+  "focusedRegressions": [
+    {
+      "test": "ConnectionDrain_WaitsForInitializationAndCloseBeforeReopening",
+      "scope": "The partition captures middleware before initialization completes, rejects new admissions, and waits for both middleware exit and connection close before reopening."
+    },
+    {
+      "test": "ConnectionDrain_CapturesUnidentifiedPeersAndPreservesHealthyConnections",
+      "scope": "Peer-specific drain includes unidentified handshakes, preserves healthy connections, and retains admission blocking when the drain caller is canceled."
+    },
+    {
+      "test": "ControlledCall_WaitsForRawCancellationAfterExplicitSignal",
+      "scope": "The durable controller call has no automatic timer, retains a live token until explicit cancellation, and cannot complete merely because cancellation was requested while its raw task is still pending."
+    },
+    {
+      "test": "ControlledCall_DoesNotTreatRawTimeoutAsCancellation",
+      "scope": "A raw RPC timeout after cancellation is requested remains a failure, rather than being mistaken for successful cooperative cancellation."
+    },
+    {
+      "test": "StateComparison_ObservesNestedPublicReadonlyFieldChanges",
+      "scope": "Lightweight controller regression for the exact cached IncludeFields serializer used by the host load-state comparison. Demonstrates that the previous properties-only serializer misses the mutation."
+    },
+    {
+      "test": "InFlightCallGate_DrainsPriorCallsAndRejectsLaterCalls",
+      "scope": "Lightweight regression for the admission/drain primitive used by the native PushBroadcast filter. A prior active call delays the barrier; subsequent calls cannot enter before or after drain until explicitly reopened."
+    }
+  ],
+  "load": {
+    "test": "Scaling_OriginalLegacy_DefaultOff_EnabledSupported",
+    "comparison": "Three separately labeled paths: pinned original legacy binary; actual current binary with untouched dissemination-off defaults; the same current binary enabled using production dissemination defaults after peers have confirmed support.",
+    "runtimePaths": [
+      { "name": "OriginalLegacy", "runtime": "Old", "enabled": false },
+      { "name": "CurrentDefaultOff", "runtime": "New", "enabled": false },
+      { "name": "CurrentEnabledSupported", "runtime": "New", "enabled": true }
+    ],
+    "automaticPrProfile": { "mode": "Cost", "sizes": [4, 8], "iterations": 3, "pairedRepetitions": 1, "overrideable": false },
+    "manualDefaults": { "mode": "Scale", "sizes": [4, 8, 16], "iterations": 10, "pairedRepetitions": 1 },
+    "controls": { "sizes": "1..6 comma-separated sizes, each 3..32", "iterations": "3..200", "pairedRepetitions": "1..5" },
+    "scenarios": "Stable; graceful stop/restart at the same endpoint every other round; real connection partition and heal with old pooled connections retired at both endpoints before reopening and confirming transport readiness via bidirectional acknowledged control RPCs. Teardown, readiness probes and retries share a 60-second deadline and remain inside recovery latency and total cost. Each path then offers the same single publication round. Gate artifacts separately cover silent repair, retained-history misses and same-version heartbeat recovery.",
+    "cadence": "Pause automatic deployment-load timers after startup. Invoke the actual production PublishStatistics method once per active node per offered round, then compare state using cached JsonSerializerOptions with IncludeFields=true, including every public readonly EnvironmentStatistics field. Do not replace it with a formula or synthetic protocol implementation.",
+    "window": "Two warmup publication rounds and complete enabled-peer capability discovery before measuring. Replacements also finish capability discovery before offered rounds; their bootstrap/fallback/discovery costs remain inside the churn window. Two-second OS-counter sampling margins on all paths. Full-GC retained-memory probes are after the CPU/allocation window.",
+    "metrics": [
+      "All transmitted request AND one-way RPC messages; responses reported in the separate total-message count",
+      "Complete serialized Orleans message bytes, including headers/body, from message-size observations",
+      "Actual process-wide System.Net.Sockets sent/received bytes, sampled each second; transport-pipe submitted/read bytes separately",
+      "Process CPU time, GC total allocated bytes, post-full-GC retained managed bytes, working set and private bytes",
+      "Per-round exact state-convergence latency and partition recovery latency",
+      "Per-node counters, actual originator/forwarding targets, tree rank and upper-tree role; raw snapshots preserve topology changes",
+      "Raw protocol payload, namespace-batch and anti-entropy counters, never substituted for total RPC or byte counts"
+    ],
+    "limitations": [
+      "Socket counters exclude TCP/IP headers and retransmissions; transport submissions can include bytes buffered then lost on an aborted connection.",
+      "One-second socket-counter sampling and non-atomic cross-process snapshots impose boundary uncertainty. Raw captured UTC timestamps are included.",
+      "Instrumentation and stdin/state-snapshot overhead are included. Detailed counters are serialized only at cost boundaries and per-value diagnostic events are disabled for scale runs.",
+      "Controller CPU/allocation, disk byte costs, production providers, application grains, cross-machine latency and NIC-level wire costs are not measured. This is a closed-loop control-plane workload with a convergence barrier each round, not a saturation-throughput benchmark.",
+      "Retained managed memory is a post-GC live-size sample on surviving nodes, not peak memory. Retired process snapshots and all-node RSS/private-memory samples remain in artifacts.",
+      "Normal partition cost comparisons include a transport-readiness barrier followed by the same single publication round. The separate anti-entropy-only gate measures silent repair.",
+      "Original-to-current default-off deltas include the lifecycle and scoped-RPC prerequisites and feature registration costs. The current off/on pair uses the identical current binary and isolates enabling the subsystem.",
+      "Raw samples and repetitions are evidence inputs, not predeclared improvement thresholds or broad-enable approval."
+    ]
+  },
+  "bounds": {
+    "startupSeconds": 90,
+    "controllerStartupSeconds": 100,
+    "siloCommandSeconds": 60,
+    "controllerCommandSeconds": 70,
+    "convergenceSeconds": 60,
+    "scaleCapabilityDiscoverySeconds": 90,
+    "membershipLockSeconds": 10,
+    "shutdownSeconds": 35,
+    "individualProcessLifetimeMinutes": 45,
+    "gateJobMinutes": 35,
+    "automaticCostJobMinutes": 25,
+    "manualScaleJobMinutes": 90,
+    "rpcLifetimeScope": "ResponseTimeout bounds locally observable raw RPC completion, not remote execution. The harness does not require the fourth-slice per-call acknowledgment-scope API. Cooperative Hold cancellation is checked separately through the remote Started/Cancelled/Pending counters, not inferred from caller cancellation or RPC completion.",
+    "failure": "Fail, preserve exact state/raw stdout/stderr/binlogs/TRX, and kill only the specific owned child process after its shutdown bound. A forced kill is not a successful bounded shutdown.",
+    "largeDispatch": "The job lifetime is a hard budget, including extreme user-selected size/iteration combinations."
+  },
+  "artifacts": {
+    "gate": "dissemination-gate-evidence: TRX, identity/probe snapshots, isolated repair checkpoints, bounded shutdown outcomes, raw logs, methodology and binlogs",
+    "binaries": "dissemination-binaries: pinned old/current/runner publish directories plus SHA manifests for explicit replay using -SkipBuild",
+    "automaticCost": "dissemination-bounded-cost-evidence: cost-results.json and per-window/raw artifacts for the fixed automatic PR profile, including actual restart and partition counts",
+    "scale": "dissemination-scale-evidence: cost-results.json, per-window cost.json, raw start/finish/warmup/node snapshots and partial results on failure"
+  }
+}
