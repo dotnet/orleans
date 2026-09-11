@@ -32,6 +32,18 @@ public sealed class NatsOptionsTests
     }
 
     [Theory]
+    [InlineData(int.MinValue, 3)]
+    [InlineData(-1, 3)]
+    [InlineData(0, 3)]
+    [InlineData(int.MaxValue, 3)]
+    public void ProducerIndex_IsAlwaysWithinBounds(int hashCode, int producerCount)
+    {
+        var index = NatsConnectionManager.GetProducerIndex(hashCode, producerCount);
+
+        Assert.InRange(index, 0, producerCount - 1);
+    }
+
+    [Theory]
     [InlineData(0)]
     [InlineData(-1)]
     [InlineData(-100)]

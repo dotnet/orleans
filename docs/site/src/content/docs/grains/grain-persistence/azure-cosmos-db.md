@@ -1,7 +1,7 @@
 ---
 title: Azure Cosmos DB grain persistence
 description: Configure Azure Cosmos DB for NoSQL as an Orleans grain storage provider.
-ms.date: 08/02/2026
+ms.date: 08/23/2026
 ms.topic: how-to
 ---
 
@@ -17,6 +17,18 @@ Configure a named provider with <xref:Orleans.Hosting.HostingExtensions.AddCosmo
 
 :::code language="csharp" source="../../snippets/compiled/Grains/PersistenceSnippets.cs" id="configure_cosmos_storage":::
 <xref:Orleans.Persistence.Cosmos.CosmosOptions.DatabaseName> defaults to `Orleans`, <xref:Orleans.Persistence.Cosmos.CosmosOptions.ContainerName> defaults to `OrleansStorage`, and <xref:Orleans.Persistence.Cosmos.CosmosGrainStorageOptions.PartitionKeyPath> defaults to `/PartitionKey`. Provision the database and container before startup when <xref:Orleans.Persistence.Cosmos.CosmosOptions.IsResourceCreationEnabled> is `false`. Enabling resource creation is convenient for development but production provisioning is usually managed separately.
+
+## Use with Aspire
+
+Reference the Azure Cosmos DB account resource from Orleans so Aspire emits the `AzureCosmosDB` provider type and a keyed Cosmos client. Declare the database and containers as child resources to provision the provider topology:
+
+:::code language="csharp" source="../../host/snippets/aspire/AppHost/AppHostExamples.cs" id="cosmos_providers_aspire":::
+
+Register the keyed client in the silo before Orleans reads the generated clustering, storage, and reminder configuration:
+
+:::code language="csharp" source="../../host/snippets/aspire/Silo/SiloProgram.cs" id="cosmos_providers_silo":::
+
+The clustering container uses `/ClusterId`; grain storage and reminders use `/PartitionKey`. Keep the AppHost container names aligned with the Orleans configuration supplied to each provider.
 
 ## Partitioning and indexing
 

@@ -16,3 +16,8 @@ aspire run --project JournalingAzureBlobJson.AppHost
 
 The application writes a scenario, verifies the recovered state, and prints the raw
 JSON Lines journal stored by the Azure Storage emulator.
+
+The AppHost starts Azurite and injects the `blobs` connection into the Orleans
+application. The application creates the configured blob container, and the Orleans
+Azure Blob journal provider owns the write-ahead log and checkpoint blobs used to
+recover grain state.

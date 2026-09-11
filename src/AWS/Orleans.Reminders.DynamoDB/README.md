@@ -51,6 +51,10 @@ await host.WaitForShutdownAsync();
 
 `UseDynamoDBReminderService` configures reminder storage independently from the cluster membership provider. The AWS SDK credential and profile resolution chain supplies credentials when the reminder options omit explicit keys. This example uses on-demand capacity and an infrastructure-managed table.
 
+## Aspire
+
+AWS Aspire can run DynamoDB Local and provide CDK or CloudFormation table outputs to Orleans. See [Use Amazon DynamoDB with Aspire](https://dotnet.github.io/orleans/docs/host/dynamodb-aspire/) for clustering, grain storage, reminders, identity, and table lifecycle guidance.
+
 ## Example - Using Reminders in a Grain
 ```csharp
 using System;

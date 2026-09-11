@@ -6,6 +6,8 @@ using Orleans.Providers;
 using StackExchange.Redis;
 
 [assembly: RegisterProvider("Redis", "GrainJournaling", "Silo", typeof(Orleans.Hosting.RedisGrainJournalingProviderBuilder))]
+[assembly: RegisterProvider("AzureRedisCache", "GrainJournaling", "Silo", typeof(Orleans.Hosting.RedisGrainJournalingProviderBuilder))]
+[assembly: RegisterProvider("AzureManagedRedis", "GrainJournaling", "Silo", typeof(Orleans.Hosting.RedisGrainJournalingProviderBuilder))]
 
 namespace Orleans.Hosting;
 

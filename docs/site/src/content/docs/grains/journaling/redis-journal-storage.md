@@ -1,7 +1,7 @@
 ---
 title: Redis journal storage
 description: Configure Redis as a storage provider for experimental Orleans Journaling durable state.
-ms.date: 08/21/2026
+ms.date: 08/23/2026
 ms.topic: how-to
 ---
 
@@ -18,6 +18,14 @@ Configure the provider with <xref:Orleans.Journaling.RedisJournalStorageHostingE
 :::code language="csharp" source="./snippets/redis-journaling/RedisJournalingConfiguration.cs" id="configure_redis_journaling":::
 
 The [runnable Redis Journaling sample](samples.md#run-the-redis-sample) uses the same provider with a <xref:Orleans.Journaling.DurableGrain>, acknowledges a durable value update, deactivates the grain, and verifies recovery on a new activation.
+
+## Use with Aspire
+
+Aspire injects the Redis connection and keyed client. Configure the journaling provider section explicitly in the silo resource:
+
+:::code language="csharp" source="../../host/snippets/aspire/AppHost/AppHostExamples.cs" id="redis_journaling_aspire":::
+
+The silo registers the `orleans-redis` keyed client before `UseOrleans`, as shown in the [Redis provider silo example](../grain-persistence/redis-storage.md#use-with-aspire). Orleans then activates Redis journal storage from `Orleans:GrainJournaling`.
 
 ## Storage behavior
 

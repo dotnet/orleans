@@ -36,4 +36,7 @@
     <ProjectReference Include="$(SourceRoot)test\Orleans.Streaming.Tests\Orleans.Streaming.Tests.csproj" />
     <ProjectReference Include="..\Orleans.Azure.Tests\Orleans.Azure.Tests.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Compile Include="$(SourceRoot)test\Extensions\AspireTestInfrastructure\AspireResourceConfiguration.cs" Link="AspireResourceConfiguration.cs" />
+  </ItemGroup>
 </Project>

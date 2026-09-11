@@ -9,8 +9,10 @@ using System.Threading.Tasks;
 
 [assembly: RegisterProvider("Redis", "Streaming", "Silo", typeof(RedisStreamingProviderBuilder))]
 [assembly: RegisterProvider("AzureRedisCache", "Streaming", "Silo", typeof(RedisStreamingProviderBuilder))]
+[assembly: RegisterProvider("AzureManagedRedis", "Streaming", "Silo", typeof(RedisStreamingProviderBuilder))]
 [assembly: RegisterProvider("Redis", "Streaming", "Client", typeof(RedisStreamingProviderBuilder))]
 [assembly: RegisterProvider("AzureRedisCache", "Streaming", "Client", typeof(RedisStreamingProviderBuilder))]
+[assembly: RegisterProvider("AzureManagedRedis", "Streaming", "Client", typeof(RedisStreamingProviderBuilder))]
 
 namespace Orleans.Hosting;
 
