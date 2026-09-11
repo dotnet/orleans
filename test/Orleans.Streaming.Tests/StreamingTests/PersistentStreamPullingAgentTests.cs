@@ -3992,6 +3992,114 @@ namespace UnitTests.StreamingTests
         [TestProvider("None")]
         [TestArea("Streaming")]
         [Theory, TestCategory("BVT"), TestCategory("Streaming")]
+        [InlineData(false, false, 1)]
+        [InlineData(false, false, 2)]
+        [InlineData(false, true, 1)]
+        [InlineData(false, true, 2)]
+        [InlineData(true, false, 1)]
+        [InlineData(true, false, 2)]
+        [InlineData(true, true, 1)]
+        [InlineData(true, true, 2)]
+        public async Task Recovery_NewReadPreservesEmptyCursorReplayBoundary(
+            bool inclusiveReplay, bool replayAvailable, int batchSize)
+        {
+            var pubSub = Substitute.For<IStreamPubSub>();
+            pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
+                .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
+            var queueId = QueueId.GetQueueId("queue", 0u, 0u);
+            var streamId = new QualifiedStreamId("provider", StreamId.Create("namespace", Guid.NewGuid()));
+            var requiredToken = new EventSequenceTokenV2(100);
+            var latestToken = new EventSequenceTokenV2(500);
+            var queueCache = new PurgeablePooledQueueCache(retainPurgeMetadata: true);
+            queueCache.AddToCache(
+            [
+                new TestBatchContainer(streamId.StreamId, requiredToken),
+                new TestBatchContainer(streamId.StreamId, new EventSequenceTokenV2(200)),
+            ]);
+            queueCache.Purge();
+            var adapterCache = Substitute.For<IQueueAdapterCache>();
+            adapterCache.CreateQueueCache(queueId).Returns(queueCache);
+            var receiver = Substitute.For<IQueueAdapterReceiver>();
+            receiver.GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
+                .Returns(Task.FromResult<IList<IBatchContainer>>(replayAvailable
+                    ?
+                    [
+                        new TestBatchContainer(streamId.StreamId, requiredToken),
+                        new TestBatchContainer(streamId.StreamId, new EventSequenceTokenV2(200)),
+                        new TestBatchContainer(streamId.StreamId, latestToken),
+                    ]
+                    : [new TestBatchContainer(streamId.StreamId, latestToken)]));
+            var agent = CreateAgent(pubSub, queueId, receiver, adapterCache,
+                options: new StreamPullingAgentOptions { BatchContainerBatchSize = batchSize });
+            var accessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
+            await InitializeAgent(agent);
+            await accessor.RegisterStream(streamId, requiredToken, DateTime.UtcNow);
+            var observer = new RecordingConsumer(inclusiveReplay
+                ? StreamHandshakeToken.CreateStartToken(requiredToken)
+                : StreamHandshakeToken.CreateDeliveyToken(requiredToken));
+            observer.ReleaseDelivery();
+            var consumer = (await accessor.GetPubSubCache()).Single().Value.AddConsumer(
+                GuidId.GetGuidId(SubscriptionMarker.MarkAsExplicitSubscriptionId(Guid.NewGuid())),
+                streamId, observer, null, DateTime.UtcNow);
+            Assert.True(await accessor.DoHandshakeWithConsumer(consumer, cacheToken: null));
+            consumer.IsRegistered = true;
+            Assert.False(consumer.HasDeliveryProgressError);
+
+            var failedCursor = Substitute.For<IQueueCacheCursor>();
+            var cursorError = new InvalidOperationException("Injected cursor failure before an empty-cache recovery.");
+            failedCursor.MoveNextWithResult().Returns(_ => throw cursorError);
+            consumer.SafeDisposeCursor(NullLogger.Instance);
+            consumer.Cursor = failedCursor;
+            await accessor.RunConsumerCursor(consumer);
+
+            Assert.Contains(cursorError, observer.Errors);
+            Assert.Empty(observer.DeliveredBatches);
+            Assert.True(consumer.HasDeliveryProgressError);
+            Assert.False(consumer.IsCaughtUp);
+            Assert.Equal(StreamConsumerDataState.Inactive, consumer.State);
+            var recoveryCursor = consumer.Cursor;
+            Assert.NotNull(recoveryCursor);
+            Assert.Same(recoveryCursor, consumer.DeliveryRecoveryCursor);
+            var recoveryToken = consumer.DeliveryRecoveryToken;
+            Assert.Equal(requiredToken, Assert.IsAssignableFrom<StreamHandshakeToken>(recoveryToken).Token);
+
+            Assert.True(await accessor.ReadFromQueue(queueId, receiver, 1000));
+
+            Assert.Equal(StreamConsumerDataState.Inactive, consumer.State);
+            Assert.Equal(!replayAvailable, consumer.HasDeliveryProgressError);
+            Assert.Equal(replayAvailable, consumer.IsCaughtUp);
+            // A missing range must invalidate the recovery cursor, not silently reposition it to the new read.
+            Assert.Null(consumer.DeliveryRecoveryCursor);
+            if (replayAvailable)
+            {
+                Assert.Null(consumer.DeliveryRecoveryToken);
+                Assert.Equal(latestToken, consumer.LastProcessedToken);
+            }
+            else
+            {
+                Assert.Same(recoveryToken, consumer.DeliveryRecoveryToken);
+                Assert.Equal(inclusiveReplay ? null : requiredToken, consumer.LastProcessedToken);
+            }
+
+            var deliveredTokens = observer.DeliveredBatches
+                .SelectMany(batch => batch is BatchContainerBatch group ? group.BatchContainers.AsEnumerable() : [batch])
+                .Select(batch => batch.SequenceToken.SequenceNumber);
+            Assert.Equal(replayAvailable ? new[] { 100L, 200L, 500L } : [500L], deliveredTokens);
+            await accessor.Shutdown();
+            if (inclusiveReplay && !replayAvailable)
+            {
+                Assert.Empty(queueCache.DeliveryProgressTokens);
+            }
+            else
+            {
+                Assert.Equal(replayAvailable ? latestToken : requiredToken, Assert.Single(queueCache.DeliveryProgressTokens));
+            }
+        }
+
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
+        [Theory, TestCategory("BVT"), TestCategory("Streaming")]
         [InlineData("delivery", false, false, 1)]
         [InlineData("delivery", false, true, 2)]
         [InlineData("delivery", true, false, 2)]
