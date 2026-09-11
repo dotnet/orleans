@@ -23,6 +23,8 @@ class [GrainType("developmentleaseprovider")] Orleans.Runtime.Development.Develo
 interface [GrainInterfaceType("Orleans.Runtime.Development.IDevelopmentLeaseProviderGrain")] Orleans.Runtime.Development.IDevelopmentLeaseProviderGrain [Version(0)]
   847FCE12: Reset(System.Threading.CancellationToken) -> Task
 
+class [GrainType("disseminationsystemtarget")] Orleans.Runtime.Dissemination.DisseminationSystemTarget
+
 class [GrainType("graincallcancellationmanager")] Orleans.Runtime.GrainCallCancellationManager
 
 class [GrainType("clientdirectory")] Orleans.Runtime.GrainDirectory.ClientDirectory

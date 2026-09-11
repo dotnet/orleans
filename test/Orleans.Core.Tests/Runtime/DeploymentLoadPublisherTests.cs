@@ -2,13 +2,16 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Core.Diagnostics;
 using Orleans.Internal;
 using Orleans.Runtime;
+using Orleans.Runtime.Dissemination;
 using Orleans.Runtime.Scheduler;
+using Orleans.Serialization;
 using Orleans.Statistics;
 using Orleans.Timers;
 using TestExtensions;
@@ -22,6 +25,199 @@ namespace NonSilo.Tests.Runtime;
 [TestArea("Runtime")]
 public class DeploymentLoadPublisherTests
 {
+    [Fact]
+    public async Task PublishStatistics_DefaultDisabled_PreservesDirectPublication()
+    {
+        using var rig = CreateTestRig(TimeSpan.FromSeconds(5));
+
+        await rig.Publisher.PublishStatistics(TestContext.Current.CancellationToken);
+
+        await rig.DirectTarget.Received(1).UpdateRuntimeStatistics(
+            rig.LocalSilo, rig.Publisher.LocalRuntimeStatistics, TestContext.Current.CancellationToken);
+        Assert.Empty(rig.Dissemination.ReceivedCalls());
+        Assert.False(new DisseminationOptions().Enabled);
+        Assert.False(new DeploymentLoadPublisherOptions().Dissemination.Enabled);
+        Assert.False(new ClusterMembershipOptions().Dissemination.Enabled);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PublishStatistics_ConfirmedPeersUseDissemination(bool confirmed)
+    {
+        using var rig = CreateTestRig(TimeSpan.FromSeconds(5), enableDissemination: true);
+        var remoteSilo = SiloAddress.FromParsableString("127.0.0.1:200@100");
+        rig.Dissemination.GetUnconfirmedPeers(Arg.Any<IDisseminationNamespace>())
+            .Returns(confirmed ? [] : new[] { remoteSilo });
+
+        await rig.Publisher.PublishStatistics(TestContext.Current.CancellationToken);
+
+        await rig.Dissemination.Received(1).Publish(
+            Arg.Any<IDisseminationNamespace>(), rig.LocalSilo,
+            rig.Publisher.LocalRuntimeStatistics.DateTime.Ticks, Arg.Any<CancellationToken>());
+        await rig.DirectTarget.Received(confirmed ? 0 : 1).UpdateRuntimeStatistics(
+            rig.LocalSilo, rig.Publisher.LocalRuntimeStatistics, TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task PublishStatistics_DisseminationCancelsIndependently_FallsBackToDirectPublication()
+    {
+        using var rig = CreateTestRig(TimeSpan.FromSeconds(5), enableDissemination: true);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        rig.Dissemination.Publish(
+            Arg.Any<IDisseminationNamespace>(), Arg.Any<DisseminationKey>(), Arg.Any<long>(), Arg.Any<CancellationToken>())
+            .Returns(_ => ValueTask.FromCanceled<bool>(cancellation.Token));
+
+        await rig.Publisher.PublishStatistics(TestContext.Current.CancellationToken);
+
+        await rig.DirectTarget.Received(1).UpdateRuntimeStatistics(
+            rig.LocalSilo, rig.Publisher.LocalRuntimeStatistics, TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task PublishStatistics_CallerCancels_DoesNotFallBackToDirectPublication()
+    {
+        using var rig = CreateTestRig(TimeSpan.FromSeconds(5), enableDissemination: true);
+        using var cancellation = new CancellationTokenSource();
+        rig.Dissemination.Publish(
+            Arg.Any<IDisseminationNamespace>(), Arg.Any<DisseminationKey>(), Arg.Any<long>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                cancellation.Cancel();
+                return ValueTask.FromCanceled<bool>(call.ArgAt<CancellationToken>(3));
+            });
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => rig.Publisher.PublishStatistics(cancellation.Token));
+
+        Assert.Empty(rig.DirectTarget.ReceivedCalls());
+    }
+
+    [Fact]
+    public async Task PublishStatistics_DeadlineCancelsNativePublicationBeforeDirectDelivery()
+    {
+        using var rig = CreateTestRig(TimeSpan.FromSeconds(5), enableDissemination: true);
+        var timeProvider = (FakeTimeProvider)rig.ServiceProvider.GetRequiredService<TimeProvider>();
+        var started = new TaskCompletionSource<CancellationToken>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var completed = false;
+        rig.Dissemination.Publish(
+            Arg.Any<IDisseminationNamespace>(), Arg.Any<DisseminationKey>(), Arg.Any<long>(), Arg.Any<CancellationToken>())
+            .Returns(call => new ValueTask<bool>(PublishAsync(call.ArgAt<CancellationToken>(3))));
+        var publication = rig.Publisher.PublishStatistics(TestContext.Current.CancellationToken);
+        var token = await started.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        timeProvider.Advance(TimeSpan.FromSeconds(5));
+        await publication.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        Assert.True(token.IsCancellationRequested);
+        Assert.True(completed);
+        await rig.DirectTarget.Received(1).UpdateRuntimeStatistics(
+            rig.LocalSilo, rig.Publisher.LocalRuntimeStatistics, TestContext.Current.CancellationToken);
+
+        async Task<bool> PublishAsync(CancellationToken cancellationToken)
+        {
+            started.SetResult(cancellationToken);
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                return true;
+            }
+            finally
+            {
+                completed = true;
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ApplyLoadStatistics_UsesPublisherSchedulerAndSuppressesDisseminationDuplicates()
+    {
+        using var rig = CreateTestRig(TimeSpan.Zero);
+        var listener = Substitute.For<ISiloStatisticsChangeListener>();
+        listener.When(value => value.SiloStatisticsChangeNotification(rig.LocalSilo, Arg.Any<SiloRuntimeStatistics>()))
+            .Do(_ =>
+            {
+                Assert.Same(rig.Publisher, RuntimeContext.Current);
+                rig.Publisher.UnsubscribeStatisticsChangeEvents(listener);
+            });
+        var remaining = Substitute.For<ISiloStatisticsChangeListener>();
+        rig.Publisher.SubscribeToStatisticsChangeEvents(listener);
+        rig.Publisher.SubscribeToStatisticsChangeEvents(remaining);
+        var ns = rig.ServiceProvider.GetRequiredService<DeploymentLoadStatisticsDisseminationNamespace>();
+        var value = ns.CreateValue(rig.LocalSilo, rig.InitialStatistics);
+
+        var applied = await ns.ApplyValueAsync(value, TestContext.Current.CancellationToken);
+        var duplicate = await ns.ApplyValueAsync(value, TestContext.Current.CancellationToken);
+
+        Assert.Equal(DisseminationApplyResult.Applied, applied);
+        Assert.Equal(DisseminationApplyResult.Duplicate, duplicate);
+        listener.Received(1).SiloStatisticsChangeNotification(rig.LocalSilo, Arg.Any<SiloRuntimeStatistics>());
+        remaining.Received(1).SiloStatisticsChangeNotification(rig.LocalSilo, Arg.Any<SiloRuntimeStatistics>());
+        Assert.Equal(rig.InitialStatistics.DateTime, rig.Publisher.PeriodicStatistics[rig.LocalSilo].DateTime);
+    }
+
+    [Fact]
+    public async Task UpdateRuntimeStatistics_DefaultDisabled_PreservesDuplicateNotifications()
+    {
+        using var rig = CreateTestRig(TimeSpan.Zero);
+        var listener = Substitute.For<ISiloStatisticsChangeListener>();
+        rig.Publisher.SubscribeToStatisticsChangeEvents(listener);
+
+        await rig.Publisher.UpdateRuntimeStatistics(rig.LocalSilo, rig.InitialStatistics, TestContext.Current.CancellationToken);
+        await rig.Publisher.UpdateRuntimeStatistics(rig.LocalSilo, rig.InitialStatistics, TestContext.Current.CancellationToken);
+
+        listener.Received(2).SiloStatisticsChangeNotification(rig.LocalSilo, rig.InitialStatistics);
+        Assert.Same(rig.InitialStatistics, rig.Publisher.PeriodicStatistics[rig.LocalSilo]);
+    }
+
+    [Theory]
+    [InlineData(SiloStatus.Dead)]
+    [InlineData(SiloStatus.None)]
+    public async Task ApplyLoadStatistics_DepartedGenerationRemainsRemoved(SiloStatus status)
+    {
+        using var rig = CreateTestRig(TimeSpan.Zero);
+        await rig.Publisher.UpdateRuntimeStatistics(rig.LocalSilo, rig.InitialStatistics, TestContext.Current.CancellationToken);
+        var oracle = rig.ServiceProvider.GetRequiredService<ISiloStatusOracle>();
+        oracle.GetApproximateSiloStatus(rig.LocalSilo).Returns(status);
+        rig.Publisher.SiloStatusChangeNotification(rig.LocalSilo, SiloStatus.Dead);
+        var ns = rig.ServiceProvider.GetRequiredService<DeploymentLoadStatisticsDisseminationNamespace>();
+
+        var result = await ns.ApplyValueAsync(
+            ns.CreateValue(rig.LocalSilo, rig.InitialStatistics), TestContext.Current.CancellationToken);
+
+        Assert.Equal(DisseminationApplyResult.Rejected, result);
+        Assert.False(rig.Publisher.PeriodicStatistics.ContainsKey(rig.LocalSilo));
+        Assert.Equal(0, ns.GetVersion(rig.LocalSilo));
+    }
+
+    [Fact]
+    public async Task ApplyLoadStatistics_PreCanceledToken_PreservesLocalState()
+    {
+        using var rig = CreateTestRig(TimeSpan.Zero);
+        using var cancellation = new CancellationTokenSource();
+        var ns = rig.ServiceProvider.GetRequiredService<DeploymentLoadStatisticsDisseminationNamespace>();
+        var value = ns.CreateValue(rig.LocalSilo, rig.InitialStatistics);
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            async () => await ns.ApplyValueAsync(value, cancellation.Token));
+
+        Assert.Empty(rig.Publisher.PeriodicStatistics);
+    }
+
+    [Fact]
+    public async Task ApplyLoadStatistics_RequiresFullValue()
+    {
+        using var rig = CreateTestRig(TimeSpan.Zero);
+        var ns = rig.ServiceProvider.GetRequiredService<DeploymentLoadStatisticsDisseminationNamespace>();
+        var fullValue = ns.CreateValue(rig.LocalSilo, rig.InitialStatistics);
+        var delta = new DisseminationValue(fullValue.Key, 1, fullValue.ToVersion, fullValue.Payload);
+
+        Assert.Equal(DisseminationApplyResult.Rejected,
+            await ns.ApplyValueAsync(delta, TestContext.Current.CancellationToken));
+        Assert.Empty(rig.Publisher.PeriodicStatistics);
+    }
+
     [Theory]
     [InlineData(-5000)]
     [InlineData(-1)]
@@ -234,7 +430,10 @@ public class DeploymentLoadPublisherTests
         Assert.Same(rig.InitialStatistics, rig.Publisher.PeriodicStatistics[rig.LocalSilo]);
     }
 
-    private static TestRig CreateTestRig(TimeSpan refreshTime, ITimerRegistry? timerRegistry = null)
+    private static TestRig CreateTestRig(
+        TimeSpan refreshTime,
+        ITimerRegistry? timerRegistry = null,
+        bool enableDissemination = false)
     {
         var localSilo = SiloAddress.FromParsableString("127.0.0.1:100@100");
         var remoteSilo = SiloAddress.FromParsableString("127.0.0.1:200@100");
@@ -258,9 +457,15 @@ public class DeploymentLoadPublisherTests
         var control = Substitute.For<ISiloControl>();
         control.GetRuntimeStatistics(Arg.Any<CancellationToken>()).Returns(Task.FromResult(initialStatistics));
         grainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlType, Arg.Any<SiloAddress>()).Returns(control);
+        var dissemination = Substitute.For<IDisseminationService>();
+        dissemination.Publish(
+            Arg.Any<IDisseminationNamespace>(), Arg.Any<DisseminationKey>(), Arg.Any<long>(), Arg.Any<CancellationToken>())
+            .Returns(ValueTask.FromResult(true));
 
         var services = new ServiceCollection();
+        services.AddSerializer();
         services.AddMetrics();
+        services.AddSingleton<TimeProvider>(new FakeTimeProvider());
         services.AddSingleton<ILoggerFactory>(NullLoggerFactory.Instance);
         services.AddSingleton<OrleansInstruments>();
         services.AddSingleton<CatalogInstruments>();
@@ -271,11 +476,15 @@ public class DeploymentLoadPublisherTests
         services.AddSingleton(localDetails);
         services.AddSingleton(statusOracle);
         services.AddSingleton(grainFactory);
+        services.AddSingleton(dissemination);
         services.AddSingleton(Substitute.For<IActivationWorkingSet>());
         services.AddSingleton(environmentStatistics);
         services.AddSingleton<IOptions<LoadSheddingOptions>>(loadSheddingOptions);
-        services.AddOptions<DeploymentLoadPublisherOptions>().Configure(
-            options => options.DeploymentLoadPublisherRefreshTime = refreshTime);
+        services.AddOptions<DeploymentLoadPublisherOptions>().Configure(options =>
+        {
+            options.DeploymentLoadPublisherRefreshTime = refreshTime;
+            options.Dissemination.Enabled = enableDissemination;
+        });
         services.AddSingleton<ActivationDirectory>();
         services.AddSingleton(serviceProvider => new SystemTargetShared(
             runtimeClient: null!,
@@ -290,8 +499,9 @@ public class DeploymentLoadPublisherTests
             serviceProvider.GetRequiredService<MessagingInstruments>(),
             serviceProvider.GetRequiredService<MessagingProcessingInstruments>()));
         services.AddSingleton<DeploymentLoadPublisher>();
+        services.AddSingleton<DeploymentLoadStatisticsDisseminationNamespace>();
         var serviceProvider = services.BuildServiceProvider();
-        return new(serviceProvider, serviceProvider.GetRequiredService<DeploymentLoadPublisher>(), directTarget, control, initialStatistics, localSilo);
+        return new(serviceProvider, serviceProvider.GetRequiredService<DeploymentLoadPublisher>(), directTarget, control, initialStatistics, localSilo, dissemination);
     }
 
     private sealed record TestRig(
@@ -300,7 +510,8 @@ public class DeploymentLoadPublisherTests
         IDeploymentLoadPublisher DirectTarget,
         ISiloControl Control,
         SiloRuntimeStatistics InitialStatistics,
-        SiloAddress LocalSilo) : IDisposable
+        SiloAddress LocalSilo,
+        IDisseminationService Dissemination) : IDisposable
     {
         public void Dispose() => ServiceProvider.Dispose();
     }
