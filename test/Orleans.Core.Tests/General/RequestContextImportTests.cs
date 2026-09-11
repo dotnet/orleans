@@ -4,6 +4,7 @@ using Xunit;
 namespace UnitTests.General;
 
 [TestSuite("BVT")]
+[TestCategory("BVT")]
 [TestProvider("None")]
 [TestArea("Runtime")]
 public sealed class RequestContextImportTests : IDisposable
