@@ -60,7 +60,7 @@ internal class AdoNetQueueAdapterFactory : IQueueAdapterFactory, IQueueAdapterCa
 
                 // slow path - the member variable will only be set if the call succeeds
                 var result = await RelationalOrleansQueries
-                    .CreateInstance(_streamOptions.Invariant, _streamOptions.ConnectionString, _streamOptions.DataSource)
+                    .CreateInstance(_streamOptions.Invariant, _streamOptions.ConnectionString, _streamOptions.DataSource, cancellationToken)
                     .WaitAsync(_streamOptions.InitializationTimeout, cancellationToken);
                 Volatile.Write(ref _queries, result);
                 return result;
