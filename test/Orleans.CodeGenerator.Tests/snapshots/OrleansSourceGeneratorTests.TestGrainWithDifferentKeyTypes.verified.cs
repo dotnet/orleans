@@ -38,6 +38,10 @@ namespace OrleansCodeGen.TestProject
         {
         }
 
+        public Proxy_IMyGrainWithGuidKey(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.UniversalReference arg1) : base(arg0, arg1)
+        {
+        }
+
         global::System.Threading.Tasks.Task<global::System.Guid> global::TestProject.IMyGrainWithGuidKey.GetGuidValue()
         {
             var request = new OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E();
@@ -70,6 +74,10 @@ namespace OrleansCodeGen.TestProject
     internal sealed class Proxy_IMyGrainWithStringKey : global::Orleans.Runtime.GrainReference, global::TestProject.IMyGrainWithStringKey
     {
         public Proxy_IMyGrainWithStringKey(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.IdSpan arg1) : base(arg0, arg1)
+        {
+        }
+
+        public Proxy_IMyGrainWithStringKey(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.UniversalReference arg1) : base(arg0, arg1)
         {
         }
 
@@ -108,6 +116,10 @@ namespace OrleansCodeGen.TestProject
         {
         }
 
+        public Proxy_IMyGrainWithGuidCompoundKey(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.UniversalReference arg1) : base(arg0, arg1)
+        {
+        }
+
         global::System.Threading.Tasks.Task<global::System.Tuple<global::System.Guid, string>> global::TestProject.IMyGrainWithGuidCompoundKey.GetGuidAndStringKey()
         {
             var request = new OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF();
@@ -140,6 +152,10 @@ namespace OrleansCodeGen.TestProject
     internal sealed class Proxy_IMyGrainWithIntegerCompoundKey : global::Orleans.Runtime.GrainReference, global::TestProject.IMyGrainWithIntegerCompoundKey
     {
         public Proxy_IMyGrainWithIntegerCompoundKey(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.IdSpan arg1) : base(arg0, arg1)
+        {
+        }
+
+        public Proxy_IMyGrainWithIntegerCompoundKey(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.UniversalReference arg1) : base(arg0, arg1)
         {
         }
 

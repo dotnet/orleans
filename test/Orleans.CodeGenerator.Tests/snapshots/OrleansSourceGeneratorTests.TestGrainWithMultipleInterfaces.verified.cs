@@ -65,6 +65,10 @@ namespace OrleansCodeGen.TestProject
         {
         }
 
+        public Proxy_IGrainA(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.UniversalReference arg1) : base(arg0, arg1)
+        {
+        }
+
         global::System.Threading.Tasks.Task<string> global::TestProject.IGrainA.MethodA(string arg0)
         {
             var request = new OrleansCodeGen.TestProject.Invokable_IGrainA_GrainReference_11405B98();
@@ -125,6 +129,10 @@ namespace OrleansCodeGen.TestProject
     internal sealed class Proxy_IGrainB : global::Orleans.Runtime.GrainReference, global::TestProject.IGrainB
     {
         public Proxy_IGrainB(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.IdSpan arg1) : base(arg0, arg1)
+        {
+        }
+
+        public Proxy_IGrainB(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.UniversalReference arg1) : base(arg0, arg1)
         {
         }
 

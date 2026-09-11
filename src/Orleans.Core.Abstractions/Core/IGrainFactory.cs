@@ -204,6 +204,17 @@ namespace Orleans
         TGrainInterface GetGrain<TGrainInterface>(GrainId grainId) where TGrainInterface : IAddressable;
 
         /// <summary>
+        /// Returns a reference which preserves the provided universal identity and implements the specified interface.
+        /// </summary>
+        /// <param name="reference">The universal reference.</param>
+        /// <typeparam name="TGrainInterface">The grain interface type which the returned reference must implement.</typeparam>
+        /// <returns>A reference which implements the specified interface.</returns>
+        TGrainInterface GetGrain<TGrainInterface>(UniversalReference reference) where TGrainInterface : IAddressable
+        {
+            throw new NotSupportedException("This grain factory does not support universal references.");
+        }
+
+        /// <summary>
         /// Returns an untyped reference for the provided grain id.
         /// </summary>
         /// <param name="grainId">
@@ -213,6 +224,16 @@ namespace Orleans
         /// An untyped reference for the provided grain id.
         /// </returns>
         IAddressable GetGrain(GrainId grainId);
+
+        /// <summary>
+        /// Returns a reference for the provided universal identity.
+        /// </summary>
+        /// <param name="reference">The universal reference.</param>
+        /// <returns>A reference for the provided universal identity.</returns>
+        IAddressable GetGrain(UniversalReference reference)
+        {
+            throw new NotSupportedException("This grain factory does not support universal references.");
+        }
 
         /// <summary>
         /// Returns a reference for the provided grain id which implements the specified interface type.

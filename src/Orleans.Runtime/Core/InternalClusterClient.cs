@@ -117,6 +117,18 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc />
+        TGrainInterface IGrainFactory.GetGrain<TGrainInterface>(UniversalReference reference)
+        {
+            return this.grainFactory.GetGrain<TGrainInterface>(reference);
+        }
+
+        /// <inheritdoc />
+        IAddressable IGrainFactory.GetGrain(UniversalReference reference)
+        {
+            return this.grainFactory.GetGrain(reference);
+        }
+
+        /// <inheritdoc />
         public IGrain GetGrain(Type grainInterfaceType, Guid grainPrimaryKey)
         {
             return this.grainFactory.GetGrain(grainInterfaceType, grainPrimaryKey);

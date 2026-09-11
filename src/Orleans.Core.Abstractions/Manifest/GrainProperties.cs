@@ -155,6 +155,16 @@ namespace Orleans.Metadata
         public const string GrainDirectory = "directory-policy";
 
         /// <summary>
+        /// The name of the cluster locator for grains of this type.
+        /// </summary>
+        public const string ClusterLocator = "cluster-locator";
+
+        /// <summary>
+        /// The name of the cluster placement strategy for grains of this type.
+        /// </summary>
+        public const string ClusterPlacementStrategy = "cluster-placement-strategy";
+
+        /// <summary>
         /// Whether or not messages to this grain are unordered.
         /// </summary>
         public const string Unordered = "unordered";

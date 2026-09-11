@@ -100,6 +100,28 @@ public sealed class DirectoryMembershipSnapshotTests
     }
 
     [Fact]
+    public void GetRangeReturnsEmptyForOwnerDisplacedByBoundaryCollision()
+    {
+        var members = ImmutableDictionary.CreateBuilder<SiloAddress, ClusterMember>();
+        for (var index = 1; index <= 2; index++)
+        {
+            var address = SiloAddress.New(
+                new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, index),
+                index);
+            members.Add(address, new ClusterMember(address, SiloStatus.Active, $"Silo_{index}"));
+        }
+
+        var snapshot = new DirectoryMembershipSnapshot(
+            new ClusterMembershipSnapshot(members.ToImmutable(), new(1)),
+            null!,
+            partitionCount: 1,
+            static (_, _) => [42]);
+
+        Assert.Equal(RingRange.Empty, snapshot.GetRange(snapshot.Members[0], 0));
+        Assert.Equal(RingRange.Full, snapshot.GetRange(snapshot.Members[1], 0));
+    }
+
+    [Fact]
     public void GetRangeReturnsEmptyForPartitionMissingFromSnapshot()
     {
         var member = SiloAddress.New(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 1), 1);
@@ -140,7 +162,7 @@ public sealed class DirectoryMembershipSnapshotTests
         {
             if (boundaries[i].Hash == boundaries[i - 1].Hash)
             {
-                boundaries.RemoveAt(i);
+                boundaries.RemoveAt(i - 1);
             }
             else
             {

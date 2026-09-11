@@ -1,6 +1,7 @@
 #nullable enable
 using System.Collections.Immutable;
 using System.Linq;
+using Orleans.Runtime.ClusterServices;
 using Orleans.Runtime.GrainDirectory;
 using TestExtensions;
 using Xunit;
@@ -296,6 +297,47 @@ public sealed class GrainDirectoryPartitionTests
 
         Assert.Same(refreshedRegistration, directory[grainId]);
         Assert.Equal(intermediateRegistration, duplicate);
+    }
+
+    [Theory]
+    [InlineData((int)PartitionTransitionDirection.Inbound, "acquire")]
+    [InlineData((int)PartitionTransitionDirection.Outbound, "release")]
+    public async Task FinishRangeTransition_CapturedFailureOverridesCompletableStage(
+        int directionValue,
+        string operationName)
+    {
+        var direction = (PartitionTransitionDirection)directionValue;
+        var coordinator = new PartitionTransitionCoordinator();
+        var previousView = new ClusterServiceViewId(new(1), 1, "configuration");
+        var currentView = new ClusterServiceViewId(new(2), 1, "configuration");
+        var range = RingRange.Create(10, 20);
+        var transition = direction == PartitionTransitionDirection.Inbound
+            ? coordinator.BeginInbound(range, previousView, currentView)
+            : coordinator.BeginOutbound(range, previousView, currentView);
+        if (direction == PartitionTransitionDirection.Inbound)
+        {
+            transition.MarkStateInstalled();
+            transition.MarkFenced(new(ClusterServiceFencingMode.MembershipView, currentView.MembershipVersion.Value));
+        }
+        else
+        {
+            transition.MarkDrained();
+        }
+
+        var failure = new InvalidOperationException($"failed {operationName}");
+
+        var unsuccessful = GrainDirectoryPartition.FinishRangeTransition(
+            transition,
+            TestContext.Current.CancellationToken,
+            operationName,
+            failure);
+
+        var observed = await Assert.ThrowsAsync<InvalidOperationException>(() => transition.Completion);
+        Assert.True(unsuccessful);
+        Assert.Same(failure, observed);
+        Assert.Same(failure, transition.Failure);
+        Assert.Equal(PartitionTransitionStage.Failed, transition.Stage);
+        Assert.False(coordinator.IsBlocked(range, currentView.MembershipVersion));
     }
 
     private static void AssertRanges(RingRange previousOwnerRange, RingRange addedRange, params RingRange[] expected)
