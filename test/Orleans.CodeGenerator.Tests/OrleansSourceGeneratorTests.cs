@@ -717,12 +717,8 @@ public interface IBasicGrain : IGrainWithIntegerKey
         Assert.Contains("\"6B0E24A1\"", generatedSource, StringComparison.Ordinal);
     }
 
-    [Theory]
-    [InlineData(true, false)]
-    [InlineData(false, false)]
-    [InlineData(true, true)]
-    [InlineData(false, true)]
-    public async Task CompatibilityOverload_UsesLegacyInvokerIdentityForOutboundCalls(bool aliasLegacyMethod, bool asyncSuffix)
+    [Fact]
+    public async Task CompatibilityOverload_UsesLegacyInvokerIdentityForOutboundCalls()
     {
         var baseline = await CreateCompilation(
 @"using Orleans;
@@ -735,8 +731,6 @@ public interface IBasicGrain : IGrainWithIntegerKey
             "Baseline");
         var legacyMethod = Assert.Single(baseline.GetTypeByMetadataName("IBasicGrain")!.GetMembers().OfType<IMethodSymbol>());
         var legacyMethodId = GeneratedCodeUtilities.CreateHashedMethodId(legacyMethod);
-        var legacyAlias = aliasLegacyMethod ? "[Alias(\"Ping\")]" : string.Empty;
-        var cancellationMethodName = asyncSuffix ? "PingAsync" : "Ping";
         var compilation = await CreateCompilation(
 $@"using Orleans;
 using Orleans.Runtime;
@@ -746,14 +740,11 @@ using System.Threading.Tasks;
 [GenerateMethodSerializers(typeof(GrainReference))]
 public interface IBasicGrain : IGrainWithIntegerKey
 {{
-    {legacyAlias}
-    [System.Obsolete(""Use the cancellation overload."")]
+    [Alias(""Ping"")]
     Task Ping(string value);
 
     [Alias(""{legacyMethodId}"")]
-#pragma warning disable CS0618
-    Task {cancellationMethodName}(string value, CancellationToken cancellationToken) => Ping(value);
-#pragma warning restore CS0618
+    Task Ping(string value, CancellationToken cancellationToken) => Ping(value);
 }}",
             "TestProject");
 
@@ -775,11 +766,9 @@ public interface IBasicGrain : IGrainWithIntegerKey
             "global::System.Threading.CancellationToken.None",
             proxyMethod.Body!.ToString(),
             StringComparison.Ordinal);
-        var forwardingCall = Assert.Single(proxyMethod.Body.DescendantNodes().OfType<InvocationExpressionSyntax>());
-        Assert.Equal(cancellationMethodName, Assert.IsType<MemberAccessExpressionSyntax>(forwardingCall.Expression).Name.Identifier.ValueText);
 
         var cancellationMethod = Assert.Single(
-            compilation.GetTypeByMetadataName("IBasicGrain")!.GetMembers(cancellationMethodName).OfType<IMethodSymbol>(),
+            compilation.GetTypeByMetadataName("IBasicGrain")!.GetMembers("Ping").OfType<IMethodSymbol>(),
             static method => method.Parameters.Length == 2);
         var cancellationGeneratedId = GeneratedCodeUtilities.CreateHashedMethodId(cancellationMethod);
         var cancellationInvoker = generatedRoot.DescendantNodes().OfType<ClassDeclarationSyntax>()
@@ -796,10 +785,8 @@ public interface IBasicGrain : IGrainWithIntegerKey
         Assert.Contains(cancellationGeneratedId, generatedAliasRegistration, StringComparison.Ordinal);
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task GenericCompatibilityOverload_ForwardsToCancellationOverload(bool asyncSuffix)
+    [Fact]
+    public async Task GenericCompatibilityOverload_ForwardsToCancellationOverload()
     {
         var baseline = await CreateCompilation(
 @"using Orleans;
@@ -812,7 +799,6 @@ public interface IBasicGrain : IGrainWithIntegerKey
             "Baseline");
         var legacyMethod = Assert.Single(baseline.GetTypeByMetadataName("IBasicGrain")!.GetMembers().OfType<IMethodSymbol>());
         var legacyMethodId = GeneratedCodeUtilities.CreateHashedMethodId(legacyMethod);
-        var cancellationMethodName = asyncSuffix ? "RoundTripAsync" : "RoundTrip";
         var compilation = await CreateCompilation(
 $@"using Orleans;
 using Orleans.Runtime;
@@ -826,7 +812,7 @@ public interface IBasicGrain : IGrainWithIntegerKey
     Task<T> RoundTrip<T>(T value);
 
     [Alias(""{legacyMethodId}"")]
-    Task<T> {cancellationMethodName}<T>(T value, CancellationToken cancellationToken) => RoundTrip(value);
+    Task<T> RoundTrip<T>(T value, CancellationToken cancellationToken) => RoundTrip(value);
 }}",
             "TestProject");
 
@@ -844,7 +830,7 @@ public interface IBasicGrain : IGrainWithIntegerKey
                 .Members.OfType<MethodDeclarationSyntax>(),
             static method => method.Identifier.ValueText == "RoundTrip" && method.ParameterList.Parameters.Count == 1);
         var proxyBody = proxyMethod.Body!.ToString();
-        Assert.Contains($"{cancellationMethodName}<T>", proxyBody, StringComparison.Ordinal);
+        Assert.Contains("RoundTrip<T>", proxyBody, StringComparison.Ordinal);
         Assert.Contains("global::System.Threading.CancellationToken.None", proxyBody, StringComparison.Ordinal);
     }
 

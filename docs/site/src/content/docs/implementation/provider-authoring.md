@@ -79,7 +79,7 @@ Return completed backend results, and observe cancellation before starting furth
 
 Shared membership refreshes live until the membership manager is disposed. Each caller owns its wait, while periodic maintenance and its queued cleanup requests stop with the silo lifecycle. This keeps membership reads available during shutdown.
 
-Membership table RPCs retain their existing operation aliases and application-argument payloads, with cancellation propagated separately. Generated legacy proxy methods forward to their `Async`-suffixed counterparts. During rolling upgrades, each receiver uses its implementation's cancellation behavior.
+Membership table RPCs retain their existing operation aliases and application-argument payloads, with cancellation propagated separately. The original generated request types remain available for calls through obsolete tokenless methods. During rolling upgrades, each receiver uses its implementation's cancellation behavior.
 
 When a lifecycle callback must execute its cancellation or cleanup logic, schedule it with <xref:System.Threading.Tasks.Task.Run*> and pass the cancellation token to the operation inside the callback. The callback then owns how cancellation completes its work.
 

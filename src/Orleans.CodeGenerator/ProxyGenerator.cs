@@ -129,7 +129,7 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
             ProxyMethodDescription candidate)
         {
             if (ReferenceEquals(legacyMethod, candidate)
-                || !HaveCompatibleMethodNames(legacyMethod.Method.Name, candidate.Method.Name)
+                || !string.Equals(legacyMethod.Method.Name, candidate.Method.Name, StringComparison.Ordinal)
                 || candidate.Method.TypeParameters.Length != legacyMethod.Method.TypeParameters.Length
                 || !HaveEquivalentMethodConstraints(legacyMethod.Method, candidate.Method)
                 || candidate.Method.Parameters.Length != legacyMethod.Method.Parameters.Length + 1
@@ -164,11 +164,6 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
 
             return true;
         }
-
-        static bool HaveCompatibleMethodNames(string legacyName, string candidateName) =>
-            string.Equals(legacyName, candidateName, StringComparison.Ordinal)
-            || candidateName.EndsWith("Async", StringComparison.Ordinal)
-                && candidateName.AsSpan(0, candidateName.Length - "Async".Length).SequenceEqual(legacyName.AsSpan());
 
         static bool HaveEquivalentMethodConstraints(IMethodSymbol legacyMethod, IMethodSymbol candidateMethod)
         {

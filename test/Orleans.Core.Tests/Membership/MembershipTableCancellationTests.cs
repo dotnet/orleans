@@ -1,9 +1,17 @@
 using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Orleans;
+using Orleans.CodeGeneration;
 using Orleans.Runtime;
+using Orleans.Serialization;
+using Orleans.Serialization.Cloning;
+using Orleans.Serialization.Configuration;
 using Orleans.Serialization.Invocation;
+using Orleans.Serialization.Serializers;
 using TestExtensions;
 using Xunit;
+using TypeConverter = Orleans.Serialization.TypeSystem.TypeConverter;
 
 namespace NonSilo.Tests.Membership;
 
@@ -25,15 +33,20 @@ public class MembershipTableCancellationTests
         nameof(IMembershipTable.UpdateIAmAliveAsync),
     };
 
+    public static TheoryData<string, string> WireOperations { get; } = new()
+    {
+        { nameof(IMembershipTable.InitializeMembershipTableAsync), "FB89E5E9" },
+        { nameof(IMembershipTable.DeleteMembershipTableEntriesAsync), "BF899C85" },
+        { nameof(IMembershipTable.CleanupDefunctSiloEntriesAsync), "7A519C2E" },
+        { nameof(IMembershipTable.ReadRowAsync), "D851FB33" },
+        { nameof(IMembershipTable.ReadAllAsync), "00BCE16F" },
+        { nameof(IMembershipTable.InsertRowAsync), "FEF3AC5A" },
+        { nameof(IMembershipTable.UpdateRowAsync), "E06D3DBC" },
+        { nameof(IMembershipTable.UpdateIAmAliveAsync), "B1A52D2B" },
+    };
+
     [Theory]
-    [InlineData(nameof(IMembershipTable.InitializeMembershipTableAsync), "FB89E5E9")]
-    [InlineData(nameof(IMembershipTable.DeleteMembershipTableEntriesAsync), "BF899C85")]
-    [InlineData(nameof(IMembershipTable.CleanupDefunctSiloEntriesAsync), "7A519C2E")]
-    [InlineData(nameof(IMembershipTable.ReadRowAsync), "D851FB33")]
-    [InlineData(nameof(IMembershipTable.ReadAllAsync), "00BCE16F")]
-    [InlineData(nameof(IMembershipTable.InsertRowAsync), "FEF3AC5A")]
-    [InlineData(nameof(IMembershipTable.UpdateRowAsync), "E06D3DBC")]
-    [InlineData(nameof(IMembershipTable.UpdateIAmAliveAsync), "B1A52D2B")]
+    [MemberData(nameof(WireOperations))]
     public void CancellationOverload_UsesLegacyWireIdentity(string methodName, string legacyId)
     {
         var method = Assert.Single(typeof(IMembershipTable).GetMethods(),
@@ -52,6 +65,79 @@ public class MembershipTableCancellationTests
         Assert.Equal(method, invokable.GetMethod());
         Assert.True(invokable.IsCancellable);
         Assert.Equal(typeof(IMembershipTable), invokable.GetInterfaceType());
+    }
+
+    [Theory]
+    [MemberData(nameof(WireOperations))]
+    public async Task GeneratedProxyCalls_PreserveLegacyWireCompatibility(string operation, string legacyId)
+    {
+        using var currentServices = CreateSerializerServices();
+        using var legacyServices = CreateSerializerServices(useLegacyMetadata: true);
+        var currentSerializer = currentServices.GetRequiredService<Serializer>();
+        var legacySerializer = legacyServices.GetRequiredService<Serializer>();
+        var currentConverter = currentServices.GetRequiredService<TypeConverter>();
+        var legacyConverter = legacyServices.GetRequiredService<TypeConverter>();
+        var fixture = new LegacyProvider();
+        var arguments = ExpectedArguments(fixture, operation);
+        var legacyMethodName = operation[..^"Async".Length];
+        var legacyType = GetLegacyInvokerType(legacyId);
+        var currentType = GetCurrentInvokerType(operation);
+        using var cancellation = new CancellationTokenSource();
+        using var legacyRequest = await CaptureProxyCall(currentServices, legacyMethodName, arguments);
+        using var currentRequest = await CaptureProxyCall(currentServices, operation, [.. arguments, cancellation.Token]);
+
+        Assert.Equal(legacyType, legacyRequest.GetType());
+        Assert.Equal(legacyMethodName, legacyRequest.GetMethodName());
+        Assert.False(legacyRequest.IsCancellable);
+        Assert.Equal($"{legacyType.FullName},Orleans.Core", currentConverter.Format(legacyType));
+        Assert.Equal(currentType, currentRequest.GetType());
+        Assert.Equal(operation, currentRequest.GetMethodName());
+        Assert.Equal(cancellation.Token, currentRequest.GetCancellationToken());
+        Assert.Equal(GetLegacyAlias(legacyId), currentConverter.Format(currentType));
+        Assert.Equal(GetLegacyAlias(legacyId), legacyConverter.Format(legacyType));
+        Assert.Equal(currentType, currentConverter.Parse(GetLegacyAlias(legacyId)));
+        Assert.Equal(legacyType, legacyConverter.Parse(GetLegacyAlias(legacyId)));
+
+        var oldSenderBytes = legacySerializer.SerializeToArray<object>(legacyRequest);
+        var asyncSenderBytes = currentSerializer.SerializeToArray<object>(currentRequest);
+        var tokenlessSenderBytes = currentSerializer.SerializeToArray<object>(legacyRequest);
+        Assert.Equal(oldSenderBytes, asyncSenderBytes);
+        cancellation.Cancel();
+        Assert.Equal(asyncSenderBytes, currentSerializer.SerializeToArray<object>(currentRequest));
+
+        await AssertReceivedCall(currentSerializer, oldSenderBytes, currentType);
+        await AssertReceivedCall(legacySerializer, oldSenderBytes, legacyType);
+        await AssertReceivedCall(currentSerializer, asyncSenderBytes, currentType);
+        await AssertReceivedCall(legacySerializer, asyncSenderBytes, legacyType);
+        await AssertReceivedCall(currentSerializer, tokenlessSenderBytes, legacyType);
+        await AssertReceivedCall(legacySerializer, tokenlessSenderBytes, legacyType);
+
+        async Task AssertReceivedCall(Serializer serializer, byte[] bytes, Type expectedType)
+        {
+            using var request = Assert.IsAssignableFrom<IInvokable>(serializer.Deserialize<object>(bytes));
+            Assert.Equal(expectedType, request.GetType());
+            Assert.Equal(expectedType == currentType ? operation : legacyMethodName, request.GetMethodName());
+            Assert.Equal(arguments.Length + (expectedType == currentType ? 1 : 0), request.GetArgumentCount());
+            Assert.Equal(CancellationToken.None, request.GetCancellationToken());
+            AssertArguments(arguments, Enumerable.Range(0, arguments.Length).Select(request.GetArgument).ToArray());
+            var target = new LegacyProvider();
+            target.Completion.SetResult(true);
+            request.SetTarget(new MembershipTargetHolder(target));
+
+            using var response = await request.Invoke();
+
+            Assert.Null(response.Exception);
+            var call = Assert.Single(target.Calls);
+            Assert.Equal(legacyMethodName, call.Method);
+            AssertArguments(arguments, call.Arguments);
+            object expectedResult = operation switch
+            {
+                nameof(IMembershipTable.ReadAllAsync) or nameof(IMembershipTable.ReadRowAsync) => target.Data,
+                nameof(IMembershipTable.InsertRowAsync) or nameof(IMembershipTable.UpdateRowAsync) => true,
+                _ => null,
+            };
+            Assert.Equal(expectedResult, response.Result);
+        }
     }
 
     [Theory]
@@ -182,6 +268,144 @@ public class MembershipTableCancellationTests
         nameof(IMembershipTable.UpdateIAmAliveAsync) => [provider.Entry],
         _ => throw new ArgumentOutOfRangeException(nameof(operation)),
     };
+
+    private static Type GetLegacyInvokerType(string legacyId) =>
+        typeof(IMembershipTable).Assembly.GetType($"OrleansCodeGen.Orleans.Invokable_IMembershipTable_GrainReference_{legacyId}", throwOnError: true);
+
+    private static Type GetCurrentInvokerType(string operation)
+    {
+        var legacyId = typeof(IMembershipTable).GetMethod(operation).GetCustomAttribute<AliasAttribute>().Alias;
+        return Assert.Single(typeof(IMembershipTable).Assembly.GetTypes(),
+            type => typeof(IInvokable).IsAssignableFrom(type)
+                && type.GetCustomAttributes<CompoundTypeAliasAttribute>().Any(
+                    alias => alias.Components.SequenceEqual(new object[] { "inv", typeof(GrainReference), typeof(IMembershipTable), legacyId })));
+    }
+
+    private static string GetLegacyAlias(string legacyId) =>
+        $"(\"inv\",[GrainRef],[Orleans.IMembershipTable,Orleans.Core],\"{legacyId}\")";
+
+    private static ServiceProvider CreateSerializerServices(bool useLegacyMetadata = false)
+    {
+        var services = new ServiceCollection();
+        services.AddSerializer(builder => builder.AddAssembly(typeof(IMembershipTable).Assembly));
+        if (useLegacyMetadata)
+        {
+            var operations = typeof(IMembershipTable).GetMethods()
+                .Where(method => method.Name.EndsWith("Async", StringComparison.Ordinal))
+                .Select(method =>
+                {
+                    var legacyId = method.GetCustomAttribute<AliasAttribute>().Alias;
+                    return (Id: legacyId, Legacy: GetLegacyInvokerType(legacyId), Current: GetCurrentInvokerType(method.Name));
+                }).ToArray();
+            services.AddSingleton<ITypeConverter>(new LegacyInvokerTypeFormatter(
+                operations.ToDictionary(operation => operation.Legacy, operation => GetLegacyAlias(operation.Id))));
+            services.PostConfigure<TypeManifestOptions>(options =>
+            {
+                var aliases = options.CompoundTypeAliases.Add("inv").Add(typeof(GrainReference)).Add(typeof(IMembershipTable));
+                foreach (var operation in operations)
+                {
+                    // Clear the current alias owner before installing the baseline owner.
+                    aliases.Add(operation.Id);
+                    aliases.Add(operation.Id, operation.Legacy);
+                    aliases.Add(operation.Current.Name[(operation.Current.Name.LastIndexOf('_') + 1)..]);
+                }
+
+                var currentTypes = operations.Select(operation => operation.Current).ToHashSet();
+                options.Serializers.RemoveWhere(RegistersCurrentInvoker);
+                options.FieldCodecs.RemoveWhere(RegistersCurrentInvoker);
+                options.Copiers.RemoveWhere(RegistersCurrentInvoker);
+                options.Activators.RemoveWhere(RegistersCurrentInvoker);
+
+                bool RegistersCurrentInvoker(Type implementation) =>
+                    implementation.GetInterfaces().Any(type => type.IsGenericType && type.GenericTypeArguments.Any(currentTypes.Contains));
+            });
+        }
+
+        var provider = services.BuildServiceProvider();
+        Assert.False(provider.GetRequiredService<IOptions<TypeManifestOptions>>().Value.AllowAllTypes);
+        return provider;
+    }
+
+    private static async Task<IInvokable> CaptureProxyCall(ServiceProvider services, string operation, object[] arguments)
+    {
+        var runtime = new CapturingRuntime();
+        var shared = new GrainReferenceShared(
+            GrainType.Create("membership-wire-test"),
+            GrainInterfaceType.Create("membership-wire-test"),
+            interfaceVersion: 0,
+            runtime,
+            InvokeMethodOptions.None,
+            services.GetRequiredService<CodecProvider>(),
+            services.GetRequiredService<CopyContextPool>(),
+            services);
+        var proxyType = Assert.Single(services.GetRequiredService<IOptions<TypeManifestOptions>>().Value.InterfaceProxies,
+            type => type.Assembly == typeof(IMembershipTable).Assembly && typeof(IMembershipTableSystemTarget).IsAssignableFrom(type));
+        var proxy = Activator.CreateInstance(proxyType, shared, IdSpan.Create("membership"));
+
+        await Assert.IsAssignableFrom<Task>(typeof(IMembershipTable).GetMethod(operation).Invoke(proxy, arguments));
+
+        return Assert.Single(runtime.Calls);
+    }
+
+    private static void AssertArguments(object[] expected, object[] actual)
+    {
+        Assert.Equal(expected.Length, actual.Length);
+        for (var i = 0; i < expected.Length; i++)
+        {
+            switch (expected[i])
+            {
+                case MembershipEntry entry:
+                    Assert.Equal(entry.SiloAddress, Assert.IsType<MembershipEntry>(actual[i]).SiloAddress);
+                    break;
+                case TableVersion version:
+                    var actualVersion = Assert.IsType<TableVersion>(actual[i]);
+                    Assert.Equal(version.Version, actualVersion.Version);
+                    Assert.Equal(version.VersionEtag, actualVersion.VersionEtag);
+                    break;
+                default:
+                    Assert.Equal(expected[i], actual[i]);
+                    break;
+            }
+        }
+    }
+
+    // Baseline metadata emitted aliases for these retained types. Parsing still uses the real Orleans resolver.
+    private sealed class LegacyInvokerTypeFormatter(IReadOnlyDictionary<Type, string> aliases) : ITypeConverter
+    {
+        public bool TryFormat(Type type, out string formatted) => aliases.TryGetValue(type, out formatted);
+
+        public bool TryParse(string formatted, out Type type)
+        {
+            type = null;
+            return false;
+        }
+    }
+
+    private sealed class MembershipTargetHolder(IMembershipTable target) : ITargetHolder
+    {
+        public object GetTarget() => target;
+        public object GetComponent(Type componentType) => null;
+    }
+
+    private sealed class CapturingRuntime : IGrainReferenceRuntime
+    {
+        public List<IInvokable> Calls { get; } = [];
+
+        public ValueTask<T> InvokeMethodAsync<T>(GrainReference reference, IInvokable request, InvokeMethodOptions options)
+        {
+            Calls.Add(request);
+            return default;
+        }
+
+        public ValueTask InvokeMethodAsync(GrainReference reference, IInvokable request, InvokeMethodOptions options)
+        {
+            Calls.Add(request);
+            return default;
+        }
+
+        public void InvokeMethod(GrainReference reference, IInvokable request, InvokeMethodOptions options) => Calls.Add(request);
+        public object Cast(IAddressable grain, Type interfaceType) => grain;
+    }
 
     private class LegacyProvider : IMembershipTable
     {
