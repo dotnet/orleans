@@ -106,7 +106,7 @@ namespace OrleansAWSUtils.Storage
             {
                 sqsClient = new AmazonSQSClient(new BasicAWSCredentials(accessKey, secretKey), config);
             }
-            else if (isServiceEndpoint)
+            else if (service.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
             {
                 // Local SQS-compatible services typically require a signed request but do not validate credentials.
                 sqsClient = new AmazonSQSClient(new BasicAWSCredentials("dummy", "dummyKey"), config);

@@ -144,15 +144,47 @@ public sealed class SQSStreamProviderBuilderTests
             typeof(SQSStorage)
                 .GetField("sqsClient", BindingFlags.Instance | BindingFlags.NonPublic)!
                 .GetValue(storage));
-        var credentials = Assert.IsAssignableFrom<AWSCredentials>(
-            typeof(AmazonServiceClient)
-                .GetProperty("ExplicitAWSCredentials", BindingFlags.Instance | BindingFlags.NonPublic)!
-                .GetValue(client));
+        var credentials = Assert.IsAssignableFrom<AWSCredentials>(GetExplicitCredentials(client));
         var immutableCredentials = credentials.GetCredentials();
 
         Assert.Equal("access", immutableCredentials.AccessKey);
         Assert.Equal("secret", immutableCredentials.SecretKey);
         Assert.Equal(useSessionToken ? "token" : string.Empty, immutableCredentials.Token);
+    }
+
+    [Fact]
+    public void SqsStorage_HttpEndpointUsesDummyCredentials()
+    {
+        var storage = new SQSStorage(
+            NullLoggerFactory.Instance,
+            "queue",
+            new SqsOptions { ConnectionString = "Service=http://localhost:9324" },
+            "service");
+        var client = Assert.IsType<AmazonSQSClient>(
+            typeof(SQSStorage)
+                .GetField("sqsClient", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .GetValue(storage));
+        var credentials = Assert.IsType<BasicAWSCredentials>(GetExplicitCredentials(client));
+        var immutableCredentials = credentials.GetCredentials();
+
+        Assert.Equal("dummy", immutableCredentials.AccessKey);
+        Assert.Equal("dummyKey", immutableCredentials.SecretKey);
+    }
+
+    [Fact]
+    public void SqsStorage_HttpsEndpointUsesDefaultCredentialChain()
+    {
+        var storage = new SQSStorage(
+            NullLoggerFactory.Instance,
+            "queue",
+            new SqsOptions { ConnectionString = "Service=https://sqs.example.com" },
+            "service");
+        var client = Assert.IsType<AmazonSQSClient>(
+            typeof(SQSStorage)
+                .GetField("sqsClient", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .GetValue(storage));
+
+        Assert.Null(GetExplicitCredentials(client));
     }
 
     [Theory]
@@ -440,6 +472,11 @@ public sealed class SQSStreamProviderBuilderTests
     private static TOptions GetOptions<TOptions>(IServiceProvider services, string providerName)
         where TOptions : class
         => services.GetRequiredService<IOptionsMonitor<TOptions>>().Get(providerName);
+
+    private static object? GetExplicitCredentials(AmazonServiceClient client)
+        => typeof(AmazonServiceClient)
+            .GetProperty("ExplicitAWSCredentials", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(client);
 
     private sealed class FakeSqsDataAdapter(string id) : ISQSDataAdapter
     {
