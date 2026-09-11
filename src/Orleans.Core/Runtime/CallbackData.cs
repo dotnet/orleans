@@ -16,7 +16,6 @@ namespace Orleans.Runtime
         private readonly IResponseCompletionSource context;
         private readonly ApplicationRequestInstruments _applicationRequestInstruments;
         private readonly long _startTimestamp;
-        private readonly bool _waitForCancellationAcknowledgement;
         private int _state;
         private StatusResponse? lastKnownStatus;
         private CancellationTokenRegistration _cancellationTokenRegistration;
@@ -25,15 +24,13 @@ namespace Orleans.Runtime
             SharedCallbackData shared,
             IResponseCompletionSource ctx,
             Message msg,
-            ApplicationRequestInstruments applicationRequestInstruments,
-            bool waitForCancellationAcknowledgement = false)
+            ApplicationRequestInstruments applicationRequestInstruments)
         {
             this.shared = shared;
             this.context = ctx;
             this.Message = msg;
             _applicationRequestInstruments = applicationRequestInstruments;
             _startTimestamp = shared.TimeProvider.GetTimestamp();
-            _waitForCancellationAcknowledgement = shared.WaitForCancellationAcknowledgement || waitForCancellationAcknowledgement;
         }
 
         public Message Message { get; } // might hold metadata used by response pipeline
@@ -116,7 +113,7 @@ namespace Orleans.Runtime
         {
             // If waiting for acknowledgement is enabled, simply signal to the remote grain that cancellation
             // is requested and return.
-            if (_waitForCancellationAcknowledgement)
+            if (shared.WaitForCancellationAcknowledgement)
             {
                 SignalCancellation();
                 return;
