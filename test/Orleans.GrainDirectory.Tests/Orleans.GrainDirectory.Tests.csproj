@@ -12,5 +12,9 @@
 
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)test\Orleans.Runtime.Internal.Tests\Orleans.Runtime.Internal.Tests.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\Orleans.GrainDirectory.Compatibility.CurrentHost\Orleans.GrainDirectory.Compatibility.CurrentHost.csproj"
+                      ReferenceOutputAssembly="false" />
+    <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\Orleans.GrainDirectory.Compatibility.ReleaseHost\Orleans.GrainDirectory.Compatibility.ReleaseHost.csproj"
+                      ReferenceOutputAssembly="false" />
   </ItemGroup>
 </Project>

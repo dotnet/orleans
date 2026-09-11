@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
+    <OutputType>Exe</OutputType>
+    <Nullable>enable</Nullable>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <AssemblyName>Orleans.GrainDirectory.Compatibility.CurrentHost</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Orleans.GrainDirectory.Compatibility.Shared\CompatibilityHost.cs" Link="CompatibilityHost.cs" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Persistence.Memory\Orleans.Persistence.Memory.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
+  </ItemGroup>
+</Project>
