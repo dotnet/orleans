@@ -46,15 +46,15 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
         membershipEntries[5].Status = SiloStatus.Active;
         membershipEntries[9].Status = SiloStatus.Active;
 
-        var data = await membershipTable.ReadAll(TestContext.Current.CancellationToken);
+        var data = await membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
         Assert.NotNull(data);
         Assert.Empty(data.Members);
 
         var version = data.Version;
         foreach (var membershipEntry in membershipEntries)
         {
-            Assert.True(await membershipTable.InsertRow(membershipEntry, version.Next(), TestContext.Current.CancellationToken));
-            version = (await membershipTable.ReadRow(membershipEntry.SiloAddress, TestContext.Current.CancellationToken)).Version;
+            Assert.True(await membershipTable.InsertRowAsync(membershipEntry, version.Next(), TestContext.Current.CancellationToken));
+            version = (await membershipTable.ReadRowAsync(membershipEntry.SiloAddress, TestContext.Current.CancellationToken)).Version;
         }
 
         var gateways = await gatewayListProvider.GetGateways();
@@ -76,7 +76,7 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
         var (membershipTable, _) = await CreateNewMembershipTableAsync(
             TestContext.Current.CancellationToken);
 
-        var data = await membershipTable.ReadAll(TestContext.Current.CancellationToken);
+        var data = await membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
         Assert.NotNull(data);
 
         _testOutputHelper.WriteLine("Membership.ReadAll returned TableVersion={0} Data={1}", data.Version, data);
@@ -94,16 +94,16 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
 
         var membershipEntry = CreateMembershipEntryForTest();
 
-        var data = await membershipTable.ReadAll(TestContext.Current.CancellationToken);
+        var data = await membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
         Assert.NotNull(data);
         Assert.Empty(data.Members);
 
         var nextTableVersion = data.Version.Next();
 
-        var ok = await membershipTable.InsertRow(membershipEntry, nextTableVersion, TestContext.Current.CancellationToken);
+        var ok = await membershipTable.InsertRowAsync(membershipEntry, nextTableVersion, TestContext.Current.CancellationToken);
         Assert.True(ok, "InsertRow failed");
 
-        data = await membershipTable.ReadAll(TestContext.Current.CancellationToken);
+        data = await membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(1, data.Version.Version);
 
@@ -118,7 +118,7 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
             "blu",
             TestContext.Current.CancellationToken);
 
-        MembershipTableData data = await membershipTable.ReadAll(TestContext.Current.CancellationToken);
+        MembershipTableData data = await membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
 
         _testOutputHelper.WriteLine("Membership.ReadAll returned TableVersion={0} Data={1}", data.Version, data);
 
@@ -127,28 +127,28 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
         TableVersion newTableVersion = data.Version.Next();
 
         MembershipEntry newEntry = CreateMembershipEntryForTest();
-        bool ok = await membershipTable.InsertRow(newEntry, newTableVersion, TestContext.Current.CancellationToken);
+        bool ok = await membershipTable.InsertRowAsync(newEntry, newTableVersion, TestContext.Current.CancellationToken);
         Assert.True(ok, "InsertRow failed");
 
-        ok = await membershipTable.InsertRow(newEntry, newTableVersion, TestContext.Current.CancellationToken);
+        ok = await membershipTable.InsertRowAsync(newEntry, newTableVersion, TestContext.Current.CancellationToken);
         Assert.False(ok, "InsertRow should have failed - same entry, old table version");
 
-        ok = await membershipTable.InsertRow(CreateMembershipEntryForTest(), newTableVersion, TestContext.Current.CancellationToken);
+        ok = await membershipTable.InsertRowAsync(CreateMembershipEntryForTest(), newTableVersion, TestContext.Current.CancellationToken);
         Assert.False(ok, "InsertRow should have failed - new entry, old table version");
 
-        data = await membershipTable.ReadAll(TestContext.Current.CancellationToken);
+        data = await membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(1, data.Version.Version);
 
         TableVersion nextTableVersion = data.Version.Next();
 
-        ok = await membershipTable.InsertRow(newEntry, nextTableVersion, TestContext.Current.CancellationToken);
+        ok = await membershipTable.InsertRowAsync(newEntry, nextTableVersion, TestContext.Current.CancellationToken);
         Assert.False(ok, "InsertRow should have failed - duplicate entry");
 
-        data = await membershipTable.ReadAll(TestContext.Current.CancellationToken);
+        data = await membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
         Assert.Single(data.Members);
 
-        data = await membershipTable.ReadRow(newEntry.SiloAddress, TestContext.Current.CancellationToken);
+        data = await membershipTable.ReadRowAsync(newEntry.SiloAddress, TestContext.Current.CancellationToken);
         Assert.Equal(newTableVersion.Version, data.Version.Version);
 
         _testOutputHelper.WriteLine("Membership.ReadAll returned TableVersion={0} Data={1}", data.Version, data);
@@ -173,7 +173,7 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
         var (membershipTable, _) = await CreateNewMembershipTableAsync(
             TestContext.Current.CancellationToken);
 
-        var data = await membershipTable.ReadAll(TestContext.Current.CancellationToken);
+        var data = await membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
         _testOutputHelper.WriteLine("Membership.ReadAll returned TableVersion={0} Data={1}", data.Version, data);
 
         Assert.Empty(data.Members);
@@ -181,10 +181,10 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
         var newTableVersion = data.Version.Next();
 
         var newEntry = CreateMembershipEntryForTest();
-        var ok = await membershipTable.InsertRow(newEntry, newTableVersion, TestContext.Current.CancellationToken);
+        var ok = await membershipTable.InsertRowAsync(newEntry, newTableVersion, TestContext.Current.CancellationToken);
         Assert.True(ok, "InsertRow failed");
 
-        data = await membershipTable.ReadAll(TestContext.Current.CancellationToken);
+        data = await membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
         _testOutputHelper.WriteLine("Membership.ReadAll returned TableVersion={0} Data={1}", data.Version, data);
 
         Assert.Single(data.Members);
@@ -207,7 +207,7 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
         var (membershipTable, _) = await CreateNewMembershipTableAsync(
             TestContext.Current.CancellationToken);
 
-        var tableData = await membershipTable.ReadAll(TestContext.Current.CancellationToken);
+        var tableData = await membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
         Assert.NotNull(tableData.Version);
 
         Assert.Equal(0, tableData.Version.Version);
@@ -226,10 +226,10 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
             var tableVersion = Assert.IsType<TableVersion>(tableData.Version.Next());
 
             _testOutputHelper.WriteLine("Calling InsertRow with Entry = {0} TableVersion = {1}", siloEntry, tableVersion);
-            var ok = await membershipTable.InsertRow(siloEntry, tableVersion, TestContext.Current.CancellationToken);
+            var ok = await membershipTable.InsertRowAsync(siloEntry, tableVersion, TestContext.Current.CancellationToken);
             Assert.True(ok, "InsertRow failed");
 
-            tableData = await membershipTable.ReadAll(TestContext.Current.CancellationToken);
+            tableData = await membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
 
             var etagBefore = tableData.TryGet(siloEntry.SiloAddress)?.Item2;
 
@@ -240,9 +240,9 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
                 siloEntry,
                 etagBefore,
                 tableVersion.ToString());
-            ok = await membershipTable.UpdateRow(siloEntry, etagBefore, tableVersion, TestContext.Current.CancellationToken);
+            ok = await membershipTable.UpdateRowAsync(siloEntry, etagBefore, tableVersion, TestContext.Current.CancellationToken);
             Assert.False(ok, $"row update should have failed - Table Data = {tableData}");
-            tableData = await membershipTable.ReadAll(TestContext.Current.CancellationToken);
+            tableData = await membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
 
             tableVersion = Assert.IsType<TableVersion>(tableData.Version.Next());
 
@@ -252,7 +252,7 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
                 etagBefore,
                 tableVersion.ToString());
 
-            ok = await membershipTable.UpdateRow(siloEntry, etagBefore, tableVersion, TestContext.Current.CancellationToken);
+            ok = await membershipTable.UpdateRowAsync(siloEntry, etagBefore, tableVersion, TestContext.Current.CancellationToken);
 
             Assert.True(ok, $"UpdateRow failed - Table Data = {tableData}");
 
@@ -261,10 +261,10 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
                 siloEntry,
                 etagBefore,
                 tableVersion.ToString());
-            ok = await membershipTable.UpdateRow(siloEntry, etagBefore, tableVersion, TestContext.Current.CancellationToken);
+            ok = await membershipTable.UpdateRowAsync(siloEntry, etagBefore, tableVersion, TestContext.Current.CancellationToken);
             Assert.False(ok, $"row update should have failed - Table Data = {tableData}");
 
-            tableData = await membershipTable.ReadAll(TestContext.Current.CancellationToken);
+            tableData = await membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
 
             var tuple = tableData.TryGet(siloEntry.SiloAddress);
             Assert.NotNull(tuple);
@@ -279,11 +279,11 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
                 etagAfter,
                 tableVersion.ToString());
 
-            ok = await membershipTable.UpdateRow(siloEntry, etagAfter, tableVersion, TestContext.Current.CancellationToken);
+            ok = await membershipTable.UpdateRowAsync(siloEntry, etagAfter, tableVersion, TestContext.Current.CancellationToken);
 
             Assert.False(ok, $"row update should have failed - Table Data = {tableData}");
 
-            tableData = await membershipTable.ReadAll(TestContext.Current.CancellationToken);
+            tableData = await membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
 
             etagBefore = etagAfter;
 
@@ -321,13 +321,13 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
         var (membershipTable, _) = await CreateNewMembershipTableAsync(
             TestContext.Current.CancellationToken);
 
-        var tableData = await membershipTable.ReadAll(TestContext.Current.CancellationToken);
+        var tableData = await membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
 
         var data = CreateMembershipEntryForTest();
 
         var newTableVer = tableData.Version.Next();
 
-        var insertions = Task.WhenAll(Enumerable.Range(1, 20).Select(async _ => { try { return await membershipTable.InsertRow(data, newTableVer, TestContext.Current.CancellationToken); } catch { return false; } }));
+        var insertions = Task.WhenAll(Enumerable.Range(1, 20).Select(async _ => { try { return await membershipTable.InsertRowAsync(data, newTableVer, TestContext.Current.CancellationToken); } catch { return false; } }));
 
         Assert.True((await insertions).Single(x => x), "InsertRow failed");
 
@@ -336,7 +336,7 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
             var done = false;
             do
             {
-                var updatedTableData = await membershipTable.ReadAll(TestContext.Current.CancellationToken);
+                var updatedTableData = await membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
                 var updatedRow = updatedTableData.TryGet(data.SiloAddress);
 
                 await Task.Delay(10, TestContext.Current.CancellationToken);
@@ -345,7 +345,7 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
                 var tableVersion = updatedTableData.Version.Next();
                 try
                 {
-                    done = await membershipTable.UpdateRow(updatedRow.Item1, updatedRow.Item2, tableVersion, TestContext.Current.CancellationToken);
+                    done = await membershipTable.UpdateRowAsync(updatedRow.Item1, updatedRow.Item2, tableVersion, TestContext.Current.CancellationToken);
                 }
                 catch
                 {
@@ -355,7 +355,7 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
         })).WithTimeout(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
 
 
-        tableData = await membershipTable.ReadAll(TestContext.Current.CancellationToken);
+        tableData = await membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
         Assert.NotNull(tableData.Version);
 
         Assert.Equal(20, tableData.Version.Version);
@@ -378,13 +378,13 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
             testCancellationToken,
             cassandraTtl: cassandraTtl);
 
-        var tableData = await membershipTable.ReadAll(testCancellationToken);
+        var tableData = await membershipTable.ReadAllAsync(testCancellationToken);
 
         var newTableVersion = tableData.Version.Next();
         var newEntry = CreateMembershipEntryForTest();
-        var ok = await membershipTable.InsertRow(newEntry, newTableVersion, testCancellationToken);
+        var ok = await membershipTable.InsertRowAsync(newEntry, newTableVersion, testCancellationToken);
         Assert.True(ok);
-        MembershipEntry originalMembershipEntry = (await membershipTable.ReadAll(testCancellationToken))
+        MembershipEntry originalMembershipEntry = (await membershipTable.ReadAllAsync(testCancellationToken))
             .Members.First(e => e.Item1.SiloAddress.Equals(newEntry.SiloAddress))
             .Item1;
         Assert.Null(originalMembershipEntry.SuspectTimes);
@@ -402,9 +402,9 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
             IAmAliveTime = amAliveTime
         };
 
-        await membershipTable.UpdateIAmAlive(entry, testCancellationToken);
+        await membershipTable.UpdateIAmAliveAsync(entry, testCancellationToken);
 
-        tableData = await membershipTable.ReadAll(testCancellationToken);
+        tableData = await membershipTable.ReadAllAsync(testCancellationToken);
         MembershipEntry updatedMember = tableData.Members
             .First(e => e.Item1.SiloAddress.Equals(newEntry.SiloAddress))
             .Item1;
@@ -547,7 +547,7 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
                     throw new TimeoutException("Did not validate Cassandra data deletion within timeout");
                 }
 
-                tableData = await membershipTable.ReadAll(testCancellationToken);
+                tableData = await membershipTable.ReadAllAsync(testCancellationToken);
                 if (tableData.Members.Count == 0)
                 {
                     // Success!
@@ -579,7 +579,7 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
                     return;
                 }
 
-                tableData = await membershipTable.ReadAll(testCancellationToken);
+                tableData = await membershipTable.ReadAllAsync(testCancellationToken);
                 if (tableData.Members.Count == 0)
                 {
                     throw new Exception("Cassandra data was unexpectedly deleted when not using a TTL");
@@ -605,7 +605,7 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
         var (membershipTable, _) = await CreateNewMembershipTableAsync(
             TestContext.Current.CancellationToken);
 
-        var data = await membershipTable.ReadAll(TestContext.Current.CancellationToken);
+        var data = await membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
         _testOutputHelper.WriteLine("Membership.ReadAll returned TableVersion={0} Data={1}", data.Version, data);
 
         Assert.Empty(data.Members);
@@ -616,8 +616,8 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
         oldEntryDead.IAmAliveTime = oldEntryDead.IAmAliveTime.AddDays(-10);
         oldEntryDead.StartTime = oldEntryDead.StartTime.AddDays(-10);
         oldEntryDead.Status = SiloStatus.Dead;
-        var ok = await membershipTable.InsertRow(oldEntryDead, newTableVersion, TestContext.Current.CancellationToken);
-        var table = await membershipTable.ReadAll(TestContext.Current.CancellationToken);
+        var ok = await membershipTable.InsertRowAsync(oldEntryDead, newTableVersion, TestContext.Current.CancellationToken);
+        var table = await membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
 
         Assert.True(ok, "InsertRow Dead failed");
 
@@ -626,17 +626,17 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
         oldEntryJoining.IAmAliveTime = oldEntryJoining.IAmAliveTime.AddDays(-10);
         oldEntryJoining.StartTime = oldEntryJoining.StartTime.AddDays(-10);
         oldEntryJoining.Status = SiloStatus.Joining;
-        ok = await membershipTable.InsertRow(oldEntryJoining, newTableVersion, TestContext.Current.CancellationToken);
-        table = await membershipTable.ReadAll(TestContext.Current.CancellationToken);
+        ok = await membershipTable.InsertRowAsync(oldEntryJoining, newTableVersion, TestContext.Current.CancellationToken);
+        table = await membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
 
         Assert.True(ok, "InsertRow Joining failed");
 
         newTableVersion = table.Version.Next();
         var newEntry = CreateMembershipEntryForTest();
-        ok = await membershipTable.InsertRow(newEntry, newTableVersion, TestContext.Current.CancellationToken);
+        ok = await membershipTable.InsertRowAsync(newEntry, newTableVersion, TestContext.Current.CancellationToken);
         Assert.True(ok, "InsertRow failed");
 
-        data = await membershipTable.ReadAll(TestContext.Current.CancellationToken);
+        data = await membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
         newTableVersion = data.Version.Next();
         _testOutputHelper.WriteLine("Membership.ReadAll returned TableVersion={0} Data={1}", data.Version, data);
 
@@ -649,17 +649,17 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
             oldEntry.IAmAliveTime = oldEntry.IAmAliveTime.AddDays(-10);
             oldEntry.StartTime = oldEntry.StartTime.AddDays(-10);
             oldEntry.Status = siloStatus;
-            ok = await membershipTable.InsertRow(oldEntry, newTableVersion, TestContext.Current.CancellationToken);
-            table = await membershipTable.ReadAll(TestContext.Current.CancellationToken);
+            ok = await membershipTable.InsertRowAsync(oldEntry, newTableVersion, TestContext.Current.CancellationToken);
+            table = await membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
 
             Assert.True(ok, "InsertRow failed");
 
             newTableVersion = table.Version.Next();
         }
 
-        await membershipTable.CleanupDefunctSiloEntries(oldEntryDead.IAmAliveTime.AddDays(3), TestContext.Current.CancellationToken);
+        await membershipTable.CleanupDefunctSiloEntriesAsync(oldEntryDead.IAmAliveTime.AddDays(3), TestContext.Current.CancellationToken);
 
-        data = await membershipTable.ReadAll(TestContext.Current.CancellationToken);
+        data = await membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
         _testOutputHelper.WriteLine("Membership.ReadAll returned TableVersion={0} Data={1}", data.Version, data);
 
         Assert.Equal(2, data.Members.Count);
@@ -723,7 +723,7 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
             .Configure<GatewayOptions>(o => o.GatewayListRefreshPeriod = TimeSpan.FromSeconds(15))
             .BuildServiceProvider();
         IMembershipTable membershipTable = services.GetRequiredService<CassandraClusteringTable>();
-        await membershipTable.InitializeMembershipTable(true, cancellationToken);
+        await membershipTable.InitializeMembershipTableAsync(true, cancellationToken);
 
         IGatewayListProvider gatewayProvider = services.GetRequiredService<CassandraGatewayListProvider>();
         await gatewayProvider.InitializeGatewayListProvider();
@@ -769,9 +769,9 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
             clusterId + "_2",
             TestContext.Current.CancellationToken);
 
-        var tableData = await membershipTable.ReadAll(TestContext.Current.CancellationToken);
+        var tableData = await membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
 
-        await membershipTable.InsertRow(
+        await membershipTable.InsertRowAsync(
             new MembershipEntry
             {
                 HostName = "host1",
@@ -783,9 +783,9 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
                 StartTime = DateTime.UtcNow
             }, tableData.Version.Next(), TestContext.Current.CancellationToken);
 
-        tableData = await membershipTable.ReadAll(TestContext.Current.CancellationToken);
+        tableData = await membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
 
-        await membershipTable.InsertRow(
+        await membershipTable.InsertRowAsync(
             new MembershipEntry
             {
                 HostName = "host1",
@@ -797,8 +797,8 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
                 StartTime = DateTime.UtcNow
             }, tableData.Version.Next(), TestContext.Current.CancellationToken);
 
-        tableData = await otherMembershipTable.ReadAll(TestContext.Current.CancellationToken);
-        await otherMembershipTable.InsertRow(
+        tableData = await otherMembershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
+        await otherMembershipTable.InsertRowAsync(
             new MembershipEntry
             {
                 HostName = "host1",
@@ -810,7 +810,7 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
                 StartTime = DateTime.UtcNow
             }, tableData.Version.Next(), TestContext.Current.CancellationToken);
 
-        tableData = await membershipTable.ReadAll(TestContext.Current.CancellationToken);
+        tableData = await membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
 
         var membershipEntry = new MembershipEntry
         {
@@ -822,9 +822,9 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
             Status = SiloStatus.Active,
             StartTime = DateTime.UtcNow
         };
-        await membershipTable.InsertRow(membershipEntry, tableData.Version.Next(), TestContext.Current.CancellationToken);
+        await membershipTable.InsertRowAsync(membershipEntry, tableData.Version.Next(), TestContext.Current.CancellationToken);
 
-        var readAll = await membershipTable.ReadAll(TestContext.Current.CancellationToken);
+        var readAll = await membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
 
         _testOutputHelper.WriteLine(readAll.Version.Version.ToString());
         foreach (var row in readAll.Members)
@@ -841,9 +841,9 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
         }
 
         membershipEntry.IAmAliveTime = DateTime.UtcNow + TimeSpan.FromSeconds(10);
-        await membershipTable.UpdateIAmAlive(membershipEntry, TestContext.Current.CancellationToken);
+        await membershipTable.UpdateIAmAliveAsync(membershipEntry, TestContext.Current.CancellationToken);
 
-        readAll = await membershipTable.ReadAll(TestContext.Current.CancellationToken);
+        readAll = await membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
 
         _testOutputHelper.WriteLine(readAll.Version.Version.ToString());
         foreach (var row in readAll.Members)
@@ -869,15 +869,15 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
             _testOutputHelper.WriteLine(gateway.ToString());
         }
 
-        var queriedEntry = await membershipTable.ReadRow(membershipEntry.SiloAddress, TestContext.Current.CancellationToken);
+        var queriedEntry = await membershipTable.ReadRowAsync(membershipEntry.SiloAddress, TestContext.Current.CancellationToken);
         foreach (var queriedEntryMember in queriedEntry.Members)
         {
             _testOutputHelper.WriteLine(queriedEntryMember.Item1.SiloAddress.ToParsableString());
         }
 
-        await membershipTable.DeleteMembershipTableEntries(clusterOptions.ClusterId, TestContext.Current.CancellationToken);
+        await membershipTable.DeleteMembershipTableEntriesAsync(clusterOptions.ClusterId, TestContext.Current.CancellationToken);
 
-        readAll = await membershipTable.ReadAll(TestContext.Current.CancellationToken);
+        readAll = await membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
 
         _testOutputHelper.WriteLine(readAll.Version.Version.ToString());
         foreach (var row in readAll.Members)

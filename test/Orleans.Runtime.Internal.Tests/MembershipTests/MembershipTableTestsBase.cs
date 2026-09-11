@@ -62,7 +62,7 @@ namespace UnitTests.MembershipTests
             membershipTable = CreateMembershipTable(logger);
             using var initialization = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
             initialization.CancelAfter(SiloInstanceTableTestConstants.Timeout);
-            membershipTable.InitializeMembershipTable(true, initialization.Token).Wait();
+            membershipTable.InitializeMembershipTableAsync(true, initialization.Token).Wait();
 
             this._gatewayOptions = Options.Create(new GatewayOptions());
             gatewayListProvider = CreateGatewayListProvider(logger);
@@ -80,7 +80,7 @@ namespace UnitTests.MembershipTests
                 if (membershipTable != null && SiloInstanceTableTestConstants.DeleteEntriesAfterTest)
                 {
                     using var cleanup = new CancellationTokenSource(SiloInstanceTableTestConstants.Timeout);
-                    membershipTable.DeleteMembershipTableEntries(this.clusterId, cleanup.Token).Wait();
+                    membershipTable.DeleteMembershipTableEntriesAsync(this.clusterId, cleanup.Token).Wait();
                 }
             }
             finally
@@ -108,15 +108,15 @@ namespace UnitTests.MembershipTests
             membershipEntries[5].Status = SiloStatus.Active;
             membershipEntries[9].Status = SiloStatus.Active;
 
-            var data = await membershipTable.ReadAll(cancellationToken);
+            var data = await membershipTable.ReadAllAsync(cancellationToken);
             Assert.NotNull(data);
             Assert.Empty(data.Members);
 
             var version = data.Version;
             foreach (var membershipEntry in membershipEntries)
             {
-                Assert.True(await membershipTable.InsertRow(membershipEntry, version.Next(), cancellationToken));
-                version = (await membershipTable.ReadRow(membershipEntry.SiloAddress, cancellationToken)).Version;
+                Assert.True(await membershipTable.InsertRowAsync(membershipEntry, version.Next(), cancellationToken));
+                version = (await membershipTable.ReadRowAsync(membershipEntry.SiloAddress, cancellationToken)).Version;
             }
 
             var gateways = await gatewayListProvider.GetGateways();
@@ -135,7 +135,7 @@ namespace UnitTests.MembershipTests
         protected async Task MembershipTable_ReadAll_EmptyTable()
         {
             var cancellationToken = TestContext.Current.CancellationToken;
-            var data = await membershipTable.ReadAll(cancellationToken);
+            var data = await membershipTable.ReadAllAsync(cancellationToken);
             Assert.NotNull(data);
 
             logger.LogInformation("Membership.ReadAll returned TableVersion={TableVersion} Data={Data}", data.Version, data);
@@ -150,16 +150,16 @@ namespace UnitTests.MembershipTests
             var cancellationToken = TestContext.Current.CancellationToken;
             var membershipEntry = CreateMembershipEntryForTest();
 
-            var data = await membershipTable.ReadAll(cancellationToken);
+            var data = await membershipTable.ReadAllAsync(cancellationToken);
             Assert.NotNull(data);
             Assert.Empty(data.Members);
 
             TableVersion nextTableVersion = data.Version.Next();
 
-            bool ok = await membershipTable.InsertRow(membershipEntry, nextTableVersion, cancellationToken);
+            bool ok = await membershipTable.InsertRowAsync(membershipEntry, nextTableVersion, cancellationToken);
             Assert.True(ok, "InsertRow failed");
 
-            data = await membershipTable.ReadAll(cancellationToken);
+            data = await membershipTable.ReadAllAsync(cancellationToken);
 
             if (extendedProtocol)
                 Assert.Equal(1, data.Version.Version);
@@ -170,7 +170,7 @@ namespace UnitTests.MembershipTests
         protected async Task MembershipTable_ReadRow_Insert_Read(bool extendedProtocol = true)
         {
             var cancellationToken = TestContext.Current.CancellationToken;
-            MembershipTableData data = await membershipTable.ReadAll(cancellationToken);
+            MembershipTableData data = await membershipTable.ReadAllAsync(cancellationToken);
 
             logger.LogInformation("Membership.ReadAll returned TableVersion={TableVersion} Data={Data}", data.Version, data);
 
@@ -179,34 +179,34 @@ namespace UnitTests.MembershipTests
             TableVersion newTableVersion = data.Version.Next();
 
             MembershipEntry newEntry = CreateMembershipEntryForTest();
-            bool ok = await membershipTable.InsertRow(newEntry, newTableVersion, cancellationToken);
+            bool ok = await membershipTable.InsertRowAsync(newEntry, newTableVersion, cancellationToken);
 
             Assert.True(ok, "InsertRow failed");
 
-            ok = await membershipTable.InsertRow(newEntry, newTableVersion, cancellationToken);
+            ok = await membershipTable.InsertRowAsync(newEntry, newTableVersion, cancellationToken);
             Assert.False(ok, "InsertRow should have failed - same entry, old table version");
 
             if (extendedProtocol)
             {
-                ok = await membershipTable.InsertRow(CreateMembershipEntryForTest(), newTableVersion, cancellationToken);
+                ok = await membershipTable.InsertRowAsync(CreateMembershipEntryForTest(), newTableVersion, cancellationToken);
                 Assert.False(ok, "InsertRow should have failed - new entry, old table version");
             }
 
-            data = await membershipTable.ReadAll(cancellationToken);
+            data = await membershipTable.ReadAllAsync(cancellationToken);
 
             if (extendedProtocol)
                 Assert.Equal(1, data.Version.Version);
 
             TableVersion nextTableVersion = data.Version.Next();
 
-            ok = await membershipTable.InsertRow(newEntry, nextTableVersion, cancellationToken);
+            ok = await membershipTable.InsertRowAsync(newEntry, nextTableVersion, cancellationToken);
             Assert.False(ok, "InsertRow should have failed - duplicate entry");
 
-            data = await membershipTable.ReadAll(cancellationToken);
+            data = await membershipTable.ReadAllAsync(cancellationToken);
 
             Assert.Single(data.Members);
 
-            data = await membershipTable.ReadRow(newEntry.SiloAddress, cancellationToken);
+            data = await membershipTable.ReadRowAsync(newEntry.SiloAddress, cancellationToken);
             if (extendedProtocol)
                 Assert.Equal(newTableVersion.Version, data.Version.Version);
 
@@ -230,7 +230,7 @@ namespace UnitTests.MembershipTests
         protected async Task MembershipTable_ReadAll_Insert_ReadAll(bool extendedProtocol = true)
         {
             var cancellationToken = TestContext.Current.CancellationToken;
-            MembershipTableData data = await membershipTable.ReadAll(cancellationToken);
+            MembershipTableData data = await membershipTable.ReadAllAsync(cancellationToken);
             logger.LogInformation("Membership.ReadAll returned TableVersion={TableVersion} Data={Data}", data.Version, data);
 
             Assert.Empty(data.Members);
@@ -238,11 +238,11 @@ namespace UnitTests.MembershipTests
             TableVersion newTableVersion = data.Version.Next();
 
             MembershipEntry newEntry = CreateMembershipEntryForTest();
-            bool ok = await membershipTable.InsertRow(newEntry, newTableVersion, cancellationToken);
+            bool ok = await membershipTable.InsertRowAsync(newEntry, newTableVersion, cancellationToken);
 
             Assert.True(ok, "InsertRow failed");
 
-            data = await membershipTable.ReadAll(cancellationToken);
+            data = await membershipTable.ReadAllAsync(cancellationToken);
             logger.LogInformation("Membership.ReadAll returned TableVersion={TableVersion} Data={Data}", data.Version, data);
 
             Assert.Single(data.Members);
@@ -265,7 +265,7 @@ namespace UnitTests.MembershipTests
         protected async Task MembershipTable_UpdateRow(bool extendedProtocol = true)
         {
             var cancellationToken = TestContext.Current.CancellationToken;
-            var tableData = await membershipTable.ReadAll(cancellationToken);
+            var tableData = await membershipTable.ReadAllAsync(cancellationToken);
             Assert.NotNull(tableData.Version);
 
             Assert.Equal(0, tableData.Version.Version);
@@ -285,11 +285,11 @@ namespace UnitTests.MembershipTests
                 TableVersion tableVersion = tableData.Version.Next();
 
                 logger.LogInformation("Calling InsertRow with Entry = {Entry} TableVersion = {TableVersion}", siloEntry, tableVersion);
-                bool ok = await membershipTable.InsertRow(siloEntry, tableVersion, cancellationToken);
+                bool ok = await membershipTable.InsertRowAsync(siloEntry, tableVersion, cancellationToken);
 
                 Assert.True(ok, "InsertRow failed");
 
-                tableData = await membershipTable.ReadAll(cancellationToken);
+                tableData = await membershipTable.ReadAllAsync(cancellationToken);
 
                 var etagBefore = tableData.TryGet(siloEntry.SiloAddress)?.Item2;
 
@@ -302,9 +302,9 @@ namespace UnitTests.MembershipTests
                         siloEntry,
                         etagBefore,
                         tableVersion?.ToString() ?? "null");
-                    ok = await membershipTable.UpdateRow(siloEntry, etagBefore, tableVersion!, cancellationToken);
+                    ok = await membershipTable.UpdateRowAsync(siloEntry, etagBefore, tableVersion!, cancellationToken);
                     Assert.False(ok, $"row update should have failed - Table Data = {tableData}");
-                    tableData = await membershipTable.ReadAll(cancellationToken);
+                    tableData = await membershipTable.ReadAllAsync(cancellationToken);
                 }
 
                 tableVersion = tableData.Version.Next();
@@ -315,7 +315,7 @@ namespace UnitTests.MembershipTests
                     etagBefore,
                     tableVersion?.ToString() ?? "null");
 
-                ok = await membershipTable.UpdateRow(siloEntry, etagBefore, tableVersion!, cancellationToken);
+                ok = await membershipTable.UpdateRowAsync(siloEntry, etagBefore, tableVersion!, cancellationToken);
 
                 Assert.True(ok, $"UpdateRow failed - Table Data = {tableData}");
 
@@ -324,10 +324,10 @@ namespace UnitTests.MembershipTests
                     siloEntry,
                     etagBefore,
                     tableVersion?.ToString() ?? "null");
-                ok = await membershipTable.UpdateRow(siloEntry, etagBefore, tableVersion!, cancellationToken);
+                ok = await membershipTable.UpdateRowAsync(siloEntry, etagBefore, tableVersion!, cancellationToken);
                 Assert.False(ok, $"row update should have failed - Table Data = {tableData}");
 
-                tableData = await membershipTable.ReadAll(cancellationToken);
+                tableData = await membershipTable.ReadAllAsync(cancellationToken);
 
                 var tuple = tableData.TryGet(siloEntry.SiloAddress);
 
@@ -344,12 +344,12 @@ namespace UnitTests.MembershipTests
                         etagAfter,
                         tableVersion?.ToString() ?? "null");
 
-                    ok = await membershipTable.UpdateRow(siloEntry, etagAfter, tableVersion!, cancellationToken);
+                    ok = await membershipTable.UpdateRowAsync(siloEntry, etagAfter, tableVersion!, cancellationToken);
 
                     Assert.False(ok, $"row update should have failed - Table Data = {tableData}");
                 }
 
-                tableData = await membershipTable.ReadAll(cancellationToken);
+                tableData = await membershipTable.ReadAllAsync(cancellationToken);
 
                 etagBefore = etagAfter;
 
@@ -367,13 +367,13 @@ namespace UnitTests.MembershipTests
         protected async Task MembershipTable_UpdateRowInParallel(bool extendedProtocol = true)
         {
             var cancellationToken = TestContext.Current.CancellationToken;
-            var tableData = await membershipTable.ReadAll(cancellationToken);
+            var tableData = await membershipTable.ReadAllAsync(cancellationToken);
 
             var data = CreateMembershipEntryForTest();
 
             TableVersion newTableVer = tableData.Version.Next();
 
-            var insertions = Task.WhenAll(Enumerable.Range(1, 20).Select(async i => { try { return await membershipTable.InsertRow(data, newTableVer, cancellationToken); } catch { return false; } }));
+            var insertions = Task.WhenAll(Enumerable.Range(1, 20).Select(async i => { try { return await membershipTable.InsertRowAsync(data, newTableVer, cancellationToken); } catch { return false; } }));
 
             Assert.True((await insertions).Single(x => x), "InsertRow failed");
 
@@ -382,7 +382,7 @@ namespace UnitTests.MembershipTests
                 var done = false;
                 do
                 {
-                    var updatedTableData = await membershipTable.ReadAll(cancellationToken);
+                    var updatedTableData = await membershipTable.ReadAllAsync(cancellationToken);
                     var updatedRow = updatedTableData.TryGet(data.SiloAddress);
 
                     await Task.Delay(10, cancellationToken);
@@ -391,7 +391,7 @@ namespace UnitTests.MembershipTests
                     TableVersion tableVersion = updatedTableData.Version.Next();
                     try
                     {
-                        done = await membershipTable.UpdateRow(updatedRow.Item1, updatedRow.Item2, tableVersion, cancellationToken);
+                        done = await membershipTable.UpdateRowAsync(updatedRow.Item1, updatedRow.Item2, tableVersion, cancellationToken);
                     }
                     catch
                     {
@@ -401,7 +401,7 @@ namespace UnitTests.MembershipTests
             })).WaitAsync(TimeSpan.FromSeconds(30));
 
 
-            tableData = await membershipTable.ReadAll(cancellationToken);
+            tableData = await membershipTable.ReadAllAsync(cancellationToken);
             Assert.NotNull(tableData.Version);
 
             if (extendedProtocol)
@@ -413,11 +413,11 @@ namespace UnitTests.MembershipTests
         protected async Task MembershipTable_UpdateIAmAlive(bool extendedProtocol = true)
         {
             var cancellationToken = TestContext.Current.CancellationToken;
-            MembershipTableData tableData = await membershipTable.ReadAll(cancellationToken);
+            MembershipTableData tableData = await membershipTable.ReadAllAsync(cancellationToken);
 
             TableVersion newTableVersion = tableData.Version.Next();
             MembershipEntry newEntry = CreateMembershipEntryForTest();
-            bool ok = await membershipTable.InsertRow(newEntry, newTableVersion, cancellationToken);
+            bool ok = await membershipTable.InsertRowAsync(newEntry, newTableVersion, cancellationToken);
             Assert.True(ok);
 
             var amAliveTime = DateTime.UtcNow.Add(TimeSpan.FromSeconds(5));
@@ -429,9 +429,9 @@ namespace UnitTests.MembershipTests
                 IAmAliveTime = amAliveTime
             };
 
-            await membershipTable.UpdateIAmAlive(entry, cancellationToken);
+            await membershipTable.UpdateIAmAliveAsync(entry, cancellationToken);
 
-            tableData = await membershipTable.ReadAll(cancellationToken);
+            tableData = await membershipTable.ReadAllAsync(cancellationToken);
             var member = tableData.Members.First(e => e.Item1.SiloAddress.Equals(newEntry.SiloAddress));
 
             // compare that the value is close to what we passed in, but not exactly, as the underlying store can set its own precision settings
@@ -443,7 +443,7 @@ namespace UnitTests.MembershipTests
         protected async Task MembershipTable_CleanupDefunctSiloEntries(bool extendedProtocol = true)
         {
             var cancellationToken = TestContext.Current.CancellationToken;
-            MembershipTableData data = await membershipTable.ReadAll(cancellationToken);
+            MembershipTableData data = await membershipTable.ReadAllAsync(cancellationToken);
             logger.LogInformation("Membership.ReadAll returned TableVersion={TableVersion} Data={Data}", data.Version, data);
 
             Assert.Empty(data.Members);
@@ -454,8 +454,8 @@ namespace UnitTests.MembershipTests
             oldEntryDead.IAmAliveTime = oldEntryDead.IAmAliveTime.AddDays(-10);
             oldEntryDead.StartTime = oldEntryDead.StartTime.AddDays(-10);
             oldEntryDead.Status = SiloStatus.Dead;
-            bool ok = await membershipTable.InsertRow(oldEntryDead, newTableVersion, cancellationToken);
-            var table = await membershipTable.ReadAll(cancellationToken);
+            bool ok = await membershipTable.InsertRowAsync(oldEntryDead, newTableVersion, cancellationToken);
+            var table = await membershipTable.ReadAllAsync(cancellationToken);
 
             Assert.True(ok, "InsertRow Dead failed");
 
@@ -464,18 +464,18 @@ namespace UnitTests.MembershipTests
             oldEntryJoining.IAmAliveTime = oldEntryJoining.IAmAliveTime.AddDays(-10);
             oldEntryJoining.StartTime = oldEntryJoining.StartTime.AddDays(-10);
             oldEntryJoining.Status = SiloStatus.Joining;
-            ok = await membershipTable.InsertRow(oldEntryJoining, newTableVersion, cancellationToken);
-            table = await membershipTable.ReadAll(cancellationToken);
+            ok = await membershipTable.InsertRowAsync(oldEntryJoining, newTableVersion, cancellationToken);
+            table = await membershipTable.ReadAllAsync(cancellationToken);
 
             Assert.True(ok, "InsertRow Joining failed");
 
             newTableVersion = table.Version.Next();
             var newEntry = CreateMembershipEntryForTest();
-            ok = await membershipTable.InsertRow(newEntry, newTableVersion, cancellationToken);
+            ok = await membershipTable.InsertRowAsync(newEntry, newTableVersion, cancellationToken);
 
             Assert.True(ok, "InsertRow failed");
 
-            data = await membershipTable.ReadAll(cancellationToken);
+            data = await membershipTable.ReadAllAsync(cancellationToken);
             newTableVersion = data.Version.Next();
             logger.LogInformation("Membership.ReadAll returned TableVersion={TableVersion} Data={Data}", data.Version, data);
 
@@ -488,17 +488,17 @@ namespace UnitTests.MembershipTests
                 oldEntry.IAmAliveTime = oldEntry.IAmAliveTime.AddDays(-10);
                 oldEntry.StartTime = oldEntry.StartTime.AddDays(-10);
                 oldEntry.Status = siloStatus;
-                ok = await membershipTable.InsertRow(oldEntry, newTableVersion, cancellationToken);
-                table = await membershipTable.ReadAll(cancellationToken);
+                ok = await membershipTable.InsertRowAsync(oldEntry, newTableVersion, cancellationToken);
+                table = await membershipTable.ReadAllAsync(cancellationToken);
 
                 Assert.True(ok, "InsertRow failed");
 
                 newTableVersion = table.Version.Next();
             }
 
-            await membershipTable.CleanupDefunctSiloEntries(oldEntryDead.IAmAliveTime.AddDays(3), cancellationToken);
+            await membershipTable.CleanupDefunctSiloEntriesAsync(oldEntryDead.IAmAliveTime.AddDays(3), cancellationToken);
 
-            data = await membershipTable.ReadAll(cancellationToken);
+            data = await membershipTable.ReadAllAsync(cancellationToken);
             logger.LogInformation("Membership.ReadAll returned TableVersion={TableVersion} Data={Data}", data.Version, data);
 
             Assert.Equal(2, data.Members.Count);

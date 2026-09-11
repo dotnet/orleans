@@ -64,7 +64,7 @@ namespace NonSilo.Tests.Membership
             var table = Substitute.For<IMembershipTable>();
             var requested = new TaskCompletionSource<CancellationToken>(TaskCreationOptions.RunContinuationsAsynchronously);
             Task cleanup = Task.CompletedTask;
-            table.CleanupDefunctSiloEntries(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(call =>
+            table.CleanupDefunctSiloEntriesAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(call =>
             {
                 var token = call.ArgAt<CancellationToken>(1);
                 cleanup = Task.Delay(Timeout.InfiniteTimeSpan, token);
@@ -108,7 +108,7 @@ namespace NonSilo.Tests.Membership
                 Entry(this.localSilo, SiloStatus.Active, now)), cancellationToken);
 
             Assert.False(cleanupCalled.Task.IsCompleted);
-            Assert.DoesNotContain(table.Calls, c => c.Method.Equals(nameof(IMembershipTable.CleanupDefunctSiloEntries), StringComparison.Ordinal));
+            Assert.DoesNotContain(table.Calls, c => c.Method.Equals(nameof(IMembershipTable.CleanupDefunctSiloEntriesAsync), StringComparison.Ordinal));
 
             await lifecycle.OnStop(cancellationToken);
         }
@@ -140,9 +140,9 @@ namespace NonSilo.Tests.Membership
                 oldestDefunctEntry,
                 removedDefunctEntry,
                 retainedDefunctEntry), cancellationToken);
-            Assert.DoesNotContain(table.Calls, call => call.Method == nameof(IMembershipTable.ReadAll));
+            Assert.DoesNotContain(table.Calls, call => call.Method == nameof(IMembershipTable.ReadAllAsync));
 
-            var updatedTable = await table.ReadAll(cancellationToken);
+            var updatedTable = await table.ReadAllAsync(cancellationToken);
             Assert.Single(updatedTable.Members, member => member.Item1.Status == SiloStatus.Dead);
             Assert.Contains(updatedTable.Members, member => member.Item1.SiloAddress.Equals(retainedDefunctSilo));
 
@@ -182,7 +182,7 @@ namespace NonSilo.Tests.Membership
                 newerAliveEntry,
                 recentlySuspectedEntry), cancellationToken);
 
-            var updatedTable = await table.ReadAll(cancellationToken);
+            var updatedTable = await table.ReadAllAsync(cancellationToken);
             Assert.Single(updatedTable.Members, member => member.Item1.Status == SiloStatus.Dead);
             Assert.Contains(updatedTable.Members, member => member.Item1.SiloAddress.Equals(recentlySuspectedSilo));
 
@@ -248,7 +248,7 @@ namespace NonSilo.Tests.Membership
             ((ILifecycleParticipant<ISiloLifecycle>)cleanupAgent).Participate(lifecycle);
 
             await lifecycle.OnStart(cancellationToken);
-            Assert.DoesNotContain(table.Calls, c => c.Method.Equals(nameof(IMembershipTable.CleanupDefunctSiloEntries), StringComparison.Ordinal));
+            Assert.DoesNotContain(table.Calls, c => c.Method.Equals(nameof(IMembershipTable.CleanupDefunctSiloEntriesAsync), StringComparison.Ordinal));
 
             if (enabled)
             {
@@ -267,12 +267,12 @@ namespace NonSilo.Tests.Membership
             {
                 var cleanupCall = Assert.Single(
                     table.Calls,
-                    call => call.Method.Equals(nameof(IMembershipTable.CleanupDefunctSiloEntries), StringComparison.Ordinal));
+                    call => call.Method.Equals(nameof(IMembershipTable.CleanupDefunctSiloEntriesAsync), StringComparison.Ordinal));
                 Assert.Equal(now - options.DefunctSiloExpiration, cleanupCall.Arguments);
             }
             else
             {
-                Assert.DoesNotContain(table.Calls, c => c.Method.Equals(nameof(IMembershipTable.CleanupDefunctSiloEntries), StringComparison.Ordinal));
+                Assert.DoesNotContain(table.Calls, c => c.Method.Equals(nameof(IMembershipTable.CleanupDefunctSiloEntriesAsync), StringComparison.Ordinal));
             }
         }
 
@@ -290,7 +290,7 @@ namespace NonSilo.Tests.Membership
                 this.loggerFactory.CreateLogger<MembershipTableCleanupAgent>());
         }
 
-        private static int CleanupCallCount(InMemoryMembershipTable table) => table.Calls.Count(call => call.Method == nameof(IMembershipTable.CleanupDefunctSiloEntries));
+        private static int CleanupCallCount(InMemoryMembershipTable table) => table.Calls.Count(call => call.Method == nameof(IMembershipTable.CleanupDefunctSiloEntriesAsync));
 
         private static SiloAddress Silo(string value) => SiloAddress.FromParsableString(value);
 

@@ -166,7 +166,7 @@ namespace Orleans.Runtime.MembershipService
                 }
 
                 LogDebugCleaningUpDefunctMembershipTableEntries(_logger, beforeDate.Value);
-                await _membershipTableProvider.CleanupDefunctSiloEntries(beforeDate.Value, cancellationToken);
+                await _membershipTableProvider.CleanupDefunctSiloEntriesAsync(beforeDate.Value, cancellationToken);
                 _lastDefunctSiloCleanupTime = now;
             }
             catch (Exception exception) when (exception is NotImplementedException or MissingMethodException)

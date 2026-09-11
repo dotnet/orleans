@@ -41,14 +41,14 @@ public sealed class RedisMembershipTableCancellationTests
 
         var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => operation switch
         {
-            "Initialize" => table.InitializeMembershipTable(true, token),
-            "Delete" => table.DeleteMembershipTableEntries("cluster", token),
-            "ReadAll" => table.ReadAll(token),
-            "ReadRow" => table.ReadRow(entry.SiloAddress, token),
-            "Insert" => table.InsertRow(entry, version, token),
-            "Update" => table.UpdateRow(entry, "0", version, token),
-            "Heartbeat" => table.UpdateIAmAlive(entry, token),
-            "Cleanup" => table.CleanupDefunctSiloEntries(DateTimeOffset.MaxValue, token),
+            "Initialize" => table.InitializeMembershipTableAsync(true, token),
+            "Delete" => table.DeleteMembershipTableEntriesAsync("cluster", token),
+            "ReadAll" => table.ReadAllAsync(token),
+            "ReadRow" => table.ReadRowAsync(entry.SiloAddress, token),
+            "Insert" => table.InsertRowAsync(entry, version, token),
+            "Update" => table.UpdateRowAsync(entry, "0", version, token),
+            "Heartbeat" => table.UpdateIAmAliveAsync(entry, token),
+            "Cleanup" => table.CleanupDefunctSiloEntriesAsync(DateTimeOffset.MaxValue, token),
             _ => throw new ArgumentOutOfRangeException(nameof(operation))
         });
 
@@ -70,7 +70,7 @@ public sealed class RedisMembershipTableCancellationTests
         });
         using var table = CreateTable(_ => creation.Task);
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        var initialization = table.InitializeMembershipTable(true, cancellation.Token);
+        var initialization = table.InitializeMembershipTableAsync(true, cancellation.Token);
         Assert.False(initialization.IsCompleted);
 
         cancellation.Cancel();
@@ -103,7 +103,7 @@ public sealed class RedisMembershipTableCancellationTests
         muxer.DisposeAsync().Returns(ValueTask.CompletedTask);
         using var table = CreateTable(_ => Task.FromResult((muxer, isShared)));
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        var initialization = table.InitializeMembershipTable(true, cancellation.Token);
+        var initialization = table.InitializeMembershipTableAsync(true, cancellation.Token);
         Assert.False(initialization.IsCompleted);
 
         cancellation.Cancel();
@@ -134,7 +134,7 @@ public sealed class RedisMembershipTableCancellationTests
         muxer.GetDatabase(Arg.Any<int>(), Arg.Any<object>()).Returns(database);
         using var table = CreateTable(_ => Task.FromResult((muxer, true)));
 
-        await table.InitializeMembershipTable(true, cancellation.Token);
+        await table.InitializeMembershipTableAsync(true, cancellation.Token);
 
         Assert.True(cancellation.IsCancellationRequested);
         Assert.True(table.IsInitialized);
@@ -152,9 +152,9 @@ public sealed class RedisMembershipTableCancellationTests
         var muxer = Substitute.For<IConnectionMultiplexer>();
         muxer.GetDatabase(Arg.Any<int>(), Arg.Any<object>()).Returns(database);
         using var table = CreateTable(_ => Task.FromResult((muxer, true)));
-        await table.InitializeMembershipTable(false, TestContext.Current.CancellationToken);
+        await table.InitializeMembershipTableAsync(false, TestContext.Current.CancellationToken);
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        var read = table.ReadRow(SiloAddress.New(IPAddress.Loopback, 11111, 1), cancellation.Token);
+        var read = table.ReadRowAsync(SiloAddress.New(IPAddress.Loopback, 11111, 1), cancellation.Token);
         Assert.False(read.IsCompleted);
 
         cancellation.Cancel();

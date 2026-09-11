@@ -14,7 +14,7 @@ namespace Orleans.Clustering.Cassandra;
 
 internal sealed class CassandraClusteringTable : IMembershipTable, IDisposable
 {
-    private const string NotInitializedMessage = $"This instance has not been initialized. Ensure that {nameof(IMembershipTable.InitializeMembershipTable)} is called to initialize this instance before use.";
+    private const string NotInitializedMessage = $"This instance has not been initialized. Ensure that {nameof(IMembershipTable.InitializeMembershipTableAsync)} is called to initialize this instance before use.";
     private readonly ClusterOptions _clusterOptions;
     private readonly CassandraClusteringOptions _options;
     private readonly int? _ttlSeconds;
@@ -39,10 +39,10 @@ internal sealed class CassandraClusteringTable : IMembershipTable, IDisposable
 
     private OrleansQueries Queries => _queries ?? throw new InvalidOperationException(NotInitializedMessage);
 
-    [Obsolete("Use the overload accepting a CancellationToken instead.")]
-    Task IMembershipTable.InitializeMembershipTable(bool tryInitTableVersion) => InitializeMembershipTable(tryInitTableVersion, CancellationToken.None);
+    [Obsolete("Use InitializeMembershipTableAsync instead.")]
+    Task IMembershipTable.InitializeMembershipTable(bool tryInitTableVersion) => InitializeMembershipTableAsync(tryInitTableVersion, CancellationToken.None);
 
-    public async Task InitializeMembershipTable(bool tryInitTableVersion, CancellationToken cancellationToken = default)
+    public async Task InitializeMembershipTableAsync(bool tryInitTableVersion, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var ownsSession = _options.OwnsSession;
@@ -108,10 +108,10 @@ internal sealed class CassandraClusteringTable : IMembershipTable, IDisposable
         }
     }
 
-    [Obsolete("Use the overload accepting a CancellationToken instead.")]
-    Task IMembershipTable.DeleteMembershipTableEntries(string clusterId) => DeleteMembershipTableEntries(clusterId, CancellationToken.None);
+    [Obsolete("Use DeleteMembershipTableEntriesAsync instead.")]
+    Task IMembershipTable.DeleteMembershipTableEntries(string clusterId) => DeleteMembershipTableEntriesAsync(clusterId, CancellationToken.None);
 
-    public async Task DeleteMembershipTableEntries(string clusterId, CancellationToken cancellationToken = default)
+    public async Task DeleteMembershipTableEntriesAsync(string clusterId, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (string.Compare(clusterId, _clusterOptions.ClusterId, StringComparison.OrdinalIgnoreCase) != 0)
@@ -124,14 +124,14 @@ internal sealed class CassandraClusteringTable : IMembershipTable, IDisposable
         await Queries.ExecuteAsync(await Queries.DeleteMembershipTableEntries(_identifier, cancellationToken), cancellationToken);
     }
 
-    [Obsolete("Use the overload accepting a CancellationToken instead.")]
-    Task<bool> IMembershipTable.InsertRow(MembershipEntry entry, TableVersion tableVersion) => InsertRow(entry, tableVersion, CancellationToken.None);
+    [Obsolete("Use InsertRowAsync instead.")]
+    Task<bool> IMembershipTable.InsertRow(MembershipEntry entry, TableVersion tableVersion) => InsertRowAsync(entry, tableVersion, CancellationToken.None);
 
-    public async Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
+    public async Task<bool> InsertRowAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
     {
         // Prevent duplicate rows
         cancellationToken.ThrowIfCancellationRequested();
-        var existingRow = await ReadRow(entry.SiloAddress, cancellationToken);
+        var existingRow = await ReadRowAsync(entry.SiloAddress, cancellationToken);
         if (existingRow is not null)
         {
             if (existingRow.Version.Version >= tableVersion.Version)
@@ -149,10 +149,10 @@ internal sealed class CassandraClusteringTable : IMembershipTable, IDisposable
         return (bool)query.First()["[applied]"];
     }
 
-    [Obsolete("Use the overload accepting a CancellationToken instead.")]
-    Task<bool> IMembershipTable.UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => UpdateRow(entry, etag, tableVersion, CancellationToken.None);
+    [Obsolete("Use UpdateRowAsync instead.")]
+    Task<bool> IMembershipTable.UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => UpdateRowAsync(entry, etag, tableVersion, CancellationToken.None);
 
-    public async Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
+    public async Task<bool> UpdateRowAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var query = await Queries.ExecuteAsync(await Queries.UpdateMembership(_identifier, entry, tableVersion.Version - 1, cancellationToken), cancellationToken);
@@ -226,35 +226,35 @@ internal sealed class CassandraClusteringTable : IMembershipTable, IDisposable
         }
     }
 
-    [Obsolete("Use the overload accepting a CancellationToken instead.")]
-    Task<MembershipTableData> IMembershipTable.ReadAll() => ReadAll(CancellationToken.None);
+    [Obsolete("Use ReadAllAsync instead.")]
+    Task<MembershipTableData> IMembershipTable.ReadAll() => ReadAllAsync(CancellationToken.None);
 
-    public async Task<MembershipTableData> ReadAll(CancellationToken cancellationToken = default)
+    public async Task<MembershipTableData> ReadAllAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         return await GetMembershipTableData(await Queries.ExecuteAsync(await Queries.MembershipReadAll(_identifier, cancellationToken), cancellationToken), cancellationToken);
     }
 
-    [Obsolete("Use the overload accepting a CancellationToken instead.")]
-    Task<MembershipTableData> IMembershipTable.ReadRow(SiloAddress key) => ReadRow(key, CancellationToken.None);
+    [Obsolete("Use ReadRowAsync instead.")]
+    Task<MembershipTableData> IMembershipTable.ReadRow(SiloAddress key) => ReadRowAsync(key, CancellationToken.None);
 
-    public async Task<MembershipTableData> ReadRow(SiloAddress key, CancellationToken cancellationToken = default)
+    public async Task<MembershipTableData> ReadRowAsync(SiloAddress key, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         return await GetMembershipTableData(await Queries.ExecuteAsync(await Queries.MembershipReadRow(_identifier, key, cancellationToken), cancellationToken), cancellationToken);
     }
 
-    [Obsolete("Use the overload accepting a CancellationToken instead.")]
-    Task IMembershipTable.UpdateIAmAlive(MembershipEntry entry) => UpdateIAmAlive(entry, CancellationToken.None);
+    [Obsolete("Use UpdateIAmAliveAsync instead.")]
+    Task IMembershipTable.UpdateIAmAlive(MembershipEntry entry) => UpdateIAmAliveAsync(entry, CancellationToken.None);
 
-    public async Task UpdateIAmAlive(MembershipEntry entry, CancellationToken cancellationToken = default)
+    public async Task UpdateIAmAliveAsync(MembershipEntry entry, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (_ttlSeconds.HasValue)
         {
             // User has opted in to Cassandra TTL behavior for membership table rows, which means the entire row's data
             // has to be written back so each cell's TTL can be updated
-            MembershipTableData existingRow = await ReadRow(entry.SiloAddress, cancellationToken);
+            MembershipTableData existingRow = await ReadRowAsync(entry.SiloAddress, cancellationToken);
 
             await Queries.ExecuteAsync(await Queries.UpdateIAmAliveTimeWithTtL(
                 clusterIdentifier: _identifier,
@@ -270,10 +270,10 @@ internal sealed class CassandraClusteringTable : IMembershipTable, IDisposable
         }
     }
 
-    [Obsolete("Use the overload accepting a CancellationToken instead.")]
-    public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) => CleanupDefunctSiloEntries(beforeDate, CancellationToken.None);
+    [Obsolete("Use CleanupDefunctSiloEntriesAsync instead.")]
+    public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) => CleanupDefunctSiloEntriesAsync(beforeDate, CancellationToken.None);
 
-    public async Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate, CancellationToken cancellationToken = default)
+    public async Task CleanupDefunctSiloEntriesAsync(DateTimeOffset beforeDate, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var rows = await Queries.ExecuteAsync(await Queries.MembershipReadAll(_identifier, cancellationToken), cancellationToken);

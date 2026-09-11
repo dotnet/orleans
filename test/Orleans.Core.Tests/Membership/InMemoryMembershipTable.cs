@@ -53,16 +53,16 @@ namespace NonSilo.Tests.Membership
             }
         }
 
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
-        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) => CleanupDefunctSiloEntries(beforeDate, CancellationToken.None);
+        [Obsolete("Use CleanupDefunctSiloEntriesAsync instead.")]
+        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) => CleanupDefunctSiloEntriesAsync(beforeDate, CancellationToken.None);
 
-        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate, CancellationToken cancellationToken = default)
+        public Task CleanupDefunctSiloEntriesAsync(DateTimeOffset beforeDate, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             this.OnCleanupDefunctSiloEntries?.Invoke(beforeDate);
             lock (this.tableLock)
             {
-                this.calls.Add((nameof(CleanupDefunctSiloEntries), beforeDate));
+                this.calls.Add((nameof(CleanupDefunctSiloEntriesAsync), beforeDate));
                 var newEntries = ImmutableList.CreateBuilder<(MembershipEntry, string)>();
                 foreach (var (entry, etag) in this.entries)
                 {
@@ -81,43 +81,43 @@ namespace NonSilo.Tests.Membership
             return Task.CompletedTask;
         }
 
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
-        public Task DeleteMembershipTableEntries(string clusterId) => DeleteMembershipTableEntries(clusterId, CancellationToken.None);
+        [Obsolete("Use DeleteMembershipTableEntriesAsync instead.")]
+        public Task DeleteMembershipTableEntries(string clusterId) => DeleteMembershipTableEntriesAsync(clusterId, CancellationToken.None);
 
-        public Task DeleteMembershipTableEntries(string clusterId, CancellationToken cancellationToken = default)
+        public Task DeleteMembershipTableEntriesAsync(string clusterId, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             lock (this.tableLock)
             {
-                this.calls.Add((nameof(DeleteMembershipTableEntries), clusterId));
+                this.calls.Add((nameof(DeleteMembershipTableEntriesAsync), clusterId));
             }
 
             return Task.CompletedTask;
         }
 
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
-        public Task InitializeMembershipTable(bool tryInitTableVersion) => InitializeMembershipTable(tryInitTableVersion, CancellationToken.None);
+        [Obsolete("Use InitializeMembershipTableAsync instead.")]
+        public Task InitializeMembershipTable(bool tryInitTableVersion) => InitializeMembershipTableAsync(tryInitTableVersion, CancellationToken.None);
 
-        public Task InitializeMembershipTable(bool tryInitTableVersion, CancellationToken cancellationToken = default)
+        public Task InitializeMembershipTableAsync(bool tryInitTableVersion, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             lock (this.tableLock)
             {
-                this.calls.Add((nameof(InitializeMembershipTable), tryInitTableVersion));
+                this.calls.Add((nameof(InitializeMembershipTableAsync), tryInitTableVersion));
             }
 
             return Task.CompletedTask;
         }
 
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
-        public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => InsertRow(entry, tableVersion, CancellationToken.None);
+        [Obsolete("Use InsertRowAsync instead.")]
+        public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => InsertRowAsync(entry, tableVersion, CancellationToken.None);
 
-        public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
+        public Task<bool> InsertRowAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             lock (this.tableLock)
             {
-                this.calls.Add((nameof(InsertRow), (entry, tableVersion)));
+                this.calls.Add((nameof(InsertRowAsync), (entry, tableVersion)));
                 this.ValidateVersion(tableVersion);
 
                 if (this.entries.Exists(e => e.Item1.SiloAddress.Equals(entry.SiloAddress)))
@@ -132,16 +132,16 @@ namespace NonSilo.Tests.Membership
             }
         }
 
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
-        public Task<MembershipTableData> ReadAll() => ReadAll(CancellationToken.None);
+        [Obsolete("Use ReadAllAsync instead.")]
+        public Task<MembershipTableData> ReadAll() => ReadAllAsync(CancellationToken.None);
 
-        public Task<MembershipTableData> ReadAll(CancellationToken cancellationToken = default)
+        public Task<MembershipTableData> ReadAllAsync(CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             this.OnReadAll?.Invoke();
             lock (this.tableLock)
             {
-                this.calls.Add((nameof(ReadAll), null));
+                this.calls.Add((nameof(ReadAllAsync), null));
                 var result = new MembershipTableData(
                     this.entries.Select(e => Tuple.Create(e.Item1, e.Item2)).ToList(),
                     this.Version);
@@ -149,15 +149,15 @@ namespace NonSilo.Tests.Membership
             }
         }
 
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
-        public Task<MembershipTableData> ReadRow(SiloAddress key) => ReadRow(key, CancellationToken.None);
+        [Obsolete("Use ReadRowAsync instead.")]
+        public Task<MembershipTableData> ReadRow(SiloAddress key) => ReadRowAsync(key, CancellationToken.None);
 
-        public Task<MembershipTableData> ReadRow(SiloAddress key, CancellationToken cancellationToken = default)
+        public Task<MembershipTableData> ReadRowAsync(SiloAddress key, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             lock (this.tableLock)
             {
-                this.calls.Add((nameof(ReadRow), key));
+                this.calls.Add((nameof(ReadRowAsync), key));
                 var result = new MembershipTableData(
                     this.entries.Where(e => e.Item1.SiloAddress.Equals(key)).Select(e => Tuple.Create(e.Item1, e.Item2)).ToList(),
                     this.Version);
@@ -165,15 +165,15 @@ namespace NonSilo.Tests.Membership
             }
         }
 
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
-        public Task UpdateIAmAlive(MembershipEntry entry) => UpdateIAmAlive(entry, CancellationToken.None);
+        [Obsolete("Use UpdateIAmAliveAsync instead.")]
+        public Task UpdateIAmAlive(MembershipEntry entry) => UpdateIAmAliveAsync(entry, CancellationToken.None);
 
-        public Task UpdateIAmAlive(MembershipEntry entry, CancellationToken cancellationToken = default)
+        public Task UpdateIAmAliveAsync(MembershipEntry entry, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             lock (this.tableLock)
             {
-                this.calls.Add((nameof(UpdateIAmAlive), entry));
+                this.calls.Add((nameof(UpdateIAmAliveAsync), entry));
                 var existingEntry = this.entries.Single(e => e.Item1.SiloAddress.Equals(entry.SiloAddress));
                 var replacement = existingEntry.Item1.Copy();
                 replacement.IAmAliveTime = entry.IAmAliveTime;
@@ -182,15 +182,15 @@ namespace NonSilo.Tests.Membership
             }
         }
 
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
-        public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => UpdateRow(entry, etag, tableVersion, CancellationToken.None);
+        [Obsolete("Use UpdateRowAsync instead.")]
+        public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => UpdateRowAsync(entry, etag, tableVersion, CancellationToken.None);
 
-        public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
+        public Task<bool> UpdateRowAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             lock (this.tableLock)
             {
-                this.calls.Add((nameof(UpdateRow), (entry, etag, tableVersion)));
+                this.calls.Add((nameof(UpdateRowAsync), (entry, etag, tableVersion)));
                 this.ValidateVersion(tableVersion);
                 var existingEntry = this.entries.Find(e => e.Item1.SiloAddress.Equals(entry.SiloAddress));
                 if (existingEntry.Item1 is null) return Task.FromResult(false);

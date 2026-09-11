@@ -169,7 +169,7 @@ namespace Orleans.Runtime.MembershipService
         private async Task<bool> RefreshInternal(bool requireCleanup, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var table = await this.membershipTableProvider.ReadAll(cancellationToken);
+            var table = await this.membershipTableProvider.ReadAllAsync(cancellationToken);
 
             bool success;
             try
@@ -198,7 +198,7 @@ namespace Orleans.Runtime.MembershipService
                 LogInformationMembershipStarting(this.log, this.localSiloDetails.DnsHostName, this.myAddress, LogFormatter.PrintDate(this.siloStartTime));
 
                 // Init the membership table.
-                await this.membershipTableProvider.InitializeMembershipTable(true, cancellationToken);
+                await this.membershipTableProvider.InitializeMembershipTableAsync(true, cancellationToken);
 
                 // Perform an initial table read
                 var refreshed = await AsyncExecutorWithRetries.ExecuteWithRetries(
@@ -236,7 +236,7 @@ namespace Orleans.Runtime.MembershipService
                 IAmAliveTime = GetDateTimeUtcNow()
             };
 
-            await this.membershipTableProvider.UpdateIAmAlive(entry, cancellationToken);
+            await this.membershipTableProvider.UpdateIAmAliveAsync(entry, cancellationToken);
         }
 
         private void DetectNodeMigration(MembershipTableSnapshot snapshot, string myHostname)
@@ -430,7 +430,7 @@ namespace Orleans.Runtime.MembershipService
         private async Task<bool> TryUpdateMyStatusGlobalOnce(SiloStatus newStatus, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var table = await membershipTableProvider.ReadAll(cancellationToken);
+            var table = await membershipTableProvider.ReadAllAsync(cancellationToken);
 
             LogDebugTryUpdateMyStatusGlobalOnce(this.log, newStatus.Equals(SiloStatus.Active) ? "All" : " my entry from", table.ToString());
             LogMissedIAmAlives(table);
@@ -453,11 +453,11 @@ namespace Orleans.Runtime.MembershipService
             TableVersion next = table.Version.Next();
             if (myEtag is not null) // existing etag for my entry -> there is a previous row, so update instead of insert.
             {
-                ok = await membershipTableProvider.UpdateRow(myEntry, myEtag, next, cancellationToken);
+                ok = await membershipTableProvider.UpdateRowAsync(myEntry, myEtag, next, cancellationToken);
             }
             else
             {
-                ok = await membershipTableProvider.InsertRow(myEntry, next, cancellationToken);
+                ok = await membershipTableProvider.InsertRowAsync(myEntry, next, cancellationToken);
             }
 
             if (ok)
@@ -885,7 +885,7 @@ namespace Orleans.Runtime.MembershipService
         private async Task<bool> InnerTryKill(SiloAddress silo, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var table = await membershipTableProvider.ReadAll(cancellationToken);
+            var table = await membershipTableProvider.ReadAllAsync(cancellationToken);
 
             LogDebugTryKillReadMembershipTable(this.log, table.ToString());
 
@@ -932,7 +932,7 @@ namespace Orleans.Runtime.MembershipService
         private async Task<bool> InnerTryToSuspectOrKill(SiloAddress silo, SiloAddress? indirectProbingSilo, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var table = await membershipTableProvider.ReadAll(cancellationToken);
+            var table = await membershipTableProvider.ReadAllAsync(cancellationToken);
             var now = GetDateTimeUtcNow();
 
             LogDebugTryToSuspectOrKillReadMembershipTable(this.log, table.ToString());
@@ -1004,10 +1004,10 @@ namespace Orleans.Runtime.MembershipService
             LogInformationVotingToEvictSilo(this.log, entry.SiloAddress, PrintSuspectList(prevList), PrintSuspectList(entry.SuspectTimes), eTag, PrintSuspectList(freshVotes));
 
             // If we fail to update here we will retry later.
-            var ok = await membershipTableProvider.UpdateRow(entry, eTag, table.Version.Next(), cancellationToken);
+            var ok = await membershipTableProvider.UpdateRowAsync(entry, eTag, table.Version.Next(), cancellationToken);
             if (ok)
             {
-                table = await membershipTableProvider.ReadAll(cancellationToken);
+                table = await membershipTableProvider.ReadAllAsync(cancellationToken);
                 this.ProcessTableUpdate(table, "TrySuspectOrKill");
 
                 // Gossip using the local silo status, since this is just informational to propagate the suspicion vote.
@@ -1034,12 +1034,12 @@ namespace Orleans.Runtime.MembershipService
 
                 LogDebugGoingToDeclareDead(this.log, entry.SiloAddress, entry.ToString());
                 entry.Status = SiloStatus.Dead;
-                bool ok = await membershipTableProvider.UpdateRow(entry, etag, tableVersion.Next(), cancellationToken);
+                bool ok = await membershipTableProvider.UpdateRowAsync(entry, etag, tableVersion.Next(), cancellationToken);
                 if (ok)
                 {
                     LogDebugSuccessfullyUpdatedStatusToDead(this.log, entry.SiloAddress);
 
-                    var table = await membershipTableProvider.ReadAll(cancellationToken);
+                    var table = await membershipTableProvider.ReadAllAsync(cancellationToken);
                     this.ProcessTableUpdate(table, "DeclareDead");
                     GossipToOthers(entry.SiloAddress, entry.Status, GossipTimeout, cancellationToken).Ignore();
                     return true;

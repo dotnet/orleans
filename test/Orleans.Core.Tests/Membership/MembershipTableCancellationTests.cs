@@ -15,29 +15,34 @@ public class MembershipTableCancellationTests
 {
     public static TheoryData<string> Operations { get; } = new()
     {
-        nameof(IMembershipTable.InitializeMembershipTable),
-        nameof(IMembershipTable.DeleteMembershipTableEntries),
-        nameof(IMembershipTable.CleanupDefunctSiloEntries),
-        nameof(IMembershipTable.ReadRow),
-        nameof(IMembershipTable.ReadAll),
-        nameof(IMembershipTable.InsertRow),
-        nameof(IMembershipTable.UpdateRow),
-        nameof(IMembershipTable.UpdateIAmAlive),
+        nameof(IMembershipTable.InitializeMembershipTableAsync),
+        nameof(IMembershipTable.DeleteMembershipTableEntriesAsync),
+        nameof(IMembershipTable.CleanupDefunctSiloEntriesAsync),
+        nameof(IMembershipTable.ReadRowAsync),
+        nameof(IMembershipTable.ReadAllAsync),
+        nameof(IMembershipTable.InsertRowAsync),
+        nameof(IMembershipTable.UpdateRowAsync),
+        nameof(IMembershipTable.UpdateIAmAliveAsync),
     };
 
     [Theory]
-    [InlineData(nameof(IMembershipTable.InitializeMembershipTable), "FB89E5E9")]
-    [InlineData(nameof(IMembershipTable.DeleteMembershipTableEntries), "BF899C85")]
-    [InlineData(nameof(IMembershipTable.CleanupDefunctSiloEntries), "7A519C2E")]
-    [InlineData(nameof(IMembershipTable.ReadRow), "D851FB33")]
-    [InlineData(nameof(IMembershipTable.ReadAll), "00BCE16F")]
-    [InlineData(nameof(IMembershipTable.InsertRow), "FEF3AC5A")]
-    [InlineData(nameof(IMembershipTable.UpdateRow), "E06D3DBC")]
-    [InlineData(nameof(IMembershipTable.UpdateIAmAlive), "B1A52D2B")]
+    [InlineData(nameof(IMembershipTable.InitializeMembershipTableAsync), "FB89E5E9")]
+    [InlineData(nameof(IMembershipTable.DeleteMembershipTableEntriesAsync), "BF899C85")]
+    [InlineData(nameof(IMembershipTable.CleanupDefunctSiloEntriesAsync), "7A519C2E")]
+    [InlineData(nameof(IMembershipTable.ReadRowAsync), "D851FB33")]
+    [InlineData(nameof(IMembershipTable.ReadAllAsync), "00BCE16F")]
+    [InlineData(nameof(IMembershipTable.InsertRowAsync), "FEF3AC5A")]
+    [InlineData(nameof(IMembershipTable.UpdateRowAsync), "E06D3DBC")]
+    [InlineData(nameof(IMembershipTable.UpdateIAmAliveAsync), "B1A52D2B")]
     public void CancellationOverload_UsesLegacyWireIdentity(string methodName, string legacyId)
     {
         var method = Assert.Single(typeof(IMembershipTable).GetMethods(),
             candidate => candidate.Name == methodName && candidate.GetParameters().LastOrDefault()?.ParameterType == typeof(CancellationToken));
+        var legacyMethod = typeof(IMembershipTable).GetMethod(
+            methodName[..^"Async".Length],
+            method.GetParameters().SkipLast(1).Select(parameter => parameter.ParameterType).ToArray());
+        Assert.NotNull(legacyMethod);
+        Assert.Contains(methodName, Assert.IsType<ObsoleteAttribute>(legacyMethod.GetCustomAttribute<ObsoleteAttribute>()).Message, StringComparison.Ordinal);
         Assert.Equal(legacyId, Assert.Single(method.GetCustomAttributes<AliasAttribute>()).Alias);
         var invokableType = Assert.Single(typeof(IMembershipTable).Assembly.GetTypes(),
             type => typeof(IInvokable).IsAssignableFrom(type)
@@ -59,12 +64,12 @@ public class MembershipTableCancellationTests
         var result = await Invoke(provider, operation, TestContext.Current.CancellationToken);
 
         var call = Assert.Single(provider.Calls);
-        Assert.Equal(operation, call.Method);
+        Assert.Equal(operation[..^"Async".Length], call.Method);
         Assert.Equal(ExpectedArguments(provider, operation), call.Arguments);
         object? expected = operation switch
         {
-            nameof(IMembershipTable.ReadAll) or nameof(IMembershipTable.ReadRow) => provider.Data,
-            nameof(IMembershipTable.InsertRow) or nameof(IMembershipTable.UpdateRow) => true,
+            nameof(IMembershipTable.ReadAllAsync) or nameof(IMembershipTable.ReadRowAsync) => provider.Data,
+            nameof(IMembershipTable.InsertRowAsync) or nameof(IMembershipTable.UpdateRowAsync) => true,
             _ => null,
         };
         Assert.Equal(expected, result);
@@ -126,7 +131,7 @@ public class MembershipTableCancellationTests
         IMembershipTable table = provider;
         using var cancellation = new CancellationTokenSource();
 
-        var result = await table.ReadAll(cancellation.Token);
+        var result = await table.ReadAllAsync(cancellation.Token);
 
         Assert.Equal(cancellation.Token, provider.ReceivedToken);
         Assert.Same(provider.Data, result);
@@ -138,25 +143,25 @@ public class MembershipTableCancellationTests
         IMembershipTable table = provider;
         switch (operation)
         {
-            case nameof(IMembershipTable.InitializeMembershipTable):
-                await table.InitializeMembershipTable(true, cancellationToken);
+            case nameof(IMembershipTable.InitializeMembershipTableAsync):
+                await table.InitializeMembershipTableAsync(true, cancellationToken);
                 break;
-            case nameof(IMembershipTable.DeleteMembershipTableEntries):
-                await table.DeleteMembershipTableEntries("cluster", cancellationToken);
+            case nameof(IMembershipTable.DeleteMembershipTableEntriesAsync):
+                await table.DeleteMembershipTableEntriesAsync("cluster", cancellationToken);
                 break;
-            case nameof(IMembershipTable.CleanupDefunctSiloEntries):
-                await table.CleanupDefunctSiloEntries(DateTimeOffset.UnixEpoch, cancellationToken);
+            case nameof(IMembershipTable.CleanupDefunctSiloEntriesAsync):
+                await table.CleanupDefunctSiloEntriesAsync(DateTimeOffset.UnixEpoch, cancellationToken);
                 break;
-            case nameof(IMembershipTable.ReadRow):
-                return await table.ReadRow(provider.Entry.SiloAddress, cancellationToken);
-            case nameof(IMembershipTable.ReadAll):
-                return await table.ReadAll(cancellationToken);
-            case nameof(IMembershipTable.InsertRow):
-                return await table.InsertRow(provider.Entry, provider.Data.Version, cancellationToken);
-            case nameof(IMembershipTable.UpdateRow):
-                return await table.UpdateRow(provider.Entry, "etag", provider.Data.Version, cancellationToken);
-            case nameof(IMembershipTable.UpdateIAmAlive):
-                await table.UpdateIAmAlive(provider.Entry, cancellationToken);
+            case nameof(IMembershipTable.ReadRowAsync):
+                return await table.ReadRowAsync(provider.Entry.SiloAddress, cancellationToken);
+            case nameof(IMembershipTable.ReadAllAsync):
+                return await table.ReadAllAsync(cancellationToken);
+            case nameof(IMembershipTable.InsertRowAsync):
+                return await table.InsertRowAsync(provider.Entry, provider.Data.Version, cancellationToken);
+            case nameof(IMembershipTable.UpdateRowAsync):
+                return await table.UpdateRowAsync(provider.Entry, "etag", provider.Data.Version, cancellationToken);
+            case nameof(IMembershipTable.UpdateIAmAliveAsync):
+                await table.UpdateIAmAliveAsync(provider.Entry, cancellationToken);
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(operation));
@@ -167,14 +172,14 @@ public class MembershipTableCancellationTests
 
     private static object[] ExpectedArguments(LegacyProvider provider, string operation) => operation switch
     {
-        nameof(IMembershipTable.InitializeMembershipTable) => [true],
-        nameof(IMembershipTable.DeleteMembershipTableEntries) => ["cluster"],
-        nameof(IMembershipTable.CleanupDefunctSiloEntries) => [DateTimeOffset.UnixEpoch],
-        nameof(IMembershipTable.ReadRow) => [provider.Entry.SiloAddress],
-        nameof(IMembershipTable.ReadAll) => [],
-        nameof(IMembershipTable.InsertRow) => [provider.Entry, provider.Data.Version],
-        nameof(IMembershipTable.UpdateRow) => [provider.Entry, "etag", provider.Data.Version],
-        nameof(IMembershipTable.UpdateIAmAlive) => [provider.Entry],
+        nameof(IMembershipTable.InitializeMembershipTableAsync) => [true],
+        nameof(IMembershipTable.DeleteMembershipTableEntriesAsync) => ["cluster"],
+        nameof(IMembershipTable.CleanupDefunctSiloEntriesAsync) => [DateTimeOffset.UnixEpoch],
+        nameof(IMembershipTable.ReadRowAsync) => [provider.Entry.SiloAddress],
+        nameof(IMembershipTable.ReadAllAsync) => [],
+        nameof(IMembershipTable.InsertRowAsync) => [provider.Entry, provider.Data.Version],
+        nameof(IMembershipTable.UpdateRowAsync) => [provider.Entry, "etag", provider.Data.Version],
+        nameof(IMembershipTable.UpdateIAmAliveAsync) => [provider.Entry],
         _ => throw new ArgumentOutOfRangeException(nameof(operation)),
     };
 
@@ -185,27 +190,27 @@ public class MembershipTableCancellationTests
         public MembershipEntry Entry { get; } = new() { SiloAddress = SiloAddress.FromParsableString("127.0.0.1:100@100") };
         public MembershipTableData Data { get; } = new(new TableVersion(1, "version"));
 
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
+        [Obsolete("Use InitializeMembershipTableAsync instead.")]
         public Task InitializeMembershipTable(bool tryInitTableVersion) => Record(nameof(InitializeMembershipTable), tryInitTableVersion);
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
+        [Obsolete("Use DeleteMembershipTableEntriesAsync instead.")]
         public Task DeleteMembershipTableEntries(string clusterId) => Record(nameof(DeleteMembershipTableEntries), clusterId);
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
+        [Obsolete("Use CleanupDefunctSiloEntriesAsync instead.")]
         public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) => Record(nameof(CleanupDefunctSiloEntries), beforeDate);
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
+        [Obsolete("Use InsertRowAsync instead.")]
         public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => Record(nameof(InsertRow), entry, tableVersion);
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
+        [Obsolete("Use UpdateRowAsync instead.")]
         public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => Record(nameof(UpdateRow), entry, etag, tableVersion);
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
+        [Obsolete("Use UpdateIAmAliveAsync instead.")]
         public Task UpdateIAmAlive(MembershipEntry entry) => Record(nameof(UpdateIAmAlive), entry);
 
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
+        [Obsolete("Use ReadRowAsync instead.")]
         public async Task<MembershipTableData> ReadRow(SiloAddress key)
         {
             await Record(nameof(ReadRow), key);
             return Data;
         }
 
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
+        [Obsolete("Use ReadAllAsync instead.")]
         public async Task<MembershipTableData> ReadAll()
         {
             await Record(nameof(ReadAll));
@@ -223,7 +228,7 @@ public class MembershipTableCancellationTests
     {
         public CancellationToken ReceivedToken { get; private set; }
 
-        public Task<MembershipTableData> ReadAll(CancellationToken cancellationToken = default)
+        public Task<MembershipTableData> ReadAllAsync(CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             ReceivedToken = cancellationToken;

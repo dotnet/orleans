@@ -54,22 +54,22 @@ namespace Orleans.Runtime.Membership
         /// Consul Membership Provider does not support the extended Membership Protocol,
         /// therefore there is no MembershipTable to Initialize
         /// </remarks>
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
-        public Task InitializeMembershipTable(bool tryInitTableVersion) => InitializeMembershipTable(tryInitTableVersion, CancellationToken.None);
+        [Obsolete("Use InitializeMembershipTableAsync instead.")]
+        public Task InitializeMembershipTable(bool tryInitTableVersion) => InitializeMembershipTableAsync(tryInitTableVersion, CancellationToken.None);
 
         /// <inheritdoc />
-        public Task InitializeMembershipTable(bool tryInitTableVersion, CancellationToken cancellationToken = default)
+        public Task InitializeMembershipTableAsync(bool tryInitTableVersion, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             return Task.CompletedTask;
         }
 
         /// <inheritdoc />
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
-        public Task<MembershipTableData> ReadRow(SiloAddress siloAddress) => ReadRow(siloAddress, CancellationToken.None);
+        [Obsolete("Use ReadRowAsync instead.")]
+        public Task<MembershipTableData> ReadRow(SiloAddress siloAddress) => ReadRowAsync(siloAddress, CancellationToken.None);
 
         /// <inheritdoc />
-        public async Task<MembershipTableData> ReadRow(SiloAddress siloAddress, CancellationToken cancellationToken = default)
+        public async Task<MembershipTableData> ReadRowAsync(SiloAddress siloAddress, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var (siloRegistration, tableVersion) = await GetConsulSiloRegistration(siloAddress, cancellationToken);
@@ -78,13 +78,13 @@ namespace Orleans.Runtime.Membership
         }
 
         /// <inheritdoc />
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
-        public Task<MembershipTableData> ReadAll() => ReadAll(CancellationToken.None);
+        [Obsolete("Use ReadAllAsync instead.")]
+        public Task<MembershipTableData> ReadAll() => ReadAllAsync(CancellationToken.None);
 
         /// <inheritdoc />
-        public Task<MembershipTableData> ReadAll(CancellationToken cancellationToken = default)
+        public Task<MembershipTableData> ReadAllAsync(CancellationToken cancellationToken = default)
         {
-            return ReadAll(this._consulClient, this.clusterId, this.kvRootFolder, this._logger, this.versionKey, cancellationToken);
+            return ReadAllAsync(this._consulClient, this.clusterId, this.kvRootFolder, this._logger, this.versionKey, cancellationToken);
         }
 
         /// <summary>
@@ -96,9 +96,9 @@ namespace Orleans.Runtime.Membership
         /// <param name="logger">The logger.</param>
         /// <param name="versionKey">The key containing the membership table version, or <see langword="null"/> when no version key is available.</param>
         /// <returns>The cluster membership entries and table version.</returns>
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
+        [Obsolete("Use ReadAllAsync instead.")]
         public static Task<MembershipTableData> ReadAll(IConsulClient consulClient, string clusterId, string? kvRootFolder, ILogger logger, string? versionKey) =>
-            ReadAll(consulClient, clusterId, kvRootFolder, logger, versionKey, CancellationToken.None);
+            ReadAllAsync(consulClient, clusterId, kvRootFolder, logger, versionKey, CancellationToken.None);
 
         /// <summary>
         /// Reads all membership entries for a cluster from Consul.
@@ -110,7 +110,7 @@ namespace Orleans.Runtime.Membership
         /// <param name="versionKey">The key containing the membership table version, or <see langword="null"/> when no version key is available.</param>
         /// <param name="cancellationToken">A token which cancels the operation.</param>
         /// <returns>The cluster membership entries and table version.</returns>
-        public static async Task<MembershipTableData> ReadAll(IConsulClient consulClient, string clusterId, string? kvRootFolder, ILogger logger, string? versionKey, CancellationToken cancellationToken = default)
+        public static async Task<MembershipTableData> ReadAllAsync(IConsulClient consulClient, string clusterId, string? kvRootFolder, ILogger logger, string? versionKey, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var deploymentKVAddresses = await consulClient.KV.List(ConsulSiloRegistrationAssembler.FormatDeploymentKVPrefix(clusterId, kvRootFolder), cancellationToken);
@@ -136,11 +136,11 @@ namespace Orleans.Runtime.Membership
         }
 
         /// <inheritdoc />
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
-        public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => InsertRow(entry, tableVersion, CancellationToken.None);
+        [Obsolete("Use InsertRowAsync instead.")]
+        public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => InsertRowAsync(entry, tableVersion, CancellationToken.None);
 
         /// <inheritdoc />
-        public async Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
+        public async Task<bool> InsertRowAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             try
@@ -168,11 +168,11 @@ namespace Orleans.Runtime.Membership
         }
 
         /// <inheritdoc />
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
-        public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => UpdateRow(entry, etag, tableVersion, CancellationToken.None);
+        [Obsolete("Use UpdateRowAsync instead.")]
+        public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => UpdateRowAsync(entry, etag, tableVersion, CancellationToken.None);
 
         /// <inheritdoc />
-        public async Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
+        public async Task<bool> UpdateRowAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             //Update Silo Liveness
@@ -201,11 +201,11 @@ namespace Orleans.Runtime.Membership
         }
 
         /// <inheritdoc />
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
-        public Task UpdateIAmAlive(MembershipEntry entry) => UpdateIAmAlive(entry, CancellationToken.None);
+        [Obsolete("Use UpdateIAmAliveAsync instead.")]
+        public Task UpdateIAmAlive(MembershipEntry entry) => UpdateIAmAliveAsync(entry, CancellationToken.None);
 
         /// <inheritdoc />
-        public async Task UpdateIAmAlive(MembershipEntry entry, CancellationToken cancellationToken = default)
+        public async Task UpdateIAmAliveAsync(MembershipEntry entry, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var iAmAliveKV = ConsulSiloRegistrationAssembler.ToIAmAliveKVPair(this.clusterId, this.kvRootFolder, entry.SiloAddress, entry.IAmAliveTime);
@@ -213,11 +213,11 @@ namespace Orleans.Runtime.Membership
         }
 
         /// <inheritdoc />
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
-        public Task DeleteMembershipTableEntries(string clusterId) => DeleteMembershipTableEntries(clusterId, CancellationToken.None);
+        [Obsolete("Use DeleteMembershipTableEntriesAsync instead.")]
+        public Task DeleteMembershipTableEntries(string clusterId) => DeleteMembershipTableEntriesAsync(clusterId, CancellationToken.None);
 
         /// <inheritdoc />
-        public async Task DeleteMembershipTableEntries(string clusterId, CancellationToken cancellationToken = default)
+        public async Task DeleteMembershipTableEntriesAsync(string clusterId, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             await _consulClient.KV.DeleteTree(ConsulSiloRegistrationAssembler.FormatDeploymentKVPrefix(this.clusterId, this.kvRootFolder), cancellationToken);
@@ -279,11 +279,11 @@ namespace Orleans.Runtime.Membership
         }
 
         /// <inheritdoc />
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
-        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) => CleanupDefunctSiloEntries(beforeDate, CancellationToken.None);
+        [Obsolete("Use CleanupDefunctSiloEntriesAsync instead.")]
+        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) => CleanupDefunctSiloEntriesAsync(beforeDate, CancellationToken.None);
 
         /// <inheritdoc />
-        public async Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate, CancellationToken cancellationToken = default)
+        public async Task CleanupDefunctSiloEntriesAsync(DateTimeOffset beforeDate, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var allKVs = await _consulClient.KV.List(ConsulSiloRegistrationAssembler.FormatDeploymentKVPrefix(this.clusterId, this.kvRootFolder), cancellationToken);

@@ -39,11 +39,11 @@ namespace Orleans.Runtime.MembershipService
         }
 
         /// <inheritdoc />
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
-        public Task InitializeMembershipTable(bool tryInitTableVersion) => InitializeMembershipTable(tryInitTableVersion, CancellationToken.None);
+        [Obsolete("Use InitializeMembershipTableAsync instead.")]
+        public Task InitializeMembershipTable(bool tryInitTableVersion) => InitializeMembershipTableAsync(tryInitTableVersion, CancellationToken.None);
 
         /// <inheritdoc />
-        public async Task InitializeMembershipTable(bool tryInitTableVersion, CancellationToken cancellationToken = default)
+        public async Task InitializeMembershipTableAsync(bool tryInitTableVersion, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             LogTraceInitializeMembershipTable();
@@ -70,11 +70,11 @@ namespace Orleans.Runtime.MembershipService
         }
 
         /// <inheritdoc />
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
-        public Task<MembershipTableData> ReadRow(SiloAddress key) => ReadRow(key, CancellationToken.None);
+        [Obsolete("Use ReadRowAsync instead.")]
+        public Task<MembershipTableData> ReadRow(SiloAddress key) => ReadRowAsync(key, CancellationToken.None);
 
         /// <inheritdoc />
-        public async Task<MembershipTableData> ReadRow(SiloAddress key, CancellationToken cancellationToken = default)
+        public async Task<MembershipTableData> ReadRowAsync(SiloAddress key, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             LogTraceReadRow(key);
@@ -90,11 +90,11 @@ namespace Orleans.Runtime.MembershipService
         }
 
         /// <inheritdoc />
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
-        public Task<MembershipTableData> ReadAll() => ReadAll(CancellationToken.None);
+        [Obsolete("Use ReadAllAsync instead.")]
+        public Task<MembershipTableData> ReadAll() => ReadAllAsync(CancellationToken.None);
 
         /// <inheritdoc />
-        public async Task<MembershipTableData> ReadAll(CancellationToken cancellationToken = default)
+        public async Task<MembershipTableData> ReadAllAsync(CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             LogTraceReadAll();
@@ -110,11 +110,11 @@ namespace Orleans.Runtime.MembershipService
         }
 
         /// <inheritdoc />
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
-        public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => InsertRow(entry, tableVersion, CancellationToken.None);
+        [Obsolete("Use InsertRowAsync instead.")]
+        public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => InsertRowAsync(entry, tableVersion, CancellationToken.None);
 
         /// <inheritdoc />
-        public async Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
+        public async Task<bool> InsertRowAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             LogTraceInsertRow(entry, tableVersion);
@@ -147,11 +147,11 @@ namespace Orleans.Runtime.MembershipService
         }
 
         /// <inheritdoc />
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
-        public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => UpdateRow(entry, etag, tableVersion, CancellationToken.None);
+        [Obsolete("Use UpdateRowAsync instead.")]
+        public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => UpdateRowAsync(entry, etag, tableVersion, CancellationToken.None);
 
         /// <inheritdoc />
-        public async Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
+        public async Task<bool> UpdateRowAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             LogTraceUpdateRow(entry, etag, tableVersion);
@@ -184,11 +184,11 @@ namespace Orleans.Runtime.MembershipService
         }
 
         /// <inheritdoc />
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
-        public Task UpdateIAmAlive(MembershipEntry entry) => UpdateIAmAlive(entry, CancellationToken.None);
+        [Obsolete("Use UpdateIAmAliveAsync instead.")]
+        public Task UpdateIAmAlive(MembershipEntry entry) => UpdateIAmAliveAsync(entry, CancellationToken.None);
 
         /// <inheritdoc />
-        public async Task UpdateIAmAlive(MembershipEntry entry, CancellationToken cancellationToken = default)
+        public async Task UpdateIAmAliveAsync(MembershipEntry entry, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             LogTraceUpdateIAmAlive(entry);
@@ -209,11 +209,11 @@ namespace Orleans.Runtime.MembershipService
         }
 
         /// <inheritdoc />
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
-        public Task DeleteMembershipTableEntries(string clusterId) => DeleteMembershipTableEntries(clusterId, CancellationToken.None);
+        [Obsolete("Use DeleteMembershipTableEntriesAsync instead.")]
+        public Task DeleteMembershipTableEntries(string clusterId) => DeleteMembershipTableEntriesAsync(clusterId, CancellationToken.None);
 
         /// <inheritdoc />
-        public async Task DeleteMembershipTableEntries(string clusterId, CancellationToken cancellationToken = default)
+        public async Task DeleteMembershipTableEntriesAsync(string clusterId, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             LogTraceDeleteMembershipTableEntries(clusterId);
@@ -229,11 +229,11 @@ namespace Orleans.Runtime.MembershipService
         }
 
         /// <inheritdoc />
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
-        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) => CleanupDefunctSiloEntries(beforeDate, CancellationToken.None);
+        [Obsolete("Use CleanupDefunctSiloEntriesAsync instead.")]
+        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) => CleanupDefunctSiloEntriesAsync(beforeDate, CancellationToken.None);
 
         /// <inheritdoc />
-        public async Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate, CancellationToken cancellationToken = default)
+        public async Task CleanupDefunctSiloEntriesAsync(DateTimeOffset beforeDate, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             LogTraceCleanupDefunctSiloEntries(beforeDate, clusterId);
@@ -263,7 +263,7 @@ namespace Orleans.Runtime.MembershipService
 
         [LoggerMessage(
             Level = LogLevel.Trace,
-            Message = $"{nameof(AdoNetClusteringTable)}.{nameof(InitializeMembershipTable)} called."
+            Message = $"{nameof(AdoNetClusteringTable)}.{nameof(InitializeMembershipTableAsync)} called."
         )]
         private partial void LogTraceInitializeMembershipTable();
 
@@ -275,115 +275,115 @@ namespace Orleans.Runtime.MembershipService
 
         [LoggerMessage(
             Level = LogLevel.Trace,
-            Message = $"{nameof(AdoNetClusteringTable)}.{nameof(ReadRow)} called with key: {{Key}}."
+            Message = $"{nameof(AdoNetClusteringTable)}.{nameof(ReadRowAsync)} called with key: {{Key}}."
         )]
         private partial void LogTraceReadRow(SiloAddress key);
 
         [LoggerMessage(
             Level = LogLevel.Debug,
-            Message = $"{nameof(AdoNetClusteringTable)}.{nameof(ReadRow)} failed"
+            Message = $"{nameof(AdoNetClusteringTable)}.{nameof(ReadRowAsync)} failed"
         )]
         private partial void LogDebugReadRowFailed(Exception exception);
 
         [LoggerMessage(
             Level = LogLevel.Trace,
-            Message = $"{nameof(AdoNetClusteringTable)}.{nameof(ReadAll)} called."
+            Message = $"{nameof(AdoNetClusteringTable)}.{nameof(ReadAllAsync)} called."
         )]
         private partial void LogTraceReadAll();
 
         [LoggerMessage(
             Level = LogLevel.Debug,
-            Message = $"{nameof(AdoNetClusteringTable)}.{nameof(ReadAll)} failed"
+            Message = $"{nameof(AdoNetClusteringTable)}.{nameof(ReadAllAsync)} failed"
         )]
         private partial void LogDebugReadAllFailed(Exception exception);
 
         [LoggerMessage(
             Level = LogLevel.Trace,
-            Message = $"{nameof(AdoNetClusteringTable)}.{nameof(InsertRow)} called with entry {{Entry}} and tableVersion {{TableVersion}}."
+            Message = $"{nameof(AdoNetClusteringTable)}.{nameof(InsertRowAsync)} called with entry {{Entry}} and tableVersion {{TableVersion}}."
         )]
         private partial void LogTraceInsertRow(MembershipEntry entry, TableVersion tableVersion);
 
         [LoggerMessage(
             Level = LogLevel.Debug,
-            Message = $"{nameof(AdoNetClusteringTable)}.{nameof(InsertRow)} aborted due to null check. MembershipEntry is null."
+            Message = $"{nameof(AdoNetClusteringTable)}.{nameof(InsertRowAsync)} aborted due to null check. MembershipEntry is null."
         )]
         private partial void LogDebugInsertRowAbortedNullEntry();
 
         [LoggerMessage(
             Level = LogLevel.Debug,
-            Message = $"{nameof(AdoNetClusteringTable)}.{nameof(InsertRow)} aborted due to null check. TableVersion is null "
+            Message = $"{nameof(AdoNetClusteringTable)}.{nameof(InsertRowAsync)} aborted due to null check. TableVersion is null "
         )]
         private partial void LogDebugInsertRowAbortedNullTableVersion();
 
         [LoggerMessage(
             Level = LogLevel.Debug,
-            Message = $"{nameof(AdoNetClusteringTable)}.{nameof(InsertRow)} failed"
+            Message = $"{nameof(AdoNetClusteringTable)}.{nameof(InsertRowAsync)} failed"
         )]
         private partial void LogDebugInsertRowFailed(Exception exception);
 
         [LoggerMessage(
             Level = LogLevel.Trace,
-            Message = $"{nameof(IMembershipTable)}.{nameof(UpdateRow)} called with entry {{Entry}}, etag {{ETag}} and tableVersion {{TableVersion}}."
+            Message = $"{nameof(IMembershipTable)}.{nameof(UpdateRowAsync)} called with entry {{Entry}}, etag {{ETag}} and tableVersion {{TableVersion}}."
         )]
         private partial void LogTraceUpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion);
 
         [LoggerMessage(
             Level = LogLevel.Debug,
-            Message = $"{nameof(AdoNetClusteringTable)}.{nameof(UpdateRow)} aborted due to null check. MembershipEntry is null."
+            Message = $"{nameof(AdoNetClusteringTable)}.{nameof(UpdateRowAsync)} aborted due to null check. MembershipEntry is null."
         )]
         private partial void LogDebugUpdateRowAbortedNullEntry();
 
         [LoggerMessage(
             Level = LogLevel.Debug,
-            Message = $"{nameof(AdoNetClusteringTable)}.{nameof(UpdateRow)} aborted due to null check. TableVersion is null"
+            Message = $"{nameof(AdoNetClusteringTable)}.{nameof(UpdateRowAsync)} aborted due to null check. TableVersion is null"
         )]
         private partial void LogDebugUpdateRowAbortedNullTableVersion();
 
         [LoggerMessage(
             Level = LogLevel.Debug,
-            Message = $"{nameof(AdoNetClusteringTable)}.{nameof(UpdateRow)} failed"
+            Message = $"{nameof(AdoNetClusteringTable)}.{nameof(UpdateRowAsync)} failed"
         )]
         private partial void LogDebugUpdateRowFailed(Exception exception);
 
         [LoggerMessage(
             Level = LogLevel.Trace,
-            Message = $"{nameof(IMembershipTable)}.{nameof(UpdateIAmAlive)} called with entry {{Entry}}."
+            Message = $"{nameof(IMembershipTable)}.{nameof(UpdateIAmAliveAsync)} called with entry {{Entry}}."
         )]
         private partial void LogTraceUpdateIAmAlive(MembershipEntry entry);
 
         [LoggerMessage(
             Level = LogLevel.Debug,
-            Message = $"{nameof(AdoNetClusteringTable)}.{nameof(UpdateIAmAlive)} aborted due to null check. MembershipEntry is null."
+            Message = $"{nameof(AdoNetClusteringTable)}.{nameof(UpdateIAmAliveAsync)} aborted due to null check. MembershipEntry is null."
         )]
         private partial void LogDebugUpdateIAmAliveAbortedNullEntry();
 
         [LoggerMessage(
             Level = LogLevel.Debug,
-            Message = $"{nameof(AdoNetClusteringTable)}.{nameof(UpdateIAmAlive)} failed"
+            Message = $"{nameof(AdoNetClusteringTable)}.{nameof(UpdateIAmAliveAsync)} failed"
         )]
         private partial void LogDebugUpdateIAmAliveFailed(Exception exception);
 
         [LoggerMessage(
             Level = LogLevel.Trace,
-            Message = $"{nameof(IMembershipTable)}.{nameof(DeleteMembershipTableEntries)} called with clusterId {{ClusterId}}."
+            Message = $"{nameof(IMembershipTable)}.{nameof(DeleteMembershipTableEntriesAsync)} called with clusterId {{ClusterId}}."
         )]
         private partial void LogTraceDeleteMembershipTableEntries(string clusterId);
 
         [LoggerMessage(
             Level = LogLevel.Debug,
-            Message = $"{nameof(AdoNetClusteringTable)}.{nameof(DeleteMembershipTableEntries)} failed"
+            Message = $"{nameof(AdoNetClusteringTable)}.{nameof(DeleteMembershipTableEntriesAsync)} failed"
         )]
         private partial void LogDebugDeleteMembershipTableEntriesFailed(Exception exception);
 
         [LoggerMessage(
             Level = LogLevel.Trace,
-            Message = $"{nameof(IMembershipTable)}.{nameof(CleanupDefunctSiloEntries)} called with beforeDate {{beforeDate}} and clusterId {{ClusterId}}."
+            Message = $"{nameof(IMembershipTable)}.{nameof(CleanupDefunctSiloEntriesAsync)} called with beforeDate {{beforeDate}} and clusterId {{ClusterId}}."
         )]
         private partial void LogTraceCleanupDefunctSiloEntries(DateTimeOffset beforeDate, string clusterId);
 
         [LoggerMessage(
             Level = LogLevel.Debug,
-            Message = $"{nameof(AdoNetClusteringTable)}.{nameof(CleanupDefunctSiloEntries)} failed"
+            Message = $"{nameof(AdoNetClusteringTable)}.{nameof(CleanupDefunctSiloEntriesAsync)} failed"
         )]
         private partial void LogDebugCleanupDefunctSiloEntriesFailed(Exception exception);
 

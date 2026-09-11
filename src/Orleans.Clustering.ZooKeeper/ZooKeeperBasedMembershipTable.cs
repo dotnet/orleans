@@ -90,11 +90,11 @@ namespace Orleans.Runtime.Membership
         /// </summary>
         /// <param name="tryInitPath">if set to true, we'll try to create a node named "/ClusterId"</param>
         /// <returns></returns>
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
-        public Task InitializeMembershipTable(bool tryInitPath) => InitializeMembershipTable(tryInitPath, CancellationToken.None);
+        [Obsolete("Use InitializeMembershipTableAsync instead.")]
+        public Task InitializeMembershipTable(bool tryInitPath) => InitializeMembershipTableAsync(tryInitPath, CancellationToken.None);
 
         /// <inheritdoc />
-        public async Task InitializeMembershipTable(bool tryInitPath, CancellationToken cancellationToken = default)
+        public async Task InitializeMembershipTableAsync(bool tryInitPath, CancellationToken cancellationToken = default)
         {
             // even if I am not the one who created the path, 
             // try to insert an initial path if it is not already there,
@@ -125,11 +125,11 @@ namespace Orleans.Runtime.Membership
         /// <param name="siloAddress">The address of the silo whose membership information needs to be read.</param>
         /// <returns>The membership information for a given silo: MembershipTableData consisting one MembershipEntry entry and
         /// TableVersion, read atomically.</returns>
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
-        public Task<MembershipTableData> ReadRow(SiloAddress siloAddress) => ReadRow(siloAddress, CancellationToken.None);
+        [Obsolete("Use ReadRowAsync instead.")]
+        public Task<MembershipTableData> ReadRow(SiloAddress siloAddress) => ReadRowAsync(siloAddress, CancellationToken.None);
 
         /// <inheritdoc />
-        public Task<MembershipTableData> ReadRow(SiloAddress siloAddress, CancellationToken cancellationToken = default)
+        public Task<MembershipTableData> ReadRowAsync(SiloAddress siloAddress, CancellationToken cancellationToken = default)
         {
             return UsingZookeeper(async zk =>
             {
@@ -159,16 +159,16 @@ namespace Orleans.Runtime.Membership
         /// </summary>
         /// <returns>The membership information for a given table: MembershipTableData consisting multiple MembershipEntry entries and
         /// TableVersion, all read atomically.</returns>
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
-        public Task<MembershipTableData> ReadAll() => ReadAll(CancellationToken.None);
+        [Obsolete("Use ReadAllAsync instead.")]
+        public Task<MembershipTableData> ReadAll() => ReadAllAsync(CancellationToken.None);
 
         /// <inheritdoc />
-        public Task<MembershipTableData> ReadAll(CancellationToken cancellationToken = default)
+        public Task<MembershipTableData> ReadAllAsync(CancellationToken cancellationToken = default)
         {
-            return ReadAll(this.deploymentConnectionString, this.watcher, cancellationToken);
+            return ReadAllAsync(this.deploymentConnectionString, this.watcher, cancellationToken);
         }
 
-        internal static Task<MembershipTableData> ReadAll(string deploymentConnectionString, ZooKeeperWatcher watcher, CancellationToken cancellationToken)
+        internal static Task<MembershipTableData> ReadAllAsync(string deploymentConnectionString, ZooKeeperWatcher watcher, CancellationToken cancellationToken)
         {
             return UsingZookeeper(async zk =>
             {
@@ -203,11 +203,11 @@ namespace Orleans.Runtime.Membership
         /// <exception cref="ArgumentNullException">
         /// <paramref name="entry"/> or <paramref name="tableVersion"/> is <see langword="null"/>.
         /// </exception>
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
-        public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => InsertRow(entry, tableVersion, CancellationToken.None);
+        [Obsolete("Use InsertRowAsync instead.")]
+        public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => InsertRowAsync(entry, tableVersion, CancellationToken.None);
 
         /// <inheritdoc />
-        public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
+        public Task<bool> InsertRowAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(entry);
             ArgumentNullException.ThrowIfNull(tableVersion);
@@ -247,11 +247,11 @@ namespace Orleans.Runtime.Membership
         /// <paramref name="entry"/>, <paramref name="etag"/>, or <paramref name="tableVersion"/> is
         /// <see langword="null"/>.
         /// </exception>
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
-        public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => UpdateRow(entry, etag, tableVersion, CancellationToken.None);
+        [Obsolete("Use UpdateRowAsync instead.")]
+        public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => UpdateRowAsync(entry, etag, tableVersion, CancellationToken.None);
 
         /// <inheritdoc />
-        public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
+        public Task<bool> UpdateRowAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(entry);
             ArgumentNullException.ThrowIfNull(etag);
@@ -285,11 +285,11 @@ namespace Orleans.Runtime.Membership
         /// <param name="entry">The target MembershipEntry tp update</param>
         /// <returns>Task representing the successful execution of this operation. </returns>
         /// <exception cref="ArgumentNullException"><paramref name="entry"/> is <see langword="null"/>.</exception>
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
-        public Task UpdateIAmAlive(MembershipEntry entry) => UpdateIAmAlive(entry, CancellationToken.None);
+        [Obsolete("Use UpdateIAmAliveAsync instead.")]
+        public Task UpdateIAmAlive(MembershipEntry entry) => UpdateIAmAliveAsync(entry, CancellationToken.None);
 
         /// <inheritdoc />
-        public Task UpdateIAmAlive(MembershipEntry entry, CancellationToken cancellationToken = default)
+        public Task UpdateIAmAliveAsync(MembershipEntry entry, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(entry);
             cancellationToken.ThrowIfCancellationRequested();
@@ -303,11 +303,11 @@ namespace Orleans.Runtime.Membership
         /// <summary>
         /// Deletes all table entries of the given clusterId
         /// </summary>
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
-        public Task DeleteMembershipTableEntries(string clusterId) => DeleteMembershipTableEntries(clusterId, CancellationToken.None);
+        [Obsolete("Use DeleteMembershipTableEntriesAsync instead.")]
+        public Task DeleteMembershipTableEntries(string clusterId) => DeleteMembershipTableEntriesAsync(clusterId, CancellationToken.None);
 
         /// <inheritdoc />
-        public Task DeleteMembershipTableEntries(string clusterId, CancellationToken cancellationToken = default)
+        public Task DeleteMembershipTableEntriesAsync(string clusterId, CancellationToken cancellationToken = default)
         {
             string pathToDelete = "/" + clusterId;
             return UsingZookeeper(rootConnectionString, async zk =>
@@ -440,11 +440,11 @@ namespace Orleans.Runtime.Membership
         }
 
         /// <inheritdoc />
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
-        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) => CleanupDefunctSiloEntries(beforeDate, CancellationToken.None);
+        [Obsolete("Use CleanupDefunctSiloEntriesAsync instead.")]
+        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) => CleanupDefunctSiloEntriesAsync(beforeDate, CancellationToken.None);
 
         /// <inheritdoc />
-        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate, CancellationToken cancellationToken = default)
+        public Task CleanupDefunctSiloEntriesAsync(DateTimeOffset beforeDate, CancellationToken cancellationToken = default)
         {
             return UsingZookeeper(async zk =>
             {

@@ -22,10 +22,10 @@ namespace Orleans.Runtime.MembershipService
             this.serviceProvider = serviceProvider;
             this.logger = logger;
         }
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
-        public Task InitializeMembershipTable(bool tryInitTableVersion) => InitializeMembershipTable(tryInitTableVersion, CancellationToken.None);
+        [Obsolete("Use InitializeMembershipTableAsync instead.")]
+        public Task InitializeMembershipTable(bool tryInitTableVersion) => InitializeMembershipTableAsync(tryInitTableVersion, CancellationToken.None);
 
-        public async Task InitializeMembershipTable(bool tryInitTableVersion, CancellationToken cancellationToken = default)
+        public async Task InitializeMembershipTableAsync(bool tryInitTableVersion, CancellationToken cancellationToken = default)
         {
             this.grain = await GetMembershipTable(cancellationToken);
         }
@@ -65,7 +65,7 @@ namespace Orleans.Runtime.MembershipService
                 using var requestCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
                 try
                 {
-                    await membershipTableSystemTarget.ReadAll(requestCancellation.Token);
+                    await membershipTableSystemTarget.ReadAllAsync(requestCancellation.Token);
                     LogInformationConnectedToMembershipTableProvider(logger);
                     return;
                 }
@@ -95,40 +95,40 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
-        public Task DeleteMembershipTableEntries(string clusterId) => DeleteMembershipTableEntries(clusterId, CancellationToken.None);
+        [Obsolete("Use DeleteMembershipTableEntriesAsync instead.")]
+        public Task DeleteMembershipTableEntries(string clusterId) => DeleteMembershipTableEntriesAsync(clusterId, CancellationToken.None);
 
-        public Task DeleteMembershipTableEntries(string clusterId, CancellationToken cancellationToken = default) => this.grain.DeleteMembershipTableEntries(clusterId, cancellationToken);
+        public Task DeleteMembershipTableEntriesAsync(string clusterId, CancellationToken cancellationToken = default) => this.grain.DeleteMembershipTableEntriesAsync(clusterId, cancellationToken);
 
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
-        public Task<MembershipTableData> ReadRow(SiloAddress key) => ReadRow(key, CancellationToken.None);
+        [Obsolete("Use ReadRowAsync instead.")]
+        public Task<MembershipTableData> ReadRow(SiloAddress key) => ReadRowAsync(key, CancellationToken.None);
 
-        public Task<MembershipTableData> ReadRow(SiloAddress key, CancellationToken cancellationToken = default) => this.grain.ReadRow(key, cancellationToken);
+        public Task<MembershipTableData> ReadRowAsync(SiloAddress key, CancellationToken cancellationToken = default) => this.grain.ReadRowAsync(key, cancellationToken);
 
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
-        public Task<MembershipTableData> ReadAll() => ReadAll(CancellationToken.None);
+        [Obsolete("Use ReadAllAsync instead.")]
+        public Task<MembershipTableData> ReadAll() => ReadAllAsync(CancellationToken.None);
 
-        public Task<MembershipTableData> ReadAll(CancellationToken cancellationToken = default) => this.grain.ReadAll(cancellationToken);
+        public Task<MembershipTableData> ReadAllAsync(CancellationToken cancellationToken = default) => this.grain.ReadAllAsync(cancellationToken);
 
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
-        public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => InsertRow(entry, tableVersion, CancellationToken.None);
+        [Obsolete("Use InsertRowAsync instead.")]
+        public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => InsertRowAsync(entry, tableVersion, CancellationToken.None);
 
-        public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default) => this.grain.InsertRow(entry, tableVersion, cancellationToken);
+        public Task<bool> InsertRowAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default) => this.grain.InsertRowAsync(entry, tableVersion, cancellationToken);
 
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
-        public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => UpdateRow(entry, etag, tableVersion, CancellationToken.None);
+        [Obsolete("Use UpdateRowAsync instead.")]
+        public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => UpdateRowAsync(entry, etag, tableVersion, CancellationToken.None);
 
-        public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default) => this.grain.UpdateRow(entry, etag, tableVersion, cancellationToken);
+        public Task<bool> UpdateRowAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default) => this.grain.UpdateRowAsync(entry, etag, tableVersion, cancellationToken);
 
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
-        public Task UpdateIAmAlive(MembershipEntry entry) => UpdateIAmAlive(entry, CancellationToken.None);
+        [Obsolete("Use UpdateIAmAliveAsync instead.")]
+        public Task UpdateIAmAlive(MembershipEntry entry) => UpdateIAmAliveAsync(entry, CancellationToken.None);
 
-        public Task UpdateIAmAlive(MembershipEntry entry, CancellationToken cancellationToken = default) => this.grain.UpdateIAmAlive(entry, cancellationToken);
+        public Task UpdateIAmAliveAsync(MembershipEntry entry, CancellationToken cancellationToken = default) => this.grain.UpdateIAmAliveAsync(entry, cancellationToken);
 
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
-        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) => CleanupDefunctSiloEntries(beforeDate, CancellationToken.None);
+        [Obsolete("Use CleanupDefunctSiloEntriesAsync instead.")]
+        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) => CleanupDefunctSiloEntriesAsync(beforeDate, CancellationToken.None);
 
-        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate, CancellationToken cancellationToken = default) => this.grain.CleanupDefunctSiloEntries(beforeDate, cancellationToken);
+        public Task CleanupDefunctSiloEntriesAsync(DateTimeOffset beforeDate, CancellationToken cancellationToken = default) => this.grain.CleanupDefunctSiloEntriesAsync(beforeDate, cancellationToken);
 
         [LoggerMessage(
             EventId = (int)ErrorCode.MembershipFactory1,
@@ -182,20 +182,20 @@ namespace Orleans.Runtime.MembershipService
             return SystemTargetGrainId.Create(Constants.SystemMembershipTableType, SiloAddress.New(siloAddress.Endpoint, 0));
         }
 
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
-        public Task InitializeMembershipTable(bool tryInitTableVersion) => InitializeMembershipTable(tryInitTableVersion, CancellationToken.None);
+        [Obsolete("Use InitializeMembershipTableAsync instead.")]
+        public Task InitializeMembershipTable(bool tryInitTableVersion) => InitializeMembershipTableAsync(tryInitTableVersion, CancellationToken.None);
 
-        public Task InitializeMembershipTable(bool tryInitTableVersion, CancellationToken cancellationToken = default)
+        public Task InitializeMembershipTableAsync(bool tryInitTableVersion, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             LogInformationInitializeMembershipTable(logger, tryInitTableVersion);
             return Task.CompletedTask;
         }
 
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
-        public Task DeleteMembershipTableEntries(string clusterId) => DeleteMembershipTableEntries(clusterId, CancellationToken.None);
+        [Obsolete("Use DeleteMembershipTableEntriesAsync instead.")]
+        public Task DeleteMembershipTableEntries(string clusterId) => DeleteMembershipTableEntriesAsync(clusterId, CancellationToken.None);
 
-        public Task DeleteMembershipTableEntries(string clusterId, CancellationToken cancellationToken = default)
+        public Task DeleteMembershipTableEntriesAsync(string clusterId, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             LogInformationDeleteMembershipTableEntries(logger, clusterId);
@@ -203,29 +203,29 @@ namespace Orleans.Runtime.MembershipService
             return Task.CompletedTask;
         }
 
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
-        public Task<MembershipTableData> ReadRow(SiloAddress key) => ReadRow(key, CancellationToken.None);
+        [Obsolete("Use ReadRowAsync instead.")]
+        public Task<MembershipTableData> ReadRow(SiloAddress key) => ReadRowAsync(key, CancellationToken.None);
 
-        public Task<MembershipTableData> ReadRow(SiloAddress key, CancellationToken cancellationToken = default)
+        public Task<MembershipTableData> ReadRowAsync(SiloAddress key, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             return Task.FromResult(table.Read(key));
         }
 
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
-        public Task<MembershipTableData> ReadAll() => ReadAll(CancellationToken.None);
+        [Obsolete("Use ReadAllAsync instead.")]
+        public Task<MembershipTableData> ReadAll() => ReadAllAsync(CancellationToken.None);
 
-        public Task<MembershipTableData> ReadAll(CancellationToken cancellationToken = default)
+        public Task<MembershipTableData> ReadAllAsync(CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var t = table.ReadAll();
             return Task.FromResult(t);
         }
 
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
-        public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => InsertRow(entry, tableVersion, CancellationToken.None);
+        [Obsolete("Use InsertRowAsync instead.")]
+        public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => InsertRowAsync(entry, tableVersion, CancellationToken.None);
 
-        public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
+        public Task<bool> InsertRowAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             LogDebugInsertRow(logger, entry, tableVersion);
@@ -236,10 +236,10 @@ namespace Orleans.Runtime.MembershipService
             return Task.FromResult(result);
         }
 
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
-        public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => UpdateRow(entry, etag, tableVersion, CancellationToken.None);
+        [Obsolete("Use UpdateRowAsync instead.")]
+        public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => UpdateRowAsync(entry, etag, tableVersion, CancellationToken.None);
 
-        public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
+        public Task<bool> UpdateRowAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             LogDebugUpdateRow(logger, entry, etag, tableVersion);
@@ -250,10 +250,10 @@ namespace Orleans.Runtime.MembershipService
             return Task.FromResult(result);
         }
 
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
-        public Task UpdateIAmAlive(MembershipEntry entry) => UpdateIAmAlive(entry, CancellationToken.None);
+        [Obsolete("Use UpdateIAmAliveAsync instead.")]
+        public Task UpdateIAmAlive(MembershipEntry entry) => UpdateIAmAliveAsync(entry, CancellationToken.None);
 
-        public Task UpdateIAmAlive(MembershipEntry entry, CancellationToken cancellationToken = default)
+        public Task UpdateIAmAliveAsync(MembershipEntry entry, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             LogDebugUpdateIAmAlive(logger, entry);
@@ -261,10 +261,10 @@ namespace Orleans.Runtime.MembershipService
             return Task.CompletedTask;
         }
 
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
-        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) => CleanupDefunctSiloEntries(beforeDate, CancellationToken.None);
+        [Obsolete("Use CleanupDefunctSiloEntriesAsync instead.")]
+        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) => CleanupDefunctSiloEntriesAsync(beforeDate, CancellationToken.None);
 
-        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate, CancellationToken cancellationToken = default)
+        public Task CleanupDefunctSiloEntriesAsync(DateTimeOffset beforeDate, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             table.CleanupDefunctSiloEntries(beforeDate);

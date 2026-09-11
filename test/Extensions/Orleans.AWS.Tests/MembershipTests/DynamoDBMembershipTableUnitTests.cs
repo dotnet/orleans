@@ -40,14 +40,14 @@ namespace AWSUtils.Tests.MembershipTests
 
             var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => operation switch
             {
-                "Initialize" => table.InitializeMembershipTable(true, token),
-                "Delete" => table.DeleteMembershipTableEntries("cluster", token),
-                "Cleanup" => table.CleanupDefunctSiloEntries(DateTimeOffset.MaxValue, token),
-                "ReadRow" => table.ReadRow(silo, token),
-                "ReadAll" => table.ReadAll(token),
-                "Insert" => table.InsertRow(entry, version, token),
-                "Update" => table.UpdateRow(entry, "etag", version, token),
-                "Heartbeat" => table.UpdateIAmAlive(entry, token),
+                "Initialize" => table.InitializeMembershipTableAsync(true, token),
+                "Delete" => table.DeleteMembershipTableEntriesAsync("cluster", token),
+                "Cleanup" => table.CleanupDefunctSiloEntriesAsync(DateTimeOffset.MaxValue, token),
+                "ReadRow" => table.ReadRowAsync(silo, token),
+                "ReadAll" => table.ReadAllAsync(token),
+                "Insert" => table.InsertRowAsync(entry, version, token),
+                "Update" => table.UpdateRowAsync(entry, "etag", version, token),
+                "Heartbeat" => table.UpdateIAmAliveAsync(entry, token),
                 _ => throw new ArgumentOutOfRangeException(nameof(operation))
             });
 

@@ -38,14 +38,14 @@ public class CosmosMembershipTableCancellationTests
 
         var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => operation switch
         {
-            "Initialize" => table.InitializeMembershipTable(true, token),
-            "Delete" => table.DeleteMembershipTableEntries("cluster", token),
-            "Cleanup" => table.CleanupDefunctSiloEntries(DateTimeOffset.MaxValue, token),
-            "ReadRow" => table.ReadRow(silo, token),
-            "ReadAll" => table.ReadAll(token),
-            "Insert" => table.InsertRow(entry, version, token),
-            "Update" => table.UpdateRow(entry, "etag", version, token),
-            "Heartbeat" => table.UpdateIAmAlive(entry, token),
+            "Initialize" => table.InitializeMembershipTableAsync(true, token),
+            "Delete" => table.DeleteMembershipTableEntriesAsync("cluster", token),
+            "Cleanup" => table.CleanupDefunctSiloEntriesAsync(DateTimeOffset.MaxValue, token),
+            "ReadRow" => table.ReadRowAsync(silo, token),
+            "ReadAll" => table.ReadAllAsync(token),
+            "Insert" => table.InsertRowAsync(entry, version, token),
+            "Update" => table.UpdateRowAsync(entry, "etag", version, token),
+            "Heartbeat" => table.UpdateIAmAliveAsync(entry, token),
             _ => throw new ArgumentOutOfRangeException(nameof(operation))
         });
 
@@ -68,7 +68,7 @@ public class CosmosMembershipTableCancellationTests
         });
         var table = CreateTable(services, options);
 
-        var initialization = table.InitializeMembershipTable(false, cancellation.Token);
+        var initialization = table.InitializeMembershipTableAsync(false, cancellation.Token);
         cancellation.Cancel();
         var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(
             () => initialization);
@@ -82,7 +82,7 @@ public class CosmosMembershipTableCancellationTests
         var failure = new InvalidOperationException("retry reached the retained client");
         client.ContainerFailure = failure;
         var retryException = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => table.InitializeMembershipTable(false, TestContext.Current.CancellationToken));
+            () => table.InitializeMembershipTableAsync(false, TestContext.Current.CancellationToken));
 
         Assert.Same(failure, retryException);
         Assert.Equal(1, calls);
@@ -113,7 +113,7 @@ public class CosmosMembershipTableCancellationTests
         options.ConfigureCosmosClient(_ => new ValueTask<CosmosClient>(client));
         var table = CreateTable(services, options);
 
-        var initialization = table.InitializeMembershipTable(true, cancellation.Token);
+        var initialization = table.InitializeMembershipTableAsync(true, cancellation.Token);
         var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => initialization);
 
         Assert.Equal(cancellation.Token, exception.CancellationToken);

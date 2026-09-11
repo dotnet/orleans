@@ -15,10 +15,10 @@ namespace Orleans
     /// Interface for Membership Table.
     /// </summary>
     /// <remarks>
-    /// Providers can override the cancellation-aware overloads to cancel their underlying operations.
+    /// Providers can implement the cancellation-aware Async methods to cancel their underlying operations.
     /// The default implementations cancel the caller's wait while the tokenless operation completes,
     /// and observe any exception from that operation.
-    /// Cancellation-aware RPC overloads retain the existing operation aliases and serialized application arguments.
+    /// Cancellation-aware RPC methods retain the existing operation aliases and serialized application arguments.
     /// Cancellation is propagated separately from those arguments.
     /// </remarks>
     public interface IMembershipTable
@@ -28,14 +28,14 @@ namespace Orleans
         /// </summary>
         /// <param name="tryInitTableVersion">whether an attempt will be made to init the underlying table</param>
         /// <returns>A task representing the initialization operation.</returns>
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
+        [Obsolete("Use InitializeMembershipTableAsync instead.")]
         Task InitializeMembershipTable(bool tryInitTableVersion);
 
         /// <inheritdoc cref="InitializeMembershipTable(bool)"/>
         /// <param name="tryInitTableVersion">Whether to initialize the underlying table version.</param>
         /// <param name="cancellationToken">A token which cancels the operation.</param>
         [Alias("FB89E5E9")]
-        async Task InitializeMembershipTable(bool tryInitTableVersion, CancellationToken cancellationToken = default)
+        async Task InitializeMembershipTableAsync(bool tryInitTableVersion, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
 #pragma warning disable CS0618 // Compatibility dispatch to existing tokenless providers.
@@ -50,14 +50,14 @@ namespace Orleans
         /// </summary>
         /// <param name="clusterId">The identifier of the cluster whose entries are deleted.</param>
         /// <returns>A task representing the deletion operation.</returns>
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
+        [Obsolete("Use DeleteMembershipTableEntriesAsync instead.")]
         Task DeleteMembershipTableEntries(string clusterId);
 
         /// <inheritdoc cref="DeleteMembershipTableEntries(string)"/>
         /// <param name="clusterId">The cluster whose entries are deleted.</param>
         /// <param name="cancellationToken">A token which cancels the operation.</param>
         [Alias("BF899C85")]
-        async Task DeleteMembershipTableEntries(string clusterId, CancellationToken cancellationToken = default)
+        async Task DeleteMembershipTableEntriesAsync(string clusterId, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
 #pragma warning disable CS0618 // Compatibility dispatch to existing tokenless providers.
@@ -72,14 +72,14 @@ namespace Orleans
         /// </summary>
         /// <param name="beforeDate">The exclusive upper bound for the last known update time of entries to delete.</param>
         /// <returns>A task representing the cleanup operation.</returns>
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
+        [Obsolete("Use CleanupDefunctSiloEntriesAsync instead.")]
         Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate);
 
         /// <inheritdoc cref="CleanupDefunctSiloEntries(DateTimeOffset)"/>
         /// <param name="beforeDate">The exclusive upper bound for the last update time of entries to delete.</param>
         /// <param name="cancellationToken">A token which cancels the operation.</param>
         [Alias("7A519C2E")]
-        async Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate, CancellationToken cancellationToken = default)
+        async Task CleanupDefunctSiloEntriesAsync(DateTimeOffset beforeDate, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
 #pragma warning disable CS0618 // Compatibility dispatch to existing tokenless providers.
@@ -97,14 +97,14 @@ namespace Orleans
         /// <param name="key">The address of the silo whose membership information needs to be read.</param>
         /// <returns>The membership information for a given silo: MembershipTableData consisting one MembershipEntry entry and
         /// TableVersion, read atomically.</returns>
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
+        [Obsolete("Use ReadRowAsync instead.")]
         Task<MembershipTableData> ReadRow(SiloAddress key);
 
         /// <inheritdoc cref="ReadRow(SiloAddress)"/>
         /// <param name="key">The address of the silo to read.</param>
         /// <param name="cancellationToken">A token which cancels the operation.</param>
         [Alias("D851FB33")]
-        async Task<MembershipTableData> ReadRow(SiloAddress key, CancellationToken cancellationToken = default)
+        async Task<MembershipTableData> ReadRowAsync(SiloAddress key, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
 #pragma warning disable CS0618 // Compatibility dispatch to existing tokenless providers.
@@ -121,13 +121,13 @@ namespace Orleans
         /// </summary>
         /// <returns>The membership information for a given table: MembershipTableData consisting multiple MembershipEntry entries and
         /// TableVersion, all read atomically.</returns>
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
+        [Obsolete("Use ReadAllAsync instead.")]
         Task<MembershipTableData> ReadAll();
 
         /// <inheritdoc cref="ReadAll()"/>
         /// <param name="cancellationToken">A token which cancels the operation.</param>
         [Alias("00BCE16F")]
-        async Task<MembershipTableData> ReadAll(CancellationToken cancellationToken = default)
+        async Task<MembershipTableData> ReadAllAsync(CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
 #pragma warning disable CS0618 // Compatibility dispatch to existing tokenless providers.
@@ -152,7 +152,7 @@ namespace Orleans
         /// <param name="entry">MembershipEntry to be inserted.</param>
         /// <param name="tableVersion">The new TableVersion for this table, along with its etag.</param>
         /// <returns>True if the insert operation succeeded and false otherwise.</returns>
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
+        [Obsolete("Use InsertRowAsync instead.")]
         Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion);
 
         /// <inheritdoc cref="InsertRow(MembershipEntry, TableVersion)"/>
@@ -160,7 +160,7 @@ namespace Orleans
         /// <param name="tableVersion">The new table version and its expected etag.</param>
         /// <param name="cancellationToken">A token which cancels the operation.</param>
         [Alias("FEF3AC5A")]
-        async Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
+        async Task<bool> InsertRowAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
 #pragma warning disable CS0618 // Compatibility dispatch to existing tokenless providers.
@@ -187,7 +187,7 @@ namespace Orleans
         /// <param name="etag">The etag  for the given MembershipEntry.</param>
         /// <param name="tableVersion">The new TableVersion for this table, along with its etag.</param>
         /// <returns>True if the update operation succeeded and false otherwise.</returns>
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
+        [Obsolete("Use UpdateRowAsync instead.")]
         Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion);
 
         /// <inheritdoc cref="UpdateRow(MembershipEntry, string, TableVersion)"/>
@@ -196,7 +196,7 @@ namespace Orleans
         /// <param name="tableVersion">The new table version and its expected etag.</param>
         /// <param name="cancellationToken">A token which cancels the operation.</param>
         [Alias("E06D3DBC")]
-        async Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
+        async Task<bool> UpdateRowAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
 #pragma warning disable CS0618 // Compatibility dispatch to existing tokenless providers.
@@ -218,14 +218,14 @@ namespace Orleans
         /// </summary>
         /// <param name="entry">The membership entry containing the updated <see cref="MembershipEntry.IAmAliveTime"/> value.</param>
         /// <returns>A task representing the update operation.</returns>
-        [Obsolete("Use the overload accepting a CancellationToken instead.")]
+        [Obsolete("Use UpdateIAmAliveAsync instead.")]
         Task UpdateIAmAlive(MembershipEntry entry);
 
         /// <inheritdoc cref="UpdateIAmAlive(MembershipEntry)"/>
         /// <param name="entry">The membership entry containing the updated liveness timestamp.</param>
         /// <param name="cancellationToken">A token which cancels the operation.</param>
         [Alias("B1A52D2B")]
-        async Task UpdateIAmAlive(MembershipEntry entry, CancellationToken cancellationToken = default)
+        async Task UpdateIAmAliveAsync(MembershipEntry entry, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
 #pragma warning disable CS0618 // Compatibility dispatch to existing tokenless providers.

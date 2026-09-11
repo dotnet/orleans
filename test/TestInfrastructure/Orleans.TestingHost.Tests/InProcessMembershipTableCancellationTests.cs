@@ -12,20 +12,20 @@ namespace Orleans.TestingHost.Tests;
 public sealed class InProcessMembershipTableCancellationTests
 {
     [Theory]
-    [InlineData(nameof(IMembershipTable.InitializeMembershipTable))]
-    [InlineData(nameof(IMembershipTable.DeleteMembershipTableEntries))]
-    [InlineData(nameof(IMembershipTable.CleanupDefunctSiloEntries))]
-    [InlineData(nameof(IMembershipTable.ReadRow))]
-    [InlineData(nameof(IMembershipTable.ReadAll))]
-    [InlineData(nameof(IMembershipTable.InsertRow))]
-    [InlineData(nameof(IMembershipTable.UpdateRow))]
-    [InlineData(nameof(IMembershipTable.UpdateIAmAlive))]
+    [InlineData(nameof(IMembershipTable.InitializeMembershipTableAsync))]
+    [InlineData(nameof(IMembershipTable.DeleteMembershipTableEntriesAsync))]
+    [InlineData(nameof(IMembershipTable.CleanupDefunctSiloEntriesAsync))]
+    [InlineData(nameof(IMembershipTable.ReadRowAsync))]
+    [InlineData(nameof(IMembershipTable.ReadAllAsync))]
+    [InlineData(nameof(IMembershipTable.InsertRowAsync))]
+    [InlineData(nameof(IMembershipTable.UpdateRowAsync))]
+    [InlineData(nameof(IMembershipTable.UpdateIAmAliveAsync))]
     public async Task PreCanceledOperation_PreservesTable(string operation)
     {
         var testToken = TestContext.Current.CancellationToken;
         IMembershipTable table = new InProcessMembershipTable("cluster");
-        await table.InitializeMembershipTable(true, testToken);
-        var initial = await table.ReadAll(testToken);
+        await table.InitializeMembershipTableAsync(true, testToken);
+        var initial = await table.ReadAllAsync(testToken);
         var entry = new MembershipEntry
         {
             SiloAddress = SiloAddress.FromParsableString("127.0.0.1:100@100"),
@@ -33,8 +33,8 @@ public sealed class InProcessMembershipTableCancellationTests
             StartTime = DateTime.UnixEpoch,
             IAmAliveTime = DateTime.UnixEpoch,
         };
-        Assert.True(await table.InsertRow(entry, initial.Version.Next(), testToken));
-        var before = await table.ReadAll(testToken);
+        Assert.True(await table.InsertRowAsync(entry, initial.Version.Next(), testToken));
+        var before = await table.ReadAllAsync(testToken);
         var row = Assert.Single(before.Members);
         var changedEntry = new MembershipEntry
         {
@@ -50,7 +50,7 @@ public sealed class InProcessMembershipTableCancellationTests
             () => Invoke(table, operation, changedEntry, row.Item2, before.Version.Next(), cancellation.Token));
 
         Assert.Equal(cancellation.Token, exception.CancellationToken);
-        var after = await table.ReadAll(testToken);
+        var after = await table.ReadAllAsync(testToken);
         Assert.Equal(before.Version, after.Version);
         var unchanged = Assert.Single(after.Members);
         Assert.Equal(row.Item2, unchanged.Item2);
@@ -66,14 +66,14 @@ public sealed class InProcessMembershipTableCancellationTests
         TableVersion version,
         CancellationToken cancellationToken) => operation switch
         {
-            nameof(IMembershipTable.InitializeMembershipTable) => table.InitializeMembershipTable(true, cancellationToken),
-            nameof(IMembershipTable.DeleteMembershipTableEntries) => table.DeleteMembershipTableEntries("cluster", cancellationToken),
-            nameof(IMembershipTable.CleanupDefunctSiloEntries) => table.CleanupDefunctSiloEntries(DateTimeOffset.UnixEpoch.AddDays(1), cancellationToken),
-            nameof(IMembershipTable.ReadRow) => table.ReadRow(entry.SiloAddress, cancellationToken),
-            nameof(IMembershipTable.ReadAll) => table.ReadAll(cancellationToken),
-            nameof(IMembershipTable.InsertRow) => table.InsertRow(entry, version, cancellationToken),
-            nameof(IMembershipTable.UpdateRow) => table.UpdateRow(entry, etag, version, cancellationToken),
-            nameof(IMembershipTable.UpdateIAmAlive) => table.UpdateIAmAlive(entry, cancellationToken),
+            nameof(IMembershipTable.InitializeMembershipTableAsync) => table.InitializeMembershipTableAsync(true, cancellationToken),
+            nameof(IMembershipTable.DeleteMembershipTableEntriesAsync) => table.DeleteMembershipTableEntriesAsync("cluster", cancellationToken),
+            nameof(IMembershipTable.CleanupDefunctSiloEntriesAsync) => table.CleanupDefunctSiloEntriesAsync(DateTimeOffset.UnixEpoch.AddDays(1), cancellationToken),
+            nameof(IMembershipTable.ReadRowAsync) => table.ReadRowAsync(entry.SiloAddress, cancellationToken),
+            nameof(IMembershipTable.ReadAllAsync) => table.ReadAllAsync(cancellationToken),
+            nameof(IMembershipTable.InsertRowAsync) => table.InsertRowAsync(entry, version, cancellationToken),
+            nameof(IMembershipTable.UpdateRowAsync) => table.UpdateRowAsync(entry, etag, version, cancellationToken),
+            nameof(IMembershipTable.UpdateIAmAliveAsync) => table.UpdateIAmAliveAsync(entry, cancellationToken),
             _ => throw new ArgumentOutOfRangeException(nameof(operation)),
         };
 }
