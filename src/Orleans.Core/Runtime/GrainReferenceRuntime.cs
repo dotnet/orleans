@@ -16,7 +16,7 @@ namespace Orleans.Runtime
         private readonly GrainInterfaceTypeResolver interfaceTypeResolver;
         private readonly IGrainCancellationTokenRuntime cancellationTokenRuntime;
         private readonly IOutgoingGrainCallFilter[] filters;
-        private readonly Action<GrainReference, IResponseCompletionSource, IInvokable, InvokeMethodOptions, bool> sendRequest;
+        private readonly Action<GrainReference, IResponseCompletionSource, IInvokable, InvokeMethodOptions> sendRequest;
 
         public GrainReferenceRuntime(
             IRuntimeClient runtimeClient,
@@ -30,75 +30,71 @@ namespace Orleans.Runtime
             this.referenceActivator = referenceActivator;
             this.interfaceTypeResolver = interfaceTypeResolver;
             this.filters = outgoingCallFilters.ToArray();
-            this.sendRequest = (reference, callback, body, options, waitForCancellationAcknowledgement) =>
-                RuntimeClient.SendRequest(reference, body, callback, options, waitForCancellationAcknowledgement);
+            this.sendRequest = (GrainReference reference, IResponseCompletionSource callback, IInvokable body, InvokeMethodOptions options) => RuntimeClient.SendRequest(reference, body, callback, options);
         }
 
         public IRuntimeClient RuntimeClient { get; private set; }
 
         public ValueTask<TResult?> InvokeMethodAsync<TResult>(GrainReference reference, IInvokable request, InvokeMethodOptions options)
         {
-            using var cancellationScope = CancellationAcknowledgementScope.Capture();
             // TODO: Remove expensive interface type check
             if (this.filters.Length == 0 && request is not IOutgoingGrainCallFilter)
             {
                 SetGrainCancellationTokensTarget(reference, request);
                 var responseCompletionSource = ResponseCompletionSourcePool.Get<TResult>();
-                this.RuntimeClient.SendRequest(reference, request, responseCompletionSource, options, cancellationScope.WaitForAcknowledgement);
+                this.RuntimeClient.SendRequest(reference, request, responseCompletionSource, options);
                 return responseCompletionSource.AsValueTask();
             }
             else
             {
-                return InvokeMethodWithFiltersAsync<TResult>(reference, request, options, cancellationScope.WaitForAcknowledgement);
+                return InvokeMethodWithFiltersAsync<TResult>(reference, request, options);
             }
         }
 
         public ValueTask InvokeMethodAsync(GrainReference reference, IInvokable request, InvokeMethodOptions options)
         {
-            using var cancellationScope = CancellationAcknowledgementScope.Capture();
             // TODO: Remove expensive interface type check
             if (filters.Length == 0 && request is not IOutgoingGrainCallFilter)
             {
                 SetGrainCancellationTokensTarget(reference, request);
                 var responseCompletionSource = ResponseCompletionSourcePool.Get();
-                this.RuntimeClient.SendRequest(reference, request, responseCompletionSource, options, cancellationScope.WaitForAcknowledgement);
+                this.RuntimeClient.SendRequest(reference, request, responseCompletionSource, options);
                 return responseCompletionSource.AsVoidValueTask();
             }
             else
             {
-                return InvokeMethodWithFiltersAsync(reference, request, options, cancellationScope.WaitForAcknowledgement);
+                return InvokeMethodWithFiltersAsync(reference, request, options);
             }
         }
 
         public void InvokeMethod(GrainReference reference, IInvokable request, InvokeMethodOptions options)
         {
-            using var cancellationScope = CancellationAcknowledgementScope.Capture();
             Debug.Assert((options & InvokeMethodOptions.OneWay) != 0);
 
             // TODO: Remove expensive interface type check
             if (filters.Length == 0 && request is not IOutgoingGrainCallFilter)
             {
                 SetGrainCancellationTokensTarget(reference, request);
-                this.RuntimeClient.SendRequest(reference, request, context: null, options, cancellationScope.WaitForAcknowledgement);
+                this.RuntimeClient.SendRequest(reference, request, context: null, options);
             }
             else
             {
-                InvokeMethodWithFiltersAsync(reference, request, options, cancellationScope.WaitForAcknowledgement).AsTask().Ignore();
+                InvokeMethodWithFiltersAsync(reference, request, options).AsTask().Ignore();
             }
         }
 
-        private async ValueTask<TResult?> InvokeMethodWithFiltersAsync<TResult>(GrainReference reference, IInvokable request, InvokeMethodOptions options, bool waitForCancellationAcknowledgement)
+        private async ValueTask<TResult?> InvokeMethodWithFiltersAsync<TResult>(GrainReference reference, IInvokable request, InvokeMethodOptions options)
         {
             SetGrainCancellationTokensTarget(reference, request);
-            var invoker = new OutgoingCallInvoker<TResult>(reference, request, options, this.sendRequest, this.filters, waitForCancellationAcknowledgement);
+            var invoker = new OutgoingCallInvoker<TResult>(reference, request, options, this.sendRequest, this.filters);
             await invoker.Invoke();
             return invoker.TypedResult;
         }
 
-        private async ValueTask InvokeMethodWithFiltersAsync(GrainReference reference, IInvokable request, InvokeMethodOptions options, bool waitForCancellationAcknowledgement)
+        private async ValueTask InvokeMethodWithFiltersAsync(GrainReference reference, IInvokable request, InvokeMethodOptions options)
         {
             SetGrainCancellationTokensTarget(reference, request);
-            var invoker = new OutgoingCallInvoker<object>(reference, request, options, this.sendRequest, this.filters, waitForCancellationAcknowledgement);
+            var invoker = new OutgoingCallInvoker<object>(reference, request, options, this.sendRequest, this.filters);
             await invoker.Invoke();
         }
 

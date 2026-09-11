@@ -13,8 +13,7 @@ namespace Orleans.Runtime
     {
         private readonly IInvokable request;
         private readonly InvokeMethodOptions options;
-        private readonly Action<GrainReference, IResponseCompletionSource, IInvokable, InvokeMethodOptions, bool> sendRequest;
-        private readonly bool _waitForCancellationAcknowledgement;
+        private readonly Action<GrainReference, IResponseCompletionSource, IInvokable, InvokeMethodOptions> sendRequest;
         private readonly IOutgoingGrainCallFilter[] filters;
         private readonly int stages;
         private readonly GrainReference grainReference;
@@ -29,21 +28,18 @@ namespace Orleans.Runtime
         /// <param name="options"></param>
         /// <param name="sendRequest"></param>
         /// <param name="filters">The invocation interceptors.</param>
-        /// <param name="waitForCancellationAcknowledgement">The cancellation policy captured at invocation entry.</param>
         public OutgoingCallInvoker(
             GrainReference grain,
             IInvokable request,
             InvokeMethodOptions options,
-            Action<GrainReference, IResponseCompletionSource, IInvokable, InvokeMethodOptions, bool> sendRequest,
-            IOutgoingGrainCallFilter[] filters,
-            bool waitForCancellationAcknowledgement)
+            Action<GrainReference, IResponseCompletionSource, IInvokable, InvokeMethodOptions> sendRequest,
+            IOutgoingGrainCallFilter[] filters)
         {
             this.request = request;
             this.options = options;
             this.sendRequest = sendRequest;
             this.grainReference = grain;
             this.filters = filters;
-            _waitForCancellationAcknowledgement = waitForCancellationAcknowledgement;
             this.stages = filters.Length;
             SourceContext = RuntimeContext.Current;
 
@@ -117,7 +113,7 @@ namespace Orleans.Runtime
                     // Finally call the root-level invoker.
                     stage++;
                     var responseCompletionSource = ResponseCompletionSourcePool.Get();
-                    this.sendRequest(this.grainReference, responseCompletionSource, this.request, this.options, _waitForCancellationAcknowledgement);
+                    this.sendRequest(this.grainReference, responseCompletionSource, this.request, this.options);
                     this.Response = await responseCompletionSource.AsValueTask().ConfigureAwait(false);
 
                     return;

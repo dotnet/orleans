@@ -792,22 +792,39 @@ public class ClusterManifestProviderTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task PeerRepair_RetriesRetainSlotsUntilCanceledRpcCompletes(bool waitForUpdate)
+    [InlineData(false, false, false)]
+    [InlineData(false, false, true)]
+    [InlineData(false, true, false)]
+    [InlineData(false, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(true, false, true)]
+    [InlineData(true, true, false)]
+    [InlineData(true, true, true)]
+    public async Task PeerRepair_LocalCompletionReleasesSlotsBeforeLateResponses(bool waitForUpdate, bool cancelCaller, bool lateFailure)
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var localSilo = CreateSiloAddress(11111, 1);
         var peers = Enumerable.Range(11112, 4).Select(port => CreateSiloAddress(port, 1)).ToArray();
         using var membership = new TestClusterMembershipService(CreateActiveMembershipSnapshot(1, localSilo, peers));
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var timeProvider = new FakeTimeProvider();
         var logger = new PeerProbeLogger(expectedTimeoutCount: 3);
-        var requests = new ManifestRequestLog(expectedProbeCount: 6, expectedLegacyFetchCount: 20);
+        var requests = new ManifestRequestLog(expectedProbeCount: 6, expectedLegacyFetchCount: 8);
         var pendingSummary = new TaskCompletionSource<ClusterManifestHashSummary>(TaskCreationOptions.RunContinuationsAsynchronously);
         var pendingUpdate = new TaskCompletionSource<ClusterManifestUpdate?>(TaskCreationOptions.RunContinuationsAsynchronously);
         var allUpdatesEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var summary = new ClusterManifestHashSummary(new MajorMinorVersion(1, 0), new Dictionary<SiloAddress, ManifestHash>());
+        var lateManifest = CreateGrainManifest();
+        var lateHash = ManifestHashCalculator.ComputeHash(lateManifest);
+        var summary = new ClusterManifestHashSummary(
+            new MajorMinorVersion(1, 0),
+            peers.ToDictionary(peer => peer, _ => lateHash));
+        var lateUpdate = new ClusterManifestUpdate(
+            new MajorMinorVersion(1, 0),
+            peers.ToImmutableDictionary(peer => peer, _ => lateManifest),
+            includesAllActiveServers: true);
         var updateRequests = 0;
         var recovered = false;
+        GrainManifest recoveredManifest = null!;
         var targets = peers.ToDictionary(
             peer => peer,
             peer => new TestClusterManifestSystemTarget(
@@ -828,50 +845,81 @@ public class ClusterManifestProviderTests
                 getLegacyManifest: _ =>
                 {
                     requests.RecordLegacyFetch(peer);
-                    return recovered ? Task.FromResult(CreateGrainManifest())
+                    return recovered ? Task.FromResult(recoveredManifest)
                         : Task.FromException<GrainManifest>(new InvalidOperationException("Direct fetch temporarily unavailable."));
                 }));
         await using var provider = CreateClusterManifestProvider(localSilo, membership, CreateGrainFactory(targets), timeProvider, logger);
+        recoveredManifest = provider.LocalGrainManifest;
+        Assert.NotEqual(lateHash, ManifestHashCalculator.ComputeHash(recoveredManifest));
+        var initial = provider.Current;
+        var originalCache = GetCachedManifests(provider);
         var initialize = typeof(ClusterManifestProvider).GetMethod("Initialize", BindingFlags.Instance | BindingFlags.NonPublic)!;
-        await (Task)initialize.Invoke(provider, [TestContext.Current.CancellationToken])!;
+        await (Task)initialize.Invoke(provider, [cancellationToken])!;
         var updateMethod = typeof(ClusterManifestProvider).GetMethod("UpdateManifest", BindingFlags.Instance | BindingFlags.NonPublic)!;
         try
         {
-            var first = (Task<bool>)updateMethod.Invoke(provider, [membership.CurrentSnapshot, TestContext.Current.CancellationToken])!;
-            await requests.WaitForProbeCountAsync(3, TestContext.Current.CancellationToken);
+            var first = (Task<bool>)updateMethod.Invoke(provider, [membership.CurrentSnapshot, cancellation.Token])!;
+            await requests.WaitForProbeCountAsync(3, cancellationToken);
             if (waitForUpdate)
             {
-                await allUpdatesEntered.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+                await allUpdatesEntered.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
             }
 
-            timeProvider.Advance(TimeSpan.FromSeconds(1));
-            Assert.False(await first.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
-            for (var version = 2; version <= 4; version++)
-            {
-                membership.Update(CreateActiveMembershipSnapshot(version, localSilo, peers));
-                var retry = (Task<bool>)updateMethod.Invoke(provider, [membership.CurrentSnapshot, TestContext.Current.CancellationToken])!;
-                Assert.False(await retry.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
-                Assert.Equal(3, requests.ProbeAddresses.Count);
-                Assert.Equal(version * peers.Length, requests.LegacyFetchAddresses.Count);
-                Assert.False(waitForUpdate ? pendingUpdate.Task.IsCompleted : pendingSummary.Task.IsCompleted);
-            }
+            var probeMethod = typeof(ClusterManifestProvider).GetMethod("ProbePeerForManifests", BindingFlags.Instance | BindingFlags.NonPublic)!;
+            var atCapacity = (Task)probeMethod.Invoke(provider, [peers[0], peers, originalCache, cancellationToken])!;
+            await atCapacity.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+            Assert.Equal(3, requests.ProbeAddresses.Count);
+            Assert.False(first.IsCompleted);
 
-            recovered = true;
-            if (waitForUpdate)
+            if (cancelCaller)
             {
-                pendingUpdate.SetException(new InvalidOperationException("Late update failure."));
+                cancellation.Cancel();
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => first.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken));
             }
             else
             {
-                pendingSummary.SetException(new InvalidOperationException("Late summary failure."));
+                timeProvider.Advance(TimeSpan.FromSeconds(1));
+                Assert.False(await first.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken));
             }
 
-            await logger.WaitForLateFailureCountAsync(3, TestContext.Current.CancellationToken);
-            membership.Update(CreateActiveMembershipSnapshot(5, localSilo, peers));
-            Assert.True(await (Task<bool>)updateMethod.Invoke(provider, [membership.CurrentSnapshot, TestContext.Current.CancellationToken])!);
+            Assert.Same(initial, provider.Current);
+            recovered = true;
+            membership.Update(CreateActiveMembershipSnapshot(2, localSilo, peers));
+            var retry = (Task<bool>)updateMethod.Invoke(provider, [membership.CurrentSnapshot, cancellationToken])!;
+            Assert.True(await retry.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken));
             Assert.Equal(6, requests.ProbeAddresses.Count);
-            Assert.Equal(20, requests.LegacyFetchAddresses.Count);
+            Assert.Equal(8, requests.LegacyFetchAddresses.Count);
             Assert.Equal(5, provider.Current.Silos.Count);
+            Assert.All(peers, peer => Assert.Same(recoveredManifest, provider.Current.Silos[peer]));
+            Assert.False(waitForUpdate ? pendingUpdate.Task.IsCompleted : pendingSummary.Task.IsCompleted);
+            var current = provider.Current;
+            var currentCache = GetCachedManifests(provider);
+
+            if (lateFailure)
+            {
+                if (waitForUpdate)
+                {
+                    pendingUpdate.SetException(new InvalidOperationException("Late update failure."));
+                }
+                else
+                {
+                    pendingSummary.SetException(new InvalidOperationException("Late summary failure."));
+                }
+
+                await logger.WaitForLateFailureCountAsync(3, cancellationToken);
+            }
+            else
+            {
+                pendingSummary.TrySetResult(summary);
+                pendingUpdate.TrySetResult(lateUpdate);
+                await Task.WhenAll(pendingSummary.Task, pendingUpdate.Task);
+            }
+
+            Assert.Same(current, provider.Current);
+            Assert.Same(currentCache, GetCachedManifests(provider));
+            Assert.False(originalCache.ContainsKey(lateHash));
+            Assert.False(currentCache.ContainsKey(lateHash));
+            Assert.Equal(6, requests.ProbeAddresses.Count);
         }
         finally
         {

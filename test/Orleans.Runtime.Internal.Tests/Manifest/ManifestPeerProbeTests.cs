@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
@@ -34,9 +34,11 @@ public sealed class ManifestPeerProbeTests(ManifestPeerProbeTests.Fixture fixtur
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task PeerDeadline_PreservesSlotsUntilRpcResponse(bool waitForUpdate)
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task LocalCompletion_ReleasesSlotsAndSignalsPeerCancellation(bool waitForUpdate, bool cancelCaller)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var local = fixture.HostedCluster.Silos[0];
@@ -48,14 +50,14 @@ public sealed class ManifestPeerProbeTests(ManifestPeerProbeTests.Fixture fixtur
         var factory = Substitute.For<IInternalGrainFactory>();
         factory.GetSystemTarget<IClusterManifestSystemTarget>(Constants.ManifestProviderType, remote.SiloAddress).Returns(proxy);
         using var services = new ServiceCollection().AddSingleton(factory).BuildServiceProvider();
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var time = new FakeTimeProvider();
-        var logger = new ProbeLogger();
         await using var provider = new ClusterManifestProvider(
             localServices.GetRequiredService<ILocalSiloDetails>(),
             localServices.GetRequiredService<SiloManifestProvider>(),
             localServices.GetRequiredService<IClusterMembershipService>(),
             localServices.GetRequiredService<IFatalErrorHandler>(),
-            logger,
+            NullLogger<ClusterManifestProvider>.Instance,
             services,
             time,
             Options.Create(new ClusterManifestOptions { EnableContentAddressedRetrieval = true }));
@@ -65,37 +67,50 @@ public sealed class ManifestPeerProbeTests(ManifestPeerProbeTests.Fixture fixtur
         var scenario = new ProbeScenario(waitForUpdate);
         target.Scenario = scenario;
         var initialSummaryRequests = target.SummaryRequests;
-        var probes = Enumerable.Range(0, 3).Select(_ => ProbeAsync(provider, remote.SiloAddress, cancellationToken)).ToArray();
-        Task? retry = null;
+        var probes = Enumerable.Range(0, 3).Select(_ => ProbeAsync(provider, remote.SiloAddress, cancellation.Token)).ToArray();
         try
         {
             await scenario.Entered.Task.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
             Assert.Equal(initialSummaryRequests + 3, target.SummaryRequests);
-            time.Advance(TimeSpan.FromSeconds(1));
-            await Task.WhenAll(probes).WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+
+            await ProbeAsync(provider, remote.SiloAddress, cancellationToken).WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+            Assert.Equal(initialSummaryRequests + 3, target.SummaryRequests);
+            Assert.All(probes, probe => Assert.False(probe.IsCompleted));
+            if (cancelCaller)
+            {
+                cancellation.Cancel();
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+                    Task.WhenAll(probes).WaitAsync(TimeSpan.FromSeconds(10), cancellationToken));
+            }
+            else
+            {
+                time.Advance(TimeSpan.FromSeconds(1));
+                await Task.WhenAll(probes).WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+            }
+
             await scenario.CancellationObserved.Task.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
             Assert.False(scenario.Finished.Task.IsCompleted);
 
-            retry = ProbeAsync(provider, remote.SiloAddress, cancellationToken);
-            await retry.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
-            Assert.Equal(initialSummaryRequests + 3, target.SummaryRequests);
-
-            scenario.Release();
-            await logger.LateFailuresObserved.Task.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
-            await scenario.Finished.Task.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
             target.Scenario = null;
-
             await ProbeAsync(provider, remote.SiloAddress, cancellationToken).WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
             Assert.Equal(initialSummaryRequests + 4, target.SummaryRequests);
-            Assert.Equal(3, logger.LateFailureCount);
+            Assert.False(scenario.Finished.Task.IsCompleted);
+
+            scenario.Release();
+            await scenario.Finished.Task.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+            await ProbeAsync(provider, remote.SiloAddress, cancellationToken).WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+            Assert.Equal(initialSummaryRequests + 5, target.SummaryRequests);
         }
         finally
         {
+            cancellation.Cancel();
             scenario.Release();
-            await Task.WhenAll(probes).WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
-            if (retry is not null)
+            try
             {
-                await retry.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+                await Task.WhenAll(probes).WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+            {
             }
 
             await scenario.Finished.Task.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
@@ -139,8 +154,6 @@ public sealed class ManifestPeerProbeTests(ManifestPeerProbeTests.Fixture fixtur
             {
                 Finished.TrySetResult();
             }
-
-            throw new InvalidOperationException("Late manifest probe failure.");
         }
 
         public void Release() => _release.TrySetResult();
@@ -191,25 +204,6 @@ public sealed class ManifestPeerProbeTests(ManifestPeerProbeTests.Fixture fixtur
 
         public void Participate(ISiloLifecycle lifecycle)
         {
-        }
-    }
-
-    private sealed class ProbeLogger : ILogger<ClusterManifestProvider>
-    {
-        private int _lateFailureCount;
-
-        public TaskCompletionSource LateFailuresObserved { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        public int LateFailureCount => Volatile.Read(ref _lateFailureCount);
-        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
-        public bool IsEnabled(LogLevel logLevel) => true;
-
-        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
-        {
-            if (formatter(state, exception).StartsWith("Cluster manifest peer probe task for ", StringComparison.Ordinal)
-                && Interlocked.Increment(ref _lateFailureCount) == 3)
-            {
-                LateFailuresObserved.TrySetResult();
-            }
         }
     }
 }

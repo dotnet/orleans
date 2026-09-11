@@ -409,7 +409,7 @@ namespace Orleans.Runtime.Metadata
             try
             {
                 var remoteManifestProvider = _grainFactory!.GetSystemTarget<IClusterManifestSystemTarget>(Constants.ManifestProviderType, peer);
-                var summaryTask = InvokePeerRequest(remoteManifestProvider.GetClusterManifestHashSummary, probeToken);
+                var summaryTask = remoteManifestProvider.GetClusterManifestHashSummary(probeToken).AsTask();
                 probeTask = summaryTask;
                 var summary = await summaryTask
                     .WaitAsync(probeToken);
@@ -426,9 +426,7 @@ namespace Orleans.Runtime.Metadata
 
                 // No per-peer manifest body is retained, so request a complete update instead of synthesizing a
                 // baseline from the local provider's version.
-                var updateTask = InvokePeerRequest(
-                    token => remoteManifestProvider.GetClusterManifestUpdate(MajorMinorVersion.MinValue, token),
-                    probeToken);
+                var updateTask = remoteManifestProvider.GetClusterManifestUpdate(MajorMinorVersion.MinValue, probeToken).AsTask();
                 probeTask = updateTask;
                 var update = await updateTask
                     .WaitAsync(probeToken);
@@ -457,35 +455,20 @@ namespace Orleans.Runtime.Metadata
             }
             finally
             {
+                slots.Release();
                 if (probeTask is { IsCompleted: false })
                 {
-                    // Keep the slot until a response or the transport retires the RPC, even after cancellation.
-                    // This bounds outstanding requests across retries and observes late failures.
                     probeTask.ContinueWith(
-                        task =>
-                        {
-                            slots.Release();
-                            if (task.IsFaulted)
-                            {
-                                LogDebugLateClusterManifestPeerProbeFailure(task.Exception!, peer);
-                            }
-                        },
+                        task => LogDebugLateClusterManifestPeerProbeFailure(task.Exception!, peer),
                         CancellationToken.None,
-                        TaskContinuationOptions.ExecuteSynchronously,
+                        TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
                         TaskScheduler.Default).Ignore();
                 }
                 else
                 {
                     _ = probeTask?.Exception;
-                    slots.Release();
                 }
             }
-        }
-
-        private static Task<T> InvokePeerRequest<T>(Func<CancellationToken, ValueTask<T>> request, CancellationToken cancellationToken)
-        {
-            using var scope = CancellationAcknowledgementScope.Enter();
-            return request(cancellationToken).AsTask();
         }
 
         private sealed record PeerManifestProbeResult(
@@ -679,7 +662,7 @@ namespace Orleans.Runtime.Metadata
 
         [LoggerMessage(
             Level = LogLevel.Debug,
-            Message = "Skipping cluster manifest peer probe for {SiloAddress} while outstanding probes occupy all slots. Direct manifest fetch continues."
+            Message = "Skipping cluster manifest peer probe for {SiloAddress} while three local probe attempts are active. Direct manifest fetch continues."
         )]
         private partial void LogDebugClusterManifestPeerProbeAtCapacity(SiloAddress siloAddress);
 

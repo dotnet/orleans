@@ -138,8 +138,7 @@ namespace Orleans.Runtime
             GrainReference target,
             IInvokable request,
             IResponseCompletionSource? context,
-            InvokeMethodOptions options,
-            bool waitForCancellationAcknowledgement)
+            InvokeMethodOptions options)
         {
             var cancellationToken = request.GetCancellationToken();
             cancellationToken.ThrowIfCancellationRequested();
@@ -191,7 +190,7 @@ namespace Orleans.Runtime
                 Debug.Assert(context is not null);
 
                 // Register a callback for the request.
-                callbackData = new CallbackData(sharedData, context, message, _applicationRequestInstruments, waitForCancellationAcknowledgement);
+                callbackData = new CallbackData(sharedData, context, message, _applicationRequestInstruments);
                 if (Volatile.Read(ref _isStopping) != 0)
                 {
                     callbackData.OnHostShutdown();
