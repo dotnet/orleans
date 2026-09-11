@@ -646,7 +646,9 @@ namespace Orleans.Streaming.EventHubs
             {
                 lock (this.cacheLock)
                 {
-                    if (this.receiverState != ReceiverRunning)
+                    if (this.receiverState != ReceiverRunning
+                        || this.receiver is null
+                        || this.cache is null)
                     {
                         return;
                     }

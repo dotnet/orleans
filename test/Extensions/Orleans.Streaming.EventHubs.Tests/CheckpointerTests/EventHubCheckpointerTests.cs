@@ -1010,6 +1010,9 @@ public class EventHubCheckpointerTests
 
         Assert.Equal("The supplied offset is invalid.", exception.Message);
         Assert.Equal(1, checkpointer.ResetCount);
+
+        receiver.UpdateDeliveryProgress(MakeToken(124), DateTime.UtcNow);
+        Assert.Equal(0, checkpointer.UpdateCount);
     }
 
     [TestSuite("BVT")]
