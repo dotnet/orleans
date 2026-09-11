@@ -32,6 +32,7 @@ public sealed class DurableJobsOptions
     /// <summary>
     /// Gets or sets how far ahead of the current time shard discovery loads eligible shards.
     /// A value of zero discovers shards whose start time is at or before the current time.
+    /// The resulting discovery horizon is capped at <see cref="DateTimeOffset.MaxValue"/>.
     /// Must be non-negative. Default: 10 minutes.
     /// </summary>
     public TimeSpan ShardLoadLookaheadPeriod { get; set; } = TimeSpan.FromMinutes(10);

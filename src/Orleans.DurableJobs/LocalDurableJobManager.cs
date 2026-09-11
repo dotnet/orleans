@@ -445,11 +445,12 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
     {
         cancellationToken.ThrowIfCancellationRequested();
         var now = _timeProvider.GetUtcNow();
+        var maxDueTime = new DateTimeOffset(now.UtcDateTime.AddClamped(_options.ShardLoadLookaheadPeriod));
         // Compute the slow-start budget for this sweep.
         var budget = ComputeClaimBudget();
         var newClaimsThisCycle = 0;
         var assignedCount = 0;
-        await foreach (var shard in _shardManager.DiscoverJobShardsAsync(now.Add(_options.ShardLoadLookaheadPeriod), budget, cancellationToken))
+        await foreach (var shard in _shardManager.DiscoverJobShardsAsync(maxDueTime, budget, cancellationToken))
         {
             // Take responsibility for yielded resources before observing cancellation.
             if (_shardCache.TryAdd(shard.Id, shard))
