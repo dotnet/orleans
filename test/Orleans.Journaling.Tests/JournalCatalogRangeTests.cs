@@ -1,3 +1,4 @@
+using System.Text;
 using Xunit;
 
 namespace Orleans.Journaling.Tests;
@@ -75,6 +76,66 @@ public sealed class JournalCatalogRangeTests
         Assert.True(range.Contains("tenant/\U0001F600-b"));
         Assert.True(range.Contains("tenant/\U0001F601-a"));
         Assert.Null(range.GetUpperBoundForSuffix("/wal"));
+    }
+
+    [Theory]
+    [InlineData(0xD800, "", "suffix")]
+    [InlineData(0xDBFF, "", "")]
+    [InlineData(0xDC00, "", "suffix")]
+    [InlineData(0xDFFF, "", "")]
+    [InlineData(0xD800, "tenant/", "/suffix")]
+    [InlineData(0xDBFF, "tenant/", "")]
+    [InlineData(0xDC00, "tenant/", "/suffix")]
+    [InlineData(0xDFFF, "tenant/", "")]
+    [InlineData(0xD800, "tenant/\U0001F600/", "/\U0001F601")]
+    [InlineData(0xDC00, "tenant/\U0001F600/", "/\U0001F601")]
+    public void NativePrefix_BroadensBeforeFirstUnpairedSurrogateAndKeepsOrdinalBounds(
+        int surrogate, string before, string after)
+    {
+        // Construct malformed UTF-16 at runtime so attribute serialization preserves the intended code unit.
+        var prefix = before + (char)surrogate + after;
+        var min = new JournalId(prefix + "b");
+        var max = new JournalId(prefix + "d");
+        var strictUtf8 = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
+        foreach (var fromBounds in new[] { false, true })
+        {
+            var options = new ListOptions
+            {
+                Prefix = fromBounds ? default : new(prefix),
+                MinId = min,
+                MaxId = max
+            };
+            var range = new JournalCatalogRange(options);
+            options.Prefix = new("changed");
+            options.MinId = default;
+            options.MaxId = default;
+
+            Assert.Equal(before.Length == 0 ? null : before, range.ListingPrefix);
+            Assert.Equal(fromBounds ? null : prefix, range.Prefix);
+            Assert.Equal(min.Value, range.MinId);
+            Assert.Equal(max.Value, range.MaxId);
+            Assert.Equal(before, strictUtf8.GetString(strictUtf8.GetBytes(range.ListingPrefix ?? string.Empty)));
+            Assert.True(range.Contains(min.Value));
+            Assert.True(range.Contains(prefix + "c"));
+            Assert.True(range.Contains(max.Value));
+            Assert.False(range.Contains(prefix + "a"));
+            Assert.False(range.Contains(prefix + "e"));
+            Assert.False(range.Contains(before + "other"));
+        }
+    }
+
+    [Theory]
+    [InlineData("tenant/ascii")]
+    [InlineData("tenant/\u00e9")]
+    [InlineData("tenant/\U0001F600")]
+    [InlineData("\U00010000/\U0010FFFF")]
+    public void NativePrefix_PreservesCompleteCharacters(string prefix)
+    {
+        var range = new JournalCatalogRange(new() { Prefix = new(prefix) });
+
+        Assert.Equal(prefix, range.ListingPrefix);
+        Assert.True(range.Contains(prefix + "/child"));
+        Assert.False(range.Contains("other"));
     }
 
     [Fact]

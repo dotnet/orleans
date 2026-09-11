@@ -32,10 +32,24 @@ internal readonly struct JournalCatalogRange
             }
         }
 
-        // A storage API's UTF-8 prefix must end on a complete character.
-        if (listingPrefix is { Length: > 0 } && char.IsHighSurrogate(listingPrefix[^1]))
+        // Broaden only the native prefix to well-formed UTF-16; Contains retains the original ordinal range.
+        for (var index = 0; listingPrefix is not null && index < listingPrefix.Length; index++)
         {
-            listingPrefix = listingPrefix[..^1];
+            var character = listingPrefix[index];
+            if (!char.IsSurrogate(character))
+            {
+                continue;
+            }
+
+            if (char.IsHighSurrogate(character) && index + 1 < listingPrefix.Length
+                && char.IsLowSurrogate(listingPrefix[index + 1]))
+            {
+                index++;
+                continue;
+            }
+
+            listingPrefix = listingPrefix[..index];
+            break;
         }
 
         ListingPrefix = string.IsNullOrEmpty(listingPrefix) ? null : listingPrefix;
