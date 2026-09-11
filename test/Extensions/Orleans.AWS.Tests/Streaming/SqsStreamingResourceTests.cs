@@ -460,7 +460,7 @@ public sealed class SqsStreamingResourceTests
         }
     }
 
-    private static async Task<TestApp> CreateAppAsync(SqsStreamingOptions options)
+    private static Task<TestApp> CreateAppAsync(SqsStreamingOptions options)
     {
         var builder = CreateBuilder();
         var aws = builder.AddAWSSDKConfig()
@@ -471,7 +471,7 @@ public sealed class SqsStreamingResourceTests
         var silo = builder.AddContainer("silo", "unused").WithReference(orleans);
         var client = builder.AddContainer("client", "unused").WithReference(orleans.AsClient());
         var application = builder.Build();
-        return new TestApp(application, streaming, silo.Resource, client.Resource);
+        return Task.FromResult(new TestApp(application, streaming, silo.Resource, client.Resource));
     }
 
     private static IDistributedApplicationBuilder CreateBuilder()
