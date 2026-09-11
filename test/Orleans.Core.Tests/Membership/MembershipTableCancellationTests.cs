@@ -130,7 +130,7 @@ public class MembershipTableCancellationTests
             var call = Assert.Single(target.Calls);
             Assert.Equal(legacyMethodName, call.Method);
             AssertArguments(arguments, call.Arguments);
-            object expectedResult = operation switch
+            object? expectedResult = operation switch
             {
                 nameof(IMembershipTable.ReadAllAsync) or nameof(IMembershipTable.ReadRowAsync) => target.Data,
                 nameof(IMembershipTable.InsertRowAsync) or nameof(IMembershipTable.UpdateRowAsync) => true,
@@ -270,11 +270,12 @@ public class MembershipTableCancellationTests
     };
 
     private static Type GetLegacyInvokerType(string legacyId) =>
-        typeof(IMembershipTable).Assembly.GetType($"OrleansCodeGen.Orleans.Invokable_IMembershipTable_GrainReference_{legacyId}", throwOnError: true);
+        typeof(IMembershipTable).Assembly.GetType($"OrleansCodeGen.Orleans.Invokable_IMembershipTable_GrainReference_{legacyId}", throwOnError: true)!;
 
     private static Type GetCurrentInvokerType(string operation)
     {
-        var legacyId = typeof(IMembershipTable).GetMethod(operation).GetCustomAttribute<AliasAttribute>().Alias;
+        var method = Assert.Single(typeof(IMembershipTable).GetMethods(), method => method.Name == operation);
+        var legacyId = Assert.Single(method.GetCustomAttributes<AliasAttribute>()).Alias;
         return Assert.Single(typeof(IMembershipTable).Assembly.GetTypes(),
             type => typeof(IInvokable).IsAssignableFrom(type)
                 && type.GetCustomAttributes<CompoundTypeAliasAttribute>().Any(
@@ -294,7 +295,7 @@ public class MembershipTableCancellationTests
                 .Where(method => method.Name.EndsWith("Async", StringComparison.Ordinal))
                 .Select(method =>
                 {
-                    var legacyId = method.GetCustomAttribute<AliasAttribute>().Alias;
+                    var legacyId = Assert.Single(method.GetCustomAttributes<AliasAttribute>()).Alias;
                     return (Id: legacyId, Legacy: GetLegacyInvokerType(legacyId), Current: GetCurrentInvokerType(method.Name));
                 }).ToArray();
             services.AddSingleton<ITypeConverter>(new LegacyInvokerTypeFormatter(
@@ -342,12 +343,13 @@ public class MembershipTableCancellationTests
             type => type.Assembly == typeof(IMembershipTable).Assembly && typeof(IMembershipTableSystemTarget).IsAssignableFrom(type));
         var proxy = Activator.CreateInstance(proxyType, shared, IdSpan.Create("membership"));
 
-        await Assert.IsAssignableFrom<Task>(typeof(IMembershipTable).GetMethod(operation).Invoke(proxy, arguments));
+        var method = Assert.Single(typeof(IMembershipTable).GetMethods(), method => method.Name == operation);
+        await Assert.IsAssignableFrom<Task>(method.Invoke(proxy, arguments));
 
         return Assert.Single(runtime.Calls);
     }
 
-    private static void AssertArguments(object[] expected, object[] actual)
+    private static void AssertArguments(object[] expected, object?[] actual)
     {
         Assert.Equal(expected.Length, actual.Length);
         for (var i = 0; i < expected.Length; i++)
@@ -372,11 +374,21 @@ public class MembershipTableCancellationTests
     // Baseline metadata emitted aliases for these retained types. Parsing still uses the real Orleans resolver.
     private sealed class LegacyInvokerTypeFormatter(IReadOnlyDictionary<Type, string> aliases) : ITypeConverter
     {
-        public bool TryFormat(Type type, out string formatted) => aliases.TryGetValue(type, out formatted);
+        public bool TryFormat(Type type, out string formatted)
+        {
+            if (aliases.TryGetValue(type, out var alias))
+            {
+                formatted = alias;
+                return true;
+            }
+
+            formatted = null!;
+            return false;
+        }
 
         public bool TryParse(string formatted, out Type type)
         {
-            type = null;
+            type = null!;
             return false;
         }
     }
@@ -384,14 +396,14 @@ public class MembershipTableCancellationTests
     private sealed class MembershipTargetHolder(IMembershipTable target) : ITargetHolder
     {
         public object GetTarget() => target;
-        public object GetComponent(Type componentType) => null;
+        public object? GetComponent(Type componentType) => null;
     }
 
     private sealed class CapturingRuntime : IGrainReferenceRuntime
     {
         public List<IInvokable> Calls { get; } = [];
 
-        public ValueTask<T> InvokeMethodAsync<T>(GrainReference reference, IInvokable request, InvokeMethodOptions options)
+        public ValueTask<T?> InvokeMethodAsync<T>(GrainReference reference, IInvokable request, InvokeMethodOptions options)
         {
             Calls.Add(request);
             return default;
