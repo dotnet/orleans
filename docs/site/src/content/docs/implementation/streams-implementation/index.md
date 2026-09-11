@@ -81,7 +81,7 @@ The default maximum adapter batch-container batch size is 1 and the empty-poll p
 
 An <xref:Orleans.Streams.IQueueCache> decouples queue reads from consumer delivery. Each subscription has an <xref:Orleans.Streams.IQueueCacheCursor>, so a slow consumer does not directly block a fast consumer at a later cursor.
 
-The cache tracks the earliest delivery progress across active subscriptions. Purging must not remove an item still needed by any cursor. <xref:Orleans.Providers.Streams.Common.SimpleQueueCache> uses pressure buckets to stop or slow reads as lag grows instead of discarding undelivered events. Its default capacity is 4,096 batch containers.
+The cache tracks the earliest contiguous partition position which is safe across active subscriptions. A matching record becomes safe after delivery or intentional filtering. A cursor also advances safely across records for other streams when no earlier matching delivery is pending, so a quiet stream does not pin an otherwise busy partition. Purging must not remove an item still needed by any cursor. <xref:Orleans.Providers.Streams.Common.SimpleQueueCache> uses pressure buckets to stop or slow reads as lag grows instead of discarding undelivered events. Its default capacity is 4,096 batch containers.
 
 ```mermaid
 flowchart TB
@@ -97,11 +97,13 @@ flowchart TB
 
 Cache capacity is not durability. The queue remains the durable boundary, subject to the adapter's acknowledgement contract.
 
+Recoverable partitioned stream providers can compose a stream partition pipeline from <xref:Orleans.Providers.Streams.Common.RecoverableStreamReceiver%601>, a partition source, and a data adapter. The pipeline admits immutable stream records into pooled storage, reconstructs batches lazily, reconciles the earliest safe subscription scan/delivery watermark, and persists a checkpoint which resumes strictly after that position.
+
 ## Pub-sub handshake
 
 The agent registers as a producer for each stream and obtains subscription records from stream pub-sub. It holds a pin cursor while subscription handshakes complete so cache cleanup cannot pass the requested start token. New subscription notifications update the agent's local pub-sub cache.
 
-Sequence tokens allow a rewindable adapter to start from a supported historical position. An adapter whose <xref:Orleans.Streams.IQueueAdapter.IsRewindable?displayProperty=nameWithType> property is `false` must reject unsupported tokens rather than pretending to honor them.
+Sequence tokens allow a rewindable adapter to start from a supported historical position. A start token is inclusive and remains unsafe until its record is delivered or intentionally filtered. A delivery handshake token confirms that its position was already processed. Exact `EventSequenceToken` and `EventSequenceTokenV2` values interoperate for legacy compatibility. Derived tokens compare only with the same concrete type unless the provider overrides equality, ordering, and hashing together. An adapter whose <xref:Orleans.Streams.IQueueAdapter.IsRewindable?displayProperty=nameWithType> property is `false` must reject unsupported tokens rather than pretending to honor them.
 
 ## Delivery and failure semantics
 

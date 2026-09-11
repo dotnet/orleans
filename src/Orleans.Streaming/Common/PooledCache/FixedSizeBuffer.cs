@@ -22,6 +22,8 @@ namespace Orleans.Providers.Streams.Common
         /// </summary>
         public object Id => buffer;
 
+        internal int Position => count;
+
         /// <summary>
         /// Manages access to a fixed size byte buffer.
         /// </summary>
@@ -54,6 +56,13 @@ namespace Orleans.Providers.Streams.Common
             value = new ArraySegment<byte>(buffer, count, size);
             count += size;
             return true;
+        }
+
+        internal void ResetTo(int position)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegative(position);
+            ArgumentOutOfRangeException.ThrowIfGreaterThan(position, count);
+            count = position;
         }
 
         /// <inheritdoc />

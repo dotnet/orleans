@@ -88,6 +88,81 @@ public static class StreamingEvents
     }
 
     /// <summary>
+    /// Event payload for a failed delivery attempt to a stream consumer.
+    /// </summary>
+    /// <param name="streamProvider">The stream provider.</param>
+    /// <param name="streamId">The stream identifier.</param>
+    /// <param name="subscriptionId">The subscription identifier.</param>
+    /// <param name="siloAddress">The delivering silo.</param>
+    /// <param name="consumer">The consumer endpoint.</param>
+    /// <param name="sequenceToken">The attempted batch position.</param>
+    /// <param name="exception">The delivery failure.</param>
+    public sealed class MessageDeliveryFailed(
+        string streamProvider,
+        StreamId streamId,
+        Guid subscriptionId,
+        SiloAddress? siloAddress,
+        IAddressable consumer,
+        StreamSequenceToken sequenceToken,
+        Exception exception) : StreamingEvent(streamProvider, siloAddress)
+    {
+        /// <summary>The stream identifier.</summary>
+        public readonly StreamId StreamId = streamId;
+        /// <summary>The subscription identifier.</summary>
+        public readonly Guid SubscriptionId = subscriptionId;
+        /// <summary>The consumer endpoint.</summary>
+        public readonly IAddressable Consumer = consumer;
+        /// <summary>The attempted batch position.</summary>
+        public readonly StreamSequenceToken SequenceToken = sequenceToken;
+        /// <summary>The delivery failure.</summary>
+        public readonly Exception Exception = exception;
+    }
+
+    /// <summary>
+    /// Identifies the stage of an unavailable consumer's unregistration request.
+    /// </summary>
+    public enum SubscriptionUnregistrationStage
+    {
+        /// <summary>The pulling agent is requesting unregistration.</summary>
+        Requested,
+        /// <summary>The pubsub unregistration call completed successfully.</summary>
+        Completed,
+        /// <summary>The pubsub unregistration call failed.</summary>
+        Failed,
+    }
+
+    /// <summary>
+    /// Reports the outcome of an unavailable consumer's unregistration request.
+    /// </summary>
+    /// <param name="streamProvider">The stream provider.</param>
+    /// <param name="streamId">The stream identifier.</param>
+    /// <param name="subscriptionId">The subscription identifier.</param>
+    /// <param name="siloAddress">The requesting silo.</param>
+    /// <param name="consumer">The consumer endpoint.</param>
+    /// <param name="stage">The request stage.</param>
+    /// <param name="exception">The failure when the request failed.</param>
+    public sealed class SubscriptionUnregistration(
+        string streamProvider,
+        StreamId streamId,
+        Guid subscriptionId,
+        SiloAddress? siloAddress,
+        IAddressable consumer,
+        SubscriptionUnregistrationStage stage,
+        Exception? exception) : StreamingEvent(streamProvider, siloAddress)
+    {
+        /// <summary>The stream identifier.</summary>
+        public readonly StreamId StreamId = streamId;
+        /// <summary>The subscription identifier.</summary>
+        public readonly Guid SubscriptionId = subscriptionId;
+        /// <summary>The consumer endpoint.</summary>
+        public readonly IAddressable Consumer = consumer;
+        /// <summary>The request stage.</summary>
+        public readonly SubscriptionUnregistrationStage Stage = stage;
+        /// <summary>The failure when the request failed.</summary>
+        public readonly Exception? Exception = exception;
+    }
+
+    /// <summary>
     /// Event payload for when a stream becomes inactive due to no activity.
     /// </summary>
     /// <param name="streamProvider">The name of the stream provider.</param>
@@ -796,6 +871,46 @@ public static class StreamingEvents
                 siloAddress,
                 consumerData.StreamConsumer,
                 batch));
+        }
+    }
+
+    internal static void EmitMessageDeliveryFailed(
+        string streamProviderName,
+        StreamConsumerData consumerData,
+        StreamSequenceToken sequenceToken,
+        SiloAddress? siloAddress,
+        Exception exception)
+    {
+        if (Listener.IsEnabled(nameof(MessageDeliveryFailed)))
+        {
+            Listener.Write(nameof(MessageDeliveryFailed), new MessageDeliveryFailed(
+                streamProviderName,
+                consumerData.StreamId.StreamId,
+                consumerData.SubscriptionId.Guid,
+                siloAddress,
+                consumerData.StreamConsumer,
+                sequenceToken,
+                exception));
+        }
+    }
+
+    internal static void EmitSubscriptionUnregistration(
+        string streamProviderName,
+        StreamConsumerData consumerData,
+        SiloAddress? siloAddress,
+        SubscriptionUnregistrationStage stage,
+        Exception? exception = null)
+    {
+        if (Listener.IsEnabled(nameof(SubscriptionUnregistration)))
+        {
+            Listener.Write(nameof(SubscriptionUnregistration), new SubscriptionUnregistration(
+                streamProviderName,
+                consumerData.StreamId.StreamId,
+                consumerData.SubscriptionId.Guid,
+                siloAddress,
+                consumerData.StreamConsumer,
+                stage,
+                exception));
         }
     }
 

@@ -106,6 +106,8 @@ namespace Orleans.Streaming.Kinesis
 
         public System.TimeSpan GetRecordsInterval { get { throw null; } set { } }
 
+        public long MaxCacheSizeBytes { get { throw null; } set { } }
+
         public string? Region { get { throw null; } set { } }
 
         [Redact]
