@@ -1269,7 +1269,7 @@ namespace Orleans.Streams
 
                     if (consumer.Cursor is IQueueCacheCursorReplayState { IsReplaying: true })
                     {
-                        continue;
+                        return false;
                     }
 
                     var current = consumer.Cursor is IQueueCacheCursorProgress

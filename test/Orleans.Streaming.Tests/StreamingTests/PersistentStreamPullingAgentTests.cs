@@ -5928,7 +5928,7 @@ namespace UnitTests.StreamingTests
         [TestProvider("None")]
         [TestArea("Streaming")]
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
-        public async Task DeliveryProgress_ReplayCursorDoesNotBlockLiveQueueCheckpoint()
+        public async Task DeliveryProgress_ReplayCursorSuppressesLiveQueueCheckpoint()
         {
             var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
             var options = new StreamPullingAgentOptions();
@@ -5964,11 +5964,10 @@ namespace UnitTests.StreamingTests
             queueCache.ClearDeliveryProgress();
 
             timeProvider.Advance(options.DeliveryProgressUpdateInterval);
-            await queueCache.DeliveryProgressUpdated.WaitAsync(
-                TimeSpan.FromSeconds(5),
-                TestContext.Current.CancellationToken);
+            await testAccessor.GetPubSubCache();
 
-            Assert.Null(Assert.Single(queueCache.DeliveryProgressTokens));
+            Assert.Empty(queueCache.DeliveryProgressTokens);
+            Assert.Equal(0, queueCache.DeliveryProgressCallCount);
             await testAccessor.Shutdown();
         }
 

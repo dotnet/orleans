@@ -696,10 +696,14 @@ internal sealed class RecoverableStreamReplayManager<TQueueMessage>
 
     private void HandoffLocked(ReplayCursor cursor, ReplayFragment fragment)
     {
+        var startToken = fragment.LiveBoundary is { } liveBoundary
+            && liveBoundary.CompareTo(cursor.StartToken) > 0
+                ? liveBoundary
+                : cursor.StartToken;
         var liveCursor = GetCacheCursor(
             _liveCache,
             cursor.StreamId,
-            fragment.LiveBoundary ?? cursor.StartToken);
+            startToken);
         if (cursor.DeliveredThrough is { } deliveredThrough
             && liveCursor is IQueueCacheCursorProgress progressCursor)
         {
