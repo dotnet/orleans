@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using Amazon;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -220,6 +221,12 @@ public sealed class SqsStreamProviderBuilder : IProviderBuilder<ISiloBuilder>, I
         {
             throw new OrleansConfigurationException(
                 "SQS streaming service endpoint values must be absolute HTTP or HTTPS URIs.");
+        }
+        else if (!RegionEndpoint.EnumerableAllRegions.Any(
+            region => string.Equals(region.SystemName, service, StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new OrleansConfigurationException(
+                $"SQS streaming region '{service}' is not recognized by the AWS SDK.");
         }
     }
 

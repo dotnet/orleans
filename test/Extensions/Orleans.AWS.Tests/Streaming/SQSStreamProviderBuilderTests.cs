@@ -447,10 +447,22 @@ public sealed class SQSStreamProviderBuilderTests
             "service endpoint values must be absolute HTTP or HTTPS URIs"
         },
         {
+            "RegionNotRecognized",
+            ["Region", "us-east-99"],
+            [],
+            "region 'us-east-99' is not recognized"
+        },
+        {
             "ConnectionStringServiceNotAbsoluteHttp",
             ["ConnectionString", "Service=localhost:9324"],
             [],
             "service endpoint values must be absolute HTTP or HTTPS URIs"
+        },
+        {
+            "ConnectionStringRegionNotRecognized",
+            ["ConnectionString", "Service=us-east-99"],
+            [],
+            "region 'us-east-99' is not recognized"
         },
         {
             "ConnectionStringDuplicateService",
