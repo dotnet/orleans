@@ -265,6 +265,8 @@ items:
             href: host/monitoring/signals.md
           - name: Metrics
             href: host/monitoring/metrics.md
+          - name: Runtime dissemination
+            href: host/monitoring/runtime-dissemination.md
           - name: Metrics catalog
             href: host/monitoring/metrics-catalog.md
           - name: Troubleshooting workflow
@@ -343,6 +345,8 @@ items:
         href: implementation/grain-directory.md
       - name: Cluster membership
         href: implementation/cluster-management.md
+      - name: Runtime state dissemination
+        href: implementation/runtime-dissemination.md
       - name: Runtime lifecycle
         href: implementation/orleans-lifecycle.md
       - name: Scheduling and turn execution

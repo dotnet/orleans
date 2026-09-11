@@ -4,10 +4,12 @@ using System.Collections.Generic;
 using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Runtime.Diagnostics;
+using Orleans.Runtime.Dissemination;
 using Orleans.Internal;
 using Orleans.Runtime.Scheduler;
 using Orleans.Statistics;
@@ -26,6 +28,7 @@ namespace Orleans.Runtime
         private readonly IActivationWorkingSet _activationWorkingSet;
         private readonly IEnvironmentStatisticsProvider _environmentStatisticsProvider;
         private readonly IOptions<LoadSheddingOptions> _loadSheddingOptions;
+        private readonly IServiceProvider _serviceProvider;
         private readonly ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics> _periodicStats;
         private readonly TimeSpan _statisticsRefreshTime;
         private readonly List<ISiloStatisticsChangeListener> _siloStatisticsChangeListeners;
@@ -48,6 +51,7 @@ namespace Orleans.Runtime
             IActivationWorkingSet activationWorkingSet,
             IEnvironmentStatisticsProvider environmentStatisticsProvider,
             IOptions<LoadSheddingOptions> loadSheddingOptions,
+            IServiceProvider serviceProvider,
             SystemTargetShared shared)
             : base(Constants.DeploymentLoadPublisherSystemTargetType, shared)
         {
@@ -59,6 +63,7 @@ namespace Orleans.Runtime
             _activationWorkingSet = activationWorkingSet;
             _environmentStatisticsProvider = environmentStatisticsProvider;
             _loadSheddingOptions = loadSheddingOptions;
+            _serviceProvider = serviceProvider;
             _statisticsRefreshTime = options.Value.DeploymentLoadPublisherRefreshTime;
             _periodicStats = new ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics>();
             _siloStatisticsChangeListeners = new List<ISiloStatisticsChangeListener>();
@@ -85,7 +90,11 @@ namespace Orleans.Runtime
             }
 
             await RefreshClusterStatistics(cancellationToken);
-            await PublishStatistics(cancellationToken);
+            await this.RunOrQueueTask(async token =>
+            {
+                await PublishStatistics(token);
+                return true;
+            }, cancellationToken);
             LogDebugStartedDeploymentLoadPublisher(_logger);
         }
 
@@ -112,24 +121,20 @@ namespace Orleans.Runtime
                 DeploymentLoadPublisherEvents.EmitPublished(_siloDetails.SiloAddress, myStats);
 
                 // Inform other cluster members about our refreshed statistics.
-                var members = _siloStatusOracle.GetApproximateSiloStatuses(true).Keys;
-                var tasks = new List<Task>(members.Count);
-                foreach (var siloAddress in members)
+                var members = _siloStatusOracle.GetApproximateSiloStatuses(true).Keys.ToArray();
+                IReadOnlyCollection<SiloAddress> directRecipients = members;
+                if (await TryPublishStatisticsViaDissemination(myStats, cancellationToken))
                 {
-                    // No need to make a grain call to ourselves.
-                    if (siloAddress.Equals(_siloDetails.SiloAddress))
-                    {
-                        continue;
-                    }
-
                     try
                     {
-                        var deploymentLoadPublisher = _grainFactory.GetSystemTarget<IDeploymentLoadPublisher>(Constants.DeploymentLoadPublisherSystemTargetType, siloAddress);
-                        tasks.Add(deploymentLoadPublisher.UpdateRuntimeStatistics(_siloDetails.SiloAddress, myStats, cancellationToken));
+                        var dissemination = _serviceProvider.GetRequiredService<IDisseminationService>();
+                        var disseminationNamespace = _serviceProvider.GetRequiredService<DeploymentLoadStatisticsDisseminationNamespace>();
+                        var unconfirmedPeers = dissemination.GetUnconfirmedPeers(disseminationNamespace).ToHashSet();
+                        directRecipients = members.Where(unconfirmedPeers.Contains).ToArray();
                     }
                     catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                     {
-                        tasks.Add(Task.FromCanceled(cancellationToken));
+                        throw;
                     }
                     catch (Exception exception)
                     {
@@ -137,7 +142,7 @@ namespace Orleans.Runtime
                     }
                 }
 
-                await Task.WhenAll(tasks);
+                await PublishStatisticsDirectly(myStats, directRecipients, cancellationToken);
                 DeploymentLoadPublisherEvents.EmitClusterRefreshed(_siloDetails.SiloAddress, _periodicStats);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -160,23 +165,131 @@ namespace Orleans.Runtime
             return Task.CompletedTask;
         }
 
-        private void UpdateRuntimeStatisticsInternal(SiloAddress siloAddress, SiloRuntimeStatistics siloStats)
+        internal Task<DisseminationApplyResult> ApplyDisseminatedRuntimeStatisticsAsync(
+            SiloAddress siloAddress,
+            SiloRuntimeStatistics siloStats,
+            CancellationToken cancellationToken) =>
+            this.RunOrQueueTask(
+                token =>
+                {
+                    token.ThrowIfCancellationRequested();
+                    return Task.FromResult(UpdateRuntimeStatisticsInternal(siloAddress, siloStats, isDisseminated: true));
+                },
+                cancellationToken);
+
+        internal bool IsRuntimeStatisticsObsolete(SiloAddress siloAddress, long timestampTicks) =>
+            _siloStatusOracle.GetApproximateSiloStatus(siloAddress) != SiloStatus.Active
+            || (_periodicStats.TryGetValue(siloAddress, out var old) && old.DateTime.Ticks > timestampTicks);
+
+        internal IReadOnlyCollection<SiloAddress> GetActiveSilosForStatisticsDigest() =>
+            _siloStatusOracle.GetApproximateSiloStatuses(onlyActive: true).Keys;
+
+        internal async Task<bool> TryPublishStatisticsViaDissemination(
+            SiloRuntimeStatistics myStats,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (_statisticsRefreshTime <= TimeSpan.Zero)
+            {
+                return false;
+            }
+
+            var disseminationNamespace = _serviceProvider.GetRequiredService<DeploymentLoadStatisticsDisseminationNamespace>();
+            if (!disseminationNamespace.Options.Enabled)
+            {
+                return false;
+            }
+
+            var timeProvider = _serviceProvider.GetRequiredService<TimeProvider>();
+            using var timeoutCancellation = new CancellationTokenSource(_statisticsRefreshTime, timeProvider);
+            using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCancellation.Token);
+            try
+            {
+                var dissemination = _serviceProvider.GetRequiredService<IDisseminationService>();
+                return await dissemination.Publish(
+                    disseminationNamespace,
+                    _siloDetails.SiloAddress,
+                    myStats.DateTime.Ticks,
+                    cancellation.Token);
+            }
+            catch (OperationCanceledException) when (
+                timeoutCancellation.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+            {
+                LogDebugRuntimeStatisticsDisseminationTimedOut(_logger, _statisticsRefreshTime);
+                return false;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                LogWarningRuntimeStatisticsUpdateFailure1(_logger, exception);
+                return false;
+            }
+        }
+
+        private async Task PublishStatisticsDirectly(
+            SiloRuntimeStatistics myStats,
+            IReadOnlyCollection<SiloAddress> members,
+            CancellationToken cancellationToken)
+        {
+            var tasks = new List<Task>(members.Count);
+            foreach (var siloAddress in members)
+            {
+                if (siloAddress.Equals(_siloDetails.SiloAddress))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    var deploymentLoadPublisher = _grainFactory.GetSystemTarget<IDeploymentLoadPublisher>(
+                        Constants.DeploymentLoadPublisherSystemTargetType, siloAddress);
+                    tasks.Add(deploymentLoadPublisher.UpdateRuntimeStatistics(_siloDetails.SiloAddress, myStats, cancellationToken));
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    tasks.Add(Task.FromCanceled(cancellationToken));
+                }
+                catch (Exception exception)
+                {
+                    LogWarningRuntimeStatisticsUpdateFailure1(_logger, exception);
+                }
+            }
+
+            await Task.WhenAll(tasks);
+        }
+
+        private DisseminationApplyResult UpdateRuntimeStatisticsInternal(
+            SiloAddress siloAddress,
+            SiloRuntimeStatistics siloStats,
+            bool isDisseminated = false)
         {
             LogTraceUpdateRuntimeStatistics(_logger, siloAddress);
             if (_siloStatusOracle.GetApproximateSiloStatus(siloAddress) != SiloStatus.Active)
             {
-                return;
+                return DisseminationApplyResult.Rejected;
             }
 
             // Take only if newer.
-            if (_periodicStats.TryGetValue(siloAddress, out var old) && old.DateTime > siloStats.DateTime)
+            if (_periodicStats.TryGetValue(siloAddress, out var old))
             {
-                return;
+                if (old.DateTime > siloStats.DateTime)
+                {
+                    return DisseminationApplyResult.Obsolete;
+                }
+
+                if (isDisseminated && old.DateTime == siloStats.DateTime)
+                {
+                    return DisseminationApplyResult.Duplicate;
+                }
             }
 
             _periodicStats[siloAddress] = siloStats;
             NotifyAllStatisticsChangeEventsSubscribers(siloAddress, siloStats);
             DeploymentLoadPublisherEvents.EmitReceived(siloAddress, _siloDetails.SiloAddress, siloStats);
+            return DisseminationApplyResult.Applied;
         }
 
         internal async Task RefreshClusterStatistics(CancellationToken cancellationToken)
@@ -308,6 +421,11 @@ namespace Orleans.Runtime
             Message = "Started DeploymentLoadPublisher"
         )]
         private static partial void LogDebugStartedDeploymentLoadPublisher(ILogger logger);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Deployment load dissemination did not accept the update within {Timeout}. Publishing directly.")]
+        private static partial void LogDebugRuntimeStatisticsDisseminationTimedOut(ILogger logger, TimeSpan timeout);
 
         [LoggerMessage(
             Level = LogLevel.Trace,
