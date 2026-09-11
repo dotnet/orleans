@@ -1555,7 +1555,12 @@ namespace Orleans.Streams
                 consumerData.IsCaughtUp = false;
                 if (consumerData.IsRegistered)
                 {
-                    consumerData.Cursor?.Refresh(startToken);
+                    // Preserve recovery positions so the next move can detect missing replay data.
+                    if (consumerData.Cursor is { } cursor && !ReferenceEquals(cursor, consumerData.DeliveryRecoveryCursor))
+                    {
+                        cursor.Refresh(startToken);
+                    }
+
                     if (consumerData.State == StreamConsumerDataState.Inactive)
                     {
                         // wake up inactive consumers
