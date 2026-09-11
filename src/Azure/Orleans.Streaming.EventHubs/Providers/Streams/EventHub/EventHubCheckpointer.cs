@@ -71,6 +71,7 @@ public class EventHubCheckpointer : IStreamQueueCheckpointer<string>
     /// <param name="serviceId"></param>
     /// <param name="loggerFactory"></param>
     /// <returns></returns>
+    [Obsolete("Use the overload which accepts a CancellationToken.")]
     public static async Task<IStreamQueueCheckpointer<string>> Create(AzureTableStreamCheckpointerOptions options, string streamProviderName, string partition, string serviceId, ILoggerFactory loggerFactory)
         => await Create(
             options,

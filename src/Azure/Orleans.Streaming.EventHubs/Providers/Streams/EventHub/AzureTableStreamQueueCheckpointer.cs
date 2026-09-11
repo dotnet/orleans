@@ -79,6 +79,7 @@ public partial class AzureTableStreamQueueCheckpointer : IStreamQueueCheckpointe
     /// <summary>
     /// Creates and initializes an Azure Table stream queue checkpointer.
     /// </summary>
+    [Obsolete("Use the overload which accepts a CancellationToken.")]
     public static Task<IStreamQueueCheckpointer<string>> Create(
         AzureTableStreamCheckpointerOptions options,
         string streamProviderName,
