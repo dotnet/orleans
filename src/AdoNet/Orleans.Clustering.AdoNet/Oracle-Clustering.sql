@@ -241,6 +241,20 @@ VALUES
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
+    'CleanupDefunctSiloEntriesKey','
+  BEGIN
+    DELETE FROM OrleansMembershipTable
+      WHERE DeploymentId = :DeploymentId
+        AND :DeploymentId IS NOT NULL
+        AND IAmAliveTime < :IAmAliveTime
+        AND Status != 3;
+  END;
+');
+/
+
+INSERT INTO OrleansQuery(QueryKey, QueryText)
+VALUES
+(
     'GatewaysQueryKey','
     SELECT Address, ProxyPort, Generation
     FROM OrleansMembershipTable
