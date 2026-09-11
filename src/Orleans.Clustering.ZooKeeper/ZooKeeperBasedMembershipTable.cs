@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using org.apache.zookeeper;
@@ -39,8 +40,10 @@ namespace Orleans.Runtime.Membership
         private readonly ILogger logger;
 
         private const int ZOOKEEPER_SESSION_TIMEOUT = 10_000;
+        internal const int MetadataRepairCheckInterval = 10;
 
         private readonly ZooKeeperWatcher watcher;
+        private int metadataRepairCheckCountdown;
 
         /// <summary>
         /// The deployment connection string. for eg. "192.168.1.1,192.168.1.2/ClusterId"
@@ -267,9 +270,43 @@ namespace Orleans.Runtime.Membership
 
             string rowIAmAlivePath = ConvertToRowIAmAlivePath(entry.SiloAddress);
             byte[] newRowIAmAliveData = Serialize(entry.IAmAliveTime);
-            //update the data for IAmAlive unconditionally
-            return UsingZookeeper(zk => zk.setDataAsync(rowIAmAlivePath, newRowIAmAliveData), this.deploymentConnectionString, this.watcher);
+            return UsingZookeeper(this.deploymentConnectionString, async zk =>
+            {
+                // Update the data for IAmAlive unconditionally.
+                await zk.setDataAsync(rowIAmAlivePath, newRowIAmAliveData);
+
+                if (entry.Metadata is null || !ShouldCheckMetadata())
+                {
+                    return;
+                }
+
+                var rowPath = ConvertToRowPath(entry.SiloAddress);
+                var row = await zk.getDataAsync(rowPath);
+                var storedEntry = Deserialize<MembershipEntry>(row.Data);
+                if (storedEntry.Metadata is not null)
+                {
+                    MetadataChecked();
+                    return;
+                }
+
+                storedEntry.Metadata = entry.Metadata;
+                try
+                {
+                    await zk.setDataAsync(rowPath, Serialize(storedEntry), row.Stat.getVersion());
+                    MetadataChecked();
+                }
+                catch (KeeperException.BadVersionException)
+                {
+                    // Retry on the next heartbeat.
+                }
+            });
         }
+
+        private bool ShouldCheckMetadata() => ShouldCheckMetadata(ref metadataRepairCheckCountdown);
+
+        internal static bool ShouldCheckMetadata(ref int countdown) => Interlocked.Decrement(ref countdown) <= 0;
+
+        private void MetadataChecked() => Volatile.Write(ref metadataRepairCheckCountdown, MetadataRepairCheckInterval);
 
         /// <summary>
         /// Deletes all table entries of the given clusterId

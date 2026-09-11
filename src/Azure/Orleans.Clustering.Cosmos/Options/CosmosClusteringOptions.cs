@@ -14,6 +14,7 @@ public class CosmosClusteringOptions : CosmosOptions
     {
         ContainerName = ORLEANS_CLUSTER_CONTAINER;
     }
+
 }
 
 /// <summary>

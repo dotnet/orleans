@@ -1,4 +1,5 @@
 using System.Net;
+using System.Collections.Immutable;
 using Orleans.Clustering.Cosmos.Models;
 
 namespace Orleans.Clustering.Cosmos;
@@ -90,7 +91,12 @@ internal partial class CosmosMembershipTable : IMembershipTable
 
             batch = batch.DeleteItem(CLUSTER_VERSION_ID);
 
-            await batch.ExecuteAsync().ConfigureAwait(false);
+            var response = await batch.ExecuteAsync().ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new OrleansException($"Unable to delete Cosmos DB membership entries. Status code: {response.StatusCode}.");
+            }
+
         }
         catch (Exception ex)
         {
@@ -122,19 +128,22 @@ internal partial class CosmosMembershipTable : IMembershipTable
                 .Where(s => Math.Max(s.IAmAliveTime.Ticks, s.StartTime.Ticks) < beforeDate.Ticks)
                 .ToList();
 
-            if (silos.Count == 0)
+            if (silos.Count > 0)
             {
-                return;
+                var batch = _container.CreateTransactionalBatch(_partitionKey);
+
+                foreach (var silo in silos)
+                {
+                    batch = batch.DeleteItem(silo.Id);
+                }
+
+                var response = await batch.ExecuteAsync().ConfigureAwait(false);
+                if (!response.IsSuccessStatusCode)
+                {
+                    throw new OrleansException($"Unable to clean up defunct Cosmos DB membership entries. Status code: {response.StatusCode}.");
+                }
+
             }
-
-            var batch = _container.CreateTransactionalBatch(_partitionKey);
-
-            foreach (var silo in silos)
-            {
-                batch = batch.DeleteItem(silo.Id);
-            }
-
-            await batch.ExecuteAsync().ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -299,7 +308,7 @@ internal partial class CosmosMembershipTable : IMembershipTable
             _self = selfRow = response.Resource;
         }
 
-        selfRow.IAmAliveTime = entry.IAmAliveTime;
+        ApplyHeartbeat(selfRow, entry);
 
         try
         {
@@ -381,6 +390,7 @@ internal partial class CosmosMembershipTable : IMembershipTable
             }
             await Task.Delay(1000);
         }
+
     }
 
     private async Task<ClusterVersionEntity?> ReadClusterVersion()
@@ -439,6 +449,15 @@ internal partial class CosmosMembershipTable : IMembershipTable
 
     private static string ConstructSiloEntityId(SiloAddress silo) => $"{silo.Endpoint.Address}-{silo.Endpoint.Port}-{silo.Generation}";
 
+    internal static void ApplyHeartbeat(SiloEntity entity, MembershipEntry entry)
+    {
+        entity.IAmAliveTime = entry.IAmAliveTime;
+        if (entity.Metadata is null && entry.Metadata is not null)
+        {
+            entity.Metadata = entry.Metadata.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+        }
+    }
+
     private static MembershipEntry ParseEntity(SiloEntity entity)
     {
         var entry = new MembershipEntry
@@ -457,6 +476,8 @@ internal partial class CosmosMembershipTable : IMembershipTable
         entry.StartTime = entity.StartTime.UtcDateTime;
 
         entry.IAmAliveTime = entity.IAmAliveTime.UtcDateTime;
+
+        entry.Metadata = entity.Metadata?.ToImmutableDictionary();
 
         var suspectingSilos = new List<SiloAddress>();
         var suspectingTimes = new List<DateTime>();
@@ -498,7 +519,8 @@ internal partial class CosmosMembershipTable : IMembershipTable
             ProxyPort = memEntry.ProxyPort,
             SiloName = memEntry.SiloName,
             StartTime = memEntry.StartTime,
-            IAmAliveTime = memEntry.IAmAliveTime
+            IAmAliveTime = memEntry.IAmAliveTime,
+            Metadata = memEntry.Metadata?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value)
         };
 
         if (memEntry.SuspectTimes != null)

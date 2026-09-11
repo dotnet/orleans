@@ -1,9 +1,13 @@
+using System.Collections.Immutable;
+using System.Net;
+using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using TestExtensions;
 using UnitTests.MembershipTests;
 using Orleans.Messaging;
 using Orleans.Clustering.Cosmos;
+using Orleans.Clustering.Cosmos.Models;
 using UnitTests;
 
 namespace Tester.Cosmos.Clustering;
@@ -99,6 +103,12 @@ public class CosmosMembershipTableTests : MembershipTableTestsBase
     }
 
     [Fact, TestCategory("Functional")]
+    public async Task MembershipTable_Cosmos_MetadataRoundTrips()
+    {
+        await MembershipTable_MetadataRoundTrips();
+    }
+
+    [Fact, TestCategory("Functional")]
     public async Task MembershipTable_Cosmos_ReadRow_Insert_Read()
     {
         CosmosTestUtils.SkipIfCosmosEmulator(CosmosEmulatorTransactionalBatchConditionSkipReason);
@@ -142,5 +152,114 @@ public class CosmosMembershipTableTests : MembershipTableTestsBase
     public async Task MembershipTable_Cosmos_UpdateIAmAlive()
     {
         await MembershipTable_UpdateIAmAlive();
+    }
+
+    [Fact, TestCategory("Functional")]
+    public async Task MembershipMetadata_HeartbeatRepairsMissingInlineMetadata()
+    {
+        CosmosTestUtils.SkipIfCosmosEmulator(CosmosEmulatorTransactionalBatchConditionSkipReason);
+
+        var options = new CosmosClusteringOptions();
+        options.ConfigureTestDefaults();
+        var membership = new CosmosMembershipTable(loggerFactory, Services, Options.Create(options), _clusterOptions);
+        await membership.InitializeMembershipTable(false);
+
+        var entry = CreateMetadataEntry();
+        var initial = await membership.ReadAll();
+        Assert.True(await membership.InsertRow(entry, initial.Version.Next()));
+
+        using var client = await options.CreateClient(Services);
+        var container = client.GetContainer(options.DatabaseName, options.ContainerName);
+        var partitionKey = new PartitionKey(clusterId);
+        var id = $"{entry.SiloAddress.Endpoint.Address}-{entry.SiloAddress.Endpoint.Port}-{entry.SiloAddress.Generation}";
+        var legacyEntity = (await container.ReadItemAsync<SiloEntity>(
+            id,
+            partitionKey,
+            cancellationToken: TestContext.Current.CancellationToken)).Resource;
+        legacyEntity.Metadata = null;
+        await container.ReplaceItemAsync(
+            legacyEntity,
+            id,
+            partitionKey,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        entry.IAmAliveTime = entry.IAmAliveTime.AddMinutes(1);
+        await membership.UpdateIAmAlive(entry);
+
+        var repaired = (await container.ReadItemAsync<SiloEntity>(
+            id,
+            partitionKey,
+            cancellationToken: TestContext.Current.CancellationToken)).Resource;
+        Assert.Equal(entry.Metadata, repaired.Metadata);
+        Assert.Equal(entry.IAmAliveTime, repaired.IAmAliveTime.UtcDateTime);
+    }
+
+    private static MembershipEntry CreateMetadataEntry() => new()
+    {
+        SiloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 12345), 123456),
+        HostName = "host",
+        SiloName = "silo",
+        Status = SiloStatus.Joining,
+        StartTime = DateTime.UtcNow,
+        IAmAliveTime = DateTime.UtcNow,
+        Metadata = ImmutableDictionary<string, string>.Empty.Add("region", "west")
+    };
+}
+
+[TestCategory("BVT")]
+[TestSuite("BVT")]
+[TestProvider("Cosmos")]
+[TestArea("Membership")]
+public class CosmosMembershipMetadataContractTests
+{
+    [Fact]
+    public void ApplyHeartbeat_RepairsMissingInlineMetadata()
+    {
+        var expected = ImmutableDictionary<string, string>.Empty.Add("region", "west");
+        var heartbeat = new MembershipEntry
+        {
+            IAmAliveTime = DateTime.UtcNow,
+            Metadata = expected
+        };
+        var entity = new SiloEntity { Metadata = null };
+
+        CosmosMembershipTable.ApplyHeartbeat(entity, heartbeat);
+
+        Assert.Equal(expected, entity.Metadata);
+        Assert.Equal(heartbeat.IAmAliveTime, entity.IAmAliveTime);
+    }
+
+    [Fact]
+    public void ApplyHeartbeat_RepairsAvailableEmptyInlineMetadata()
+    {
+        var heartbeat = new MembershipEntry
+        {
+            IAmAliveTime = DateTime.UtcNow,
+            Metadata = ImmutableDictionary<string, string>.Empty
+        };
+        var entity = new SiloEntity { Metadata = null };
+
+        CosmosMembershipTable.ApplyHeartbeat(entity, heartbeat);
+
+        Assert.NotNull(entity.Metadata);
+        Assert.Empty(entity.Metadata);
+    }
+
+    [Fact]
+    public void ApplyHeartbeat_PreservesAvailableInlineMetadata()
+    {
+        var heartbeat = new MembershipEntry
+        {
+            IAmAliveTime = DateTime.UtcNow,
+            Metadata = ImmutableDictionary<string, string>.Empty.Add("region", "replacement")
+        };
+        var entity = new SiloEntity
+        {
+            Metadata = new Dictionary<string, string> { ["region"] = "existing" }
+        };
+
+        CosmosMembershipTable.ApplyHeartbeat(entity, heartbeat);
+
+        Assert.Equal("existing", entity.Metadata["region"]);
     }
 }

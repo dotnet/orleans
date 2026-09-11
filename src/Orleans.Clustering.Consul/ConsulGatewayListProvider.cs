@@ -63,7 +63,12 @@ namespace Orleans.Runtime.Membership
         /// <inheritdoc />
         public async Task<IList<Uri>> GetGateways()
         {
-            var membershipTableData = await ConsulBasedMembershipTable.ReadAll(this.consulClient, this.clusterId, this.kvRootFolder, this.logger, null);
+            var membershipTableData = await ConsulBasedMembershipTable.ReadAll(
+                this.consulClient,
+                this.clusterId,
+                this.kvRootFolder,
+                this.logger,
+                versionKey: null);
             if (membershipTableData == null) return new List<Uri>();
 
             return membershipTableData.Members.Select(e => e.Item1).

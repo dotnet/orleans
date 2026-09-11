@@ -106,6 +106,10 @@ Console.WriteLine($"Grain response: {response}");
 await host.WaitForShutdownAsync();
 ```
 
+## Membership metadata storage
+
+The silo provider stores membership metadata inline in each silo's membership entity. During a mixed-version rolling upgrade, an older silo can temporarily remove that property when it replaces an entity. Each active metadata-aware silo restores its own metadata on its next heartbeat.
+
 ## Documentation
 For more comprehensive documentation, please refer to:
 - [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)

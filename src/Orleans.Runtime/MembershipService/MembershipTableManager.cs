@@ -16,6 +16,7 @@ using Orleans.Configuration;
 using Orleans.Internal;
 using Orleans.Runtime.Utilities;
 using Orleans.Serialization.TypeSystem;
+using SiloMetadataModel = Orleans.Runtime.MembershipService.SiloMetadata.SiloMetadata;
 
 namespace Orleans.Runtime.MembershipService
 {
@@ -38,6 +39,7 @@ namespace Orleans.Runtime.MembershipService
         private readonly ILogger log;
         private readonly SiloLifecycleSubject siloLifecycle;
         private readonly ClusterMembershipOptions clusterMembershipOptions;
+        private readonly ImmutableDictionary<string, string> localSiloMetadata;
         private readonly DateTime siloStartTime = DateTime.UtcNow;
         private readonly SiloAddress myAddress;
         private readonly AsyncEnumerable<MembershipTableSnapshot> updates;
@@ -59,13 +61,15 @@ namespace Orleans.Runtime.MembershipService
             ILogger<MembershipTableManager> log,
             IAsyncTimerFactory timerFactory,
             SiloLifecycleSubject siloLifecycle,
-            [FromKeyedServices(TimeProviderNames.Membership)] TimeProvider timeProvider)
+            [FromKeyedServices(TimeProviderNames.Membership)] TimeProvider timeProvider,
+            IOptions<SiloMetadataModel>? siloMetadata = null)
         {
             this.localSiloDetails = localSiloDetails;
             this.membershipTableProvider = membershipTable;
             this.fatalErrorHandler = fatalErrorHandler;
             this.gossiper = gossiper;
             this.clusterMembershipOptions = clusterMembershipOptions.Value;
+            this.localSiloMetadata = siloMetadata?.Value.Metadata ?? ImmutableDictionary<string, string>.Empty;
             this.myAddress = this.localSiloDetails.SiloAddress;
             this.log = log;
             this.siloLifecycle = siloLifecycle;
@@ -213,7 +217,8 @@ namespace Orleans.Runtime.MembershipService
             var entry = new MembershipEntry
             {
                 SiloAddress = myAddress,
-                IAmAliveTime = GetDateTimeUtcNow()
+                IAmAliveTime = GetDateTimeUtcNow(),
+                Metadata = localSiloMetadata
             };
 
             await this.membershipTableProvider.UpdateIAmAlive(entry);
@@ -463,7 +468,8 @@ namespace Orleans.Runtime.MembershipService
 
                 SuspectTimes = new List<Tuple<SiloAddress, DateTime>>(),
                 StartTime = this.siloStartTime,
-                IAmAliveTime = GetDateTimeUtcNow()
+                IAmAliveTime = GetDateTimeUtcNow(),
+                Metadata = this.localSiloMetadata
             };
         }
 

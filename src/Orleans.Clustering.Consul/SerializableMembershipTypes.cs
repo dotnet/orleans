@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Text;
 using Consul;
@@ -78,6 +79,9 @@ namespace Orleans.Runtime.Host
         [JsonProperty]
         public List<SuspectingSilo>? SuspectingSilos { get; set; }
 
+        [JsonProperty]
+        public Dictionary<string, string>? Metadata { get; set; }
+
         [JsonConstructor]
         internal ConsulSiloRegistration()
         {
@@ -124,10 +128,8 @@ namespace Orleans.Runtime.Host
             {
                 return $"{DeploymentKVPrefix}{KeySeparator}{deploymentId}";
             }
-            else
-            {
-                return $"{rootKvFolder}{KeySeparator}{DeploymentKVPrefix}{KeySeparator}{deploymentId}";
-            }
+
+            return $"{rootKvFolder}{KeySeparator}{DeploymentKVPrefix}{KeySeparator}{deploymentId}";
         }
 
         internal static string FormatDeploymentSiloKey(string deploymentId, string? rootKvFolder, SiloAddress siloAddress)
@@ -175,7 +177,8 @@ namespace Orleans.Runtime.Host
                 StartTime = entry.StartTime,
                 Status = entry.Status,
                 SiloName = entry.SiloName,
-                SuspectingSilos = entry.SuspectTimes?.Select(silo => new SuspectingSilo { Id = silo.Item1.ToParsableString(), Time = silo.Item2 }).ToList()
+                SuspectingSilos = entry.SuspectTimes?.Select(silo => new SuspectingSilo { Id = silo.Item1.ToParsableString(), Time = silo.Item2 }).ToList(),
+                Metadata = entry.Metadata?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value)
             };
 
             return ret;
@@ -208,6 +211,7 @@ namespace Orleans.Runtime.Host
                 SuspectTimes = siloRegistration.SuspectingSilos?.Select(silo => new Tuple<SiloAddress, DateTime>(SiloAddress.FromParsableString(silo.Id), silo.Time)).ToList(),
                 IAmAliveTime = siloRegistration.IAmAliveTime,
                 SiloName = siloRegistration.SiloName,
+                Metadata = siloRegistration.Metadata?.ToImmutableDictionary(),
 
                 // Optional - only for Azure role so initialised here
                 RoleName = string.Empty,
@@ -218,4 +222,5 @@ namespace Orleans.Runtime.Host
             return new Tuple<MembershipEntry, string>(entry, siloRegistration.LastIndex.ToString());
         }
     }
+
 }

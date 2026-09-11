@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Clustering.Redis;
@@ -110,5 +111,46 @@ namespace Tester.Redis.Clustering
         {
             await MembershipTable_CleanupDefunctSiloEntries(false);
         }
+
+    }
+
+    [TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Membership")]
+    public class RedisMembershipMetadataContractTests
+    {
+        [Fact]
+        public void ApplyHeartbeat_RepairsMissingMetadata()
+        {
+            var existing = CreateMetadataEntry(metadata: null);
+            var heartbeat = CreateMetadataEntry(
+                ImmutableDictionary<string, string>.Empty.Add("region", "west"));
+
+            RedisMembershipTable.ApplyHeartbeat(existing, heartbeat);
+
+            Assert.Equal("west", existing.Metadata!["region"]);
+        }
+
+        [Fact]
+        public void ApplyHeartbeat_PreservesExistingMetadata()
+        {
+            var existing = CreateMetadataEntry(
+                ImmutableDictionary<string, string>.Empty.Add("region", "existing"));
+            var heartbeat = CreateMetadataEntry(
+                ImmutableDictionary<string, string>.Empty.Add("region", "replacement"));
+
+            RedisMembershipTable.ApplyHeartbeat(existing, heartbeat);
+
+            Assert.Equal("existing", existing.Metadata!["region"]);
+        }
+
+        private static MembershipEntry CreateMetadataEntry(ImmutableDictionary<string, string>? metadata)
+            => new()
+            {
+                SiloAddress = SiloAddress.FromParsableString("127.0.0.1:11111@1"),
+                IAmAliveTime = DateTime.UtcNow,
+                Metadata = metadata
+            };
     }
 }

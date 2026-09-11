@@ -32,6 +32,10 @@ var builder = Host.CreateApplicationBuilder(args)
 await builder.RunAsync();
 ```
 
+## Membership metadata storage
+
+The silo provider stores membership metadata inline in each silo's membership document. During a mixed-version rolling upgrade, an older silo can temporarily remove that field when it replaces a document. Each active metadata-aware silo restores its own metadata on its next heartbeat.
+
 ## Documentation
 For more comprehensive documentation, please refer to:
 - [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)

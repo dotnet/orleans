@@ -1,7 +1,13 @@
+using System.Collections.Immutable;
+using System.Net;
+using System.Text;
+using Consul;
+using Newtonsoft.Json;
 using Orleans.Messaging;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Runtime.Host;
 using Orleans.Runtime.Membership;
 using TestExtensions;
 using UnitTests;
@@ -111,6 +117,12 @@ namespace Consul.Tests
         }
 
         [Fact, TestCategory("Functional")]
+        public async Task MembershipTable_Consul_MetadataRoundTrips()
+        {
+            await MembershipTable_MetadataRoundTrips();
+        }
+
+        [Fact, TestCategory("Functional")]
         public async Task MembershipTable_Consul_ReadRow_Insert_Read()
         {
             await MembershipTable_ReadRow_Insert_Read(false);
@@ -155,6 +167,101 @@ namespace Consul.Tests
         public async Task MembershipTable_Consul_CleanupDefunctSiloEntries()
         {
             await MembershipTable_CleanupDefunctSiloEntries(false);
+        }
+
+        [Fact, TestCategory("Functional")]
+        public async Task MembershipMetadata_HeartbeatRepairsMissingInlineMetadata()
+        {
+            var options = new ConsulClusteringOptions();
+            options.ConfigureConsulClient(new Uri(connectionString));
+            var membership = new ConsulBasedMembershipTable(
+                loggerFactory.CreateLogger<ConsulBasedMembershipTable>(),
+                Options.Create(options),
+                _clusterOptions);
+
+            var entry = CreateMetadataEntry();
+            var initial = await membership.ReadAll();
+            Assert.True(await membership.InsertRow(entry, initial.Version.Next()));
+
+            using var client = options.CreateClient();
+            var address = entry.SiloAddress.ToParsableString();
+            var membershipKey = $"orleans/{clusterId}/{address}";
+            var legacyPair = (await client.KV.Get(membershipKey, TestContext.Current.CancellationToken)).Response;
+            var legacyRegistration = JsonConvert.DeserializeObject<ConsulSiloRegistration>(
+                Encoding.UTF8.GetString(legacyPair.Value))!;
+            legacyRegistration.Metadata = null;
+            legacyPair.Value = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(legacyRegistration));
+            Assert.True((await client.KV.Put(legacyPair, TestContext.Current.CancellationToken)).Response);
+
+            var versionBeforeHeartbeat = (await membership.ReadAll()).Version;
+            entry.IAmAliveTime = entry.IAmAliveTime.AddMinutes(1);
+            await membership.UpdateIAmAlive(entry);
+
+            var repairedPair = (await client.KV.Get(membershipKey, TestContext.Current.CancellationToken)).Response;
+            var repairedRegistration = JsonConvert.DeserializeObject<ConsulSiloRegistration>(
+                Encoding.UTF8.GetString(repairedPair.Value))!;
+            Assert.Equal(entry.Metadata, repairedRegistration.Metadata);
+            Assert.Equal(versionBeforeHeartbeat, (await membership.ReadAll()).Version);
+        }
+
+        [Fact, TestCategory("Functional")]
+        public async Task MembershipMetadata_HeartbeatDoesNotOverwritePresentInlineMetadata()
+        {
+            var options = new ConsulClusteringOptions();
+            options.ConfigureConsulClient(new Uri(connectionString));
+            var membership = new ConsulBasedMembershipTable(
+                loggerFactory.CreateLogger<ConsulBasedMembershipTable>(),
+                Options.Create(options),
+                _clusterOptions);
+            var entry = CreateMetadataEntry();
+            var initial = await membership.ReadAll();
+            Assert.True(await membership.InsertRow(entry, initial.Version.Next()));
+            var expected = entry.Metadata;
+
+            using var client = options.CreateClient();
+            var membershipKey = $"orleans/{clusterId}/{entry.SiloAddress.ToParsableString()}";
+            var originalIndex = (await client.KV.Get(membershipKey, TestContext.Current.CancellationToken)).Response.ModifyIndex;
+
+            entry.Metadata = ImmutableDictionary<string, string>.Empty.Add("region", "conflict");
+            entry.IAmAliveTime = entry.IAmAliveTime.AddMinutes(1);
+            await membership.UpdateIAmAlive(entry);
+
+            var storedPair = (await client.KV.Get(membershipKey, TestContext.Current.CancellationToken)).Response;
+            var storedRegistration = JsonConvert.DeserializeObject<ConsulSiloRegistration>(
+                Encoding.UTF8.GetString(storedPair.Value))!;
+            Assert.Equal(expected, storedRegistration.Metadata);
+            Assert.Equal(originalIndex, storedPair.ModifyIndex);
+        }
+
+        private static MembershipEntry CreateMetadataEntry() => new()
+        {
+            SiloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 12345), 123456),
+            HostName = "host",
+            SiloName = "silo",
+            Status = SiloStatus.Joining,
+            StartTime = DateTime.UtcNow,
+            IAmAliveTime = DateTime.UtcNow,
+            Metadata = ImmutableDictionary<string, string>.Empty.Add("region", "west")
+        };
+    }
+
+    [TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Membership")]
+    public class ConsulMembershipMetadataContractTests
+    {
+        [Fact]
+        public void MetadataRepairCountdown_ChecksOnConfiguredInterval()
+        {
+            var countdown = ConsulBasedMembershipTable.MetadataRepairCheckInterval;
+
+            for (var heartbeat = 1; heartbeat < ConsulBasedMembershipTable.MetadataRepairCheckInterval; heartbeat++)
+            {
+                Assert.False(ConsulBasedMembershipTable.ShouldCheckMetadata(ref countdown));
+            }
+
+            Assert.True(ConsulBasedMembershipTable.ShouldCheckMetadata(ref countdown));
         }
     }
 }

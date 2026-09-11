@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Consul;
 using Microsoft.Extensions.Logging;
@@ -24,6 +25,9 @@ namespace Orleans.Runtime.Membership
         private readonly string clusterId;
         private readonly string? kvRootFolder;
         private readonly string versionKey;
+        private int metadataRepairCheckCountdown;
+
+        internal const int MetadataRepairCheckInterval = 10;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ConsulBasedMembershipTable"/> class.
@@ -83,7 +87,8 @@ namespace Orleans.Runtime.Membership
         /// <returns>The cluster membership entries and table version.</returns>
         public static async Task<MembershipTableData> ReadAll(IConsulClient consulClient, string clusterId, string? kvRootFolder, ILogger logger, string? versionKey)
         {
-            var deploymentKVAddresses = await consulClient.KV.List(ConsulSiloRegistrationAssembler.FormatDeploymentKVPrefix(clusterId, kvRootFolder));
+            var deploymentKVAddresses = await consulClient.KV.List(
+                ConsulSiloRegistrationAssembler.FormatDeploymentKVPrefix(clusterId, kvRootFolder));
             if (deploymentKVAddresses.Response == null)
             {
                 LogDebugCouldNotFindSiloRegistrations(logger, clusterId);
@@ -95,10 +100,14 @@ namespace Orleans.Runtime.Membership
                 .Where(siloKV => !siloKV.Key.EndsWith(ConsulSiloRegistrationAssembler.SiloIAmAliveSuffix, StringComparison.OrdinalIgnoreCase)
                         && !siloKV.Key.EndsWith(ConsulSiloRegistrationAssembler.VersionSuffix, StringComparison.OrdinalIgnoreCase))
                 .Select(siloKV =>
-                {
-                    var iAmAliveKV = deploymentKVAddresses.Response.SingleOrDefault(kv => kv.Key.Equals(ConsulSiloRegistrationAssembler.FormatSiloIAmAliveKey(siloKV.Key), StringComparison.OrdinalIgnoreCase));
-                    return ConsulSiloRegistrationAssembler.FromKVPairs(clusterId, siloKV, iAmAliveKV);
-                }).ToArray();
+                    ConsulSiloRegistrationAssembler.FromKVPairs(
+                        clusterId,
+                        siloKV,
+                        deploymentKVAddresses.Response.SingleOrDefault(kv =>
+                            kv.Key.Equals(
+                                ConsulSiloRegistrationAssembler.FormatSiloIAmAliveKey(siloKV.Key),
+                                StringComparison.OrdinalIgnoreCase))))
+                .ToArray();
 
             var tableVersion = GetTableVersion(versionKey, deploymentKVAddresses);
 
@@ -165,7 +174,50 @@ namespace Orleans.Runtime.Membership
         {
             var iAmAliveKV = ConsulSiloRegistrationAssembler.ToIAmAliveKVPair(this.clusterId, this.kvRootFolder, entry.SiloAddress, entry.IAmAliveTime);
             await _consulClient.KV.Put(iAmAliveKV);
+
+            if (entry.Metadata is null || !ShouldCheckMetadata())
+            {
+                return;
+            }
+
+            var membershipKey = ConsulSiloRegistrationAssembler.FormatDeploymentSiloKey(
+                this.clusterId,
+                this.kvRootFolder,
+                entry.SiloAddress);
+            var membership = await _consulClient.KV.Get(membershipKey);
+            if (membership.Response is not { } membershipPair)
+            {
+                return;
+            }
+
+            var registration = ConsulSiloRegistrationAssembler.FromKVPairs(this.clusterId, membershipPair, null);
+            if (registration.Metadata is not null)
+            {
+                MetadataChecked();
+                return;
+            }
+
+            registration.Metadata = entry.Metadata.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+            var repair = ConsulSiloRegistrationAssembler.ToKVPair(registration, this.kvRootFolder);
+            var result = await _consulClient.KV.Txn(
+            [
+                new KVTxnOp(repair.Key, KVTxnVerb.CAS)
+                {
+                    Index = membershipPair.ModifyIndex,
+                    Value = repair.Value
+                }
+            ]);
+            if (result.Response.Success)
+            {
+                MetadataChecked();
+            }
         }
+
+        private bool ShouldCheckMetadata() => ShouldCheckMetadata(ref metadataRepairCheckCountdown);
+
+        internal static bool ShouldCheckMetadata(ref int countdown) => Interlocked.Decrement(ref countdown) <= 0;
+
+        private void MetadataChecked() => Volatile.Write(ref metadataRepairCheckCountdown, MetadataRepairCheckInterval);
 
         /// <inheritdoc />
         public async Task DeleteMembershipTableEntries(string clusterId)
@@ -235,16 +287,16 @@ namespace Orleans.Runtime.Membership
             if (allKVs.Response == null)
             {
                 LogDebugCouldNotFindSiloRegistrationsForCleanup(this.clusterId);
-                return;
             }
 
+            var deploymentEntries = allKVs.Response ?? [];
             var allRegistrations =
-                allKVs.Response
+                deploymentEntries
                 .Where(siloKV => !siloKV.Key.EndsWith(ConsulSiloRegistrationAssembler.SiloIAmAliveSuffix, StringComparison.OrdinalIgnoreCase)
                     && !siloKV.Key.EndsWith(ConsulSiloRegistrationAssembler.VersionSuffix, StringComparison.OrdinalIgnoreCase))
                 .Select(siloKV =>
                 {
-                    var iAmAliveKV = allKVs.Response.SingleOrDefault(kv => kv.Key.Equals(ConsulSiloRegistrationAssembler.FormatSiloIAmAliveKey(siloKV.Key), StringComparison.OrdinalIgnoreCase));
+                    var iAmAliveKV = deploymentEntries.SingleOrDefault(kv => kv.Key.Equals(ConsulSiloRegistrationAssembler.FormatSiloIAmAliveKey(siloKV.Key), StringComparison.OrdinalIgnoreCase));
                     return new
                     {
                         RegistrationKey = siloKV.Key,

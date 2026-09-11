@@ -89,6 +89,12 @@ namespace UnitTests.MembershipTests
         }
 
         [Fact]
+        public async Task MembershipTable_PostgreSql_MetadataRoundTrips()
+        {
+            await MembershipTable_MetadataRoundTrips();
+        }
+
+        [Fact]
         public async Task MembershipTable_PostgreSql_ReadRow_Insert_Read()
         {
             await MembershipTable_ReadRow_Insert_Read();

@@ -6,6 +6,7 @@ using System.Net;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Azure;
 using Azure.Data.Tables;
 using Microsoft.Extensions.Logging;
 using Orleans.Clustering.AzureStorage;
@@ -69,7 +70,9 @@ namespace Orleans.AzureUtils
             catch (Exception ex)
             {
                 instance.LogErrorConnectingToAzureTable(ex, instance.storage.TableName);
-                throw;
+                throw new OrleansException(
+                    $"Unable to create or connect to Azure membership storage '{instance.storage.TableName}'.",
+                    ex);
             }
             return instance;
         }

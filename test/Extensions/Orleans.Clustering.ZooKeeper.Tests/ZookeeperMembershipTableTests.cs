@@ -1,7 +1,10 @@
+using System.Collections.Immutable;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
+using Newtonsoft.Json;
 using Orleans.Messaging;
+using Orleans.Runtime.Host;
 using Orleans.Runtime.Membership;
 using Orleans.Configuration;
 using TestExtensions;
@@ -141,6 +144,64 @@ namespace UnitTests.MembershipTests
         public async Task MembershipTable_ZooKeeper_UpdateIAmAlive()
         {
             await MembershipTable_UpdateIAmAlive();
+        }
+
+        [TestCategory("BVT")]
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Membership")]
+        public class ZooKeeperMembershipMetadataContractTests
+        {
+            [Fact]
+            public void MembershipEntry_MetadataRoundTrips()
+            {
+                var expected = ImmutableDictionary<string, string>.Empty.Add("region", "west");
+                var entry = new MembershipEntry
+                {
+                    SiloAddress = SiloAddress.FromParsableString("127.0.0.1:11111@1"),
+                    Metadata = expected
+                };
+
+                var json = JsonConvert.SerializeObject(entry, MembershipSerializerSettings.Instance);
+                var result = JsonConvert.DeserializeObject<MembershipEntry>(json, MembershipSerializerSettings.Instance);
+
+                Assert.NotNull(result);
+                Assert.Equal(expected, result.Metadata);
+            }
+
+            [Fact]
+            public void LegacyMembershipEntry_HasUnavailableMetadata()
+            {
+                const string json = """
+                    {
+                      "SiloAddress": { "SiloAddress": "127.0.0.1:11111@1" },
+                      "HostName": "localhost",
+                      "SiloName": "silo",
+                      "Status": "Active",
+                      "ProxyPort": 0,
+                      "StartTime": "2026-01-01T00:00:00Z",
+                      "SuspectTimes": []
+                    }
+                    """;
+
+                var result = JsonConvert.DeserializeObject<MembershipEntry>(json, MembershipSerializerSettings.Instance);
+
+                Assert.NotNull(result);
+                Assert.Null(result.Metadata);
+            }
+
+            [Fact]
+            public void MetadataRepairCountdown_ChecksOnConfiguredInterval()
+            {
+                var countdown = ZooKeeperBasedMembershipTable.MetadataRepairCheckInterval;
+
+                for (var heartbeat = 1; heartbeat < ZooKeeperBasedMembershipTable.MetadataRepairCheckInterval; heartbeat++)
+                {
+                    Assert.False(ZooKeeperBasedMembershipTable.ShouldCheckMetadata(ref countdown));
+                }
+
+                Assert.True(ZooKeeperBasedMembershipTable.ShouldCheckMetadata(ref countdown));
+            }
         }
     }
 }
