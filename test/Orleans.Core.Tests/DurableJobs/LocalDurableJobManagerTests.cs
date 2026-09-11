@@ -200,6 +200,48 @@ public class LocalDurableJobManagerTests
     }
 
     [Fact]
+    public async Task Discovery_MaximumLookaheadIncludesAllRepresentableDates()
+    {
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var shardManager = new TestJobShardManager();
+        var options = CreateOptions();
+        options.ShardLoadLookaheadPeriod = TimeSpan.MaxValue;
+        new DurableJobsOptionsValidator(NullLogger<DurableJobsOptionsValidator>.Instance, Options.Create(options)).ValidateConfiguration();
+        var manager = CreateManager(shardManager, timeProvider, options);
+        var accessor = new LocalDurableJobManager.TestAccessor(manager);
+
+        await accessor.ProcessShardCheckCycleAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(DateTimeOffset.MaxValue, shardManager.LastMaxDueTime);
+        Assert.Equal(TimeSpan.Zero, shardManager.LastMaxDueTime.Offset);
+        Assert.Equal(TimeSpan.MaxValue, options.ShardLoadLookaheadPeriod);
+    }
+
+    [Theory]
+    [InlineData(2, 0, 2)]
+    [InlineData(2, 1, 1)]
+    [InlineData(2, 2, 0)]
+    [InlineData(2, 3, 0)]
+    [InlineData(2, long.MaxValue, 0)]
+    [InlineData(0, 0, 0)]
+    [InlineData(0, 1, 0)]
+    public async Task Discovery_NearMaximumTimeClampsLookahead(long remainingTicks, long lookaheadTicks, long expectedRemainingTicks)
+    {
+        var timeProvider = new FakeTimeProvider(DateTimeOffset.MaxValue.AddTicks(-remainingTicks));
+        var shardManager = new TestJobShardManager();
+        var options = CreateOptions();
+        options.ShardLoadLookaheadPeriod = TimeSpan.FromTicks(lookaheadTicks);
+        var manager = CreateManager(shardManager, timeProvider, options);
+        var accessor = new LocalDurableJobManager.TestAccessor(manager);
+
+        await accessor.ProcessShardCheckCycleAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(DateTimeOffset.MaxValue.AddTicks(-expectedRemainingTicks), shardManager.LastMaxDueTime);
+        Assert.Equal(TimeSpan.Zero, shardManager.LastMaxDueTime.Offset);
+        Assert.Equal(TimeSpan.FromTicks(lookaheadTicks), options.ShardLoadLookaheadPeriod);
+    }
+
+    [Fact]
     public async Task Discovery_RevisitedFutureShardActivatesAfterClockAdvances()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

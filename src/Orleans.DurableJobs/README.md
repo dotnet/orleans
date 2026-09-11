@@ -113,7 +113,8 @@ A discovered shard starts processing once its start time enters `ShardActivation
 `DurableJobsOptions.ShardCheckInterval` controls periodic discovery and writable-shard cleanup
 checks, with a default of five minutes. Membership changes also trigger checks.
 The lookahead accepts non-negative durations; zero selects shards whose start time is at or
-before the current time. The check interval accepts durations from 1 to 4294967294 milliseconds.
+before the current time. The discovery horizon is capped at `DateTimeOffset.MaxValue`.
+The check interval accepts durations from 1 to 4294967294 milliseconds.
 
 Shard journals use names such as
 `jobs/shards/20260909T1200000000000Z-<unique-id>`. The fixed-width UTC start time
