@@ -77,10 +77,10 @@ public class SqlServerStorageForTestingTests
                 attempt,
                 cancellation.Token))
             .ToArray();
-        await Task.WhenAll(reconnectAttempts.Select(attempt => attempt.Task)).WaitAsync(cancellationToken);
 
         try
         {
+            await Task.WhenAll(reconnectAttempts.Select(attempt => attempt.Task)).WaitAsync(cancellationToken);
             await storage.ExecuteSetupScriptBatchesAsync(
                 [
                     $"""
