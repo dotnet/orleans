@@ -67,6 +67,11 @@ namespace Orleans.Streaming.EventHubs
         private readonly HashSet<Cursor> cursors = new(ReferenceEqualityComparer.Instance);
         private HashSet<Cursor>? recoveryPendingCursors;
         private Task? recoveryTask;
+        private readonly SemaphoreSlim receiverCloseLock = new(1, 1);
+        private readonly SemaphoreSlim shutdownLock = new(1, 1);
+        private IEventHubReceiver? receiverPendingClose;
+        private Task? receiverCloseTask;
+        private bool shutdownCompleted;
 
         // Receiver life cycle
         private int receiverState = ReceiverShutdown;
@@ -254,6 +259,11 @@ namespace Orleans.Streaming.EventHubs
                 await recoveryTask.WaitAsync(cancellationToken);
             }
 
+            if (Volatile.Read(ref this.receiverPendingClose) is not null)
+            {
+                await ClosePendingReceiverWithTimeout().WaitAsync(cancellationToken);
+            }
+
             // if receiver initialization failed, retry
             if (this.receiver == null)
             {
@@ -376,6 +386,11 @@ namespace Orleans.Streaming.EventHubs
                     this.cache = null;
                     this.flowController = new(MaxMessagesPerRead);
                     receiver = Interlocked.Exchange(ref this.receiver, null);
+                    if (receiver is not null)
+                    {
+                        this.receiverPendingClose = receiver;
+                        this.receiverCloseTask = null;
+                    }
                 }
             }
 
@@ -409,12 +424,7 @@ namespace Orleans.Streaming.EventHubs
 
             try
             {
-                if (receiver is not null)
-                {
-                    using var cleanupCancellation = new CancellationTokenSource(ReceiveTimeout);
-                    await receiver.CloseAsync(cleanupCancellation.Token)
-                        .WaitAsync(cleanupCancellation.Token);
-                }
+                await ClosePendingReceiverWithTimeout();
             }
             catch (Exception exception)
             {
@@ -460,6 +470,61 @@ namespace Orleans.Streaming.EventHubs
             if (exceptions.Count > 1)
             {
                 throw new AggregateException(exceptions);
+            }
+        }
+
+        private async Task ClosePendingReceiverWithTimeout()
+        {
+            using var cleanupCancellation = new CancellationTokenSource(ReceiveTimeout);
+            await ClosePendingReceiver(cleanupCancellation.Token);
+        }
+
+        private async Task ClosePendingReceiver(CancellationToken cancellationToken)
+        {
+            await this.receiverCloseLock.WaitAsync(cancellationToken);
+            try
+            {
+                IEventHubReceiver? receiver;
+                Task closeTask;
+                lock (this.cacheLock)
+                {
+                    receiver = this.receiverPendingClose;
+                    if (receiver is null)
+                    {
+                        return;
+                    }
+
+                    if (this.receiverCloseTask is { IsCompletedSuccessfully: true })
+                    {
+                        this.receiverPendingClose = null;
+                        this.receiverCloseTask = null;
+                        return;
+                    }
+
+                    var existingCloseTask = this.receiverCloseTask;
+                    if (existingCloseTask is null || existingCloseTask.IsCompleted)
+                    {
+                        existingCloseTask = receiver.CloseAsync(cancellationToken);
+                        existingCloseTask.Ignore();
+                        this.receiverCloseTask = existingCloseTask;
+                    }
+
+                    closeTask = existingCloseTask;
+                }
+
+                await closeTask.WaitAsync(cancellationToken);
+                lock (this.cacheLock)
+                {
+                    if (ReferenceEquals(this.receiverPendingClose, receiver))
+                    {
+                        this.receiverPendingClose = null;
+                        this.receiverCloseTask = null;
+                    }
+                }
+            }
+            finally
+            {
+                this.receiverCloseLock.Release();
             }
         }
 
@@ -649,16 +714,22 @@ namespace Orleans.Streaming.EventHubs
 
         public async Task Shutdown(TimeSpan timeout)
         {
+            using var shutdownCancellation = timeout == Timeout.InfiniteTimeSpan
+                ? null
+                : new CancellationTokenSource(timeout);
+            var shutdownCancellationToken = shutdownCancellation?.Token ?? CancellationToken.None;
+            await this.shutdownLock.WaitAsync(shutdownCancellationToken);
             var watch = Stopwatch.StartNew();
             try
             {
-                // if receiver was already shutdown, do nothing
+                if (this.shutdownCompleted)
+                {
+                    return;
+                }
+
                 lock (this.cacheLock)
                 {
-                    if (ReceiverShutdown == Interlocked.Exchange(ref this.receiverState, ReceiverShutdown))
-                    {
-                        return;
-                    }
+                    this.receiverState = ReceiverShutdown;
                 }
 
                 LogInfoStoppingReadingFromEventHubPartition(this.settings.Hub.EventHubName, this.settings.Partition);
@@ -671,8 +742,7 @@ namespace Orleans.Streaming.EventHubs
                     // so the latest processed offset is persisted and not replayed on restart.
                     if (this.checkpointer != null)
                     {
-                        using var flushCancellation = timeout == Timeout.InfiniteTimeSpan ? null : new CancellationTokenSource(timeout);
-                        await this.checkpointer.FlushAsync(flushCancellation?.Token ?? CancellationToken.None);
+                        await this.checkpointer.FlushAsync(shutdownCancellationToken);
                     }
                 }
                 catch (Exception ex)
@@ -682,21 +752,13 @@ namespace Orleans.Streaming.EventHubs
 
                 // clear receiver
                 var localReceiver = Interlocked.Exchange(ref this.receiver, null);
-
-                // start closing receiver
-                Task closeTask = Task.CompletedTask;
-                using var closeCancellation = timeout == Timeout.InfiniteTimeSpan ? null : new CancellationTokenSource(timeout);
-                var closeCancellationToken = closeCancellation?.Token ?? CancellationToken.None;
-                try
+                lock (this.cacheLock)
                 {
-                    if (localReceiver != null)
+                    if (localReceiver is not null)
                     {
-                        closeTask = localReceiver.CloseAsync(closeCancellationToken);
+                        this.receiverPendingClose = localReceiver;
+                        this.receiverCloseTask = null;
                     }
-                }
-                catch (Exception ex)
-                {
-                    shutdownExceptions.Add(ex);
                 }
 
                 // dispose of cache
@@ -717,7 +779,7 @@ namespace Orleans.Streaming.EventHubs
                 // finish return receiver closing task
                 try
                 {
-                    await closeTask.WaitAsync(closeCancellationToken);
+                    await ClosePendingReceiver(shutdownCancellationToken);
                 }
                 catch (Exception ex)
                 {
@@ -725,6 +787,7 @@ namespace Orleans.Streaming.EventHubs
                 }
 
                 ThrowIfAny(shutdownExceptions);
+                this.shutdownCompleted = true;
 
                 watch.Stop();
                 this.monitor?.TrackShutdown(true, watch.Elapsed, null);
@@ -734,6 +797,10 @@ namespace Orleans.Streaming.EventHubs
                 watch.Stop();
                 this.monitor?.TrackShutdown(false, watch.Elapsed, ex);
                 throw;
+            }
+            finally
+            {
+                this.shutdownLock.Release();
             }
 
             static void ThrowIfAny(List<Exception> exceptions)
@@ -965,19 +1032,24 @@ namespace Orleans.Streaming.EventHubs
 
                     if (!ReferenceEquals(this.cache, cache))
                     {
-                        this.owner.ClearRecoveredDeliveryToken(this);
-                        this.cache = cache;
-                        this.current = null;
-                        this.recoveryResumeToken = null;
                         var result = cache.TryGetCursor(this.streamId, token);
                         switch (result.Kind)
                         {
                             case QueueCacheCursorResultKind.Success:
+                                this.owner.ClearRecoveredDeliveryToken(this);
+                                this.cache = cache;
                                 this.cursor = result.Cursor;
+                                this.current = null;
+                                this.recoveryResumeToken =
+                                    ReferenceEquals(cache, this.owner.recoveryCache) ? token : null;
                                 this.pendingMoveResult = null;
                                 break;
                             case QueueCacheCursorResultKind.CacheMiss:
+                                this.owner.ClearRecoveredDeliveryToken(this);
+                                this.cache = cache;
                                 this.cursor = null;
+                                this.current = null;
+                                this.recoveryResumeToken = null;
                                 this.pendingMoveResult = QueueCacheCursorMoveResult.FromCacheMiss(result.CacheMiss!.Value);
                                 break;
                             default:
