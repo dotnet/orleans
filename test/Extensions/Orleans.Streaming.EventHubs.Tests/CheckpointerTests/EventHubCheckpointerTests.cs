@@ -514,6 +514,23 @@ public class EventHubCheckpointerTests
         }
     }
 
+    private sealed class BlockingInvalidOffsetEventHubReceiver : IEventHubReceiver
+    {
+        public TaskCompletionSource ReceiveStarted { get; } = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource ReleaseReceive { get; } = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public async Task<IEnumerable<EventData>> ReceiveAsync(int maxCount, TimeSpan waitTime)
+        {
+            ReceiveStarted.TrySetResult();
+            await ReleaseReceive.Task;
+            throw new ArgumentException("The supplied offset is invalid.");
+        }
+
+        public Task CloseAsync() => Task.CompletedTask;
+    }
+
     private sealed class CancellableEventHubReceiver : IEventHubReceiver
     {
         public TaskCompletionSource<CancellationToken> ReceiveStarted { get; } = new(
@@ -622,6 +639,7 @@ public class EventHubCheckpointerTests
         Action<string>? onReceiverCreated = null,
         Func<string, IEventHubReceiver>? receiverFactory = null,
         Func<IEventHubQueueCache>? cacheFactory = null,
+        Func<CancellationToken, Task<IStreamQueueCheckpointer<string>>>? checkpointerFactory = null,
         bool initialize = true)
     {
         var settings = new EventHubPartitionSettings
@@ -639,7 +657,8 @@ public class EventHubCheckpointerTests
         var receiver = new EventHubAdapterReceiver(
             settings,
             cacheFactory: (_, createdCheckpointer, _) => cacheFactory?.Invoke() ?? cache ?? new TestEventHubQueueCache(createdCheckpointer),
-            checkpointerFactory: _ => Task.FromResult<IStreamQueueCheckpointer<string>>(checkpointer),
+            checkpointerFactory: (_, cancellationToken) => checkpointerFactory?.Invoke(cancellationToken)
+                ?? Task.FromResult<IStreamQueueCheckpointer<string>>(checkpointer),
             loggerFactory: Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance,
             monitor: new Orleans.Streaming.EventHubs.DefaultEventHubReceiverMonitor(
                 new EventHubReceiverMonitorDimensions
@@ -689,6 +708,37 @@ public class EventHubCheckpointerTests
             onReceiverCreated: offset => receiverOffset = offset);
 
         Assert.Equal(EventHubConstants.StartOfStream, receiverOffset);
+    }
+
+    [TestSuite("BVT")]
+    [Fact, TestCategory("BVT")]
+    public async Task Initialize_ConcurrentCallersShareInitialization()
+    {
+        var checkpointer = new TestCheckpointer();
+        var factoryStarted = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFactory = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var factoryCalls = 0;
+        var receiver = await CreateReceiver(
+            checkpointer,
+            checkpointerFactory: async cancellationToken =>
+            {
+                Interlocked.Increment(ref factoryCalls);
+                factoryStarted.TrySetResult();
+                await releaseFactory.Task.WaitAsync(cancellationToken);
+                return checkpointer;
+            },
+            initialize: false);
+
+        var first = receiver.Initialize(TimeSpan.FromSeconds(5));
+        await factoryStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+        var second = receiver.Initialize(TimeSpan.FromSeconds(5));
+
+        Assert.False(second.IsCompleted);
+        releaseFactory.TrySetResult();
+        await Task.WhenAll(first, second);
+        Assert.Equal(1, factoryCalls);
     }
 
     [TestSuite("BVT")]
@@ -828,6 +878,65 @@ public class EventHubCheckpointerTests
         receiver.UpdateDeliveryProgress(recoveredToken, DateTime.UtcNow);
         Assert.Equal("10", checkpointer.LastOffset);
         Assert.Equal(1, checkpointer.UpdateCount);
+    }
+
+    [TestSuite("BVT")]
+    [Fact, TestCategory("BVT")]
+    public async Task CursorGetCurrent_WhenRecoveryDetachesCache_DiscardsSelectedBatch()
+    {
+        var checkpointer = new BlockingResetCheckpointer
+        {
+            LoadedOffset = "123",
+        };
+        var initialBatch = new TestBatchContainer();
+        var initialCache = new TestEventHubQueueCache
+        {
+            NextMessage = initialBatch,
+        };
+        var caches = new Queue<IEventHubQueueCache>(
+            [initialCache, new TestEventHubQueueCache()]);
+        var receiver = await CreateReceiver(
+            checkpointer,
+            receiverFactory: offset => offset == "123"
+                ? new InvalidOffsetEventHubReceiver()
+                : new TestEventHubReceiver(),
+            cacheFactory: caches.Dequeue);
+        using var cursor = AssertCursor(
+            receiver,
+            StreamId.Create("namespace", Guid.NewGuid()),
+            MakeToken(1));
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
+        Assert.Same(initialBatch, cursor.GetCurrent(out _));
+
+        var recovery = receiver.GetQueueMessagesAsync(10, CancellationToken.None);
+        await checkpointer.ResetStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+
+        Assert.Null(cursor.GetCurrent(out _));
+
+        checkpointer.ReleaseReset.TrySetResult();
+        await Assert.ThrowsAsync<ArgumentException>(() => recovery);
+    }
+
+    [TestSuite("BVT")]
+    [Fact, TestCategory("BVT")]
+    public async Task GetQueueMessagesAsync_WhenShutdownDetachesFailedRead_DoesNotReset()
+    {
+        var checkpointer = new TestCheckpointer
+        {
+            LoadedOffset = "123",
+        };
+        var eventHubReceiver = new BlockingInvalidOffsetEventHubReceiver();
+        var receiver = await CreateReceiver(
+            checkpointer,
+            eventHubReceiver: eventHubReceiver);
+
+        var read = receiver.GetQueueMessagesAsync(10, TestContext.Current.CancellationToken);
+        await eventHubReceiver.ReceiveStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+        await receiver.Shutdown(TimeSpan.FromSeconds(5));
+        eventHubReceiver.ReleaseReceive.TrySetResult();
+
+        await Assert.ThrowsAsync<ArgumentException>(() => read);
+        Assert.Equal(0, checkpointer.ResetCount);
     }
 
     [TestSuite("BVT")]
@@ -1790,7 +1899,7 @@ public class EventHubCheckpointerTests
         CancellationToken cancellationToken)
     {
         var method = typeof(EventHubAdapterReceiver).GetMethod(
-            "Initialize",
+            "InitializeCore",
             BindingFlags.Instance | BindingFlags.NonPublic,
             binder: null,
             [typeof(CancellationToken)],
