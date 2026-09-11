@@ -412,17 +412,20 @@ namespace Orleans.Runtime.MembershipService
                         else
                         {
                             // Allow some minimum time for graceful shutdown.
-                            var gracePeriod = Task.WhenAll(Task.Delay(ClusterMembershipOptions.ClusteringShutdownGracePeriod, CancellationToken.None), cancellationTask);
-                            var shuttingDown = this.BecomeShuttingDown(cleanup.Token);
-                            shuttingDown.Ignore();
+                            var gracePeriod = Task.WhenAll(Task.Delay(ClusterMembershipOptions.ClusteringShutdownGracePeriod, this.timeProvider, CancellationToken.None), cancellationTask);
+                            using var gracefulAttempt = CancellationTokenSource.CreateLinkedTokenSource(cleanup.Token);
+                            var shuttingDown = this.BecomeShuttingDown(gracefulAttempt.Token);
                             var task = await Task.WhenAny(gracePeriod, shuttingDown);
                             if (ReferenceEquals(task, gracePeriod))
                             {
                                 LogWarningGracefulShutdownAborted(this.log);
+                                gracefulAttempt.Cancel();
+                                await shuttingDown.SuppressThrowing();
                                 await Task.Run(() => this.BecomeStopping(cleanup.Token), CancellationToken.None);
                             }
                             else
                             {
+                                await shuttingDown;
                                 var completion = Task.WhenAll(tasks);
                                 completion.Ignore();
                                 await Task.WhenAny(gracePeriod, completion);

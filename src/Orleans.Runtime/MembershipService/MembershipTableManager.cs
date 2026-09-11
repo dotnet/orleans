@@ -651,11 +651,12 @@ namespace Orleans.Runtime.MembershipService
             var completions = new List<Task>(silosToDeclareDead.Count);
             foreach (var siloData in silosToDeclareDead)
             {
+                cleanupCancellation.Token.ThrowIfCancellationRequested();
                 var (request, completion) = SuspectOrKillRequest.CreateAcknowledgedKillRequest(siloData.Item1.SiloAddress);
-                await _trySuspectOrKillChannel.Writer.WaitToWriteAsync(cleanupCancellation.Token);
-                if (_trySuspectOrKillChannel.Writer.TryWrite(request))
+                completions.Add(completion);
+                if (!_trySuspectOrKillChannel.Writer.TryWrite(request))
                 {
-                    completions.Add(completion);
+                    request.Completion!.TrySetCanceled(cleanupCancellation.Token);
                 }
             }
 
@@ -766,6 +767,7 @@ namespace Orleans.Runtime.MembershipService
             public static (SuspectOrKillRequest Request, Task Completion) CreateAcknowledgedKillRequest(SiloAddress silo)
             {
                 var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                completion.Task.Ignore();
                 var request = new SuspectOrKillRequest
                 {
                     SiloAddress = silo,

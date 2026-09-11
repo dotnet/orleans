@@ -238,6 +238,7 @@ namespace Orleans.Clustering.DynamoDB
                     if (records.Exists(record => record.MembershipVersion > versionRow.MembershipVersion))
                     {
                         LogWarningFoundInconsistencyReadingAllSiloEntries();
+                        await Task.Delay(TimeSpan.FromMilliseconds(100), cancellationToken);
                         continue;
                     }
 

@@ -40,6 +40,28 @@ public sealed class RelationalStorageExtensionsTests
     }
 
     [Fact]
+    public async Task ReadAsync_CanceledCallbackToken_PreventsSynchronousSelector()
+    {
+        const string Sql = "SELECT Value FROM Sample";
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var storage = new ScriptedRelationalStorage().ExpectRead(Sql, CreateTable(("Value", typeof(int), 42)));
+        storage.BeforeSelector = cancellation.Cancel;
+        var selectorCalls = 0;
+
+        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            storage.ReadAsync(Sql, record =>
+            {
+                selectorCalls++;
+                return record.GetInt32(0);
+            }, parameterProvider: null, cancellationToken: cancellation.Token));
+
+        Assert.Equal(cancellation.Token, exception.CancellationToken);
+        Assert.Equal(0, selectorCalls);
+        Assert.Equal(cancellation.Token, Assert.Single(storage.Calls).CancellationToken);
+        storage.VerifyComplete();
+    }
+
+    [Fact]
     public async Task ReadAsync_FlowsAcrossResultSetsInOrder()
     {
         const string Sql = "SELECT 10 AS Value; SELECT 30 AS Value;";
