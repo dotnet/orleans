@@ -67,7 +67,7 @@ An exception or event identifies where Orleans noticed a problem. Preserve the e
 
 ## Request timeouts
 
-**Signals:** <xref:System.TimeoutException>, increasing `orleans-app-requests-timedout` (tagged by `grain_type`), or rising latency reported by the `orleans-app-requests-latency` histogram components (`-bucket`, `-count`, and `-sum`).
+**Signals:** <xref:System.TimeoutException>, increasing `orleans-app-requests-timedout` (tagged by `grain_type`), or rising bucket counts or percentiles from the `orleans-app-requests-latency` histogram.
 
 **Likely causes:** queueing before execution, a long-running grain turn, cyclic calls, blocking work, slow storage or another dependency, membership recovery, or network loss.
 

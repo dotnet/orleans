@@ -221,7 +221,7 @@ namespace Orleans.Runtime
         {
             if (_applicationRequestInstruments.AppRequestsLatencyEnabled)
             {
-                var elapsedMilliseconds = (long)shared.TimeProvider.GetElapsedTime(_startTimestamp).TotalMilliseconds;
+                var elapsedMilliseconds = shared.TimeProvider.GetElapsedTime(_startTimestamp).TotalMilliseconds;
                 _applicationRequestInstruments.OnAppRequestsEnd(elapsedMilliseconds);
             }
         }

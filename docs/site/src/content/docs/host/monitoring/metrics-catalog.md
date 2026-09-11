@@ -26,9 +26,7 @@ Some instruments retain historical types or unit strings. The descriptions below
 | Instrument | Type | Unit | Attributes | Description |
 |---|---|---|---|---|
 | `orleans-app-requests-canceled` | C | Requests, implicit | `grain_type` | Outbound grain requests canceled by their caller. |
-| `orleans-app-requests-latency-bucket` | OC | Milliseconds, implicit | `duration` | Completed outbound request callbacks in one latency band. Bands are mutually exclusive, range from `1ms` through `15000ms`, and include an overflow band. |
-| `orleans-app-requests-latency-count` | OC | Requests, implicit | - | Total completed outbound request callbacks represented by the latency bands. |
-| `orleans-app-requests-latency-sum` | OC | Milliseconds, implicit | - | Sum of caller-observed elapsed time for completed outbound request callbacks. |
+| `orleans-app-requests-latency` | H | `ms` | - | Distribution of caller-observed elapsed time for completed outbound request callbacks. Orleans advises request-specific explicit bucket boundaries from `0.1ms` through `30000ms` on .NET 10; configure an exporter view on .NET 8. |
 | `orleans-app-requests-timedout` | C | Requests, implicit | `grain_type` | Outbound grain requests which exceeded the configured response timeout. |
 | `orleans-client-connected-gateways` | OG | Gateways, implicit | - | Gateway connections currently held by an Orleans client. |
 
