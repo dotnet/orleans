@@ -70,7 +70,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
         [Fact, TestCategory("BVT")]
         public async Task EventHubQueueCache_WontPurge_WhenUnderPressure()
         {
-            InitForTesting();
+            await InitForTesting();
             var tasks = new List<Task>();
             //add items into cache, make sure will allocate multiple buffers from the pool
             int itemAddToCache = 100;
@@ -93,7 +93,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
         [Fact, TestCategory("BVT")]
         public async Task EventHubQueueCache_WontPurge_WhenTimePurgePredicateSaysDontPurge()
         {
-            InitForTesting();
+            await InitForTesting();
             var tasks = new List<Task>();
             //add items into cache
             int itemAddToCache = 100;
@@ -118,7 +118,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
         [Fact, TestCategory("BVT")]
         public async Task EventHubQueueCache_WillPurge_WhenTimePurgePredicateSaysPurge_And_NotUnderPressure()
         {
-            InitForTesting();
+            await InitForTesting();
             var tasks = new List<Task>();
             //add items into cache
             int itemAddToCache = 100;
@@ -144,7 +144,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
         [Fact, TestCategory("BVT")]
         public async Task EventHubQueueCache_EvictionStrategy_Behavior()
         {
-            InitForTesting();
+            await InitForTesting();
             var tasks = new List<Task>();
             //add items into cache
             int itemAddToCache = 100;
@@ -200,7 +200,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             expectedPurgedBuffers.ForEach(buffer => Assert.Contains(buffer, newBufferAllocated));
         }
 
-        private void InitForTesting()
+        private async Task InitForTesting()
         {
             this.cacheList = new ConcurrentBag<EventHubQueueCacheForTesting>();
             this.evictionStrategyList = new List<EHEvictionStrategyForTesting>();
@@ -211,11 +211,14 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             };
 
             this.receiver1 = new EventHubAdapterReceiver(this.ehSettings, this.CacheFactory, this.CheckPointerFactory, NullLoggerFactory.Instance,
-                new DefaultEventHubReceiverMonitor(monitorDimensions, this.instruments), new LoadSheddingOptions(), environmentStatisticsProvider);
+                new DefaultEventHubReceiverMonitor(monitorDimensions, this.instruments), new LoadSheddingOptions(), environmentStatisticsProvider,
+                static (_, _, _) => NoOpEventHubReceiver.Instance);
             this.receiver2 = new EventHubAdapterReceiver(this.ehSettings, this.CacheFactory, this.CheckPointerFactory, NullLoggerFactory.Instance,
-                new DefaultEventHubReceiverMonitor(monitorDimensions, this.instruments), new LoadSheddingOptions(), environmentStatisticsProvider);
-            this.receiver1.Initialize(this.timeOut);
-            this.receiver2.Initialize(this.timeOut);
+                new DefaultEventHubReceiverMonitor(monitorDimensions, this.instruments), new LoadSheddingOptions(), environmentStatisticsProvider,
+                static (_, _, _) => NoOpEventHubReceiver.Instance);
+            await Task.WhenAll(
+                this.receiver1.Initialize(this.timeOut),
+                this.receiver2.Initialize(this.timeOut));
         }
 
         private int GetItemCountInAllCache(ConcurrentBag<EventHubQueueCacheForTesting> caches)
@@ -270,6 +273,16 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             cache.AddCachePressureMonitor(this.cachePressureInjectionMonitor);
             this.cacheList.Add(cache);
             return cache;
+        }
+
+        private sealed class NoOpEventHubReceiver : IEventHubReceiver
+        {
+            public static NoOpEventHubReceiver Instance { get; } = new();
+
+            public Task<IEnumerable<EventData>> ReceiveAsync(int maxCount, TimeSpan waitTime)
+                => Task.FromResult<IEnumerable<EventData>>([]);
+
+            public Task CloseAsync() => Task.CompletedTask;
         }
     }
 }
