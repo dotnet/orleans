@@ -19,43 +19,75 @@ namespace NonSilo.Tests
     /// </summary>
     public class NoOpMembershipTable : IMembershipTable
     {
-        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
+        [Obsolete("Use CleanupDefunctSiloEntriesAsync instead.")]
+        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) => CleanupDefunctSiloEntriesAsync(beforeDate, CancellationToken.None);
+
+        public Task CleanupDefunctSiloEntriesAsync(DateTimeOffset beforeDate, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             return Task.CompletedTask;
         }
 
-        public Task DeleteMembershipTableEntries(string clusterId)
+        [Obsolete("Use DeleteMembershipTableEntriesAsync instead.")]
+        public Task DeleteMembershipTableEntries(string clusterId) => DeleteMembershipTableEntriesAsync(clusterId, CancellationToken.None);
+
+        public Task DeleteMembershipTableEntriesAsync(string clusterId, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             return Task.CompletedTask;
         }
 
-        public Task InitializeMembershipTable(bool tryInitTableVersion)
+        [Obsolete("Use InitializeMembershipTableAsync instead.")]
+        public Task InitializeMembershipTable(bool tryInitTableVersion) => InitializeMembershipTableAsync(tryInitTableVersion, CancellationToken.None);
+
+        public Task InitializeMembershipTableAsync(bool tryInitTableVersion, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             return Task.CompletedTask;
         }
 
-        public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion)
+        [Obsolete("Use InsertRowAsync instead.")]
+        public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => InsertRowAsync(entry, tableVersion, CancellationToken.None);
+
+        public Task<bool> InsertRowAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             return Task.FromResult(true);
         }
 
-        public Task<MembershipTableData> ReadAll()
+        [Obsolete("Use ReadAllAsync instead.")]
+        public Task<MembershipTableData> ReadAll() => ReadAllAsync(CancellationToken.None);
+
+        public Task<MembershipTableData> ReadAllAsync(CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             throw new NotImplementedException();
         }
 
-        public Task<MembershipTableData> ReadRow(SiloAddress key)
+        [Obsolete("Use ReadRowAsync instead.")]
+        public Task<MembershipTableData> ReadRow(SiloAddress key) => ReadRowAsync(key, CancellationToken.None);
+
+        public Task<MembershipTableData> ReadRowAsync(SiloAddress key, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             throw new NotImplementedException();
         }
 
-        public Task UpdateIAmAlive(MembershipEntry entry)
+        [Obsolete("Use UpdateIAmAliveAsync instead.")]
+        public Task UpdateIAmAlive(MembershipEntry entry) => UpdateIAmAliveAsync(entry, CancellationToken.None);
+
+        public Task UpdateIAmAliveAsync(MembershipEntry entry, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             return Task.CompletedTask;
         }
 
-        public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion)
+        [Obsolete("Use UpdateRowAsync instead.")]
+        public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => UpdateRowAsync(entry, etag, tableVersion, CancellationToken.None);
+
+        public Task<bool> UpdateRowAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             return Task.FromResult(true);
         }
     }

@@ -168,6 +168,33 @@ public class FaultInjectionAzureTableTransactionStateStorageTests
 
         Assert.Equal(cancellation.Token, exception.CancellationToken);
         Assert.Equal(AzureTableTransactionalStateOptions.DEFAULT_INIT_STAGE, lifecycle.Stage);
+        Assert.Equal(0, tableService.GetTableClientCallCount);
+        Assert.Equal(0, table.CreateIfNotExistsCallCount);
+        Assert.Equal(CancellationToken.None, table.CreateCancellationToken);
+        Assert.Equal(0, table.QueryCallCount);
+        Assert.Empty(table.SubmittedTransactions);
+    }
+
+    [Fact]
+    public async Task Participate_Start_ForwardsCancellationTokenToStorage()
+    {
+        var table = new RecordingTableClient([]);
+        var tableService = new RecordingTableServiceClient(table);
+        using var services = CreateServices(options => options.TableServiceClient = tableService);
+        var inner = new AzureTableTransactionalStateStorageFactory(
+            ProviderName,
+            services.GetRequiredService<IOptionsMonitor<AzureTableTransactionalStateOptions>>().Get(ProviderName),
+            services.GetRequiredService<IOptions<ClusterOptions>>(),
+            services,
+            NullLoggerFactory.Instance);
+        var factory = new FaultInjectionAzureTableTransactionStateStorageFactory(inner);
+        var lifecycle = new RecordingSiloLifecycle();
+        factory.Participate(lifecycle);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+
+        await lifecycle.StartAsync(cancellation.Token);
+
+        Assert.Equal(AzureTableTransactionalStateOptions.DEFAULT_INIT_STAGE, lifecycle.Stage);
         Assert.Equal(1, tableService.GetTableClientCallCount);
         Assert.Equal(1, table.CreateIfNotExistsCallCount);
         Assert.Equal(cancellation.Token, table.CreateCancellationToken);

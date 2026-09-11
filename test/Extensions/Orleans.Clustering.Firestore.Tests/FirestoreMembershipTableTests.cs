@@ -99,16 +99,16 @@ public class FirestoreMembershipTableTests : MembershipTableTestsBase, IClassFix
             Options.Create(options),
             Options.Create(new ClusterOptions { ClusterId = clusterId }));
 
-        await table.InitializeMembershipTable(true);
+        await table.InitializeMembershipTableAsync(true, TestContext.Current.CancellationToken);
         try
         {
-            var initial = await table.ReadAll();
+            var initial = await table.ReadAllAsync(TestContext.Current.CancellationToken);
             var address = SiloAddress.New(IPAddress.Loopback, 12_000, 1);
             var version = initial.Version.Next();
             var entry = CreateMembershipEntry(address, version.Version);
-            Assert.True(await table.InsertRow(entry, version));
+            Assert.True(await table.InsertRowAsync(entry, version, TestContext.Current.CancellationToken));
 
-            // Make ReadAll consume a multi-message RunQuery stream while the sentinel row changes.
+            // Make ReadAllAsync consume a multi-message RunQuery stream while the sentinel row changes.
             var storage = new FirestoreDataManager(
                 "Cluster",
                 Utils.SanitizeId(clusterId),
@@ -127,8 +127,8 @@ public class FirestoreMembershipTableTests : MembershipTableTestsBase, IClassFix
 
             var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var writer = WriteUpdates();
-            var readAll = ReadSnapshots(table.ReadAll);
-            var readRow = ReadSnapshots(() => table.ReadRow(address));
+            var readAll = ReadSnapshots(() => table.ReadAllAsync(TestContext.Current.CancellationToken));
+            var readRow = ReadSnapshots(() => table.ReadRowAsync(address, TestContext.Current.CancellationToken));
             start.SetResult();
 
             await Task.WhenAll(writer, readAll, readRow).WaitAsync(
@@ -144,12 +144,12 @@ public class FirestoreMembershipTableTests : MembershipTableTestsBase, IClassFix
                     while (!updated)
                     {
                         var snapshot = await ReadWithRetries(
-                            () => table.ReadRow(address),
+                            () => table.ReadRowAsync(address, TestContext.Current.CancellationToken),
                             TestContext.Current.CancellationToken);
                         var row = Assert.Single(snapshot.Members);
                         var nextVersion = snapshot.Version.Next();
                         row.Item1.ProxyPort = nextVersion.Version;
-                        updated = await table.UpdateRow(row.Item1, row.Item2, nextVersion);
+                        updated = await table.UpdateRowAsync(row.Item1, row.Item2, nextVersion, TestContext.Current.CancellationToken);
                     }
                 }
 
@@ -193,7 +193,7 @@ public class FirestoreMembershipTableTests : MembershipTableTestsBase, IClassFix
         }
         finally
         {
-            await table.DeleteMembershipTableEntries(clusterId);
+            await table.DeleteMembershipTableEntriesAsync(clusterId, TestContext.Current.CancellationToken);
         }
     }
 

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -14,14 +15,16 @@ internal partial class MembershipGossiper(IServiceProvider serviceProvider, ILog
         List<SiloAddress> gossipPartners,
         MembershipTableSnapshot snapshot,
         SiloAddress updatedSilo,
-        SiloStatus updatedStatus)
+        SiloStatus updatedStatus,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (gossipPartners.Count == 0) return Task.CompletedTask;
 
         LogDebugGossipingStatusToPartners(logger, updatedSilo, updatedStatus, gossipPartners.Count);
 
         var systemTarget = _membershipSystemTarget ??= serviceProvider.GetRequiredService<MembershipSystemTarget>();
-        return systemTarget.GossipToRemoteSilos(gossipPartners, snapshot, updatedSilo, updatedStatus);
+        return systemTarget.GossipToRemoteSilos(gossipPartners, snapshot, updatedSilo, updatedStatus, cancellationToken);
     }
 
     [LoggerMessage(

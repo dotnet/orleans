@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Orleans.Runtime.MembershipService
@@ -9,6 +10,7 @@ namespace Orleans.Runtime.MembershipService
             List<SiloAddress> gossipPartners,
             MembershipTableSnapshot snapshot,
             SiloAddress updatedSilo,
-            SiloStatus updatedStatus);
+            SiloStatus updatedStatus,
+            CancellationToken cancellationToken);
     }
 }

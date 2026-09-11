@@ -194,7 +194,7 @@ namespace Tester.AzureUtils
             var data = GenerateNewData();
             try
             {
-                await manager.MergeTableEntryAsync(data, AzureTableUtils.ANY_ETAG);
+                await manager.MergeTableEntryAsync(data, AzureTableUtils.ANY_ETAG, TestContext.Current.CancellationToken);
                 Assert.Fail("Should have thrown RequestFailedException.");
             }
             catch (RequestFailedException exc)
@@ -210,11 +210,11 @@ namespace Tester.AzureUtils
             string eTag1 = await manager.UpsertTableEntryAsync(data);
             var data2 = data.Clone();
             data2.StringData = "NewData";
-            await manager.MergeTableEntryAsync(data2, eTag1);
+            await manager.MergeTableEntryAsync(data2, eTag1, TestContext.Current.CancellationToken);
 
             try
             {
-                await manager.MergeTableEntryAsync(data, eTag1);
+                await manager.MergeTableEntryAsync(data, eTag1, TestContext.Current.CancellationToken);
                 Assert.Fail("Should have thrown RequestFailedException.");
             }
             catch (RequestFailedException exc)
@@ -255,7 +255,7 @@ namespace Tester.AzureUtils
             var data2 = GenerateNewData();
             try
             {
-                await manager.CreateAndUpdateTableEntriesAsync(data1, (data2, AzureTableUtils.ANY_ETAG));
+                await manager.CreateAndUpdateTableEntriesAsync(data1, (data2, AzureTableUtils.ANY_ETAG), cancellationToken: TestContext.Current.CancellationToken);
             }
             catch (RequestFailedException exc)
             {
@@ -268,12 +268,13 @@ namespace Tester.AzureUtils
             }
 
             string etag = await manager.CreateTableEntryAsync(data2.Clone());
-            var result = await manager.CreateAndUpdateTableEntriesAsync(data1, (data2, etag));
+            var result = await manager.CreateAndUpdateTableEntriesAsync(data1, (data2, etag), cancellationToken: TestContext.Current.CancellationToken);
             try
             {
                 await manager.CreateAndUpdateTableEntriesAsync(
                     data1.Clone(),
-                    (data2.Clone(), result.UpdatedEntryETag));
+                    (data2.Clone(), result.UpdatedEntryETag),
+                    cancellationToken: TestContext.Current.CancellationToken);
                 Assert.Fail("Should have thrown RequestFailedException.");
             }
             catch (RequestFailedException exc)
@@ -290,7 +291,8 @@ namespace Tester.AzureUtils
             {
                 await manager.CreateAndUpdateTableEntriesAsync(
                     data1.Clone(),
-                    (data2.Clone(), AzureTableUtils.ANY_ETAG));
+                    (data2.Clone(), AzureTableUtils.ANY_ETAG),
+                    cancellationToken: TestContext.Current.CancellationToken);
                 Assert.Fail("Should have thrown RequestFailedException.");
             }
             catch (RequestFailedException exc)
@@ -316,7 +318,8 @@ namespace Tester.AzureUtils
             {
                 await manager.UpdateTableEntriesAsync(
                     (data1, AzureTableUtils.ANY_ETAG),
-                    (data2, AzureTableUtils.ANY_ETAG));
+                    (data2, AzureTableUtils.ANY_ETAG),
+                    cancellationToken: TestContext.Current.CancellationToken);
                 Assert.Fail("Update should have failed since the data has not been created yet");
             }
             catch (RequestFailedException exc)
@@ -330,16 +333,18 @@ namespace Tester.AzureUtils
             }
 
             string etag = await manager.CreateTableEntryAsync(data2.Clone());
-            var createResult = await manager.CreateAndUpdateTableEntriesAsync(data1, (data2, etag));
+            var createResult = await manager.CreateAndUpdateTableEntriesAsync(data1, (data2, etag), cancellationToken: TestContext.Current.CancellationToken);
             _ = await manager.UpdateTableEntriesAsync(
                 (data1, createResult.CreatedEntryETag),
-                (data2, createResult.UpdatedEntryETag));
+                (data2, createResult.UpdatedEntryETag),
+                cancellationToken: TestContext.Current.CancellationToken);
 
             try
             {
                 await manager.UpdateTableEntriesAsync(
                     (data1, createResult.CreatedEntryETag),
-                    (data2, createResult.UpdatedEntryETag));
+                    (data2, createResult.UpdatedEntryETag),
+                    cancellationToken: TestContext.Current.CancellationToken);
                 Assert.Fail("Should have thrown RequestFailedException.");
             }
             catch (RequestFailedException exc)

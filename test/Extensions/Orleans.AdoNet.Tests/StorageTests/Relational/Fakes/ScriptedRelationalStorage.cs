@@ -22,6 +22,8 @@ internal sealed class ScriptedRelationalStorage(
 
     public IReadOnlyList<RecordedStorageCall> Calls => _calls;
 
+    public Action? BeforeSelector { get; set; }
+
     public ScriptedRelationalStorage ExpectRead(string query, params DataTable[] resultSets)
     {
         _expectedCalls.Enqueue(new(ExpectedCallKind.Read, query, resultSets, 0, null));
@@ -84,6 +86,7 @@ internal sealed class ScriptedRelationalStorage(
             while (reader.Read())
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                BeforeSelector?.Invoke();
                 results.Add(await selector(reader, resultSet, cancellationToken));
             }
 

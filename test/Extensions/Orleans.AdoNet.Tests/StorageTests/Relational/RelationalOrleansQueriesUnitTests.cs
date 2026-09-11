@@ -67,7 +67,7 @@ public sealed class RelationalOrleansQueriesUnitTests
     {
         var storage = new ScriptedRelationalStorage().ExpectRead(GetQueriesSql, CreateQueryTable());
 
-        _ = await PersistenceQueries.CreateInstance(storage);
+        _ = await PersistenceQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
 
         var call = Assert.Single(storage.Calls);
         Assert.Equal(GetQueriesSql, call.Query);
@@ -82,7 +82,7 @@ public sealed class RelationalOrleansQueriesUnitTests
         var storage = ExpectQueryLoad(new ScriptedRelationalStorage(), suppliedKeys);
 
         var exception = await Assert.ThrowsAsync<ArgumentException>(
-            () => ReminderQueries.CreateInstance(storage));
+            () => ReminderQueries.CreateInstance(storage, TestContext.Current.CancellationToken));
 
         Assert.Contains("DeleteReminderRowsKey", exception.Message, StringComparison.Ordinal);
         Assert.Single(storage.Calls);
@@ -99,7 +99,7 @@ public sealed class RelationalOrleansQueriesUnitTests
                 ("DuplicateKey", "second")));
 
         var exception = await Assert.ThrowsAsync<ArgumentException>(
-            () => PersistenceQueries.CreateInstance(storage));
+            () => PersistenceQueries.CreateInstance(storage, TestContext.Current.CancellationToken));
 
         Assert.Contains("same key", exception.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Single(storage.Calls);
@@ -111,7 +111,7 @@ public sealed class RelationalOrleansQueriesUnitTests
     {
         var storage = ExpectQueryLoad(new ScriptedRelationalStorage(), ReminderQueryKeys);
 
-        var queries = await ReminderQueries.CreateInstance(storage);
+        var queries = await ReminderQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
 
         Assert.NotNull(queries);
         Assert.Single(storage.Calls);
@@ -125,7 +125,7 @@ public sealed class RelationalOrleansQueriesUnitTests
         const uint EndHash = 0;
         var storage = ExpectQueryLoad(new ScriptedRelationalStorage(), ReminderQueryKeys)
             .ExpectRead(Sql("ReadRangeRows1Key"));
-        var queries = await ReminderQueries.CreateInstance(storage);
+        var queries = await ReminderQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
 
         var result = await queries.ReadReminderRowsAsync("service-a", BeginHash, EndHash);
 
@@ -145,7 +145,7 @@ public sealed class RelationalOrleansQueriesUnitTests
         const uint EndHash = 0x8000_0000;
         var storage = ExpectQueryLoad(new ScriptedRelationalStorage(), ReminderQueryKeys)
             .ExpectRead(Sql("ReadRangeRows2Key"));
-        var queries = await ReminderQueries.CreateInstance(storage);
+        var queries = await ReminderQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
 
         var result = await queries.ReadReminderRowsAsync("service-b", BeginHash, EndHash);
 
@@ -165,7 +165,7 @@ public sealed class RelationalOrleansQueriesUnitTests
         var grainId = GrainId.Create("reminder-type", "grain-7");
         var storage = ExpectQueryLoad(new ScriptedRelationalStorage(), ReminderQueryKeys)
             .ExpectRead(Sql("ReadReminderRowKey"));
-        var queries = await ReminderQueries.CreateInstance(storage);
+        var queries = await ReminderQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
 
         var result = await queries.ReadReminderRowAsync("service-c", grainId, "wake-up");
 
@@ -197,7 +197,7 @@ public sealed class RelationalOrleansQueriesUnitTests
                         ("Version", typeof(long)),
                     ],
                     [grainId.ToString(), "refresh", startAt, 90_000L, 23L]));
-        var queries = await ReminderQueries.CreateInstance(storage);
+        var queries = await ReminderQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
 
         var result = await queries.ReadReminderRowAsync("service-d", grainId, "refresh");
 
@@ -220,9 +220,9 @@ public sealed class RelationalOrleansQueriesUnitTests
                 CreateTable(
                     [("StartTime", typeof(DateTime)), ("Version", typeof(long))],
                     [DBNull.Value, 17L]));
-        var queries = await ClusteringQueries.CreateInstance(storage);
+        var queries = await ClusteringQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
 
-        var result = await queries.MembershipReadAllAsync("cluster-a");
+        var result = await queries.MembershipReadAllAsync("cluster-a", TestContext.Current.CancellationToken);
 
         Assert.Empty(result.Members);
         Assert.Equal(17, result.Version.Version);
@@ -256,9 +256,9 @@ public sealed class RelationalOrleansQueriesUnitTests
                         ("Version", typeof(long)),
                     ],
                     [startTime, 11_111, 9, "127.0.0.1", "silo-a", "host-a", (int)SiloStatus.Active, 30_000, aliveTime, DBNull.Value, 42L]));
-        var queries = await ClusteringQueries.CreateInstance(storage);
+        var queries = await ClusteringQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
 
-        var result = await queries.MembershipReadAllAsync("cluster-b");
+        var result = await queries.MembershipReadAllAsync("cluster-b", TestContext.Current.CancellationToken);
 
         var member = Assert.Single(result.Members).Item1;
         Assert.Equal(SiloAddress.New(IPAddress.Loopback, 11_111, 9), member.SiloAddress);
@@ -295,9 +295,9 @@ public sealed class RelationalOrleansQueriesUnitTests
             .ExpectRead(
                 Sql("InsertMembershipKey"),
                 CreateTable([("Result", typeof(int))], [1]));
-        var queries = await ClusteringQueries.CreateInstance(storage);
+        var queries = await ClusteringQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
 
-        var result = await queries.InsertMembershipRowAsync("cluster-c", entry, "73");
+        var result = await queries.InsertMembershipRowAsync("cluster-c", entry, "73", TestContext.Current.CancellationToken);
 
         Assert.True(result);
         AssertParameters(
@@ -327,7 +327,7 @@ public sealed class RelationalOrleansQueriesUnitTests
                     StreamMessageColumns,
                     ["service-e", "provider-a", "queue-a", 20L, 2, now, now.AddHours(1), now.AddMinutes(-2), now.AddMinutes(-1), new byte[] { 2, 0 }],
                     ["service-e", "provider-a", "queue-a", 3L, 1, now, now.AddHours(2), now.AddMinutes(-4), now.AddMinutes(-3), new byte[] { 0, 3 }]));
-        var queries = await StreamingQueries.CreateInstance(storage);
+        var queries = await StreamingQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
 
         var result = await queries.GetStreamMessagesAsync("service-e", "provider-a", "queue-a", 25, 4, 30, 60, 90, 10);
 
@@ -353,7 +353,7 @@ public sealed class RelationalOrleansQueriesUnitTests
     {
         var storage = ExpectQueryLoad(new ScriptedRelationalStorage(), StreamingQueryKeys)
             .ExpectRead(Sql("GetStreamMessagesKey"));
-        var queries = await StreamingQueries.CreateInstance(storage);
+        var queries = await StreamingQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
 
         var result = await queries.GetStreamMessagesAsync("service-f", "provider-b", "queue-b", 5, 2, 10, 20, 30, 4);
 
@@ -376,7 +376,7 @@ public sealed class RelationalOrleansQueriesUnitTests
     public async Task ConfirmStreamMessages_EmptySet_DoesNotExecuteMutation()
     {
         var storage = ExpectQueryLoad(new ScriptedRelationalStorage(), StreamingQueryKeys);
-        var queries = await StreamingQueries.CreateInstance(storage);
+        var queries = await StreamingQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
 
         var result = await queries.ConfirmStreamMessagesAsync("service-g", "provider-c", "queue-c", []);
 
@@ -395,7 +395,7 @@ public sealed class RelationalOrleansQueriesUnitTests
                     StreamConfirmationColumns,
                     ["service-g", "provider-c", "queue-c", 11L],
                     ["service-g", "provider-c", "queue-c", 12L]));
-        var queries = await StreamingQueries.CreateInstance(storage);
+        var queries = await StreamingQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
 
         var result = await queries.ConfirmStreamMessagesAsync(
             "service-g",
@@ -417,7 +417,7 @@ public sealed class RelationalOrleansQueriesUnitTests
             .ExpectRead(
                 Sql("ConfirmStreamMessagesKey"),
                 CreateTable(StreamConfirmationColumns, ["service-g", "provider-c", "queue-c", 13L]));
-        var singletonQueries = await StreamingQueries.CreateInstance(singletonStorage);
+        var singletonQueries = await StreamingQueries.CreateInstance(singletonStorage, TestContext.Current.CancellationToken);
 
         var singletonResult = await singletonQueries.ConfirmStreamMessagesAsync(
             "service-g",
@@ -439,7 +439,7 @@ public sealed class RelationalOrleansQueriesUnitTests
     public async Task ReleaseStreamMessages_EmptySet_DoesNotExecuteMutation()
     {
         var storage = ExpectQueryLoad(new ScriptedRelationalStorage(), StreamingQueryKeys);
-        var queries = await StreamingQueries.CreateInstance(storage);
+        var queries = await StreamingQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
 
         var result = await queries.ReleaseStreamMessagesAsync("service-h", "provider-d", "queue-d", []);
 
@@ -458,7 +458,7 @@ public sealed class RelationalOrleansQueriesUnitTests
                     StreamConfirmationColumns,
                     ["service-h", "provider-d", "queue-d", 21L],
                     ["service-h", "provider-d", "queue-d", 22L]));
-        var queries = await StreamingQueries.CreateInstance(storage);
+        var queries = await StreamingQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
 
         var result = await queries.ReleaseStreamMessagesAsync(
             "service-h",
@@ -479,7 +479,7 @@ public sealed class RelationalOrleansQueriesUnitTests
             .ExpectRead(
                 Sql("ConfirmStreamMessagesKey"),
                 CreateTable(StreamConfirmationColumns, ["service-h", "provider-d", "queue-d", 23L]));
-        var singletonQueries = await StreamingQueries.CreateInstance(singletonStorage);
+        var singletonQueries = await StreamingQueries.CreateInstance(singletonStorage, TestContext.Current.CancellationToken);
 
         var singletonResult = await singletonQueries.ReleaseStreamMessagesAsync(
             "service-h",
@@ -506,7 +506,7 @@ public sealed class RelationalOrleansQueriesUnitTests
                 CreateTable(
                     DirectoryEntryColumns,
                     ["cluster-d", "directory-a", "type/key", "127.0.0.1:11111@9", "activation-1"]));
-        var queries = await DirectoryQueries.CreateInstance(storage);
+        var queries = await DirectoryQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
 
         var result = await queries.LookupGrainActivationAsync("cluster-d", "directory-a", "type/key");
 
@@ -526,7 +526,7 @@ public sealed class RelationalOrleansQueriesUnitTests
     {
         var storage = ExpectQueryLoad(new ScriptedRelationalStorage(), DirectoryQueryKeys)
             .ExpectRead(Sql("LookupGrainActivationKey"));
-        var queries = await DirectoryQueries.CreateInstance(storage);
+        var queries = await DirectoryQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
 
         var result = await queries.LookupGrainActivationAsync("cluster-e", "directory-b", "type/missing");
 
@@ -549,7 +549,7 @@ public sealed class RelationalOrleansQueriesUnitTests
                     DirectoryEntryColumns,
                     ["cluster-f", "directory-c", "type/duplicate", "127.0.0.1:11111@1", "activation-1"],
                     ["cluster-f", "directory-c", "type/duplicate", "127.0.0.1:11112@2", "activation-2"]));
-        var queries = await DirectoryQueries.CreateInstance(storage);
+        var queries = await DirectoryQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => queries.LookupGrainActivationAsync("cluster-f", "directory-c", "type/duplicate"));
@@ -568,7 +568,7 @@ public sealed class RelationalOrleansQueriesUnitTests
         var expected = new InvalidOperationException("scripted storage failure");
         var reminderStorage = ExpectQueryLoad(new ScriptedRelationalStorage(), ReminderQueryKeys)
             .ExpectReadException(Sql("ReadReminderRowKey"), expected);
-        var reminderQueries = await ReminderQueries.CreateInstance(reminderStorage);
+        var reminderQueries = await ReminderQueries.CreateInstance(reminderStorage, TestContext.Current.CancellationToken);
         var reminderError = await Assert.ThrowsAsync<InvalidOperationException>(
             () => reminderQueries.ReadReminderRowAsync("service-error", GrainId.Create("type", "key"), "name"));
         Assert.Same(expected, reminderError);
@@ -577,16 +577,16 @@ public sealed class RelationalOrleansQueriesUnitTests
 
         var membershipStorage = ExpectQueryLoad(new ScriptedRelationalStorage(), MembershipQueryKeys)
             .ExpectReadException(Sql("MembershipReadAllKey"), expected);
-        var membershipQueries = await ClusteringQueries.CreateInstance(membershipStorage);
+        var membershipQueries = await ClusteringQueries.CreateInstance(membershipStorage, TestContext.Current.CancellationToken);
         var membershipError = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => membershipQueries.MembershipReadAllAsync("cluster-error"));
+            () => membershipQueries.MembershipReadAllAsync("cluster-error", TestContext.Current.CancellationToken));
         Assert.Same(expected, membershipError);
         AssertOperationCall(membershipStorage, Sql("MembershipReadAllKey"));
         membershipStorage.VerifyComplete();
 
         var streamingStorage = ExpectQueryLoad(new ScriptedRelationalStorage(), StreamingQueryKeys)
             .ExpectReadException(Sql("GetStreamMessagesKey"), expected);
-        var streamingQueries = await StreamingQueries.CreateInstance(streamingStorage);
+        var streamingQueries = await StreamingQueries.CreateInstance(streamingStorage, TestContext.Current.CancellationToken);
         var streamingError = await Assert.ThrowsAsync<InvalidOperationException>(
             () => streamingQueries.GetStreamMessagesAsync("service-error", "provider-error", "queue-error", 5, 2, 10, 20, 30, 4));
         Assert.Same(expected, streamingError);
@@ -595,7 +595,7 @@ public sealed class RelationalOrleansQueriesUnitTests
 
         var directoryStorage = ExpectQueryLoad(new ScriptedRelationalStorage(), DirectoryQueryKeys)
             .ExpectReadException(Sql("LookupGrainActivationKey"), expected);
-        var directoryQueries = await DirectoryQueries.CreateInstance(directoryStorage);
+        var directoryQueries = await DirectoryQueries.CreateInstance(directoryStorage, TestContext.Current.CancellationToken);
         var directoryError = await Assert.ThrowsAsync<InvalidOperationException>(
             () => directoryQueries.LookupGrainActivationAsync("cluster-error", "provider-error", "grain-error"));
         Assert.Same(expected, directoryError);
@@ -618,7 +618,7 @@ public sealed class RelationalOrleansQueriesUnitTests
                 CreateTable(
                     DirectoryEntryColumns,
                     [expected.ClusterId, expected.ProviderId, expected.GrainId, expected.SiloAddress, expected.ActivationId]));
-        var queries = await DirectoryQueries.CreateInstance(storage);
+        var queries = await DirectoryQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
 
         var result = await queries.RegisterGrainActivationAsync(
             expected.ClusterId,
@@ -645,7 +645,7 @@ public sealed class RelationalOrleansQueriesUnitTests
             .ExpectRead(
                 Sql("UnregisterGrainActivationKey"),
                 CreateTable([("Result", typeof(int))], [3]));
-        var queries = await DirectoryQueries.CreateInstance(storage);
+        var queries = await DirectoryQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
 
         var result = await queries.UnregisterGrainActivationAsync(
             "cluster-unregister",
@@ -671,7 +671,7 @@ public sealed class RelationalOrleansQueriesUnitTests
             .ExpectRead(
                 Sql("UnregisterGrainActivationsKey"),
                 CreateTable([("Result", typeof(int))], [5]));
-        var queries = await DirectoryQueries.CreateInstance(storage);
+        var queries = await DirectoryQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
 
         var result = await queries.UnregisterGrainActivationsAsync(
             "cluster-unregister-all",
@@ -697,7 +697,7 @@ public sealed class RelationalOrleansQueriesUnitTests
                 CreateTable(
                     StreamConfirmationColumns,
                     ["service-queue", "provider-queue", "queue-queue", 9_876_543_210L]));
-        var queries = await StreamingQueries.CreateInstance(storage);
+        var queries = await StreamingQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
 
         var result = await queries.QueueStreamMessageAsync(
             "service-queue",
@@ -730,7 +730,7 @@ public sealed class RelationalOrleansQueriesUnitTests
             .ExpectRead(
                 Sql("UpsertReminderRowKey"),
                 CreateTable([("Version", typeof(long))], [81L]));
-        var queries = await ReminderQueries.CreateInstance(storage);
+        var queries = await ReminderQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
 
         var result = await queries.UpsertReminderRowAsync(
             "service-upsert",
@@ -761,7 +761,7 @@ public sealed class RelationalOrleansQueriesUnitTests
             .ExpectRead(
                 Sql("DeleteReminderRowKey"),
                 CreateTable([("Result", typeof(int))], [1]));
-        var queries = await ReminderQueries.CreateInstance(storage);
+        var queries = await ReminderQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
 
         var result = await queries.DeleteReminderRowAsync(
             "service-delete",
@@ -800,7 +800,7 @@ public sealed class RelationalOrleansQueriesUnitTests
                     ],
                     [grainId.ToString(), "first-reminder", firstStart, 45_000L, 91L],
                     [grainId.ToString(), "second-reminder", secondStart, 120_000L, 92L]));
-        var queries = await ReminderQueries.CreateInstance(storage);
+        var queries = await ReminderQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
 
         var result = await queries.ReadReminderRowsAsync("service-read", grainId);
 
@@ -866,9 +866,9 @@ public sealed class RelationalOrleansQueriesUnitTests
             .ExpectRead(
                 Sql("UpdateMembershipKey"),
                 CreateTable([("Result", typeof(int))], [1]));
-        var queries = await ClusteringQueries.CreateInstance(storage);
+        var queries = await ClusteringQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
 
-        var result = await queries.UpdateMembershipRowAsync("cluster-update", entry, "105");
+        var result = await queries.UpdateMembershipRowAsync("cluster-update", entry, "105", TestContext.Current.CancellationToken);
 
         Assert.True(result);
         AssertParameters(
@@ -894,7 +894,7 @@ public sealed class RelationalOrleansQueriesUnitTests
                     [("ProxyPort", typeof(int)), ("Generation", typeof(int)), ("Address", typeof(string))],
                     [30_002, 12, "10.2.3.4"],
                     [30_003, 13, "10.2.3.5"]));
-        var queries = await ClusteringQueries.CreateInstance(storage);
+        var queries = await ClusteringQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
 
         var result = await queries.ActiveGatewaysAsync("cluster-gateways");
 
@@ -945,9 +945,9 @@ public sealed class RelationalOrleansQueriesUnitTests
                         "10.4.5.7:11223@15,2026-08-27 17:33:00.000 GMT",
                         106L,
                     ]));
-        var queries = await ClusteringQueries.CreateInstance(storage);
+        var queries = await ClusteringQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
 
-        var result = await queries.MembershipReadRowAsync("cluster-read-row", address);
+        var result = await queries.MembershipReadRowAsync("cluster-read-row", address, TestContext.Current.CancellationToken);
 
         var memberAndEtag = Assert.Single(result.Members);
         var member = memberAndEtag.Item1;
@@ -981,9 +981,9 @@ public sealed class RelationalOrleansQueriesUnitTests
             .ExpectRead(
                 Sql("InsertMembershipVersionKey"),
                 CreateTable([("Result", typeof(int))], [1]));
-        var queries = await ClusteringQueries.CreateInstance(storage);
+        var queries = await ClusteringQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
 
-        var result = await queries.InsertMembershipVersionRowAsync("cluster-version");
+        var result = await queries.InsertMembershipVersionRowAsync("cluster-version", TestContext.Current.CancellationToken);
 
         Assert.True(result);
         AssertParameters(
@@ -997,7 +997,7 @@ public sealed class RelationalOrleansQueriesUnitTests
     {
         var storage = ExpectQueryLoad(new ScriptedRelationalStorage(), StreamingQueryKeys)
             .ExpectExecute(Sql("FailStreamMessageKey"), affectedRows: 1);
-        var queries = await StreamingQueries.CreateInstance(storage);
+        var queries = await StreamingQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
 
         await queries.FailStreamMessageAsync(
             "service-fail",
@@ -1029,7 +1029,7 @@ public sealed class RelationalOrleansQueriesUnitTests
         var arguments = new string?[] { "service-null", "provider-null", "queue-null" };
         arguments[nullIndex] = null;
         var storage = ExpectQueryLoad(new ScriptedRelationalStorage(), StreamingQueryKeys);
-        var queries = await StreamingQueries.CreateInstance(storage);
+        var queries = await StreamingQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
 
         var exception = await Assert.ThrowsAsync<ArgumentNullException>(
             () => queries.QueueStreamMessageAsync(
@@ -1064,7 +1064,7 @@ public sealed class RelationalOrleansQueriesUnitTests
         };
         arguments[nullIndex] = null;
         var storage = ExpectQueryLoad(new ScriptedRelationalStorage(), DirectoryQueryKeys);
-        var queries = await DirectoryQueries.CreateInstance(storage);
+        var queries = await DirectoryQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
 
         var exception = await Assert.ThrowsAsync<ArgumentNullException>(
             () => queries.RegisterGrainActivationAsync(
@@ -1097,7 +1097,7 @@ public sealed class RelationalOrleansQueriesUnitTests
         };
         arguments[nullIndex] = null;
         var storage = ExpectQueryLoad(new ScriptedRelationalStorage(), DirectoryQueryKeys);
-        var queries = await DirectoryQueries.CreateInstance(storage);
+        var queries = await DirectoryQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
 
         var exception = await Assert.ThrowsAsync<ArgumentNullException>(
             () => queries.UnregisterGrainActivationAsync(
@@ -1127,7 +1127,7 @@ public sealed class RelationalOrleansQueriesUnitTests
         };
         arguments[nullIndex] = null;
         var storage = ExpectQueryLoad(new ScriptedRelationalStorage(), DirectoryQueryKeys);
-        var queries = await DirectoryQueries.CreateInstance(storage);
+        var queries = await DirectoryQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
 
         var exception = await Assert.ThrowsAsync<ArgumentNullException>(
             () => queries.UnregisterGrainActivationsAsync(
@@ -1145,7 +1145,7 @@ public sealed class RelationalOrleansQueriesUnitTests
     {
         var storage = ExpectQueryLoad(new ScriptedRelationalStorage(), StreamingQueryKeys)
             .ExpectExecute(Sql("EvictStreamMessagesKey"), affectedRows: 37);
-        var queries = await StreamingQueries.CreateInstance(storage);
+        var queries = await StreamingQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
 
         await queries.EvictStreamMessagesAsync(
             "service-evict",
@@ -1171,7 +1171,7 @@ public sealed class RelationalOrleansQueriesUnitTests
     {
         var storage = ExpectQueryLoad(new ScriptedRelationalStorage(), StreamingQueryKeys)
             .ExpectExecute(Sql("EvictStreamDeadLettersKey"), affectedRows: 43);
-        var queries = await StreamingQueries.CreateInstance(storage);
+        var queries = await StreamingQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
 
         await queries.EvictStreamDeadLettersAsync(
             "service-dead-letter",
@@ -1195,9 +1195,9 @@ public sealed class RelationalOrleansQueriesUnitTests
         var aliveTime = new DateTime(2026, 8, 27, 22, 31, 45, DateTimeKind.Utc);
         var storage = ExpectQueryLoad(new ScriptedRelationalStorage(), MembershipQueryKeys)
             .ExpectExecute(Sql("UpdateIAmAlivetimeKey"), affectedRows: 1);
-        var queries = await ClusteringQueries.CreateInstance(storage);
+        var queries = await ClusteringQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
 
-        await queries.UpdateIAmAliveTimeAsync("cluster-alive", address, aliveTime);
+        await queries.UpdateIAmAliveTimeAsync("cluster-alive", address, aliveTime, TestContext.Current.CancellationToken);
 
         var call = AssertOperationCall(storage, Sql("UpdateIAmAlivetimeKey"), ExpectedCallKind.Execute);
         AssertParameters(
@@ -1216,7 +1216,7 @@ public sealed class RelationalOrleansQueriesUnitTests
     {
         var storage = ExpectQueryLoad(new ScriptedRelationalStorage(), ReminderQueryKeys)
             .ExpectExecute(Sql("DeleteReminderRowsKey"), affectedRows: 12);
-        var queries = await ReminderQueries.CreateInstance(storage);
+        var queries = await ReminderQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
 
         await queries.DeleteReminderRowsAsync("service-delete-all");
 
@@ -1231,9 +1231,9 @@ public sealed class RelationalOrleansQueriesUnitTests
     {
         var storage = ExpectQueryLoad(new ScriptedRelationalStorage(), MembershipQueryKeys)
             .ExpectExecute(Sql("DeleteMembershipTableEntriesKey"), affectedRows: 17);
-        var queries = await ClusteringQueries.CreateInstance(storage);
+        var queries = await ClusteringQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
 
-        await queries.DeleteMembershipTableEntriesAsync("cluster-delete-all");
+        await queries.DeleteMembershipTableEntriesAsync("cluster-delete-all", TestContext.Current.CancellationToken);
 
         AssertParameters(
             AssertOperationCall(storage, Sql("DeleteMembershipTableEntriesKey"), ExpectedCallKind.Execute),
@@ -1247,9 +1247,9 @@ public sealed class RelationalOrleansQueriesUnitTests
         var beforeDate = new DateTimeOffset(2026, 8, 28, 4, 15, 30, TimeSpan.FromHours(5.5));
         var storage = ExpectQueryLoad(new ScriptedRelationalStorage(), MembershipQueryKeys)
             .ExpectExecute(Sql("CleanupDefunctSiloEntriesKey"), affectedRows: 5);
-        var queries = await ClusteringQueries.CreateInstance(storage);
+        var queries = await ClusteringQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
 
-        await queries.CleanupDefunctSiloEntriesAsync(beforeDate, "cluster-cleanup");
+        await queries.CleanupDefunctSiloEntriesAsync(beforeDate, "cluster-cleanup", TestContext.Current.CancellationToken);
 
         var call = AssertOperationCall(storage, Sql("CleanupDefunctSiloEntriesKey"), ExpectedCallKind.Execute);
         AssertParameters(

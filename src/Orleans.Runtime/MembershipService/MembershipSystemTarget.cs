@@ -43,6 +43,7 @@ namespace Orleans.Runtime.MembershipService
             MembershipTableSnapshot snapshot,
             CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (snapshot.Version != MembershipVersion.MinValue)
             {
                 await this.membershipManager.ProcessGossipSnapshot(snapshot, cancellationToken);
@@ -60,8 +61,13 @@ namespace Orleans.Runtime.MembershipService
         /// </summary>
         /// <param name="remoteSilo">The remote silo to ping.</param>
         /// <param name="probeNumber">The probe number, for diagnostic purposes.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>The result of pinging the remote silo.</returns>
-        public Task ProbeRemoteSilo(SiloAddress remoteSilo, int probeNumber) => this.RunOrQueueTask(() => ProbeInternal(remoteSilo, probeNumber));
+        public async Task ProbeRemoteSilo(SiloAddress remoteSilo, int probeNumber, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await this.RunOrQueueTask(() => ProbeInternal(remoteSilo, probeNumber, cancellationToken));
+        }
 
         /// <summary>
         /// Send a ping to a remote silo via an intermediary silo. This is intended to be called from a <see cref="SiloHealthMonitor"/>
@@ -71,18 +77,18 @@ namespace Orleans.Runtime.MembershipService
         /// <param name="target">The target which will be probed.</param>
         /// <param name="probeTimeout">The timeout for the eventual direct probe request.</param>
         /// <param name="probeNumber">The probe number, for diagnostic purposes.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>The result of pinging the remote silo.</returns>
-        public Task<IndirectProbeResponse> ProbeRemoteSiloIndirectly(SiloAddress intermediary, SiloAddress target, TimeSpan probeTimeout, int probeNumber)
+        public Task<IndirectProbeResponse> ProbeRemoteSiloIndirectly(SiloAddress intermediary, SiloAddress target, TimeSpan probeTimeout, int probeNumber, CancellationToken cancellationToken)
         {
-            Task<IndirectProbeResponse> ProbeIndirectly()
+            Task<IndirectProbeResponse> ProbeIndirectly(CancellationToken token)
             {
+                token.ThrowIfCancellationRequested();
                 var remoteOracle = this.grainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipServiceType, intermediary);
-                return remoteOracle.ProbeIndirectly(target, probeTimeout, probeNumber);
+                return remoteOracle.ProbeIndirectly(target, probeTimeout, probeNumber, token);
             }
 
-            var workItem = new AsyncClosureWorkItem<IndirectProbeResponse>(ProbeIndirectly, this);
-            WorkItemGroup.QueueWorkItem(workItem);
-            return workItem.Task;
+            return this.RunOrQueueTask(ProbeIndirectly, cancellationToken);
         }
 
         public async Task<IndirectProbeResponse> ProbeIndirectly(
@@ -91,25 +97,28 @@ namespace Orleans.Runtime.MembershipService
             int probeNumber,
             CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var probeTimer = TimeProviderValueStopwatch.StartNew(_timeProvider);
             var succeeded = false;
             string? failureMessage = null;
+            using var timeout = new CancellationTokenSource(probeTimeout, _timeProvider);
+            using var probeCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
             try
             {
-                var probeTask = this.ProbeInternal(target, probeNumber);
                 try
                 {
-                    await probeTask.WaitAsync(probeTimeout, _timeProvider, cancellationToken);
+                    await this.ProbeInternal(target, probeNumber, probeCancellation.Token);
                 }
-                catch (TimeoutException exception)
+                catch (OperationCanceledException exception) when (timeout.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
                 {
-                    LogWarningRequestedProbeTimeoutExceeded(this.log, exception, probeTimeout);
-                    throw;
+                    var timeoutException = new TimeoutException($"The probe exceeded its timeout of {probeTimeout}.", exception);
+                    LogWarningRequestedProbeTimeoutExceeded(this.log, timeoutException, probeTimeout);
+                    throw timeoutException;
                 }
 
                 succeeded = true;
             }
-            catch (OperationCanceledException exception) when (exception.CancellationToken == cancellationToken)
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 throw;
             }
@@ -131,38 +140,47 @@ namespace Orleans.Runtime.MembershipService
             };
         }
 
-        public Task GossipToRemoteSilos(
+        public async Task GossipToRemoteSilos(
             List<SiloAddress> gossipPartners,
             MembershipTableSnapshot snapshot,
             SiloAddress updatedSilo,
-            SiloStatus updatedStatus)
+            SiloStatus updatedStatus,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             async Task Gossip()
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var tasks = new List<Task>(gossipPartners.Count);
                 foreach (var silo in gossipPartners)
                 {
-                    tasks.Add(this.GossipToRemoteSilo(silo, snapshot, updatedSilo, updatedStatus));
+                    tasks.Add(this.GossipToRemoteSilo(silo, snapshot, updatedSilo, updatedStatus, cancellationToken));
                 }
 
                 await Task.WhenAll(tasks);
             }
 
-            return this.RunOrQueueTask(Gossip);
+            await this.RunOrQueueTask(Gossip);
         }
 
         private async Task GossipToRemoteSilo(
             SiloAddress silo,
             MembershipTableSnapshot snapshot,
             SiloAddress updatedSilo,
-            SiloStatus updatedStatus)
+            SiloStatus updatedStatus,
+            CancellationToken cancellationToken)
         {
             LogTraceSendingStatusUpdateGossipNotification(this.log, updatedSilo, updatedStatus, silo);
 
             try
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var remoteOracle = this.grainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipServiceType, silo);
-                await remoteOracle.MembershipChangeNotification(snapshot, CancellationToken.None);
+                await remoteOracle.MembershipChangeNotification(snapshot, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception exception)
             {
@@ -186,14 +204,15 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        private Task ProbeInternal(SiloAddress remoteSilo, int probeNumber)
+        private Task ProbeInternal(SiloAddress remoteSilo, int probeNumber, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             Task task;
             try
             {
                 RequestContext.Set(RequestContext.PING_APPLICATION_HEADER, true);
                 var remoteOracle = this.grainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipServiceType, remoteSilo);
-                task = remoteOracle.Ping(probeNumber);
+                task = remoteOracle.Ping(probeNumber, cancellationToken);
 
                 // Update stats counter. Only count Pings that were successfully sent, but not necessarily replied to.
                 _messagingInstruments.OnPingSend(remoteSilo);

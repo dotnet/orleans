@@ -13,6 +13,9 @@ using Xunit;
 namespace NonSilo.Tests.Membership
 {
     [TestCategory("BVT"), TestCategory("Membership")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class MembershipSystemTargetTests
     {
         private static readonly DateTimeOffset Start = new(2026, 1, 1, 12, 0, 0, TimeSpan.Zero);
@@ -33,7 +36,7 @@ namespace NonSilo.Tests.Membership
                 probeTimeout,
                 ProbeNumber,
                 TestContext.Current.CancellationToken);
-            await rig.PingEntered.Task;
+            await rig.PingEntered.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
             Assert.False(responseTask.IsCompleted);
             Assert.Empty(rig.LocalHealthMonitor.ReceivedCalls());
@@ -76,7 +79,7 @@ namespace NonSilo.Tests.Membership
                     probeTimeout,
                     ProbeNumber,
                     TestContext.Current.CancellationToken);
-                await rig.PingEntered.Task;
+                await rig.PingEntered.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
                 Assert.Empty(rig.LocalHealthMonitor.ReceivedCalls());
                 rig.TimeProvider.Advance(probeTimeout - TimeSpan.FromTicks(1));
@@ -104,6 +107,27 @@ namespace NonSilo.Tests.Membership
             {
                 rig.PingRelease.TrySetResult();
             }
+        }
+
+        [Fact]
+        public async Task ProbeIndirectly_CallerCancellationRemainsCancellation()
+        {
+            using var rig = CreateTestRig(CreateDistinctStallStatus());
+            using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+            var response = rig.Target.ProbeIndirectly(
+                SiloAddress.FromParsableString("127.0.0.1:300@100"),
+                TimeSpan.FromSeconds(5),
+                29,
+                cancellation.Token);
+            await rig.PingEntered.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+            cancellation.Cancel();
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => response.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
+            Assert.True(response.IsCanceled);
+            Assert.Empty(rig.LocalHealthMonitor.ReceivedCalls());
+            rig.PingRelease.TrySetResult();
         }
 
         private static LocalSiloHealthStatus CreateDistinctStallStatus() => new(
@@ -175,10 +199,10 @@ namespace NonSilo.Tests.Membership
             var pingEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var pingRelease = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var remoteMembershipService = Substitute.For<IMembershipService>();
-            remoteMembershipService.Ping(Arg.Any<int>()).Returns(_ =>
+            remoteMembershipService.Ping(Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(call =>
             {
                 pingEntered.TrySetResult();
-                return pingRelease.Task;
+                return pingRelease.Task.WaitAsync(call.ArgAt<CancellationToken>(1));
             });
             var grainFactory = Substitute.For<IInternalGrainFactory>();
             grainFactory

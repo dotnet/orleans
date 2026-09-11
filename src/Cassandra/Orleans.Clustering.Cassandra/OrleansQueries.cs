@@ -1,8 +1,11 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Threading;
+using System.Threading.Tasks;
 using Cassandra;
 using Orleans.Runtime;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace Orleans.Clustering.Cassandra;
 
@@ -40,75 +43,77 @@ internal sealed class OrleansQueries
         Session = session;
     }
 
-    internal async Task EnsureTableExistsAsync(TimeSpan maxRetryDelay, int? ttl)
+    internal async Task EnsureTableExistsAsync(TimeSpan maxRetryDelay, int? ttl, CancellationToken cancellationToken = default)
     {
-        if (!await DoesTableAlreadyExistAsync())
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!await DoesTableAlreadyExistAsync(cancellationToken))
         {
             try
             {
-                await MakeTableAsync(ttl);
+                await MakeTableAsync(ttl, cancellationToken);
             }
             catch (WriteTimeoutException) // If there's contention on table creation, backoff a bit and try once more
             {
                 // Randomize the delay to avoid contention, preferring that more instances will wait longer
                 var nextSingle = Random.Shared.NextSingle();
-                await Task.Delay(maxRetryDelay * Math.Sqrt(nextSingle));
+                await Task.Delay(maxRetryDelay * Math.Sqrt(nextSingle), cancellationToken);
 
-                if (!await DoesTableAlreadyExistAsync())
+                if (!await DoesTableAlreadyExistAsync(cancellationToken))
                 {
-                    await MakeTableAsync(ttl);
+                    await MakeTableAsync(ttl, cancellationToken);
                 }
             }
         }
     }
 
-    internal async Task EnsureClusterVersionExistsAsync(TimeSpan maxRetryDelay, string clusterIdentifier)
+    internal async Task EnsureClusterVersionExistsAsync(TimeSpan maxRetryDelay, string clusterIdentifier, CancellationToken cancellationToken = default)
     {
-        if (!await DoesClusterVersionAlreadyExistAsync(clusterIdentifier))
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!await DoesClusterVersionAlreadyExistAsync(clusterIdentifier, cancellationToken))
         {
             try
             {
-                await Session.ExecuteAsync(await InsertMembershipVersion(clusterIdentifier));
+                await ExecuteAsync(await InsertMembershipVersion(clusterIdentifier, cancellationToken), cancellationToken);
             }
             catch (WriteTimeoutException) // If there's contention on table creation, backoff a bit and try once more
             {
                 // Randomize the delay to avoid contention, preferring that more instances will wait longer
                 var nextSingle = Random.Shared.NextSingle();
-                await Task.Delay(maxRetryDelay * Math.Sqrt(nextSingle));
+                await Task.Delay(maxRetryDelay * Math.Sqrt(nextSingle), cancellationToken);
 
-                if (!await DoesClusterVersionAlreadyExistAsync(clusterIdentifier))
+                if (!await DoesClusterVersionAlreadyExistAsync(clusterIdentifier, cancellationToken))
                 {
-                    await Session.ExecuteAsync(await InsertMembershipVersion(clusterIdentifier));
+                    await ExecuteAsync(await InsertMembershipVersion(clusterIdentifier, cancellationToken), cancellationToken);
                 }
             }
         }
     }
 
-    private async Task<bool> DoesClusterVersionAlreadyExistAsync(string clusterIdentifier)
+    private async Task<bool> DoesClusterVersionAlreadyExistAsync(string clusterIdentifier, CancellationToken cancellationToken)
     {
         try
         {
-            var resultSet = await Session.ExecuteAsync(CheckIfClusterVersionExists(clusterIdentifier, ConsistencyLevel.LocalOne));
-            return resultSet.Any();
+            var resultSet = await ExecuteAsync(CheckIfClusterVersionExists(clusterIdentifier, ConsistencyLevel.LocalOne), cancellationToken);
+            return await ReadFirstRowAsync(resultSet, cancellationToken) is not null;
         }
         catch (UnavailableException)
         {
-            var resultSet = await Session.ExecuteAsync(CheckIfClusterVersionExists(clusterIdentifier, ConsistencyLevel.One));
-            return resultSet.Any();
+            var resultSet = await ExecuteAsync(CheckIfClusterVersionExists(clusterIdentifier, ConsistencyLevel.One), cancellationToken);
+            return await ReadFirstRowAsync(resultSet, cancellationToken) is not null;
         }
     }
 
-    private async Task<bool> DoesTableAlreadyExistAsync()
+    private async Task<bool> DoesTableAlreadyExistAsync(CancellationToken cancellationToken)
     {
         try
         {
-            var resultSet = await Session.ExecuteAsync(CheckIfTableExists(Session.Keyspace, ConsistencyLevel.LocalOne));
-            return resultSet.Any();
+            var resultSet = await ExecuteAsync(CheckIfTableExists(Session.Keyspace, ConsistencyLevel.LocalOne), cancellationToken);
+            return await ReadFirstRowAsync(resultSet, cancellationToken) is not null;
         }
         catch (UnavailableException)
         {
-            var resultSet = await Session.ExecuteAsync(CheckIfTableExists(Session.Keyspace, ConsistencyLevel.One));
-            return resultSet.Any();
+            var resultSet = await ExecuteAsync(CheckIfTableExists(Session.Keyspace, ConsistencyLevel.One), cancellationToken);
+            return await ReadFirstRowAsync(resultSet, cancellationToken) is not null;
         }
         catch (UnauthorizedException)
         {
@@ -116,10 +121,10 @@ internal sealed class OrleansQueries
         }
     }
 
-    private async Task MakeTableAsync(int? ttlSeconds)
+    private async Task MakeTableAsync(int? ttlSeconds, CancellationToken cancellationToken)
     {
-        await Session.ExecuteAsync(EnsureTableExists(ttlSeconds));
-        await Session.ExecuteAsync(EnsureIndexExists);
+        await ExecuteAsync(EnsureTableExists(ttlSeconds), cancellationToken);
+        await ExecuteAsync(EnsureIndexExists, cancellationToken);
     }
 
     public ConsistencyLevel MembershipWriteConsistencyLevel { get; set; }
@@ -168,7 +173,7 @@ internal sealed class OrleansQueries
             CREATE INDEX IF NOT EXISTS ix_membership_status ON membership(status);
             """);
 
-    public async ValueTask<IStatement> InsertMembership(string clusterIdentifier, MembershipEntry membershipEntry, int version)
+    public async ValueTask<IStatement> InsertMembership(string clusterIdentifier, MembershipEntry membershipEntry, int version, CancellationToken cancellationToken = default)
     {
         _insertMembershipPreparedStatement ??= await PrepareStatementAsync("""
            UPDATE membership
@@ -187,7 +192,7 @@ internal sealed class OrleansQueries
              AND generation = :generation
            IF
              version = :expected_version;
-           """, MembershipWriteConsistencyLevel);
+           """, MembershipWriteConsistencyLevel, cancellationToken);
         return _insertMembershipPreparedStatement.Bind(new
         {
             partition_key = clusterIdentifier,
@@ -205,7 +210,7 @@ internal sealed class OrleansQueries
         });
     }
 
-    public async ValueTask<IStatement> InsertMembershipVersion(string clusterIdentifier)
+    public async ValueTask<IStatement> InsertMembershipVersion(string clusterIdentifier, CancellationToken cancellationToken = default)
     {
         _insertMembershipVersionPreparedStatement ??= await PrepareStatementAsync("""
             INSERT INTO membership(
@@ -217,20 +222,20 @@ internal sealed class OrleansQueries
             	0
             )
             IF NOT EXISTS;
-            """, MembershipWriteConsistencyLevel);
+            """, MembershipWriteConsistencyLevel, cancellationToken);
         return _insertMembershipVersionPreparedStatement.Bind(clusterIdentifier);
     }
 
-    public async ValueTask<IStatement> DeleteMembershipTableEntries(string clusterIdentifier)
+    public async ValueTask<IStatement> DeleteMembershipTableEntries(string clusterIdentifier, CancellationToken cancellationToken = default)
     {
         _deleteMembershipTablePreparedStatement ??= await PrepareStatementAsync("""
                 DELETE FROM membership WHERE partition_key = :partition_key;
                 """,
-            MembershipWriteConsistencyLevel);
+            MembershipWriteConsistencyLevel, cancellationToken);
         return _deleteMembershipTablePreparedStatement.Bind(clusterIdentifier);
     }
 
-    public async ValueTask<IStatement> UpdateIAmAliveTime(string clusterIdentifier, MembershipEntry membershipEntry)
+    public async ValueTask<IStatement> UpdateIAmAliveTime(string clusterIdentifier, MembershipEntry membershipEntry, CancellationToken cancellationToken = default)
     {
         _updateIAmAlivePreparedStatement ??= await PrepareStatementAsync("""
              UPDATE membership
@@ -242,7 +247,7 @@ internal sealed class OrleansQueries
                 AND port = :port
                 AND generation = :generation;
              """,
-            ConsistencyLevel.Any);
+            ConsistencyLevel.Any, cancellationToken);
 
         return _updateIAmAlivePreparedStatement.Bind(new
         {
@@ -267,7 +272,8 @@ internal sealed class OrleansQueries
         string clusterIdentifier,
         MembershipEntry iAmAliveEntry,
         MembershipEntry existingEntry,
-        TableVersion existingVersion)
+        TableVersion existingVersion,
+        CancellationToken cancellationToken = default)
     {
         _updateIAmAliveWithTtlPreparedStatement ??= await PrepareStatementAsync(
             """
@@ -290,7 +296,7 @@ internal sealed class OrleansQueries
             	version = :expected_version;
             """,
             // This is ignored because we're creating a LWT
-            MembershipWriteConsistencyLevel);
+            MembershipWriteConsistencyLevel, cancellationToken);
 
         BoundStatement updateIAmAliveTimeWithTtL = _updateIAmAliveWithTtlPreparedStatement.Bind(new
         {
@@ -316,7 +322,7 @@ internal sealed class OrleansQueries
         return updateIAmAliveTimeWithTtL;
     }
 
-    public async ValueTask<IStatement> DeleteMembershipEntry(string clusterIdentifier, MembershipEntry membershipEntry)
+    public async ValueTask<IStatement> DeleteMembershipEntry(string clusterIdentifier, MembershipEntry membershipEntry, CancellationToken cancellationToken = default)
     {
         _deleteMembershipEntryPreparedStatement ??= await PrepareStatementAsync("""
             DELETE FROM
@@ -326,7 +332,7 @@ internal sealed class OrleansQueries
             	AND address = :address
             	AND port = :port
             	AND generation = :generation;
-            """, MembershipWriteConsistencyLevel);
+            """, MembershipWriteConsistencyLevel, cancellationToken);
         return _deleteMembershipEntryPreparedStatement.Bind(new
         {
             partition_key = clusterIdentifier,
@@ -336,7 +342,7 @@ internal sealed class OrleansQueries
         });
     }
 
-    public async ValueTask<IStatement> UpdateMembership(string clusterIdentifier, MembershipEntry membershipEntry, int version)
+    public async ValueTask<IStatement> UpdateMembership(string clusterIdentifier, MembershipEntry membershipEntry, int version, CancellationToken cancellationToken = default)
     {
         _updateMembershipPreparedStatement ??= await PrepareStatementAsync("""
             UPDATE membership
@@ -352,7 +358,7 @@ internal sealed class OrleansQueries
             	AND generation = :generation
             IF
             	version = :expected_version;
-            """, MembershipWriteConsistencyLevel);
+            """, MembershipWriteConsistencyLevel, cancellationToken);
         return _updateMembershipPreparedStatement.Bind(new
         {
             partition_key = clusterIdentifier,
@@ -367,7 +373,7 @@ internal sealed class OrleansQueries
         });
     }
 
-    public async ValueTask<IStatement> MembershipReadVersion(string clusterIdentifier)
+    public async ValueTask<IStatement> MembershipReadVersion(string clusterIdentifier, CancellationToken cancellationToken = default)
     {
         _membershipReadVersionPreparedStatement ??= await PrepareStatementAsync("""
                 SELECT
@@ -377,11 +383,11 @@ internal sealed class OrleansQueries
                 WHERE
                 	partition_key = :partition_key;
                 """,
-            MembershipReadConsistencyLevel);
+            MembershipReadConsistencyLevel, cancellationToken);
         return _membershipReadVersionPreparedStatement.Bind(clusterIdentifier);
     }
 
-    public async ValueTask<IStatement> MembershipReadAll(string clusterIdentifier)
+    public async ValueTask<IStatement> MembershipReadAll(string clusterIdentifier, CancellationToken cancellationToken = default)
     {
         _membershipReadAllPreparedStatement ??= await PrepareStatementAsync("""
             SELECT
@@ -401,11 +407,11 @@ internal sealed class OrleansQueries
             WHERE
                 partition_key = :partition_key;
             """,
-            MembershipReadConsistencyLevel);
+            MembershipReadConsistencyLevel, cancellationToken);
         return _membershipReadAllPreparedStatement.Bind(clusterIdentifier);
     }
 
-    public async ValueTask<IStatement> MembershipReadRow(string clusterIdentifier, SiloAddress siloAddress)
+    public async ValueTask<IStatement> MembershipReadRow(string clusterIdentifier, SiloAddress siloAddress, CancellationToken cancellationToken = default)
     {
         _membershipReadRowPreparedStatement ??= await PrepareStatementAsync("""
             SELECT
@@ -428,7 +434,7 @@ internal sealed class OrleansQueries
                 AND port = :port
                 AND generation = :generation;
             """,
-            MembershipReadConsistencyLevel);
+            MembershipReadConsistencyLevel, cancellationToken);
         return _membershipReadRowPreparedStatement.Bind(new
         {
             partition_key = clusterIdentifier,
@@ -463,11 +469,72 @@ internal sealed class OrleansQueries
         });
     }
 
-    private async ValueTask<PreparedStatement> PrepareStatementAsync(string cql, ConsistencyLevel consistencyLevel)
+    private async ValueTask<PreparedStatement> PrepareStatementAsync(string cql, ConsistencyLevel consistencyLevel, CancellationToken cancellationToken = default)
     {
-        var statement = await Session.PrepareAsync(cql);
+        cancellationToken.ThrowIfCancellationRequested();
+        var statement = await AwaitAsync(Session.PrepareAsync(cql), cancellationToken);
         statement.SetConsistencyLevel(consistencyLevel);
         return statement;
+    }
+
+    internal async Task<RowSet> ExecuteAsync(IStatement statement, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        statement.SetAutoPage(true);
+        var rows = await AwaitAsync(Session.ExecuteAsync(statement), cancellationToken);
+        return rows;
+    }
+
+    internal static async Task<Row?> ReadFirstRowAsync(RowSet rows, CancellationToken cancellationToken)
+    {
+        await foreach (var row in ReadRowsAsync(rows, cancellationToken))
+        {
+            return row;
+        }
+
+        return null;
+    }
+
+    internal static async IAsyncEnumerable<Row> ReadRowsAsync(RowSet rows, [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        // Consume buffered rows so that fetching each subsequent page stays on the cancellable await path.
+        while (true)
+        {
+            var available = rows.GetAvailableWithoutFetching();
+            using (var buffered = rows.GetEnumerator())
+            {
+                for (var i = 0; i < available; i++)
+                {
+                    if (!buffered.MoveNext())
+                    {
+                        break;
+                    }
+
+                    yield return buffered.Current;
+                }
+            }
+
+            if (rows.IsFullyFetched)
+            {
+                yield break;
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            await AwaitAsync(rows.FetchMoreResultsAsync(), cancellationToken);
+        }
+    }
+
+    // Cassandra's session and paging APIs are tokenless. Observe eventual faults when cancellation ends the wait.
+    internal static async Task<T> AwaitAsync<T>(Task<T> operation, CancellationToken cancellationToken)
+    {
+        operation.Ignore();
+        return await operation.WaitAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    internal static async Task AwaitAsync(Task operation, CancellationToken cancellationToken)
+    {
+        operation.Ignore();
+        await operation.WaitAsync(cancellationToken).ConfigureAwait(false);
     }
 
     private static string? GetSuspectTimesString(MembershipEntry entry) =>

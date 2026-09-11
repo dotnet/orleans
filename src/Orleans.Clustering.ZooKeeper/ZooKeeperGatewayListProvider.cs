@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Messaging;
 using Microsoft.Extensions.Logging;
@@ -66,7 +67,7 @@ namespace Orleans.Runtime.Membership
         /// </summary>
         public async Task<IList<Uri>> GetGateways()
         {
-            var membershipTableData = await ZooKeeperBasedMembershipTable.ReadAll(this._deploymentConnectionString, this._watcher);
+            var membershipTableData = await ZooKeeperBasedMembershipTable.ReadAllAsync(this._deploymentConnectionString, this._watcher, CancellationToken.None);
             return membershipTableData.Members.Select(e => e.Item1).
                 Where(m => m.Status == SiloStatus.Active && m.ProxyPort != 0).
                 Select(m =>

@@ -88,23 +88,50 @@ namespace Orleans.Runtime.Membership
     {
         public ConsulBasedMembershipTable(Microsoft.Extensions.Logging.ILogger<ConsulBasedMembershipTable> logger, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.ConsulClusteringOptions> membershipTableOptions, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.ClusterOptions> clusterOptions) { }
 
+        [System.Obsolete("Use CleanupDefunctSiloEntriesAsync instead.")]
         public System.Threading.Tasks.Task CleanupDefunctSiloEntries(System.DateTimeOffset beforeDate) { throw null; }
 
+        public System.Threading.Tasks.Task CleanupDefunctSiloEntriesAsync(System.DateTimeOffset beforeDate, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        [System.Obsolete("Use DeleteMembershipTableEntriesAsync instead.")]
         public System.Threading.Tasks.Task DeleteMembershipTableEntries(string clusterId) { throw null; }
 
+        public System.Threading.Tasks.Task DeleteMembershipTableEntriesAsync(string clusterId, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        [System.Obsolete("Use InitializeMembershipTableAsync instead.")]
         public System.Threading.Tasks.Task InitializeMembershipTable(bool tryInitTableVersion) { throw null; }
 
+        public System.Threading.Tasks.Task InitializeMembershipTableAsync(bool tryInitTableVersion, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        [System.Obsolete("Use InsertRowAsync instead.")]
         public System.Threading.Tasks.Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) { throw null; }
 
+        public System.Threading.Tasks.Task<bool> InsertRowAsync(MembershipEntry entry, TableVersion tableVersion, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        [System.Obsolete("Use ReadAllAsync instead.")]
         public System.Threading.Tasks.Task<MembershipTableData> ReadAll() { throw null; }
 
+        [System.Obsolete("Use ReadAllAsync instead.")]
         public static System.Threading.Tasks.Task<MembershipTableData> ReadAll(Consul.IConsulClient consulClient, string clusterId, string? kvRootFolder, Microsoft.Extensions.Logging.ILogger logger, string? versionKey) { throw null; }
 
+        public static System.Threading.Tasks.Task<MembershipTableData> ReadAllAsync(Consul.IConsulClient consulClient, string clusterId, string? kvRootFolder, Microsoft.Extensions.Logging.ILogger logger, string? versionKey, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public System.Threading.Tasks.Task<MembershipTableData> ReadAllAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        [System.Obsolete("Use ReadRowAsync instead.")]
         public System.Threading.Tasks.Task<MembershipTableData> ReadRow(SiloAddress siloAddress) { throw null; }
 
+        public System.Threading.Tasks.Task<MembershipTableData> ReadRowAsync(SiloAddress siloAddress, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        [System.Obsolete("Use UpdateIAmAliveAsync instead.")]
         public System.Threading.Tasks.Task UpdateIAmAlive(MembershipEntry entry) { throw null; }
 
+        public System.Threading.Tasks.Task UpdateIAmAliveAsync(MembershipEntry entry, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        [System.Obsolete("Use UpdateRowAsync instead.")]
         public System.Threading.Tasks.Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) { throw null; }
+
+        public System.Threading.Tasks.Task<bool> UpdateRowAsync(MembershipEntry entry, string etag, TableVersion tableVersion, System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }
 
     public partial class ConsulGatewayListProvider : Orleans.Messaging.IGatewayListProvider

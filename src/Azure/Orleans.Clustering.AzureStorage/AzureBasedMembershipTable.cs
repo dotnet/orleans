@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Net;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Azure;
 using Microsoft.Extensions.Logging;
@@ -34,14 +35,19 @@ namespace Orleans.Runtime.MembershipService
             this.clusterId = clusterOptions.Value.ClusterId;
         }
 
-        public async Task InitializeMembershipTable(bool tryInitTableVersion)
+        [Obsolete("Use InitializeMembershipTableAsync instead.")]
+        public Task InitializeMembershipTable(bool tryInitTableVersion) => InitializeMembershipTableAsync(tryInitTableVersion, CancellationToken.None);
+
+        public async Task InitializeMembershipTableAsync(bool tryInitTableVersion, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             LogFormatter.SetExceptionDecoder(typeof(RequestFailedException), AzureTableUtils.PrintStorageException);
 
             this.tableManager = await OrleansSiloInstanceManager.GetManager(
                 this.clusterId,
                 this.loggerFactory,
-                this.options);
+                this.options,
+                cancellationToken);
 
             // even if I am not the one who created the table,
             // try to insert an initial table version if it is not already there,
@@ -49,26 +55,38 @@ namespace Orleans.Runtime.MembershipService
             if (tryInitTableVersion)
             {
                 // ignore return value, since we don't care if I inserted it or not, as long as it is in there.
-                bool created = await tableManager.TryCreateTableVersionEntryAsync();
+                bool created = await tableManager.TryCreateTableVersionEntryAsync(cancellationToken);
                 if (created) LogInformationCreatedNewTableVersionRow();
             }
         }
 
-        public Task DeleteMembershipTableEntries(string clusterId)
+        [Obsolete("Use DeleteMembershipTableEntriesAsync instead.")]
+        public Task DeleteMembershipTableEntries(string clusterId) => DeleteMembershipTableEntriesAsync(clusterId, CancellationToken.None);
+
+        public Task DeleteMembershipTableEntriesAsync(string clusterId, CancellationToken cancellationToken = default)
         {
-            return tableManager.DeleteTableEntries(clusterId);
+            cancellationToken.ThrowIfCancellationRequested();
+            return tableManager.DeleteTableEntries(clusterId, cancellationToken);
         }
 
-        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
+        [Obsolete("Use CleanupDefunctSiloEntriesAsync instead.")]
+        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) => CleanupDefunctSiloEntriesAsync(beforeDate, CancellationToken.None);
+
+        public Task CleanupDefunctSiloEntriesAsync(DateTimeOffset beforeDate, CancellationToken cancellationToken = default)
         {
-            return tableManager.CleanupDefunctSiloEntries(beforeDate);
+            cancellationToken.ThrowIfCancellationRequested();
+            return tableManager.CleanupDefunctSiloEntries(beforeDate, cancellationToken);
         }
 
-        public async Task<MembershipTableData> ReadRow(SiloAddress key)
+        [Obsolete("Use ReadRowAsync instead.")]
+        public Task<MembershipTableData> ReadRow(SiloAddress key) => ReadRowAsync(key, CancellationToken.None);
+
+        public async Task<MembershipTableData> ReadRowAsync(SiloAddress key, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
-                var entries = await tableManager.FindSiloEntryAndTableVersionRow(key);
+                var entries = await tableManager.FindSiloEntryAndTableVersionRow(key, cancellationToken);
                 MembershipTableData data = Convert(entries);
                 LogDebugReadMyEntry(key, data);
                 return data;
@@ -80,11 +98,15 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        public async Task<MembershipTableData> ReadAll()
+        [Obsolete("Use ReadAllAsync instead.")]
+        public Task<MembershipTableData> ReadAll() => ReadAllAsync(CancellationToken.None);
+
+        public async Task<MembershipTableData> ReadAllAsync(CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
-                var entries = await tableManager.FindAllSiloEntries();
+                var entries = await tableManager.FindAllSiloEntries(cancellationToken);
                 MembershipTableData data = Convert(entries);
                 LogTraceReadAllTable(data);
 
@@ -97,8 +119,12 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        public async Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion)
+        [Obsolete("Use InsertRowAsync instead.")]
+        public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => InsertRowAsync(entry, tableVersion, CancellationToken.None);
+
+        public async Task<bool> InsertRowAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
                 LogDebugInsertRow(entry, tableVersion);
@@ -106,7 +132,7 @@ namespace Orleans.Runtime.MembershipService
                 var versionEntry = tableManager.CreateTableVersionEntry(tableVersion.Version);
 
                 bool result = await tableManager.InsertSiloEntryConditionally(
-                    tableEntry, versionEntry, tableVersion.VersionEtag);
+                    tableEntry, versionEntry, tableVersion.VersionEtag, cancellationToken);
 
                 if (result == false)
                     LogWarningTableContention(entry, tableVersion);
@@ -122,15 +148,19 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        public async Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion)
+        [Obsolete("Use UpdateRowAsync instead.")]
+        public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => UpdateRowAsync(entry, etag, tableVersion, CancellationToken.None);
+
+        public async Task<bool> UpdateRowAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
                 LogDebugUpdateRow(entry, etag, tableVersion);
                 var siloEntry = Convert(entry, tableManager.DeploymentId);
                 var versionEntry = tableManager.CreateTableVersionEntry(tableVersion.Version);
 
-                bool result = await tableManager.UpdateSiloEntryConditionally(siloEntry, etag, versionEntry, tableVersion.VersionEtag);
+                bool result = await tableManager.UpdateSiloEntryConditionally(siloEntry, etag, versionEntry, tableVersion.VersionEtag, cancellationToken);
                 if (result == false)
                     LogWarningTableContentionEtag(entry, etag, tableVersion);
                 return result;
@@ -145,13 +175,17 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        public async Task UpdateIAmAlive(MembershipEntry entry)
+        [Obsolete("Use UpdateIAmAliveAsync instead.")]
+        public Task UpdateIAmAlive(MembershipEntry entry) => UpdateIAmAliveAsync(entry, CancellationToken.None);
+
+        public async Task UpdateIAmAliveAsync(MembershipEntry entry, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
                 LogDebugMergeEntry(entry);
                 var siloEntry = ConvertPartial(entry, tableManager.DeploymentId);
-                await tableManager.MergeTableEntryAsync(siloEntry);
+                await tableManager.MergeTableEntryAsync(siloEntry, cancellationToken);
             }
             catch (Exception exc)
             {

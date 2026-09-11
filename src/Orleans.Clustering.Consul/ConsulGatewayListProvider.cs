@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Consul;
 using Orleans.Messaging;
@@ -63,7 +64,7 @@ namespace Orleans.Runtime.Membership
         /// <inheritdoc />
         public async Task<IList<Uri>> GetGateways()
         {
-            var membershipTableData = await ConsulBasedMembershipTable.ReadAll(this.consulClient, this.clusterId, this.kvRootFolder, this.logger, null);
+            var membershipTableData = await ConsulBasedMembershipTable.ReadAllAsync(this.consulClient, this.clusterId, this.kvRootFolder, this.logger, null, CancellationToken.None);
             if (membershipTableData == null) return new List<Uri>();
 
             return membershipTableData.Members.Select(e => e.Item1).

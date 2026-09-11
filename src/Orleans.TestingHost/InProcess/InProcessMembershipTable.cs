@@ -20,10 +20,21 @@ internal sealed class InProcessMembershipTable(string clusterId) : IMembershipTa
     public TimeSpan MaxStaleness => TimeSpan.Zero;
     public bool IsUpdatable => true;
 
-    public Task InitializeMembershipTable(bool tryInitTableVersion) => Task.CompletedTask;
+    [Obsolete("Use InitializeMembershipTableAsync instead.")]
+    public Task InitializeMembershipTable(bool tryInitTableVersion) => InitializeMembershipTableAsync(tryInitTableVersion, CancellationToken.None);
 
-    public Task DeleteMembershipTableEntries(string clusterId)
+    public Task InitializeMembershipTableAsync(bool tryInitTableVersion, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.CompletedTask;
+    }
+
+    [Obsolete("Use DeleteMembershipTableEntriesAsync instead.")]
+    public Task DeleteMembershipTableEntries(string clusterId) => DeleteMembershipTableEntriesAsync(clusterId, CancellationToken.None);
+
+    public Task DeleteMembershipTableEntriesAsync(string clusterId, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         if (string.Equals(_clusterId, clusterId, StringComparison.Ordinal))
         {
             _table.Clear();
@@ -32,22 +43,58 @@ internal sealed class InProcessMembershipTable(string clusterId) : IMembershipTa
         return Task.CompletedTask;
     }
 
-    public Task<MembershipTableData> ReadRow(SiloAddress key) => Task.FromResult(_table.Read(key));
+    [Obsolete("Use ReadRowAsync instead.")]
+    public Task<MembershipTableData> ReadRow(SiloAddress key) => ReadRowAsync(key, CancellationToken.None);
 
-    public Task<MembershipTableData> ReadAll() => Task.FromResult(_table.ReadAll());
-
-    public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => Task.FromResult(_table.Insert(entry, tableVersion));
-
-    public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => Task.FromResult(_table.Update(entry, etag, tableVersion));
-
-    public Task UpdateIAmAlive(MembershipEntry entry)
+    public Task<MembershipTableData> ReadRowAsync(SiloAddress key, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(_table.Read(key));
+    }
+
+    [Obsolete("Use ReadAllAsync instead.")]
+    public Task<MembershipTableData> ReadAll() => ReadAllAsync(CancellationToken.None);
+
+    public Task<MembershipTableData> ReadAllAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(_table.ReadAll());
+    }
+
+    [Obsolete("Use InsertRowAsync instead.")]
+    public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => InsertRowAsync(entry, tableVersion, CancellationToken.None);
+
+    public Task<bool> InsertRowAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(_table.Insert(entry, tableVersion));
+    }
+
+    [Obsolete("Use UpdateRowAsync instead.")]
+    public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => UpdateRowAsync(entry, etag, tableVersion, CancellationToken.None);
+
+    public Task<bool> UpdateRowAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(_table.Update(entry, etag, tableVersion));
+    }
+
+    [Obsolete("Use UpdateIAmAliveAsync instead.")]
+    public Task UpdateIAmAlive(MembershipEntry entry) => UpdateIAmAliveAsync(entry, CancellationToken.None);
+
+    public Task UpdateIAmAliveAsync(MembershipEntry entry, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         _table.UpdateIAmAlive(entry);
         return Task.CompletedTask;
     }
 
-    public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
+    [Obsolete("Use CleanupDefunctSiloEntriesAsync instead.")]
+    public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) => CleanupDefunctSiloEntriesAsync(beforeDate, CancellationToken.None);
+
+    public Task CleanupDefunctSiloEntriesAsync(DateTimeOffset beforeDate, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         _table.CleanupDefunctSiloEntries(beforeDate);
         return Task.CompletedTask;
     }

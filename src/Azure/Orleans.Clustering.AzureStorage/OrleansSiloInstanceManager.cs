@@ -59,12 +59,14 @@ namespace Orleans.AzureUtils
         public static async Task<OrleansSiloInstanceManager> GetManager(
             string clusterId,
             ILoggerFactory loggerFactory,
-            AzureStorageOperationOptions options)
+            AzureStorageOperationOptions options,
+            CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var instance = new OrleansSiloInstanceManager(clusterId, loggerFactory, options);
             try
             {
-                await instance.storage.InitTableAsync();
+                await instance.storage.InitTableAsync(cancellationToken);
             }
             catch (Exception ex)
             {
@@ -201,9 +203,9 @@ namespace Orleans.AzureUtils
             return sb.ToString();
         }
 
-        internal Task<string> MergeTableEntryAsync(SiloInstanceTableEntry data)
+        internal Task<string> MergeTableEntryAsync(SiloInstanceTableEntry data, CancellationToken cancellationToken = default)
         {
-            return storage.MergeTableEntryAsync(data, AzureTableUtils.ANY_ETAG); // we merge this without checking eTags.
+            return storage.MergeTableEntryAsync(data, AzureTableUtils.ANY_ETAG, cancellationToken); // we merge this without checking eTags.
         }
 
         internal Task<(SiloInstanceTableEntry? Entity, string? ETag)> ReadSingleTableEntryAsync(string partitionKey, string rowKey)
@@ -211,52 +213,49 @@ namespace Orleans.AzureUtils
             return storage.ReadSingleTableEntryAsync(partitionKey, rowKey);
         }
 
-        internal async Task<int> DeleteTableEntries(string clusterId)
+        internal async Task<int> DeleteTableEntries(string clusterId, CancellationToken cancellationToken = default)
         {
             if (clusterId == null) throw new ArgumentNullException(nameof(clusterId));
 
-            var entries = await storage.ReadAllTableEntriesForPartitionAsync(clusterId);
+            var entries = await storage.ReadAllTableEntriesForPartitionAsync(clusterId, cancellationToken);
 
-            await DeleteEntriesBatch(entries);
+            await DeleteEntriesBatch(entries, cancellationToken);
 
             return entries.Count;
         }
 
-        public async Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
+        public async Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate, CancellationToken cancellationToken = default)
         {
-            var entriesList = (await FindAllSiloEntries())
+            var entriesList = (await FindAllSiloEntries(cancellationToken))
                 .Where(entry => !SiloInstanceTableEntry.IsVersionRow(entry.Entity.RowKey)
                     && entry.Item1.Status != INSTANCE_STATUS_ACTIVE
                     && entry.Item1.Timestamp < beforeDate)
                 .ToList();
 
             // Defunct-row cleanup intentionally does not advance the membership snapshot fence.
-            await DeleteEntriesBatch(entriesList);
+            await DeleteEntriesBatch(entriesList, cancellationToken);
         }
 
-        private async Task DeleteEntriesBatch(List<(SiloInstanceTableEntry, string)> entriesList)
+        private async Task DeleteEntriesBatch(List<(SiloInstanceTableEntry, string)> entriesList, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (entriesList.Count <= this.storagePolicyOptions.MaxBulkUpdateRows)
             {
-                await storage.DeleteTableEntriesAsync(entriesList);
+                await storage.DeleteTableEntriesAsync(entriesList, cancellationToken);
             }
             else
             {
-                var tasks = new List<Task>();
-                foreach (var batch in entriesList.BatchIEnumerable(this.storagePolicyOptions.MaxBulkUpdateRows))
-                {
-                    tasks.Add(storage.DeleteTableEntriesAsync(batch));
-                }
-                await Task.WhenAll(tasks);
+                await Task.WhenAll(entriesList.BatchIEnumerable(this.storagePolicyOptions.MaxBulkUpdateRows)
+                    .Select(batch => storage.DeleteTableEntriesAsync(batch, cancellationToken)));
             }
         }
 
-        internal async Task<List<(SiloInstanceTableEntry, string)>> FindSiloEntryAndTableVersionRow(SiloAddress siloAddress)
+        internal async Task<List<(SiloInstanceTableEntry, string)>> FindSiloEntryAndTableVersionRow(SiloAddress siloAddress, CancellationToken cancellationToken = default)
         {
             string rowKey = SiloInstanceTableEntry.ConstructRowKey(siloAddress);
 
             var filter = TableClient.CreateQueryFilter($"(PartitionKey eq {DeploymentId}) and ((RowKey eq {rowKey}) or (RowKey eq {SiloInstanceTableEntry.TABLE_VERSION_ROW}))");
-            var queryResults = await storage.ReadTableEntriesAndEtagsAsync(filter);
+            var queryResults = await storage.ReadTableEntriesAndEtagsAsync(filter, cancellationToken);
             if (queryResults.Count < 1 || queryResults.Count > 2)
                 throw new KeyNotFoundException(string.Format(
                     CultureInfo.CurrentCulture,
@@ -295,6 +294,7 @@ namespace Orleans.AzureUtils
             MembershipTableQueryResult query = default;
             for (var attempt = 0; attempt < MaxMembershipSnapshotAttempts; attempt++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 query = await membershipTableReadStorage.ReadAllTableEntriesForPartitionAsync(DeploymentId, cancellationToken);
                 var tableVersion = ValidateAllSiloEntries(query.Entries);
                 if (CanAcceptSnapshot(query, tableVersion))
@@ -418,11 +418,12 @@ namespace Orleans.AzureUtils
         /// <summary>
         /// Insert (create new) row entry
         /// </summary>
-        internal async Task<bool> TryCreateTableVersionEntryAsync()
+        internal async Task<bool> TryCreateTableVersionEntryAsync(CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
-                var versionRow = await storage.ReadSingleTableEntryAsync(DeploymentId, SiloInstanceTableEntry.TABLE_VERSION_ROW);
+                var versionRow = await storage.ReadSingleTableEntryAsync(DeploymentId, SiloInstanceTableEntry.TABLE_VERSION_ROW, cancellationToken);
                 if (versionRow.Entity != null)
                 {
                     return false;
@@ -430,7 +431,7 @@ namespace Orleans.AzureUtils
 
                 var entry = CreateTableVersionEntry(0);
                 var boundaryEntries = CreateBoundaryVersionEntries(entry);
-                await storage.CreateTableEntriesAsync([entry, boundaryEntries.Min, boundaryEntries.Max]);
+                await storage.CreateTableEntriesAsync([entry, boundaryEntries.Min, boundaryEntries.Max], cancellationToken);
                 return true;
             }
             catch (Exception exc)
@@ -450,7 +451,8 @@ namespace Orleans.AzureUtils
         /// <param name="siloEntry">Silo Entry to be written</param>
         /// <param name="tableVersionEntry">Version row to update</param>
         /// <param name="tableVersionEtag">Version row eTag</param>
-        internal async Task<bool> InsertSiloEntryConditionally(SiloInstanceTableEntry siloEntry, SiloInstanceTableEntry tableVersionEntry, string tableVersionEtag)
+        /// <param name="cancellationToken">The cancellation token.</param>
+        internal async Task<bool> InsertSiloEntryConditionally(SiloInstanceTableEntry siloEntry, SiloInstanceTableEntry tableVersionEntry, string tableVersionEtag, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -458,7 +460,8 @@ namespace Orleans.AzureUtils
                 await storage.CreateAndUpdateTableEntriesAsync(
                     siloEntry,
                     (tableVersionEntry, tableVersionEtag),
-                    (boundaryEntries.Min, boundaryEntries.Max));
+                    (boundaryEntries.Min, boundaryEntries.Max),
+                    cancellationToken);
                 return true;
             }
             catch (Exception exc)
@@ -479,8 +482,9 @@ namespace Orleans.AzureUtils
         /// <param name="entryEtag">ETag value for the entry being updated</param>
         /// <param name="tableVersionEntry">Version row to update</param>
         /// <param name="versionEtag">ETag value for the version row</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns></returns>
-        internal async Task<bool> UpdateSiloEntryConditionally(SiloInstanceTableEntry siloEntry, string entryEtag, SiloInstanceTableEntry tableVersionEntry, string versionEtag)
+        internal async Task<bool> UpdateSiloEntryConditionally(SiloInstanceTableEntry siloEntry, string entryEtag, SiloInstanceTableEntry tableVersionEntry, string versionEtag, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -488,7 +492,8 @@ namespace Orleans.AzureUtils
                 await storage.UpdateTableEntriesAsync(
                     (siloEntry, entryEtag),
                     (tableVersionEntry, versionEtag),
-                    (boundaryEntries.Min, boundaryEntries.Max));
+                    (boundaryEntries.Min, boundaryEntries.Max),
+                    cancellationToken);
                 return true;
             }
             catch (Exception exc)

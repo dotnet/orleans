@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Orleans.Runtime.Scheduler
@@ -44,6 +45,28 @@ namespace Orleans.Runtime.Scheduler
             var workItem = new AsyncClosureWorkItem(taskFunc, targetContext);
             targetContext.Scheduler.QueueWorkItem(workItem);
             return workItem.Task;
+        }
+
+        internal static async Task<TResult> RunOrQueueTask<TResult>(
+            this IGrainContext targetContext,
+            Func<CancellationToken, Task<TResult>> taskFunc,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var currentContext = RuntimeContext.Current;
+            if (currentContext is not null && currentContext.Equals(targetContext))
+            {
+                return await taskFunc(cancellationToken);
+            }
+
+            var workItem = new AsyncClosureWorkItem<TResult>(() =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return taskFunc(cancellationToken);
+            }, targetContext);
+            targetContext.Scheduler.QueueWorkItem(workItem);
+            return await workItem.Task;
         }
 
         internal static Task<TResult> RunOrQueueTaskResult<TResult>(this IGrainContext targetContext, Func<TResult> taskFunc)

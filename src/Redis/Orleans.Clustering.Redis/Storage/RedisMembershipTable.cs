@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 using StackExchange.Redis;
@@ -33,36 +34,86 @@ namespace Orleans.Clustering.Redis
 
         public bool IsInitialized { get; private set; }
 
-        public async Task DeleteMembershipTableEntries(string clusterId)
+        [Obsolete("Use DeleteMembershipTableEntriesAsync instead.")]
+        public Task DeleteMembershipTableEntries(string clusterId) => DeleteMembershipTableEntriesAsync(clusterId, CancellationToken.None);
+
+        public async Task DeleteMembershipTableEntriesAsync(string clusterId, CancellationToken cancellationToken = default)
         {
-            await _db.KeyDeleteAsync(_clusterKey);
+            cancellationToken.ThrowIfCancellationRequested();
+            await AwaitAsync(_db.KeyDeleteAsync(_clusterKey), cancellationToken);
         }
 
-        public async Task InitializeMembershipTable(bool tryInitTableVersion)
+        [Obsolete("Use InitializeMembershipTableAsync instead.")]
+        public Task InitializeMembershipTable(bool tryInitTableVersion) => InitializeMembershipTableAsync(tryInitTableVersion, CancellationToken.None);
+
+        public async Task InitializeMembershipTableAsync(bool tryInitTableVersion, CancellationToken cancellationToken = default)
         {
-            (_muxer, _muxerIsShared) = await _redisOptions.CreateMultiplexer(_redisOptions);
-            _db = _muxer.GetDatabase();
-
-            if (tryInitTableVersion)
+            cancellationToken.ThrowIfCancellationRequested();
+            var creation = _redisOptions.CreateMultiplexer(_redisOptions);
+            IConnectionMultiplexer muxer;
+            bool isShared;
+            try
             {
-                await _db.HashSetAsync(_clusterKey, TableVersionKey, SerializeVersion(DefaultTableVersion), When.NotExists);
-
-                if (_redisOptions.EntryExpiry is { } expiry)
-                {
-                    await _db.KeyExpireAsync(_clusterKey, expiry);
-                }
+                (muxer, isShared) = await AwaitAsync(creation, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                // The tokenless factory can still return an owned connection after the caller stops waiting.
+                DisposeAbandonedMultiplexerAsync(creation).Ignore();
+                throw;
             }
 
-            this.IsInitialized = true;
+            var initialized = false;
+            try
+            {
+                var db = muxer.GetDatabase();
+                if (tryInitTableVersion)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    await AwaitAsync(db.HashSetAsync(_clusterKey, TableVersionKey, SerializeVersion(DefaultTableVersion), When.NotExists), cancellationToken);
+
+                    if (_redisOptions.EntryExpiry is { } expiry)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        await AwaitAsync(db.KeyExpireAsync(_clusterKey, expiry), cancellationToken);
+                    }
+                }
+
+                _muxer = muxer;
+                _muxerIsShared = isShared;
+                _db = db;
+                IsInitialized = true;
+                initialized = true;
+            }
+            finally
+            {
+                if (!initialized && !isShared)
+                {
+                    await muxer.DisposeAsync().ConfigureAwait(false);
+                }
+            }
         }
 
-        public async Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion)
+        private static async Task DisposeAbandonedMultiplexerAsync(Task<(IConnectionMultiplexer Multiplexer, bool IsShared)> creation)
         {
-            return await UpsertRowInternal(entry, tableVersion, updateTableVersion: true, allowInsertOnly: true) == UpsertResult.Success;
+            var (muxer, isShared) = await creation.ConfigureAwait(false);
+            if (!isShared)
+            {
+                await muxer.DisposeAsync().ConfigureAwait(false);
+            }
         }
 
-        private async Task<UpsertResult> UpsertRowInternal(MembershipEntry entry, TableVersion tableVersion, bool updateTableVersion, bool allowInsertOnly)
+        [Obsolete("Use InsertRowAsync instead.")]
+        public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => InsertRowAsync(entry, tableVersion, CancellationToken.None);
+
+        public async Task<bool> InsertRowAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
         {
+            return await UpsertRowInternal(entry, tableVersion, updateTableVersion: true, allowInsertOnly: true, cancellationToken) == UpsertResult.Success;
+        }
+
+        private async Task<UpsertResult> UpsertRowInternal(MembershipEntry entry, TableVersion tableVersion, bool updateTableVersion, bool allowInsertOnly, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
             var tx = _db.CreateTransaction();
             var rowKey = entry.SiloAddress.ToString();
 
@@ -85,7 +136,8 @@ namespace Orleans.Clustering.Redis
 
             tx.HashSetAsync(_clusterKey, rowKey, Serialize(entry)).Ignore();
 
-            var success = await tx.ExecuteAsync();
+            cancellationToken.ThrowIfCancellationRequested();
+            var success = await AwaitAsync(tx.ExecuteAsync(), cancellationToken);
 
             if (success)
             {
@@ -105,9 +157,13 @@ namespace Orleans.Clustering.Redis
             return UpsertResult.Failure;
         }
 
-        public async Task<MembershipTableData> ReadAll()
+        [Obsolete("Use ReadAllAsync instead.")]
+        public Task<MembershipTableData> ReadAll() => ReadAllAsync(CancellationToken.None);
+
+        public async Task<MembershipTableData> ReadAllAsync(CancellationToken cancellationToken = default)
         {
-            var all = await _db.HashGetAllAsync(_clusterKey);
+            cancellationToken.ThrowIfCancellationRequested();
+            var all = await AwaitAsync(_db.HashGetAllAsync(_clusterKey), cancellationToken);
             var tableVersionRow = all.SingleOrDefault(h => TableVersionKey.Equals(h.Name, StringComparison.Ordinal));
             TableVersion tableVersion = GetTableVersionFromRow(tableVersionRow.Value);
 
@@ -139,18 +195,25 @@ namespace Orleans.Clustering.Redis
             return false;
         }
 
-        public async Task<MembershipTableData> ReadRow(SiloAddress key)
+        [Obsolete("Use ReadRowAsync instead.")]
+        public Task<MembershipTableData> ReadRow(SiloAddress key) => ReadRowAsync(key, CancellationToken.None);
+
+        public async Task<MembershipTableData> ReadRowAsync(SiloAddress key, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var tx = _db.CreateTransaction();
             var tableVersionRowTask = tx.HashGetAsync(_clusterKey, TableVersionKey);
+            tableVersionRowTask.Ignore();
             var entryRowTask = tx.HashGetAsync(_clusterKey, key.ToString());
-            if (!await tx.ExecuteAsync())
+            entryRowTask.Ignore();
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!await AwaitAsync(tx.ExecuteAsync(), cancellationToken))
             {
                 throw new RedisClusteringException($"Unexpected transaction failure while reading key {key}");
             }
 
-            TableVersion tableVersion = GetTableVersionFromRow(await tableVersionRowTask);
-            var entryRow = await entryRowTask;
+            TableVersion tableVersion = GetTableVersionFromRow(await AwaitAsync(tableVersionRowTask, cancellationToken));
+            var entryRow = await AwaitAsync(entryRowTask, cancellationToken);
             if (TryGetValueString(entryRow, out var entryValueString))
             {
                 var entry = Deserialize(entryValueString);
@@ -162,30 +225,37 @@ namespace Orleans.Clustering.Redis
             }
         }
 
-        public async Task UpdateIAmAlive(MembershipEntry entry)
+        [Obsolete("Use UpdateIAmAliveAsync instead.")]
+        public Task UpdateIAmAlive(MembershipEntry entry) => UpdateIAmAliveAsync(entry, CancellationToken.None);
+
+        public async Task UpdateIAmAliveAsync(MembershipEntry entry, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var key = entry.SiloAddress.ToString();
             var tx = _db.CreateTransaction();
             var tableVersionRowTask = tx.HashGetAsync(_clusterKey, TableVersionKey);
+            tableVersionRowTask.Ignore();
             var entryRowTask = tx.HashGetAsync(_clusterKey, key);
-            if (!await tx.ExecuteAsync())
+            entryRowTask.Ignore();
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!await AwaitAsync(tx.ExecuteAsync(), cancellationToken))
             {
                 throw new RedisClusteringException($"Unexpected transaction failure while reading key {key}");
             }
 
-            var entryRow = await entryRowTask;
+            var entryRow = await AwaitAsync(entryRowTask, cancellationToken);
             if (!TryGetValueString(entryRow, out var entryRowValue))
             {
                 throw new RedisClusteringException($"Could not find a value for the key {key}");
             }
 
-            TableVersion tableVersion = GetTableVersionFromRow(await tableVersionRowTask).Next();
+            TableVersion tableVersion = GetTableVersionFromRow(await AwaitAsync(tableVersionRowTask, cancellationToken)).Next();
             var existingEntry = Deserialize(entryRowValue);
 
             // Update only the IAmAliveTime property.
             existingEntry.IAmAliveTime = entry.IAmAliveTime;
 
-            var result = await UpsertRowInternal(existingEntry, tableVersion, updateTableVersion: false, allowInsertOnly: false);
+            var result = await UpsertRowInternal(existingEntry, tableVersion, updateTableVersion: false, allowInsertOnly: false, cancellationToken);
             if (result == UpsertResult.Conflict)
             {
                 throw new RedisClusteringException($"Failed to update IAmAlive value for key {key} due to conflict");
@@ -196,22 +266,36 @@ namespace Orleans.Clustering.Redis
             }
         }
 
-        public async Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion)
+        [Obsolete("Use UpdateRowAsync instead.")]
+        public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => UpdateRowAsync(entry, etag, tableVersion, CancellationToken.None);
+
+        public async Task<bool> UpdateRowAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
         {
-            return await UpsertRowInternal(entry, tableVersion, updateTableVersion: true, allowInsertOnly: false) == UpsertResult.Success;
+            return await UpsertRowInternal(entry, tableVersion, updateTableVersion: true, allowInsertOnly: false, cancellationToken) == UpsertResult.Success;
         }
 
-        public async Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
+        [Obsolete("Use CleanupDefunctSiloEntriesAsync instead.")]
+        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) => CleanupDefunctSiloEntriesAsync(beforeDate, CancellationToken.None);
+
+        public async Task CleanupDefunctSiloEntriesAsync(DateTimeOffset beforeDate, CancellationToken cancellationToken = default)
         {
-            var entries = await this.ReadAll();
+            var entries = await ReadAllAsync(cancellationToken);
             foreach (var (entry, _) in entries.Members)
             {
                 if (entry.Status != SiloStatus.Active
                     && new DateTime(Math.Max(entry.IAmAliveTime.Ticks, entry.StartTime.Ticks), DateTimeKind.Utc) < beforeDate)
                 {
-                    await _db.HashDeleteAsync(_clusterKey, entry.SiloAddress.ToString());
+                    cancellationToken.ThrowIfCancellationRequested();
+                    await AwaitAsync(_db.HashDeleteAsync(_clusterKey, entry.SiloAddress.ToString()), cancellationToken);
                 }
             }
+        }
+
+        // StackExchange.Redis does not accept cancellation tokens. Observe terminal faults if a caller abandons its wait.
+        private static async Task<T> AwaitAsync<T>(Task<T> operation, CancellationToken cancellationToken)
+        {
+            operation.Ignore();
+            return await operation.WaitAsync(cancellationToken).ConfigureAwait(false);
         }
 
         public void Dispose()

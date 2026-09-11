@@ -4,6 +4,7 @@ using System.Data;
 using System.Data.Common;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
@@ -73,27 +74,29 @@ namespace Orleans.Tests.SqlUtils
         /// <summary>
         /// Creates an instance using exactly one configured connection source and initializes Orleans queries from the database.
         /// </summary>
-        internal static Task<RelationalOrleansQueries> CreateInstance(string invariantName, string? connectionString, DbDataSource? dataSource) =>
-            CreateInstance(RelationalStorage.CreateInstance(invariantName, connectionString, dataSource));
+        internal static Task<RelationalOrleansQueries> CreateInstance(string invariantName, string? connectionString, DbDataSource? dataSource, CancellationToken cancellationToken = default) =>
+            CreateInstance(RelationalStorage.CreateInstance(invariantName, connectionString, dataSource), cancellationToken);
 
-        internal static async Task<RelationalOrleansQueries> CreateInstance(IRelationalStorage storage)
+        internal static async Task<RelationalOrleansQueries> CreateInstance(IRelationalStorage storage, CancellationToken cancellationToken = default)
         {
-            var queries = await storage.ReadAsync(DbStoredQueries.GetQueriesKey, DbStoredQueries.Converters.GetQueryKeyAndValue, null);
+            var queries = await storage.ReadAsync(DbStoredQueries.GetQueriesKey, DbStoredQueries.Converters.GetQueryKeyAndValue, null, cancellationToken);
 
             return new RelationalOrleansQueries(storage, new DbStoredQueries(queries.ToDictionary(q => q.Key, q => q.Value)));
         }
 
-        private Task ExecuteAsync(string query, Func<IDbCommand, DbStoredQueries.Columns> parameterProvider)
+        private Task ExecuteAsync(string query, Func<IDbCommand, DbStoredQueries.Columns> parameterProvider, CancellationToken cancellationToken = default)
         {
-            return storage.ExecuteAsync(query, command => parameterProvider(command));
+            cancellationToken.ThrowIfCancellationRequested();
+            return storage.ExecuteAsync(query, command => parameterProvider(command), cancellationToken: cancellationToken);
         }
 
         private async Task<TAggregate> ReadAsync<TResult, TAggregate>(string query,
             Func<IDataRecord, TResult> selector,
             Func<IDbCommand, DbStoredQueries.Columns> parameterProvider,
-            Func<IEnumerable<TResult>, TAggregate> aggregator)
+            Func<IEnumerable<TResult>, TAggregate> aggregator,
+            CancellationToken cancellationToken = default)
         {
-            var ret = await storage.ReadAsync(query, selector, command => parameterProvider(command));
+            var ret = await storage.ReadAsync(query, selector, command => parameterProvider(command), cancellationToken);
             return aggregator(ret);
         }
 
@@ -257,34 +260,37 @@ namespace Orleans.Tests.SqlUtils
         /// </summary>
         /// <param name="deploymentId">The deployment for which to query data.</param>
         /// <param name="siloAddress">Silo data used as parameters in the query.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>Membership table data.</returns>
-        internal Task<MembershipTableData> MembershipReadRowAsync(string deploymentId, SiloAddress siloAddress)
+        internal Task<MembershipTableData> MembershipReadRowAsync(string deploymentId, SiloAddress siloAddress, CancellationToken cancellationToken = default)
         {
             return ReadAsync(dbStoredQueries.MembershipReadRowKey, DbStoredQueries.Converters.GetMembershipEntry, command =>
                 new DbStoredQueries.Columns(command) { DeploymentId = deploymentId, SiloAddress = siloAddress },
-                ConvertToMembershipTableData);
+                ConvertToMembershipTableData, cancellationToken);
         }
 
         /// <summary>
         /// returns all membership data for a deployment id
         /// </summary>
         /// <param name="deploymentId"></param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns></returns>
-        internal Task<MembershipTableData> MembershipReadAllAsync(string deploymentId)
+        internal Task<MembershipTableData> MembershipReadAllAsync(string deploymentId, CancellationToken cancellationToken = default)
         {
             return ReadAsync(dbStoredQueries.MembershipReadAllKey, DbStoredQueries.Converters.GetMembershipEntry, command =>
-                new DbStoredQueries.Columns(command) { DeploymentId = deploymentId }, ConvertToMembershipTableData);
+                new DbStoredQueries.Columns(command) { DeploymentId = deploymentId }, ConvertToMembershipTableData, cancellationToken);
         }
 
         /// <summary>
         /// deletes all membership entries for a deployment id
         /// </summary>
         /// <param name="deploymentId"></param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns></returns>
-        internal Task DeleteMembershipTableEntriesAsync(string deploymentId)
+        internal Task DeleteMembershipTableEntriesAsync(string deploymentId, CancellationToken cancellationToken = default)
         {
             return ExecuteAsync(dbStoredQueries.DeleteMembershipTableEntriesKey, command =>
-                new DbStoredQueries.Columns(command) { DeploymentId = deploymentId });
+                new DbStoredQueries.Columns(command) { DeploymentId = deploymentId }, cancellationToken);
         }
 
         /// <summary>
@@ -293,11 +299,12 @@ namespace Orleans.Tests.SqlUtils
         /// </summary>
         /// <param name="beforeDate"></param>
         /// <param name="deploymentId"></param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns></returns>
-        internal Task CleanupDefunctSiloEntriesAsync(DateTimeOffset beforeDate, string deploymentId)
+        internal Task CleanupDefunctSiloEntriesAsync(DateTimeOffset beforeDate, string deploymentId, CancellationToken cancellationToken = default)
         {
             return ExecuteAsync(dbStoredQueries.CleanupDefunctSiloEntriesKey, command =>
-                new DbStoredQueries.Columns(command) { DeploymentId = deploymentId, IAmAliveTime = beforeDate.UtcDateTime });
+                new DbStoredQueries.Columns(command) { DeploymentId = deploymentId, IAmAliveTime = beforeDate.UtcDateTime }, cancellationToken);
         }
 
         /// <summary>
@@ -306,8 +313,9 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="deploymentId"></param>
         /// <param name="siloAddress"></param>
         /// <param name="iAmAliveTime"></param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns></returns>
-        internal Task UpdateIAmAliveTimeAsync(string deploymentId, SiloAddress siloAddress, DateTime iAmAliveTime)
+        internal Task UpdateIAmAliveTimeAsync(string deploymentId, SiloAddress siloAddress, DateTime iAmAliveTime, CancellationToken cancellationToken = default)
         {
             return ExecuteAsync(dbStoredQueries.UpdateIAmAlivetimeKey, command =>
                 new DbStoredQueries.Columns(command)
@@ -315,18 +323,19 @@ namespace Orleans.Tests.SqlUtils
                     DeploymentId = deploymentId,
                     SiloAddress = siloAddress,
                     IAmAliveTime = iAmAliveTime
-                });
+                }, cancellationToken);
         }
 
         /// <summary>
         /// Inserts a version row if one does not already exist.
         /// </summary>
         /// <param name="deploymentId">The deployment for which to query data.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns><em>TRUE</em> if a row was inserted. <em>FALSE</em> otherwise.</returns>
-        internal Task<bool> InsertMembershipVersionRowAsync(string deploymentId)
+        internal Task<bool> InsertMembershipVersionRowAsync(string deploymentId, CancellationToken cancellationToken = default)
         {
             return ReadAsync(dbStoredQueries.InsertMembershipVersionKey, DbStoredQueries.Converters.GetSingleBooleanValue, command =>
-                new DbStoredQueries.Columns(command) { DeploymentId = deploymentId }, ret => ret.First());
+                new DbStoredQueries.Columns(command) { DeploymentId = deploymentId }, ret => ret.First(), cancellationToken);
         }
 
         /// <summary>
@@ -335,9 +344,10 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="deploymentId">The deployment with which to insert row.</param>
         /// <param name="membershipEntry">The membership entry data to insert.</param>
         /// <param name="etag">The table expected version etag.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns><em>TRUE</em> if insert succeeds. <em>FALSE</em> otherwise.</returns>
         internal Task<bool> InsertMembershipRowAsync(string deploymentId, MembershipEntry membershipEntry,
-            string etag)
+            string etag, CancellationToken cancellationToken = default)
         {
             return ReadAsync(dbStoredQueries.InsertMembershipKey, DbStoredQueries.Converters.GetSingleBooleanValue, command =>
                 new DbStoredQueries.Columns(command)
@@ -351,7 +361,7 @@ namespace Orleans.Tests.SqlUtils
                     Status = membershipEntry.Status,
                     ProxyPort = membershipEntry.ProxyPort,
                     Version = etag
-                }, ret => ret.First());
+                }, ret => ret.First(), cancellationToken);
         }
 
         /// <summary>
@@ -360,9 +370,10 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="deploymentId">The deployment with which to insert row.</param>
         /// <param name="membershipEntry">The membership data to used to update database.</param>
         /// <param name="etag">The table expected version etag.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns><em>TRUE</em> if update SUCCEEDS. <em>FALSE</em> ot</returns>
         internal Task<bool> UpdateMembershipRowAsync(string deploymentId, MembershipEntry membershipEntry,
-            string etag)
+            string etag, CancellationToken cancellationToken = default)
         {
             return ReadAsync(dbStoredQueries.UpdateMembershipKey, DbStoredQueries.Converters.GetSingleBooleanValue, command =>
                 new DbStoredQueries.Columns(command)
@@ -373,7 +384,7 @@ namespace Orleans.Tests.SqlUtils
                     Status = membershipEntry.Status,
                     SuspectTimes = membershipEntry.SuspectTimes,
                     Version = etag
-                }, ret => ret.First());
+                }, ret => ret.First(), cancellationToken);
         }
 
         private static MembershipTableData ConvertToMembershipTableData(IEnumerable<Tuple<MembershipEntry?, int>> ret)

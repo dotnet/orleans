@@ -12,6 +12,7 @@ using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Orleans.Clustering.DynamoDB
@@ -39,8 +40,12 @@ namespace Orleans.Clustering.DynamoDB
             this.clusterId = clusterOptions.Value.ClusterId;
         }
 
-        public async Task InitializeMembershipTable(bool tryInitTableVersion)
+        [Obsolete("Use InitializeMembershipTableAsync instead.")]
+        public Task InitializeMembershipTable(bool tryInitTableVersion) => InitializeMembershipTableAsync(tryInitTableVersion, CancellationToken.None);
+
+        public async Task InitializeMembershipTableAsync(bool tryInitTableVersion, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             this.storage = new DynamoDBStorage(
                 this.logger,
                 this.options.Service,
@@ -65,7 +70,8 @@ namespace Orleans.Clustering.DynamoDB
                 {
                     new AttributeDefinition { AttributeName = SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME, AttributeType = ScalarAttributeType.S },
                     new AttributeDefinition { AttributeName = SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME, AttributeType = ScalarAttributeType.S }
-                });
+                },
+                cancellationToken: cancellationToken);
 
             // even if I am not the one who created the table,
             // try to insert an initial table version if it is not already there,
@@ -73,12 +79,12 @@ namespace Orleans.Clustering.DynamoDB
             if (tryInitTableVersion)
             {
                 // ignore return value, since we don't care if I inserted it or not, as long as it is in there.
-                bool created = await TryCreateTableVersionEntryAsync();
+                bool created = await TryCreateTableVersionEntryAsync(cancellationToken);
                 if (created) LogInformationCreatedNewTableVersionRow();
             }
         }
 
-        private async Task<bool> TryCreateTableVersionEntryAsync()
+        private async Task<bool> TryCreateTableVersionEntryAsync(CancellationToken cancellationToken)
         {
             var keys = new Dictionary<string, AttributeValue>
             {
@@ -86,7 +92,7 @@ namespace Orleans.Clustering.DynamoDB
                 { $"{SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME}", new AttributeValue(SiloInstanceRecord.TABLE_VERSION_ROW) }
             };
 
-            var versionRow = await storage.ReadSingleEntryAsync(this.options.TableName, keys, fields => new SiloInstanceRecord(fields));
+            var versionRow = await storage.ReadSingleEntryAsync(this.options.TableName, keys, fields => new SiloInstanceRecord(fields), cancellationToken);
             if (versionRow != null)
             {
                 return false;
@@ -101,7 +107,7 @@ namespace Orleans.Clustering.DynamoDB
                 $"attribute_not_exists({SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}) AND attribute_not_exists({SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME})";
             try
             {
-                await storage.PutEntryAsync(this.options.TableName, entry.GetFields(true), notExistConditionExpression);
+                await storage.PutEntryAsync(this.options.TableName, entry.GetFields(true), cancellationToken, notExistConditionExpression);
             }
             catch (ConditionalCheckFailedException)
             {
@@ -138,25 +144,26 @@ namespace Orleans.Clustering.DynamoDB
             return true;
         }
 
-        public async Task DeleteMembershipTableEntries(string clusterId)
+        [Obsolete("Use DeleteMembershipTableEntriesAsync instead.")]
+        public Task DeleteMembershipTableEntries(string clusterId) => DeleteMembershipTableEntriesAsync(clusterId, CancellationToken.None);
+
+        public async Task DeleteMembershipTableEntriesAsync(string clusterId, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
                 var keys = new Dictionary<string, AttributeValue> { { $":{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", new AttributeValue(clusterId) } };
-                var records = await storage.QueryAsync(this.options.TableName, keys, $"{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME} = :{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", item => new SiloInstanceRecord(item));
+                var records = await storage.QueryAllAsync(this.options.TableName, keys, $"{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME} = :{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", item => new SiloInstanceRecord(item), cancellationToken);
 
                 var toDelete = new List<Dictionary<string, AttributeValue>>();
-                foreach (var record in records.results)
+                foreach (var record in records)
                 {
                     toDelete.Add(record.GetKeys());
                 }
 
-                List<Task> tasks = new List<Task>();
-                foreach (var batch in toDelete.BatchIEnumerable(MAX_BATCH_SIZE))
-                {
-                    tasks.Add(storage.DeleteEntriesAsync(this.options.TableName, batch));
-                }
-                await Task.WhenAll(tasks);
+                // Capture synchronous cancellation as a task so every started batch remains owned by WhenAll.
+                await Task.WhenAll(toDelete.BatchIEnumerable(MAX_BATCH_SIZE)
+                    .Select(async batch => await storage.DeleteEntriesAsync(this.options.TableName, batch, cancellationToken)));
             }
             catch (Exception exc)
             {
@@ -165,8 +172,12 @@ namespace Orleans.Clustering.DynamoDB
             }
         }
 
-        public async Task<MembershipTableData> ReadRow(SiloAddress siloAddress)
+        [Obsolete("Use ReadRowAsync instead.")]
+        public Task<MembershipTableData> ReadRow(SiloAddress siloAddress) => ReadRowAsync(siloAddress, CancellationToken.None);
+
+        public async Task<MembershipTableData> ReadRowAsync(SiloAddress siloAddress, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
                 var siloEntryKeys = new Dictionary<string, AttributeValue>
@@ -182,7 +193,7 @@ namespace Orleans.Clustering.DynamoDB
                 };
 
                 var entries = await storage.GetEntriesTxAsync(this.options.TableName,
-                    new[] { siloEntryKeys, versionEntryKeys }, fields => new SiloInstanceRecord(fields));
+                    new[] { siloEntryKeys, versionEntryKeys }, fields => new SiloInstanceRecord(fields), cancellationToken);
 
                 MembershipTableData data = Convert(entries.ToList());
                 LogTraceReadMyEntry(siloAddress, data);
@@ -195,8 +206,12 @@ namespace Orleans.Clustering.DynamoDB
             }
         }
 
-        public async Task<MembershipTableData> ReadAll()
+        [Obsolete("Use ReadAllAsync instead.")]
+        public Task<MembershipTableData> ReadAll() => ReadAllAsync(CancellationToken.None);
+
+        public async Task<MembershipTableData> ReadAllAsync(CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
                 //first read just the version row so that we can check for version consistency
@@ -205,27 +220,30 @@ namespace Orleans.Clustering.DynamoDB
                     { $"{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", new AttributeValue(this.clusterId) },
                     { $"{SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME}", new AttributeValue(SiloInstanceRecord.TABLE_VERSION_ROW) }
                 };
-                var versionRow = await this.storage.ReadSingleEntryAsync(this.options.TableName, versionEntryKeys,
-                    fields => new SiloInstanceRecord(fields));
-                if (versionRow == null)
-                {
-                    throw new KeyNotFoundException("No version row found for membership table");
-                }
-
                 var keys = new Dictionary<string, AttributeValue> { { $":{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", new AttributeValue(this.clusterId) } };
-                var records = await this.storage.QueryAllAsync(this.options.TableName, keys, $"{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME} = :{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", item => new SiloInstanceRecord(item));
-
-                if (records.Exists(record => record.MembershipVersion > versionRow.MembershipVersion))
+                while (true)
                 {
-                    LogWarningFoundInconsistencyReadingAllSiloEntries();
-                    //not expecting this to hit often, but if it does, should put in a limit
-                    return await this.ReadAll();
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var versionRow = await this.storage.ReadSingleEntryAsync(this.options.TableName, versionEntryKeys,
+                        fields => new SiloInstanceRecord(fields), cancellationToken);
+                    if (versionRow == null)
+                    {
+                        throw new KeyNotFoundException("No version row found for membership table");
+                    }
+
+                    var records = await this.storage.QueryAllAsync(this.options.TableName, keys, $"{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME} = :{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", item => new SiloInstanceRecord(item), cancellationToken);
+
+                    if (records.Exists(record => record.MembershipVersion > versionRow.MembershipVersion))
+                    {
+                        LogWarningFoundInconsistencyReadingAllSiloEntries();
+                        await Task.Delay(TimeSpan.FromMilliseconds(100), cancellationToken);
+                        continue;
+                    }
+
+                    MembershipTableData data = Convert(records);
+                    LogTraceReadAllTable(data);
+                    return data;
                 }
-
-                MembershipTableData data = Convert(records);
-                LogTraceReadAllTable(data);
-
-                return data;
             }
             catch (Exception exc)
             {
@@ -234,8 +252,12 @@ namespace Orleans.Clustering.DynamoDB
             }
         }
 
-        public async Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion)
+        [Obsolete("Use InsertRowAsync instead.")]
+        public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => InsertRowAsync(entry, tableVersion, CancellationToken.None);
+
+        public async Task<bool> InsertRowAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
                 LogDebugInsertRow(entry);
@@ -273,7 +295,7 @@ namespace Orleans.Clustering.DynamoDB
                     (versionEntryUpdate.UpdateExpression, versionEntryUpdate.ExpressionAttributeValues) =
                         this.storage.ConvertUpdate(versionEntry.GetFields(), conditionalValues);
 
-                    await this.storage.WriteTxAsync(new[] { tableEntryInsert }, new[] { versionEntryUpdate });
+                    await this.storage.WriteTxAsync(cancellationToken, new[] { tableEntryInsert }, new[] { versionEntryUpdate });
 
                     result = true;
                 }
@@ -299,8 +321,12 @@ namespace Orleans.Clustering.DynamoDB
             }
         }
 
-        public async Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion)
+        [Obsolete("Use UpdateRowAsync instead.")]
+        public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => UpdateRowAsync(entry, etag, tableVersion, CancellationToken.None);
+
+        public async Task<bool> UpdateRowAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
                 LogDebugUpdateRow(entry, etag);
@@ -348,7 +374,7 @@ namespace Orleans.Clustering.DynamoDB
                     (versionEntryUpdate.UpdateExpression, versionEntryUpdate.ExpressionAttributeValues) =
                         this.storage.ConvertUpdate(versionEntry.GetFields(), versionConditionalValues);
 
-                    await this.storage.WriteTxAsync(updates: new[] { siloEntryUpdate, versionEntryUpdate });
+                    await this.storage.WriteTxAsync(cancellationToken, updates: new[] { siloEntryUpdate, versionEntryUpdate });
                     result = true;
                 }
                 catch (TransactionCanceledException canceledException)
@@ -373,15 +399,19 @@ namespace Orleans.Clustering.DynamoDB
             }
         }
 
-        public async Task UpdateIAmAlive(MembershipEntry entry)
+        [Obsolete("Use UpdateIAmAliveAsync instead.")]
+        public Task UpdateIAmAlive(MembershipEntry entry) => UpdateIAmAliveAsync(entry, CancellationToken.None);
+
+        public async Task UpdateIAmAliveAsync(MembershipEntry entry, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
                 LogDebugMergeEntry(entry);
                 var siloEntry = ConvertPartial(entry);
                 var fields = new Dictionary<string, AttributeValue> { { SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME, new AttributeValue(siloEntry.IAmAliveTime) } };
                 var expression = $"attribute_exists({SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}) AND attribute_exists({SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME})";
-                await this.storage.UpsertEntryAsync(this.options.TableName, siloEntry.GetKeys(), fields, expression);
+                await this.storage.UpsertEntryAsync(this.options.TableName, siloEntry.GetKeys(), fields, cancellationToken, expression);
             }
             catch (Exception exc)
             {
@@ -535,8 +565,12 @@ namespace Orleans.Clustering.DynamoDB
             };
         }
 
-        public async Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
+        [Obsolete("Use CleanupDefunctSiloEntriesAsync instead.")]
+        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) => CleanupDefunctSiloEntriesAsync(beforeDate, CancellationToken.None);
+
+        public async Task CleanupDefunctSiloEntriesAsync(DateTimeOffset beforeDate, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
                 var keys = new Dictionary<string, AttributeValue>
@@ -545,15 +579,11 @@ namespace Orleans.Clustering.DynamoDB
                 };
                 var filter = $"{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME} = :{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}";
 
-                var records = await this.storage.QueryAllAsync(this.options.TableName, keys, filter, item => new SiloInstanceRecord(item));
+                var records = await this.storage.QueryAllAsync(this.options.TableName, keys, filter, item => new SiloInstanceRecord(item), cancellationToken);
                 var defunctRecordKeys = records.Where(r => SiloIsDefunct(r, beforeDate)).Select(r => r.GetKeys());
 
-                var tasks = new List<Task>();
-                foreach (var batch in defunctRecordKeys.BatchIEnumerable(MAX_BATCH_SIZE))
-                {
-                    tasks.Add(this.storage.DeleteEntriesAsync(this.options.TableName, batch));
-                }
-                await Task.WhenAll(tasks);
+                await Task.WhenAll(defunctRecordKeys.BatchIEnumerable(MAX_BATCH_SIZE)
+                    .Select(async batch => await this.storage.DeleteEntriesAsync(this.options.TableName, batch, cancellationToken)));
             }
             catch (Exception exc)
             {

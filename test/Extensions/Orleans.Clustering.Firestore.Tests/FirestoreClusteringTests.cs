@@ -37,9 +37,9 @@ public class FirestoreClusteringTests : IAsyncLifetime
             await WriteSiloInstance(SiloStatus.Active, TestContext.Current.CancellationToken);
         }
 
-        await this._membershipTable.CleanupDefunctSiloEntries(TestStartTime.AddTicks(1));
+        await this._membershipTable.CleanupDefunctSiloEntriesAsync(TestStartTime.AddTicks(1), TestContext.Current.CancellationToken);
 
-        var membership = await this._membershipTable.ReadAll();
+        var membership = await this._membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
         Assert.Equal(4, membership.Members.Count);
         Assert.All(membership.Members, member => Assert.NotEqual(SiloStatus.Dead, member.Item1.Status));
     }
@@ -69,9 +69,9 @@ public class FirestoreClusteringTests : IAsyncLifetime
                 TestContext.Current.CancellationToken)));
         }
 
-        await this._membershipTable.CleanupDefunctSiloEntries(TestStartTime.AddTicks(1));
+        await this._membershipTable.CleanupDefunctSiloEntriesAsync(TestStartTime.AddTicks(1), TestContext.Current.CancellationToken);
 
-        var membership = await this._membershipTable.ReadAll();
+        var membership = await this._membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
         Assert.Empty(membership.Members);
     }
 
@@ -102,24 +102,24 @@ public class FirestoreClusteringTests : IAsyncLifetime
 
         var entry = this._entity.ToMembershipEntry();
         entry.IAmAliveTime = current.AddMinutes(-1).UtcDateTime;
-        await this._membershipTable.UpdateIAmAlive(entry);
+        await this._membershipTable.UpdateIAmAliveAsync(entry, TestContext.Current.CancellationToken);
 
-        var row = await this._membershipTable.ReadRow(entry.SiloAddress);
+        var row = await this._membershipTable.ReadRowAsync(entry.SiloAddress, TestContext.Current.CancellationToken);
         Assert.Equal(current.UtcDateTime, Assert.Single(row.Members).Item1.IAmAliveTime);
 
         entry.IAmAliveTime = current.AddMinutes(1).UtcDateTime;
-        await this._membershipTable.UpdateIAmAlive(entry);
+        await this._membershipTable.UpdateIAmAliveAsync(entry, TestContext.Current.CancellationToken);
 
-        row = await this._membershipTable.ReadRow(entry.SiloAddress);
+        row = await this._membershipTable.ReadRowAsync(entry.SiloAddress, TestContext.Current.CancellationToken);
         Assert.Equal(entry.IAmAliveTime, Assert.Single(row.Members).Item1.IAmAliveTime);
     }
 
     [Fact]
     public async Task ReadRowReturnsVersionWhenSiloDoesNotExist()
     {
-        var expected = await this._membershipTable.ReadAll();
+        var expected = await this._membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
 
-        var actual = await this._membershipTable.ReadRow(SiloAddressUtils.NewLocalSiloAddress(this._generation + 1));
+        var actual = await this._membershipTable.ReadRowAsync(SiloAddressUtils.NewLocalSiloAddress(this._generation + 1), TestContext.Current.CancellationToken);
 
         Assert.Empty(actual.Members);
         Assert.Equal(expected.Version.Version, actual.Version.Version);
@@ -138,14 +138,14 @@ public class FirestoreClusteringTests : IAsyncLifetime
             StartTime = TestStartTime.UtcDateTime,
             IAmAliveTime = TestStartTime.UtcDateTime,
         };
-        var table = await this._membershipTable.ReadAll();
-        Assert.True(await this._membershipTable.InsertRow(entry, table.Version.Next()));
-        var inserted = await this._membershipTable.ReadRow(entry.SiloAddress);
+        var table = await this._membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
+        Assert.True(await this._membershipTable.InsertRowAsync(entry, table.Version.Next(), TestContext.Current.CancellationToken));
+        var inserted = await this._membershipTable.ReadRowAsync(entry.SiloAddress, TestContext.Current.CancellationToken);
         var insertedEtag = Assert.Single(inserted.Members).Item2;
 
-        Assert.True(await this._membershipTable.UpdateRow(entry, insertedEtag, inserted.Version.Next()));
+        Assert.True(await this._membershipTable.UpdateRowAsync(entry, insertedEtag, inserted.Version.Next(), TestContext.Current.CancellationToken));
 
-        var updated = await this._membershipTable.ReadRow(entry.SiloAddress);
+        var updated = await this._membershipTable.ReadRowAsync(entry.SiloAddress, TestContext.Current.CancellationToken);
         Assert.NotEqual(insertedEtag, Assert.Single(updated.Members).Item2);
     }
 
@@ -197,7 +197,7 @@ public class FirestoreClusteringTests : IAsyncLifetime
             NullLoggerFactory.Instance,
             firestoreOptions,
             clusterOptions);
-        await this._membershipTable.InitializeMembershipTable(tryInitTableVersion: true);
+        await this._membershipTable.InitializeMembershipTableAsync(tryInitTableVersion: true, TestContext.Current.CancellationToken);
 
         this._gatewayProvider = new FirestoreGatewayListProvider(
             NullLoggerFactory.Instance,

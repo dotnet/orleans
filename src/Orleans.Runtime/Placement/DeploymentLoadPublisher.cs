@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -31,7 +32,7 @@ namespace Orleans.Runtime
         private readonly ILogger _logger;
 
         private long _lastUpdateDateTimeTicks;
-        private IDisposable? _publishTimer;
+        private IGrainTimer? _publishTimer;
 
         public ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics> PeriodicStatistics => _periodicStats;
 
@@ -67,6 +68,7 @@ namespace Orleans.Runtime
 
         private async Task StartAsync(CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             LogDebugStartingDeploymentLoadPublisher(_logger);
 
             if (_statisticsRefreshTime > TimeSpan.Zero)
@@ -74,11 +76,12 @@ namespace Orleans.Runtime
                 // Randomize PublishStatistics timer,
                 // but also upon start publish my stats to everyone and take everyone's stats for me to start with something.
                 var randomTimerOffset = RandomTimeSpan.Next(_statisticsRefreshTime);
-                _publishTimer = RegisterTimer(
-                    static state => ((DeploymentLoadPublisher)state!).PublishStatistics(CancellationToken.None),
-                    this,
-                    randomTimerOffset,
-                    _statisticsRefreshTime);
+                await this.RunOrQueueTask(() =>
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    _publishTimer = RegisterGrainTimer(PublishStatistics, randomTimerOffset, _statisticsRefreshTime);
+                    return Task.CompletedTask;
+                });
             }
 
             await RefreshClusterStatistics(cancellationToken);
@@ -86,8 +89,9 @@ namespace Orleans.Runtime
             LogDebugStartedDeploymentLoadPublisher(_logger);
         }
 
-        private async Task PublishStatistics(CancellationToken cancellationToken)
+        internal async Task PublishStatistics(CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
                 LogTracePublishStatistics(_logger);
@@ -112,7 +116,6 @@ namespace Orleans.Runtime
                 var tasks = new List<Task>(members.Count);
                 foreach (var siloAddress in members)
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
                     // No need to make a grain call to ourselves.
                     if (siloAddress.Equals(_siloDetails.SiloAddress))
                     {
@@ -124,16 +127,20 @@ namespace Orleans.Runtime
                         var deploymentLoadPublisher = _grainFactory.GetSystemTarget<IDeploymentLoadPublisher>(Constants.DeploymentLoadPublisherSystemTargetType, siloAddress);
                         tasks.Add(deploymentLoadPublisher.UpdateRuntimeStatistics(_siloDetails.SiloAddress, myStats, cancellationToken));
                     }
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                    {
+                        tasks.Add(Task.FromCanceled(cancellationToken));
+                    }
                     catch (Exception exception)
                     {
                         LogWarningRuntimeStatisticsUpdateFailure1(_logger, exception);
                     }
                 }
 
-                await Task.WhenAll(tasks).WaitAsync(cancellationToken);
+                await Task.WhenAll(tasks);
                 DeploymentLoadPublisherEvents.EmitClusterRefreshed(_siloDetails.SiloAddress, _periodicStats);
             }
-            catch (OperationCanceledException exception) when (exception.CancellationToken == cancellationToken)
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 throw;
             }
@@ -172,8 +179,9 @@ namespace Orleans.Runtime
             DeploymentLoadPublisherEvents.EmitReceived(siloAddress, _siloDetails.SiloAddress, siloStats);
         }
 
-        internal async Task RefreshClusterStatistics(CancellationToken cancellationToken = default)
+        internal async Task RefreshClusterStatistics(CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             LogTraceRefreshStatistics(_logger);
             await this.RunOrQueueTask(() =>
                 {
@@ -181,23 +189,23 @@ namespace Orleans.Runtime
                     var tasks = new List<Task>(members.Count);
                     foreach (var siloAddress in members)
                     {
-                        cancellationToken.ThrowIfCancellationRequested();
                         tasks.Add(RefreshSiloStatistics(siloAddress, cancellationToken));
                     }
 
-                    return Task.WhenAll(tasks).WaitAsync(cancellationToken);
+                    return Task.WhenAll(tasks);
                 });
         }
 
         private async Task RefreshSiloStatistics(SiloAddress silo, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
                 var statistics = await _grainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlType, silo)
                     .GetRuntimeStatistics(cancellationToken);
                 UpdateRuntimeStatisticsInternal(silo, statistics);
             }
-            catch (OperationCanceledException exception) when (exception.CancellationToken == cancellationToken)
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 throw;
             }
@@ -228,9 +236,16 @@ namespace Orleans.Runtime
 
         private void NotifyAllStatisticsChangeEventsSubscribers(SiloAddress silo, SiloRuntimeStatistics? stats)
         {
+            ISiloStatisticsChangeListener[] subscribers;
             lock (_siloStatisticsChangeListeners)
             {
-                foreach (var subscriber in _siloStatisticsChangeListeners)
+                subscribers = [.. _siloStatisticsChangeListeners];
+            }
+
+            ExceptionDispatchInfo? failure = null;
+            foreach (var subscriber in subscribers)
+            {
+                try
                 {
                     if (stats == null)
                     {
@@ -241,7 +256,13 @@ namespace Orleans.Runtime
                         subscriber.SiloStatisticsChangeNotification(silo, stats);
                     }
                 }
+                catch (Exception exception)
+                {
+                    failure ??= ExceptionDispatchInfo.Capture(exception);
+                }
             }
+
+            failure?.Throw();
         }
 
         public void SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status)
@@ -271,7 +292,7 @@ namespace Orleans.Runtime
 
             Task DisposePublishTimer(CancellationToken ct)
             {
-                _publishTimer!.Dispose(); // Preserve the existing lifecycle contract that publishing is enabled.
+                _publishTimer?.Dispose();
                 return Task.CompletedTask;
             }
         }

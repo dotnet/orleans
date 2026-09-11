@@ -166,7 +166,7 @@ namespace Orleans.Runtime.MembershipService
                 }
 
                 LogDebugCleaningUpDefunctMembershipTableEntries(_logger, beforeDate.Value);
-                await _membershipTableProvider.CleanupDefunctSiloEntries(beforeDate.Value).WaitAsync(cancellationToken);
+                await _membershipTableProvider.CleanupDefunctSiloEntriesAsync(beforeDate.Value, cancellationToken);
                 _lastDefunctSiloCleanupTime = now;
             }
             catch (Exception exception) when (exception is NotImplementedException or MissingMethodException)
@@ -259,7 +259,8 @@ namespace Orleans.Runtime.MembershipService
 
             Task OnStart(CancellationToken ct)
             {
-                task = Task.Run(() => ProcessMembershipUpdates(_shutdownCts.Token), CancellationToken.None);
+                var shutdownToken = _shutdownCts.Token;
+                task = Task.Run(() => ProcessMembershipUpdates(shutdownToken), CancellationToken.None);
                 return Task.CompletedTask;
             }
 

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Messaging;
 using Orleans.Runtime;
@@ -22,10 +23,10 @@ internal sealed class RedisGatewayListProvider(RedisMembershipTable table, IOpti
     {
         if (!_table.IsInitialized)
         {
-            await _table.InitializeMembershipTable(true);
+            await _table.InitializeMembershipTableAsync(true, CancellationToken.None);
         }
 
-        var all = await _table.ReadAll();
+        var all = await _table.ReadAllAsync(CancellationToken.None);
         var result = all.Members
            .Where(x => x.Item1.Status == SiloStatus.Active && x.Item1.ProxyPort != 0)
            .Select(x =>
@@ -38,6 +39,6 @@ internal sealed class RedisGatewayListProvider(RedisMembershipTable table, IOpti
 
     public async Task InitializeGatewayListProvider()
     {
-        await _table.InitializeMembershipTable(true);
+        await _table.InitializeMembershipTableAsync(true, CancellationToken.None);
     }
 }

@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using Google.Cloud.Firestore;
@@ -33,45 +34,62 @@ internal partial class FirestoreMembershipTable : IMembershipTable
         this._partitionId = Utils.SanitizeId(this._clusterId);
     }
 
-    public async Task InitializeMembershipTable(bool tryInitTableVersion)
+    [Obsolete("Use InitializeMembershipTableAsync instead.")]
+    public Task InitializeMembershipTable(bool tryInitTableVersion) => InitializeMembershipTableAsync(tryInitTableVersion, CancellationToken.None);
+
+    public async Task InitializeMembershipTableAsync(bool tryInitTableVersion, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         this._storage = CreateDataManager(this._clusterId);
-        await this._storage.Initialize();
+        await this._storage.Initialize(cancellationToken);
 
         if (tryInitTableVersion)
         {
-            var created = await TryCreateTableVersionEntry();
+            cancellationToken.ThrowIfCancellationRequested();
+            var created = await TryCreateTableVersionEntry(cancellationToken);
             if (created) LogCreatedTableVersion();
         }
     }
 
-    public async Task DeleteMembershipTableEntries(string clusterId)
+    [Obsolete("Use DeleteMembershipTableEntriesAsync instead.")]
+    public Task DeleteMembershipTableEntries(string clusterId) => DeleteMembershipTableEntriesAsync(clusterId, CancellationToken.None);
+
+    public async Task DeleteMembershipTableEntriesAsync(string clusterId, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var storage = clusterId == this._clusterId ? this._storage : CreateDataManager(clusterId);
         if (!ReferenceEquals(storage, this._storage))
         {
-            await storage.Initialize();
+            await storage.Initialize(cancellationToken);
         }
 
-        await storage.ClearCollection();
+        cancellationToken.ThrowIfCancellationRequested();
+        await storage.ClearCollection(cancellationToken);
     }
 
-    public async Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
+    [Obsolete("Use CleanupDefunctSiloEntriesAsync instead.")]
+    public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) => CleanupDefunctSiloEntriesAsync(beforeDate, CancellationToken.None);
+
+    public async Task CleanupDefunctSiloEntriesAsync(DateTimeOffset beforeDate, CancellationToken cancellationToken = default)
     {
-        var entities = await this._storage.ReadAllEntities<SiloInstanceEntity>();
+        cancellationToken.ThrowIfCancellationRequested();
+        var entities = await this._storage.ReadAllEntities<SiloInstanceEntity>(cancellationToken);
         var defunctEntries = entities
             .Where(entity => entity.Id != this._partitionId)
             .Where(entity => entity.Status != (int)SiloStatus.Active)
             .Where(entity => GetEffectiveUpdateTime(entity) < beforeDate)
             .ToArray();
 
-        await Task.WhenAll(defunctEntries
-            .Chunk(FirestoreDataManager.MaxBatchSize)
-            .Select(chunk => this._storage.DeleteEntities(chunk)));
+        await Task.WhenAll(defunctEntries.Chunk(FirestoreDataManager.MaxBatchSize)
+            .Select(chunk => this._storage.DeleteEntities(chunk, cancellationToken)));
     }
 
-    public async Task<MembershipTableData> ReadRow(SiloAddress key)
+    [Obsolete("Use ReadRowAsync instead.")]
+    public Task<MembershipTableData> ReadRow(SiloAddress key) => ReadRowAsync(key, CancellationToken.None);
+
+    public async Task<MembershipTableData> ReadRowAsync(SiloAddress key, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         try
         {
             var collection = this._storage.GetCollection();
@@ -90,7 +108,7 @@ internal partial class FirestoreMembershipTable : IMembershipTable
                     ? new[] { siloSnapshot.ConvertTo<SiloInstanceEntity>() }
                     : Array.Empty<SiloInstanceEntity>();
                 return (silos, versionSnapshot.ConvertTo<ClusterVersionEntity>());
-            });
+            }, cancellationToken);
 
             var table = Convert(data);
 
@@ -98,15 +116,19 @@ internal partial class FirestoreMembershipTable : IMembershipTable
 
             return table;
         }
-        catch (Exception exc)
+        catch (Exception exc) when (exc is not OperationCanceledException)
         {
             LogReadEntryError(exc, key);
             throw;
         }
     }
 
-    public async Task<MembershipTableData> ReadAll()
+    [Obsolete("Use ReadAllAsync instead.")]
+    public Task<MembershipTableData> ReadAll() => ReadAllAsync(CancellationToken.None);
+
+    public async Task<MembershipTableData> ReadAllAsync(CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         try
         {
             var collection = this._storage.GetCollection();
@@ -122,21 +144,25 @@ internal partial class FirestoreMembershipTable : IMembershipTable
                     .Select(document => document.ConvertTo<SiloInstanceEntity>())
                     .ToArray();
                 return (silos, versionSnapshot.ConvertTo<ClusterVersionEntity>());
-            });
+            }, cancellationToken);
             var data = Convert(entries);
             LogReadAll(data);
 
             return data;
         }
-        catch (Exception exc)
+        catch (Exception exc) when (exc is not OperationCanceledException)
         {
             LogReadAllError(exc);
             throw;
         }
     }
 
-    public async Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion)
+    [Obsolete("Use InsertRowAsync instead.")]
+    public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => InsertRowAsync(entry, tableVersion, CancellationToken.None);
+
+    public async Task<bool> InsertRowAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         try
         {
             LogInsertRow(entry, tableVersion);
@@ -156,7 +182,7 @@ internal partial class FirestoreMembershipTable : IMembershipTable
                     transaction.Create(siloReference, silo);
                     transaction.Update(versionReference, version.GetFields(), Precondition.LastUpdated(version.ETag.Value));
                     return Task.FromResult(true);
-                });
+                }, cancellationToken);
             }
             catch (RpcException exception) when (IsContention(exception))
             {
@@ -167,15 +193,19 @@ internal partial class FirestoreMembershipTable : IMembershipTable
                 LogInsertContention(entry, tableVersion);
             return result;
         }
-        catch (Exception exc)
+        catch (Exception exc) when (exc is not OperationCanceledException)
         {
             LogInsertError(exc, entry, tableVersion);
             throw;
         }
     }
 
-    public async Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion)
+    [Obsolete("Use UpdateRowAsync instead.")]
+    public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => UpdateRowAsync(entry, etag, tableVersion, CancellationToken.None);
+
+    public async Task<bool> UpdateRowAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         try
         {
             LogUpdateRow(entry, etag, tableVersion);
@@ -196,7 +226,7 @@ internal partial class FirestoreMembershipTable : IMembershipTable
                     transaction.Update(siloReference, silo.GetFields(), Precondition.LastUpdated(silo.ETag.Value));
                     transaction.Update(versionReference, version.GetFields(), Precondition.LastUpdated(version.ETag.Value));
                     return Task.FromResult(true);
-                });
+                }, cancellationToken);
             }
             catch (RpcException exception) when (IsContention(exception))
             {
@@ -207,15 +237,19 @@ internal partial class FirestoreMembershipTable : IMembershipTable
                 LogUpdateContention(entry, etag, tableVersion);
             return result;
         }
-        catch (Exception exc)
+        catch (Exception exc) when (exc is not OperationCanceledException)
         {
             LogUpdateError(exc, entry, tableVersion);
             throw;
         }
     }
 
-    public async Task UpdateIAmAlive(MembershipEntry entry)
+    [Obsolete("Use UpdateIAmAliveAsync instead.")]
+    public Task UpdateIAmAlive(MembershipEntry entry) => UpdateIAmAliveAsync(entry, CancellationToken.None);
+
+    public async Task UpdateIAmAliveAsync(MembershipEntry entry, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         try
         {
             LogMergeEntry(entry);
@@ -239,9 +273,9 @@ internal partial class FirestoreMembershipTable : IMembershipTable
                     [nameof(SiloInstanceEntity.IAmAliveTime)] = iAmAliveTime,
                 });
                 return true;
-            });
+            }, cancellationToken);
         }
-        catch (Exception exc)
+        catch (Exception exc) when (exc is not OperationCanceledException)
         {
             LogUpdateIAmAliveError(exc, entry);
             throw;
@@ -260,11 +294,11 @@ internal partial class FirestoreMembershipTable : IMembershipTable
         MembershipVersion = version,
     };
 
-    private async Task<bool> TryCreateTableVersionEntry()
+    private async Task<bool> TryCreateTableVersionEntry(CancellationToken cancellationToken)
     {
         try
         {
-            await this._storage.CreateEntity(CreateClusterVersionEntity(0));
+            await this._storage.CreateEntity(CreateClusterVersionEntity(0), cancellationToken);
             return true;
         }
         catch (RpcException exception) when (exception.StatusCode == StatusCode.AlreadyExists)

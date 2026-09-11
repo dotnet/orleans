@@ -323,7 +323,7 @@ namespace Orleans.Tests.SqlUtils
                     Task<Tuple<IEnumerable<TResult>, int>> ret;
                     if (_isSynchronousAdoNetImplementation)
                     {
-                        ret = Task.Run(() => executor(command, selector, commandBehavior, cancellationToken), cancellationToken);
+                        ret = Task.Run(() => executor(command, selector, commandBehavior, cancellationToken), CancellationToken.None);
                     }
                     else
                     {

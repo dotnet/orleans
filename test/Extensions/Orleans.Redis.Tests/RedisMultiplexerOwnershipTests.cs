@@ -287,7 +287,7 @@ public sealed class RedisMultiplexerOwnershipTests
         });
 
         var table = new RedisMembershipTable(options, clusterOptions);
-        return (table, () => table.InitializeMembershipTable(tryInitTableVersion: true));
+        return (table, () => table.InitializeMembershipTableAsync(tryInitTableVersion: true, cancellationToken: TestContext.Current.CancellationToken));
     }
 
     private static (RedisReminderTable Provider, Func<Task> Initialize) CreateReminderTable(

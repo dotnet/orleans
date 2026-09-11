@@ -84,9 +84,14 @@ namespace Orleans.Transactions.DynamoDB
 
         public System.Threading.Tasks.Task DeleTableAsync(string tableName) { throw null; }
 
+        public System.Threading.Tasks.Task DeleteEntriesAsync(string tableName, System.Collections.Generic.IReadOnlyCollection<System.Collections.Generic.Dictionary<string, Amazon.DynamoDBv2.Model.AttributeValue>> toDelete, System.Threading.CancellationToken cancellationToken) { throw null; }
+
         public System.Threading.Tasks.Task DeleteEntriesAsync(string tableName, System.Collections.Generic.IReadOnlyCollection<System.Collections.Generic.Dictionary<string, Amazon.DynamoDBv2.Model.AttributeValue>> toDelete) { throw null; }
 
         public System.Threading.Tasks.Task DeleteEntryAsync(string tableName, System.Collections.Generic.Dictionary<string, Amazon.DynamoDBv2.Model.AttributeValue> keys, string conditionExpression = "", System.Collections.Generic.Dictionary<string, Amazon.DynamoDBv2.Model.AttributeValue>? conditionValues = null) { throw null; }
+
+        public System.Threading.Tasks.Task<System.Collections.Generic.IEnumerable<TResult>> GetEntriesTxAsync<TResult>(string tableName, System.Collections.Generic.IEnumerable<System.Collections.Generic.Dictionary<string, Amazon.DynamoDBv2.Model.AttributeValue>> keys, System.Func<System.Collections.Generic.Dictionary<string, Amazon.DynamoDBv2.Model.AttributeValue>, TResult> resolver, System.Threading.CancellationToken cancellationToken)
+            where TResult : class { throw null; }
 
         public System.Threading.Tasks.Task<System.Collections.Generic.IEnumerable<TResult>> GetEntriesTxAsync<TResult>(string tableName, System.Collections.Generic.IEnumerable<System.Collections.Generic.Dictionary<string, Amazon.DynamoDBv2.Model.AttributeValue>> keys, System.Func<System.Collections.Generic.Dictionary<string, Amazon.DynamoDBv2.Model.AttributeValue>, TResult> resolver)
             where TResult : class { throw null; }
@@ -97,10 +102,21 @@ namespace Orleans.Transactions.DynamoDB
 
         public System.Threading.Tasks.Task PutEntryAsync(string tableName, System.Collections.Generic.Dictionary<string, Amazon.DynamoDBv2.Model.AttributeValue> fields, string conditionExpression = "", System.Collections.Generic.Dictionary<string, Amazon.DynamoDBv2.Model.AttributeValue>? conditionValues = null) { throw null; }
 
+        public System.Threading.Tasks.Task PutEntryAsync(string tableName, System.Collections.Generic.Dictionary<string, Amazon.DynamoDBv2.Model.AttributeValue> fields, System.Threading.CancellationToken cancellationToken, string conditionExpression = "", System.Collections.Generic.Dictionary<string, Amazon.DynamoDBv2.Model.AttributeValue>? conditionValues = null) { throw null; }
+
         public System.Threading.Tasks.Task<System.Collections.Generic.List<TResult>> QueryAllAsync<TResult>(string tableName, System.Collections.Generic.Dictionary<string, Amazon.DynamoDBv2.Model.AttributeValue> keys, string keyConditionExpression, System.Func<System.Collections.Generic.Dictionary<string, Amazon.DynamoDBv2.Model.AttributeValue>, TResult> resolver, string indexName = "", bool scanIndexForward = true, bool consistentRead = true)
             where TResult : class { throw null; }
 
+        public System.Threading.Tasks.Task<System.Collections.Generic.List<TResult>> QueryAllAsync<TResult>(string tableName, System.Collections.Generic.Dictionary<string, Amazon.DynamoDBv2.Model.AttributeValue> keys, string keyConditionExpression, System.Func<System.Collections.Generic.Dictionary<string, Amazon.DynamoDBv2.Model.AttributeValue>, TResult> resolver, System.Threading.CancellationToken cancellationToken, string indexName = "", bool scanIndexForward = true, bool consistentRead = true)
+            where TResult : class { throw null; }
+
         public System.Threading.Tasks.Task<(System.Collections.Generic.List<TResult> results, System.Collections.Generic.Dictionary<string, Amazon.DynamoDBv2.Model.AttributeValue>? lastEvaluatedKey)> QueryAsync<TResult>(string tableName, System.Collections.Generic.Dictionary<string, Amazon.DynamoDBv2.Model.AttributeValue> keys, string keyConditionExpression, System.Func<System.Collections.Generic.Dictionary<string, Amazon.DynamoDBv2.Model.AttributeValue>, TResult> resolver, string indexName = "", bool scanIndexForward = true, System.Collections.Generic.Dictionary<string, Amazon.DynamoDBv2.Model.AttributeValue>? lastEvaluatedKey = null, bool consistentRead = true)
+            where TResult : class { throw null; }
+
+        public System.Threading.Tasks.Task<(System.Collections.Generic.List<TResult> results, System.Collections.Generic.Dictionary<string, Amazon.DynamoDBv2.Model.AttributeValue>? lastEvaluatedKey)> QueryAsync<TResult>(string tableName, System.Collections.Generic.Dictionary<string, Amazon.DynamoDBv2.Model.AttributeValue> keys, string keyConditionExpression, System.Func<System.Collections.Generic.Dictionary<string, Amazon.DynamoDBv2.Model.AttributeValue>, TResult> resolver, System.Threading.CancellationToken cancellationToken, string indexName = "", bool scanIndexForward = true, System.Collections.Generic.Dictionary<string, Amazon.DynamoDBv2.Model.AttributeValue>? lastEvaluatedKey = null, bool consistentRead = true)
+            where TResult : class { throw null; }
+
+        public System.Threading.Tasks.Task<TResult?> ReadSingleEntryAsync<TResult>(string tableName, System.Collections.Generic.Dictionary<string, Amazon.DynamoDBv2.Model.AttributeValue> keys, System.Func<System.Collections.Generic.Dictionary<string, Amazon.DynamoDBv2.Model.AttributeValue>, TResult> resolver, System.Threading.CancellationToken cancellationToken)
             where TResult : class { throw null; }
 
         public System.Threading.Tasks.Task<TResult?> ReadSingleEntryAsync<TResult>(string tableName, System.Collections.Generic.Dictionary<string, Amazon.DynamoDBv2.Model.AttributeValue> keys, System.Func<System.Collections.Generic.Dictionary<string, Amazon.DynamoDBv2.Model.AttributeValue>, TResult> resolver)
@@ -111,9 +127,13 @@ namespace Orleans.Transactions.DynamoDB
 
         public System.Threading.Tasks.Task UpsertEntryAsync(string tableName, System.Collections.Generic.Dictionary<string, Amazon.DynamoDBv2.Model.AttributeValue> keys, System.Collections.Generic.Dictionary<string, Amazon.DynamoDBv2.Model.AttributeValue> fields, string conditionExpression = "", System.Collections.Generic.Dictionary<string, Amazon.DynamoDBv2.Model.AttributeValue>? conditionValues = null, string extraExpression = "", System.Collections.Generic.Dictionary<string, Amazon.DynamoDBv2.Model.AttributeValue>? extraExpressionValues = null) { throw null; }
 
+        public System.Threading.Tasks.Task UpsertEntryAsync(string tableName, System.Collections.Generic.Dictionary<string, Amazon.DynamoDBv2.Model.AttributeValue> keys, System.Collections.Generic.Dictionary<string, Amazon.DynamoDBv2.Model.AttributeValue> fields, System.Threading.CancellationToken cancellationToken, string conditionExpression = "", System.Collections.Generic.Dictionary<string, Amazon.DynamoDBv2.Model.AttributeValue>? conditionValues = null, string extraExpression = "", System.Collections.Generic.Dictionary<string, Amazon.DynamoDBv2.Model.AttributeValue>? extraExpressionValues = null) { throw null; }
+
         public System.Threading.Tasks.Task WriteTxAsync(System.Collections.Generic.IEnumerable<Amazon.DynamoDBv2.Model.Put>? puts = null, System.Collections.Generic.IEnumerable<Amazon.DynamoDBv2.Model.Update>? updates = null, System.Collections.Generic.IEnumerable<Amazon.DynamoDBv2.Model.Delete>? deletes = null, System.Collections.Generic.IEnumerable<Amazon.DynamoDBv2.Model.ConditionCheck>? conditionChecks = null) { throw null; }
 
         public System.Threading.Tasks.Task WriteTxAsync(System.Collections.Generic.List<Amazon.DynamoDBv2.Model.TransactWriteItem> transactItems) { throw null; }
+
+        public System.Threading.Tasks.Task WriteTxAsync(System.Threading.CancellationToken cancellationToken, System.Collections.Generic.IEnumerable<Amazon.DynamoDBv2.Model.Put>? puts = null, System.Collections.Generic.IEnumerable<Amazon.DynamoDBv2.Model.Update>? updates = null, System.Collections.Generic.IEnumerable<Amazon.DynamoDBv2.Model.Delete>? deletes = null, System.Collections.Generic.IEnumerable<Amazon.DynamoDBv2.Model.ConditionCheck>? conditionChecks = null) { throw null; }
     }
 }
 
