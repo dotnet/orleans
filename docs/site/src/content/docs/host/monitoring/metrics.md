@@ -21,7 +21,7 @@ The instrument type determines which query is meaningful. Don't alert on every d
 
 | Instrument type | Orleans use | Interpret it as |
 |---|---|---|
-| Counter or observable counter | Completed events, failures, bytes, and preaggregated request-latency data | A monotonically increasing total for one process lifetime. Query the increase or rate over a window. Account for resets when a process restarts. |
+| Counter or observable counter | Completed events, failures, and bytes | A monotonically increasing total for one process lifetime. Query the increase or rate over a window. Account for resets when a process restarts. |
 | Up/down counter | Connected clients and grain instances | A running total which can increase or decrease. Query the latest aggregated value, not its rate, when the question is "how many exist now?" |
 | Observable gauge | Connected gateways, activations, working-set members, and available memory | A point-in-time observation. Aggregate intentionally: a minimum often finds an unhealthy instance, while a sum gives a cluster total for counts. |
 | Histogram | Storage, activation, deactivation, message-size, and reminder-tardiness distributions | A distribution of observations. Use count for volume and buckets or percentiles for tail behavior. Configure backend bucket boundaries which cover expected values. |
@@ -39,13 +39,13 @@ Caller-side request instruments are emitted by standalone clients and by silos w
 | Instrument | Type and unit | Meaning and interpretation |
 |---|---|---|
 | `orleans-client-connected-gateways` | Observable gauge, count | Number of gateway connections held by this client. Alert when it remains zero beyond the expected reconnect window. A reduction which remains above zero indicates less path redundancy and should be correlated with gateway and network signals. |
-| `orleans-app-requests-latency-count` | Observable counter, count | Completed outbound request callbacks observed by the caller. Use its increase as the request volume denominator. |
-| `orleans-app-requests-latency-sum` | Observable counter, milliseconds, without unit metadata | Cumulative caller-observed elapsed time. Divide the increase in `sum` by the increase in `count` for a windowed mean, but use the bucket series for tail behavior. |
-| `orleans-app-requests-latency-bucket` | Observable counter, milliseconds encoded by the `duration` attribute | Preaggregated latency bands with boundaries from `1ms` through `15000ms`, plus an overflow band. Each series counts observations in its own band, rather than cumulative observations less than or equal to the boundary. Compute a distribution from increases in all bands over the same window. |
+| `orleans-app-requests-latency` | Histogram, `ms` | Distribution of completed outbound request callbacks observed by the caller. Use the histogram count for request volume, its sum and count for mean latency, and its buckets or percentiles for tail behavior. On .NET 10, Orleans advises boundaries at `0.1`, `0.25`, `0.5`, `0.75`, `1`, `2`, `4`, `6`, `8`, `10`, `50`, `100`, `200`, `400`, `800`, `1000`, `1500`, `2000`, `5000`, `10000`, `15000`, and `30000` milliseconds. Configure the same boundaries in an exporter view on .NET 8. |
 | `orleans-app-requests-timedout` | Counter, count; `grain_type` | Requests which exceeded the configured response timeout. Alert on a volume-gated ratio against completed requests, not one timeout or the lifetime total. |
 | `orleans-app-requests-canceled` | Counter, count; `grain_type` | Requests canceled by their caller. Separate expected cancellation from service failure using application context and traces. |
 
 Caller-observed request latency includes time until the callback completes, so it can include transport, queueing, grain execution, storage, and response delivery. It also records terminal paths such as timeout, cancellation, target-silo failure, and host shutdown. Use traces and the [incident runbooks](troubleshooting.md) to locate the delay.
+
+Versions which predate the histogram instrument emitted three observable counters named `orleans-app-requests-latency-bucket`, `orleans-app-requests-latency-count`, and `orleans-app-requests-latency-sum`. The bucket streams used a `duration` attribute and mutually exclusive bands. The histogram replaces those streams with a standard explicit-bound histogram distribution and a floating-point sum. Exporters choose the transport representation; for example, Prometheus classic histograms use cumulative `le` bucket series. Update exporter views, dashboards, alerts, recording rules, and queries when upgrading. An OpenTelemetry view configured for this instrument overrides .NET 10 boundary advice and supplies the boundaries on .NET 8. Preserve the request-specific `2`, `4`, `6`, and `8` millisecond boundaries if those distinctions are operationally important.
 
 ## Silo signals
 

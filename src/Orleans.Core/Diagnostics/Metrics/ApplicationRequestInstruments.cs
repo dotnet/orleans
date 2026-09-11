@@ -5,32 +5,39 @@ namespace Orleans.Runtime;
 
 internal class ApplicationRequestInstruments
 {
+    private const string MillisecondsUnit = "ms";
+
+    private static readonly double[] AppRequestsLatencyHistogramBuckets =
+    [
+        0.1, 0.25, 0.5, 0.75,
+        1, 2, 4, 6, 8, 10, 50, 100,
+        200, 400, 800, 1_000, 1_500, 2_000,
+        5_000, 10_000, 15_000, 30_000
+    ];
+
     private readonly Counter<long> _timedOutRequestsCounter;
     private readonly Counter<long> _canceledRequestsCounter;
-
-    private static readonly long[] AppRequestsLatencyHistogramBuckets = [1, 2, 4, 6, 8, 10, 50, 100, 200, 400, 800, 1_000, 1_500, 2_000, 5_000, 10_000, 15_000];
-    private readonly HistogramAggregator _appRequestsLatencyHistogramAggregator;
-    private readonly ObservableCounter<long> _appRequestsLatencyHistogramBucket;
-    private readonly ObservableCounter<long> _appRequestsLatencyHistogramCount;
-    private readonly ObservableCounter<long> _appRequestsLatencyHistogramSum;
+    private readonly Histogram<double> _appRequestsLatencyHistogram;
 
     internal ApplicationRequestInstruments(OrleansInstruments instruments)
     {
         _timedOutRequestsCounter = instruments.Meter.CreateCounter<long>(InstrumentNames.APP_REQUESTS_TIMED_OUT);
         _canceledRequestsCounter = instruments.Meter.CreateCounter<long>(InstrumentNames.APP_REQUESTS_CANCELED);
-        _appRequestsLatencyHistogramAggregator = new(AppRequestsLatencyHistogramBuckets, [], value => new("duration", $"{value}ms"));
-        _appRequestsLatencyHistogramBucket = instruments.Meter.CreateObservableCounter(InstrumentNames.APP_REQUESTS_LATENCY_HISTOGRAM + "-bucket", _appRequestsLatencyHistogramAggregator.CollectBuckets);
-        _appRequestsLatencyHistogramCount = instruments.Meter.CreateObservableCounter(InstrumentNames.APP_REQUESTS_LATENCY_HISTOGRAM + "-count", _appRequestsLatencyHistogramAggregator.CollectCount);
-        _appRequestsLatencyHistogramSum = instruments.Meter.CreateObservableCounter(InstrumentNames.APP_REQUESTS_LATENCY_HISTOGRAM + "-sum", _appRequestsLatencyHistogramAggregator.CollectSum);
+#if NET10_0_OR_GREATER
+        _appRequestsLatencyHistogram = instruments.Meter.CreateHistogram<double>(
+            InstrumentNames.APP_REQUESTS_LATENCY_HISTOGRAM,
+            MillisecondsUnit,
+            advice: new() { HistogramBucketBoundaries = AppRequestsLatencyHistogramBuckets });
+#else
+        _appRequestsLatencyHistogram = instruments.Meter.CreateHistogram<double>(
+            InstrumentNames.APP_REQUESTS_LATENCY_HISTOGRAM,
+            MillisecondsUnit);
+#endif
     }
 
-    internal void OnAppRequestsEnd(long durationMilliseconds)
-    {
-        if (_appRequestsLatencyHistogramSum.Enabled)
-            _appRequestsLatencyHistogramAggregator.Record(durationMilliseconds);
-    }
+    internal void OnAppRequestsEnd(double durationMilliseconds) => _appRequestsLatencyHistogram.Record(durationMilliseconds);
 
-    internal bool AppRequestsLatencyEnabled => _appRequestsLatencyHistogramSum.Enabled;
+    internal bool AppRequestsLatencyEnabled => _appRequestsLatencyHistogram.Enabled;
 
     internal void OnAppRequestsTimedOut(string grainType)
     {
