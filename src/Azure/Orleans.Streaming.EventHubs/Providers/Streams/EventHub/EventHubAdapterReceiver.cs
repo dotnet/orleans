@@ -457,13 +457,12 @@ namespace Orleans.Streaming.EventHubs
             }
 
             await this.initializationLock.WaitAsync(cancellationToken);
-            TaskCompletionSource? recoveryCompletion = null;
-            var resetSucceeded = false;
-            var exceptions = new List<Exception>();
+            var releaseInitializationLock = true;
             try
             {
                 IStreamQueueCheckpointer<string> checkpointer;
                 IEventHubQueueCache? cache;
+                TaskCompletionSource recoveryCompletion;
                 lock (this.cacheLock)
                 {
                     if (this.receiverState != ReceiverRunning
@@ -473,6 +472,7 @@ namespace Orleans.Streaming.EventHubs
                     }
 
                     recoveryCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+                    recoveryCompletion.Task.Ignore();
                     this.recoveryTask = recoveryCompletion.Task;
                     checkpointer = this.checkpointer!;
                     this.recoveryCache = null;
@@ -485,10 +485,37 @@ namespace Orleans.Streaming.EventHubs
                     this.receiverCloseTask = null;
                 }
 
+                RunRecovery(checkpointer, cache, recoveryCompletion).Ignore();
+                releaseInitializationLock = false;
+                cancellationToken.ThrowIfCancellationRequested();
+                await recoveryCompletion.Task.WaitAsync(cancellationToken);
+            }
+            finally
+            {
+                if (releaseInitializationLock)
+                {
+                    this.initializationLock.Release();
+                }
+            }
+        }
+
+        private async Task RunRecovery(
+            IStreamQueueCheckpointer<string> checkpointer,
+            IEventHubQueueCache? cache,
+            TaskCompletionSource recoveryCompletion)
+        {
+            var exceptions = new List<Exception>();
+            var resetSucceeded = false;
+            try
+            {
                 try
                 {
-                    await checkpointer.Reset(cancellationToken);
-                    this.receiverUsesCheckpoint = false;
+                    await checkpointer.Reset(CancellationToken.None);
+                    lock (this.cacheLock)
+                    {
+                        this.receiverUsesCheckpoint = false;
+                    }
+
                     resetSucceeded = true;
                 }
                 catch (Exception exception)
@@ -514,49 +541,56 @@ namespace Orleans.Streaming.EventHubs
                     exceptions.Add(exception);
                 }
 
-                if (exceptions.Count == 0 && !cancellationToken.IsCancellationRequested)
+                bool isRunning;
+                lock (this.cacheLock)
+                {
+                    isRunning = this.receiverState == ReceiverRunning;
+                }
+
+                if (exceptions.Count == 0 && isRunning)
                 {
                     try
                     {
-                        await InitializeCore(cancellationToken);
+                        using var initializationCancellation = new CancellationTokenSource(ReceiveTimeout);
+                        await InitializeCore(initializationCancellation.Token);
                     }
                     catch (Exception exception)
                     {
                         exceptions.Add(exception);
                     }
                 }
-
-                cancellationToken.ThrowIfCancellationRequested();
-
-                if (exceptions.Count == 1)
-                {
-                    ExceptionDispatchInfo.Capture(exceptions[0]).Throw();
-                }
-
-                if (exceptions.Count > 1)
-                {
-                    throw new AggregateException(exceptions);
-                }
+            }
+            catch (Exception exception)
+            {
+                exceptions.Add(exception);
             }
             finally
             {
-                if (recoveryCompletion is not null)
+                if (exceptions.Count == 0)
                 {
-                    lock (this.cacheLock)
+                    recoveryCompletion.TrySetResult();
+                }
+                else if (exceptions.Count == 1)
+                {
+                    recoveryCompletion.TrySetException(exceptions[0]);
+                }
+                else
+                {
+                    recoveryCompletion.TrySetException(new AggregateException(exceptions));
+                }
+
+                lock (this.cacheLock)
+                {
+                    if (!resetSucceeded)
                     {
-                        if (!resetSucceeded)
-                        {
-                            this.recoveryCache = null;
-                            this.recoveredCursorProgress = null;
-                            this.recoveryPendingCursors = null;
-                        }
+                        this.recoveryCache = null;
+                        this.recoveredCursorProgress = null;
+                        this.recoveryPendingCursors = null;
+                    }
 
-                        if (ReferenceEquals(this.recoveryTask, recoveryCompletion.Task))
-                        {
-                            this.recoveryTask = null;
-                        }
-
-                        recoveryCompletion.TrySetResult();
+                    if (ReferenceEquals(this.recoveryTask, recoveryCompletion.Task))
+                    {
+                        this.recoveryTask = null;
                     }
                 }
 
