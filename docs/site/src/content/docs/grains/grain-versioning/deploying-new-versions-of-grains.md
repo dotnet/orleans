@@ -1,7 +1,7 @@
 ---
 title: Deploy new grain interface versions
 description: Roll out a new Orleans grain interface version while preserving caller compatibility.
-ms.date: 08/02/2026
+ms.date: 08/23/2026
 ms.topic: how-to
 ---
 
@@ -21,6 +21,8 @@ Before deployment:
 
 Apply a higher `[Version]` value only after defining this contract. The number asserts routing compatibility; it doesn't create compatibility.
 
+When a rollout adds grain interface methods, first ensure every client-to-gateway and silo-to-silo path runs an Orleans runtime which supports independent message-body type references. Those connections preserve a request whose generated invocation type is unavailable on an application-version-old silo and return it to version-aware placement. The compatible destination still needs to deserialize the request payload, and the caller still needs to deserialize the response.
+
 ## Rolling upgrade
 
 The default combination works for a backward-compatible rollout:
@@ -31,7 +33,7 @@ Then:
 1. Start version 2 silos while version 1 silos and callers remain.
 1. Version 1 requests can use version 1 or version 2 activations.
 1. Start version 2 callers only after enough version 2 silos are ready.
-1. A version 2 request can't use a version 1 activation. If it reaches one, Orleans deactivates that activation and places a compatible version.
+1. When a version 2 request reaches a version 1 activation, Orleans preserves the logical request, deactivates the incompatible activation, and places a compatible version.
 1. Drain version 1 callers, then version 1 silos.
 1. Keep the backward-compatible contract until rollback is no longer required.
 
