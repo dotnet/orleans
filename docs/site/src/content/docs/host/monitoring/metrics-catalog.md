@@ -72,19 +72,33 @@ Request latency covers the interval until the caller's callback completes, inclu
 | Instrument | Type | Unit | Attributes | Description |
 |---|---|---|---|---|
 | `orleans-catalog-activation-collections` | C | Scans, implicit | - | Activation-collection scans performed by the silo. |
-| `orleans-catalog-activation-concurrent-registration-attempts` | C | Attempts, implicit | - | Activation registrations which encountered an activation already registered elsewhere. |
-| `orleans-catalog-activation-created` | C | Activations, implicit | - | Activation objects created on the silo. |
-| `orleans-catalog-activation-destroyed` | C | Activations, implicit | - | Activations removed from the silo catalog. |
-| `orleans-catalog-activation-failed-to-activate` | C | Activations, implicit | - | Activations whose lifecycle initialization failed or was canceled. |
-| `orleans-catalog-activation-latency` | H | `ms` | `status`, `directory` | Activation duration, split by outcome and whether the grain uses the directory. Status values include `success`, `canceled`, `directory_error`, `duplicate`, and `error`. |
-| `orleans-catalog-activation-non-existent` | C | Messages, implicit | - | Messages which targeted an activation that wasn't present in the local catalog. |
-| `orleans-catalog-activation-shutdown` | C | Activations, implicit | `via` | Activation shutdowns split by `collection`, `deactivateOnIdle`, `deactivateStuckActivation`, or `migration`. |
-| `orleans-catalog-activation-working-set` | OG | Activations, implicit | - | Activations currently in the silo's active working set. |
-| `orleans-catalog-activations` | OG | Activations, implicit | - | Activations currently registered in the silo catalog. |
-| `orleans-catalog-deactivation-latency` | H | `ms` | `via` | Deactivation duration, split by the shutdown path. |
-| `orleans-grains` | UDC | Grains, implicit | `type` | Current grain instances by grain type. |
+| `orleans-catalog-activation-concurrent-registration-attempts` | C | Attempts, implicit | `grain_type` | Activation registrations which encountered an activation already registered elsewhere. |
+| `orleans-catalog-activation-created` | C | Activations, implicit | `grain_type` | Grain contexts created by the silo catalog, including attempts which subsequently fail activation. |
+| `orleans-catalog-activation-destroyed` | C | Activations, implicit | `grain_type` | Grain contexts successfully unregistered from the silo catalog. |
+| `orleans-catalog-activation-failed-to-activate` | C | Activations, implicit | `grain_type` | Activations whose lifecycle initialization failed or was canceled. |
+| `orleans-catalog-activation-latency` | H | `ms` | `grain_type`, `status`, `directory` | Activation duration, split by outcome and whether the grain uses the directory (`enabled` or `disabled`). Status values are `success`, `canceled`, `directory_error`, `duplicate`, and `error`. |
+| `orleans-catalog-activation-non-existent` | C | Messages, implicit | `grain_type` | Requests for a new activation which the catalog could not create while the silo was inactive. Registered target types use their canonical names; unavailable type metadata uses `unknown`. |
+| `orleans-catalog-activation-shutdown` | C | Shutdown events, implicit | `grain_type`, `via` | Activation shutdowns split by `collection`, `deactivateOnIdle`, `deactivateStuckActivation`, or `migration`. Includes the historical additional event for each nonempty collection batch, tagged `grain_type=unknown`, `via=collection`. |
+| `orleans-catalog-activation-working-set` | OG | Activations, implicit | `grain_type` | Activations recently active on this silo, counted until working-set eviction or deactivation. |
+| `orleans-catalog-activations` | OG | Catalog entries, implicit | `grain_type` | Targets currently registered in the local activation directory, including system targets and stateless-worker group contexts. |
+| `orleans-catalog-deactivation-latency` | H | `ms` | `grain_type`, `via` | Deactivation duration, split by the shutdown path. `via=unknown` identifies completion before a shutdown path was selected. |
+| `orleans-grains` | UDC | Grains, implicit | `grain_type` | Constructed grain instances, incremented on instance assignment and decremented on disposal. Each stateless-worker instance contributes individually. |
 | `orleans-scheduler-long-running-turns` | C | Turns, implicit | - | Grain micro-turns whose synchronous execution exceeded <xref:Orleans.Configuration.SchedulingOptions.TurnWarningLengthThreshold>. |
 | `orleans-system-targets` | UDC | System targets, implicit | `type` | Current Orleans system-target instances by type. |
+
+### Grain-type identity and aggregation
+
+`grain_type` is the canonical string representation of the target's <xref:Orleans.Runtime.GrainType>, equivalent to `GrainId.Type.ToString()`. Explicit grain-type names and constructed generic arguments are part of that identity. The value can differ from the CLR implementation name. Default or unavailable type identity uses `unknown`, matching the request timeout/cancellation convention.
+
+Activation metrics cache the canonical string and population counters per registered type for the silo lifetime. All activations of a type share this metadata. Working-set insertion/removal and activation-directory registration/removal update the corresponding populations. A scrape enumerates type counters, including zero counts after the last member leaves. The first idle working-set scan retains a member; eviction removes it. Completed transitions reconcile per-type sums with the corresponding local population; concurrent scrapes can observe transitions in progress.
+
+Lifecycle counters record additive events. Sum their increases across types for the same emitter and interval to recover total event volume. Collection scans retain their scan-level scope. A completed activation attempt contributes one latency observation with its outcome and directory tags; a completed deactivation contributes one observation with its shutdown path. Histograms begin timing when enabled at the start of the operation.
+
+Population gauges record snapshots. For a cluster total, select the latest fresh observation for each emitting silo and type, then sum across those silos. Preserve distinct emitter identities, expire stale observations, and materialize gauges as current values in the backend. Repeated scrapes contribute successive snapshots. `orleans-grains` instead supplies signed instance deltas which the exporter aggregates from the start of collection.
+
+Catalog populations, working-set populations, and constructed instance counts each retain their own scope. A stateless-worker group contributes one catalog entry and can contain several constructed workers. Activation failures can leave a catalog entry temporarily present while cleanup proceeds. During migration, the source and destination account for their own registrations and removals.
+
+For the `orleans-grains` key/value migration and dashboard updates, see [Activation metric schema update](../../migration-guide.md#activation-metric-schema-update).
 
 ## Grain directory and consistent rings
 

@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.GrainDirectory;
+using Orleans.Metadata;
 using Orleans.Runtime.GrainDirectory;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
@@ -101,7 +102,7 @@ namespace Orleans.Runtime
 
                 // this should be removed once we've refactored the deactivation code path. For now safe to keep.
                 activationCollector.TryCancelCollection(activation as ICollectibleGrainContext);
-                _catalogInstruments.OnActivationDestroyed();
+                _catalogInstruments.OnActivationDestroyed(GetGrainTypeMetricName(activation));
             }
         }
 
@@ -194,7 +195,7 @@ namespace Orleans.Runtime
                 }
             }
 
-            _catalogInstruments.OnActivationCreated();
+            _catalogInstruments.OnActivationCreated(GetGrainTypeMetricName(result));
 
             // Rehydration occurs before activation.
             if (rehydrationContext is not null)
@@ -221,7 +222,17 @@ namespace Orleans.Runtime
                     self.LogDebugUnableToCreateActivation(grainId);
                 }
 
-                self._catalogInstruments.OnNonExistentActivation();
+                if (self._catalogInstruments.NonExistentActivationsEnabled)
+                {
+                    var instruments = self._catalogInstruments;
+                    if (!instruments.TryGetGrainTypeMetrics(grainId.Type, out var metrics)
+                        && self.serviceProvider.GetRequiredService<GrainPropertiesResolver>().TryGetGrainProperties(grainId.Type, out _))
+                    {
+                        metrics = instruments.GetGrainTypeMetrics(grainId.Type);
+                    }
+
+                    instruments.OnNonExistentActivation(metrics?.GrainTypeTagValue ?? GrainTypeMetrics.UnknownGrainType);
+                }
 
                 var grainLocator = self.serviceProvider.GetRequiredService<GrainLocator>();
                 grainLocator.InvalidateCache(grainId);
@@ -239,6 +250,10 @@ namespace Orleans.Runtime
                 return null;
             }
         }
+
+        private string GetGrainTypeMetricName(IGrainContext context) => context is ActivationData activation
+            ? activation.Shared.GrainTypeMetricName
+            : _catalogInstruments.GetGrainTypeMetrics(context.GrainId.Type).GrainTypeTagValue;
 
         private async Task UnregisterNonExistentActivation(GrainAddress address)
         {

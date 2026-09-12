@@ -69,12 +69,17 @@ Message-size instruments `orleans-messaging-sent-messages-size` and `orleans-mes
 | Instrument | Type and unit | Meaning and interpretation |
 |---|---|---|
 | `orleans-scheduler-long-running-turns` | Counter, count | Grain micro-turns whose synchronous execution exceeded <xref:Orleans.Configuration.SchedulingOptions.TurnWarningLengthThreshold>. The default is one second. The lifetime total naturally only increases; alert on its rate and correlate with latency, CPU, thread-pool, traces, and warning logs. |
-| `orleans-catalog-activations` | Observable gauge, count | Activations currently registered on this silo. Trend it against memory and traffic. A high value isn't intrinsically unhealthy; unexpected growth, imbalance, or churn is the useful signal. |
-| `orleans-catalog-activation-working-set` | Observable gauge, count | Activations in the local active working set. Compare it with total activations to understand the active portion of the catalog. |
-| `orleans-grains` | Up/down counter, count; `type` | Current grain instances by grain type after aggregation. Use it to identify placement imbalance or a grain type driving activation growth. |
-| `orleans-catalog-activation-created` / `orleans-catalog-activation-destroyed` | Counters, count | Activation lifecycle throughput. High rates in both directions indicate churn even when the current activation gauge is flat. |
-| `orleans-catalog-activation-latency` | Histogram, `ms`; `status`, `directory` | Activation duration and outcome. Break down non-success statuses (`canceled`, `directory_error`, `duplicate`, or `error`) and correlate tail latency with directory and storage health. |
-| `orleans-catalog-activation-failed-to-activate` | Counter, count | Activation attempts which failed to construct or initialize an activation. A sustained increase is an application availability signal. |
+| `orleans-catalog-activations` | Observable gauge, count; `grain_type` | Targets registered in this silo's activation directory, including system targets and stateless-worker group contexts. Trend each type against memory and traffic to identify growth, imbalance, or churn. |
+| `orleans-catalog-activation-working-set` | Observable gauge, count; `grain_type` | Recently active activations, retained until working-set eviction or deactivation. Compare per-type trends with catalog populations. |
+| `orleans-grains` | Up/down counter, count; `grain_type` | Constructed grain instances after aggregation of instance-assignment and disposal deltas. Each stateless-worker instance contributes individually. |
+| `orleans-catalog-activation-created` / `orleans-catalog-activation-destroyed` | Counters, count; `grain_type` | Catalog creation and unregistration throughput. High rates in both directions indicate churn even when the current activation gauge is flat. |
+| `orleans-catalog-activation-latency` | Histogram, `ms`; `grain_type`, `status`, `directory` | Activation duration and outcome. Break down non-success statuses (`canceled`, `directory_error`, `duplicate`, or `error`) and correlate tail latency with directory and storage health. |
+| `orleans-catalog-deactivation-latency` | Histogram, `ms`; `grain_type`, `via` | Deactivation duration by grain type and shutdown path. Use it to diagnose collection, migration, and shutdown delays. |
+| `orleans-catalog-activation-failed-to-activate` | Counter, count; `grain_type` | Activation attempts whose lifecycle initialization failed or was canceled. A sustained increase is an application availability signal. |
+
+The `grain_type` value is the canonical `GrainId.Type.ToString()` identity, including explicit names and constructed generic arguments. Orleans caches this value once per registered type and shares it across activations. See [Grain-type identity and aggregation](metrics-catalog.md#grain-type-identity-and-aggregation) for population boundaries and the `unknown` convention.
+
+For lifecycle throughput, sum event-counter increases across types over the same interval. For current cluster populations, sum the latest fresh per-silo gauge values by type. Configure exporter resource identity and backend freshness rules so each silo contributes one current population. Compare per-host populations using the same observation window and freshness policy.
 
 A long-running turn means Orleans observed one scheduled work item executing synchronously beyond the configured warning threshold. It doesn't by itself prove a deadlock. Common causes include synchronous blocking, lock contention, CPU-heavy work, or blocking I/O. See [Grain turns appear stuck](troubleshooting.md#grain-turns-appear-stuck).
 
@@ -108,7 +113,7 @@ Metric identity includes resource attributes and instrument attributes. Set stab
 
 Useful Orleans dimensions are bounded operational categories:
 
-- `grain_type` or `type` for deployed grain types.
+- `grain_type` for canonical grain types and `type` for system-target types.
 - `Direction`, `ConnectionDirection`, `MessageDirection`, and `Phase`.
 - `status`, `directory`, and `via` for lifecycle outcomes.
 - `provider_type_name`, `state_name`, and `state_type` for configured storage.

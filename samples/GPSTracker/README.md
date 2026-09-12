@@ -80,6 +80,8 @@ Dots will appear on the map in the Web browser and begin moving randomly around 
 
 If you're interested in observability, this sample includes some optional logging, metrics, and distributed tracing.
 
+Import `grafana_dash.json` into Grafana to view the Prometheus metrics. Activation panels sum grain-type series per emitting instance: current populations use gauge snapshots, and lifecycle throughput uses counter rates or increases. The Grains panel groups current-schema metrics by canonical `grain_type`. It also shows older Orleans metrics with their CLR `type` names and a `legacy CLR` legend, supporting the sample's published packages and mixed-version upgrades. Map legacy CLR names to canonical grain-type registrations before combining those two schemas into a single type-level total.
+
 ```docker
 docker run -p 9090:9090 --mount type=bind,source="${PWD}/prometheus.yml",target=/etc/prometheus/prometheus.yml prom/prometheus
 ```
