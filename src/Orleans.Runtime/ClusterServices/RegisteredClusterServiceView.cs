@@ -100,9 +100,8 @@ internal sealed class RegisteredClusterServiceView : IClusterServiceView<Registe
         Predecessor = predecessor;
         MembershipWatermark = membershipWatermark;
         Configuration = configuration;
-        Participants = participants.OrderBy(static silo => silo).ToImmutableArray();
         var owners = new Dictionary<SiloAddress, HashSet<string>>();
-        foreach (var participant in Participants)
+        foreach (var participant in participants)
         {
             if (participant is null || !owners.TryAdd(participant, new(StringComparer.Ordinal)))
             {
@@ -110,6 +109,7 @@ internal sealed class RegisteredClusterServiceView : IClusterServiceView<Registe
             }
         }
 
+        Participants = owners.Keys.OrderBy(static silo => silo).ToImmutableArray();
         var catalog = new HashSet<string>(StringComparer.Ordinal);
         foreach (var resource in resources)
         {
