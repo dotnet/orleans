@@ -1547,7 +1547,7 @@ namespace NonSilo.Tests.Membership
             var cancellationToken = TestContext.Current.CancellationToken;
             var membershipTable = new InMemoryMembershipTable();
             var lifecycle = new SiloLifecycleSubject(this.loggerFactory.CreateLogger<SiloLifecycleSubject>());
-            using var manager = CreateMembershipTableManager(membershipTable, lifecycle);
+            using var manager = CreateMembershipTableManager(membershipTable, lifecycle: lifecycle);
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(lifecycle);
             await lifecycle.OnStart(cancellationToken);
             await lifecycle.OnStop(cancellationToken);
@@ -1570,7 +1570,7 @@ namespace NonSilo.Tests.Membership
             var innerMembershipTable = new InMemoryMembershipTable();
             var membershipTable = new DelegatingMembershipTable(innerMembershipTable);
             var lifecycle = new SiloLifecycleSubject(this.loggerFactory.CreateLogger<SiloLifecycleSubject>());
-            using var manager = CreateMembershipTableManager(membershipTable, lifecycle);
+            using var manager = CreateMembershipTableManager(membershipTable, lifecycle: lifecycle);
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(lifecycle);
             await lifecycle.OnStart(cancellationToken);
 
@@ -1578,13 +1578,13 @@ namespace NonSilo.Tests.Membership
                 TaskCreationOptions.RunContinuationsAsynchronously);
             var blockedReadStarted = new TaskCompletionSource(
                 TaskCreationOptions.RunContinuationsAsynchronously);
-            var blockedReadResult = await innerMembershipTable.ReadAll();
+            var blockedReadResult = await innerMembershipTable.ReadAllAsync(cancellationToken);
             var readCount = 0;
-            membershipTable.ReadAllOverride = () =>
+            membershipTable.ReadAllOverride = token =>
             {
                 if (Interlocked.Increment(ref readCount) == 1)
                 {
-                    return innerMembershipTable.ReadAll();
+                    return innerMembershipTable.ReadAllAsync(token);
                 }
 
                 blockedReadStarted.TrySetResult();
@@ -1630,29 +1630,78 @@ namespace NonSilo.Tests.Membership
 
         private sealed class DelegatingMembershipTable(IMembershipTable inner) : IMembershipTable
         {
-            public Func<Task<MembershipTableData>>? ReadAllOverride { get; set; }
+            public Func<CancellationToken, Task<MembershipTableData>>? ReadAllOverride { get; set; }
 
             public Task InitializeMembershipTable(bool tryInitTableVersion) =>
-                inner.InitializeMembershipTable(tryInitTableVersion);
+                InitializeMembershipTableAsync(tryInitTableVersion);
+
+            public Task InitializeMembershipTableAsync(
+                bool tryInitTableVersion,
+                CancellationToken cancellationToken = default) =>
+                inner.InitializeMembershipTableAsync(tryInitTableVersion, cancellationToken);
 
             public Task DeleteMembershipTableEntries(string clusterId) =>
-                inner.DeleteMembershipTableEntries(clusterId);
+                DeleteMembershipTableEntriesAsync(clusterId);
+
+            public Task DeleteMembershipTableEntriesAsync(
+                string clusterId,
+                CancellationToken cancellationToken = default) =>
+                inner.DeleteMembershipTableEntriesAsync(clusterId, cancellationToken);
 
             public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) =>
-                inner.CleanupDefunctSiloEntries(beforeDate);
+                CleanupDefunctSiloEntriesAsync(beforeDate);
 
-            public Task<MembershipTableData> ReadRow(SiloAddress key) => inner.ReadRow(key);
+            public Task CleanupDefunctSiloEntriesAsync(
+                DateTimeOffset beforeDate,
+                CancellationToken cancellationToken = default) =>
+                inner.CleanupDefunctSiloEntriesAsync(beforeDate, cancellationToken);
 
-            public Task<MembershipTableData> ReadAll() =>
-                ReadAllOverride?.Invoke() ?? inner.ReadAll();
+            public Task<MembershipTableData> ReadRow(SiloAddress key) => ReadRowAsync(key);
+
+            public Task<MembershipTableData> ReadRowAsync(
+                SiloAddress key,
+                CancellationToken cancellationToken = default) =>
+                inner.ReadRowAsync(key, cancellationToken);
+
+            public Task<MembershipTableData> ReadAll() => ReadAllAsync();
+
+            public async Task<MembershipTableData> ReadAllAsync(
+                CancellationToken cancellationToken = default)
+            {
+                var operation = ReadAllOverride?.Invoke(cancellationToken)
+                    ?? inner.ReadAllAsync(cancellationToken);
+                return await operation.WaitAsync(cancellationToken);
+            }
 
             public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) =>
-                inner.InsertRow(entry, tableVersion);
+                InsertRowAsync(entry, tableVersion);
 
-            public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) =>
-                inner.UpdateRow(entry, etag, tableVersion);
+            public Task<bool> InsertRowAsync(
+                MembershipEntry entry,
+                TableVersion tableVersion,
+                CancellationToken cancellationToken = default) =>
+                inner.InsertRowAsync(entry, tableVersion, cancellationToken);
 
-            public Task UpdateIAmAlive(MembershipEntry entry) => inner.UpdateIAmAlive(entry);
+            public Task<bool> UpdateRow(
+                MembershipEntry entry,
+                string etag,
+                TableVersion tableVersion) =>
+                UpdateRowAsync(entry, etag, tableVersion);
+
+            public Task<bool> UpdateRowAsync(
+                MembershipEntry entry,
+                string etag,
+                TableVersion tableVersion,
+                CancellationToken cancellationToken = default) =>
+                inner.UpdateRowAsync(entry, etag, tableVersion, cancellationToken);
+
+            public Task UpdateIAmAlive(MembershipEntry entry) =>
+                UpdateIAmAliveAsync(entry);
+
+            public Task UpdateIAmAliveAsync(
+                MembershipEntry entry,
+                CancellationToken cancellationToken = default) =>
+                inner.UpdateIAmAliveAsync(entry, cancellationToken);
         }
 
         private static MembershipTableSnapshot Snapshot(MembershipVersion version, params MembershipEntry[] entries)
