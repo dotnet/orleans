@@ -3,6 +3,7 @@ using Orleans.EventSourcing.CustomStorage;
 using Orleans.Storage;
 using Orleans.TestingHost;
 using TestExtensions;
+using TestGrains;
 
 namespace Tester.EventSourcingTests
 {
@@ -26,6 +27,7 @@ namespace Tester.EventSourcingTests
                 hostBuilder
                     .AddLogStorageBasedLogConsistencyProvider("LogStorage")
                     .AddStateStorageBasedLogConsistencyProvider("StateStorage")
+                    .AddCustomStorageBasedLogConsistencyProvider<SeparateCustomStorageFactory>("CustomStorage")
                     .AddCustomStorageBasedLogConsistencyProvider("CustomStoragePrimaryCluster")
                     .ConfigureLogging(builder =>
                     {
