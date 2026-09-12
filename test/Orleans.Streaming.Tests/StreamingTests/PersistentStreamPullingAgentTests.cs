@@ -1068,6 +1068,7 @@ namespace UnitTests.StreamingTests
             public List<StreamSequenceToken> DeliveredTokens { get; } = new();
             public List<StreamHandshakeToken?> DeliveredHandshakeTokens { get; } = new();
             public List<Exception> Errors { get; } = new();
+            public Func<Task<StreamHandshakeToken?>>? OnHandshake { get; set; }
 
             public Task<StreamHandshakeToken?> DeliverImmutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken, CancellationToken cancellationToken)
                 => throw new NotSupportedException();
@@ -1092,7 +1093,8 @@ namespace UnitTests.StreamingTests
                 return Task.CompletedTask;
             }
 
-            public Task<StreamHandshakeToken?> GetSequenceToken(GuidId subscriptionId, CancellationToken cancellationToken) => Task.FromResult(requestedToken);
+            public Task<StreamHandshakeToken?> GetSequenceToken(GuidId subscriptionId, CancellationToken cancellationToken)
+                => OnHandshake?.Invoke() ?? Task.FromResult(requestedToken);
 
             public void ReleaseDelivery() => releaseDelivery.TrySetResult(true);
         }
@@ -2574,7 +2576,7 @@ namespace UnitTests.StreamingTests
         [Theory, TestCategory("BVT"), TestCategory("Streaming")]
         [InlineData("active", 1L)]
         [InlineData("pending-batch", 1L)]
-        [InlineData("handshake", 1L)]
+        [InlineData("handshake", null)]
         [InlineData("disposed", 1L)]
         [InlineData("not-drained", 1L)]
         [InlineData("unknown-stream-read", 1L)]
@@ -2629,6 +2631,79 @@ namespace UnitTests.StreamingTests
             {
                 Assert.Empty(scenario.Checkpoints);
             }
+        }
+
+        [Theory, TestCategory("BVT"), TestCategory("Streaming")]
+        [InlineData(false, false)]
+        [InlineData(false, true)]
+        [InlineData(true, false)]
+        [InlineData(true, true)]
+        public async Task Checkpoint_RegisteredConsumerHandshakeBlocksOnlyUntilCompletion(bool legacyMode, bool completeHandshake)
+        {
+            await using var scenario = await CreateCheckpointScenario();
+            await scenario.Read((scenario.Idle, 1), (scenario.Busy, 50), (scenario.Busy, 200));
+            await scenario.Remove(scenario.Idle);
+            if (legacyMode)
+            {
+                scenario.Busy.SafeDisposeCursor(NullLogger.Instance);
+                scenario.Busy.Cursor = new InvalidMoveCursor();
+                await Assert.ThrowsAnyAsync<InvalidOperationException>(
+                    () => scenario.Accessor.RunConsumerCursor(scenario.Busy));
+                scenario.Busy.Cursor = scenario.Cache.GetCacheCursor(scenario.Busy.StreamId, new EventSequenceTokenV2(200));
+            }
+
+            var handshakeStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var releaseHandshake = new TaskCompletionSource<StreamHandshakeToken?>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var consumer = new RecordingConsumer
+            {
+                OnHandshake = () =>
+                {
+                    handshakeStarted.TrySetResult();
+                    return releaseHandshake.Task;
+                },
+            };
+            scenario.Busy.StreamConsumer = consumer;
+            var replayToken = StreamHandshakeToken.CreateDeliveyToken(new EventSequenceTokenV2(50));
+            var attachment = scenario.Accessor.AddSubscriber(scenario.Busy);
+
+            try
+            {
+                await handshakeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+                Assert.True(scenario.Busy.IsRegistered);
+                Assert.Equal(StreamConsumerDataState.Inactive, scenario.Busy.State);
+                Assert.Equal(1, scenario.Busy.PendingHandshakes);
+                Assert.Equal(200, scenario.Busy.LastProcessedToken?.SequenceNumber);
+                Assert.False(attachment.IsCompleted);
+
+                if (completeHandshake)
+                {
+                    releaseHandshake.TrySetResult(replayToken);
+                    await attachment.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+                    await consumer.Delivered.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+                    Assert.Equal(0, scenario.Busy.PendingHandshakes);
+                    Assert.Equal(50, scenario.Busy.LastProcessedToken?.SequenceNumber);
+                }
+
+                scenario.Checkpoints.Clear();
+                await scenario.Accessor.Shutdown().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+                if (completeHandshake)
+                {
+                    Assert.Equal(50, Assert.Single(scenario.Checkpoints)?.SequenceNumber);
+                }
+                else
+                {
+                    Assert.Empty(scenario.Checkpoints);
+                    Assert.False(attachment.IsCompleted);
+                }
+            }
+            finally
+            {
+                releaseHandshake.TrySetResult(replayToken);
+                consumer.ReleaseDelivery();
+                await attachment.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            }
+
+            Assert.Equal(0, scenario.Busy.PendingHandshakes);
         }
 
         [Theory, TestCategory("BVT"), TestCategory("Streaming")]

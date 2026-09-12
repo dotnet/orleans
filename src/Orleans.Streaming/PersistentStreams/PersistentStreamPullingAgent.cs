@@ -57,6 +57,7 @@ namespace Orleans.Streams
             Task<bool> ReadFromQueueWithCancellation(QueueId myQueueId, IQueueAdapterReceiver? receiver, int maxCacheAddCount, CancellationToken cancellationToken);
             Task RegisterStream(QualifiedStreamId streamId, StreamSequenceToken firstToken, DateTime now);
             Task<IReadOnlyDictionary<QualifiedStreamId, StreamConsumerCollection>> GetPubSubCache();
+            Task AddSubscriber(StreamConsumerData consumerData);
             Task<bool> DoHandshakeWithConsumer(StreamConsumerData consumerData, StreamSequenceToken? cacheToken);
             Task RunConsumerCursor(StreamConsumerData consumerData);
             Task RunQueuePump(QueueId myQueueId, CancellationToken cancellationToken);
@@ -128,6 +129,10 @@ namespace Orleans.Streams
 
         Task<IReadOnlyDictionary<QualifiedStreamId, StreamConsumerCollection>> ITestAccessor.GetPubSubCache()
             => this.RunOrQueueTaskResult(() => (IReadOnlyDictionary<QualifiedStreamId, StreamConsumerCollection>)new Dictionary<QualifiedStreamId, StreamConsumerCollection>(pubSubCache));
+
+        Task ITestAccessor.AddSubscriber(StreamConsumerData consumerData)
+            => this.RunOrQueueTask(() => AddSubscriber_Impl(
+                consumerData.SubscriptionId, consumerData.StreamId, default, consumerData.FilterData, null));
 
         Task<bool> ITestAccessor.DoHandshakeWithConsumer(StreamConsumerData consumerData, StreamSequenceToken? cacheToken)
             => this.RunOrQueueTaskResult(() => DoHandshakeWithConsumer(consumerData, cacheToken)).Unwrap();
@@ -1099,7 +1104,7 @@ namespace Orleans.Streams
 
                 foreach (var consumer in streamConsumers.AllConsumers())
                 {
-                    if (!consumer.IsRegistered)
+                    if (!consumer.IsRegistered || consumer.PendingHandshakes != 0)
                     {
                         return false;
                     }
