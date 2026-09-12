@@ -365,6 +365,12 @@ namespace Orleans.Streams
             {
                 if (await DoHandshakeWithConsumer(data, cacheToken))
                 {
+                    // Delivery can start while the handshake is awaiting a response.
+                    if (data.State == StreamConsumerDataState.Active)
+                    {
+                        _useLegacyDeliveryProgress = true;
+                    }
+
                     data.LastProcessedToken = GetInitialDeliveryProgress(data.LastToken, data.LastProcessedToken);
                     data.PendingStartToken = null;
                     data.IsRegistered = true;

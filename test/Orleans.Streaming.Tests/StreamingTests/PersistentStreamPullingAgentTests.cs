@@ -1069,6 +1069,7 @@ namespace UnitTests.StreamingTests
             public List<StreamHandshakeToken?> DeliveredHandshakeTokens { get; } = new();
             public List<Exception> Errors { get; } = new();
             public Func<Task<StreamHandshakeToken?>>? OnHandshake { get; set; }
+            public Func<IBatchContainer, Task<StreamHandshakeToken?>>? OnDelivery { get; set; }
 
             public Task<StreamHandshakeToken?> DeliverImmutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken, CancellationToken cancellationToken)
                 => throw new NotSupportedException();
@@ -1081,6 +1082,11 @@ namespace UnitTests.StreamingTests
                 DeliveredTokens.Add(item.SequenceToken);
                 DeliveredHandshakeTokens.Add(handshakeToken);
                 Delivered.TrySetResult(true);
+                if (OnDelivery is not null)
+                {
+                    return await OnDelivery(item);
+                }
+
                 await releaseDelivery.Task;
                 return null;
             }
@@ -2707,6 +2713,206 @@ namespace UnitTests.StreamingTests
         }
 
         [Theory, TestCategory("BVT"), TestCategory("Streaming")]
+        [InlineData("none", 50)]
+        [InlineData("completed", 50)]
+        [InlineData("overlapping", 1)]
+        public async Task Checkpoint_HandshakeAccountsForDeliveryStartedWhileAwaitingResponse(
+            string deliveryTiming, long expectedCheckpoint)
+        {
+            await using var scenario = await CreateCheckpointScenario();
+            await scenario.Read((scenario.Idle, 1), (scenario.Busy, 50), (scenario.Busy, 100));
+            using var replayPin = scenario.Cache.GetCacheCursor(scenario.Busy.StreamId, new EventSequenceTokenV2(50));
+            var handshakeStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var releaseHandshake = new TaskCompletionSource<StreamHandshakeToken?>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var releaseNewDelivery = new TaskCompletionSource<StreamHandshakeToken?>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var replayStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var releaseReplay = new TaskCompletionSource<StreamHandshakeToken?>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var consumer = new RecordingConsumer
+            {
+                OnHandshake = () =>
+                {
+                    handshakeStarted.TrySetResult();
+                    return releaseHandshake.Task;
+                },
+                OnDelivery = batch =>
+                {
+                    if (batch.SequenceToken.SequenceNumber == 200)
+                    {
+                        return releaseNewDelivery.Task;
+                    }
+
+                    Assert.Equal(100, batch.SequenceToken.SequenceNumber);
+                    replayStarted.TrySetResult();
+                    return releaseReplay.Task;
+                },
+            };
+            scenario.Busy.StreamConsumer = consumer;
+            var replayToken = StreamHandshakeToken.CreateDeliveyToken(new EventSequenceTokenV2(50));
+            var attachment = scenario.Accessor.AddSubscriber(scenario.Busy);
+
+            try
+            {
+                await handshakeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+                Assert.Equal(StreamConsumerDataState.Inactive, scenario.Busy.State);
+                Assert.Equal(1, scenario.Busy.PendingHandshakes);
+                Assert.Equal(100, scenario.Busy.LastProcessedToken?.SequenceNumber);
+
+                if (deliveryTiming != "none")
+                {
+                    if (deliveryTiming == "completed")
+                    {
+                        releaseNewDelivery.TrySetResult(null);
+                    }
+
+                    await scenario.Read((scenario.Busy, 200));
+                    await consumer.Delivered.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+                    Assert.Equal(
+                        deliveryTiming == "overlapping" ? StreamConsumerDataState.Active : StreamConsumerDataState.Inactive,
+                        scenario.Busy.State);
+                    Assert.Equal(1, scenario.Busy.PendingHandshakes);
+                    Assert.Equal(200, Assert.Single(consumer.DeliveredTokens).SequenceNumber);
+                }
+
+                releaseHandshake.TrySetResult(replayToken);
+                await attachment.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+                Assert.Equal(0, scenario.Busy.PendingHandshakes);
+                Assert.Equal(50, scenario.Busy.LastProcessedToken?.SequenceNumber);
+
+                releaseNewDelivery.TrySetResult(null);
+                await replayStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+                Assert.Equal(deliveryTiming == "overlapping" ? 200 : 50, scenario.Busy.LastProcessedToken?.SequenceNumber);
+                Assert.Equal(StreamConsumerDataState.Active, scenario.Busy.State);
+                Assert.Equal(
+                    deliveryTiming == "none" ? new long[] { 100 } : new long[] { 200, 100 },
+                    consumer.DeliveredTokens.Select(token => token.SequenceNumber));
+                Assert.Empty(consumer.Errors);
+
+                scenario.Checkpoints.Clear();
+                await scenario.Accessor.Shutdown().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+                Assert.Equal(expectedCheckpoint, Assert.Single(scenario.Checkpoints)?.SequenceNumber);
+            }
+            finally
+            {
+                releaseHandshake.TrySetResult(replayToken);
+                releaseNewDelivery.TrySetResult(null);
+                releaseReplay.TrySetResult(null);
+                await attachment.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            }
+        }
+
+        [Theory, TestCategory("BVT"), TestCategory("Streaming")]
+        [InlineData(false, "pending")]
+        [InlineData(false, "replaying")]
+        [InlineData(false, "drained")]
+        [InlineData(true, "pending")]
+        [InlineData(true, "replaying")]
+        [InlineData(true, "drained")]
+        public async Task Checkpoint_IdleCleanupPreservesHandshakeUntilCompletion(bool legacyMode, string outcome)
+        {
+            var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
+            await using var scenario = await CreateCheckpointScenario(timeProvider: timeProvider);
+            await scenario.Read((scenario.Idle, 50), (scenario.Idle, 100), (scenario.Busy, 200));
+            // Isolate subscription cleanup from the cache's independent eviction policy.
+            using var replayPin = scenario.Cache.GetCacheCursor(scenario.Idle.StreamId, new EventSequenceTokenV2(50));
+            if (legacyMode)
+            {
+                scenario.Idle.SafeDisposeCursor(NullLogger.Instance);
+                scenario.Idle.Cursor = new InvalidMoveCursor();
+                await Assert.ThrowsAnyAsync<InvalidOperationException>(
+                    () => scenario.Accessor.RunConsumerCursor(scenario.Idle));
+                scenario.Idle.Cursor = scenario.Cache.GetCacheCursor(scenario.Idle.StreamId, new EventSequenceTokenV2(100));
+            }
+
+            var streams = await scenario.Accessor.GetPubSubCache();
+            var idleStream = streams[scenario.Idle.StreamId];
+            var busyStream = streams[scenario.Busy.StreamId];
+            var handshakeStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var releaseHandshake = new TaskCompletionSource<StreamHandshakeToken?>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var consumer = new RecordingConsumer
+            {
+                OnHandshake = () =>
+                {
+                    handshakeStarted.TrySetResult();
+                    return releaseHandshake.Task;
+                },
+            };
+            scenario.Idle.StreamConsumer = consumer;
+            var handshakeToken = StreamHandshakeToken.CreateDeliveyToken(
+                new EventSequenceTokenV2(outcome == "drained" ? 100 : 50));
+            var attachment = scenario.Accessor.AddSubscriber(scenario.Idle);
+
+            try
+            {
+                await handshakeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+                Assert.Equal(StreamConsumerDataState.Inactive, scenario.Idle.State);
+                Assert.Equal(1, scenario.Idle.PendingHandshakes);
+                Assert.Equal(100, scenario.Idle.LastProcessedToken?.SequenceNumber);
+                var cursor = scenario.Idle.Cursor;
+
+                var inactivityPeriod = new StreamPullingAgentOptions().StreamInactivityPeriod;
+                timeProvider.Advance(inactivityPeriod + TimeSpan.FromTicks(1));
+                busyStream.RefreshActivity(timeProvider.GetUtcNow().UtcDateTime);
+                await scenario.Read((scenario.Busy, 201));
+
+                streams = await scenario.Accessor.GetPubSubCache();
+                Assert.Equal(2, streams.Count);
+                Assert.Same(idleStream, streams[scenario.Idle.StreamId]);
+                Assert.Same(scenario.Idle, Assert.Single(idleStream.AllConsumers()));
+                Assert.Same(cursor, scenario.Idle.Cursor);
+                Assert.Equal(1, scenario.Idle.PendingHandshakes);
+                Assert.False(attachment.IsCompleted);
+                Assert.Equal(201, scenario.Busy.LastProcessedToken?.SequenceNumber);
+
+                if (outcome != "pending")
+                {
+                    releaseHandshake.TrySetResult(handshakeToken);
+                    await attachment.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+                    Assert.Equal(0, scenario.Idle.PendingHandshakes);
+                    Assert.Empty(consumer.Errors);
+                    if (outcome == "replaying")
+                    {
+                        await consumer.Delivered.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+                        Assert.Equal(50, scenario.Idle.LastProcessedToken?.SequenceNumber);
+                    }
+                    else
+                    {
+                        Assert.Equal(100, scenario.Idle.LastProcessedToken?.SequenceNumber);
+                        Assert.True(scenario.Idle.IsCaughtUp);
+                        Assert.Equal(StreamConsumerDataState.Inactive, scenario.Idle.State);
+                        timeProvider.Advance(inactivityPeriod + TimeSpan.FromTicks(1));
+                        busyStream.RefreshActivity(timeProvider.GetUtcNow().UtcDateTime);
+                        await scenario.Read((scenario.Busy, 202));
+
+                        streams = await scenario.Accessor.GetPubSubCache();
+                        Assert.Equal(scenario.Busy.StreamId, Assert.Single(streams).Key);
+                        Assert.Empty(idleStream.AllConsumers());
+                        Assert.Null(scenario.Idle.Cursor);
+                    }
+                }
+
+                scenario.Checkpoints.Clear();
+                await scenario.Accessor.Shutdown().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+                if (outcome == "pending")
+                {
+                    Assert.Empty(scenario.Checkpoints);
+                    Assert.False(attachment.IsCompleted);
+                }
+                else
+                {
+                    Assert.Equal(outcome == "drained" ? 202 : 50, Assert.Single(scenario.Checkpoints)?.SequenceNumber);
+                }
+            }
+            finally
+            {
+                releaseHandshake.TrySetResult(handshakeToken);
+                consumer.ReleaseDelivery();
+                await attachment.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            }
+
+            Assert.Equal(0, scenario.Idle.PendingHandshakes);
+        }
+
+        [Theory, TestCategory("BVT"), TestCategory("Streaming")]
         [InlineData(false)]
         [InlineData(true)]
         public async Task Checkpoint_NewReadsMustBeAcknowledgedAfterDraining(bool pooled)
@@ -2965,7 +3171,8 @@ namespace UnitTests.StreamingTests
         }
 
         private static async Task<CheckpointScenario> CreateCheckpointScenario(
-            bool pooled = false, int batchSize = 1, bool filtered = false, RecordingQueueCache? emptyCache = null)
+            bool pooled = false, int batchSize = 1, bool filtered = false, RecordingQueueCache? emptyCache = null,
+            TimeProvider? timeProvider = null)
         {
             IQueueCache cache;
             List<StreamSequenceToken?> checkpoints;
@@ -2992,7 +3199,7 @@ namespace UnitTests.StreamingTests
             var (accessor, _, idleStream) = await CreateInitializedAgentWithStream(
                 idleId, new EventSequenceTokenV2(1), cache,
                 new StreamPullingAgentOptions { BatchContainerBatchSize = batchSize },
-                filtered ? Substitute.For<IStreamFilter>() : null);
+                filtered ? Substitute.For<IStreamFilter>() : null, timeProvider);
             await accessor.RegisterStream(busyId, new EventSequenceTokenV2(2), DateTime.UtcNow);
             var busyStream = (await accessor.GetPubSubCache())[busyId];
 
@@ -3057,7 +3264,8 @@ namespace UnitTests.StreamingTests
                 StreamSequenceToken registrationToken,
                 IQueueCache queueCache,
                 StreamPullingAgentOptions options,
-                IStreamFilter? filter = null)
+                IStreamFilter? filter = null,
+                TimeProvider? timeProvider = null)
         {
             var pubSub = Substitute.For<IStreamPubSub>();
             pubSub.RegisterProducer(default, default)
@@ -3070,6 +3278,7 @@ namespace UnitTests.StreamingTests
                 pubSub,
                 QueueId.GetQueueId("queue", 0u, 0u),
                 queueAdapterCache: queueAdapterCache,
+                timeProvider: timeProvider,
                 options: options,
                 filter: filter);
             var accessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
