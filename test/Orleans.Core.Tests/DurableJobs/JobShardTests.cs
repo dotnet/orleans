@@ -67,6 +67,67 @@ public class JobShardTests
     }
 
     [Fact]
+    public async Task TryScheduleJobAsync_StableJobIdIsIdempotent()
+    {
+        var dueTime = DateTimeOffset.UtcNow.AddMinutes(1);
+        var shard = new TestJobShard(dueTime.AddMinutes(-1), dueTime.AddMinutes(1));
+        var request = new ScheduleJobRequest
+        {
+            JobId = "stable-job",
+            Target = GrainId.Create("test", "job"),
+            JobName = "job",
+            DueTime = dueTime
+        };
+
+        var first = await shard.TryScheduleJobAsync(request, CancellationToken.None);
+        var second = await shard.TryScheduleJobAsync(
+            new ScheduleJobRequest
+            {
+                JobId = request.JobId,
+                Target = request.Target,
+                JobName = request.JobName,
+                DueTime = dueTime.AddSeconds(1),
+                Metadata = request.Metadata,
+                TraceParent = "different-attempt-trace"
+            },
+            CancellationToken.None);
+
+        Assert.Same(first, second);
+        Assert.Equal("stable-job", first!.Id);
+        Assert.Equal(1, shard.PersistAddCount);
+        Assert.Equal(1, await shard.GetJobCountAsync());
+    }
+
+    [Fact]
+    public async Task TryScheduleJobAsync_ConflictingStableJobIdIsRejected()
+    {
+        var dueTime = DateTimeOffset.UtcNow.AddMinutes(1);
+        var shard = new TestJobShard(dueTime.AddMinutes(-1), dueTime.AddMinutes(1));
+        await shard.TryScheduleJobAsync(
+            new ScheduleJobRequest
+            {
+                JobId = "stable-job",
+                Target = GrainId.Create("test", "job"),
+                JobName = "job",
+                DueTime = dueTime
+            },
+            CancellationToken.None);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => shard.TryScheduleJobAsync(
+                new ScheduleJobRequest
+                {
+                    JobId = "stable-job",
+                    Target = GrainId.Create("test", "other"),
+                    JobName = "job",
+                    DueTime = dueTime
+                },
+                CancellationToken.None));
+
+        Assert.Contains("different properties", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task RetryJobLaterAsync_ForwardsCompleteRunContextForPersistence()
     {
         var dueTime = DateTimeOffset.UtcNow.AddMinutes(1);
@@ -209,6 +270,7 @@ public class JobShardTests
         : JobShard("shard", startTime, endTime)
     {
         public DurableJob? PersistedJob { get; private set; }
+        public int PersistAddCount { get; private set; }
 
         public IJobRunContext? PersistedRetryContext { get; private set; }
 
@@ -216,6 +278,7 @@ public class JobShardTests
 
         protected override Task PersistAddJobAsync(DurableJob job, CancellationToken cancellationToken)
         {
+            PersistAddCount++;
             PersistedJob = job;
             return Task.CompletedTask;
         }
