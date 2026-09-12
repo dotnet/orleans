@@ -196,6 +196,121 @@ public sealed class ResourceOwnershipConsumerTests
             await consumer.InstallViewAsync(await delivery.Task.WaitAsync(TestContext.Current.CancellationToken));
     }
 
+    [Theory(Timeout = 30_000)]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task InitialInstallationRejectsAViewSupersededBeforeDelivery(bool ownershipChanged)
+    {
+        await using var provider = Create(new(), new());
+        var previous = await Publish(provider, TestServiceMembership.A);
+        var protocol = new Protocol();
+        await using var consumer = new ResourceOwnershipConsumer(TestServiceMembership.A, provider, protocol);
+        var current = await Publish(provider, ownershipChanged ? TestServiceMembership.B : TestServiceMembership.A);
+
+        await Assert.ThrowsAsync<ClusterServiceViewUnavailableException>(() => consumer.InstallViewAsync(previous));
+
+        Assert.Equal(0, protocol.Recoveries);
+        Assert.Equal(0, protocol.Fences);
+        Assert.Equal(0, protocol.Checkpoints);
+        Assert.Equal(0, protocol.Handoffs);
+        await consumer.InstallViewAsync(current).WaitAsync(TestContext.Current.CancellationToken);
+        if (ownershipChanged)
+        {
+            await Assert.ThrowsAsync<ClusterServiceViewUnavailableException>(() => Read(consumer, current.Id).AsTask());
+        }
+        else
+        {
+            Assert.Equal(new byte[] { 1 }, (await Read(consumer, current.Id)).ToArray());
+        }
+    }
+
+    [Theory(Timeout = 30_000)]
+    [InlineData("recovery")]
+    [InlineData("fence")]
+    public async Task ProviderAdvancementDuringAcquisitionPreventsActivation(string delayedStage)
+    {
+        await using var provider = Create(new(), new());
+        var previous = await Publish(provider, TestServiceMembership.A);
+        var started = Signal();
+        var resume = Signal();
+        var protocol = new Protocol
+        {
+            Recover = async (_, _, token) =>
+            {
+                if (delayedStage == "recovery")
+                {
+                    started.SetResult();
+                    await resume.Task.WaitAsync(token);
+                }
+
+                return new byte[] { 99 };
+            },
+            Fence = async (_, _, token) =>
+            {
+                if (delayedStage == "fence")
+                {
+                    started.SetResult();
+                    await resume.Task.WaitAsync(token);
+                }
+
+                return new(ClusterServiceFencingMode.External, 12345);
+            }
+        };
+        await using var consumer = new ResourceOwnershipConsumer(TestServiceMembership.A, provider, protocol);
+        var installation = consumer.InstallViewAsync(previous);
+        await started.Task.WaitAsync(TestContext.Current.CancellationToken);
+        var serving = Read(consumer, previous.Id).AsTask();
+        Assert.False(serving.IsCompleted);
+        await Publish(provider, TestServiceMembership.A);
+
+        resume.SetResult();
+
+        var failure = await Assert.ThrowsAsync<ClusterServiceViewUnavailableException>(() => installation);
+        Assert.Same(failure, await Assert.ThrowsAsync<ClusterServiceViewUnavailableException>(() => serving));
+        Assert.Equal(1, protocol.Recoveries);
+        Assert.Equal(delayedStage == "fence" ? 1 : 0, protocol.Fences);
+        Assert.Equal(0, protocol.Checkpoints);
+        Assert.Equal(new byte[] { 1 }, protocol.Durable.ToArray());
+    }
+
+    [Fact(Timeout = 30_000)]
+    public async Task ProviderAdvancementRejectsQueuedAndDelayedOldViewOperations()
+    {
+        await using var provider = Create(new(), new());
+        var protocol = new Protocol();
+        await using var consumer = new ResourceOwnershipConsumer(TestServiceMembership.A, provider, protocol);
+        var previous = await Publish(provider, TestServiceMembership.A);
+        await consumer.InstallViewAsync(previous).WaitAsync(TestContext.Current.CancellationToken);
+        var started = Signal();
+        var resume = Signal();
+        var executing = consumer.ExecuteAsync(TestServiceMembership.Resource, previous.Id, async (_, token) =>
+        {
+            started.SetResult();
+            await resume.Task.WaitAsync(token);
+            return new byte[] { 99 };
+        }, TestContext.Current.CancellationToken).AsTask();
+        await started.Task.WaitAsync(TestContext.Current.CancellationToken);
+        var queuedStarted = false;
+        var queued = consumer.ExecuteAsync(TestServiceMembership.Resource, previous.Id, (state, _) =>
+        {
+            queuedStarted = true;
+            return ValueTask.FromResult(state);
+        }, TestContext.Current.CancellationToken).AsTask();
+        var current = await Publish(provider, TestServiceMembership.A);
+        var delayed = Read(consumer, previous.Id).AsTask();
+
+        resume.SetResult();
+
+        await Assert.ThrowsAsync<ClusterServiceViewUnavailableException>(() => executing);
+        await Assert.ThrowsAsync<ClusterServiceViewUnavailableException>(() => queued);
+        await Assert.ThrowsAsync<ClusterServiceViewUnavailableException>(() => delayed);
+        Assert.False(queuedStarted);
+        await consumer.InstallViewAsync(current).WaitAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(new byte[] { 1 }, (await Read(consumer, current.Id)).ToArray());
+        Assert.Equal(1, protocol.Recoveries);
+        Assert.Equal(1, protocol.Fences);
+    }
+
     [Fact(Timeout = 30_000)]
     public async Task AuthorityFailureDuringRecoveryPreventsFencingAndServing()
     {

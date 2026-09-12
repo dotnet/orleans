@@ -449,7 +449,8 @@ internal sealed class ResourceOwnershipConsumer : IAsyncDisposable
             // The target's outbound gate must not wait on itself.
             await WaitForPredecessorAsync(resource, gate.PreviousView);
             await DrainAsync(retained.Receiver);
-            ValidateProviderView(gate.TargetView);
+            // An active release finishes its recipient-fenced checkpoint across later placement views.
+            ValidateProviderAuthority(gate.TargetView);
             if (!retained.Receiver.Ready)
             {
                 throw new ClusterServiceViewUnavailableException($"No installed predecessor state exists for '{resource}' in '{gate.PreviousView}'.");
@@ -457,7 +458,7 @@ internal sealed class ResourceOwnershipConsumer : IAsyncDisposable
 
             gate.MarkDrained();
             await _protocol.CheckpointAsync(resource, retained.Receiver.State, gate.PreviousView, _shutdown.Token);
-            ValidateProviderView(gate.TargetView);
+            ValidateProviderAuthority(gate.TargetView);
             gate.MarkStateRetained();
             gate.Complete();
             _gates.Prune(resource);
@@ -517,13 +518,22 @@ internal sealed class ResourceOwnershipConsumer : IAsyncDisposable
 
     private void ValidateProviderView(RegisteredServiceViewId view)
     {
+        var current = ValidateProviderAuthority(view);
+        if (current.Id.CompareTo(view) > 0)
+        {
+            throw new ClusterServiceViewUnavailableException($"Service view '{view}' was superseded by '{current.Id}'.");
+        }
+    }
+
+    private RegisteredClusterServiceView ValidateProviderAuthority(RegisteredServiceViewId view)
+    {
         _provider.ValidateAuthority(view);
         if (!_provider.TryGetCurrentView(out var current))
         {
             throw new ClusterServiceViewUnavailableException($"Service authority for '{view}' is unavailable.");
         }
 
-        current.Id.CompareTo(view);
+        return current;
     }
 
     private void ValidateReceiver(string resource, Receiver receiver, RegisteredServiceViewId view)
