@@ -30,7 +30,10 @@ public sealed class ConcurrentObjectPoolTests
         {
             otherThreadItem = pool.Get();
             pool.Return(otherThreadItem);
-        });
+        })
+        {
+            IsBackground = true
+        };
 
         thread.Start();
 
@@ -98,7 +101,10 @@ public sealed class ConcurrentObjectPoolTests
             {
                 exception = error;
             }
-        });
+        })
+        {
+            IsBackground = true
+        };
 
         thread.Start();
 
@@ -201,7 +207,10 @@ public sealed class ConcurrentObjectPoolTests
                 {
                     exceptions.Enqueue(exception);
                 }
-            });
+            })
+            {
+                IsBackground = true
+            };
             threads[threadIndex].Start();
         }
 
@@ -232,7 +241,10 @@ public sealed class ConcurrentObjectPoolTests
             itemReference = CreateAndReturnPooledItem(pool);
             itemReturned.Set();
             releaseThread.Wait();
-        });
+        })
+        {
+            IsBackground = true
+        };
 
         thread.Start();
 
@@ -309,7 +321,10 @@ public sealed class ConcurrentObjectPoolTests
     private static WeakReference ReturnItemOnNewThread(ConcurrentObjectPool<PooledItem> pool)
     {
         WeakReference? itemReference = null;
-        var thread = new Thread(() => itemReference = CreateAndReturnPooledItem(pool));
+        var thread = new Thread(() => itemReference = CreateAndReturnPooledItem(pool))
+        {
+            IsBackground = true
+        };
         thread.Start();
         Assert.True(thread.Join(Timeout));
         return itemReference!;
@@ -356,7 +371,10 @@ public sealed class ConcurrentObjectPoolTests
                 pool.Return(item);
                 references[index * 2] = new(pool);
                 references[index * 2 + 1] = new(item);
-            });
+            })
+            {
+                IsBackground = true
+            };
             threads[i].Start();
         }
 
