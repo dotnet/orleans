@@ -5786,6 +5786,153 @@ namespace UnitTests.StreamingTests
             Assert.Empty(await accessor.GetPubSubCache());
         }
 
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
+        [Theory, TestCategory("BVT"), TestCategory("Streaming")]
+        [InlineData("incompatible", false, 1)]
+        [InlineData("incompatible", false, 2)]
+        [InlineData("incompatible", true, 1)]
+        [InlineData("incompatible", true, 2)]
+        [InlineData("older", false, 1)]
+        [InlineData("older", false, 2)]
+        [InlineData("older", true, 1)]
+        [InlineData("older", true, 2)]
+        [InlineData("equal", false, 1)]
+        [InlineData("equal", false, 2)]
+        [InlineData("equal", true, 1)]
+        [InlineData("equal", true, 2)]
+        [InlineData("newer", false, 1)]
+        [InlineData("newer", false, 2)]
+        [InlineData("newer", true, 1)]
+        [InlineData("newer", true, 2)]
+        public async Task Recovery_FilteredAcknowledgmentHonorsUnconfirmedPosition(
+            string tokenKind, bool recovering, int batchSize)
+        {
+            var pubSub = Substitute.For<IStreamPubSub>();
+            pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
+                .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
+            var timeProvider = new FakeTimeProvider();
+            var now = timeProvider.GetUtcNow().UtcDateTime;
+            var queueId = QueueId.GetQueueId("queue", 0u, 0u);
+            var streamId = new QualifiedStreamId("provider", StreamId.Create("namespace", Guid.NewGuid()));
+            var incompatible = tokenKind == "incompatible";
+            var attemptedToken = new EventSequenceTokenV2(100);
+            StreamSequenceToken requiredToken = incompatible
+                ? new IsolatedProviderToken(50) : new EventSequenceTokenV2(50);
+            StreamSequenceToken progressToken = tokenKind switch
+            {
+                "incompatible" => new IsolatedProviderToken(200),
+                "older" => new EventSequenceTokenV2(75),
+                "equal" => new EventSequenceTokenV2(100),
+                _ => new EventSequenceTokenV2(200)
+            };
+            var batch = Substitute.For<IBatchContainer>();
+            batch.StreamId.Returns(streamId.StreamId);
+            batch.SequenceToken.Returns(progressToken);
+            batch.GetEvents<object>().Returns([Tuple.Create<object, StreamSequenceToken>("payload", progressToken)]);
+            var filter = Substitute.For<IStreamFilter>();
+            filter.ShouldDeliver(streamId.StreamId, "payload", null).Returns(false);
+            var queueCache = Substitute.For<IQueueCache>();
+            queueCache.TryGetCacheCursor(Arg.Any<StreamId>(), Arg.Any<StreamSequenceToken?>())
+                .Returns(_ => QueueCacheCursorResult<IQueueCacheCursor>.FromCursor(CreateCursor()));
+            var adapterCache = Substitute.For<IQueueAdapterCache>();
+            adapterCache.CreateQueueCache(queueId).Returns(queueCache);
+            var receiver = Substitute.For<IQueueAdapterReceiver>();
+            receiver.GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
+                .Returns(Task.FromResult<IList<IBatchContainer>>([batch]));
+            var agent = CreateAgent(pubSub, queueId, receiver, adapterCache, timeProvider,
+                options: new StreamPullingAgentOptions { BatchContainerBatchSize = batchSize }, streamFilter: filter);
+            var accessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
+            await InitializeAgent(agent);
+            await accessor.RegisterStream(streamId, requiredToken, now);
+            Assert.True(await accessor.ReadFromQueue(queueId, receiver, 1000));
+            var observer = new RecordingConsumer();
+            var consumer = (await accessor.GetPubSubCache()).Single().Value.AddConsumer(
+                GuidId.GetGuidId(SubscriptionMarker.MarkAsExplicitSubscriptionId(Guid.NewGuid())),
+                streamId, observer, null, now);
+            consumer.IsRegistered = true;
+            consumer.Cursor = CreateCursor();
+            consumer.UnconfirmedDeliveryToken = attemptedToken;
+            consumer.LastToken = recovering
+                ? StreamHandshakeToken.CreateDeliveyToken(requiredToken)
+                : StreamHandshakeToken.CreateStartToken(requiredToken);
+            consumer.LastProcessedToken = recovering ? requiredToken : null;
+            consumer.PendingStartToken = recovering ? null : requiredToken;
+            var originalRecovery = recovering ? new StreamRecoveryState(timeProvider.GetTimestamp()) : null;
+            consumer.HasDeliveryProgressError = recovering;
+            consumer.DeliveryRecovery = originalRecovery;
+            consumer.DeliveryRecoveryToken = recovering ? consumer.LastToken : null;
+            consumer.DeliveryRecoveryCursor = recovering ? consumer.Cursor : null;
+
+            await accessor.RunConsumerCursor(consumer);
+
+            Assert.Empty(observer.DeliveredTokens);
+            Assert.Empty(observer.Errors);
+            Assert.Equal(StreamConsumerDataState.Inactive, consumer.State);
+            Assert.Equal(incompatible, consumer.HasDeliveryProgressError);
+            Assert.Equal(!incompatible && tokenKind != "older", consumer.IsCaughtUp);
+            if (incompatible || tokenKind == "older")
+            {
+                Assert.Same(attemptedToken, consumer.UnconfirmedDeliveryToken);
+            }
+            else
+            {
+                Assert.Null(consumer.UnconfirmedDeliveryToken);
+            }
+
+            if (incompatible)
+            {
+                Assert.Null(consumer.LastProcessedToken);
+                Assert.Same(requiredToken, consumer.DeliveryRecoveryToken?.Token);
+                Assert.Equal(recovering, consumer.DeliveryRecoveryToken is DeliveryToken);
+                var recovery = Assert.IsType<StreamRecoveryState>(consumer.DeliveryRecovery);
+                Assert.Equal(recovering ? 1 : 0, recovery.Attempts);
+                if (recovering)
+                {
+                    Assert.Same(originalRecovery, recovery);
+                }
+
+                // Repeated incompatible acknowledgments must not replace the recovery episode or its budget.
+                for (var attempt = recovery.Attempts; attempt < 6; attempt++)
+                {
+                    await accessor.RunConsumerCursor(consumer);
+                    Assert.Same(recovery, consumer.DeliveryRecovery);
+                    Assert.Equal(attempt + 1, recovery.Attempts);
+                    Assert.Null(consumer.LastProcessedToken);
+                }
+
+                Assert.True(recovery.Stopped);
+                Assert.Null(consumer.Cursor);
+                Assert.Single(observer.Errors);
+                await accessor.RunConsumerCursor(consumer);
+                Assert.Equal(6, recovery.Attempts);
+            }
+            else
+            {
+                Assert.Same(progressToken, consumer.LastProcessedToken);
+                Assert.Null(consumer.DeliveryRecovery);
+            }
+
+            await accessor.Shutdown();
+            if (incompatible)
+            {
+                queueCache.DidNotReceive().UpdateDeliveryProgress(Arg.Any<StreamSequenceToken?>(), Arg.Any<DateTime>());
+            }
+            else
+            {
+                queueCache.Received(1).UpdateDeliveryProgress(progressToken, Arg.Any<DateTime>());
+            }
+
+            IQueueCacheCursor CreateCursor()
+            {
+                var cursor = Substitute.For<IQueueCacheCursor>();
+                cursor.MoveNextWithResult().Returns(QueueCacheCursorMoveResult.Success, QueueCacheCursorMoveResult.NoData);
+                cursor.GetCurrent(out _).Returns(batch);
+                return cursor;
+            }
+        }
+
         private sealed class IsolatedProviderToken(long sequenceNumber) : EventSequenceTokenV2(sequenceNumber);
 
         [TestSuite("BVT")]
