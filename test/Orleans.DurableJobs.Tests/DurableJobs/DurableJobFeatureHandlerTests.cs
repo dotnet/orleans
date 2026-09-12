@@ -4,7 +4,6 @@ using Xunit;
 
 namespace Tester.DurableJobs;
 
-[TestCategory("BVT"), TestCategory("DurableJobs")]
 [TestSuite("BVT")]
 [TestProvider("None")]
 [TestArea("DurableJobs")]
