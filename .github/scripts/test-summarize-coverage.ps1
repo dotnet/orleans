@@ -17,6 +17,7 @@ $azureVariablesPath = Join-Path $PSScriptRoot '../../.azure/pipelines/templates/
 $dotnetTestActionPath = Join-Path $PSScriptRoot '../actions/dotnet-test/action.yml'
 $invokeCoverageScriptPath = Join-Path $PSScriptRoot 'invoke-coverage.ps1'
 $invokeRestoreScriptPath = Join-Path $PSScriptRoot 'invoke-restore.ps1'
+$invokeTestScriptPath = Join-Path $PSScriptRoot 'invoke-test.ps1'
 $runTestsActionPath = Join-Path $PSScriptRoot '../actions/run-tests/action.yml'
 $selectCoverageBaselineScriptPath = Join-Path $PSScriptRoot 'select-coverage-baseline.ps1'
 $setupCoverageScriptPath = Join-Path $PSScriptRoot 'setup-coverage.ps1'
@@ -714,7 +715,7 @@ try {
             'Coverage collection must reject empty reports from successful test runs.'
         Assert-Matches `
             $dotnetTestAction `
-            'dotnet test --solution Orleans\.slnx' `
+            "(?s)'test'\s*'--solution'\s*'Orleans\.slnx'" `
             'Test partitions must use native solution discovery.'
         Assert-Equal 3 ([regex]::Matches($dotnetTestAction, "github\.event_name == 'push'.*?github\.event\.repository\.default_branch")).Count 'Current-main coverage condition count differs.'
         Assert-Matches `
@@ -801,6 +802,99 @@ exit 0
         } finally {
             $env:ORLEANS_RESTORE_ATTEMPT_FILE = $previousAttemptFile
             $env:ORLEANS_RESTORE_FAILURE = $previousFailure
+        }
+    }
+
+    Invoke-Test 'retries only uninitialized test coordinator failures without results' {
+        $testCase = New-TestCase
+        $dotnetTestAction = Get-Content -Raw -LiteralPath $dotnetTestActionPath
+        $attemptFile = Join-Path $testCase.Root 'test-attempt.txt'
+        $resultDirectory = $testCase.Root
+        $resultFilePattern = 'test_results_case_*.trx'
+        $fakeTest = Join-Path $testCase.Root 'fake-test.ps1'
+        [IO.File]::WriteAllText(
+            $fakeTest,
+            @'
+param(
+    [Parameter(ValueFromRemainingArguments)]
+    [string[]] $Command
+)
+
+if (($Command -join ' ') -cne 'test --forwarded-argument') {
+    Write-Output "Unexpected test command: $Command"
+    exit 3
+}
+
+$attempt = if (Test-Path -LiteralPath $env:ORLEANS_TEST_ATTEMPT_FILE) {
+    [int] (Get-Content -Raw -LiteralPath $env:ORLEANS_TEST_ATTEMPT_FILE)
+} else {
+    0
+}
+
+$attempt++
+Set-Content -LiteralPath $env:ORLEANS_TEST_ATTEMPT_FILE -Value $attempt
+if (($env:ORLEANS_TEST_FAILURE -eq 'handle' -and $attempt -eq 1) -or
+    $env:ORLEANS_TEST_FAILURE -eq 'handle-always' -or
+    $env:ORLEANS_TEST_FAILURE -eq 'handle-with-results') {
+    if ($env:ORLEANS_TEST_FAILURE -eq 'handle-with-results') {
+        $testResults = Join-Path $env:ORLEANS_TEST_RESULT_DIRECTORY 'test/Example.Tests/bin/Debug/net8.0/TestResults'
+        [void] (New-Item -ItemType Directory -Force -Path $testResults)
+        Set-Content -LiteralPath (Join-Path $testResults 'test_results_case_Example.Tests_net8.0_x64.trx') -Value '<TestRun />'
+    }
+
+    Write-Output 'Unhandled exception: One or more errors occurred. (Handle is not initialized.)'
+    exit 1
+}
+
+if ($env:ORLEANS_TEST_FAILURE -eq 'test') {
+    Write-Output 'A test failed.'
+    exit 2
+}
+
+exit 0
+'@,
+            [Text.UTF8Encoding]::new($false)
+        )
+
+        Assert-Matches `
+            $dotnetTestAction `
+            '(?ms)^  - name: Test\r?\n(?:(?!^  - name: ).)*?invoke-test\.ps1 -ResultFilePattern ''test_results_\$\{\{ inputs\.result-id \}\}_\*\.trx'' -Command \$command' `
+            'Ordinary test runs must use the coordinator retry wrapper.'
+
+        $previousAttemptFile = $env:ORLEANS_TEST_ATTEMPT_FILE
+        $previousFailure = $env:ORLEANS_TEST_FAILURE
+        $previousResultDirectory = $env:ORLEANS_TEST_RESULT_DIRECTORY
+        try {
+            $env:ORLEANS_TEST_ATTEMPT_FILE = $attemptFile
+            $env:ORLEANS_TEST_RESULT_DIRECTORY = $resultDirectory
+
+            $env:ORLEANS_TEST_FAILURE = 'handle'
+            & $invokeTestScriptPath -TestCommand $fakeTest -ResultDirectory $resultDirectory -ResultFilePattern $resultFilePattern -Command @('test', '--forwarded-argument')
+            Assert-Equal 0 $LASTEXITCODE 'The coordinator retry should succeed.'
+            Assert-Equal 2 ([int] (Get-Content -Raw -LiteralPath $attemptFile)) 'The coordinator attempt count differs.'
+
+            Remove-Item -LiteralPath $attemptFile
+            $env:ORLEANS_TEST_FAILURE = 'test'
+            & $invokeTestScriptPath -TestCommand $fakeTest -ResultDirectory $resultDirectory -ResultFilePattern $resultFilePattern -Command @('test', '--forwarded-argument')
+            Assert-Equal 2 $LASTEXITCODE 'An unrelated test failure should be preserved.'
+            Assert-Equal 1 ([int] (Get-Content -Raw -LiteralPath $attemptFile)) 'An unrelated test failure must not be retried.'
+
+            Remove-Item -LiteralPath $attemptFile
+            $env:ORLEANS_TEST_FAILURE = 'handle-with-results'
+            & $invokeTestScriptPath -TestCommand $fakeTest -ResultDirectory $resultDirectory -ResultFilePattern $resultFilePattern -Command @('test', '--forwarded-argument')
+            Assert-Equal 1 $LASTEXITCODE 'A handle failure with test results should be preserved.'
+            Assert-Equal 1 ([int] (Get-Content -Raw -LiteralPath $attemptFile)) 'A failure with test results must not be retried.'
+
+            Remove-Item -LiteralPath $attemptFile
+            Remove-Item -LiteralPath (Join-Path $resultDirectory 'test') -Recurse
+            $env:ORLEANS_TEST_FAILURE = 'handle-always'
+            & $invokeTestScriptPath -TestCommand $fakeTest -ResultDirectory $resultDirectory -ResultFilePattern $resultFilePattern -Command @('test', '--forwarded-argument')
+            Assert-Equal 1 $LASTEXITCODE 'A persistent coordinator failure should be preserved.'
+            Assert-Equal 2 ([int] (Get-Content -Raw -LiteralPath $attemptFile)) 'The coordinator must retry only once.'
+        } finally {
+            $env:ORLEANS_TEST_ATTEMPT_FILE = $previousAttemptFile
+            $env:ORLEANS_TEST_FAILURE = $previousFailure
+            $env:ORLEANS_TEST_RESULT_DIRECTORY = $previousResultDirectory
         }
     }
 
@@ -1357,9 +1451,9 @@ exit 0
         Assert-Equal 17 ([regex]::Matches($workflow, '(?m)^\s{8}provider: [A-Za-z]')).Count 'Provider-discovered test partition count differs.'
         Assert-Equal 2 ([regex]::Matches($runTestsAction, 'uses: \./\.github/actions/dotnet-test')).Count 'Native test action invocation count differs.'
         Assert-Equal 2 ([regex]::Matches($runTestsAction, "format\('/\[\(Provider=\{0\}\)")).Count 'Standard provider filter count differs.'
-        $directTestCommands = ([regex]::Matches($dotnetTestAction, 'dotnet test --solution Orleans\.slnx')).Count
+        $wrappedTestCommands = ([regex]::Matches($dotnetTestAction, 'invoke-test\.ps1')).Count
         $coveredTestCommands = ([regex]::Matches($dotnetTestAction, "(?s)'dotnet'\s*'test'\s*'--solution'\s*'Orleans\.slnx'")).Count
-        Assert-Equal 2 ($directTestCommands + $coveredTestCommands) 'Native test command count differs.'
+        Assert-Equal 2 ($wrappedTestCommands + $coveredTestCommands) 'Native test command count differs.'
         Assert-Equal 4 ([regex]::Matches($runTestsAction, "runner\.os == 'Linux' && inputs\.framework == 'net10\.0'")).Count 'Coverage selection boundary count differs.'
         Assert-Equal 0 ([regex]::Matches($workflow + $runTestsAction + $dotnetTestAction, 'static-instrumentation|coverage\.static\.config\.xml|IncludeFiles')).Count 'GitHub coverage must not use static instrumentation.'
         Assert-Equal 1 ([regex]::Matches($workflow, "retry: 'true'")).Count 'Cosmos retry configuration count differs.'
