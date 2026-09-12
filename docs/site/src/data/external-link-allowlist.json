@@ -11,6 +11,7 @@
     "https://docs.aws.amazon.com/sdk-for-net/v4/developer-guide/creds-assign.html": "AWS serves this public SDK credential-resolution page to browsers but rejects the bounded automated HEAD/GET probe with HTTP 403.",
     "https://docs.aws.amazon.com/streams/latest/dev/introduction.html": "AWS serves this public Kinesis overview to browsers but rejects the bounded automated HEAD/GET probe with HTTP 403.",
     "https://www.nuget.org/packages/Microsoft.Orleans.Journaling.S3": "The new S3 journaling package is documented but not yet published; remove this entry and its unpublished API-package entry after publication.",
+    "https://github.com/dotnet/orleans/tree/main/samples/AuthenticatedSiloConnections": "The sample is introduced by this pull request, so its permanent main-branch URL becomes available when the pull request merges.",
     "https://en.wikipedia.org/wiki/Kalman_filter": "Wikipedia serves this public article to browsers but rejects the bounded automated HEAD/GET probe with HTTP 403.",
     "https://www.f5.com/company/blog/nginx/nginx-power-of-two-choices-load-balancing-algorithm": "The F5 site serves this canonical NGINX article to browsers but rejects the bounded automated HEAD/GET probe with HTTP 403."
   }

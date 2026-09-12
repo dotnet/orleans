@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Connections.Security.Entra</PackageId>
+    <Title>Microsoft Orleans Entra silo connection authentication</Title>
+    <Description>Preview support for authenticating Microsoft Orleans silo connections using Microsoft Entra workload identities.</Description>
+    <PackageTags>$(PackageTags) Azure Entra Security Authentication Preview</PackageTags>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <Nullable>enable</Nullable>
+    <!-- This new package has no published baseline. Enable validation after its first release. -->
+    <EnablePackageValidation>false</EnablePackageValidation>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans.Connections.Security\Orleans.Connections.Security.csproj" />
+    <PackageReference Include="Azure.Core" />
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" />
+    <PackageReference Include="Microsoft.IdentityModel.Protocols.OpenIdConnect" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Orleans.Connections.Security.Entra.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>
