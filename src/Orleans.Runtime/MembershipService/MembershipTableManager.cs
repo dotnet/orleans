@@ -114,7 +114,8 @@ namespace Orleans.Runtime.MembershipService
         Task IMembershipManager.UpdateLocalStatus(SiloStatus status, CancellationToken cancellationToken) => this.UpdateStatus(status, cancellationToken);
         Task<bool> IMembershipManager.TryKillSilo(SiloAddress silo, CancellationToken cancellationToken) => this.TryKill(silo, cancellationToken);
         Task<bool> IMembershipManager.TrySuspectSilo(SiloAddress silo, SiloAddress? indirectProbingSilo, CancellationToken cancellationToken) => this.TryToSuspectOrKill(silo, indirectProbingSilo, cancellationToken);
-        Task IMembershipManager.Refresh(MembershipVersion? targetVersion, CancellationToken cancellationToken) => this.Refresh(targetVersion, cancellationToken);
+        Task IMembershipManager.Refresh(MembershipVersion? targetVersion, CancellationToken cancellationToken, bool requireFresh) =>
+            this.Refresh(targetVersion, cancellationToken, requireFresh);
         Task IMembershipManager.ProcessGossipSnapshot(MembershipTableSnapshot snapshot, CancellationToken cancellationToken) =>
             this.RefreshFromSnapshot(snapshot, cancellationToken);
         Task IMembershipManager.UpdateIAmAlive(CancellationToken cancellationToken) => this.UpdateIAmAlive(cancellationToken);
@@ -123,21 +124,43 @@ namespace Orleans.Runtime.MembershipService
 
         private Task? pendingRefresh;
 
-        public async Task Refresh(MembershipVersion? targetVersion = null, CancellationToken cancellationToken = default)
+        public async Task Refresh(
+            MembershipVersion? targetVersion = null,
+            CancellationToken cancellationToken = default,
+            bool requireFresh = false)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            using var linkedCancellation = requireFresh
+                ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _shutdownCts.Token)
+                : null;
+            var waitCancellationToken = linkedCancellation?.Token ?? cancellationToken;
+
+            if (requireFresh)
+            {
+                // A concurrent write which publishes a full view could also satisfy this fence. Issue an
+                // independent read here so that the operation makes progress without relying on other activity.
+                await RefreshInternal(requireCleanup: false, _shutdownCts.Token).WaitAsync(waitCancellationToken);
+                if (!targetVersion.HasValue || this.MembershipTableSnapshot.Version >= targetVersion.Value)
+                {
+                    return;
+                }
+            }
+
             while (!targetVersion.HasValue || this.MembershipTableSnapshot.Version < targetVersion.Value)
             {
-                cancellationToken.ThrowIfCancellationRequested();
+                waitCancellationToken.ThrowIfCancellationRequested();
 
                 var pending = this.pendingRefresh;
                 if (pending is null || pending.IsCompleted)
                 {
                     // Shared reads remain available during shutdown; disposal ends their lifetime.
-                    pending = this.pendingRefresh = this.RefreshInternal(requireCleanup: false, _lifetimeCts.Token);
+                    pending = this.pendingRefresh = this.RefreshInternal(
+                        requireCleanup: false,
+                        requireFresh ? _shutdownCts.Token : _lifetimeCts.Token);
                     pending.Ignore();
                 }
 
-                await pending.WaitAsync(cancellationToken);
+                await pending.WaitAsync(waitCancellationToken);
 
                 // If no target version specified, exit after single refresh
                 if (!targetVersion.HasValue)
@@ -184,6 +207,7 @@ namespace Orleans.Runtime.MembershipService
 
             // Publish after cleanup so that other components do not observe
             // predecessor entries that are about to be declared dead.
+            cancellationToken.ThrowIfCancellationRequested();
             this.ProcessTableUpdate(table, "Refresh");
 
             // If cleanup was not required then the cleanup result is ignored.

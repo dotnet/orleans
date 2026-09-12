@@ -1480,12 +1480,141 @@ namespace NonSilo.Tests.Membership
             }
         }
 
+        [Fact]
+        public async Task MembershipTableManager_RequireFreshStartsNewReadWhileRefreshInFlight()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var membershipTable = new InMemoryMembershipTable();
+            var manager = CreateMembershipTableManager(membershipTable);
+            var firstReadStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var releaseFirstRead = new ManualResetEventSlim();
+            var readCount = 0;
+            membershipTable.OnReadAll = () =>
+            {
+                if (Interlocked.Increment(ref readCount) == 1)
+                {
+                    firstReadStarted.TrySetResult();
+                    if (!releaseFirstRead.Wait(TimeSpan.FromSeconds(30)))
+                    {
+                        throw new TimeoutException("Timed out waiting to release the first membership-table read");
+                    }
+                }
+            };
+
+            var inFlightRefresh = Task.Run(
+                () => manager.Refresh(cancellationToken: cancellationToken),
+                cancellationToken);
+            await firstReadStarted.Task.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
+            var causalRefresh = ((IMembershipManager)manager).Refresh(
+                targetVersion: null,
+                cancellationToken: CancellationToken.None,
+                requireFresh: true);
+
+            try
+            {
+                await causalRefresh.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
+                Assert.Equal(2, readCount);
+            }
+            finally
+            {
+                releaseFirstRead.Set();
+                await inFlightRefresh;
+            }
+            Assert.Equal(2, readCount);
+        }
+
+        [Fact]
+        public async Task MembershipTableManager_PreCancelledFreshRefreshDoesNotRead()
+        {
+            var membershipTable = new InMemoryMembershipTable();
+            var manager = CreateMembershipTableManager(membershipTable);
+            var readCount = 0;
+            membershipTable.OnReadAll = () => Interlocked.Increment(ref readCount);
+            var cancellation = new CancellationToken(canceled: true);
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+                manager.Refresh(
+                    targetVersion: null,
+                    cancellationToken: cancellation,
+                    requireFresh: true));
+
+            Assert.Equal(0, readCount);
+        }
+
+        [Fact]
+        public async Task MembershipTableManager_ShutdownFreshRefreshDoesNotRead()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var membershipTable = new InMemoryMembershipTable();
+            var lifecycle = new SiloLifecycleSubject(this.loggerFactory.CreateLogger<SiloLifecycleSubject>());
+            using var manager = CreateMembershipTableManager(membershipTable, lifecycle: lifecycle);
+            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(lifecycle);
+            await lifecycle.OnStart(cancellationToken);
+            await lifecycle.OnStop(cancellationToken);
+            var readCount = 0;
+            membershipTable.OnReadAll = () => Interlocked.Increment(ref readCount);
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+                manager.Refresh(
+                    targetVersion: null,
+                    cancellationToken: CancellationToken.None,
+                    requireFresh: true));
+
+            Assert.Equal(0, readCount);
+        }
+
+        [Fact]
+        public async Task MembershipTableManager_FreshTargetRefreshStopsOnShutdown()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var innerMembershipTable = new InMemoryMembershipTable();
+            var membershipTable = new DelegatingMembershipTable(innerMembershipTable);
+            var lifecycle = new SiloLifecycleSubject(this.loggerFactory.CreateLogger<SiloLifecycleSubject>());
+            using var manager = CreateMembershipTableManager(membershipTable, lifecycle: lifecycle);
+            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(lifecycle);
+            await lifecycle.OnStart(cancellationToken);
+
+            var blockedRead = new TaskCompletionSource<MembershipTableData>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            var blockedReadStarted = new TaskCompletionSource(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            var blockedReadResult = await innerMembershipTable.ReadAllAsync(cancellationToken);
+            var readCount = 0;
+            membershipTable.ReadAllOverride = token =>
+            {
+                if (Interlocked.Increment(ref readCount) == 1)
+                {
+                    return innerMembershipTable.ReadAllAsync(token);
+                }
+
+                blockedReadStarted.TrySetResult();
+                return blockedRead.Task;
+            };
+
+            var refresh = manager.Refresh(
+                targetVersion: new MembershipVersion(long.MaxValue),
+                cancellationToken: CancellationToken.None,
+                requireFresh: true);
+            await blockedReadStarted.Task.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
+
+            try
+            {
+                await lifecycle.OnStop(cancellationToken);
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => refresh);
+            }
+            finally
+            {
+                blockedRead.TrySetResult(blockedReadResult);
+            }
+        }
+
         private static SiloAddress Silo(string value) => SiloAddress.FromParsableString(value);
 
         private MembershipTableManager CreateMembershipTableManager(
             IMembershipTable membershipTable,
             TimeProvider? timeProvider = null,
-            IAsyncTimerFactory? timerFactory = null)
+            IAsyncTimerFactory? timerFactory = null,
+            SiloLifecycleSubject? lifecycle = null)
         {
             return new MembershipTableManager(
                 localSiloDetails: this.localSiloDetails,
@@ -1495,8 +1624,84 @@ namespace NonSilo.Tests.Membership
                 gossiper: this.membershipGossiper,
                 log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
                 timerFactory: timerFactory ?? new AsyncTimerFactory(this.loggerFactory),
-                siloLifecycle: this.lifecycle,
+                siloLifecycle: lifecycle ?? this.lifecycle,
                 timeProvider: timeProvider ?? TimeProvider.System);
+        }
+
+        private sealed class DelegatingMembershipTable(IMembershipTable inner) : IMembershipTable
+        {
+            public Func<CancellationToken, Task<MembershipTableData>>? ReadAllOverride { get; set; }
+
+            public Task InitializeMembershipTable(bool tryInitTableVersion) =>
+                InitializeMembershipTableAsync(tryInitTableVersion);
+
+            public Task InitializeMembershipTableAsync(
+                bool tryInitTableVersion,
+                CancellationToken cancellationToken = default) =>
+                inner.InitializeMembershipTableAsync(tryInitTableVersion, cancellationToken);
+
+            public Task DeleteMembershipTableEntries(string clusterId) =>
+                DeleteMembershipTableEntriesAsync(clusterId);
+
+            public Task DeleteMembershipTableEntriesAsync(
+                string clusterId,
+                CancellationToken cancellationToken = default) =>
+                inner.DeleteMembershipTableEntriesAsync(clusterId, cancellationToken);
+
+            public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) =>
+                CleanupDefunctSiloEntriesAsync(beforeDate);
+
+            public Task CleanupDefunctSiloEntriesAsync(
+                DateTimeOffset beforeDate,
+                CancellationToken cancellationToken = default) =>
+                inner.CleanupDefunctSiloEntriesAsync(beforeDate, cancellationToken);
+
+            public Task<MembershipTableData> ReadRow(SiloAddress key) => ReadRowAsync(key);
+
+            public Task<MembershipTableData> ReadRowAsync(
+                SiloAddress key,
+                CancellationToken cancellationToken = default) =>
+                inner.ReadRowAsync(key, cancellationToken);
+
+            public Task<MembershipTableData> ReadAll() => ReadAllAsync();
+
+            public async Task<MembershipTableData> ReadAllAsync(
+                CancellationToken cancellationToken = default)
+            {
+                var operation = ReadAllOverride?.Invoke(cancellationToken)
+                    ?? inner.ReadAllAsync(cancellationToken);
+                return await operation.WaitAsync(cancellationToken);
+            }
+
+            public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) =>
+                InsertRowAsync(entry, tableVersion);
+
+            public Task<bool> InsertRowAsync(
+                MembershipEntry entry,
+                TableVersion tableVersion,
+                CancellationToken cancellationToken = default) =>
+                inner.InsertRowAsync(entry, tableVersion, cancellationToken);
+
+            public Task<bool> UpdateRow(
+                MembershipEntry entry,
+                string etag,
+                TableVersion tableVersion) =>
+                UpdateRowAsync(entry, etag, tableVersion);
+
+            public Task<bool> UpdateRowAsync(
+                MembershipEntry entry,
+                string etag,
+                TableVersion tableVersion,
+                CancellationToken cancellationToken = default) =>
+                inner.UpdateRowAsync(entry, etag, tableVersion, cancellationToken);
+
+            public Task UpdateIAmAlive(MembershipEntry entry) =>
+                UpdateIAmAliveAsync(entry);
+
+            public Task UpdateIAmAliveAsync(
+                MembershipEntry entry,
+                CancellationToken cancellationToken = default) =>
+                inner.UpdateIAmAliveAsync(entry, cancellationToken);
         }
 
         private static MembershipTableSnapshot Snapshot(MembershipVersion version, params MembershipEntry[] entries)
