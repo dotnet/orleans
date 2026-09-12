@@ -90,6 +90,7 @@ Use reminders for recurring durable callbacks and durable jobs for scheduled one
 | [Microsoft.Orleans.Streaming.EventHubs](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.EventHubs) | Azure Event Hubs streams. |
 | [Microsoft.Orleans.Streaming.Kinesis](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.Kinesis) | Amazon Kinesis Data Streams. |
 | [Microsoft.Orleans.Streaming.NATS](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.NATS) | NATS JetStream streams. |
+| [Microsoft.Orleans.Streaming.RabbitMQ](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.RabbitMQ) | RabbitMQ Streams integration. |
 | [Microsoft.Orleans.Streaming.Redis](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.Redis) | Redis Streams integration. |
 | [Microsoft.Orleans.Streaming.SQS](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.SQS) | Amazon SQS streams. |
 | [Microsoft.Orleans.BroadcastChannel](https://www.nuget.org/packages/Microsoft.Orleans.BroadcastChannel) | Lightweight broadcast channels. |
