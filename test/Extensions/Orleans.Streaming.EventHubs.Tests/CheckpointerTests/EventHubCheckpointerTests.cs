@@ -685,7 +685,9 @@ public class EventHubCheckpointerTests
 
         if (initialize)
         {
-            await receiver.Initialize(TimeSpan.FromSeconds(5));
+            await receiver.Initialize(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken);
         }
 
         return receiver;
@@ -739,14 +741,50 @@ public class EventHubCheckpointerTests
             },
             initialize: false);
 
-        var first = receiver.Initialize(TimeSpan.FromSeconds(5));
+        var first = receiver.Initialize(
+            TimeSpan.FromSeconds(5),
+            TestContext.Current.CancellationToken);
         await factoryStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
-        var second = receiver.Initialize(TimeSpan.FromSeconds(5));
+        var second = receiver.Initialize(
+            TimeSpan.FromSeconds(5),
+            TestContext.Current.CancellationToken);
 
         Assert.False(second.IsCompleted);
         releaseFactory.TrySetResult();
         await Task.WhenAll(first, second);
         Assert.Equal(1, factoryCalls);
+    }
+
+    [TestSuite("BVT")]
+    [Fact, TestCategory("BVT")]
+    public async Task Initialize_ThroughInterface_ForwardsCancellationToken()
+    {
+        var checkpointer = new TestCheckpointer();
+        var initializationStarted = new TaskCompletionSource<CancellationToken>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var receiver = await CreateReceiver(
+            checkpointer,
+            checkpointerFactory: async cancellationToken =>
+            {
+                initializationStarted.TrySetResult(cancellationToken);
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                return checkpointer;
+            },
+            initialize: false);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            TestContext.Current.CancellationToken);
+
+        var initialization = ((IQueueAdapterReceiver)receiver).Initialize(
+            TimeSpan.FromSeconds(30),
+            cancellation.Token);
+        var forwardedToken = await initializationStarted.Task.WaitAsync(
+            TestContext.Current.CancellationToken);
+        cancellation.Cancel();
+
+        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => initialization);
+        Assert.Equal(cancellation.Token, exception.CancellationToken);
+        Assert.True(forwardedToken.IsCancellationRequested);
     }
 
     [TestSuite("BVT")]
@@ -762,7 +800,9 @@ public class EventHubCheckpointerTests
             initialize: false);
 
         var actual = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => receiver.Initialize(TimeSpan.FromSeconds(5)));
+            () => receiver.Initialize(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken));
 
         Assert.Same(expected, actual);
         Assert.Equal(1, cache.DisposeCount);
@@ -822,7 +862,9 @@ public class EventHubCheckpointerTests
         Assert.Equal(1, failedReceiver.CloseCount);
         Assert.Equal(1, receiverCreations);
 
-        await receiver.Initialize(TimeSpan.FromSeconds(5));
+        await receiver.Initialize(
+            TimeSpan.FromSeconds(5),
+            TestContext.Current.CancellationToken);
 
         Assert.Equal(2, failedReceiver.CloseCount);
         Assert.Equal(2, receiverCreations);
@@ -867,10 +909,14 @@ public class EventHubCheckpointerTests
             initialize: false);
 
         var first = Task.Run(
-            () => receiver.Initialize(TimeSpan.FromMilliseconds(50)),
+            () => receiver.Initialize(
+                TimeSpan.FromMilliseconds(50),
+                TestContext.Current.CancellationToken),
             TestContext.Current.CancellationToken);
         await receiverFactoryStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
-        var second = receiver.Initialize(TimeSpan.FromSeconds(5));
+        var second = receiver.Initialize(
+            TimeSpan.FromSeconds(5),
+            TestContext.Current.CancellationToken);
         await firstCancellation.Task.WaitAsync(TestContext.Current.CancellationToken);
         releaseReceiverFactory.Set();
 
