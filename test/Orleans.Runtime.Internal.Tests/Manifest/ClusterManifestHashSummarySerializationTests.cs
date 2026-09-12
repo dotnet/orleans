@@ -47,7 +47,7 @@ public sealed class ClusterManifestHashSummarySerializationTests
         var second = ManifestHashCalculator.ComputeHash(manifest);
 
         Assert.Same(first.Value, second.Value);
-        Assert.Equal("AC3C68A3F09A51744D328E7EE3D099A85C190B600BD88BFE132DD63B74CCA2BB", first.Value);
+        Assert.Equal("163E7F66D58036CCB1D0B0058D8F46E7CD639816F570E5EB32853EA73634E4CD", first.Value);
     }
 
     [Fact]

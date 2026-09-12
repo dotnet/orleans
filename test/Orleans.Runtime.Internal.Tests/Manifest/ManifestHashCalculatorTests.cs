@@ -78,7 +78,7 @@ public sealed class ManifestHashCalculatorTests
     }
 
     [Fact]
-    public void ManifestHashIncludesCanonicalFramingVersion()
+    public void ManifestHashIncludesCanonicalEncodingVersion()
     {
         var manifest = CreatePhaseOneGrainManifest(
             new GrainType([0x80, 0x00]),
@@ -86,24 +86,37 @@ public sealed class ManifestHashCalculatorTests
 
         var actual = ManifestHashCalculator.ComputeHash(manifest);
 
-        Assert.Equal("96E0D7D5A908928A474E3E484D716E594C2C53E918F41C939B733A1639F0284D", actual.Value);
+        Assert.Equal("DD34377AD1C69045F2B55D6DCAB099A7A36C0A6B6909DC2C54D5B6AC1FA9EBF9", actual.Value);
 
-        // This is the complete frame for the fixed manifest above with only its version changed from 1 to 2.
-        byte[] versionTwoFrame =
+        // The same canonical input with only its encoding version changed from 2 to 3.
+        byte[] versionThreeInput =
         [
-            1, 2, 0, 0, 0, 2,
-            3, 12, 0, 0, 0, 1,
-            6, 9, 21, 0, 0, 0, 2, 0x80, 0x00,
-            5, 12, 0, 0, 0, 1,
-            8, 10, 18, 0, 0, 0, 1, 0, 0x6B,
-            11, 18, 0, 0, 0, 1, 0xD8, 0,
-            14, 13, 14, 13,
-            4, 12, 0, 0, 0, 0, 13, 15,
+            0, 0, 0, 3,
+            0, 0, 0, 1,
+            0, 0, 0, 2, 0x80, 0x00,
+            0, 0, 0, 1,
+            0, 0, 0, 1, 0, 0x6B,
+            0, 0, 0, 1, 0xD8, 0,
+            0, 0, 0, 0,
         ];
-        var versionTwoHash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(versionTwoFrame));
+        var versionThreeHash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(versionThreeInput));
 
-        Assert.Equal("853EB4C529561E20463769249D312D2F0D08B0257E178229B3F996960A8C89D6", versionTwoHash);
-        Assert.NotEqual(actual.Value, versionTwoHash);
+        Assert.Equal("C2CF5517ABADEF216C52FEDB4D9C4F36681DA429457CA8848EF921083C532A83", versionThreeHash);
+        Assert.NotEqual(actual.Value, versionThreeHash);
+    }
+
+    [Theory]
+    [InlineData("a", "bc", "ab", "c")]
+    [InlineData("", "abc", "a", "bc")]
+    [InlineData("abc", "", "ab", "c")]
+    public void ManifestHashLengthPrefixesSeparatePropertyKeysAndValues(
+        string firstKey, string firstValue, string secondKey, string secondValue)
+    {
+        Assert.Equal(firstKey + firstValue, secondKey + secondValue);
+        var first = CreatePhaseOneGrainManifest(GrainType.Create("grain"), (firstKey, firstValue));
+        var second = CreatePhaseOneGrainManifest(GrainType.Create("grain"), (secondKey, secondValue));
+
+        Assert.NotEqual(ManifestHashCalculator.ComputeHash(first), ManifestHashCalculator.ComputeHash(second));
     }
 
     [Fact]
@@ -125,7 +138,7 @@ public sealed class ManifestHashCalculatorTests
     }
 
     [Fact]
-    public void ManifestHashDistinguishesStructuralTokenTypes()
+    public void ManifestHashDistinguishesGrainAndInterfaceSections()
     {
         byte[] identifier = [0x78, 0x00, 0x80];
         var grainManifest = CreatePhaseOneGrainManifest(
