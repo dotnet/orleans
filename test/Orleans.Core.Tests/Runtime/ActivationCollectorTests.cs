@@ -604,8 +604,6 @@ namespace UnitTests.Runtime
             }
         }
 
-        public bool WasRemovedByCollection { get; set; }
-
         [Fact]
         public void IsMemoryOverloaded_DoesNotQueryStats_WhenNoActivations()
         {
