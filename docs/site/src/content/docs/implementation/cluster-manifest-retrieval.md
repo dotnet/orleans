@@ -13,11 +13,11 @@ Each silo publishes an immutable grain manifest describing its grain types, inte
 
 Cluster manifests have a major version corresponding to the membership version and a minor version which advances as manifests arrive. When membership advances, the provider synchronously prunes non-active silos and includes the local silo when it is active. Local grain metadata also remains available while the local silo is starting.
 
-The default retrieval path requests each missing active silo's manifest directly. Successful responses are published together after the outstanding fetches complete; unsuccessful fetches are retried after five seconds or when a newer membership snapshot arrives. Cancellation reaches the remote call and stops local waiting.
+The provider retrieves missing active silos' manifests and publishes successful results. Unsuccessful fetches are retried after five seconds or when a newer membership snapshot arrives. Cancellation reaches the remote call and stops local waiting.
 
 ## Content-addressed retrieval
 
-<xref:Orleans.Configuration.ClusterManifestOptions.EnableContentAddressedRetrieval> enables hash-based retrieval. Its default is `false`. Configure <xref:Orleans.Configuration.ClusterManifestOptions> through the silo builder's options configuration before starting the silo. The provider captures the value at construction; a restart applies configuration changes.
+<xref:Orleans.Configuration.ClusterManifestOptions.EnableContentAddressedRetrieval> defaults to `true`, enabling hash-based retrieval and peer repair. Set it to `false` in <xref:Orleans.Configuration.ClusterManifestOptions> to request each missing active silo's manifest directly. Configure the option through the silo builder before starting the silo. The provider captures the value at construction; a restart applies configuration changes.
 
 With this option enabled, the provider asks each missing silo for the content hash of its local manifest. A matching entry in the local hash cache supplies the manifest immediately. Otherwise, the provider requests the manifest by hash, verifies its content, and adds it to the cache.
 
@@ -37,11 +37,13 @@ The provider admits at most three concurrent local probe attempts. Completion, t
 
 ## Compatibility, rollout, and rollback
 
-Silos serve hash requests on demand, including when they use the default retrieval path themselves. Construction and direct retrieval perform their ordinary metadata work; hash computation begins when enabled retrieval or an incoming hash request needs it.
+Silos serve hash requests on demand, including when they are configured for direct retrieval. Providers using the default content-addressed mode compute and reuse content hashes as manifests become available.
 
 During a rolling deployment, enabled silos try hash retrieval and fall back to the established direct RPC when a peer rejects the newer method or its hash request fails. An invalid or unavailable hash-addressed body also triggers direct retrieval. Independent remote cancellation follows that compatibility path; cancellation of the local request propagates to the caller. Peer-repair failures leave direct retrieval responsible for filling the missing entries.
 
-Enable the option on a small set of silos first and observe manifest retrieval and peer-probe diagnostics during joins and restarts. Debug logs distinguish hash fallback, peer timeout, occupied probe slots, and late failures. Warnings identify failed direct fetches. For rollback, set the option to `false` and restart the affected silos; they resume direct retrieval while continuing to answer enabled peers' hash requests on demand.
+Upgraded silos adopt content-addressed retrieval at startup while existing silos continue using their deployed implementation. Unsupported hash requests can produce transient exception logs and extra requests during the upgrade; successful direct fallback supplies the required metadata. Individual silo-manifest RPCs retain the configured system response timeout, while optional peer-summary/update attempts have a one-second deadline.
+
+Observe manifest retrieval and peer-probe diagnostics during joins and restarts. Debug logs distinguish hash fallback, peer timeout, occupied probe slots, and late failures. Warnings identify failed direct fetches. To select direct retrieval, set the option to `false` and restart the affected silos; they continue answering enabled peers' hash requests on demand.
 
 ## Measuring retrieval
 
@@ -55,6 +57,6 @@ The `Microsoft.Orleans` meter exposes [manifest retrieval instruments](../host/m
 | `orleans-manifest-peer-repairs` | Counts missing silo entries supplied by successfully published peer repairs. Repeated summaries contribute each repaired entry once per publication. |
 | `orleans-manifest-retrieval-duration`, split by `mode` and `status` | Measures each local silo-manifest retrieval in milliseconds, including cache lookup, fallback, and terminal cancellation or failure. |
 
-Attributes use fixed categories, keeping time-series cardinality stable across silo restarts. The direct mode records retrieval duration while the hash and peer counters reflect opt-in activity. Use these metrics alongside serialized message sizes and silo CPU/memory to evaluate the benefit for the service's manifest sizes and mix of application versions.
+Attributes use fixed categories, keeping time-series cardinality stable across silo restarts. The direct mode records retrieval duration while the hash and peer counters reflect content-addressed retrieval activity. Use these metrics alongside serialized message sizes and silo CPU/memory to evaluate the benefit for the service's manifest sizes and mix of application versions.
 
 See [cluster membership](cluster-management.md) for membership transitions and [rolling version skew](rolling-version-skew.md) for how manifest metadata drives interface-version selection.

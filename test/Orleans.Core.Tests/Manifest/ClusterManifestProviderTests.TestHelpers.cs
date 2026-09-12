@@ -287,7 +287,7 @@ public partial class ClusterManifestProviderTests
             logger,
             services,
             timeProvider,
-            Options.Create(options ?? new ClusterManifestOptions { EnableContentAddressedRetrieval = true }),
+            Options.Create(options ?? new ClusterManifestOptions()),
             instruments ?? services.GetRequiredService<ClusterManifestInstruments>());
     }
 

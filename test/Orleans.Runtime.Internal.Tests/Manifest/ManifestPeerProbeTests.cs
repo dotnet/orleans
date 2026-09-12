@@ -37,7 +37,7 @@ public sealed class ManifestPeerProbeTests(ManifestPeerProbeTests.Fixture fixtur
     }
 
     [Fact]
-    public async Task LegacyOnlyPeer_FallsBackThroughRealGeneratedProxy()
+    public async Task DefaultOptions_LegacyOnlyPeerFallsBackThroughRealGeneratedProxy()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var local = fixture.HostedCluster.Silos[0];
@@ -58,7 +58,7 @@ public sealed class ManifestPeerProbeTests(ManifestPeerProbeTests.Fixture fixtur
             NullLogger<ClusterManifestProvider>.Instance,
             services,
             TimeProvider.System,
-            Options.Create(new ClusterManifestOptions { EnableContentAddressedRetrieval = true }),
+            Options.Create(new ClusterManifestOptions()),
             local.ServiceProvider.GetRequiredService<ClusterManifestInstruments>());
         var target = remote.ServiceProvider.GetRequiredService<LegacyManifestTarget>();
         var previousRequests = target.Requests;
@@ -100,7 +100,7 @@ public sealed class ManifestPeerProbeTests(ManifestPeerProbeTests.Fixture fixtur
             NullLogger<ClusterManifestProvider>.Instance,
             services,
             time,
-            Options.Create(new ClusterManifestOptions { EnableContentAddressedRetrieval = true }),
+            Options.Create(new ClusterManifestOptions()),
             localServices.GetRequiredService<ClusterManifestInstruments>());
         var initialize = typeof(ClusterManifestProvider).GetMethod("Initialize", BindingFlags.Instance | BindingFlags.NonPublic)!;
         await (Task)initialize.Invoke(provider, [cancellationToken])!;

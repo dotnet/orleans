@@ -59,7 +59,34 @@ public partial class ClusterManifestProviderTests
     }
 
     [Fact]
-    public async Task DefaultOptions_RetrieveDirectlyWithoutHashesOrPeerRepair()
+    public async Task DefaultOptions_ReuseContentHashesAndCaptureStartupSetting()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var localSilo = CreateSiloAddress(11111, 1);
+        var remoteSilo = CreateSiloAddress(11112, 1);
+        using var membership = new TestClusterMembershipService(CreateActiveMembershipSnapshot(1, localSilo, [remoteSilo]));
+        var grainFactory = Substitute.For<IInternalGrainFactory>();
+        var options = new ClusterManifestOptions();
+        Assert.True(options.EnableContentAddressedRetrieval);
+        await using var provider = CreateClusterManifestProvider(localSilo, membership, grainFactory, options);
+        var hash = ManifestHashCalculator.ComputeHash(provider.LocalGrainManifest);
+        var remote = new CanonicalManifestCacheTarget(hash, provider.LocalGrainManifest);
+        grainFactory.GetSystemTarget<IClusterManifestSystemTarget>(Constants.ManifestProviderType, remoteSilo).Returns(remote);
+        grainFactory.GetSystemTarget<ISiloManifestSystemTarget>(Constants.ManifestProviderType, remoteSilo).Returns(remote);
+        Assert.Same(provider.LocalGrainManifest, Assert.Single(GetCachedManifests(provider)).Value);
+
+        options.EnableContentAddressedRetrieval = false;
+        await InitializeProviderAsync(provider, cancellationToken);
+        Assert.True(await UpdateManifestAsync(provider, membership.CurrentSnapshot, cancellationToken));
+
+        Assert.Same(provider.LocalGrainManifest, provider.Current.Silos[remoteSilo]);
+        Assert.Equal(1, remote.HashRequests);
+        Assert.Equal(0, remote.ManifestByHashRequests);
+        Assert.Equal(0, remote.LegacyManifestRequests);
+    }
+
+    [Fact]
+    public async Task DisabledOptions_RetrieveDirectlyWithoutHashesOrPeerRepair()
     {
         var localSilo = CreateSiloAddress(11111, 1);
         var peers = new[] { CreateSiloAddress(11112, 1), CreateSiloAddress(11113, 1) };
@@ -74,7 +101,7 @@ public partial class ClusterManifestProviderTests
             grainFactory.GetSystemTarget<ISiloManifestSystemTarget>(Constants.ManifestProviderType, peer).Returns(legacy);
         }
 
-        var options = new ClusterManifestOptions();
+        var options = new ClusterManifestOptions { EnableContentAddressedRetrieval = false };
         Assert.False(options.EnableContentAddressedRetrieval);
         await using var provider = CreateClusterManifestProvider(localSilo, membership, grainFactory, options);
         var memoizedHashes = GetMemoizedManifestHashes();
@@ -106,7 +133,7 @@ public partial class ClusterManifestProviderTests
     }
 
     [Fact]
-    public async Task DefaultOptions_CallerCancellationStopsDirectFetch()
+    public async Task DisabledOptions_CallerCancellationStopsDirectFetch()
     {
         var localSilo = CreateSiloAddress(11111, 1);
         var remoteSilo = CreateSiloAddress(11112, 1);
@@ -123,7 +150,8 @@ public partial class ClusterManifestProviderTests
         });
         var grainFactory = Substitute.For<IInternalGrainFactory>();
         grainFactory.GetSystemTarget<ISiloManifestSystemTarget>(Constants.ManifestProviderType, remoteSilo).Returns(remote);
-        await using var provider = CreateClusterManifestProvider(localSilo, membership, grainFactory, new ClusterManifestOptions());
+        await using var provider = CreateClusterManifestProvider(
+            localSilo, membership, grainFactory, new ClusterManifestOptions { EnableContentAddressedRetrieval = false });
         await InitializeProviderAsync(provider, cancellation.Token);
         var update = UpdateManifestAsync(provider, snapshot, cancellation.Token);
         try
@@ -141,12 +169,13 @@ public partial class ClusterManifestProviderTests
     }
 
     [Fact]
-    public async Task DefaultServer_ComputesHashesOnDemandAndCachesSummaryByVersion()
+    public async Task DisabledServer_ComputesHashesOnDemandAndCachesSummaryByVersion()
     {
         var localSilo = CreateSiloAddress(11111, 1);
         using var membership = new TestClusterMembershipService(CreateMembershipSnapshot(1, (localSilo, SiloStatus.Active)));
         var grainFactory = Substitute.For<IInternalGrainFactory>();
-        await using var provider = CreateClusterManifestProvider(localSilo, membership, grainFactory, new ClusterManifestOptions());
+        await using var provider = CreateClusterManifestProvider(
+            localSilo, membership, grainFactory, new ClusterManifestOptions { EnableContentAddressedRetrieval = false });
         using var services = new ServiceCollection()
             .AddMetrics()
             .AddSingleton<OrleansInstruments>()

@@ -139,7 +139,7 @@ public partial class ClusterManifestProviderTests
         factory.GetSystemTarget<ISiloManifestSystemTarget>(Constants.ManifestProviderType, peer).Returns(target);
         await using var provider = CreateClusterManifestProvider(
             local, membership, factory, time, NullLogger<ClusterManifestProvider>.Instance,
-            metrics.Instruments, new ClusterManifestOptions());
+            metrics.Instruments, new ClusterManifestOptions { EnableContentAddressedRetrieval = false });
         await InitializeProviderAsync(provider, cancellationToken);
         var update = UpdateManifestAsync(provider, membership.CurrentSnapshot, cancellation.Token);
         try

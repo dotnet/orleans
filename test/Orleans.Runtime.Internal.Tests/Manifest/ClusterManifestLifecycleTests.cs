@@ -16,7 +16,7 @@ public sealed class ClusterManifestLifecycleTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task EnabledProviders_ConvergeAcrossJoinsDeparturesAndRollingModeChanges(bool mixedModes)
+    public async Task DefaultProviders_ConvergeAcrossJoinsDeparturesAndRollingModeChanges(bool mixedModes)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var overrides = new ConcurrentDictionary<string, bool>();
@@ -24,9 +24,14 @@ public sealed class ClusterManifestLifecycleTests
         builder.ConfigureHost(host => TestDefaultConfiguration.ConfigureHostConfiguration(host.Configuration));
         builder.ConfigureSilo((specific, silo) =>
         {
-            var enabled = overrides.TryGetValue(specific.SiloName, out var configured)
-                ? configured : !mixedModes || specific.SiloName == "Silo_0";
-            silo.Configure<ClusterManifestOptions>(options => options.EnableContentAddressedRetrieval = enabled);
+            if (overrides.TryGetValue(specific.SiloName, out var configured))
+            {
+                silo.Configure<ClusterManifestOptions>(options => options.EnableContentAddressedRetrieval = configured);
+            }
+            else if (mixedModes && specific.SiloName != "Silo_0")
+            {
+                silo.Configure<ClusterManifestOptions>(options => options.EnableContentAddressedRetrieval = false);
+            }
         });
         await using var cluster = builder.Build();
         await cluster.DeployAsync(cancellationToken);
