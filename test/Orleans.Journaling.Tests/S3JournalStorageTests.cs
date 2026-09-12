@@ -42,7 +42,7 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
     {
         if (DockerSkipReason.Value is null)
         {
-            _container = new ContainerBuilder("minio/minio:RELEASE.2025-09-07T16-13-09Z")
+            _container = new ContainerBuilder("quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z")
                 .WithEnvironment("MINIO_ROOT_USER", AccessKey)
                 .WithEnvironment("MINIO_ROOT_PASSWORD", SecretKey)
                 .WithCommand("server", "/data")
