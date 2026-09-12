@@ -206,7 +206,7 @@ namespace Orleans.Runtime
                 return;
             }
 
-            OrleansCallBackDataEvent.Instance.DoCallback(this.Message);
+            OrleansCallBackDataEvent.Instance.OnResponse(this.Message);
 
             RecordElapsedTime();
             DisposeCancellationRegistration();
@@ -214,6 +214,8 @@ namespace Orleans.Runtime
             // do callback outside the CallbackData lock. Just not a good practice to hold a lock for this unrelated operation.
             ResponseCallback(response, this.context);
         }
+
+        public void OnResponse(Message response) => DoCallback(response);
 
         private bool TryComplete() => (Interlocked.Or(ref _state, StateCompleted) & StateCompleted) == 0;
 

@@ -18,11 +18,20 @@ namespace Orleans.Runtime
         /// <param name="contextData">The context data.</param>
         public static void Import(Dictionary<string, object>? contextData)
         {
-            var values = contextData switch
+            Dictionary<string, object>? values = null;
+            if (contextData is { Count: > 0 })
             {
-                { Count: > 0 } => contextData.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
-                _ => null,
-            };
+                foreach (var (key, value) in contextData)
+                {
+                    if (Message.IsGatewayRequestContextHeader(key))
+                    {
+                        continue;
+                    }
+
+                    values ??= new(contextData.Count);
+                    values.Add(key, value);
+                }
+            }
 
             RequestContext.CallContextData.Value = new RequestContext.ContextProperties
             {

@@ -4,7 +4,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 
@@ -17,7 +16,6 @@ namespace Orleans.Runtime.Messaging
         private readonly MessageCenter messageCenter;
         private readonly ConnectionCommon connectionShared;
         private readonly ConnectionPreambleHelper connectionPreambleHelper;
-        private readonly ILogger<GatewayConnectionListener> logger;
         private readonly EndpointOptions endpointOptions;
         private readonly SiloConnectionOptions siloConnectionOptions;
         private readonly OverloadDetector overloadDetector;
@@ -33,8 +31,7 @@ namespace Orleans.Runtime.Messaging
             MessageCenter messageCenter,
             ConnectionManager connectionManager,
             ConnectionCommon connectionShared,
-            ConnectionPreambleHelper connectionPreambleHelper,
-            ILogger<GatewayConnectionListener> logger)
+            ConnectionPreambleHelper connectionPreambleHelper)
             : base(serviceProvider.GetRequiredKeyedService<IConnectionListenerFactory>(ServicesKey), connectionOptions, connectionManager, connectionShared)
         {
             this.siloConnectionOptions = siloConnectionOptions.Value;
@@ -44,7 +41,6 @@ namespace Orleans.Runtime.Messaging
             this.messageCenter = messageCenter;
             this.connectionShared = connectionShared;
             this.connectionPreambleHelper = connectionPreambleHelper;
-            this.logger = logger;
             this.endpointOptions = endpointOptions.Value;
         }
 

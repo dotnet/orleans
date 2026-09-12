@@ -26,7 +26,6 @@ namespace Orleans.Runtime
         private readonly object lockObj = new();
 #endif
         private readonly Channel<Message> incomingMessages;
-        private readonly IGrainReferenceRuntime grainReferenceRuntime;
         private readonly InvokableObjectManager invokableObjects;
         private readonly InsideRuntimeClient runtimeClient;
         private readonly ILogger logger;
@@ -43,7 +42,6 @@ namespace Orleans.Runtime
             InsideRuntimeClient runtimeClient,
             ILocalSiloDetails siloDetails,
             ILogger<HostedClient> logger,
-            IGrainReferenceRuntime grainReferenceRuntime,
             IInternalGrainFactory grainFactory,
             MessageCenter messageCenter,
             MessagingTrace messagingTrace,
@@ -59,7 +57,6 @@ namespace Orleans.Runtime
             });
 
             this.runtimeClient = runtimeClient;
-            this.grainReferenceRuntime = grainReferenceRuntime;
             this.grainFactory = grainFactory;
             this.invokableObjects = new InvokableObjectManager(
                 this,
@@ -186,8 +183,9 @@ namespace Orleans.Runtime
         /// <inheritdoc />
         public bool TryDispatchToClient(Message message)
         {
-            if (!ClientGrainId.TryParse(message.TargetGrain, out var targetClient) || !this.ClientId.Equals(targetClient))
+            if (!ClientId.IsClientEqual(message.TargetGrain))
             {
+                // The message does not target the hosted client.
                 return false;
             }
 
@@ -197,14 +195,13 @@ namespace Orleans.Runtime
                 return true;
             }
 
-            this.ReceiveMessage(message);
+            ReceiveMessage(message);
             return true;
         }
 
         public void ReceiveMessage(object message)
         {
             var msg = (Message)message;
-
             if (msg.Direction == Message.Directions.Response)
             {
                 // Requests are made through the runtime client, so deliver responses to the runtime client so that the request callback can be executed.
