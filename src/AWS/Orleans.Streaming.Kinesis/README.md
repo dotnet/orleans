@@ -101,6 +101,26 @@ The DynamoDB checkpointer uses on-demand billing and creates its table by defaul
 To provide a different checkpoint implementation, use the configurator overload and call
 `ConfigureCheckpointer<TOptions>` with an `IStreamQueueCheckpointerFactory`.
 
+## Retained-history replay
+
+Explicit subscriptions can start or resume from a retained Kinesis sequence token after its record leaves the live Orleans cache. Start tokens are inclusive; acknowledged delivery tokens resume after the acknowledged record. Each replay uses an independent shard iterator and shares the shard's `GetRecords` rate limit with live delivery.
+
+The receiver replays partition records in order, pins a live-cache boundary against purge, and attaches the subscription to live delivery before releasing replay state. This prevents a replay-to-live gap while preserving Orleans at-least-once delivery.
+
+Use `ConfigureReplay` to set bounded reader admission and memory:
+
+```csharp
+configurator.ConfigureReplay(options => options.Configure(replay =>
+{
+    replay.MaxConcurrentReaders = 4;
+    replay.MaxPendingReaders = 32;
+    replay.CacheSize = 4_096;
+    replay.ReadBatchSize = 256;
+}));
+```
+
+Expired retention, invalid sequences, and tokens from another shard surface as `DataNotAvailableException`.
+
 ## Documentation
 
 - [Microsoft Orleans documentation](https://dotnet.github.io/orleans/docs/)

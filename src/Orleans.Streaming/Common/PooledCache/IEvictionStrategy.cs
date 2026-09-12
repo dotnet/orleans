@@ -28,6 +28,19 @@ namespace Orleans.Providers.Streams.Common
         /// </summary>
         /// <param name="newBlock">The new block.</param>
         void OnBlockAllocated(FixedSizeBuffer newBlock);
+
+        /// <summary>
+        /// Performs follow-up accounting after the owner removes messages directly.
+        /// </summary>
+        /// <param name="lastMessagePurged">The last message removed.</param>
+        /// <param name="itemsPurged">The number of messages removed.</param>
+        void OnPurgeCompleted(CachedMessage? lastMessagePurged, int itemsPurged)
+        {
+            if (itemsPurged > 0)
+            {
+                OnPurged?.Invoke(lastMessagePurged, null);
+            }
+        }
     }
 
     /// <summary>

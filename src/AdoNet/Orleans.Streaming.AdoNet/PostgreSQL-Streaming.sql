@@ -1,64 +1,53 @@
-CREATE SEQUENCE OrleansStreamMessageSequence
-AS BIGINT
-START WITH 1
-INCREMENT BY 1
-NO MAXVALUE
-NO CYCLE;
+/*
+ADO.NET streaming schema version 3.
 
-CREATE TABLE OrleansStreamMessage
+This alpha schema is intentionally incompatible with the former destructive queue schema.
+Drop the former streaming tables, sequence, routines, and OrleansQuery rows before applying
+this script. Existing queue rows are not migrated.
+*/
+
+DO $$
+BEGIN
+    IF to_regclass('orleansstreampartition') IS NOT NULL
+        OR to_regclass('orleansstreammessage') IS NOT NULL
+        OR to_regclass('orleansstreamreplaylease') IS NOT NULL
+        OR to_regclass('orleansstreamdeadletter') IS NOT NULL
+        OR to_regclass('orleansstreamcontrol') IS NOT NULL
+        OR to_regclass('orleansstreammessagesequence') IS NOT NULL
+        OR EXISTS
+        (
+            SELECT 1
+            FROM OrleansQuery
+            WHERE QueryKey IN
+            (
+                'QueueStreamMessageKey',
+                'GetStreamMessagesKey',
+                'ConfirmStreamMessagesKey',
+                'FailStreamMessageKey',
+                'EvictStreamMessagesKey',
+                'EvictStreamDeadLettersKey',
+                'StreamSchemaVersionKey'
+            )
+        )
+    THEN
+        RAISE EXCEPTION 'Incompatible alpha ADO.NET streaming schema. Drop old streaming tables, sequence, routines, and OrleansQuery rows before applying version 3; no in-place migration is supported.';
+    END IF;
+END;
+$$;
+
+CREATE TABLE OrleansStreamPartition
 (
-	ServiceId VARCHAR(150) NOT NULL,
+    ServiceId VARCHAR(150) NOT NULL,
     ProviderId VARCHAR(150) NOT NULL,
-	QueueId VARCHAR(150) NOT NULL,
-	MessageId BIGINT NOT NULL,
-	Dequeued INT NOT NULL,
-	VisibleOn TIMESTAMP(6) WITHOUT TIME ZONE NOT NULL,
-	ExpiresOn TIMESTAMP(6) WITHOUT TIME ZONE NOT NULL,
-	CreatedOn TIMESTAMP(6) WITHOUT TIME ZONE NOT NULL,
-	ModifiedOn TIMESTAMP(6) WITHOUT TIME ZONE NOT NULL,
-	Payload BYTEA NOT NULL,
+    QueueId VARCHAR(150) NOT NULL,
+    NextMessageId BIGINT NOT NULL,
+    Checkpoint BIGINT NULL,
+    OwnerEpoch BIGINT NOT NULL,
+    CleanupOn TIMESTAMP(6) WITHOUT TIME ZONE NOT NULL,
+    CreatedOn TIMESTAMP(6) WITHOUT TIME ZONE NOT NULL,
+    ModifiedOn TIMESTAMP(6) WITHOUT TIME ZONE NOT NULL,
 
-	CONSTRAINT PK_OrleansStreamMessage PRIMARY KEY
-	(
-		ServiceId,
-        ProviderId,
-		QueueId,
-		MessageId
-	)
-);
-
-CREATE TABLE OrleansStreamDeadLetter
-(
-	ServiceId VARCHAR(150) NOT NULL,
-    ProviderId VARCHAR(150) NOT NULL,
-	QueueId VARCHAR(150) NOT NULL,
-	MessageId BIGINT NOT NULL,
-	Dequeued INT NOT NULL,
-	VisibleOn TIMESTAMP(6) WITHOUT TIME ZONE NOT NULL,
-	ExpiresOn TIMESTAMP(6) WITHOUT TIME ZONE NOT NULL,
-	CreatedOn TIMESTAMP(6) WITHOUT TIME ZONE NOT NULL,
-	ModifiedOn TIMESTAMP(6) WITHOUT TIME ZONE NOT NULL,
-	DeadOn TIMESTAMP(6) WITHOUT TIME ZONE NOT NULL,
-	RemoveOn TIMESTAMP(6) WITHOUT TIME ZONE NOT NULL,
-	Payload BYTEA,
-
-	CONSTRAINT PK_OrleansStreamDeadLetter PRIMARY KEY
-    (
-        ServiceId,
-        ProviderId,
-        QueueId,
-        MessageId
-    )
-);
-
-CREATE TABLE OrleansStreamControl
-(
-	ServiceId VARCHAR(150) NOT NULL,
-    ProviderId VARCHAR(150) NOT NULL,
-	QueueId VARCHAR(150) NOT NULL,
-	EvictOn TIMESTAMP(6) WITHOUT TIME ZONE NOT NULL,
-
-	CONSTRAINT PK_OrleansStreamControl PRIMARY KEY
+    CONSTRAINT PK_OrleansStreamPartition PRIMARY KEY
     (
         ServiceId,
         ProviderId,
@@ -66,642 +55,909 @@ CREATE TABLE OrleansStreamControl
     )
 );
 
-CREATE OR REPLACE FUNCTION QueueStreamMessage
+CREATE TABLE OrleansStreamMessage
 (
-	_ServiceId VARCHAR(150),
-    _ProviderId VARCHAR(150),
-	_QueueId VARCHAR(150),
-	_Payload BYTEA,
-	_ExpiryTimeout INT
-)
-RETURNS TABLE
-(
-	ServiceId VARCHAR(150),
-    ProviderId VARCHAR(150),
-	QueueId VARCHAR(150),
-	MessageId BIGINT
-)
-LANGUAGE plpgsql
-AS $$
-#VARIABLE_CONFLICT USE_COLUMN
-DECLARE
-	_MessageId BIGINT := nextval('OrleansStreamMessageSequence');
-	_Now TIMESTAMP(6) WITHOUT TIME ZONE := CURRENT_TIMESTAMP AT TIME ZONE 'UTC';
-	_ExpiresOn TIMESTAMP(6) WITHOUT TIME ZONE := _Now + INTERVAL '1 SECOND' * _ExpiryTimeout;
-BEGIN
+    ServiceId VARCHAR(150) NOT NULL,
+    ProviderId VARCHAR(150) NOT NULL,
+    QueueId VARCHAR(150) NOT NULL,
+    MessageId BIGINT NOT NULL,
+    StreamIdBytes BYTEA NOT NULL,
+    StreamNamespaceLength INT NOT NULL,
+    CreatedOn TIMESTAMP(6) WITHOUT TIME ZONE NOT NULL,
+    CheckpointedOn TIMESTAMP(6) WITHOUT TIME ZONE NULL,
+    Payload BYTEA NOT NULL,
 
-RETURN QUERY
-INSERT INTO OrleansStreamMessage
-(
-	ServiceId,
-	ProviderId,
-	QueueId,
-	MessageId,
-	Dequeued,
-	VisibleOn,
-	ExpiresOn,
-	CreatedOn,
-	ModifiedOn,
-	Payload
-)
-VALUES
-(
-	_ServiceId,
-	_ProviderId,
-	_QueueId,
-	_MessageId,
-	0,
-	_Now,
-	_ExpiresOn,
-	_Now,
-	_Now,
-	_Payload
-)
-RETURNING
-    ServiceId,
-    ProviderId,
-    QueueId,
-    MessageId;
-
-END;
-$$;
-
-INSERT INTO OrleansQuery
-(
-	QueryKey,
-	QueryText
-)
-SELECT
-	'QueueStreamMessageKey',
-	'SELECT * FROM QueueStreamMessage(@ServiceId, @ProviderId, @QueueId, @Payload, @ExpiryTimeout)'
-;
-
-CREATE OR REPLACE FUNCTION GetStreamMessages
-(
-	_ServiceId VARCHAR(150),
-    _ProviderId VARCHAR(150),
-	_QueueId VARCHAR(150),
-    _MaxCount INT,
-	_MaxAttempts INT,
-	_VisibilityTimeout INT,
-    _RemovalTimeout INT,
-    _EvictionInterval INT,
-    _EvictionBatchSize INT
-)
-RETURNS TABLE
-(
-	ServiceId VARCHAR(150),
-    ProviderId VARCHAR(150),
-	QueueId VARCHAR(150),
-	MessageId BIGINT,
-	Dequeued INT,
-	VisibleOn TIMESTAMP(6) WITHOUT TIME ZONE,
-	ExpiresOn TIMESTAMP(6) WITHOUT TIME ZONE,
-	CreatedOn TIMESTAMP(6) WITHOUT TIME ZONE,
-	ModifiedOn TIMESTAMP(6) WITHOUT TIME ZONE,
-	Payload BYTEA
-)
-LANGUAGE plpgsql
-AS $$
-#VARIABLE_CONFLICT USE_COLUMN
-DECLARE
-	_Now TIMESTAMP(6) WITHOUT TIME ZONE := CURRENT_TIMESTAMP AT TIME ZONE 'UTC';
-	_VisibleOn TIMESTAMP(6) WITHOUT TIME ZONE := _Now + INTERVAL '1 SECOND' * _VisibilityTimeout;
-	_EvictOn TIMESTAMP(6) WITHOUT TIME ZONE;
-    _NextEvictOn TIMESTAMP(6) WITHOUT TIME ZONE := _Now + INTERVAL '1 SECOND' * _EvictionInterval;
-BEGIN
-
-/* get the next eviction schedule */
-SELECT EvictOn
-INTO _EvictOn
-FROM OrleansStreamControl
-WHERE
-	ServiceId = _ServiceId
-	AND ProviderId = _ProviderId
-	AND QueueId = _QueueId;
-
-/* initialize the control row if necessary */
-IF _EvictOn IS NULL THEN
-
-    /* initialize with a past date so eviction runs immediately */
-    INSERT INTO OrleansStreamControl
+    CONSTRAINT PK_OrleansStreamMessage PRIMARY KEY
     (
         ServiceId,
         ProviderId,
         QueueId,
-        EvictOn
+        MessageId
+    )
+);
+
+CREATE TABLE OrleansStreamReplayLease
+(
+    ServiceId VARCHAR(150) NOT NULL,
+    ProviderId VARCHAR(150) NOT NULL,
+    QueueId VARCHAR(150) NOT NULL,
+    ReaderId VARCHAR(150) NOT NULL,
+    StreamIdBytes BYTEA NOT NULL,
+    StreamNamespaceLength INT NOT NULL,
+    OwnerEpoch BIGINT NOT NULL,
+    Watermark BIGINT NOT NULL,
+    ExpiresOn TIMESTAMP(6) WITHOUT TIME ZONE NOT NULL,
+    CreatedOn TIMESTAMP(6) WITHOUT TIME ZONE NOT NULL,
+    ModifiedOn TIMESTAMP(6) WITHOUT TIME ZONE NOT NULL,
+
+    CONSTRAINT PK_OrleansStreamReplayLease PRIMARY KEY
+    (
+        ServiceId,
+        ProviderId,
+        QueueId,
+        ReaderId
+    )
+);
+
+CREATE INDEX IX_OrleansStreamReplayLease_Active
+    ON OrleansStreamReplayLease (ServiceId, ProviderId, QueueId, ExpiresOn, Watermark);
+
+CREATE OR REPLACE FUNCTION AppendStreamMessage
+(
+    _ServiceId VARCHAR(150),
+    _ProviderId VARCHAR(150),
+    _QueueId VARCHAR(150),
+    _StreamIdBytes BYTEA,
+    _StreamNamespaceLength INT,
+    _Payload BYTEA
+)
+RETURNS TABLE
+(
+    ServiceId VARCHAR(150),
+    ProviderId VARCHAR(150),
+    QueueId VARCHAR(150),
+    MessageId BIGINT
+)
+LANGUAGE plpgsql
+AS $$
+#VARIABLE_CONFLICT USE_COLUMN
+DECLARE
+    _Now TIMESTAMP(6) WITHOUT TIME ZONE;
+    _MessageId BIGINT;
+BEGIN
+    INSERT INTO OrleansStreamPartition
+    (
+        ServiceId,
+        ProviderId,
+        QueueId,
+        NextMessageId,
+        Checkpoint,
+        OwnerEpoch,
+        CleanupOn,
+        CreatedOn,
+        ModifiedOn
     )
     VALUES
     (
         _ServiceId,
         _ProviderId,
         _QueueId,
-        _Now - INTERVAL '1 SECOND'
+        1,
+        NULL,
+        0,
+        clock_timestamp() AT TIME ZONE 'UTC',
+        clock_timestamp() AT TIME ZONE 'UTC',
+        clock_timestamp() AT TIME ZONE 'UTC'
     )
-    ON CONFLICT (ServiceId, ProviderId, QueueId)
-    DO NOTHING;
+    ON CONFLICT (ServiceId, ProviderId, QueueId) DO NOTHING;
 
-    /* get the next eviction schedule again */
-    SELECT EvictOn
-    INTO _EvictOn
-    FROM OrleansStreamControl
-    WHERE
-	    ServiceId = _ServiceId
-	    AND ProviderId = _ProviderId
-	    AND QueueId = _QueueId;
-
-END IF;
-
-/* evict messages if necessary */
-IF _EvictOn <= _Now THEN
-
-    /* race to set the next schedule */
-	UPDATE OrleansStreamControl
-	SET EvictOn = _NextEvictOn
-    WHERE
-	    ServiceId = _ServiceId
-		AND ProviderId = _ProviderId
-		AND QueueId = _QueueId
-		AND EvictOn <= _Now;
-
-    /* if we won the race then we also run the due eviction */
-	IF (FOUND) THEN
-		CALL EvictStreamMessages(_ServiceId, _ProviderId, _QueueId, _EvictionBatchSize, _MaxAttempts, _RemovalTimeout);
-		CALL EvictStreamDeadLetters(_ServiceId, _ProviderId, _QueueId, _EvictionBatchSize);
-	END IF;
-
-END IF;
-
-RETURN QUERY
-WITH Batch AS
-(
-    /* elect the next batch of visible messages */
-	SELECT
-		ServiceId,
-		ProviderId,
-		QueueId,
-		MessageId
-	FROM
-		OrleansStreamMessage
-	WHERE
-		ServiceId = _ServiceId
-		AND ProviderId = _ProviderId
-		AND QueueId = _QueueId
-		AND Dequeued < _MaxAttempts
-		AND VisibleOn <= _Now
-		AND ExpiresOn > _Now
-
-    /* the criteria below helps prevent deadlocks while improving queue-like throughput */
-	ORDER BY
-		ServiceId,
-		ProviderId,
-		QueueId,
-		MessageId
-    FOR UPDATE
-	LIMIT _MaxCount
-)
-UPDATE OrleansStreamMessage AS M
-SET
-	Dequeued = Dequeued + 1,
-	VisibleOn = _VisibleOn,
-	ModifiedOn = _Now
-FROM
-    Batch AS B
-WHERE
-	M.ServiceId = B.ServiceId
-	AND M.ProviderId = B.ProviderId
-	AND M.QueueId = B.QueueId
-	AND M.MessageId = B.MessageId
-RETURNING
-    M.ServiceId,
-    M.ProviderId,
-    M.QueueId,
-    M.MessageId,
-    M.Dequeued,
-    M.VisibleOn,
-    M.ExpiresOn,
-    M.CreatedOn,
-    M.ModifiedOn,
-    M.Payload;
-
-END;
-$$;
-
-INSERT INTO OrleansQuery
-(
-	QueryKey,
-	QueryText
-)
-SELECT
-	'GetStreamMessagesKey',
-	'SELECT * FROM GetStreamMessages(@ServiceId, @ProviderId, @QueueId, @MaxCount, @MaxAttempts, @VisibilityTimeout, @RemovalTimeout, @EvictionInterval, @EvictionBatchSize)'
-;
-
-CREATE OR REPLACE FUNCTION ConfirmStreamMessages
-(
-	_ServiceId VARCHAR(150),
-    _ProviderId VARCHAR(150),
-	_QueueId VARCHAR(150),
-    _Items TEXT
-)
-RETURNS TABLE
-(
-	ServiceId VARCHAR(150),
-    ProviderId VARCHAR(150),
-	QueueId VARCHAR(150),
-	MessageId BIGINT
-)
-LANGUAGE plpgsql
-AS $$
-#VARIABLE_CONFLICT USE_COLUMN
-DECLARE
-	_Count INT;
-    _Now TIMESTAMP(6) WITHOUT TIME ZONE := CURRENT_TIMESTAMP AT TIME ZONE 'UTC';
-BEGIN
-
-CREATE TEMP TABLE _ItemsTable
-(
-	MessageId BIGINT PRIMARY KEY NOT NULL,
-	Dequeued INT NOT NULL
-) ON COMMIT DROP;
-
-INSERT INTO _ItemsTable
-(
-	MessageId,
-	Dequeued
-)
-SELECT
-	CAST(split_part(Value, ':', 1) AS BIGINT) AS MessageId,
-	CAST(split_part(Value, ':', 2) AS INT) AS Dequeued
-FROM
-	UNNEST(string_to_array(_Items, '|')) AS Value;
-
-/* negative dequeue receipts release messages for immediate redelivery */
-IF EXISTS (SELECT 1 FROM _ItemsTable WHERE Dequeued < 0) THEN
-    RETURN QUERY
-    WITH Batch AS
-    (
-        SELECT
-            M.*
-        FROM
-            OrleansStreamMessage AS M
-            INNER JOIN _ItemsTable AS I
-                ON I.MessageId = M.MessageId
-                AND -I.Dequeued = M.Dequeued
-        WHERE
-            ServiceId = _ServiceId
-            AND ProviderId = _ProviderId
-            AND QueueId = _QueueId
-        ORDER BY
-            ServiceId,
-            ProviderId,
-            QueueId,
-            MessageId
-        FOR UPDATE
-    )
-    UPDATE OrleansStreamMessage AS M
+    UPDATE OrleansStreamPartition AS P
     SET
-        VisibleOn = _Now,
-        ModifiedOn = _Now
-    FROM
-        Batch AS B
-    WHERE
-        M.ServiceId = B.ServiceId
-        AND M.ProviderId = B.ProviderId
-        AND M.QueueId = B.QueueId
-        AND M.MessageId = B.MessageId
-    RETURNING
-        M.ServiceId,
-        M.ProviderId,
-        M.QueueId,
-        M.MessageId;
-    RETURN;
-END IF;
+        NextMessageId = P.NextMessageId + 1,
+        ModifiedOn = clock_timestamp() AT TIME ZONE 'UTC'
+    WHERE P.ServiceId = _ServiceId
+        AND P.ProviderId = _ProviderId
+        AND P.QueueId = _QueueId
+    RETURNING P.NextMessageId - 1 INTO _MessageId;
 
-RETURN QUERY
-WITH Batch AS
-(
-	SELECT
-		M.*
-	FROM
-		OrleansStreamMessage AS M
-        INNER JOIN _ItemsTable AS I
-            ON I.MessageId = M.MessageId
-            AND I.Dequeued = M.Dequeued
-	WHERE
-		ServiceId = _ServiceId
-	    AND ProviderId = _ProviderId
-		AND QueueId = _QueueId
+    _Now := clock_timestamp() AT TIME ZONE 'UTC';
 
-    /* the criteria below helps prevent deadlocks */
-	ORDER BY
-	    ServiceId,
-	    ProviderId,
-	    QueueId,
-		MessageId
-    FOR UPDATE
-)
-DELETE FROM OrleansStreamMessage AS M
-USING Batch AS B
-WHERE
-    M.ServiceId = B.ServiceId
-    AND M.ProviderId = B.ProviderId
-    AND M.QueueId = B.QueueId
-    AND M.MessageId = B.MessageId
-RETURNING
-    M.ServiceId,
-    M.ProviderId,
-    M.QueueId,
-    M.MessageId;
-
-END;
-$$;
-
-INSERT INTO OrleansQuery
-(
-	QueryKey,
-	QueryText
-)
-SELECT
-	'ConfirmStreamMessagesKey',
-	'SELECT * FROM ConfirmStreamMessages(@ServiceId, @ProviderId, @QueueId, @Items)'
-;
-
-CREATE OR REPLACE PROCEDURE FailStreamMessage
-(
-    _ServiceId VARCHAR(150),
-    _ProviderId VARCHAR(150),
-    _QueueId VARCHAR(150),
-    _MessageId BIGINT,
-    _MaxAttempts INT,
-    _RemovalTimeout INT
-)
-LANGUAGE plpgsql
-AS $$
-#VARIABLE_CONFLICT USE_COLUMN
-DECLARE
-    _Now TIMESTAMP(6) WITHOUT TIME ZONE := CURRENT_TIMESTAMP AT TIME ZONE 'UTC';
-    _RemoveOn TIMESTAMP(6) WITHOUT TIME ZONE := _Now + INTERVAL '1 SECOND' * _RemovalTimeout;
-BEGIN
-
-/* if the message can still be dequeued then attempt to mark it visible again */
-UPDATE OrleansStreamMessage
-SET
-    VisibleOn = _Now,
-    ModifiedOn = _Now
-WHERE
-    ServiceId = _ServiceId
-    AND ProviderId = _ProviderId
-    AND QueueId = _QueueId
-    AND MessageId = _MessageId
-    AND Dequeued < _MaxAttempts;
-
-IF FOUND THEN
-    RETURN;
-END IF;
-
-/* otherwise attempt to move the message to dead letters */
-WITH Deleted AS
-(
-    DELETE FROM OrleansStreamMessage
-    WHERE
-        ServiceId = _ServiceId
-        AND ProviderId = _ProviderId
-        AND QueueId = _QueueId
-        AND MessageId = _MessageId
-    RETURNING
+    INSERT INTO OrleansStreamMessage
+    (
         ServiceId,
         ProviderId,
         QueueId,
         MessageId,
-        Dequeued,
-        VisibleOn,
-        ExpiresOn,
+        StreamIdBytes,
+        StreamNamespaceLength,
         CreatedOn,
-        ModifiedOn,
         Payload
-)
-INSERT INTO OrleansStreamDeadLetter
-(
-    ServiceId,
-    ProviderId,
-    QueueId,
-    MessageId,
-    Dequeued,
-    VisibleOn,
-    ExpiresOn,
-    CreatedOn,
-    ModifiedOn,
-    DeadOn,
-    RemoveOn,
-    Payload
-)
-SELECT
-    ServiceId,
-    ProviderId,
-    QueueId,
-    MessageId,
-    Dequeued,
-    VisibleOn,
-    ExpiresOn,
-    CreatedOn,
-    ModifiedOn,
-    _Now AS DeadOn,
-    _RemoveOn AS RemoveOn,
-    Payload
-FROM
-    Deleted;
+    )
+    VALUES
+    (
+        _ServiceId,
+        _ProviderId,
+        _QueueId,
+        _MessageId,
+        _StreamIdBytes,
+        _StreamNamespaceLength,
+        _Now,
+        _Payload
+    );
 
+    RETURN QUERY
+    SELECT _ServiceId, _ProviderId, _QueueId, _MessageId;
 END;
 $$;
 
-INSERT INTO OrleansQuery
-(
-	QueryKey,
-	QueryText
-)
-SELECT
-	'FailStreamMessageKey',
-	'CALL FailStreamMessage(@ServiceId, @ProviderId, @QueueId, @MessageId, @MaxAttempts, @RemovalTimeout)'
-;
-
-CREATE OR REPLACE PROCEDURE EvictStreamMessages
+CREATE OR REPLACE FUNCTION AcquireStreamPartition
 (
     _ServiceId VARCHAR(150),
     _ProviderId VARCHAR(150),
     _QueueId VARCHAR(150),
-    _BatchSize INT,
-    _MaxAttempts INT,
-    _RemovalTimeout INT
+    _StartFromNow BOOLEAN
+)
+RETURNS TABLE
+(
+    ServiceId VARCHAR(150),
+    ProviderId VARCHAR(150),
+    QueueId VARCHAR(150),
+    OwnerEpoch BIGINT,
+    NextMessageId BIGINT,
+    Checkpoint BIGINT,
+    EarliestMessageId BIGINT,
+    TailMessageId BIGINT
 )
 LANGUAGE plpgsql
 AS $$
 #VARIABLE_CONFLICT USE_COLUMN
 DECLARE
-    _Now TIMESTAMP(6) WITHOUT TIME ZONE := CURRENT_TIMESTAMP AT TIME ZONE 'UTC';
-    _RemoveOn TIMESTAMP(6) WITHOUT TIME ZONE := _Now + INTERVAL '1 second' * _RemovalTimeout;
+    _Now TIMESTAMP(6) WITHOUT TIME ZONE;
+    _NextMessageId BIGINT;
+    _Checkpoint BIGINT;
+    _OwnerEpoch BIGINT;
+    _EarliestMessageId BIGINT;
+    _TailMessageId BIGINT;
 BEGIN
+    INSERT INTO OrleansStreamPartition
+    (
+        ServiceId,
+        ProviderId,
+        QueueId,
+        NextMessageId,
+        Checkpoint,
+        OwnerEpoch,
+        CleanupOn,
+        CreatedOn,
+        ModifiedOn
+    )
+    VALUES
+    (
+        _ServiceId,
+        _ProviderId,
+        _QueueId,
+        1,
+        NULL,
+        0,
+        clock_timestamp() AT TIME ZONE 'UTC',
+        clock_timestamp() AT TIME ZONE 'UTC',
+        clock_timestamp() AT TIME ZONE 'UTC'
+    )
+    ON CONFLICT (ServiceId, ProviderId, QueueId) DO NOTHING;
 
-/* elect the next batch of messages to evict */
-WITH Batch AS
-(
+    SELECT P.NextMessageId, P.Checkpoint
+    INTO _NextMessageId, _Checkpoint
+    FROM OrleansStreamPartition AS P
+    WHERE P.ServiceId = _ServiceId
+        AND P.ProviderId = _ProviderId
+        AND P.QueueId = _QueueId
+    FOR UPDATE;
+
+    _Now := clock_timestamp() AT TIME ZONE 'UTC';
+
+    SELECT MIN(M.MessageId), MAX(M.MessageId)
+    INTO _EarliestMessageId, _TailMessageId
+    FROM OrleansStreamMessage AS M
+    WHERE M.ServiceId = _ServiceId
+        AND M.ProviderId = _ProviderId
+        AND M.QueueId = _QueueId;
+
+    IF _Checkpoint IS NULL THEN
+        _Checkpoint := CASE
+            WHEN _StartFromNow THEN _NextMessageId - 1
+            ELSE COALESCE(_EarliestMessageId - 1, _NextMessageId - 1)
+        END;
+    END IF;
+
+    UPDATE OrleansStreamPartition AS P
+    SET
+        Checkpoint = _Checkpoint,
+        OwnerEpoch = P.OwnerEpoch + 1,
+        ModifiedOn = _Now
+    WHERE P.ServiceId = _ServiceId
+        AND P.ProviderId = _ProviderId
+        AND P.QueueId = _QueueId
+    RETURNING P.OwnerEpoch INTO _OwnerEpoch;
+
+    UPDATE OrleansStreamMessage AS M
+    SET CheckpointedOn = COALESCE(M.CheckpointedOn, _Now)
+    WHERE M.ServiceId = _ServiceId
+        AND M.ProviderId = _ProviderId
+        AND M.QueueId = _QueueId
+        AND M.MessageId <= _Checkpoint
+        AND M.CheckpointedOn IS NULL;
+
+    RETURN QUERY
     SELECT
-        ServiceId,
-        ProviderId,
-        QueueId,
-        MessageId
-    FROM
-        OrleansStreamMessage
-    WHERE
-        ServiceId = _ServiceId
-        AND ProviderId = _ProviderId
-        AND QueueId = _QueueId
-
-        -- the message was given the opportunity to complete
-        AND VisibleOn <= _Now
-		AND
-		(
-			-- the message was dequeued too many times
-			Dequeued >= _MaxAttempts
-			OR
-			-- the message expired
-			ExpiresOn <= _Now
-		)
-
-    /* the criteria below helps prevent deadlocks while improving queue-like throughput */
-    ORDER BY
-        ServiceId,
-        ProviderId,
-        QueueId,
-        MessageId
-    FOR UPDATE
-    LIMIT _BatchSize
-),
-
-/* delete the messages locked in the batch */
-Deleted AS
-(
-    DELETE FROM OrleansStreamMessage AS M
-    USING Batch AS B
-    WHERE
-        M.ServiceId = B.ServiceId
-        AND M.ProviderId = B.ProviderId
-        AND M.QueueId = B.QueueId
-        AND M.MessageId = B.MessageId
-    RETURNING
-        M.ServiceId,
-        M.ProviderId,
-        M.QueueId,
-        M.MessageId,
-        M.Dequeued,
-        M.VisibleOn,
-        M.ExpiresOn,
-        M.CreatedOn,
-        M.ModifiedOn,
-        M.Payload
-)
-
-/* copy the deleted messages to the dead-letter table */
-INSERT INTO OrleansStreamDeadLetter
-(
-    ServiceId,
-    ProviderId,
-    QueueId,
-    MessageId,
-    Dequeued,
-    VisibleOn,
-    ExpiresOn,
-    CreatedOn,
-    ModifiedOn,
-    DeadOn,
-    RemoveOn,
-    Payload
-)
-SELECT
-    ServiceId,
-    ProviderId,
-    QueueId,
-    MessageId,
-    Dequeued,
-    VisibleOn,
-    ExpiresOn,
-    CreatedOn,
-    ModifiedOn,
-    _Now,
-    _RemoveOn,
-    Payload
-FROM
-    Deleted AS D;
-
+        _ServiceId,
+        _ProviderId,
+        _QueueId,
+        _OwnerEpoch,
+        _NextMessageId,
+        _Checkpoint,
+        _EarliestMessageId,
+        _TailMessageId;
 END;
 $$;
 
-INSERT INTO OrleansQuery
-(
-	QueryKey,
-	QueryText
-)
-SELECT
-	'EvictStreamMessagesKey',
-	'CALL EvictStreamMessages(@ServiceId, @ProviderId, @QueueId, @BatchSize, @MaxAttempts, @RemovalTimeout)'
-;
-
-CREATE OR REPLACE PROCEDURE EvictStreamDeadLetters
+CREATE OR REPLACE FUNCTION AdvanceStreamCheckpoint
 (
     _ServiceId VARCHAR(150),
     _ProviderId VARCHAR(150),
     _QueueId VARCHAR(150),
-    _BatchSize INT
+    _OwnerEpoch BIGINT,
+    _Checkpoint BIGINT
+)
+RETURNS TABLE
+(
+    ServiceId VARCHAR(150),
+    ProviderId VARCHAR(150),
+    QueueId VARCHAR(150),
+    OwnerEpoch BIGINT,
+    Checkpoint BIGINT,
+    Updated BOOLEAN
 )
 LANGUAGE plpgsql
 AS $$
 #VARIABLE_CONFLICT USE_COLUMN
 DECLARE
-    _Now TIMESTAMP(6) WITHOUT TIME ZONE := CURRENT_TIMESTAMP AT TIME ZONE 'UTC';
+    _Now TIMESTAMP(6) WITHOUT TIME ZONE;
+    _CurrentOwnerEpoch BIGINT;
+    _CurrentCheckpoint BIGINT;
+    _PreviousCheckpoint BIGINT;
+    _Updated BOOLEAN := FALSE;
 BEGIN
+    SELECT P.OwnerEpoch, P.Checkpoint
+    INTO _CurrentOwnerEpoch, _CurrentCheckpoint
+    FROM OrleansStreamPartition AS P
+    WHERE P.ServiceId = _ServiceId
+        AND P.ProviderId = _ProviderId
+        AND P.QueueId = _QueueId
+    FOR UPDATE;
+    _PreviousCheckpoint := _CurrentCheckpoint;
 
-/* elect the next batch of dead letters to evict */
-WITH Batch AS
-(
-    SELECT
-        ServiceId,
-        ProviderId,
-        QueueId,
-        MessageId
-    FROM
-        OrleansStreamDeadLetter
-    WHERE
-        ServiceId = _ServiceId
-        AND ProviderId = _ProviderId
-        AND QueueId = _QueueId
-        AND RemoveOn <= _Now
+    _Now := clock_timestamp() AT TIME ZONE 'UTC';
 
-    /* the criteria below helps prevent deadlocks while improving queue-like throughput */
-    ORDER BY
-        ServiceId,
-        ProviderId,
-        QueueId,
-        MessageId
-    FOR UPDATE
-    LIMIT _BatchSize
-)
-DELETE FROM OrleansStreamDeadLetter AS M
-USING Batch AS B
-WHERE
-    M.ServiceId = B.ServiceId
-    AND M.ProviderId = B.ProviderId
-    AND M.QueueId = B.QueueId
-    AND M.MessageId = B.MessageId;
+    UPDATE OrleansStreamPartition AS P
+    SET
+        Checkpoint = _Checkpoint,
+        ModifiedOn = _Now
+    WHERE P.ServiceId = _ServiceId
+        AND P.ProviderId = _ProviderId
+        AND P.QueueId = _QueueId
+        AND P.OwnerEpoch = _OwnerEpoch
+        AND (P.Checkpoint IS NULL OR P.Checkpoint < _Checkpoint)
+        AND _Checkpoint < P.NextMessageId
+    RETURNING P.OwnerEpoch, P.Checkpoint
+    INTO _CurrentOwnerEpoch, _CurrentCheckpoint;
 
+    IF FOUND THEN
+        _Updated := TRUE;
+        UPDATE OrleansStreamMessage AS M
+        SET CheckpointedOn = COALESCE(M.CheckpointedOn, _Now)
+        WHERE M.ServiceId = _ServiceId
+            AND M.ProviderId = _ProviderId
+            AND M.QueueId = _QueueId
+            AND (_PreviousCheckpoint IS NULL OR M.MessageId > _PreviousCheckpoint)
+            AND M.MessageId <= _Checkpoint
+            AND M.CheckpointedOn IS NULL;
+    ELSE
+        SELECT P.OwnerEpoch, P.Checkpoint
+        INTO _CurrentOwnerEpoch, _CurrentCheckpoint
+        FROM OrleansStreamPartition AS P
+        WHERE P.ServiceId = _ServiceId
+            AND P.ProviderId = _ProviderId
+            AND P.QueueId = _QueueId;
+    END IF;
+
+    IF _CurrentOwnerEpoch IS NOT NULL THEN
+        RETURN QUERY
+        SELECT
+            _ServiceId,
+            _ProviderId,
+            _QueueId,
+            _CurrentOwnerEpoch,
+            _CurrentCheckpoint,
+            _Updated;
+    END IF;
 END;
 $$;
 
-INSERT INTO OrleansQuery
+CREATE OR REPLACE FUNCTION AcquireStreamReplayLease
 (
-	QueryKey,
-	QueryText
+    _ServiceId VARCHAR(150),
+    _ProviderId VARCHAR(150),
+    _QueueId VARCHAR(150),
+    _ReaderId VARCHAR(150),
+    _StreamIdBytes BYTEA,
+    _StreamNamespaceLength INT,
+    _OwnerEpoch BIGINT,
+    _AfterMessageId BIGINT,
+    _ReplayLeaseDurationSeconds INT
 )
-SELECT
-	'EvictStreamDeadLettersKey',
-	'CALL EvictStreamDeadLetters(@ServiceId, @ProviderId, @QueueId, @BatchSize)'
-;
+RETURNS TABLE
+(
+    Status VARCHAR(32),
+    ServiceId VARCHAR(150),
+    ProviderId VARCHAR(150),
+    QueueId VARCHAR(150),
+    ReaderId VARCHAR(150),
+    OwnerEpoch BIGINT,
+    Watermark BIGINT,
+    ExpiresOn TIMESTAMP(6) WITHOUT TIME ZONE,
+    NextMessageId BIGINT,
+    Checkpoint BIGINT,
+    EarliestMessageId BIGINT,
+    TailMessageId BIGINT
+)
+LANGUAGE plpgsql
+AS $$
+#VARIABLE_CONFLICT USE_COLUMN
+DECLARE
+    _Now TIMESTAMP(6) WITHOUT TIME ZONE;
+    _CurrentOwnerEpoch BIGINT;
+    _NextMessageId BIGINT;
+    _Checkpoint BIGINT;
+    _EarliestMessageId BIGINT;
+    _TailMessageId BIGINT;
+    _LeaseOwnerEpoch BIGINT;
+    _Watermark BIGINT;
+    _ExpiresOn TIMESTAMP(6) WITHOUT TIME ZONE;
+    _Status VARCHAR(32);
+BEGIN
+    SELECT P.OwnerEpoch, P.NextMessageId, P.Checkpoint
+    INTO _CurrentOwnerEpoch, _NextMessageId, _Checkpoint
+    FROM OrleansStreamPartition AS P
+    WHERE P.ServiceId = _ServiceId AND P.ProviderId = _ProviderId AND P.QueueId = _QueueId
+    FOR UPDATE;
+
+    _Now := clock_timestamp() AT TIME ZONE 'UTC';
+
+    SELECT L.OwnerEpoch, L.Watermark, L.ExpiresOn
+    INTO _LeaseOwnerEpoch, _Watermark, _ExpiresOn
+    FROM OrleansStreamReplayLease AS L
+    WHERE L.ServiceId = _ServiceId AND L.ProviderId = _ProviderId
+        AND L.QueueId = _QueueId AND L.ReaderId = _ReaderId
+    FOR UPDATE;
+
+    PERFORM M.MessageId
+    FROM OrleansStreamMessage AS M
+    WHERE M.ServiceId = _ServiceId AND M.ProviderId = _ProviderId AND M.QueueId = _QueueId
+    FOR UPDATE;
+
+    SELECT MIN(M.MessageId), MAX(M.MessageId)
+    INTO _EarliestMessageId, _TailMessageId
+    FROM OrleansStreamMessage AS M
+    WHERE M.ServiceId = _ServiceId AND M.ProviderId = _ProviderId AND M.QueueId = _QueueId;
+
+    IF _CurrentOwnerEpoch IS NULL OR _CurrentOwnerEpoch <> _OwnerEpoch
+        OR (_LeaseOwnerEpoch IS NOT NULL AND _LeaseOwnerEpoch <> _OwnerEpoch AND _ExpiresOn > _Now)
+    THEN
+        _Status := 'OwnershipLost';
+    ELSIF _AfterMessageId < COALESCE(_EarliestMessageId, _NextMessageId) - 1 THEN
+        _Status := 'HistoryUnavailable';
+    ELSE
+        IF _LeaseOwnerEpoch IS NOT NULL
+            AND (_LeaseOwnerEpoch <> _OwnerEpoch OR _ExpiresOn <= _Now)
+        THEN
+            DELETE FROM OrleansStreamReplayLease AS L
+            WHERE L.ServiceId = _ServiceId AND L.ProviderId = _ProviderId
+                AND L.QueueId = _QueueId AND L.ReaderId = _ReaderId;
+            _LeaseOwnerEpoch := NULL;
+        END IF;
+
+        _ExpiresOn := _Now + make_interval(secs => _ReplayLeaseDurationSeconds);
+        IF _LeaseOwnerEpoch IS NULL THEN
+            _Watermark := _AfterMessageId;
+            INSERT INTO OrleansStreamReplayLease
+            (
+                ServiceId, ProviderId, QueueId, ReaderId, StreamIdBytes,
+                StreamNamespaceLength, OwnerEpoch, Watermark, ExpiresOn, CreatedOn, ModifiedOn
+            )
+            VALUES
+            (
+                _ServiceId, _ProviderId, _QueueId, _ReaderId, _StreamIdBytes,
+                _StreamNamespaceLength, _OwnerEpoch, _Watermark, _ExpiresOn, _Now, _Now
+            );
+        ELSE
+            _Watermark := GREATEST(_Watermark, _AfterMessageId);
+            UPDATE OrleansStreamReplayLease AS L
+            SET Watermark = _Watermark, ExpiresOn = _ExpiresOn, ModifiedOn = _Now
+            WHERE L.ServiceId = _ServiceId AND L.ProviderId = _ProviderId
+                AND L.QueueId = _QueueId AND L.ReaderId = _ReaderId
+                AND L.OwnerEpoch = _OwnerEpoch;
+        END IF;
+        _Status := 'Acquired';
+    END IF;
+
+    RETURN QUERY SELECT _Status, _ServiceId, _ProviderId, _QueueId, _ReaderId,
+        _CurrentOwnerEpoch, _Watermark, _ExpiresOn, _NextMessageId, _Checkpoint,
+        _EarliestMessageId, _TailMessageId;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION ReadStreamReplayMessages
+(
+    _ServiceId VARCHAR(150),
+    _ProviderId VARCHAR(150),
+    _QueueId VARCHAR(150),
+    _ReaderId VARCHAR(150),
+    _OwnerEpoch BIGINT,
+    _AfterMessageId BIGINT,
+    _MaxCount INT,
+    _ReplayLeaseDurationSeconds INT
+)
+RETURNS TABLE
+(
+    Status VARCHAR(32),
+    OwnerEpoch BIGINT,
+    Watermark BIGINT,
+    ExpiresOn TIMESTAMP(6) WITHOUT TIME ZONE,
+    NextMessageId BIGINT,
+    Checkpoint BIGINT,
+    EarliestMessageId BIGINT,
+    TailMessageId BIGINT,
+    MessageId BIGINT,
+    StreamIdBytes BYTEA,
+    StreamNamespaceLength INT,
+    CreatedOn TIMESTAMP(6) WITHOUT TIME ZONE,
+    Payload BYTEA
+)
+LANGUAGE plpgsql
+AS $$
+#VARIABLE_CONFLICT USE_COLUMN
+DECLARE
+    _Now TIMESTAMP(6) WITHOUT TIME ZONE;
+    _CurrentOwnerEpoch BIGINT;
+    _NextMessageId BIGINT;
+    _Checkpoint BIGINT;
+    _EarliestMessageId BIGINT;
+    _TailMessageId BIGINT;
+    _LeaseOwnerEpoch BIGINT;
+    _Watermark BIGINT;
+    _ExpiresOn TIMESTAMP(6) WITHOUT TIME ZONE;
+    _Status VARCHAR(32);
+BEGIN
+    SELECT P.OwnerEpoch, P.NextMessageId, P.Checkpoint
+    INTO _CurrentOwnerEpoch, _NextMessageId, _Checkpoint
+    FROM OrleansStreamPartition AS P
+    WHERE P.ServiceId = _ServiceId AND P.ProviderId = _ProviderId AND P.QueueId = _QueueId
+    FOR UPDATE;
+
+    _Now := clock_timestamp() AT TIME ZONE 'UTC';
+
+    SELECT L.OwnerEpoch, L.Watermark, L.ExpiresOn
+    INTO _LeaseOwnerEpoch, _Watermark, _ExpiresOn
+    FROM OrleansStreamReplayLease AS L
+    WHERE L.ServiceId = _ServiceId AND L.ProviderId = _ProviderId
+        AND L.QueueId = _QueueId AND L.ReaderId = _ReaderId
+    FOR UPDATE;
+
+    PERFORM M.MessageId
+    FROM OrleansStreamMessage AS M
+    WHERE M.ServiceId = _ServiceId AND M.ProviderId = _ProviderId AND M.QueueId = _QueueId
+    FOR UPDATE;
+
+    SELECT MIN(M.MessageId), MAX(M.MessageId)
+    INTO _EarliestMessageId, _TailMessageId
+    FROM OrleansStreamMessage AS M
+    WHERE M.ServiceId = _ServiceId AND M.ProviderId = _ProviderId AND M.QueueId = _QueueId;
+
+    IF _CurrentOwnerEpoch IS NULL OR _CurrentOwnerEpoch <> _OwnerEpoch
+        OR _LeaseOwnerEpoch IS NULL OR _LeaseOwnerEpoch <> _OwnerEpoch
+    THEN
+        _Status := 'OwnershipLost';
+    ELSIF _ExpiresOn <= _Now THEN
+        _Status := 'Expired';
+    ELSIF _AfterMessageId < COALESCE(_EarliestMessageId, _NextMessageId) - 1 THEN
+        _Status := 'HistoryUnavailable';
+    ELSE
+        _ExpiresOn := _Now + make_interval(secs => _ReplayLeaseDurationSeconds);
+        UPDATE OrleansStreamReplayLease AS L
+        SET ExpiresOn = _ExpiresOn, ModifiedOn = _Now
+        WHERE L.ServiceId = _ServiceId AND L.ProviderId = _ProviderId
+            AND L.QueueId = _QueueId AND L.ReaderId = _ReaderId AND L.OwnerEpoch = _OwnerEpoch;
+        _Status := 'Active';
+    END IF;
+
+    IF _Status = 'Active' THEN
+        RETURN QUERY
+        SELECT _Status, _CurrentOwnerEpoch, _Watermark, _ExpiresOn, _NextMessageId,
+            _Checkpoint, _EarliestMessageId, _TailMessageId, M.MessageId,
+            M.StreamIdBytes, M.StreamNamespaceLength, M.CreatedOn, M.Payload
+        FROM OrleansStreamMessage AS M
+        WHERE M.ServiceId = _ServiceId AND M.ProviderId = _ProviderId
+            AND M.QueueId = _QueueId AND M.MessageId > _AfterMessageId
+        ORDER BY M.MessageId
+        LIMIT _MaxCount;
+    END IF;
+
+    IF _Status <> 'Active' OR NOT FOUND THEN
+        RETURN QUERY SELECT _Status, _CurrentOwnerEpoch, _Watermark, _ExpiresOn,
+            _NextMessageId, _Checkpoint, _EarliestMessageId, _TailMessageId,
+            NULL::BIGINT, NULL::BYTEA, NULL::INT,
+            NULL::TIMESTAMP(6) WITHOUT TIME ZONE, NULL::BYTEA;
+    END IF;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION UpdateStreamReplayLease
+(
+    _ServiceId VARCHAR(150),
+    _ProviderId VARCHAR(150),
+    _QueueId VARCHAR(150),
+    _ReaderId VARCHAR(150),
+    _OwnerEpoch BIGINT,
+    _Watermark BIGINT,
+    _ReplayLeaseDurationSeconds INT
+)
+RETURNS TABLE
+(
+    Status VARCHAR(32), OwnerEpoch BIGINT, Watermark BIGINT,
+    ExpiresOn TIMESTAMP(6) WITHOUT TIME ZONE, NextMessageId BIGINT,
+    Checkpoint BIGINT, EarliestMessageId BIGINT, TailMessageId BIGINT
+)
+LANGUAGE plpgsql
+AS $$
+#VARIABLE_CONFLICT USE_COLUMN
+DECLARE
+    _Now TIMESTAMP(6) WITHOUT TIME ZONE;
+    _CurrentOwnerEpoch BIGINT;
+    _NextMessageId BIGINT;
+    _Checkpoint BIGINT;
+    _EarliestMessageId BIGINT;
+    _TailMessageId BIGINT;
+    _LeaseOwnerEpoch BIGINT;
+    _CurrentWatermark BIGINT;
+    _ExpiresOn TIMESTAMP(6) WITHOUT TIME ZONE;
+    _Status VARCHAR(32);
+BEGIN
+    SELECT P.OwnerEpoch, P.NextMessageId, P.Checkpoint
+    INTO _CurrentOwnerEpoch, _NextMessageId, _Checkpoint
+    FROM OrleansStreamPartition AS P
+    WHERE P.ServiceId = _ServiceId AND P.ProviderId = _ProviderId AND P.QueueId = _QueueId
+    FOR UPDATE;
+    _Now := clock_timestamp() AT TIME ZONE 'UTC';
+
+    SELECT L.OwnerEpoch, L.Watermark, L.ExpiresOn
+    INTO _LeaseOwnerEpoch, _CurrentWatermark, _ExpiresOn
+    FROM OrleansStreamReplayLease AS L
+    WHERE L.ServiceId = _ServiceId AND L.ProviderId = _ProviderId
+        AND L.QueueId = _QueueId AND L.ReaderId = _ReaderId
+    FOR UPDATE;
+
+    PERFORM M.MessageId
+    FROM OrleansStreamMessage AS M
+    WHERE M.ServiceId = _ServiceId AND M.ProviderId = _ProviderId AND M.QueueId = _QueueId
+    FOR UPDATE;
+
+    SELECT MIN(M.MessageId), MAX(M.MessageId)
+    INTO _EarliestMessageId, _TailMessageId
+    FROM OrleansStreamMessage AS M
+    WHERE M.ServiceId = _ServiceId AND M.ProviderId = _ProviderId AND M.QueueId = _QueueId;
+
+    IF _CurrentOwnerEpoch IS NULL OR _CurrentOwnerEpoch <> _OwnerEpoch
+        OR _LeaseOwnerEpoch IS NULL OR _LeaseOwnerEpoch <> _OwnerEpoch
+    THEN
+        _Status := 'OwnershipLost';
+    ELSIF _ExpiresOn <= _Now THEN
+        _Status := 'Expired';
+    ELSIF _Watermark < COALESCE(_EarliestMessageId, _NextMessageId) - 1 THEN
+        _Status := 'HistoryUnavailable';
+    ELSE
+        _CurrentWatermark := GREATEST(_CurrentWatermark, _Watermark);
+        _ExpiresOn := _Now + make_interval(secs => _ReplayLeaseDurationSeconds);
+        UPDATE OrleansStreamReplayLease AS L
+        SET Watermark = _CurrentWatermark, ExpiresOn = _ExpiresOn, ModifiedOn = _Now
+        WHERE L.ServiceId = _ServiceId AND L.ProviderId = _ProviderId
+            AND L.QueueId = _QueueId AND L.ReaderId = _ReaderId AND L.OwnerEpoch = _OwnerEpoch;
+        _Status := 'Active';
+    END IF;
+
+    RETURN QUERY SELECT _Status, _CurrentOwnerEpoch, _CurrentWatermark, _ExpiresOn,
+        _NextMessageId, _Checkpoint, _EarliestMessageId, _TailMessageId;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION ReleaseStreamReplayLease
+(
+    _ServiceId VARCHAR(150),
+    _ProviderId VARCHAR(150),
+    _QueueId VARCHAR(150),
+    _ReaderId VARCHAR(150),
+    _OwnerEpoch BIGINT
+)
+RETURNS TABLE
+(
+    Status VARCHAR(32), OwnerEpoch BIGINT, Watermark BIGINT,
+    ExpiresOn TIMESTAMP(6) WITHOUT TIME ZONE, NextMessageId BIGINT,
+    Checkpoint BIGINT, EarliestMessageId BIGINT, TailMessageId BIGINT
+)
+LANGUAGE plpgsql
+AS $$
+#VARIABLE_CONFLICT USE_COLUMN
+DECLARE
+    _CurrentOwnerEpoch BIGINT;
+    _NextMessageId BIGINT;
+    _Checkpoint BIGINT;
+    _EarliestMessageId BIGINT;
+    _TailMessageId BIGINT;
+    _LeaseOwnerEpoch BIGINT;
+    _Watermark BIGINT;
+    _ExpiresOn TIMESTAMP(6) WITHOUT TIME ZONE;
+    _Status VARCHAR(32);
+BEGIN
+    SELECT P.OwnerEpoch, P.NextMessageId, P.Checkpoint
+    INTO _CurrentOwnerEpoch, _NextMessageId, _Checkpoint
+    FROM OrleansStreamPartition AS P
+    WHERE P.ServiceId = _ServiceId AND P.ProviderId = _ProviderId AND P.QueueId = _QueueId
+    FOR UPDATE;
+
+    SELECT L.OwnerEpoch, L.Watermark, L.ExpiresOn
+    INTO _LeaseOwnerEpoch, _Watermark, _ExpiresOn
+    FROM OrleansStreamReplayLease AS L
+    WHERE L.ServiceId = _ServiceId AND L.ProviderId = _ProviderId
+        AND L.QueueId = _QueueId AND L.ReaderId = _ReaderId
+    FOR UPDATE;
+
+    PERFORM M.MessageId
+    FROM OrleansStreamMessage AS M
+    WHERE M.ServiceId = _ServiceId AND M.ProviderId = _ProviderId AND M.QueueId = _QueueId
+    FOR UPDATE;
+
+    SELECT MIN(M.MessageId), MAX(M.MessageId)
+    INTO _EarliestMessageId, _TailMessageId
+    FROM OrleansStreamMessage AS M
+    WHERE M.ServiceId = _ServiceId AND M.ProviderId = _ProviderId AND M.QueueId = _QueueId;
+
+    IF _CurrentOwnerEpoch IS NULL OR _CurrentOwnerEpoch <> _OwnerEpoch
+        OR (_LeaseOwnerEpoch IS NOT NULL AND _LeaseOwnerEpoch <> _OwnerEpoch)
+    THEN
+        _Status := 'OwnershipLost';
+    ELSE
+        DELETE FROM OrleansStreamReplayLease AS L
+        WHERE L.ServiceId = _ServiceId AND L.ProviderId = _ProviderId
+            AND L.QueueId = _QueueId AND L.ReaderId = _ReaderId AND L.OwnerEpoch = _OwnerEpoch;
+        _Status := 'Released';
+    END IF;
+
+    RETURN QUERY SELECT _Status, _CurrentOwnerEpoch, _Watermark, _ExpiresOn,
+        _NextMessageId, _Checkpoint, _EarliestMessageId, _TailMessageId;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION CleanupStreamMessages
+(
+    _ServiceId VARCHAR(150),
+    _ProviderId VARCHAR(150),
+    _QueueId VARCHAR(150),
+    _OwnerEpoch BIGINT,
+    _RetentionPeriodSeconds INT,
+    _MaximumRetentionPeriodSeconds INT,
+    _CleanupIntervalSeconds INT,
+    _CleanupBatchSize INT
+)
+RETURNS TABLE
+(
+    Ran BOOLEAN,
+    DeletedCount INT,
+    DeletedThroughMessageId BIGINT,
+    HardDeletedCount INT,
+    HardDeletedFromMessageId BIGINT,
+    HardDeletedThroughMessageId BIGINT,
+    Checkpoint BIGINT,
+    ActiveReplayWatermark BIGINT,
+    EarliestMessageId BIGINT,
+    TailMessageId BIGINT
+)
+LANGUAGE plpgsql
+AS $$
+#VARIABLE_CONFLICT USE_COLUMN
+DECLARE
+    _Now TIMESTAMP(6) WITHOUT TIME ZONE;
+    _CurrentOwnerEpoch BIGINT;
+    _Checkpoint BIGINT;
+    _CleanupOn TIMESTAMP(6) WITHOUT TIME ZONE;
+    _ActiveReplayWatermark BIGINT;
+    _DeletedCount INT := 0;
+    _DeletedThroughMessageId BIGINT;
+    _HardDeletedCount INT := 0;
+    _HardDeletedFromMessageId BIGINT;
+    _HardDeletedThroughMessageId BIGINT;
+    _EarliestMessageId BIGINT;
+    _TailMessageId BIGINT;
+BEGIN
+    SELECT P.OwnerEpoch, P.Checkpoint, P.CleanupOn
+    INTO _CurrentOwnerEpoch, _Checkpoint, _CleanupOn
+    FROM OrleansStreamPartition AS P
+    WHERE P.ServiceId = _ServiceId AND P.ProviderId = _ProviderId AND P.QueueId = _QueueId
+    FOR UPDATE;
+
+    _Now := clock_timestamp() AT TIME ZONE 'UTC';
+
+    PERFORM L.ReaderId
+    FROM OrleansStreamReplayLease AS L
+    WHERE L.ServiceId = _ServiceId AND L.ProviderId = _ProviderId AND L.QueueId = _QueueId
+    FOR UPDATE;
+
+    IF _CurrentOwnerEpoch = _OwnerEpoch THEN
+        DELETE FROM OrleansStreamReplayLease AS L
+        WHERE L.ServiceId = _ServiceId AND L.ProviderId = _ProviderId
+            AND L.QueueId = _QueueId AND L.ExpiresOn <= _Now;
+    END IF;
+
+    SELECT MIN(L.Watermark)
+    INTO _ActiveReplayWatermark
+    FROM OrleansStreamReplayLease AS L
+    WHERE L.ServiceId = _ServiceId AND L.ProviderId = _ProviderId
+        AND L.QueueId = _QueueId AND L.ExpiresOn > _Now;
+
+    PERFORM M.MessageId
+    FROM OrleansStreamMessage AS M
+    WHERE M.ServiceId = _ServiceId AND M.ProviderId = _ProviderId AND M.QueueId = _QueueId
+    FOR UPDATE;
+
+    SELECT MIN(M.MessageId), MAX(M.MessageId)
+    INTO _EarliestMessageId, _TailMessageId
+    FROM OrleansStreamMessage AS M
+    WHERE M.ServiceId = _ServiceId AND M.ProviderId = _ProviderId AND M.QueueId = _QueueId;
+
+    IF _CurrentOwnerEpoch IS NULL OR _CurrentOwnerEpoch <> _OwnerEpoch OR _CleanupOn > _Now THEN
+
+        RETURN QUERY
+        SELECT
+            FALSE,
+            0,
+            NULL::BIGINT,
+            0,
+            NULL::BIGINT,
+            NULL::BIGINT,
+            _Checkpoint,
+            _ActiveReplayWatermark,
+            _EarliestMessageId,
+            _TailMessageId;
+        RETURN;
+    END IF;
+
+    UPDATE OrleansStreamPartition AS P
+    SET CleanupOn = _Now + make_interval(secs => _CleanupIntervalSeconds), ModifiedOn = _Now
+    WHERE P.ServiceId = _ServiceId AND P.ProviderId = _ProviderId
+        AND P.QueueId = _QueueId AND P.OwnerEpoch = _OwnerEpoch;
+
+    WITH Candidate AS
+    (
+        SELECT M.MessageId
+        FROM OrleansStreamMessage AS M
+        WHERE M.ServiceId = _ServiceId
+            AND M.ProviderId = _ProviderId
+            AND M.QueueId = _QueueId
+            AND
+            (
+                (
+                    _Checkpoint IS NOT NULL
+                    AND M.MessageId <= _Checkpoint
+                    AND M.CheckpointedOn < _Now - make_interval(secs => _RetentionPeriodSeconds)
+                    AND (_ActiveReplayWatermark IS NULL OR M.MessageId <= _ActiveReplayWatermark)
+                )
+                OR
+                (
+                    _MaximumRetentionPeriodSeconds IS NOT NULL
+                    AND M.CreatedOn < _Now - make_interval(secs => _MaximumRetentionPeriodSeconds)
+                )
+            )
+        ORDER BY M.MessageId
+            LIMIT _CleanupBatchSize
+            FOR UPDATE
+    ),
+    Deleted AS
+    (
+        DELETE FROM OrleansStreamMessage AS M
+        USING Candidate AS C
+        WHERE M.ServiceId = _ServiceId
+            AND M.ProviderId = _ProviderId
+            AND M.QueueId = _QueueId
+            AND M.MessageId = C.MessageId
+        RETURNING M.MessageId, M.CreatedOn, M.CheckpointedOn
+    )
+    SELECT
+        COUNT(*)::INT,
+        MAX(D.MessageId),
+        COUNT(*) FILTER
+        (
+            WHERE _MaximumRetentionPeriodSeconds IS NOT NULL
+                AND D.CreatedOn < _Now - make_interval(secs => _MaximumRetentionPeriodSeconds)
+                AND NOT
+                (
+                    _Checkpoint IS NOT NULL
+                    AND D.MessageId <= _Checkpoint
+                    AND D.CheckpointedOn < _Now - make_interval(secs => _RetentionPeriodSeconds)
+                    AND (_ActiveReplayWatermark IS NULL OR D.MessageId <= _ActiveReplayWatermark)
+                )
+        )::INT,
+        MIN(D.MessageId) FILTER
+        (
+            WHERE _MaximumRetentionPeriodSeconds IS NOT NULL
+                AND D.CreatedOn < _Now - make_interval(secs => _MaximumRetentionPeriodSeconds)
+                AND NOT
+                (
+                    _Checkpoint IS NOT NULL
+                    AND D.MessageId <= _Checkpoint
+                    AND D.CheckpointedOn < _Now - make_interval(secs => _RetentionPeriodSeconds)
+                    AND (_ActiveReplayWatermark IS NULL OR D.MessageId <= _ActiveReplayWatermark)
+                )
+        ),
+        MAX(D.MessageId) FILTER
+        (
+            WHERE _MaximumRetentionPeriodSeconds IS NOT NULL
+                AND D.CreatedOn < _Now - make_interval(secs => _MaximumRetentionPeriodSeconds)
+                AND NOT
+                (
+                    _Checkpoint IS NOT NULL
+                    AND D.MessageId <= _Checkpoint
+                    AND D.CheckpointedOn < _Now - make_interval(secs => _RetentionPeriodSeconds)
+                    AND (_ActiveReplayWatermark IS NULL OR D.MessageId <= _ActiveReplayWatermark)
+                )
+        )
+    INTO
+        _DeletedCount,
+        _DeletedThroughMessageId,
+        _HardDeletedCount,
+        _HardDeletedFromMessageId,
+        _HardDeletedThroughMessageId
+    FROM Deleted AS D;
+
+    SELECT MIN(M.MessageId), MAX(M.MessageId)
+    INTO _EarliestMessageId, _TailMessageId
+    FROM OrleansStreamMessage AS M
+    WHERE M.ServiceId = _ServiceId
+        AND M.ProviderId = _ProviderId
+        AND M.QueueId = _QueueId;
+
+    RETURN QUERY
+    SELECT
+        TRUE,
+        _DeletedCount,
+        _DeletedThroughMessageId,
+        _HardDeletedCount,
+        _HardDeletedFromMessageId,
+        _HardDeletedThroughMessageId,
+        _Checkpoint,
+        _ActiveReplayWatermark,
+        _EarliestMessageId,
+        _TailMessageId;
+END;
+$$;
+
+INSERT INTO OrleansQuery (QueryKey, QueryText)
+VALUES
+    ('StreamSchemaVersionKey', '3'),
+    ('AppendStreamMessageKey', 'SELECT * FROM AppendStreamMessage(@ServiceId, @ProviderId, @QueueId, @StreamIdBytes, @StreamNamespaceLength, @Payload)'),
+    ('AcquireStreamPartitionKey', 'SELECT * FROM AcquireStreamPartition(@ServiceId, @ProviderId, @QueueId, @StartFromNow)'),
+    ('ReadStreamMessagesKey', 'SELECT ServiceId, ProviderId, QueueId, MessageId, StreamIdBytes, StreamNamespaceLength, CreatedOn, Payload FROM OrleansStreamMessage WHERE ServiceId = @ServiceId AND ProviderId = @ProviderId AND QueueId = @QueueId AND MessageId > @AfterMessageId ORDER BY MessageId LIMIT @MaxCount'),
+    ('AdvanceStreamCheckpointKey', 'SELECT * FROM AdvanceStreamCheckpoint(@ServiceId, @ProviderId, @QueueId, @OwnerEpoch, @Checkpoint)'),
+    ('GetStreamPartitionBoundsKey', 'SELECT P.ServiceId, P.ProviderId, P.QueueId, P.OwnerEpoch, P.NextMessageId, P.Checkpoint, MIN(M.MessageId) AS EarliestMessageId, MAX(M.MessageId) AS TailMessageId FROM OrleansStreamPartition AS P LEFT JOIN OrleansStreamMessage AS M ON M.ServiceId = P.ServiceId AND M.ProviderId = P.ProviderId AND M.QueueId = P.QueueId WHERE P.ServiceId = @ServiceId AND P.ProviderId = @ProviderId AND P.QueueId = @QueueId GROUP BY P.ServiceId, P.ProviderId, P.QueueId, P.OwnerEpoch, P.NextMessageId, P.Checkpoint'),
+    ('AcquireStreamReplayLeaseKey', 'SELECT * FROM AcquireStreamReplayLease(@ServiceId, @ProviderId, @QueueId, @ReaderId, @StreamIdBytes, @StreamNamespaceLength, @OwnerEpoch, @AfterMessageId, @ReplayLeaseDurationSeconds)'),
+    ('ReadStreamReplayMessagesKey', 'SELECT * FROM ReadStreamReplayMessages(@ServiceId, @ProviderId, @QueueId, @ReaderId, @OwnerEpoch, @AfterMessageId, @MaxCount, @ReplayLeaseDurationSeconds)'),
+    ('UpdateStreamReplayLeaseKey', 'SELECT * FROM UpdateStreamReplayLease(@ServiceId, @ProviderId, @QueueId, @ReaderId, @OwnerEpoch, @Watermark, @ReplayLeaseDurationSeconds)'),
+    ('ReleaseStreamReplayLeaseKey', 'SELECT * FROM ReleaseStreamReplayLease(@ServiceId, @ProviderId, @QueueId, @ReaderId, @OwnerEpoch)'),
+    ('CleanupStreamMessagesKey', 'SELECT * FROM CleanupStreamMessages(@ServiceId, @ProviderId, @QueueId, @OwnerEpoch, @RetentionPeriodSeconds, @MaximumRetentionPeriodSeconds, @CleanupIntervalSeconds, @CleanupBatchSize)');

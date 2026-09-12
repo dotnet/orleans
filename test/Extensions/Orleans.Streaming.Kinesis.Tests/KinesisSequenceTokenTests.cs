@@ -1,9 +1,12 @@
 using System;
+using System.Reflection;
+using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using Orleans.Serialization;
 using Orleans.Providers.Streams.Common;
 using Orleans.Streams;
+using Orleans.Streaming.JsonConverters;
 using Orleans.Streaming.Kinesis;
 using TestExtensions;
 using UnitTests.StreamingTests;
@@ -131,11 +134,13 @@ public sealed class KinesisSequenceTokenTests
     [Fact]
     public void CreateSequenceTokenForEventPreservesKinesisPosition()
     {
-        var batchToken = new KinesisSequenceToken(HugeShardSequence, sequenceNumber: 42, eventIndex: 0);
+        var batchToken = new KinesisSequenceToken("stream", "shard-1", HugeShardSequence, sequenceNumber: 42, eventIndex: 0);
 
         var eventToken = Assert.IsType<KinesisSequenceToken>(batchToken.CreateSequenceTokenForEvent(3));
 
         Assert.Equal(HugeShardSequence, eventToken.ShardSequence);
+        Assert.Equal("stream", eventToken.StreamName);
+        Assert.Equal("shard-1", eventToken.ShardId);
         Assert.Equal(42, eventToken.SequenceNumber);
         Assert.Equal(3, eventToken.EventIndex);
         Assert.True(batchToken.CompareTo(eventToken) < 0);
@@ -170,7 +175,7 @@ public sealed class KinesisSequenceTokenTests
     [Fact]
     public void BinarySerializationRoundTripPreservesFieldsAndOrderingAfterRestart()
     {
-        var original = new KinesisSequenceToken(HugeShardSequence, sequenceNumber: 42, eventIndex: 3);
+        var original = new KinesisSequenceToken("stream", "shard-1", HugeShardSequence, sequenceNumber: 42, eventIndex: 3);
 
         var bytes = serializer.SerializeToArray(original);
         var restored = serializer.Deserialize(bytes);
@@ -178,13 +183,25 @@ public sealed class KinesisSequenceTokenTests
         Assert.NotNull(restored);
         Assert.NotSame(original, restored);
         Assert.Equal(HugeShardSequence, restored.ShardSequence);
+        Assert.Equal("stream", restored.StreamName);
+        Assert.Equal("shard-1", restored.ShardId);
         Assert.Equal(42, restored.SequenceNumber);
         Assert.Equal(3, restored.EventIndex);
         Assert.True(original.Equals(restored));
         Assert.Equal(0, original.CompareTo(restored));
 
-        var newer = new KinesisSequenceToken(SlightlyLargerShardSequence, sequenceNumber: 0, eventIndex: 0);
+        var newer = new KinesisSequenceToken("stream", "shard-1", SlightlyLargerShardSequence, sequenceNumber: 0, eventIndex: 0);
         Assert.True(restored.CompareTo(newer) < 0);
+    }
+
+    [Fact]
+    public void TokensFromDifferentShardsAreIncompatible()
+    {
+        var first = new KinesisSequenceToken("stream", "shard-1", HugeShardSequence, 0, 0);
+        var second = new KinesisSequenceToken("stream", "shard-2", HugeShardSequence, 0, 0);
+
+        Assert.False(first.Equals(second));
+        Assert.Throws<ArgumentOutOfRangeException>(() => first.CompareTo(second));
     }
 
     [Fact]
@@ -198,5 +215,58 @@ public sealed class KinesisSequenceTokenTests
         Assert.Equal(7, restored.SequenceNumber);
         Assert.Equal(2, restored.EventIndex);
         Assert.True(restored.CompareTo(new KinesisSequenceToken(SlightlyLargerShardSequence, 0, 0)) < 0);
+    }
+
+    [Fact]
+    public void JsonRoundTripPreservesShardIdentity()
+    {
+        var original = new KinesisSequenceToken("stream", "shard-1", HugeShardSequence, 7, 2);
+
+        var restored = JsonConvert.DeserializeObject<KinesisSequenceToken>(
+            JsonConvert.SerializeObject(original))!;
+
+        Assert.Equal("shard-1", restored.ShardId);
+        Assert.Equal("stream", restored.StreamName);
+        Assert.Equal(original, restored);
+    }
+
+    [Fact]
+    public void SystemTextJsonRoundTripPreservesProviderPosition()
+    {
+        var options = new JsonSerializerOptions();
+        options.Converters.Add(new EventSequenceTokenJsonConverter());
+        StreamSequenceToken original = new KinesisSequenceToken(
+            "stream",
+            "shard-1",
+            HugeShardSequence,
+            7,
+            2);
+
+        var restored = Assert.IsType<PartitionedStreamSequenceToken>(
+            System.Text.Json.JsonSerializer.Deserialize<StreamSequenceToken>(
+                System.Text.Json.JsonSerializer.Serialize(original, options),
+                options));
+
+        Assert.Equal("stream", restored.ProviderIdentity);
+        Assert.Equal("shard-1", restored.PartitionIdentity);
+        Assert.Equal(HugeShardSequence, restored.Position);
+        Assert.Equal(2, restored.EventIndex);
+        Assert.True(original.Equals(restored));
+        Assert.True(restored.Equals(original));
+        Assert.Equal(original.GetHashCode(), restored.GetHashCode());
+    }
+
+    [Fact]
+    public void SerializerIdsPreserveLegacyShardSequenceAndAllocateNewFields()
+    {
+        Assert.Equal(0u, GetId(nameof(KinesisSequenceToken.ShardSequence)));
+        Assert.Equal(1u, GetId(nameof(KinesisSequenceToken.ShardId)));
+        Assert.Equal(2u, GetId(nameof(KinesisSequenceToken.StreamName)));
+
+        static uint GetId(string propertyName)
+            => typeof(KinesisSequenceToken)
+                .GetProperty(propertyName)!
+                .GetCustomAttribute<Orleans.IdAttribute>()!
+                .Id;
     }
 }

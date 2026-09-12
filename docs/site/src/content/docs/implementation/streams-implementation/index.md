@@ -81,7 +81,7 @@ The default maximum adapter batch-container batch size is 1 and the empty-poll p
 
 An <xref:Orleans.Streams.IQueueCache> decouples queue reads from consumer delivery. Each subscription has an <xref:Orleans.Streams.IQueueCacheCursor>, so a slow consumer does not directly block a fast consumer at a later cursor.
 
-The cache tracks the earliest delivery progress across active subscriptions. Purging must not remove an item still needed by any cursor. <xref:Orleans.Providers.Streams.Common.SimpleQueueCache> uses pressure buckets to stop or slow reads as lag grows instead of discarding undelivered events. Its default capacity is 4,096 batch containers.
+The cache tracks the earliest contiguous partition position which is safe across active subscriptions. A matching record becomes safe after delivery or intentional filtering. A cursor also advances safely across records for other streams when no earlier matching delivery is pending, so a quiet stream does not pin an otherwise busy partition. Purging must not remove an item still needed by any cursor. <xref:Orleans.Providers.Streams.Common.SimpleQueueCache> uses pressure buckets to stop or slow reads as lag grows instead of discarding undelivered events. Its default capacity is 4,096 batch containers.
 
 ```mermaid
 flowchart TB
@@ -97,11 +97,37 @@ flowchart TB
 
 Cache capacity is not durability. The queue remains the durable boundary, subject to the adapter's acknowledgement contract.
 
+Recoverable partitioned stream providers can compose a stream partition pipeline from <xref:Orleans.Providers.Streams.Common.RecoverableStreamReceiver%601>, a partition source, and a data adapter. The pipeline admits immutable stream records into pooled storage, reconstructs batches lazily, reconciles the earliest safe subscription scan/delivery watermark, and persists a checkpoint which resumes strictly after that position.
+
+## Retained-history replay pipeline
+
+Kinesis and ADO.NET supply an <xref:Orleans.Providers.Streams.Common.IRecoverableStreamReplaySourceFactory%601> to the recoverable receiver. A token outside the live cache creates an asynchronous replay cursor and follows this state machine:
+
+1. Normalize and validate the provider token.
+1. Attach to a compatible existing replay fragment, start an independent reader within `MaxConcurrentReaders`, or enter the bounded pending-admission list.
+1. Read physical partition records into a fragment cache. Multiple compatible subscription cursors can share that cache, and its earliest safe cursor progress controls reclamation.
+1. Record the oldest live-cache position as the handoff boundary and prevent live purge from crossing it.
+1. Scan historical records in partition order. Records for other streams advance safe scan progress without being delivered to the target observer.
+1. Create and seed the live cursor at the boundary before detaching the historical cursor.
+1. Dispose the fragment and provider reader after its final cursor leaves.
+
+`CacheSize` is a raw-record item limit for each fragment. When the cache has no add capacity, the asynchronous cursor returns a temporary-tail transition after the configured delay; the pulling agent keeps the subscription active and retries. Pending admission has no independent timeout: cancellation, cursor disposal, receiver shutdown, available reader capacity, or the configured queue limit resolves the wait.
+
+The replay manager owns per-queue reader admission and fragment record capacity, while the pulling agent owns delivery retries and consumer handshakes. A transient replay failure causes the pulling agent to reconstruct from the last safe partition token. An unavailable or invalid retained position remains a `DataNotAvailableException` until the application selects an available position.
+
+The replay cursor and the live receiver use separate progress:
+
+- replay-fragment safe progress reclaims fragment memory and, for ADO.NET, advances the provider-visible lease watermark;
+- subscription delivery progress controls what one observer has accepted;
+- the earliest safe live subscription progress updates the durable queue checkpoint.
+
+This separation preserves a contiguous replay-to-live scan with at-least-once delivery. See [Replay retained persistent-stream history](../../streaming/retained-history-replay.md) for public behavior and operational sizing.
+
 ## Pub-sub handshake
 
 The agent registers as a producer for each stream and obtains subscription records from stream pub-sub. It holds a pin cursor while subscription handshakes complete so cache cleanup cannot pass the requested start token. New subscription notifications update the agent's local pub-sub cache.
 
-Sequence tokens allow a rewindable adapter to start from a supported historical position. An adapter whose <xref:Orleans.Streams.IQueueAdapter.IsRewindable?displayProperty=nameWithType> property is `false` must reject unsupported tokens rather than pretending to honor them.
+Sequence tokens allow a rewindable adapter to start from a supported historical position. A start token is inclusive and remains unsafe until its record is delivered or intentionally filtered. A delivery handshake token confirms that its position was already processed. Exact `EventSequenceToken` and `EventSequenceTokenV2` values interoperate for legacy compatibility. Derived tokens compare only with the same concrete type unless the provider overrides equality, ordering, and hashing together. An adapter whose <xref:Orleans.Streams.IQueueAdapter.IsRewindable?displayProperty=nameWithType> property is `false` must reject unsupported tokens rather than pretending to honor them.
 
 ## Delivery and failure semantics
 

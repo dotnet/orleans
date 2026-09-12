@@ -12,7 +12,6 @@ namespace Tester.StreamingTests
 {
     public class ClientStreamTestRunner
     {
-        private static readonly Func<Task<int>> DefaultDeliveryFailureCount = () => Task.FromResult(0);
         private static readonly TimeSpan _timeout = TimeSpan.FromMinutes(3);
 
         private readonly TestCluster testHost;
@@ -53,8 +52,6 @@ namespace Tester.StreamingTests
             CancellationToken cancellationToken = default)
         {
             var hasDeliveryFailureCounter = getDeliveryFailureCount is not null;
-            getDeliveryFailureCount ??= DefaultDeliveryFailureCount;
-
             Guid streamGuid = Guid.NewGuid();
             var streamId = StreamId.Create(streamNamespace, streamGuid);
             int[] eventCount = { 0 };
@@ -83,8 +80,10 @@ namespace Tester.StreamingTests
                 await streamingObserver.WaitForSubscriptionUnregisteredAsync(streamId, droppedSubscriptionId, streamProviderName, cts.Token);
             }
 
-            int deliveryFailureCount = await getDeliveryFailureCount();
-            Assert.Equal(0, deliveryFailureCount);
+            if (getDeliveryFailureCount is not null)
+            {
+                Assert.Equal(0, await getDeliveryFailureCount());
+            }
         }
 
         private Task<StreamSubscriptionHandle<int>> SubscribeToStream(string streamProviderName, Guid streamGuid, string streamNamespace,
