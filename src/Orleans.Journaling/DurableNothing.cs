@@ -14,6 +14,8 @@ public interface IDurableNothing
 /// </summary>
 internal sealed class DurableNothing : IDurableNothing, IJournaledState
 {
+    bool IJournaledState.HasPendingChanges => false;
+
     public DurableNothing([ServiceKey] string key, IJournaledStateManager manager)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
