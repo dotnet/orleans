@@ -11,6 +11,8 @@ A reminder stores a periodic schedule for one logical grain. The configured remi
 
 Use a reminder for work whose schedule must survive activation changes and cluster restarts. Reminders suit periods measured in minutes, hours, or days. A reminder can wake a grain which then creates a [grain timer](timers.md) for finer-grained activation-scoped work.
 
+When many reminders can become due together, [reminder concurrency control](reminder-concurrency-control.md) limits per-silo delivery concurrency or rate, backs off during silo overload, and ramps up delivery after startup.
+
 ## Receive reminder ticks
 
 A grain receiving reminders implements <xref:Orleans.IRemindable>:
