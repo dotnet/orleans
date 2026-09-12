@@ -3,6 +3,7 @@ using System.Diagnostics.Metrics;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.Metrics.Testing;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using Orleans.Runtime;
@@ -137,6 +138,27 @@ public class CallbackDataTests
         callback.OnHostShutdown();
 
         Assert.Equal(1, timeProvider.GetTimestampCallCount);
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
+    public void LatencyDiagnosticsPreserveFractionalMilliseconds()
+    {
+        using var serviceProvider = CreateServiceProvider();
+        var meterFactory = serviceProvider.GetRequiredService<IMeterFactory>();
+        using var collector = new MetricCollector<double>(meterFactory, "Microsoft.Orleans", InstrumentNames.APP_REQUESTS_LATENCY_HISTOGRAM);
+        var timeProvider = new FakeTimeProvider();
+        var callback = CreateCallback(
+            new TestResponseCompletionSource(),
+            _ => { },
+            CreateInstruments(serviceProvider),
+            timeProvider);
+
+        timeProvider.Advance(TimeSpan.FromMicroseconds(125));
+        callback.OnHostShutdown();
+
+        Assert.Equal(0.125, Assert.Single(collector.GetMeasurementSnapshot()).Value);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
