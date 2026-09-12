@@ -128,12 +128,26 @@ namespace Orleans.Streaming.EventHubs
             this.eventHubReceiverFactory = eventHubReceiverFactory == null ? EventHubAdapterReceiver.CreateReceiver : eventHubReceiverFactory;
         }
 
-        public async Task Initialize(TimeSpan timeout)
+        public Task Initialize(TimeSpan timeout)
+            => Initialize(timeout, CancellationToken.None);
+
+        public async Task Initialize(
+            TimeSpan timeout,
+            CancellationToken cancellationToken)
         {
             LogInfoInitializingEventHubPartition(this.settings.Hub.EventHubName, this.settings.Partition);
             Interlocked.Exchange(ref this.receiverState, ReceiverRunning);
-            using var cancellation = new CancellationTokenSource(timeout);
-            await EnsureInitialized(cancellation.Token);
+            using var timeoutCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeoutCancellation.CancelAfter(timeout);
+            try
+            {
+                await EnsureInitialized(timeoutCancellation.Token);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                throw;
+            }
         }
 
         /// <summary>
