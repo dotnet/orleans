@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Hosting;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -42,7 +41,7 @@ public sealed class InProcessTestClusterOptions
     /// Gets or sets a value indicating whether to use test cluster membership.
     /// </summary>
     /// <value><see langword="true" /> if test cluster membership should be used; otherwise, <see langword="false" />.</value>
-    internal bool UseTestClusterMembership { get; set; }
+    public bool UseTestClusterMembership { get; set; }
 
     /// <summary>
     /// Gets or sets a value indicating whether to use test cluster grain directory, which is only applicable if <see cref="UseTestClusterMembership"/> is <see langword="true"/>.
@@ -51,10 +50,9 @@ public sealed class InProcessTestClusterOptions
     internal bool UseTestClusterGrainDirectory { get; set; }
 
     /// <summary>
-    /// Gets or sets a value indicating whether to use the experimental distributed grain directory.
+    /// Gets or sets a value indicating whether to use the distributed grain directory.
     /// </summary>
     /// <value><see langword="true" /> if the distributed grain directory should be used; otherwise, <see langword="false" />.</value>
-    [Experimental("ORLEANSEXP003")]
     public bool UseDistributedGrainDirectory { get; set; }
 
     /// <summary>

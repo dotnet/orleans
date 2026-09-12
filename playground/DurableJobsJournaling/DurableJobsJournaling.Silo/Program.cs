@@ -15,7 +15,6 @@ var storagePrefix = builder.Configuration.GetValue("Playground:Storage:Prefix", 
 
 builder.UseOrleans(siloBuilder =>
 {
-#pragma warning disable ORLEANSEXP003 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
     siloBuilder
         .AddDashboard()
         .AddActivityPropagation()
@@ -43,7 +42,6 @@ builder.UseOrleans(siloBuilder =>
                 ? DateTimeOffset.UtcNow.AddMilliseconds(250 * Math.Pow(2, context.DequeueCount))
                 : null;
         });
-#pragma warning restore ORLEANSEXP003 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
 });
 
 builder.Services.AddOptions<AzureBlobJournalStorageOptions>()

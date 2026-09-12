@@ -39,14 +39,24 @@ namespace Orleans.Runtime.Hosting
         public static IServiceCollection AddGrainDirectory<T>(this IServiceCollection collection, string name, Func<IServiceProvider, string, T> implementationFactory)
             where T : class, IGrainDirectory
         {
-            // Register the grain directory name so that directories can be enumerated by name.
-            collection.AddSingleton(sp => new NamedService<IGrainDirectory>(name));
-
-            // Register the grain directory implementation.
-            collection.AddKeyedSingleton<IGrainDirectory>(name, (sp, key) => implementationFactory(sp, name));
+            collection.AddGrainDirectoryAlias(name, implementationFactory);
             collection.AddSingleton<ILifecycleParticipant<ISiloLifecycle>>(s =>
                 s.GetKeyedService<IGrainDirectory>(name) as ILifecycleParticipant<ISiloLifecycle> ?? NoOpLifecycleParticipant.Instance);
 
+            return collection;
+        }
+
+        internal static IServiceCollection AddGrainDirectoryAlias<T>(
+            this IServiceCollection collection,
+            string name,
+            Func<IServiceProvider, string, T> implementationFactory)
+            where T : class, IGrainDirectory
+        {
+            // Register the grain directory name so that directories can be enumerated by name.
+            collection.AddSingleton(_ => new NamedService<IGrainDirectory>(name));
+
+            // Register the grain directory implementation.
+            collection.AddKeyedSingleton<IGrainDirectory>(name, (sp, _) => implementationFactory(sp, name));
             return collection;
         }
 

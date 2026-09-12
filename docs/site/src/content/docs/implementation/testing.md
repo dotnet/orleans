@@ -79,7 +79,7 @@ Stopping a host gracefully exercises shutdown. Disposing or terminating a handle
 
 ## Class-configurator test cluster and custom silo creation <a name="use-the-testcluster"></a>
 
-<xref:Orleans.TestingHost.TestClusterBuilder> is the class-configurator-based harness. It defaults to two silos, in-memory transport, generated cluster identity, test membership, client initialization, file logging, and homogeneous-silo assumptions. It also installs `ConfigureDistributedGrainDirectory`, so its silos opt into the experimental distributed grain directory instead of the production runtime's default `LocalGrainDirectory`.
+<xref:Orleans.TestingHost.TestClusterBuilder> is the class-configurator-based harness. It defaults to two silos, in-memory transport, generated cluster identity, test membership, client initialization, file logging, and homogeneous-silo assumptions. It also installs `ConfigureDistributedGrainDirectory`, configuring its silos with the distributed grain directory.
 
 <xref:Orleans.TestingHost.ISiloConfigurator>, <xref:Orleans.TestingHost.IHostConfigurator>, and <xref:Orleans.TestingHost.IClientBuilderConfigurator> are serializable configuration identities which can be applied to every host. Assigning <xref:Orleans.TestingHost.TestClusterBuilder.CreateSiloAsync?displayProperty=nameWithType> sets <xref:Orleans.TestingHost.TestClusterOptions.ConnectionTransport?displayProperty=nameWithType> to `TcpSocket`, so the built-in client uses its TCP transport instead of the harness's in-memory transport. The delegate bypasses <xref:Orleans.TestingHost.TestCluster.DefaultCreateSiloAsync*> and cannot access the harness's private in-memory transport hub, so it must configure the custom silo host with a compatible transport.
 
