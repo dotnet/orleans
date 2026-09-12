@@ -1309,7 +1309,7 @@
                         "uid": "${datasource}"
                     },
                     "editorMode": "code",
-                    "expr": "orleans_catalog_activations{cluster=\"$cluster\",job=\"$job\"}",
+                    "expr": "sum by (instance) (orleans_catalog_activations{cluster=\"$cluster\",job=\"$job\"})",
                     "legendFormat": "{{instance}}",
                     "range": true,
                     "refId": "A"
@@ -1401,7 +1401,7 @@
                         "uid": "${datasource}"
                     },
                     "editorMode": "code",
-                    "expr": "rate(orleans_catalog_activation_created{cluster=\"$cluster\",job=\"$job\"}[$__rate_interval])",
+                    "expr": "sum by (instance) (rate(orleans_catalog_activation_created{cluster=\"$cluster\",job=\"$job\"}[$__rate_interval]))",
                     "legendFormat": "{{instance}} Created",
                     "range": true,
                     "refId": "A"
@@ -1412,7 +1412,7 @@
                         "uid": "${datasource}"
                     },
                     "editorMode": "code",
-                    "expr": "rate(orleans_catalog_activation_destroyed{cluster=\"$cluster\",job=\"$job\"}[$__rate_interval])",
+                    "expr": "sum by (instance) (rate(orleans_catalog_activation_destroyed{cluster=\"$cluster\",job=\"$job\"}[$__rate_interval]))",
                     "hide": false,
                     "legendFormat": "{{instance}} Destroyed",
                     "range": true,
@@ -1504,7 +1504,7 @@
                         "uid": "${datasource}"
                     },
                     "editorMode": "code",
-                    "expr": "increase(orleans_catalog_activation_failed_to_activate{cluster=\"$cluster\",job=\"$job\"}[5m])",
+                    "expr": "sum by (instance) (increase(orleans_catalog_activation_failed_to_activate{cluster=\"$cluster\",job=\"$job\"}[5m]))",
                     "legendFormat": "{{instance}}  Failed",
                     "range": true,
                     "refId": "A"
@@ -1515,7 +1515,7 @@
                         "uid": "${datasource}"
                     },
                     "editorMode": "code",
-                    "expr": "increase(orleans_catalog_activation_non_existent{cluster=\"$cluster\",job=\"$job\"}[5m])",
+                    "expr": "sum by (instance) (increase(orleans_catalog_activation_non_existent{cluster=\"$cluster\",job=\"$job\"}[5m]))",
                     "hide": false,
                     "legendFormat": "{{instance}} Non-Existent",
                     "range": true,
@@ -1527,7 +1527,7 @@
                         "uid": "${datasource}"
                     },
                     "editorMode": "code",
-                    "expr": "increase(orleans_catalog_activation_concurrent_registration_attempts{cluster=\"$cluster\",job=\"$job\"}[5m])",
+                    "expr": "sum by (instance) (increase(orleans_catalog_activation_concurrent_registration_attempts{cluster=\"$cluster\",job=\"$job\"}[5m]))",
                     "hide": false,
                     "legendFormat": "{{instance}} Conflict",
                     "range": true,
@@ -1619,7 +1619,7 @@
                         "uid": "${datasource}"
                     },
                     "editorMode": "code",
-                    "expr": "rate(orleans_catalog_activation_shutdown{cluster=\"$cluster\",job=\"$job\"}[$__rate_interval])",
+                    "expr": "sum by (instance,via) (rate(orleans_catalog_activation_shutdown{cluster=\"$cluster\",job=\"$job\"}[$__rate_interval]))",
                     "legendFormat": "{{instance}} {{via}}",
                     "range": true,
                     "refId": "A"
@@ -2947,10 +2947,21 @@
                         "uid": "${datasource}"
                     },
                     "editorMode": "code",
-                    "expr": "sum by (job,type) (orleans_grains{cluster=\"$cluster\",job=\"$job\"})",
-                    "legendFormat": "{{type}}",
+                    "expr": "sum by (job,grain_type) (orleans_grains{cluster=\"$cluster\",job=\"$job\",grain_type!=\"\"})",
+                    "legendFormat": "{{grain_type}}",
                     "range": true,
                     "refId": "A"
+                },
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${datasource}"
+                    },
+                    "editorMode": "code",
+                    "expr": "sum by (job,type) (orleans_grains{cluster=\"$cluster\",job=\"$job\",grain_type=\"\",type!=\"\"})",
+                    "legendFormat": "{{type}} (legacy CLR)",
+                    "range": true,
+                    "refId": "B"
                 }
             ],
             "title": "Grains",

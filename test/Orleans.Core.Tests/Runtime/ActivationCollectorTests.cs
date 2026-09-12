@@ -9,6 +9,8 @@ using Orleans.Runtime;
 using Orleans.Statistics;
 using TestGrains;
 using Xunit;
+using System.Diagnostics.Metrics;
+using System.Threading.Channels;
 
 namespace UnitTests.Runtime
 {
@@ -887,6 +889,495 @@ namespace UnitTests.Runtime
             activation.Deactivated.Returns(Task.CompletedTask).AndDoes(_ => { Interlocked.Decrement(ref collector._activationCount); });
 
             return (IActivationWorkingSetMember)activation;
+        }
+
+        [Theory, TestCategory("Activation")]
+        [InlineData("evicted")]
+        [InlineData("deactivating")]
+        [InlineData("deactivated")]
+        public async Task WorkingSet_NotificationsBalancePerTypeCounts(string notification)
+        {
+            using var metrics = new AccountingMetricFixture();
+            await using var scans = new WorkingSetScanDriver(timeProvider);
+            var observer = Substitute.For<IActivationWorkingSetObserver>();
+            var workingSet = new ActivationWorkingSet(scans.Factory, NullLogger<ActivationWorkingSet>.Instance, [observer], metrics.Instruments, timeProvider);
+            var first = WorkingSetMember("working-orders", "one");
+            var second = WorkingSetMember("working-orders", "two");
+            var other = WorkingSetMember("working-invoices", "one");
+            workingSet.OnActivated(first);
+            workingSet.OnActivated(second);
+            workingSet.OnActivated(other);
+            Assert.Throws<InvalidOperationException>(() => workingSet.OnActivated(first));
+            workingSet.OnActive(first);
+            workingSet.OnActive(first);
+            observer.Received(1).OnAdded(first);
+            observer.Received(2).OnActive(first);
+
+            metrics.StartListening(); // No recording was enabled while members were added.
+            metrics.AssertWorkingSetSnapshot(workingSet, ("working-orders", 2), ("working-invoices", 1));
+            metrics.AssertWorkingSetSnapshot(workingSet, ("working-orders", 2), ("working-invoices", 1));
+            Assert.Equal(3, workingSet.Members.Count());
+            switch (notification)
+            {
+                case "evicted": workingSet.OnEvicted(first); break;
+                case "deactivating": workingSet.OnDeactivating(first); break;
+                case "deactivated": workingSet.OnDeactivated(first); break;
+                default: throw new ArgumentOutOfRangeException(nameof(notification));
+            }
+            // Check the selected removal before another notification can mask a missing eviction.
+            observer.Received(1).OnEvicted(first);
+            Assert.DoesNotContain(first, workingSet.Members);
+            metrics.AssertWorkingSetSnapshot(workingSet, ("working-orders", 1), ("working-invoices", 1));
+            workingSet.OnEvicted(first);
+            workingSet.OnDeactivating(first);
+            workingSet.OnDeactivated(first);
+            observer.Received(1).OnEvicted(first);
+            observer.Received(notification == "deactivating" ? 2 : 1).OnDeactivating(first);
+            observer.Received(notification == "deactivated" ? 2 : 1).OnDeactivated(first);
+            Assert.DoesNotContain(first, workingSet.Members);
+            Assert.Contains(other, workingSet.Members);
+            metrics.AssertWorkingSetSnapshot(workingSet, ("working-orders", 1), ("working-invoices", 1));
+
+            // OnActive can also add a previously evicted member, without a second OnAdded notification.
+            workingSet.OnActive(first);
+            workingSet.OnActive(first);
+            observer.Received(1).OnAdded(first);
+            observer.Received(4).OnActive(first);
+            Assert.Contains(first, workingSet.Members);
+            metrics.AssertWorkingSetSnapshot(workingSet, ("working-orders", 2), ("working-invoices", 1));
+            workingSet.OnDeactivated(first);
+            workingSet.OnDeactivated(second);
+            workingSet.OnDeactivated(other);
+            workingSet.OnEvicted(first);
+            observer.Received(2).OnEvicted(first);
+            observer.Received(1).OnEvicted(second);
+            observer.Received(1).OnEvicted(other);
+            Assert.Empty(workingSet.Members);
+            metrics.AssertWorkingSetSnapshot(workingSet, ("working-orders", 0), ("working-invoices", 0));
+            metrics.AssertWorkingSetSnapshot(workingSet, ("working-orders", 0), ("working-invoices", 0));
+            Assert.Empty(metrics.Events);
+        }
+
+        [Fact, TestCategory("Activation")]
+        public async Task WorkingSet_NonContextMemberUsesUnknown()
+        {
+            using var metrics = new AccountingMetricFixture();
+            await using var scans = new WorkingSetScanDriver(timeProvider);
+            var observer = Substitute.For<IActivationWorkingSetObserver>();
+            var workingSet = new ActivationWorkingSet(scans.Factory, NullLogger<ActivationWorkingSet>.Instance, [observer], metrics.Instruments, timeProvider);
+            var typed = WorkingSetMember("working-typed", "one");
+            var unknown = Substitute.For<IActivationWorkingSetMember>();
+            Assert.False(unknown is IGrainContext);
+            workingSet.OnActivated(typed);
+            workingSet.OnActivated(unknown);
+            workingSet.OnActive(unknown);
+            metrics.StartListening();
+            metrics.AssertWorkingSetSnapshot(workingSet, ("working-typed", 1), ("unknown", 1));
+            metrics.AssertWorkingSetSnapshot(workingSet, ("working-typed", 1), ("unknown", 1));
+
+            workingSet.OnDeactivating(unknown);
+            workingSet.OnDeactivated(unknown);
+            workingSet.OnEvicted(unknown);
+            Assert.Same(typed, Assert.Single(workingSet.Members));
+            observer.Received(1).OnEvicted(unknown);
+            observer.DidNotReceive().OnEvicted(typed);
+            metrics.AssertWorkingSetSnapshot(workingSet, ("working-typed", 1), ("unknown", 0));
+            workingSet.OnDeactivated(typed);
+            Assert.Empty(workingSet.Members);
+            metrics.AssertWorkingSetSnapshot(workingSet, ("working-typed", 0), ("unknown", 0));
+            Assert.Empty(metrics.Events);
+        }
+
+        [Fact, TestCategory("Activation")]
+        public Task WorkingSet_TwoIdleScansRetainThenEvict() => AssertIdleScanAccounting(revive: false);
+
+        [Fact, TestCategory("Activation")]
+        public Task WorkingSet_ActivityBetweenIdleScansRevives() => AssertIdleScanAccounting(revive: true);
+
+        private async Task AssertIdleScanAccounting(bool revive)
+        {
+            using var metrics = new AccountingMetricFixture();
+            await using var scans = new WorkingSetScanDriver(timeProvider);
+            var observer = Substitute.For<IActivationWorkingSetObserver>();
+            var workingSet = new ActivationWorkingSet(scans.Factory, NullLogger<ActivationWorkingSet>.Instance, [observer], metrics.Instruments, timeProvider);
+            var candidate = WorkingSetMember("scan-orders", "one");
+            var survivor = WorkingSetMember("scan-invoices", "one");
+            candidate.IsCandidateForRemoval(Arg.Any<bool>()).Returns(true);
+            survivor.IsCandidateForRemoval(Arg.Any<bool>()).Returns(false);
+            workingSet.OnActivated(candidate);
+            workingSet.OnActivated(survivor);
+            metrics.StartListening();
+            metrics.AssertWorkingSetSnapshot(workingSet, ("scan-orders", 1), ("scan-invoices", 1));
+            await scans.StartAsync(workingSet);
+
+            var firstIdle = ArmWorkingSetNotification(observer, candidate, idle: true);
+            await scans.ScanAsync("first idle scan", firstIdle);
+            Assert.Same(survivor, Assert.Single(workingSet.Members));
+            observer.Received(1).OnIdle(candidate);
+            observer.DidNotReceive().OnEvicted(candidate);
+            candidate.Received(1).IsCandidateForRemoval(false);
+            candidate.DidNotReceive().IsCandidateForRemoval(true);
+            // Idle entries are invisible in Members but still included in Count and the gauge.
+            metrics.AssertWorkingSetSnapshot(workingSet, ("scan-orders", 1), ("scan-invoices", 1));
+            metrics.AssertWorkingSetSnapshot(workingSet, ("scan-orders", 1), ("scan-invoices", 1));
+
+            if (revive)
+            {
+                workingSet.OnActive(candidate);
+                workingSet.OnActive(candidate);
+                Assert.Contains(candidate, workingSet.Members);
+                Assert.Equal(2, workingSet.Members.Count());
+                metrics.AssertWorkingSetSnapshot(workingSet, ("scan-orders", 1), ("scan-invoices", 1));
+                candidate.IsCandidateForRemoval(false).Returns(false);
+                var active = ArmWorkingSetNotification(observer, candidate, idle: false);
+                await scans.ScanAsync("active scan after revival", active);
+                Assert.Contains(candidate, workingSet.Members);
+                observer.Received(1).OnIdle(candidate);
+                observer.DidNotReceive().OnEvicted(candidate);
+                observer.Received(3).OnActive(candidate);
+                candidate.DidNotReceive().IsCandidateForRemoval(true);
+                metrics.AssertWorkingSetSnapshot(workingSet, ("scan-orders", 1), ("scan-invoices", 1));
+
+                candidate.IsCandidateForRemoval(false).Returns(true);
+                var idleAgain = ArmWorkingSetNotification(observer, candidate, idle: true);
+                await scans.ScanAsync("fresh idle scan after revival", idleAgain);
+                Assert.Same(survivor, Assert.Single(workingSet.Members));
+                observer.Received(2).OnIdle(candidate);
+                observer.DidNotReceive().OnEvicted(candidate);
+                metrics.AssertWorkingSetSnapshot(workingSet, ("scan-orders", 1), ("scan-invoices", 1));
+            }
+
+            var evicted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            observer.When(item => item.OnEvicted(candidate)).Do(_ => evicted.TrySetResult());
+            await scans.ScanAsync("second eligible idle scan evicts", evicted.Task);
+            observer.Received(1).OnEvicted(candidate);
+            observer.Received(revive ? 2 : 1).OnIdle(candidate);
+            candidate.Received(revive ? 3 : 1).IsCandidateForRemoval(false);
+            candidate.Received(1).IsCandidateForRemoval(true);
+            Assert.Same(survivor, Assert.Single(workingSet.Members));
+            metrics.AssertWorkingSetSnapshot(workingSet, ("scan-orders", 0), ("scan-invoices", 1));
+
+            var survivorActive = ArmWorkingSetNotification(observer, survivor, idle: false);
+            await scans.ScanAsync("scan after eviction must not decrement again", survivorActive);
+            workingSet.OnEvicted(candidate);
+            workingSet.OnDeactivating(candidate);
+            workingSet.OnDeactivated(candidate);
+            observer.Received(1).OnEvicted(candidate);
+            candidate.Received(revive ? 3 : 1).IsCandidateForRemoval(false);
+            candidate.Received(1).IsCandidateForRemoval(true);
+            survivor.Received(revive ? 5 : 3).IsCandidateForRemoval(false);
+            survivor.DidNotReceive().IsCandidateForRemoval(true);
+            observer.Received(revive ? 5 : 3).OnActive(survivor);
+            metrics.AssertWorkingSetSnapshot(workingSet, ("scan-orders", 0), ("scan-invoices", 1));
+            workingSet.OnDeactivated(survivor);
+            Assert.Empty(workingSet.Members);
+            metrics.AssertWorkingSetSnapshot(workingSet, ("scan-orders", 0), ("scan-invoices", 0));
+            metrics.AssertWorkingSetSnapshot(workingSet, ("scan-orders", 0), ("scan-invoices", 0));
+            Assert.Empty(metrics.Events);
+        }
+
+        [Fact, TestCategory("Activation")]
+        public async Task Collector_NonemptyBatchHasOneUnknownShutdown()
+        {
+            using var metrics = new AccountingMetricFixture();
+            using var batchCollector = new ActivationCollector(timeProvider, Options.Create(new GrainCollectionOptions()),
+                NullLogger<ActivationCollector>.Instance, Substitute.For<IEnvironmentStatisticsProvider>(), metrics.Instruments);
+            await using var scans = new WorkingSetScanDriver(timeProvider);
+            var workingSet = new ActivationWorkingSet(scans.Factory, NullLogger<ActivationWorkingSet>.Instance, [batchCollector], metrics.Instruments, timeProvider);
+            var ageLimit = TimeSpan.FromMinutes(1);
+            var awaited = Enumerable.Range(0, 2).Select(_ => new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously)).ToArray();
+            var releases = Enumerable.Range(0, 2).Select(_ => new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously)).ToArray();
+            var completionReads = new int[2];
+            var activations = new[] { "batch-orders", "batch-invoices" }.Select((type, index) =>
+            {
+                var activation = Substitute.For<ICollectibleGrainContext, IActivationWorkingSetMember>();
+                ConfigureCollectionRegistrationSlot(activation);
+                activation.GrainId.Returns(GrainId.Create(type, "one"));
+                activation.CollectionAgeLimit.Returns(ageLimit);
+                activation.IsExemptFromCollection.Returns(false);
+                activation.TryDeactivateForCollection(Arg.Any<DeactivationReason>(), Arg.Any<DateTime>(),
+                    Arg.Any<TimeSpan>(), Arg.Any<bool>(), Arg.Any<CancellationToken>()).Returns(ActivationCollectionResult.StartedDeactivation);
+                activation.Deactivated.Returns(_ =>
+                {
+                    Interlocked.Increment(ref completionReads[index]);
+                    awaited[index].TrySetResult();
+                    return releases[index].Task;
+                });
+                return activation;
+            }).ToArray();
+            foreach (var activation in activations) workingSet.OnActivated((IActivationWorkingSetMember)activation);
+            var unrelated = WorkingSetMember("batch-unrelated", "one");
+            workingSet.OnActivated(unrelated);
+            metrics.StartListening();
+            Assert.Empty(metrics.Events);
+            Assert.Equal(2, batchCollector._activationCount);
+            metrics.AssertWorkingSetSnapshot(workingSet, ("batch-orders", 1), ("batch-invoices", 1), ("batch-unrelated", 1));
+            var completionObservers = Task.WhenAll(awaited.Select(signal => signal.Task).ToArray());
+            timeProvider.Advance(ageLimit);
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var collection = batchCollector.CollectStaleActivations(cancellationToken);
+            try
+            {
+                await completionObservers.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
+                Assert.False(collection.IsCompleted);
+                Assert.Equal(new[] { 1, 1 }, completionReads);
+                AssertCollectionEvents(metrics.Events, passes: 1, batches: 1);
+                foreach (var activation in activations)
+                {
+                    Assert.Equal(default, batchCollector.GetCollectionTicketForTesting(activation));
+                    activation.Received(1).TryDeactivateForCollection(
+                        Arg.Is<DeactivationReason>(reason => reason.ReasonCode == DeactivationReasonCode.ActivationIdle),
+                        timeProvider.GetUtcNow().UtcDateTime, ageLimit, true, cancellationToken);
+                    workingSet.OnDeactivating((IActivationWorkingSetMember)activation);
+                    workingSet.OnDeactivated((IActivationWorkingSetMember)activation);
+                }
+                releases[0].SetResult();
+                Assert.False(collection.IsCompleted); // The other activation still owns an incomplete completion.
+                releases[1].SetResult();
+                await collection.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
+
+                Assert.Equal(0, batchCollector._activationCount);
+                Assert.Equal(new[] { 1, 1 }, completionReads);
+                Assert.All(activations, activation => Assert.False(batchCollector.HasActiveCollectionRegistrationForTesting(activation)));
+                Assert.Same(unrelated, Assert.Single(workingSet.Members));
+                metrics.AssertWorkingSetSnapshot(workingSet, ("batch-orders", 0), ("batch-invoices", 0), ("batch-unrelated", 1));
+                metrics.AssertWorkingSetSnapshot(workingSet, ("batch-orders", 0), ("batch-invoices", 0), ("batch-unrelated", 1));
+                // Historical collector scope: one unknown shutdown for the batch, not one per fake context.
+                AssertCollectionEvents(metrics.Events, passes: 1, batches: 1);
+                await batchCollector.CollectStaleActivations(cancellationToken);
+                AssertCollectionEvents(metrics.Events, passes: 2, batches: 1);
+                Assert.Equal(new[] { 1, 1 }, completionReads);
+                metrics.AssertWorkingSetSnapshot(workingSet, ("batch-orders", 0), ("batch-invoices", 0), ("batch-unrelated", 1));
+            }
+            finally
+            {
+                foreach (var release in releases) release.TrySetResult();
+                await collection.WaitAsync(TimeSpan.FromSeconds(30), CancellationToken.None);
+            }
+        }
+
+        [Fact, TestCategory("Activation")]
+        public async Task Collector_EmptyPassHasNoBatchShutdown()
+        {
+            using var metrics = new AccountingMetricFixture();
+            using var emptyCollector = new ActivationCollector(timeProvider, Options.Create(new GrainCollectionOptions()),
+                NullLogger<ActivationCollector>.Instance, Substitute.For<IEnvironmentStatisticsProvider>(), metrics.Instruments);
+            await using var scans = new WorkingSetScanDriver(timeProvider);
+            var workingSet = new ActivationWorkingSet(scans.Factory, NullLogger<ActivationWorkingSet>.Instance, [emptyCollector], metrics.Instruments, timeProvider);
+            var unrelated = WorkingSetMember("empty-pass-unrelated", "one");
+            workingSet.OnActivated(unrelated);
+            metrics.StartListening();
+            Assert.Empty(metrics.Events);
+            metrics.AssertWorkingSetSnapshot(workingSet, ("empty-pass-unrelated", 1));
+
+            await emptyCollector.CollectStaleActivations(TestContext.Current.CancellationToken);
+
+            AssertCollectionEvents(metrics.Events, passes: 1, batches: 0);
+            Assert.Equal(0, emptyCollector._activationCount);
+            Assert.Same(unrelated, Assert.Single(workingSet.Members));
+            metrics.AssertWorkingSetSnapshot(workingSet, ("empty-pass-unrelated", 1));
+            metrics.AssertWorkingSetSnapshot(workingSet, ("empty-pass-unrelated", 1));
+            Assert.False(metrics.Instruments.TryGetGrainTypeMetrics(default, out _));
+        }
+
+        private static IActivationWorkingSetMember WorkingSetMember(string type, string key)
+        {
+            var context = Substitute.For<IGrainContext, IActivationWorkingSetMember>();
+            context.GrainId.Returns(GrainId.Create(type, key));
+            return (IActivationWorkingSetMember)context;
+        }
+
+        private static Task ArmWorkingSetNotification(IActivationWorkingSetObserver observer, IActivationWorkingSetMember member, bool idle)
+        {
+            var signal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            if (idle) observer.When(item => item.OnIdle(member)).Do(_ => signal.TrySetResult());
+            else observer.When(item => item.OnActive(member)).Do(_ => signal.TrySetResult());
+            return signal.Task;
+        }
+
+        private static void AssertCollectionEvents(AccountingMeasurement[] events, int passes, int batches)
+        {
+            Assert.Equal(passes + batches, events.Length); // No unrelated lifecycle counters may change.
+            var collections = events.Where(item => item.Instrument.Name == InstrumentNames.CATALOG_ACTIVATION_COLLECTION_NUMBER_OF_COLLECTIONS).ToArray();
+            Assert.Equal(passes, collections.Length);
+            Assert.All(collections, item =>
+            {
+                Assert.IsType<Counter<int>>(item.Instrument);
+                Assert.Equal(1, item.Value);
+                Assert.Empty(item.Tags);
+            });
+            var shutdowns = events.Where(item => item.Instrument.Name == InstrumentNames.CATALOG_ACTIVATION_SHUTDOWN).ToArray();
+            Assert.Equal(batches, shutdowns.Length);
+            Assert.All(shutdowns, item =>
+            {
+                Assert.IsType<Counter<int>>(item.Instrument);
+                Assert.Equal(1, item.Value);
+                Assert.Equal(2, item.Tags.Length);
+                Assert.Equal("collection", Assert.Single(item.Tags, tag => tag.Key == "via").Value);
+                Assert.Same(GrainTypeMetrics.UnknownGrainType, Assert.Single(item.Tags, tag => tag.Key == "grain_type").Value);
+            });
+        }
+
+        private sealed record AccountingMeasurement(Instrument Instrument, int Value, KeyValuePair<string, object?>[] Tags);
+
+        private sealed class AccountingMetricFixture : IDisposable
+        {
+            private readonly ServiceProvider _provider = new ServiceCollection().AddMetrics().BuildServiceProvider();
+            private readonly Meter _meter;
+            private readonly ConcurrentQueue<AccountingMeasurement> _events = new();
+            private readonly List<AccountingMeasurement> _snapshot = [];
+            private MeterListener? _listener;
+            public CatalogInstruments Instruments { get; }
+            public AccountingMeasurement[] Events => _events.ToArray();
+
+            public AccountingMetricFixture()
+            {
+                var instruments = new OrleansInstruments(_provider.GetRequiredService<IMeterFactory>());
+                _meter = instruments.Meter;
+                Instruments = new CatalogInstruments(instruments);
+                // The working set owns its gauge registration; this fixture must never register it.
+            }
+
+            public void StartListening()
+            {
+                Assert.Null(_listener);
+                _listener = new MeterListener();
+                _listener.InstrumentPublished = (instrument, listener) =>
+                {
+                    if (ReferenceEquals(instrument.Meter, _meter)) listener.EnableMeasurementEvents(instrument);
+                };
+                _listener.SetMeasurementEventCallback<int>((instrument, value, tags, _) =>
+                {
+                    var measurement = new AccountingMeasurement(instrument, value, tags.ToArray());
+                    if (instrument is ObservableGauge<int>) _snapshot.Add(measurement);
+                    else _events.Enqueue(measurement);
+                });
+                _listener.Start();
+            }
+
+            public void AssertWorkingSetSnapshot(ActivationWorkingSet workingSet, params (string Type, int Count)[] expected)
+            {
+                Assert.NotNull(_listener);
+                _snapshot.Clear();
+                _listener.RecordObservableInstruments();
+                Assert.Equal(expected.Length, _snapshot.Count);
+                foreach (var (type, count) in expected)
+                {
+                    var item = Assert.Single(_snapshot, item => Equals(Assert.Single(item.Tags).Value, type));
+                    Assert.IsType<ObservableGauge<int>>(item.Instrument);
+                    Assert.Equal(InstrumentNames.CATALOG_ACTIVATION_WORKING_SET, item.Instrument.Name);
+                    Assert.Equal(count, item.Value);
+                    var tag = Assert.Single(item.Tags);
+                    Assert.Equal("grain_type", tag.Key);
+                    Assert.True(Instruments.TryGetGrainTypeMetrics(type == "unknown" ? default : GrainType.Create(type), out var cached));
+                    Assert.Same(cached.GrainTypeTagValue, tag.Value);
+                }
+                Assert.Equal(expected.Sum(item => item.Count), workingSet.Count);
+                Assert.Equal(workingSet.Count, _snapshot.Sum(item => item.Value));
+            }
+
+            public void Dispose()
+            {
+                _listener?.Dispose();
+                _provider.Dispose();
+            }
+        }
+
+        private sealed class WorkingSetScanDriver : IAsyncDisposable
+        {
+            private static readonly TimeSpan Period = TimeSpan.FromSeconds(5);
+            private readonly FakeTimeProvider _clock;
+            private readonly CancellationTokenSource _stop = new();
+            private readonly Channel<int> _scheduled = Channel.CreateUnbounded<int>();
+            private readonly IAsyncTimer _timer = Substitute.For<IAsyncTimer>();
+            private ILifecycleObserver? _lifecycleObserver;
+            private int _scheduleNumber;
+            private int _observedSchedule;
+            public IAsyncTimerFactory Factory { get; } = Substitute.For<IAsyncTimerFactory>();
+
+            public WorkingSetScanDriver(FakeTimeProvider clock)
+            {
+                _clock = clock;
+                _timer.NextTick().Returns(_ => NextTick());
+                _timer.When(timer => timer.Dispose()).Do(_ => _stop.Cancel());
+                Factory.Create(Arg.Any<TimeSpan>(), Arg.Any<string>(), Arg.Any<TimeProvider>()).Returns(call =>
+                {
+                    Assert.Equal(Period, call.Arg<TimeSpan>());
+                    Assert.Equal("ActivationWorkingSet.MonitorWorkingSet", call.Arg<string>());
+                    Assert.Same(_clock, call.Arg<TimeProvider>());
+                    return _timer;
+                });
+            }
+
+            public async Task StartAsync(ActivationWorkingSet workingSet)
+            {
+                var lifecycle = Substitute.For<ISiloLifecycle>();
+                lifecycle.Subscribe(nameof(ActivationWorkingSet), ServiceLifecycleStage.BecomeActive, Arg.Any<ILifecycleObserver>())
+                    .Returns(call =>
+                    {
+                        _lifecycleObserver = call.Arg<ILifecycleObserver>();
+                        return Substitute.For<IDisposable>();
+                    });
+                ((ILifecycleParticipant<ISiloLifecycle>)workingSet).Participate(lifecycle);
+                lifecycle.Received(1).Subscribe(nameof(ActivationWorkingSet), ServiceLifecycleStage.BecomeActive, Arg.Any<ILifecycleObserver>());
+                Assert.NotNull(_lifecycleObserver);
+                await _lifecycleObserver.OnStart(TestContext.Current.CancellationToken);
+                await AwaitSchedule("monitor startup");
+            }
+
+            public async Task ScanAsync(string phase, Task notification)
+            {
+                Assert.False(notification.IsCompleted, $"Observer must be armed before {phase}.");
+                _clock.Advance(Period); // The sole clock driver, with a scheduled fake delay already observed.
+                try
+                {
+                    await notification.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+                    await AwaitSchedule(phase);
+                }
+                catch (TimeoutException exception)
+                {
+                    throw new TimeoutException($"Working-set {phase}: expected notification and next schedule after {_observedSchedule}.", exception);
+                }
+            }
+
+            private async Task AwaitSchedule(string phase)
+            {
+                var schedule = await _scheduled.Reader.ReadAsync(TestContext.Current.CancellationToken).AsTask()
+                    .WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+                Assert.True(schedule == ++_observedSchedule, $"{phase}: expected schedule {_observedSchedule}, observed {schedule}.");
+            }
+
+            private async Task<bool> NextTick()
+            {
+                var delay = Task.Delay(Period, _clock, _stop.Token);
+                _scheduled.Writer.TryWrite(++_scheduleNumber); // Delay is installed before publishing readiness.
+                try
+                {
+                    await delay;
+                    return true;
+                }
+                catch (OperationCanceledException) when (_stop.IsCancellationRequested)
+                {
+                    return false;
+                }
+            }
+
+            public async ValueTask DisposeAsync()
+            {
+                try
+                {
+                    if (_lifecycleObserver is not null)
+                    {
+                        await _lifecycleObserver.OnStop(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(30), CancellationToken.None);
+                        _timer.Received(1).Dispose();
+                    }
+                }
+                finally
+                {
+                    _stop.Cancel();
+                    _stop.Dispose();
+                }
+            }
         }
     }
 }
