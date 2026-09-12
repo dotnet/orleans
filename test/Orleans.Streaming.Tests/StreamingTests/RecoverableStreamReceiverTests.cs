@@ -456,6 +456,10 @@ public sealed class RecoverableStreamReceiverTests
         {
             await Assert.ThrowsAsync<TransientStreamReplayException>(
                 async () => await failed.MoveNextAsync(CancellationToken.None));
+            await replayFactory.Sources[0].Disposed.Task.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken);
+            Assert.True(replayFactory.Sources[0].IsDisposed);
         }
 
         using var recovered = receiver.GetCacheCursor(streamId, new EventSequenceTokenV2(1));
@@ -1801,6 +1805,8 @@ public sealed class RecoverableStreamReceiverTests
         private Exception? _readException = readException;
 
         public bool IsDisposed { get; private set; }
+        public TaskCompletionSource Disposed { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public async ValueTask<RecoverableStreamReplayReadResult<TestQueueMessage>> Read(
             int maxCount,
@@ -1828,6 +1834,7 @@ public sealed class RecoverableStreamReceiverTests
         public ValueTask DisposeAsync()
         {
             IsDisposed = true;
+            Disposed.TrySetResult();
             return disposeException is null
                 ? ValueTask.CompletedTask
                 : ValueTask.FromException(disposeException);
