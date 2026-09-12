@@ -148,10 +148,18 @@ namespace Orleans.Streams
             return true;
         }
 
-        public void FinishAttempt(TimeProvider timeProvider, IBackoffProvider backoff)
+        public void FinishAttempt(TimeProvider timeProvider, IBackoffProvider backoff, ILogger logger)
         {
             _lastAttempt = timeProvider.GetTimestamp();
-            _retryDelay = backoff.Next(Attempts - 1);
+            try
+            {
+                _retryDelay = backoff.Next(Attempts - 1);
+            }
+            catch (OperationCanceledException exception)
+            {
+                _retryDelay = TimeSpan.Zero;
+                Utils.LogIgnoredException(logger, exception, "Stream recovery backoff was canceled. Retaining bounded recovery without a retry delay.");
+            }
         }
     }
 }
