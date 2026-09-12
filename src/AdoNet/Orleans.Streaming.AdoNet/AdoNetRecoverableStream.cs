@@ -505,9 +505,18 @@ internal sealed partial class AdoNetRecoverableStream(
                 return;
             }
 
+            ExceptionDispatchInfo? heartbeatFailure = null;
             try
             {
                 await StopHeartbeat();
+            }
+            catch (Exception exception)
+            {
+                heartbeatFailure = ExceptionDispatchInfo.Capture(exception);
+            }
+
+            try
+            {
                 var result = await _queries.ReleaseStreamReplayLeaseAsync(
                     _serviceId,
                     _providerId,
@@ -517,10 +526,16 @@ internal sealed partial class AdoNetRecoverableStream(
                     CancellationToken.None);
                 ThrowForReplayStatus(result, _readerId, _safeWatermark);
             }
+            catch (Exception releaseException) when (heartbeatFailure is not null)
+            {
+                throw new AggregateException(heartbeatFailure.SourceException, releaseException);
+            }
             finally
             {
                 _cancellation.Dispose();
             }
+
+            heartbeatFailure?.Throw();
         }
 
         public async ValueTask ShutdownAsync(CancellationToken cancellationToken)

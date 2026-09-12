@@ -589,13 +589,14 @@ internal sealed class RecoverableStreamReplayManager<TQueueMessage>
                     }
                 }
 
+                var failureInfo = ExceptionDispatchInfo.Capture(failure);
                 lock (_gate)
                 {
-                    fragment.Failure = ExceptionDispatchInfo.Capture(failure);
-                    _fragments.Remove(fragment);
+                    fragment.Failure = failureInfo;
+                    BeginFragmentDisposalLocked(fragment);
                 }
 
-                ExceptionDispatchInfo.Capture(failure).Throw();
+                failureInfo.Throw();
                 throw;
             }
             finally

@@ -484,6 +484,43 @@ public class AdoNetRecoverableStreamTests
     }
 
     [Fact]
+    public async Task ReplaySource_HeartbeatFailureStillReleasesLeaseOnCursorDisposal()
+    {
+        var storage = new CapturingRelationalStorage
+        {
+            ReplayUpdateStatus = AdoNetStreamReplayStatus.OwnershipLost,
+        };
+        var timeProvider = new FakeTimeProvider();
+        var source = new AdoNetRecoverableStream(
+            "service",
+            "provider",
+            "queue",
+            new AdoNetStreamOptions
+            {
+                ReplayLeaseDuration = TimeSpan.FromSeconds(3),
+                ReplayLeaseRenewalInterval = TimeSpan.FromSeconds(1),
+            },
+            CreateQueries(storage),
+            NullLogger.Instance,
+            timeProvider);
+        _ = await source.Load(TestContext.Current.CancellationToken);
+        var replay = await ((IRecoverableStreamReplaySourceFactory<AdoNetStreamMessage>)source).Create(
+            StreamId.Create("namespace", Guid.NewGuid()),
+            new AdoNetStreamSequenceToken("service", "provider", "queue", 1),
+            TestContext.Current.CancellationToken);
+
+        timeProvider.Advance(TimeSpan.FromSeconds(1));
+        await storage.ReplayLeaseUpdated.Task.WaitAsync(
+            TimeSpan.FromSeconds(5),
+            TestContext.Current.CancellationToken);
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await replay.DisposeAsync());
+
+        Assert.Contains("ownership", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(1, storage.CallCounts[nameof(DbStoredQueries.ReleaseStreamReplayLeaseKey)]);
+    }
+
+    [Fact]
     public async Task ReplaySource_GapBeforeFirstReturnedMessageSurfacesDataNotAvailable()
     {
         var storage = new CapturingRelationalStorage();
@@ -964,6 +1001,7 @@ public class AdoNetRecoverableStreamTests
         public TaskCompletionSource ReplayLeaseUpdated { get; } =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
         public string ReplayAcquireStatus { get; init; } = AdoNetStreamReplayStatus.Acquired;
+        public string ReplayUpdateStatus { get; init; } = AdoNetStreamReplayStatus.Active;
         public List<AdoNetStreamMessage> LiveMessages { get; } = [];
         public List<AdoNetStreamMessage> ReplayMessages { get; } = [];
         public int CleanupHardDeletedCount { get; init; }
@@ -1012,7 +1050,7 @@ public class AdoNetRecoverableStreamTests
                 nameof(DbStoredQueries.UpdateStreamReplayLeaseKey) =>
                 [
                     ReplayLeaseRecord(
-                        AdoNetStreamReplayStatus.Active,
+                        ReplayUpdateStatus,
                         includeIdentity: false,
                         watermark: Convert.ToInt64(Parameters[query][nameof(DbStoredQueries.Columns.Watermark)]),
                         tailMessageId: 1),
