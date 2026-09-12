@@ -85,6 +85,8 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
 
     public PlacementStrategy PlacementStrategy => _shared.Shared.PlacementStrategy;
 
+    internal GrainTypeMetrics GrainTypeMetrics => _shared.Shared.GrainTypeMetrics;
+
     public Task Deactivated
     {
         get

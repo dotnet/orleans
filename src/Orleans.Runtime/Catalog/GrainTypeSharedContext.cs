@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -77,6 +78,7 @@ public sealed class GrainTypeSharedContext
         CatalogInstruments = serviceProvider.GetRequiredService<CatalogInstruments>();
         GrainTypeMetrics = CatalogInstruments.GetGrainTypeMetrics(grainType);
         GrainInstruments = serviceProvider.GetRequiredService<GrainInstruments>();
+        GrainCount = GrainInstruments.GetGrainCount(GrainTypeName);
         MessagingProcessingInstruments = serviceProvider.GetRequiredService<MessagingProcessingInstruments>();
 
         CollectionAgeLimit = GetCollectionAgeLimit(
@@ -95,6 +97,7 @@ public sealed class GrainTypeSharedContext
     internal string GrainTypeMetricName => GrainTypeMetrics.GrainTypeTagValue;
     internal CatalogInstruments CatalogInstruments { get; }
     internal GrainInstruments GrainInstruments { get; }
+    internal StrongBox<int> GrainCount { get; }
     internal MessagingProcessingInstruments MessagingProcessingInstruments { get; }
 
     private static TimeSpan GetCollectionAgeLimit(GrainType grainType, Type grainClass, GrainManifest siloManifest, GrainCollectionOptions collectionOptions)
@@ -252,7 +255,7 @@ public sealed class GrainTypeSharedContext
     /// <param name="grainContext">The grain activation.</param>
     public void OnCreateActivation(IGrainContext grainContext)
     {
-        GrainInstruments.IncrementGrainCounts(GrainTypeMetricName, GrainTypeName);
+        GrainInstruments.IncrementGrainCounts(GrainTypeMetricName, GrainCount);
     }
 
     /// <summary>
@@ -261,7 +264,7 @@ public sealed class GrainTypeSharedContext
     /// <param name="grainContext">The grain activation.</param>
     public void OnDestroyActivation(IGrainContext grainContext)
     {
-        GrainInstruments.DecrementGrainCounts(GrainTypeMetricName, GrainTypeName);
+        GrainInstruments.DecrementGrainCounts(GrainTypeMetricName, GrainCount);
     }
 }
 
