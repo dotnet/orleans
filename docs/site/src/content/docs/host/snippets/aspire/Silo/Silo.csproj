@@ -27,7 +27,6 @@
     <PackageReference Include="Microsoft.Orleans.Reminders.AdoNet" Version="10.2.2" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.8" />
   </ItemGroup>
-
   <ItemGroup>
     <ProjectReference Include="..\ServiceDefaults\ServiceDefaults.csproj" />
   </ItemGroup>

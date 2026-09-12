@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageId>Microsoft.Orleans.Streaming.SQS.Aspire</PackageId>
+    <Title>Microsoft Orleans Aspire integration for AWS SQS Streaming</Title>
+    <Description>Provisions and configures Orleans SQS stream providers in .NET Aspire AppHost projects.</Description>
+    <PackageTags>$(PackageTags) Aspire AWS SQS CDK</PackageTags>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <CentralPackageTransitivePinningEnabled>false</CentralPackageTransitivePinningEnabled>
+    <EnablePackageValidation>false</EnablePackageValidation>
+    <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Remove="Orleans.Metadata.FrameworkPartAttribute" />
+    <Compile Include="..\Shared\Storage\SqsQueueName.cs" Link="Storage\SqsQueueName.cs" />
+    <PackageReference Include="Amazon.CDK.Lib" />
+    <PackageReference Include="Aspire.Hosting.AWS" />
+    <PackageReference Include="Aspire.Hosting.Orleans" VersionOverride="13.4.6" />
+    <PackageReference Include="MessagePack" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

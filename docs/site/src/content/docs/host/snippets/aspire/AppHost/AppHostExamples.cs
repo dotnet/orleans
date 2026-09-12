@@ -1,5 +1,7 @@
+using Amazon;
 using Aspire.Hosting;
 using Aspire.Hosting.Azure;
+using Aspire.Hosting.Orleans;
 
 namespace Orleans.Docs.Snippets.Aspire;
 
@@ -8,6 +10,41 @@ namespace Orleans.Docs.Snippets.Aspire;
 
 public static class AppHostExamples
 {
+    // <sqs_streaming_apphost>
+    public static void SqsStreaming(string[] args)
+    {
+        var builder = DistributedApplication.CreateBuilder(args);
+
+        var aws = builder.AddAWSSDKConfig()
+            .WithRegion(RegionEndpoint.USEast1);
+
+        var orleans = builder.AddOrleans("cluster")
+            .WithDevelopmentClustering()
+            .WithMemoryGrainStorage("PubSubStore")
+            .WithSqsStreaming(
+                "Orders",
+                aws,
+                new SqsStreamingOptions
+                {
+                    ServiceId = "orders-service",
+                    PartitionCount = 16,
+                    FifoQueue = true,
+                    ReceiveWaitTimeSeconds = 20,
+                    VisibilityTimeoutSeconds = 60,
+                });
+
+        var silo = builder.AddProject<Projects.Silo>("silo")
+            .WithReference(orleans)
+            .WithReplicas(3);
+
+        builder.AddProject<Projects.Client>("client")
+            .WithReference(orleans.AsClient())
+            .WaitFor(silo);
+
+        builder.Build().Run();
+    }
+    // </sqs_streaming_apphost>
+
     // <basic_orleans_cluster>
     public static void BasicOrleansCluster(string[] args)
     {
@@ -263,4 +300,5 @@ public static class AppHostExamples
         builder.Build().Run();
     }
     // </explicit_cluster_ids>
+
 }

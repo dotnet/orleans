@@ -92,6 +92,7 @@ Use reminders for recurring durable callbacks and durable jobs for scheduled one
 | [Microsoft.Orleans.Streaming.NATS](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.NATS) | NATS JetStream streams. |
 | [Microsoft.Orleans.Streaming.Redis](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.Redis) | Redis Streams integration. |
 | [Microsoft.Orleans.Streaming.SQS](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.SQS) | Amazon SQS streams. |
+| [Microsoft.Orleans.Streaming.SQS.Aspire](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.SQS.Aspire) | .NET Aspire and AWS CDK integration for Orleans SQS streams. |
 | [Microsoft.Orleans.BroadcastChannel](https://www.nuget.org/packages/Microsoft.Orleans.BroadcastChannel) | Lightweight broadcast channels. |
 
 ## Grain directories
