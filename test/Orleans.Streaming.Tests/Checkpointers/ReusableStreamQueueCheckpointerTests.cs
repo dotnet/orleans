@@ -112,6 +112,49 @@ public sealed class ReusableStreamQueueCheckpointerTests : StreamQueueCheckpoint
         Assert.Equal("40", (await store.Load(CancellationToken.None)).Checkpoint);
     }
 
+    [Fact]
+    public async Task Reset_WhenConflictAdvancesCheckpointThenRetryFails_PreservesAuthoritativeCheckpoint()
+    {
+        var store = new ResetConflictThenFailureStore();
+        var checkpointer = new StreamQueueCheckpointer(
+            store,
+            new StreamQueueCheckpointerOptions
+            {
+                CheckpointComparer = StreamCheckpointComparers.Numeric,
+            });
+        Assert.Equal("10", await checkpointer.Load(CancellationToken.None));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => checkpointer.Reset(CancellationToken.None));
+        await checkpointer.FlushAsync(CancellationToken.None);
+
+        Assert.Equal([("version-1", string.Empty), ("version-2", string.Empty)], store.Attempts);
+        Assert.Equal("20", (await store.Load(CancellationToken.None)).Checkpoint);
+    }
+
+    [Fact]
+    public async Task Reset_WhenConflictAndConcurrentUpdateRegress_PreservesLargestCheckpoint()
+    {
+        var store = new ResetConflictThenFailureStore("100", "80");
+        var checkpointer = new StreamQueueCheckpointer(
+            store,
+            new StreamQueueCheckpointerOptions
+            {
+                CheckpointComparer = StreamCheckpointComparers.Numeric,
+            });
+        Assert.Equal("100", await checkpointer.Load(CancellationToken.None));
+        store.OnConflict = () => checkpointer.Update("50", DateTime.UtcNow, CancellationToken.None);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => checkpointer.Reset(CancellationToken.None));
+        await checkpointer.FlushAsync(CancellationToken.None);
+
+        Assert.Equal(
+            [("version-1", string.Empty), ("version-2", string.Empty), ("version-2", "100")],
+            store.Attempts);
+        Assert.Equal("100", (await store.Load(CancellationToken.None)).Checkpoint);
+    }
+
     private sealed class TestCheckpointStore(ControllableCheckpointStore store) : IStreamCheckpointStore
     {
         public async ValueTask<StreamCheckpointStoreState> Load(CancellationToken cancellationToken)
@@ -163,6 +206,55 @@ public sealed class ReusableStreamQueueCheckpointerTests : StreamQueueCheckpoint
                 state = new(checkpoint, "version-3");
             }
 
+            return ValueTask.FromResult(state);
+        }
+    }
+
+    private sealed class ResetConflictThenFailureStore : IStreamCheckpointStore
+    {
+        private StreamCheckpointStoreState state;
+        private readonly string conflictCheckpoint;
+        private int updateCount;
+
+        public List<(string ExpectedVersion, string Checkpoint)> Attempts { get; } = [];
+
+        public Action? OnConflict { get; set; }
+
+        public ResetConflictThenFailureStore(
+            string initialCheckpoint = "10",
+            string conflictCheckpoint = "20")
+        {
+            state = new(initialCheckpoint, "version-1");
+            this.conflictCheckpoint = conflictCheckpoint;
+        }
+
+        public ValueTask<StreamCheckpointStoreState> Load(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return ValueTask.FromResult(state);
+        }
+
+        public ValueTask<StreamCheckpointStoreState> Update(
+            string checkpoint,
+            string expectedVersion,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Attempts.Add((expectedVersion, checkpoint));
+            updateCount++;
+            if (updateCount == 1)
+            {
+                state = new(conflictCheckpoint, "version-2");
+                OnConflict?.Invoke();
+                return ValueTask.FromResult(state);
+            }
+
+            if (updateCount == 2)
+            {
+                throw new InvalidOperationException("checkpoint reset failed");
+            }
+
+            state = new(checkpoint, "version-3");
             return ValueTask.FromResult(state);
         }
     }
