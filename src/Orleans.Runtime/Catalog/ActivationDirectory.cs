@@ -50,9 +50,12 @@ internal sealed class ActivationDirectory : IEnumerable<KeyValuePair<GrainId, IG
         return false;
     }
 
-    private GrainTypeMetrics GetMetrics(IGrainContext target) => target is ActivationData activation
-        ? activation.Shared.GrainTypeMetrics
-        : _catalogInstruments.GetGrainTypeMetrics(target.GrainId.Type);
+    private GrainTypeMetrics GetMetrics(IGrainContext target) => target switch
+    {
+        ActivationData activation => activation.Shared.GrainTypeMetrics,
+        StatelessWorkerGrainContext worker => worker.GrainTypeMetrics,
+        _ => _catalogInstruments.GetGrainTypeMetrics(target.GrainId.Type)
+    };
 
     public IEnumerator<KeyValuePair<GrainId, IGrainContext>> GetEnumerator() => _activations.GetEnumerator();
 

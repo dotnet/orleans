@@ -251,9 +251,12 @@ namespace Orleans.Runtime
             }
         }
 
-        private string GetGrainTypeMetricName(IGrainContext context) => context is ActivationData activation
-            ? activation.Shared.GrainTypeMetricName
-            : _catalogInstruments.GetGrainTypeMetrics(context.GrainId.Type).GrainTypeTagValue;
+        private string GetGrainTypeMetricName(IGrainContext context) => context switch
+        {
+            ActivationData activation => activation.Shared.GrainTypeMetricName,
+            StatelessWorkerGrainContext worker => worker.GrainTypeMetrics.GrainTypeTagValue,
+            _ => _catalogInstruments.GetGrainTypeMetrics(context.GrainId.Type).GrainTypeTagValue
+        };
 
         private async Task UnregisterNonExistentActivation(GrainAddress address)
         {

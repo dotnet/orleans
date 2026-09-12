@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 
 namespace Orleans.Runtime;
 
@@ -12,7 +13,7 @@ internal class GrainCountStatistics(GrainInstruments instruments)
     {
         return instruments
             .GrainCounts
-            .Select(s => new KeyValuePair<string, long>(s.Key, s.Value))
+            .Select(s => new KeyValuePair<string, long>(s.Key, Volatile.Read(ref s.Value.Value)))
             .Where(p => p.Value > 0);
     }
 }

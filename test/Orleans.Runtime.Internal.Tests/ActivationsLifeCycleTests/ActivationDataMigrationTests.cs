@@ -165,6 +165,9 @@ public class ActivationDataMigrationTestsRuntimeMetrics
         Assert.NotSame(first, second);
         Assert.Same(shared, second.Shared);
         Assert.Same(first.Shared.GrainTypeMetrics, second.Shared.GrainTypeMetrics);
+        Assert.Same(first.Shared.GrainCount, second.Shared.GrainCount);
+        Assert.Same(services.GetRequiredService<GrainInstruments>().GetGrainCount(shared.GrainTypeName), shared.GrainCount);
+        Assert.Equal(2, shared.GrainCount.Value);
         Assert.Same(first.Shared.GrainTypeMetricName, second.Shared.GrainTypeMetricName);
         if (kind == "named")
         {
@@ -194,6 +197,7 @@ public class ActivationDataMigrationTestsRuntimeMetrics
         Assert.NotSame(first, replacement);
         Assert.NotEqual(first.ActivationId, replacement.ActivationId);
         Assert.Same(shared, replacement.Shared);
+        Assert.Same(shared.GrainCount, replacement.Shared.GrainCount);
         Assert.Same(shared.GrainTypeMetricName, replacement.Shared.GrainTypeMetricName);
 
         // An obsolete context must not remove the replacement which owns the same GrainId.
@@ -209,6 +213,7 @@ public class ActivationDataMigrationTestsRuntimeMetrics
         catalog.UnregisterMessageTarget(second);
         AssertCounts(services, lateListener, baseline, shared, 0, 0, 0);
         AssertCounts(services, lateListener, baseline, shared, 0, 0, 0);
+        Assert.Equal(0, shared.GrainCount.Value);
         AssertActivationEvents(metrics, shared, created: 3, destroyed: 3, failed: 0, instances: [1, 1, -1, 1, -1, -1]);
         AssertActivationLatencies(metrics, shared, "success", "success", "success");
         AssertDeactivationMetrics(metrics, shared, "deactivateOnIdle", "deactivateOnIdle", "deactivateOnIdle");
@@ -635,6 +640,7 @@ public class ActivationDataMigrationTestsRuntimeMetrics
         Assert.Null(parent.GrainInstance);
         Assert.IsType<UnitTests.Grains.StatelessWorkerActivationCollectorTestGrain1>(worker.GrainInstance);
         var shared = AssertCanonicalContext(services, worker);
+        Assert.Same(shared.GrainTypeMetrics, parent.GrainTypeMetrics);
         AssertCounts(services, metrics, baseline, shared, 1, 1, 1);
         AssertActivationEvents(metrics, shared, created: 1, destroyed: 0, failed: 0, instances: [1]);
         var latency = Assert.Single(metrics.For(InstrumentNames.CATALOG_ACTIVATION_LATENCY, shared.GrainTypeMetricName));
@@ -695,6 +701,9 @@ public class ActivationDataMigrationTestsRuntimeMetrics
             Assert.Same(shared, second.Shared);
             Assert.Same(shared.GrainTypeMetricName, second.Shared.GrainTypeMetricName);
             parent = Assert.IsType<StatelessWorkerGrainContext>(services.GetRequiredService<ActivationDirectory>().FindTarget(id));
+            Assert.Same(shared.GrainTypeMetrics, parent.GrainTypeMetrics);
+            Assert.Same(first.Shared.GrainCount, second.Shared.GrainCount);
+            Assert.Equal(2, shared.GrainCount.Value);
             Assert.Null(parent.GrainInstance);
             Assert.NotSame(parent, first);
             Assert.NotSame(parent, second);
