@@ -51,6 +51,7 @@ namespace Orleans.Streams
         private Task _activePumpTask = Task.CompletedTask;
         private StreamSequenceToken? _lastReadToken;
         private StreamSequenceToken? _retainedDeliveryProgress;
+        private StreamSequenceToken? _completedDeliveryProgress;
         private bool _hasUnknownReplayPosition;
         private bool IsShutdown => timer is null;
         private string StatisticUniquePostfix => $"{streamProviderName}.{QueueId}";
@@ -164,6 +165,7 @@ namespace Orleans.Streams
             // Progress belongs to this receiver lifetime, not the reusable pulling-agent instance.
             _lastReadToken = null;
             _retainedDeliveryProgress = null;
+            _completedDeliveryProgress = null;
             _hasUnknownReplayPosition = false;
             pendingConsumerRecoveries.Clear();
             lastTimeCleanedPubSubCache = _timeProvider.GetUtcNow().UtcDateTime;
@@ -816,6 +818,7 @@ namespace Orleans.Streams
 
             if (streamData.TryGetConsumer(subscriptionId, out var consumer))
             {
+                RetainCompletedDeliveryProgress(consumer.LastProcessedToken);
                 pendingConsumerRecoveries.Remove(consumer);
             }
 
@@ -1084,6 +1087,11 @@ namespace Orleans.Streams
                 return;
             }
 
+            if (TryGetDeliveryProgress(out var progress))
+            {
+                RetainCompletedDeliveryProgress(progress);
+            }
+
             foreach (var streamId in inactiveStreams)
             {
                 if (pubSubCache.Remove(streamId, out var streamData))
@@ -1111,9 +1119,9 @@ namespace Orleans.Streams
 
         private bool TryGetDeliveryProgress(out StreamSequenceToken? earliest)
         {
-            earliest = _lastReadToken;
-            if (_hasUnknownReplayPosition
-                || _retainedDeliveryProgress is not null && !IncludeProgress(_retainedDeliveryProgress, ref earliest))
+            earliest = _retainedDeliveryProgress;
+            var hasSubscriptions = false;
+            if (_hasUnknownReplayPosition)
             {
                 return false;
             }
@@ -1125,6 +1133,20 @@ namespace Orleans.Streams
                 {
                     return false;
                 }
+
+                hasSubscriptions |= streamConsumers.Count > 0;
+            }
+
+            // Removed subscriptions preserve proven progress, not evidence that subsequent reads were delivered.
+            if (!hasSubscriptions && _completedDeliveryProgress is { } completed
+                && !IncludeProgress(completed, ref earliest))
+            {
+                return false;
+            }
+
+            if ((hasSubscriptions || earliest is not null) && _lastReadToken is { } read)
+            {
+                return IncludeProgress(read, ref earliest);
             }
 
             return true;
@@ -1132,11 +1154,31 @@ namespace Orleans.Streams
 
         private void RetainStreamDeliveryProgress(StreamConsumerCollection streamData)
         {
+            foreach (var consumer in streamData.AllConsumers())
+            {
+                RetainCompletedDeliveryProgress(consumer.LastProcessedToken);
+            }
+
             // Reclaim inactive subscription records without forgetting their unresolved handoff constraint.
             if (!TryGetStreamDeliveryProgress(streamData, out var token)
                 || token is not null && !IncludeProgress(token, ref _retainedDeliveryProgress))
             {
                 _hasUnknownReplayPosition = true;
+            }
+        }
+
+        private void RetainCompletedDeliveryProgress(StreamSequenceToken? token)
+        {
+            if (token is null
+                || _lastReadToken is { } read && !TryCompareQueueProgress(token, read, out _))
+            {
+                return;
+            }
+
+            if (_completedDeliveryProgress is null
+                || TryCompareQueueProgress(token, _completedDeliveryProgress, out var comparison) && comparison > 0)
+            {
+                _completedDeliveryProgress = token;
             }
         }
 
@@ -1586,7 +1628,7 @@ namespace Orleans.Streams
                     else
                     {
                         streamData.RegistrationTask = Task.CompletedTask;
-                        recovery.FinishAttempt(_timeProvider, deliveryBackoffProvider);
+                        recovery.FinishAttempt(_timeProvider, deliveryBackoffProvider, logger);
                         if (IsShutdown
                             || !pubSubCache.TryGetValue(streamId, out var current) || !ReferenceEquals(current, streamData))
                         {
@@ -2000,7 +2042,7 @@ namespace Orleans.Streams
                         if (recoveryAttempt is not null && ReferenceEquals(recoveryAttempt, consumerData.DeliveryRecovery)
                             && !recoveryAttempt.Stopped && !IsShutdown)
                         {
-                            recoveryAttempt.FinishAttempt(_timeProvider, deliveryBackoffProvider);
+                            recoveryAttempt.FinishAttempt(_timeProvider, deliveryBackoffProvider, logger);
                             if (recoveryAttempt.IsExhausted(_timeProvider, options.MaxEventDeliveryTime, RecoveryAttemptMax))
                             {
                                 await StopConsumerRecovery(consumerData, cancellationToken);
