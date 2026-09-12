@@ -28,6 +28,7 @@ namespace Orleans.Runtime.Metadata
         private readonly IClusterMembershipService _clusterMembershipService;
         private readonly IFatalErrorHandler _fatalErrorHandler;
         private readonly TimeProvider _timeProvider;
+        private readonly ClusterManifestInstruments _instruments;
         private readonly bool _enableContentAddressedRetrieval;
         private readonly SemaphoreSlim? _peerProbeSlots;
         private readonly CancellationTokenSource _shutdownCts = new();
@@ -51,7 +52,8 @@ namespace Orleans.Runtime.Metadata
             ILogger<ClusterManifestProvider> logger,
             IServiceProvider services,
             TimeProvider timeProvider,
-            IOptions<ClusterManifestOptions> options)
+            IOptions<ClusterManifestOptions> options,
+            ClusterManifestInstruments instruments)
         {
             _localSiloAddress = localSiloDetails.SiloAddress;
             _logger = logger;
@@ -59,6 +61,7 @@ namespace Orleans.Runtime.Metadata
             _clusterMembershipService = clusterMembershipService;
             _fatalErrorHandler = fatalErrorHandler;
             _timeProvider = timeProvider;
+            _instruments = instruments;
             _enableContentAddressedRetrieval = options.Value.EnableContentAddressedRetrieval;
             LocalGrainManifest = siloManifestProvider.SiloManifest;
             if (_enableContentAddressedRetrieval)
@@ -208,8 +211,11 @@ namespace Orleans.Runtime.Metadata
                 missingSilos.Add(siloAddress);
             }
 
-            var peerRepairTask = cache is not null && missingSilos.Count > 1
-                ? TryFillMissingManifestsFromPeers(clusterMembership, builder, missingSilos, cache, cancellationToken)
+            using var peerRepairCancellation = cache is not null && missingSilos.Count > 1
+                ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)
+                : null;
+            var peerRepairTask = peerRepairCancellation is not null
+                ? TryFillMissingManifestsFromPeers(clusterMembership, builder, missingSilos, cache!, peerRepairCancellation.Token)
                 : Task.FromResult(false);
 
             var tasks = new Dictionary<SiloAddress, Task<(SiloAddress Key, GrainManifest? Value, Exception? Exception)>>();
@@ -218,7 +224,27 @@ namespace Orleans.Runtime.Metadata
                 tasks.Add(siloAddress, GetManifest(siloAddress, cancellationToken));
             }
 
-            var peerRepaired = await peerRepairTask;
+            var directFetches = Task.WhenAll(tasks.Values);
+            var peerRepaired = false;
+            if (!peerRepairTask.IsCompleted
+                && await Task.WhenAny(peerRepairTask, directFetches) == directFetches
+                && (await directFetches).All(static result => result.Value is not null && result.Exception is null))
+            {
+                peerRepairCancellation!.Cancel();
+                try
+                {
+                    peerRepaired = await peerRepairTask;
+                }
+                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+                {
+                    // Direct retrieval supplied every missing manifest.
+                }
+            }
+            else
+            {
+                peerRepaired = await peerRepairTask;
+            }
+
             cancellationToken.ThrowIfCancellationRequested();
             if (peerRepaired)
             {
@@ -232,6 +258,7 @@ namespace Orleans.Runtime.Metadata
                     return false;
                 }
 
+                _instruments.OnPeerRepair(missingSilos.Count(builder.ContainsKey));
                 existingManifest = repairedManifest;
                 modified = false;
                 foreach (var siloAddress in missingSilos)
@@ -398,6 +425,7 @@ namespace Orleans.Runtime.Metadata
             var slots = _peerProbeSlots!;
             if (!slots.Wait(0, cancellationToken))
             {
+                _instruments.OnPeerProbe("skipped");
                 LogDebugClusterManifestPeerProbeAtCapacity(peer);
                 return null;
             }
@@ -405,6 +433,7 @@ namespace Orleans.Runtime.Metadata
             using var timeoutCancellation = new CancellationTokenSource(PeerManifestProbeTimeout, _timeProvider);
             using var probeCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCancellation.Token);
             var probeToken = probeCancellation.Token;
+            var status = "error";
             Task? probeTask = null;
             try
             {
@@ -419,6 +448,7 @@ namespace Orleans.Runtime.Metadata
                     summary.SiloManifestHashes.TryGetValue(silo, out var hash)
                     && cache.ContainsKey(hash)))
                 {
+                    status = "success";
                     return new(summary, Update: null);
                 }
 
@@ -432,19 +462,23 @@ namespace Orleans.Runtime.Metadata
                     .WaitAsync(probeToken);
                 probeTask = null;
                 probeToken.ThrowIfCancellationRequested();
+                status = "success";
                 return new(summary, update);
             }
             catch (TimeoutException)
             {
+                status = "timeout";
                 LogDebugClusterManifestPeerProbeTimedOut(peer, PeerManifestProbeTimeout);
                 return null;
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
+                status = "canceled";
                 throw;
             }
             catch (OperationCanceledException) when (timeoutCancellation.IsCancellationRequested)
             {
+                status = "timeout";
                 LogDebugClusterManifestPeerProbeTimedOut(peer, PeerManifestProbeTimeout);
                 return null;
             }
@@ -456,6 +490,7 @@ namespace Orleans.Runtime.Metadata
             finally
             {
                 slots.Release();
+                _instruments.OnPeerProbe(status);
                 if (probeTask is { IsCompleted: false })
                 {
                     probeTask.ContinueWith(
@@ -475,7 +510,7 @@ namespace Orleans.Runtime.Metadata
             ClusterManifestHashSummary Summary,
             ClusterManifestUpdate? Update);
 
-        private static void FillFromCachedHashes(
+        private void FillFromCachedHashes(
             ClusterManifestHashSummary summary,
             HashSet<SiloAddress> missing,
             ImmutableDictionary<SiloAddress, GrainManifest>.Builder builder,
@@ -484,12 +519,16 @@ namespace Orleans.Runtime.Metadata
         {
             foreach (var silo in missing.ToArray())
             {
-                if (summary.SiloManifestHashes.TryGetValue(silo, out var hash)
-                    && cache.TryGetValue(hash, out var cached))
+                if (summary.SiloManifestHashes.TryGetValue(silo, out var hash))
                 {
-                    builder[silo] = cached;
-                    missing.Remove(silo);
-                    modified = true;
+                    var hit = cache.TryGetValue(hash, out var cached);
+                    _instruments.OnCacheLookup(hit, "peer");
+                    if (hit)
+                    {
+                        builder[silo] = cached!;
+                        missing.Remove(silo);
+                        modified = true;
+                    }
                 }
             }
         }
@@ -531,7 +570,39 @@ namespace Orleans.Runtime.Metadata
             return builder?.ToImmutable() ?? silos;
         }
 
-        private async Task<GrainManifest> GetSiloManifest(
+        private Task<GrainManifest> GetSiloManifest(
+            SiloAddress siloAddress,
+            ConcurrentDictionary<ManifestHash, GrainManifest>? cache,
+            CancellationToken cancellationToken) =>
+            _instruments.RetrievalDurationEnabled
+                ? GetSiloManifestWithMetrics(siloAddress, cache, cancellationToken)
+                : GetSiloManifestCore(siloAddress, cache, cancellationToken);
+
+        private async Task<GrainManifest> GetSiloManifestWithMetrics(
+            SiloAddress siloAddress,
+            ConcurrentDictionary<ManifestHash, GrainManifest>? cache,
+            CancellationToken cancellationToken)
+        {
+            var started = _timeProvider.GetTimestamp();
+            var status = "error";
+            try
+            {
+                var manifest = await GetSiloManifestCore(siloAddress, cache, cancellationToken);
+                status = "success";
+                return manifest;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                status = "canceled";
+                throw;
+            }
+            finally
+            {
+                _instruments.OnRetrievalCompleted(_timeProvider.GetElapsedTime(started), cache is null ? "direct" : "hash", status);
+            }
+        }
+
+        private async Task<GrainManifest> GetSiloManifestCore(
             SiloAddress siloAddress,
             ConcurrentDictionary<ManifestHash, GrainManifest>? cache,
             CancellationToken cancellationToken)
@@ -543,9 +614,11 @@ namespace Orleans.Runtime.Metadata
                 {
                     var remoteManifestProvider = _grainFactory!.GetSystemTarget<IClusterManifestSystemTarget>(Constants.ManifestProviderType, siloAddress);
                     var hash = await AwaitManifestRequest(remoteManifestProvider.GetSiloManifestHash(cancellationToken).AsTask(), cancellationToken);
-                    if (cache.TryGetValue(hash, out var cached))
+                    var hit = cache.TryGetValue(hash, out var cached);
+                    _instruments.OnCacheLookup(hit, "silo");
+                    if (hit)
                     {
-                        return cached;
+                        return cached!;
                     }
 
                     var manifest = await AwaitManifestRequest(remoteManifestProvider.GetSiloManifestByHash(hash, cancellationToken).AsTask(), cancellationToken);
@@ -554,9 +627,12 @@ namespace Orleans.Runtime.Metadata
                         cache[hash] = manifest;
                         return manifest;
                     }
+
+                    _instruments.OnFallback(manifest is null ? "missing" : "mismatch");
                 }
                 catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
                 {
+                    _instruments.OnFallback("error");
                     LogDebugErrorRetrievingSiloManifestByHash(exception, siloAddress);
                 }
             }

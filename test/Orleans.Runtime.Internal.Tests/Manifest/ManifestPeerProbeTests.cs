@@ -20,6 +20,7 @@ namespace UnitTests.Manifest;
 public sealed class ManifestPeerProbeTests(ManifestPeerProbeTests.Fixture fixture) : IClassFixture<ManifestPeerProbeTests.Fixture>
 {
     private static readonly GrainType TargetType = SystemTargetGrainId.CreateGrainType("manifest-probe-test");
+    private static readonly GrainType LegacyTargetType = SystemTargetGrainId.CreateGrainType("legacy-manifest-test");
 
     public sealed class Fixture : BaseInProcessTestClusterFixture
     {
@@ -29,8 +30,47 @@ public sealed class ManifestPeerProbeTests(ManifestPeerProbeTests.Fixture fixtur
             {
                 silo.Services.AddSingleton<PeerTarget>();
                 silo.Services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>>(services => services.GetRequiredService<PeerTarget>());
+                silo.Services.AddSingleton<LegacyManifestTarget>();
+                silo.Services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>>(services => services.GetRequiredService<LegacyManifestTarget>());
             });
         }
+    }
+
+    [Fact]
+    public async Task LegacyOnlyPeer_FallsBackThroughRealGeneratedProxy()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var local = fixture.HostedCluster.Silos[0];
+        var remote = fixture.HostedCluster.Silos[1];
+        var actualFactory = local.ServiceProvider.GetRequiredService<IInternalGrainFactory>();
+        var hashProxy = actualFactory.GetSystemTarget<IClusterManifestSystemTarget>(LegacyTargetType, remote.SiloAddress);
+        var legacyProxy = actualFactory.GetSystemTarget<ISiloManifestSystemTarget>(LegacyTargetType, remote.SiloAddress);
+        var factory = Substitute.For<IInternalGrainFactory>();
+        factory.GetSystemTarget<IClusterManifestSystemTarget>(Constants.ManifestProviderType, remote.SiloAddress).Returns(hashProxy);
+        factory.GetSystemTarget<ISiloManifestSystemTarget>(Constants.ManifestProviderType, remote.SiloAddress).Returns(legacyProxy);
+        using var services = new ServiceCollection().AddSingleton(factory).BuildServiceProvider();
+        var membership = local.ServiceProvider.GetRequiredService<IClusterMembershipService>();
+        await using var provider = new ClusterManifestProvider(
+            local.ServiceProvider.GetRequiredService<ILocalSiloDetails>(),
+            local.ServiceProvider.GetRequiredService<SiloManifestProvider>(),
+            membership,
+            local.ServiceProvider.GetRequiredService<IFatalErrorHandler>(),
+            NullLogger<ClusterManifestProvider>.Instance,
+            services,
+            TimeProvider.System,
+            Options.Create(new ClusterManifestOptions { EnableContentAddressedRetrieval = true }),
+            local.ServiceProvider.GetRequiredService<ClusterManifestInstruments>());
+        var target = remote.ServiceProvider.GetRequiredService<LegacyManifestTarget>();
+        var previousRequests = target.Requests;
+        var initialize = typeof(ClusterManifestProvider).GetMethod("Initialize", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        await (Task)initialize.Invoke(provider, [cancellationToken])!;
+        var update = (Task<bool>)typeof(ClusterManifestProvider).GetMethod("UpdateManifest", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(provider, [membership.CurrentSnapshot, cancellationToken])!;
+
+        Assert.True(await update.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken));
+        Assert.Equal(previousRequests + 1, target.Requests);
+        Assert.Equal(target.Manifest, provider.Current.Silos[remote.SiloAddress]);
+        Assert.Equal(2, provider.Current.Silos.Count);
     }
 
     [Theory]
@@ -60,7 +100,8 @@ public sealed class ManifestPeerProbeTests(ManifestPeerProbeTests.Fixture fixtur
             NullLogger<ClusterManifestProvider>.Instance,
             services,
             time,
-            Options.Create(new ClusterManifestOptions { EnableContentAddressedRetrieval = true }));
+            Options.Create(new ClusterManifestOptions { EnableContentAddressedRetrieval = true }),
+            localServices.GetRequiredService<ClusterManifestInstruments>());
         var initialize = typeof(ClusterManifestProvider).GetMethod("Initialize", BindingFlags.Instance | BindingFlags.NonPublic)!;
         await (Task)initialize.Invoke(provider, [cancellationToken])!;
         var target = remote.ServiceProvider.GetRequiredService<PeerTarget>();
@@ -204,6 +245,31 @@ public sealed class ManifestPeerProbeTests(ManifestPeerProbeTests.Fixture fixtur
 
         public void Participate(ISiloLifecycle lifecycle)
         {
+        }
+
+        private sealed class LegacyManifestTarget : SystemTarget, ISiloManifestSystemTarget, ILifecycleParticipant<ISiloLifecycle>
+        {
+            private int _requests;
+
+            public LegacyManifestTarget(SystemTargetShared shared, SiloManifestProvider provider) : base(LegacyTargetType, shared)
+            {
+                Manifest = provider.SiloManifest;
+                shared.ActivationDirectory.RecordNewTarget(this);
+            }
+
+            public GrainManifest Manifest { get; }
+            public int Requests => Volatile.Read(ref _requests);
+
+            public ValueTask<GrainManifest> GetSiloManifest(CancellationToken cancellationToken = default)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                Interlocked.Increment(ref _requests);
+                return new(Manifest);
+            }
+
+            public void Participate(ISiloLifecycle lifecycle)
+            {
+            }
         }
     }
 }
