@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using Orleans.Metadata;
 using Orleans.Runtime;
+using Orleans.Runtime.Metadata;
 using Xunit;
 
 namespace UnitTests.Manifest;

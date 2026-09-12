@@ -246,30 +246,30 @@ public sealed class ManifestPeerProbeTests(ManifestPeerProbeTests.Fixture fixtur
         public void Participate(ISiloLifecycle lifecycle)
         {
         }
+    }
 
-        private sealed class LegacyManifestTarget : SystemTarget, ISiloManifestSystemTarget, ILifecycleParticipant<ISiloLifecycle>
+    private sealed class LegacyManifestTarget : SystemTarget, ISiloManifestSystemTarget, ILifecycleParticipant<ISiloLifecycle>
+    {
+        private int _requests;
+
+        public LegacyManifestTarget(SystemTargetShared shared, SiloManifestProvider provider) : base(LegacyTargetType, shared)
         {
-            private int _requests;
+            Manifest = provider.SiloManifest;
+            shared.ActivationDirectory.RecordNewTarget(this);
+        }
 
-            public LegacyManifestTarget(SystemTargetShared shared, SiloManifestProvider provider) : base(LegacyTargetType, shared)
-            {
-                Manifest = provider.SiloManifest;
-                shared.ActivationDirectory.RecordNewTarget(this);
-            }
+        public GrainManifest Manifest { get; }
+        public int Requests => Volatile.Read(ref _requests);
 
-            public GrainManifest Manifest { get; }
-            public int Requests => Volatile.Read(ref _requests);
+        public ValueTask<GrainManifest> GetSiloManifest(CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Interlocked.Increment(ref _requests);
+            return new(Manifest);
+        }
 
-            public ValueTask<GrainManifest> GetSiloManifest(CancellationToken cancellationToken = default)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                Interlocked.Increment(ref _requests);
-                return new(Manifest);
-            }
-
-            public void Participate(ISiloLifecycle lifecycle)
-            {
-            }
+        public void Participate(ISiloLifecycle lifecycle)
+        {
         }
     }
 }

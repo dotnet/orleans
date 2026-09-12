@@ -11,6 +11,7 @@ using NSubstitute;
 using Orleans.Configuration;
 using Orleans.Metadata;
 using Orleans.Runtime;
+using Orleans.Runtime.Metadata;
 using TestExtensions;
 using Xunit;
 
