@@ -73,6 +73,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton<ConsistentRingInstruments>();
             services.TryAddSingleton<StorageInstruments>();
             services.TryAddSingleton<CatalogInstruments>();
+            services.TryAddSingleton<ClusterManifestInstruments>();
             services.TryAddSingleton<DirectoryInstruments>();
             services.TryAddSingleton<GrainInstruments>();
             services.TryAddSingleton<MessagingInstruments>();
@@ -337,6 +338,7 @@ namespace Orleans.Hosting
             services.ConfigureFormatter<ConnectionOptions>();
             services.ConfigureFormatter<SiloMessagingOptions>();
             services.ConfigureFormatter<ClusterMembershipOptions>();
+            services.ConfigureFormatter<ClusterManifestOptions>();
             services.ConfigureFormatter<GrainDirectoryOptions>();
             services.ConfigureFormatter<ActivationCountBasedPlacementOptions>();
             services.ConfigureFormatter<ResourceOptimizedPlacementOptions>();
