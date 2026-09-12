@@ -8,7 +8,7 @@ CREATE TABLE OrleansStorage
     grainidextensionstring character varying(512) ,
     serviceid character varying(150)  NOT NULL,
     payloadbinary bytea,
-    modifiedon timestamp without time zone NOT NULL,
+    modifiedon timestamptz NOT NULL,
     version integer
 );
 
@@ -58,7 +58,7 @@ AS $function$
         UPDATE OrleansStorage
         SET
             PayloadBinary = _PayloadBinary,
-            ModifiedOn = (now() at time zone 'utc'),
+            ModifiedOn = now(),
             Version = Version + 1
 
         WHERE
@@ -104,7 +104,7 @@ AS $function$
             _GrainIdExtensionString,
             _ServiceId,
             _PayloadBinary,
-           (now() at time zone 'utc'),
+           now(),
             1
         WHERE NOT EXISTS
          (
