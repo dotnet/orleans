@@ -101,6 +101,14 @@ public class EventHubCheckpointerTests
         }
     }
 
+    private sealed class CanceledFlushCheckpointer : TestCheckpointer
+    {
+        public override async Task FlushAsync(CancellationToken cancellationToken)
+        {
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+        }
+    }
+
     private sealed class FailingResetCheckpointer : TestCheckpointer
     {
         public override Task Reset(CancellationToken cancellationToken)
@@ -1197,9 +1205,14 @@ public class EventHubCheckpointerTests
         {
             LoadedOffset = "123",
         };
+        var caches = new Queue<IEventHubQueueCache>(
+            [new TestEventHubQueueCache(), new TestEventHubQueueCache()]);
         var receiver = await CreateReceiver(
             checkpointer,
-            eventHubReceiver: new InvalidOffsetEventHubReceiver());
+            receiverFactory: offset => offset == "123"
+                ? new InvalidOffsetEventHubReceiver()
+                : new TestEventHubReceiver(),
+            cacheFactory: caches.Dequeue);
 
         var exception = await Assert.ThrowsAsync<ArgumentException>(
             () => receiver.GetQueueMessagesAsync(10, TestContext.Current.CancellationToken));
@@ -1207,6 +1220,9 @@ public class EventHubCheckpointerTests
         Assert.Equal("The supplied offset is invalid.", exception.Message);
         Assert.Equal(1, checkpointer.ResetCount);
 
+        Assert.Empty(await receiver.GetQueueMessagesAsync(
+            10,
+            TestContext.Current.CancellationToken));
         receiver.UpdateDeliveryProgress(MakeToken(124), DateTime.UtcNow);
         Assert.Equal(0, checkpointer.UpdateCount);
     }
@@ -1508,6 +1524,22 @@ public class EventHubCheckpointerTests
         Assert.Equal(1, checkpointer.FlushCount);
         Assert.Equal(1, cache.DisposeCount);
         Assert.Equal(1, eventHubReceiver.CloseCount);
+    }
+
+    [TestSuite("BVT")]
+    [Fact, TestCategory("BVT")]
+    public async Task Shutdown_WhenFlushTimesOut_ClosesReceiverWithIndependentToken()
+    {
+        var eventHubReceiver = new CleanupTrackingEventHubReceiver();
+        var receiver = await CreateReceiver(
+            new CanceledFlushCheckpointer(),
+            eventHubReceiver: eventHubReceiver);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => receiver.Shutdown(TimeSpan.FromMilliseconds(50)));
+
+        Assert.Equal(1, eventHubReceiver.CloseCount);
+        Assert.False(eventHubReceiver.CloseCancellationToken.IsCancellationRequested);
     }
 
     [TestSuite("BVT")]
