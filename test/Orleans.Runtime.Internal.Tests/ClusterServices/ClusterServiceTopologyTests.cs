@@ -4,6 +4,7 @@ using CsCheck;
 using Orleans.Runtime;
 using Orleans.Runtime.ClusterServices;
 using Orleans.Runtime.GrainDirectory;
+using Orleans.Runtime.Utilities;
 using TestExtensions;
 using Xunit;
 
@@ -96,6 +97,26 @@ public sealed class ClusterServiceTopologyTests
             Assert.InRange(probes, 1, (int)Math.Ceiling(Math.Log2(partitions)) + 2);
             Assert.True(Assert.Single(actual).Range.Contains(point));
         }
+    }
+
+    [Theory]
+    [InlineData(0, 35u, -1, 0)]
+    [InlineData(3, 35u, 1, 1)]
+    [InlineData(3, 15u, 0, 2)]
+    [InlineData(3, uint.MaxValue, 2, 2)]
+    [InlineData(3, 0u, 2, 3)]
+    [InlineData(3, 10u, -1, 3)]
+    [InlineData(3, 25u, -1, 3)]
+    [InlineData(3, 45u, -1, 3)]
+    public void RingOwnerSearch_ReportsExactProbesForHitsAndMisses(int length, uint point, int expectedIndex, int expectedProbes)
+    {
+        RingRange[] ranges = [RingRange.Create(10, 20), RingRange.Create(30, 40), RingRange.Create(50, 5)];
+
+        var index = SearchAlgorithms.RingRangeBinarySearch(length, ranges, static (entries, index) => entries[index], point, out var probes);
+
+        Assert.Equal(expectedIndex, index);
+        Assert.Equal(expectedProbes, probes);
+        Assert.Equal(index, SearchAlgorithms.RingRangeBinarySearch(length, ranges, static (entries, index) => entries[index], point));
     }
 
     [Fact]

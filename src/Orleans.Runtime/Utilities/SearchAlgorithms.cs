@@ -92,9 +92,8 @@ internal static class SearchAlgorithms
         }
 
 #if DEBUG
-        // Try the first element.
+        // Check the sort-order invariant independently of search probes.
         entry = getEntry(collection, 0);
-        probeCount++;
         if (entry.CompareTo(key) == 0)
         {
             Debug.Fail("Sort order invariant violated.");

@@ -489,6 +489,47 @@ public sealed class RegisteredClusterServiceViewProviderTests
                 [TestServiceMembership.A, TestServiceMembership.B], catalog, mapping);
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void ViewRejectsNullParticipantsBeforeOrdering(int nullIndex)
+    {
+        var participants = new List<SiloAddress> { TestServiceMembership.B, TestServiceMembership.A };
+        participants.Insert(nullIndex, null!);
+
+        Assert.Throws<ArgumentException>("participants", () => new RegisteredClusterServiceView(
+            new("service", "authority", 1), null, new(7), Configuration, participants, [], []));
+    }
+
+    [Fact]
+    public void ViewRejectsDuplicateParticipants()
+    {
+        Assert.Throws<ArgumentException>("participants", () => new RegisteredClusterServiceView(
+            new("service", "authority", 1), null, new(7), Configuration,
+            [TestServiceMembership.B, TestServiceMembership.A, TestServiceMembership.B], [], []));
+    }
+
+    [Fact]
+    public void ViewEnumeratesParticipantsOnceAndOrdersCanonicalIndexes()
+    {
+        var enumerations = 0;
+        var view = new RegisteredClusterServiceView(
+            new("service", "authority", 1), null, new(7), Configuration, Participants(), [], []);
+
+        Assert.Equal(1, enumerations);
+        Assert.Equal(new[] { TestServiceMembership.A, TestServiceMembership.B }, view.Participants);
+        Assert.Equal(view.Participants, view.OwnerResources.Keys.Order());
+        Assert.All(view.OwnerResources.Values, Assert.Empty);
+
+        IEnumerable<SiloAddress> Participants()
+        {
+            enumerations++;
+            yield return TestServiceMembership.B;
+            yield return TestServiceMembership.A;
+        }
+    }
+
     [Fact(Timeout = 30_000)]
     public async Task ExplicitRingPublicationRejectsGapsOverlapAndIneligibleOwners()
     {
