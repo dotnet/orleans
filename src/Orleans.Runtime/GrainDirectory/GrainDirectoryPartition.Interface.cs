@@ -70,7 +70,9 @@ internal sealed partial class GrainDirectoryPartition
             }
         }
 
-        return DirectoryResult.FromResult(RegisterCore(address, currentRegistration, currentView.Version), version);
+        var result = RegisterCore(address, currentRegistration, currentView.Version,
+            currentView.ClusterMembershipSnapshot);
+        return DirectoryResult.FromResult(result, version);
     }
 
     async ValueTask<DirectoryResult<GrainAddress?>> IGrainDirectoryPartition.LookupAsync(
@@ -87,7 +89,8 @@ internal sealed partial class GrainDirectoryPartition
             return DirectoryResult.RefreshRequired<GrainAddress?>(currentView.Version);
         }
 
-        return DirectoryResult.FromResult(LookupCore(grainId), version);
+        var result = LookupCore(grainId, currentView.ClusterMembershipSnapshot);
+        return DirectoryResult.FromResult(result, version);
     }
 
     async ValueTask<DirectoryResult<bool>> IGrainDirectoryPartition.DeregisterAsync(
@@ -106,10 +109,11 @@ internal sealed partial class GrainDirectoryPartition
         }
 
         DebugAssertOwnership(currentView, address.GrainId);
-        return DirectoryResult.FromResult(DeregisterCore(address), version);
+        var result = DeregisterCore(address, currentView.ClusterMembershipSnapshot);
+        return DirectoryResult.FromResult(result, version);
     }
 
-    private bool DeregisterCore(GrainAddress address)
+    private bool DeregisterCore(GrainAddress address, ClusterMembershipSnapshot membership)
     {
         if (!_directory.TryGetValue(address.GrainId, out var existing))
         {
@@ -124,7 +128,7 @@ internal sealed partial class GrainDirectoryPartition
             return false;
         }
 
-        if (existing.Matches(address) || IsSiloDead(existing))
+        if (existing.Matches(address) || IsSiloDead(existing, membership))
         {
             return _directory.Remove(address.GrainId);
         }
@@ -132,9 +136,11 @@ internal sealed partial class GrainDirectoryPartition
         return false;
     }
 
-    internal GrainAddress? LookupCore(GrainId grainId)
+    internal GrainAddress? LookupCore(GrainId grainId) => LookupCore(grainId, _owner.ClusterMembershipSnapshot);
+
+    private GrainAddress? LookupCore(GrainId grainId, ClusterMembershipSnapshot membership)
     {
-        if (_directory.TryGetValue(grainId, out var existing) && !IsSiloDead(existing))
+        if (_directory.TryGetValue(grainId, out var existing) && !IsSiloDead(existing, membership))
         {
             return existing;
         }
@@ -163,11 +169,15 @@ internal sealed partial class GrainDirectoryPartition
         }
     }
 
-    private GrainAddress RegisterCore(GrainAddress newAddress, GrainAddress? existingAddress, MembershipVersion currentVersion)
+    private GrainAddress RegisterCore(
+        GrainAddress newAddress,
+        GrainAddress? existingAddress,
+        MembershipVersion currentVersion,
+        ClusterMembershipSnapshot membership)
     {
         ref var existing = ref CollectionsMarshal.GetValueRefOrAddDefault(_directory, newAddress.GrainId, out _);
 
-        if (existing is null || existing.Matches(existingAddress) || IsSiloDead(existing))
+        if (existing is null || existing.Matches(existingAddress) || IsSiloDead(existing, membership))
         {
             if (newAddress.MembershipVersion != currentVersion)
             {
@@ -187,8 +197,8 @@ internal sealed partial class GrainDirectoryPartition
         return existing;
     }
 
-    private bool IsSiloDead(GrainAddress existing)
-        => existing.SiloAddress is null || _owner.ClusterMembershipSnapshot.GetSiloStatus(existing.SiloAddress, existing.MembershipVersion) == SiloStatus.Dead;
+    private static bool IsSiloDead(GrainAddress existing, ClusterMembershipSnapshot membership)
+        => existing.SiloAddress is null || membership.GetSiloStatus(existing.SiloAddress, existing.MembershipVersion) == SiloStatus.Dead;
 
     [LoggerMessage(
         Level = LogLevel.Trace,

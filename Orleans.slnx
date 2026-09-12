@@ -207,6 +207,8 @@
     <Project Path="test/Misc/TestSerializerExternalModels/TestSerializerExternalModels.csproj" />
   </Folder>
   <Folder Name="/test/TestInfrastructure/">
+    <Project Path="test/TestInfrastructure/Orleans.GrainDirectory.Compatibility.CurrentHost/Orleans.GrainDirectory.Compatibility.CurrentHost.csproj" />
+    <Project Path="test/TestInfrastructure/Orleans.GrainDirectory.Compatibility.ReleaseHost/Orleans.GrainDirectory.Compatibility.ReleaseHost.csproj" />
     <Project Path="test/TestInfrastructure/Orleans.TestingHost.Tests/Orleans.TestingHost.Tests.csproj" />
     <Project Path="test/TestInfrastructure/TestExtensions/TestExtensions.csproj" />
   </Folder>
