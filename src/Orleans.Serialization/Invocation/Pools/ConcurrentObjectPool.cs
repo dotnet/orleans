@@ -166,6 +166,12 @@ internal class ConcurrentObjectPool<T, TPoolPolicy> : ObjectPool<T>, IDisposable
     {
         lock (_stacks!)
         {
+            if (Volatile.Read(ref _disposed) != 0)
+            {
+                holder.Release();
+                return;
+            }
+
             for (var i = _stacks.Count - 1; i >= 0; i--)
             {
                 if (!_stacks[i].TryGetTarget(out _))
