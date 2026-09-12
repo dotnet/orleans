@@ -26,6 +26,8 @@ namespace Orleans.Streams
         public StreamSequenceToken? RegistrationStartToken;
         [NonSerialized]
         public IQueueCacheCursor? RegistrationCursor;
+        [NonSerialized]
+        public StreamRecoveryState? RegistrationRecovery;
 
         public StreamConsumerCollection(DateTime now)
         {
@@ -45,6 +47,7 @@ namespace Orleans.Streams
         {
             if (!queueData.Remove(subscriptionId, out var consumer)) return false;
 
+            consumer.IsRemoved = true;
             consumer.SafeDisposeCursor(logger);
             return true;
         }
@@ -69,6 +72,7 @@ namespace Orleans.Streams
             DisposeRegistrationCursor(logger);
             foreach (StreamConsumerData consumer in queueData.Values)
             {
+                consumer.IsRemoved = true;
                 consumer.SafeDisposeCursor(logger);
             }
             queueData.Clear();

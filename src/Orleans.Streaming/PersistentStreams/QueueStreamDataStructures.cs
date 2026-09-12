@@ -1,5 +1,6 @@
 using System;
 using Microsoft.Extensions.Logging;
+using Orleans.Internal;
 using Orleans.Runtime;
 
 namespace Orleans.Streams
@@ -33,7 +34,11 @@ namespace Orleans.Streams
         [NonSerialized]
         public bool IsRegistered = false;
         [NonSerialized]
+        public bool IsRemoved;
+        [NonSerialized]
         public StreamSequenceToken? PendingStartToken;
+        [NonSerialized]
+        public StreamSequenceToken? PendingContinuationToken;
         [NonSerialized]
         public IBatchContainer? PendingBatch;
         [NonSerialized]
@@ -64,6 +69,14 @@ namespace Orleans.Streams
         public bool HasObservedRecoveryStart;
         [NonSerialized]
         public long CursorVersion;
+        [NonSerialized]
+        public StreamRecoveryState? DeliveryRecovery;
+        [NonSerialized]
+        public bool DeliveryRecoveryFailureReported;
+        [NonSerialized]
+        public bool DeliveryRecoveryFailureIsDelivery;
+        [NonSerialized]
+        public StreamSequenceToken? DeliveryRecoveryFailureToken;
 
         public StreamConsumerData(GuidId subscriptionId, QualifiedStreamId streamId, IStreamConsumerExtension streamConsumer, string? filterData)
         {
@@ -102,7 +115,43 @@ namespace Orleans.Streams
                     catch { }
                     Utils.LogIgnoredException(logger, ex, caller);
                 }
+
             }
+        }
+    }
+
+    internal sealed class StreamRecoveryState(long startedAt)
+    {
+        private long _lastAttempt;
+        private TimeSpan _retryDelay;
+
+        public int Attempts { get; private set; }
+        public bool Stopped { get; set; }
+
+        public TimeSpan RemainingTime(TimeProvider timeProvider, TimeSpan maximumTime)
+            => maximumTime <= TimeSpan.Zero
+                ? Timeout.InfiniteTimeSpan
+                : maximumTime - timeProvider.GetElapsedTime(startedAt);
+
+        public bool IsExhausted(TimeProvider timeProvider, TimeSpan maximumTime, int maximumAttempts)
+            => Stopped || Attempts >= maximumAttempts
+                || maximumTime > TimeSpan.Zero && RemainingTime(timeProvider, maximumTime) <= TimeSpan.Zero;
+
+        public bool TryBeginAttempt(TimeProvider timeProvider)
+        {
+            if (Attempts != 0 && timeProvider.GetElapsedTime(_lastAttempt) < _retryDelay)
+            {
+                return false;
+            }
+
+            Attempts++;
+            return true;
+        }
+
+        public void FinishAttempt(TimeProvider timeProvider, IBackoffProvider backoff)
+        {
+            _lastAttempt = timeProvider.GetTimestamp();
+            _retryDelay = backoff.Next(Attempts - 1);
         }
     }
 }
