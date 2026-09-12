@@ -86,6 +86,18 @@ Request latency covers the interval until the caller's callback completes, inclu
 | `orleans-scheduler-long-running-turns` | C | Turns, implicit | - | Grain micro-turns whose synchronous execution exceeded <xref:Orleans.Configuration.SchedulingOptions.TurnWarningLengthThreshold>. |
 | `orleans-system-targets` | UDC | System targets, implicit | `type` | Current Orleans system-target instances by type. |
 
+## Cluster manifests
+
+| Instrument | Type | Unit | Attributes | Description |
+|---|---|---|---|---|
+| `orleans-manifest-cache-lookups` | C | Lookups, implicit | `result`, `source` | Content-cache lookups with `hit` or `miss` results, sourced from a `silo` hash response or a `peer` summary. |
+| `orleans-manifest-fallbacks` | C | Retrievals, implicit | `reason` | Hash retrievals falling back to the direct manifest RPC: `error`, `missing`, or `mismatch`. |
+| `orleans-manifest-peer-probes` | C | Attempts, implicit | `status` | Local peer attempts completed with `success`, `timeout`, `canceled`, or `error`; `skipped` counts attempts denied by local admission. |
+| `orleans-manifest-peer-repairs` | C | Silo entries, implicit | - | Missing silo manifest entries supplied by successfully published peer repairs. |
+| `orleans-manifest-retrieval-duration` | H | `ms` | `mode`, `status` | Local silo-manifest retrieval duration in `direct` or `hash` mode, ending in `success`, `error`, or `canceled`. |
+
+The categories are fixed and carry no silo addresses, manifest hashes, or grain type names. Probe cancellation includes optional work superseded by complete direct results. See [cluster manifest retrieval](../../implementation/cluster-manifest-retrieval.md) for publication, fallback, and rollout semantics.
+
 ## Grain directory and consistent rings
 
 | Instrument | Type | Unit | Attributes | Description |

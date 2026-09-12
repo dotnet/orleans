@@ -73,6 +73,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton<ConsistentRingInstruments>();
             services.TryAddSingleton<StorageInstruments>();
             services.TryAddSingleton<CatalogInstruments>();
+            services.TryAddSingleton<ClusterManifestInstruments>();
             services.TryAddSingleton<DirectoryInstruments>();
             services.TryAddSingleton<GrainInstruments>();
             services.TryAddSingleton<MessagingInstruments>();
