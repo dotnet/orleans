@@ -22,6 +22,7 @@ The command checks the gallery manifest and builds every project in `Samples.sln
 | --- | --- | --- |
 | [Adventure](Adventure) | A text adventure game demonstrating grains, external clients, and application modeling. | [dotnet/samples](https://github.com/dotnet/samples) |
 | [Chirper](Chirper) | A social network sample using persistence, observers, and reentrant grains. | [dotnet/samples](https://github.com/dotnet/samples) |
+| [Durable Workflows](DurableWorkflows) | An Aspire-hosted application demonstrating durable RPC, fan-out, approval, cancellation, sagas, and replica recovery. | [dotnet/orleans](https://github.com/dotnet/orleans) |
 | [GPS Tracker](GPSTracker) | An IoT location tracker integrating Orleans with ASP.NET Core SignalR. | [dotnet/samples](https://github.com/dotnet/samples) |
 | [Hello World](HelloWorld) | The smallest complete Orleans application for defining and calling a grain. | [dotnet/samples](https://github.com/dotnet/samples) |
 | [Journaled Todo List](JournaledTodoList) | An Aspire-hosted Web application demonstrating durable journaled grain state. | [dotnet/samples](https://github.com/dotnet/samples) |
@@ -43,6 +44,7 @@ The command checks the gallery manifest and builds every project in `Samples.sln
 | [Chat Room](ChatRoom) | A terminal chat application demonstrating Orleans Streams. | C# | streaming, client, terminal | [dotnet/samples](https://github.com/dotnet/samples) |
 | [Chirper](Chirper) | A social network sample using persistence, observers, and reentrant grains. | C# | observers, persistence, reentrancy | [dotnet/samples](https://github.com/dotnet/samples) |
 | [Custom grain-call return type](CustomGrainCallReturnType) | An awaitable GrainCall<T> extension demonstrating generated request bases, proxy adaptation, and failure propagation. | C# | serialization, code-generation, grains | [dotnet/orleans](https://github.com/dotnet/orleans) |
+| [Durable Workflows](DurableWorkflows) | An Aspire-hosted application demonstrating durable RPC, fan-out, approval, cancellation, sagas, and replica recovery. | C# | durable-tasks, workflows, aspire, redis, azure-storage | [dotnet/orleans](https://github.com/dotnet/orleans) |
 | [F# Hello World](FSharpHelloWorld) | A minimal Orleans application with grains implemented in F#. | F#, C# | getting-started, fsharp | [dotnet/samples](https://github.com/dotnet/samples) |
 | [GPS Tracker](GPSTracker) | An IoT location tracker integrating Orleans with ASP.NET Core SignalR. | C#, JavaScript | iot, signalr, web | [dotnet/samples](https://github.com/dotnet/samples) |
 | [Google Cloud Firestore](GoogleFirestore) | An Orleans application using Firestore for clustering, grain directories, persistence, and reminders. | C# | google-cloud, firestore, clustering, persistence, reminders | [dotnet/orleans](https://github.com/dotnet/orleans) |
