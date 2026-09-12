@@ -1,5 +1,6 @@
 using System;
 using Microsoft.Extensions.Logging;
+using Orleans.Internal;
 using Orleans.Runtime;
 
 namespace Orleans.Streams
@@ -33,18 +34,49 @@ namespace Orleans.Streams
         [NonSerialized]
         public bool IsRegistered = false;
         [NonSerialized]
+        public bool IsRemoved;
+        [NonSerialized]
         public StreamSequenceToken? PendingStartToken;
+        [NonSerialized]
+        public StreamSequenceToken? PendingContinuationToken;
         [NonSerialized]
         public IBatchContainer? PendingBatch;
         [NonSerialized]
         public bool StartPositionIsProviderDefault;
 
         /// <summary>
-        /// The sequence token of the last batch processed (delivered or filtered) by this subscription.
-        /// Used by the pulling agent's periodic scan to compute the delivery-based checkpoint watermark.
+        /// The last proven-safe delivery position for this subscription.
+        /// Cannot advance after an unresolved delivery or cursor error, but earlier replay requests can lower it.
         /// </summary>
         [NonSerialized]
         public StreamSequenceToken? LastProcessedToken;
+
+        // Inactive also describes interrupted delivery, so it does not prove that the cursor drained.
+        [NonSerialized]
+        public bool IsCaughtUp;
+        [NonSerialized]
+        public int PendingHandshakes;
+        [NonSerialized]
+        public bool HasDeliveryProgressError;
+        [NonSerialized]
+        public StreamSequenceToken? UnconfirmedDeliveryToken;
+        // Unlike LastToken, this anchor must survive later fallback deliveries and handshake responses.
+        [NonSerialized]
+        public StreamHandshakeToken? DeliveryRecoveryToken;
+        [NonSerialized]
+        public IQueueCacheCursor? DeliveryRecoveryCursor;
+        [NonSerialized]
+        public bool HasObservedRecoveryStart;
+        [NonSerialized]
+        public long CursorVersion;
+        [NonSerialized]
+        public StreamRecoveryState? DeliveryRecovery;
+        [NonSerialized]
+        public bool DeliveryRecoveryFailureReported;
+        [NonSerialized]
+        public bool DeliveryRecoveryFailureIsDelivery;
+        [NonSerialized]
+        public StreamSequenceToken? DeliveryRecoveryFailureToken;
 
         public StreamConsumerData(GuidId subscriptionId, QualifiedStreamId streamId, IStreamConsumerExtension streamConsumer, string? filterData)
         {
@@ -56,9 +88,17 @@ namespace Orleans.Streams
 
         internal void SafeDisposeCursor(ILogger logger)
         {
+            CursorVersion++;
+            IsCaughtUp = false;
             PendingBatch = null;
             if (Cursor is { } cursor)
             {
+                if (ReferenceEquals(DeliveryRecoveryCursor, cursor))
+                {
+                    DeliveryRecoveryCursor = null;
+                    HasObservedRecoveryStart = false;
+                }
+
                 Cursor = null;
                 // kill cursor activity and ensure it does not start again on this consumer data.
                 try
@@ -75,6 +115,50 @@ namespace Orleans.Streams
                     catch { }
                     Utils.LogIgnoredException(logger, ex, caller);
                 }
+
+            }
+        }
+    }
+
+    internal sealed class StreamRecoveryState(long startedAt)
+    {
+        private long _lastAttempt;
+        private TimeSpan _retryDelay;
+
+        public int Attempts { get; private set; }
+        public bool Stopped { get; set; }
+
+        public TimeSpan RemainingTime(TimeProvider timeProvider, TimeSpan maximumTime)
+            => maximumTime <= TimeSpan.Zero
+                ? Timeout.InfiniteTimeSpan
+                : maximumTime - timeProvider.GetElapsedTime(startedAt);
+
+        public bool IsExhausted(TimeProvider timeProvider, TimeSpan maximumTime, int maximumAttempts)
+            => Stopped || Attempts >= maximumAttempts
+                || maximumTime > TimeSpan.Zero && RemainingTime(timeProvider, maximumTime) <= TimeSpan.Zero;
+
+        public bool TryBeginAttempt(TimeProvider timeProvider)
+        {
+            if (Attempts != 0 && timeProvider.GetElapsedTime(_lastAttempt) < _retryDelay)
+            {
+                return false;
+            }
+
+            Attempts++;
+            return true;
+        }
+
+        public void FinishAttempt(TimeProvider timeProvider, IBackoffProvider backoff, ILogger logger)
+        {
+            _lastAttempt = timeProvider.GetTimestamp();
+            try
+            {
+                _retryDelay = backoff.Next(Attempts - 1);
+            }
+            catch (OperationCanceledException exception)
+            {
+                _retryDelay = TimeSpan.Zero;
+                Utils.LogIgnoredException(logger, exception, "Stream recovery backoff was canceled. Retaining bounded recovery without a retry delay.");
             }
         }
     }

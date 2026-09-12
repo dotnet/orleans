@@ -22,6 +22,8 @@ namespace Orleans.Streams
     internal sealed partial class PersistentStreamPullingAgent : SystemTarget, IPersistentStreamPullingAgent, PersistentStreamPullingAgent.ITestAccessor
     {
         private const int ReadLoopRetryMax = 6;
+        // Like queue reads, automatic recovery stays finite even when the delivery timeout is unlimited.
+        private const int RecoveryAttemptMax = 6;
         private const int StreamInactivityCheckFrequency = 10;
         private readonly IBackoffProvider deliveryBackoffProvider;
         private readonly IBackoffProvider queueReaderBackoffProvider;
@@ -29,6 +31,7 @@ namespace Orleans.Streams
         private readonly IStreamPubSub pubSub;
         private readonly IStreamFilter streamFilter;
         private readonly Dictionary<QualifiedStreamId, StreamConsumerCollection> pubSubCache;
+        private readonly HashSet<StreamConsumerData> pendingConsumerRecoveries = new();
         private readonly StreamPullingAgentOptions options;
         private readonly ILogger logger;
         private readonly IQueueAdapterCache queueAdapterCache;
@@ -46,6 +49,10 @@ namespace Orleans.Streams
 
         private Task? receiverInitTask;
         private Task _activePumpTask = Task.CompletedTask;
+        private StreamSequenceToken? _lastReadToken;
+        private StreamSequenceToken? _retainedDeliveryProgress;
+        private StreamSequenceToken? _completedDeliveryProgress;
+        private bool _hasUnknownReplayPosition;
         private bool IsShutdown => timer is null;
         private string StatisticUniquePostfix => $"{streamProviderName}.{QueueId}";
 
@@ -155,6 +162,12 @@ namespace Orleans.Streams
             LogInfoInit(GetType().Name, GrainId, Silo, new(QueueId));
 
             _activePumpTask = Task.CompletedTask;
+            // Progress belongs to this receiver lifetime, not the reusable pulling-agent instance.
+            _lastReadToken = null;
+            _retainedDeliveryProgress = null;
+            _completedDeliveryProgress = null;
+            _hasUnknownReplayPosition = false;
+            pendingConsumerRecoveries.Clear();
             lastTimeCleanedPubSubCache = _timeProvider.GetUtcNow().UtcDateTime;
 
             try
@@ -301,6 +314,7 @@ namespace Orleans.Streams
                 LogWarningUnregisterProducer(exc);
             }
             pubSubCache.Clear();
+            pendingConsumerRecoveries.Clear();
         }
 
         public Task AddSubscriber(
@@ -345,14 +359,32 @@ namespace Orleans.Streams
                 StreamingEvents.EmitSubscriptionAdded(streamProviderName, streamId.StreamId, subscriptionId.Guid, streamConsumer, Silo);
             }
 
-            if (await DoHandshakeWithConsumer(data, cacheToken))
+            data.IsCaughtUp = false;
+            data.PendingStartToken ??= cacheToken;
+            data.PendingHandshakes++;
+            var attached = false;
+            try
             {
-                data.LastProcessedToken = GetInitialDeliveryProgress(data.LastToken, data.LastProcessedToken);
-                data.PendingStartToken = null;
-                data.IsRegistered = true;
-                StreamingEvents.EmitSubscriptionAttached(streamProviderName, streamId.StreamId, subscriptionId.Guid, streamConsumer, Silo);
-                if (data.State == StreamConsumerDataState.Inactive)
-                    RunConsumerCursor(data).Ignore(); // Start delivering events if not actively doing so
+                if (await DoHandshakeWithConsumer(data, cacheToken))
+                {
+                    RecordDeliveryProgress(data, GetInitialDeliveryProgress(data.LastToken, data.LastProcessedToken));
+                    if (!data.HasDeliveryProgressError && data.LastProcessedToken is not null)
+                    {
+                        data.PendingStartToken = null;
+                    }
+                    data.IsRegistered = true;
+                    attached = true;
+                    StreamingEvents.EmitSubscriptionAttached(streamProviderName, streamId.StreamId, subscriptionId.Guid, streamConsumer, Silo);
+                }
+            }
+            finally
+            {
+                data.PendingHandshakes--;
+            }
+
+            if (attached && data.PendingHandshakes == 0 && data.State == StreamConsumerDataState.Inactive)
+            {
+                RunConsumerCursor(data, useCurrentCursor: true).Ignore();
             }
         }
 
@@ -370,7 +402,7 @@ namespace Orleans.Streams
             StreamConsumerData consumerData,
             StreamSequenceToken? cacheToken)
         {
-            if (IsShutdown) return false;
+            if (IsShutdown || consumerData.IsRemoved) return false;
 
             StreamHandshakeToken? requestedHandshakeToken = null;
             StreamHandshakeToken? effectiveHandshakeToken = null;
@@ -386,11 +418,12 @@ namespace Orleans.Streams
                          i => consumerData.StreamConsumer.GetSequenceToken(consumerData.SubscriptionId),
                          AsyncExecutorWithRetries.INFINITE_RETRIES,
                          // Do not retry if the agent is shutting down, or if the exception is ClientNotAvailableException
-                         (exception, i) => exception is not ClientNotAvailableException && !IsShutdown,
+                         (exception, i) => exception is not ClientNotAvailableException && !IsShutdown && !consumerData.IsRemoved,
                          this.options.MaxEventDeliveryTime,
                          deliveryBackoffProvider,
                          cancellationToken: CancellationToken.None);
 
+                    if (IsShutdown || consumerData.IsRemoved) return false;
                     effectiveHandshakeToken = requestedHandshakeToken;
                     if (effectiveHandshakeToken is null && ShouldApplyInitialSubscriptionStartPosition(consumerData))
                     {
@@ -406,6 +439,8 @@ namespace Orleans.Streams
                             && startPositionToken.Equals(consumerData.LastToken);
                         if (!preservesCurrentPosition)
                         {
+                            RecordReplayRequest(consumerData, startPositionToken);
+                            RecordDeliveryProgress(consumerData, null);
                             consumerData.SafeDisposeCursor(logger);
                             consumerData.Cursor = GetCacheCursorAtStartPosition(
                                 consumerData.StreamId,
@@ -416,6 +451,9 @@ namespace Orleans.Streams
                     else if (effectiveHandshakeToken is StartToken or DeliveryToken
                         && effectiveHandshakeToken.Token is { } requestedToken)
                     {
+                        RecordReplayRequest(consumerData, effectiveHandshakeToken);
+                        RecordDeliveryProgress(
+                            consumerData, GetInitialDeliveryProgress(effectiveHandshakeToken, consumerData.LastProcessedToken));
                         consumerData.SafeDisposeCursor(logger);
                         if (effectiveHandshakeToken is DeliveryToken
                             || effectiveHandshakeToken is StartToken
@@ -423,7 +461,7 @@ namespace Orleans.Streams
                         {
                             // Delivery tokens and implicit recovery tokens identify already processed events.
                             consumerData.Cursor = GetAdvancedCursorOrFallback(
-                                consumerData.StreamId,
+                                consumerData,
                                 requestedToken,
                                 cacheToken,
                                 out consumerData.PendingBatch);
@@ -431,6 +469,11 @@ namespace Orleans.Streams
                         else
                         {
                             var result = queueCache.TryGetCacheCursor(consumerData.StreamId, requestedToken);
+                            if (result.Kind == QueueCacheCursorResultKind.CacheMiss)
+                            {
+                                RecordDeliveryProgressError(consumerData, effectiveHandshakeToken);
+                            }
+
                             consumerData.Cursor = result.Kind switch
                             {
                                 QueueCacheCursorResultKind.Success => result.Cursor!,
@@ -439,6 +482,10 @@ namespace Orleans.Streams
                                 QueueCacheCursorResultKind.CacheMiss => throw result.CacheMiss!.Value.ToException(),
                                 _ => throw new InvalidOperationException($"Unexpected cursor result: {result.Kind}."),
                             };
+                            if (result.Kind == QueueCacheCursorResultKind.Success)
+                            {
+                                TrackDeliveryRecoveryCursor(consumerData, consumerData.Cursor, effectiveHandshakeToken);
+                            }
                         }
                     }
                     else if (effectiveHandshakeToken is not null)
@@ -455,6 +502,8 @@ namespace Orleans.Streams
                 }
                 catch (Exception exception)
                 {
+                    if (consumerData.IsRemoved) return false;
+                    RecordDeliveryProgressError(consumerData, effectiveHandshakeToken);
                     exceptionOccured = exception;
                 }
                 if (exceptionOccured != null)
@@ -496,6 +545,7 @@ namespace Orleans.Streams
                 }
                 catch (Exception)
                 {
+                    RecordDeliveryProgressError(consumerData);
                     consumerData.Cursor = GetCacheCursorOrThrow(consumerData.StreamId, null);
                 }
             }
@@ -528,16 +578,7 @@ namespace Orleans.Streams
                     throw new QueueCacheCursorContractException("The cursor move result is not initialized.");
                 }
 
-                var batch = cursor.GetCurrent(out var exception);
-                if (exception is not null)
-                {
-                    throw exception;
-                }
-
-                if (batch is null)
-                {
-                    throw new QueueCacheCursorContractException("A successful cursor move did not produce a current item.");
-                }
+                var batch = GetCurrentBatchOrThrow(cursor);
 
                 var comparison = EventSequenceTokenCompatibility.Compare(batch.SequenceToken, token);
                 if (comparison >= 0)
@@ -572,6 +613,30 @@ namespace Orleans.Streams
 
         private IQueueCacheCursor GetRecoveryCursor(StreamConsumerData consumerData)
         {
+            if (consumerData.HasDeliveryProgressError)
+            {
+                if (consumerData.DeliveryRecoveryToken is { Token: { } requiredToken } recoveryToken)
+                {
+                    var acquisition = queueCache!.TryGetCacheCursor(consumerData.StreamId, requiredToken);
+                    if (acquisition.Kind == QueueCacheCursorResultKind.Success)
+                    {
+                        var recoveryCursor = acquisition.Cursor!;
+                        if (recoveryToken is StartToken
+                            || TryAdvanceRecoveryCursor(recoveryCursor, requiredToken, out consumerData.PendingBatch))
+                        {
+                            TrackDeliveryRecoveryCursor(consumerData, recoveryCursor, recoveryToken);
+                            return recoveryCursor;
+                        }
+                    }
+                    else if (acquisition.Kind != QueueCacheCursorResultKind.CacheMiss)
+                    {
+                        throw new InvalidOperationException($"Unexpected cursor result: {acquisition.Kind}.");
+                    }
+                }
+
+                return GetCacheCursorOrThrow(consumerData.StreamId, null);
+            }
+
             if (consumerData.LastProcessedToken is { } lastProcessedToken)
             {
                 var result = queueCache!.TryGetCacheCursor(consumerData.StreamId, lastProcessedToken);
@@ -641,15 +706,17 @@ namespace Orleans.Streams
         }
 
         private IQueueCacheCursor GetAdvancedCursorOrFallback(
-            StreamId streamId,
+            StreamConsumerData consumerData,
             StreamSequenceToken token,
             StreamSequenceToken? fallbackToken,
             out IBatchContainer? pendingBatch)
         {
             pendingBatch = null;
+            var streamId = consumerData.StreamId;
             var acquisitionResult = queueCache!.TryGetCacheCursor(streamId, token);
             if (acquisitionResult.Kind == QueueCacheCursorResultKind.CacheMiss)
             {
+                RecordDeliveryProgressError(consumerData, StreamHandshakeToken.CreateDeliveyToken(token));
                 return fallbackToken is not null
                     ? GetCacheCursorOrThrow(streamId, fallbackToken)
                     : throw acquisitionResult.CacheMiss!.Value.ToException();
@@ -667,6 +734,7 @@ namespace Orleans.Streams
                 var moveResult = AdvanceCursorPastToken(cursor, token, out pendingBatch);
                 if (moveResult.Kind == QueueCacheCursorMoveResultKind.CacheMiss)
                 {
+                    RecordDeliveryProgressError(consumerData, StreamHandshakeToken.CreateDeliveyToken(token));
                     return fallbackToken is not null
                         ? GetCacheCursorOrThrow(streamId, fallbackToken)
                         : throw moveResult.CacheMiss!.Value.ToException();
@@ -678,6 +746,7 @@ namespace Orleans.Streams
                 }
 
                 retainCursor = true;
+                TrackDeliveryRecoveryCursor(consumerData, cursor, StreamHandshakeToken.CreateDeliveyToken(token));
                 return cursor;
             }
             finally
@@ -747,6 +816,12 @@ namespace Orleans.Streams
 
             if (!pubSubCache.TryGetValue(streamId, out var streamData)) return;
 
+            if (streamData.TryGetConsumer(subscriptionId, out var consumer))
+            {
+                RetainCompletedDeliveryProgress(consumer.LastProcessedToken);
+                pendingConsumerRecoveries.Remove(consumer);
+            }
+
             // remove consumer
             bool removed = streamData.RemoveConsumer(subscriptionId, logger);
             if (removed)
@@ -756,8 +831,11 @@ namespace Orleans.Streams
                 LogDebugRemovedConsumer(subscriptionId, streamId);
             }
 
-            if (streamData.Count == 0)
+            if (streamData.Count == 0 && streamData.RegistrationTask is null)
+            {
                 pubSubCache.Remove(streamId);
+                streamData.DisposeAll(logger);
+            }
         }
 
         private Task RunQueuePump(QueueId queueId, CancellationToken cancellationToken)
@@ -788,6 +866,8 @@ namespace Orleans.Streams
                 }
 
                 if (IsShutdown || cancellationToken.IsCancellationRequested) return; // timer was already removed, last tick
+
+                RetryPendingWork(cancellationToken);
 
                 // loop through the queue until it is empty.
                 while (!IsShutdown && !cancellationToken.IsCancellationRequested) // shutdown sets IsShutdown and cancels the timer token.
@@ -844,8 +924,10 @@ namespace Orleans.Streams
                 return false;
             }
 
+            RetryPendingWork(cancellationToken);
+
             // Pause all queue reads so a cold stream's first batch stays pinned until registration completes.
-            if (pubSubCache.Values.Any(static stream => stream.RegistrationTask is { IsCompleted: false }))
+            if (pubSubCache.Values.Any(static stream => stream.RegistrationTask is not null))
             {
                 return false;
             }
@@ -902,37 +984,87 @@ namespace Orleans.Streams
             // Receivers built against older Orleans versions can still return null.
             if (multiBatch is null || multiBatch.Count == 0) return false; // queue is empty. Exit the loop. Will attempt again in the next timer callback.
 
-            queueCache?.AddToCache(multiBatch);
-            numMessages += multiBatch.Count;
-            if (_streamInstruments?.PersistentStreamReadMessages.Enabled is true)
+            var accountedFor = false;
+            try
             {
-                tags = StreamInstrumentsTagUtils.InitializeTags(myQueueId, streamProviderName);
-                _streamInstruments.PersistentStreamReadMessages.Add(multiBatch.Count, tags.Value);
+                queueCache?.AddToCache(multiBatch);
+                numMessages += multiBatch.Count;
+                if (_streamInstruments?.PersistentStreamReadMessages.Enabled is true)
+                {
+                    tags = StreamInstrumentsTagUtils.InitializeTags(myQueueId, streamProviderName);
+                    _streamInstruments.PersistentStreamReadMessages.Add(multiBatch.Count, tags.Value);
+                }
+
+                LogTraceGotMessages(multiBatch.Count, new(myQueueId), numMessages);
+
+                foreach (var group in
+                    multiBatch
+                    .Where(m => m is not null)
+                    .GroupBy(container => container.StreamId))
+                {
+                    var streamId = new QualifiedStreamId(queueAdapter.Name, group.Key);
+                    StreamSequenceToken startToken = group.First().SequenceToken;
+                    if (pubSubCache.TryGetValue(streamId, out var streamData))
+                    {
+                        streamData.RefreshActivity(now);
+                        StartInactiveCursors(streamData, startToken, CancellationToken.None);
+                    }
+                    else
+                    {
+                        // Run registration in the background so that cold-stream pubsub
+                        // calls do not stall message delivery for other streams on the same queue.
+                        RegisterStream(streamId, startToken, now, CancellationToken.None);
+                    }
+                }
+
+                accountedFor = true;
+            }
+            finally
+            {
+                // The receiver has consumed this read even if cache insertion or registration fails.
+                if (!accountedFor)
+                {
+                    _hasUnknownReplayPosition = true;
+                    LogErrorQueueRecoveryRequired(new(QueueId), "A fetched read could not be fully admitted to the cache and stream registry.");
+                }
             }
 
-            LogTraceGotMessages(multiBatch.Count, new(myQueueId), numMessages);
-
-            foreach (var group in
-                multiBatch
-                .Where(m => m is not null)
-                .GroupBy(container => container.StreamId))
+            if (IsShutdown || cancellationToken.IsCancellationRequested)
             {
-                var streamId = new QualifiedStreamId(queueAdapter.Name, group.Key);
-                StreamSequenceToken startToken = group.First().SequenceToken;
-                if (pubSubCache.TryGetValue(streamId, out var streamData))
+                return false;
+            }
+
+            // Only publish the read boundary after every stream has been accounted for.
+            foreach (var batch in multiBatch)
+            {
+                if (batch is null)
                 {
-                    streamData.RefreshActivity(now);
-                    StartInactiveCursors(streamData, startToken, CancellationToken.None);
+                    continue;
                 }
-                else
+
+                if (batch.SequenceToken is not { } token)
                 {
-                    // Run registration in the background so that cold-stream pubsub
-                    // calls do not stall message delivery for other streams on the same queue.
-                    RegisterStream(streamId, startToken, now, CancellationToken.None);
+                    _hasUnknownReplayPosition = true;
+                    LogErrorQueueRecoveryRequired(new(myQueueId), $"A fetched batch for stream {batch.StreamId} has no sequence token.");
+                    continue;
+                }
+
+                if (_lastReadToken is null)
+                {
+                    _lastReadToken = token;
+                }
+                else if (!TryCompareQueueProgress(token, _lastReadToken, out var comparison))
+                {
+                    _hasUnknownReplayPosition = true;
+                    LogErrorQueueRecoveryRequired(new(myQueueId), "Fetched batches have incompatible sequence tokens.");
+                }
+                else if (comparison > 0)
+                {
+                    _lastReadToken = token;
                 }
             }
 
-            return !IsShutdown && !cancellationToken.IsCancellationRequested;
+            return true;
         }
 
         private void CleanupPubSubCache(DateTime now)
@@ -940,7 +1072,10 @@ namespace Orleans.Streams
             List<QualifiedStreamId>? inactiveStreams = null;
             foreach (var tuple in pubSubCache)
             {
-                if (tuple.Value.IsInactive(now, options.StreamInactivityPeriod))
+                if (tuple.Value.IsInactive(now, options.StreamInactivityPeriod)
+                    && tuple.Value.RegistrationTask is null
+                    && !tuple.Value.AllConsumers().Any(consumer => consumer.PendingHandshakes != 0
+                        || pendingConsumerRecoveries.Contains(consumer)))
                 {
                     inactiveStreams ??= new();
                     inactiveStreams.Add(tuple.Key);
@@ -952,10 +1087,16 @@ namespace Orleans.Streams
                 return;
             }
 
+            if (TryGetDeliveryProgress(out var progress))
+            {
+                RetainCompletedDeliveryProgress(progress);
+            }
+
             foreach (var streamId in inactiveStreams)
             {
                 if (pubSubCache.Remove(streamId, out var streamData))
                 {
+                    RetainStreamDeliveryProgress(streamData);
                     streamData.DisposeAll(logger);
                     StreamingEvents.EmitStreamInactive(streamProviderName, streamId.StreamId, options.StreamInactivityPeriod, Silo);
                 }
@@ -978,52 +1119,416 @@ namespace Orleans.Streams
 
         private bool TryGetDeliveryProgress(out StreamSequenceToken? earliest)
         {
-            earliest = null;
+            earliest = _retainedDeliveryProgress;
+            var hasSubscriptions = false;
+            if (_hasUnknownReplayPosition)
+            {
+                return false;
+            }
 
             foreach (var streamConsumers in pubSubCache.Values)
             {
-                if (streamConsumers.RegistrationTask is { IsCompleted: false })
+                if (!TryGetStreamDeliveryProgress(streamConsumers, out var current)
+                    || current is not null && !IncludeProgress(current, ref earliest))
                 {
                     return false;
                 }
 
-                foreach (var consumer in streamConsumers.AllConsumers())
+                hasSubscriptions |= streamConsumers.Count > 0;
+            }
+
+            // Removed subscriptions preserve proven progress, not evidence that subsequent reads were delivered.
+            if (!hasSubscriptions && _completedDeliveryProgress is { } completed
+                && !IncludeProgress(completed, ref earliest))
+            {
+                return false;
+            }
+
+            if ((hasSubscriptions || earliest is not null) && _lastReadToken is { } read)
+            {
+                return IncludeProgress(read, ref earliest);
+            }
+
+            return true;
+        }
+
+        private void RetainStreamDeliveryProgress(StreamConsumerCollection streamData)
+        {
+            foreach (var consumer in streamData.AllConsumers())
+            {
+                RetainCompletedDeliveryProgress(consumer.LastProcessedToken);
+            }
+
+            // Reclaim inactive subscription records without forgetting their unresolved handoff constraint.
+            if (!TryGetStreamDeliveryProgress(streamData, out var token)
+                || token is not null && !IncludeProgress(token, ref _retainedDeliveryProgress))
+            {
+                _hasUnknownReplayPosition = true;
+            }
+        }
+
+        private void RetainCompletedDeliveryProgress(StreamSequenceToken? token)
+        {
+            if (token is null
+                || _lastReadToken is { } read && !TryCompareQueueProgress(token, read, out _))
+            {
+                return;
+            }
+
+            if (_completedDeliveryProgress is null
+                || TryCompareQueueProgress(token, _completedDeliveryProgress, out var comparison) && comparison > 0)
+            {
+                _completedDeliveryProgress = token;
+            }
+        }
+
+        private bool TryGetStreamDeliveryProgress(StreamConsumerCollection streamConsumers, out StreamSequenceToken? earliest)
+        {
+            earliest = null;
+            if (!streamConsumers.StreamRegistered
+                || streamConsumers.RegistrationTask is not null)
+            {
+                return false;
+            }
+
+            foreach (var consumer in streamConsumers.AllConsumers())
+            {
+                if (!consumer.IsRegistered || consumer.PendingHandshakes != 0)
                 {
-                    if (!consumer.IsRegistered)
-                    {
-                        return false;
-                    }
+                    return false;
+                }
 
-                    var current = consumer.LastProcessedToken;
-                    if (current is null)
-                    {
-                        return false;
-                    }
+                // A drained subscription's last matching event need not pin other streams.
+                if (consumer.IsCaughtUp && !consumer.HasDeliveryProgressError)
+                {
+                    continue;
+                }
 
-                    if (earliest is null)
+                var current = consumer.LastProcessedToken;
+                if (current is null)
+                {
+                    return false;
+                }
+
+                if (earliest is null)
+                {
+                    earliest = current;
+                    continue;
+                }
+
+                try
+                {
+                    if (IsBefore(current, earliest))
                     {
                         earliest = current;
-                        continue;
                     }
-
-                    try
-                    {
-                        if (IsBefore(current, earliest))
-                        {
-                            earliest = current;
-                        }
-                    }
-                    catch (ArgumentOutOfRangeException exception) when (exception.ParamName == "other")
-                    {
-                        LogWarningIncompatibleDeliveryProgress(
-                            new(QueueId), consumer.SubscriptionId, consumer.StreamId, current, earliest, exception);
-                        earliest = null;
-                        return false;
-                    }
+                }
+                catch (ArgumentOutOfRangeException exception) when (exception.ParamName == "other")
+                {
+                    LogWarningIncompatibleDeliveryProgress(
+                        new(QueueId), consumer.SubscriptionId, consumer.StreamId, current, earliest, exception);
+                    earliest = null;
+                    return false;
                 }
             }
 
             return true;
+        }
+
+        private bool IncludeProgress(StreamSequenceToken token, ref StreamSequenceToken? earliest)
+        {
+            if (earliest is null)
+            {
+                earliest = token;
+            }
+            else if (!TryCompareQueueProgress(token, earliest, out var comparison))
+            {
+                return false;
+            }
+            else if (comparison < 0)
+            {
+                earliest = token;
+            }
+
+            return true;
+        }
+
+        private bool TryCompareQueueProgress(StreamSequenceToken token, StreamSequenceToken other, out int comparison)
+        {
+            try
+            {
+                comparison = EventSequenceTokenCompatibility.Compare(token, other);
+                return true;
+            }
+            catch (ArgumentOutOfRangeException exception) when (exception.ParamName == "other")
+            {
+                LogWarningIncompatibleQueueProgress(new(QueueId), token, other, exception);
+                comparison = default;
+                return false;
+            }
+        }
+
+        private void RecordDeliveryProgress(StreamConsumerData consumer, StreamSequenceToken? token)
+        {
+            // A reset cursor's later progress cannot prove that it did not skip earlier data.
+            // An earlier or unknown replay request must still lower the retained checkpoint floor.
+            if (!consumer.HasDeliveryProgressError || token is null)
+            {
+                consumer.LastProcessedToken = token;
+                if (token is not null)
+                {
+                    consumer.PendingStartToken = null;
+                }
+            }
+            else if (consumer.LastProcessedToken is { } current)
+            {
+                if (!TryCompareQueueProgress(token, current, out var comparison))
+                {
+                    consumer.LastProcessedToken = null;
+                }
+                else if (comparison < 0)
+                {
+                    consumer.LastProcessedToken = token;
+                }
+            }
+        }
+
+        private void RecordReplayRequest(StreamConsumerData consumer, StreamHandshakeToken request)
+        {
+            if (consumer.HasDeliveryProgressError)
+            {
+                IncludeDeliveryRecoveryRequest(consumer, NormalizeRecoveryToken(consumer, request));
+                consumer.DeliveryRecoveryCursor = null;
+                consumer.HasObservedRecoveryStart = false;
+            }
+
+            if (request is StartToken)
+            {
+                consumer.PendingStartToken = request.Token;
+            }
+            else if (request is StartPositionToken)
+            {
+                consumer.PendingStartToken = null;
+            }
+        }
+
+        private static StreamHandshakeToken? NormalizeRecoveryToken(StreamConsumerData consumer, StreamHandshakeToken? token)
+            => token is StartToken && SubscriptionMarker.IsImplicitSubscription(consumer.SubscriptionId.Guid)
+                ? StreamHandshakeToken.CreateDeliveyToken(token.Token!)
+                : token is StartToken or DeliveryToken ? token : null;
+
+        private void IncludeDeliveryRecoveryRequest(StreamConsumerData consumer, StreamHandshakeToken? request)
+        {
+            if (consumer.DeliveryRecoveryToken?.Token is not { } current
+                || request?.Token is not { } requested
+                || !TryCompareQueueProgress(requested, current, out var comparison))
+            {
+                consumer.DeliveryRecoveryToken = null;
+                return;
+            }
+
+            if (comparison < 0 || comparison == 0 && request is StartToken)
+            {
+                consumer.DeliveryRecoveryToken = request;
+            }
+        }
+
+        private void TrackDeliveryRecoveryCursor(
+            StreamConsumerData consumer,
+            IQueueCacheCursor cursor,
+            StreamHandshakeToken? request)
+        {
+            if (consumer.HasDeliveryProgressError && consumer.DeliveryRecovery is not { Stopped: true }
+                && consumer.DeliveryRecoveryToken is { Token: { } required } recovery
+                && request?.Token is { } requested
+                && TryCompareQueueProgress(requested, required, out var comparison)
+                && (comparison < 0 || comparison == 0 && (request is StartToken || recovery is DeliveryToken)))
+            {
+                consumer.DeliveryRecoveryCursor = cursor;
+                consumer.HasObservedRecoveryStart = false;
+            }
+        }
+
+        private void ObserveDeliveryRecoveryStart(StreamConsumerData consumer, IBatchContainer batch)
+        {
+            if (!consumer.HasDeliveryProgressError)
+            {
+                if (consumer.LastProcessedToken is null && batch.SequenceToken is { } first
+                    && (consumer.PendingStartToken is null
+                        || TryCompareQueueProgress(first, consumer.PendingStartToken, out var startComparison) && startComparison < 0))
+                {
+                    consumer.PendingStartToken = first;
+                }
+            }
+            else if (ReferenceEquals(consumer.DeliveryRecoveryCursor, consumer.Cursor)
+                && consumer.DeliveryRecoveryToken is StartToken { Token: { } required }
+                && batch.SequenceToken is { } current
+                && TryCompareQueueProgress(current, required, out var anchorComparison) && anchorComparison == 0)
+            {
+                // Pooled caches can accept a purged token as an exclusive boundary. Inclusive recovery must see it.
+                consumer.HasObservedRecoveryStart = true;
+            }
+        }
+
+        private void RecordAcknowledgedDeliveryProgress(
+            StreamConsumerData consumer,
+            StreamSequenceToken? token,
+            IQueueCacheCursor deliveryCursor,
+            long cursorVersion)
+        {
+            if (consumer.CursorVersion != cursorVersion || !ReferenceEquals(consumer.Cursor, deliveryCursor))
+            {
+                return;
+            }
+
+            var acknowledgesUnconfirmedDelivery = false;
+            if (token is not null && consumer.UnconfirmedDeliveryToken is { } attempted)
+            {
+                if (!TryCompareQueueProgress(token, attempted, out var attemptedComparison))
+                {
+                    // Preserve the replay obligation and retry budget before accepting any new progress.
+                    RecordDeliveryProgressError(consumer);
+                    RecordDeliveryProgress(consumer, null);
+                    return;
+                }
+
+                acknowledgesUnconfirmedDelivery = attemptedComparison >= 0;
+            }
+
+            // Opening or draining an empty recovery cursor does not prove that its missing data was replayed.
+            if (consumer.HasDeliveryProgressError
+                && ReferenceEquals(consumer.DeliveryRecoveryCursor, deliveryCursor)
+                && consumer.DeliveryRecoveryToken is { Token: { } required } recovery
+                && token is not null
+                && TryCompareQueueProgress(token, required, out var comparison)
+                && (recovery is DeliveryToken && comparison > 0
+                    || recovery is StartToken && comparison >= 0 && consumer.HasObservedRecoveryStart))
+            {
+                consumer.HasDeliveryProgressError = false;
+                consumer.DeliveryRecoveryToken = null;
+                consumer.DeliveryRecoveryCursor = null;
+                consumer.HasObservedRecoveryStart = false;
+                consumer.DeliveryRecovery = null;
+                consumer.DeliveryRecoveryFailureReported = false;
+                consumer.DeliveryRecoveryFailureToken = null;
+                pendingConsumerRecoveries.Remove(consumer);
+            }
+
+            RecordDeliveryProgress(consumer, token);
+            if (acknowledgesUnconfirmedDelivery)
+            {
+                consumer.UnconfirmedDeliveryToken = null;
+            }
+        }
+
+        private void RecordDeliveryProgressError(
+            StreamConsumerData consumer,
+            StreamHandshakeToken? replayRequest = null,
+            StreamSequenceToken? failedToken = null,
+            long? startedAt = null)
+        {
+            if (consumer.IsRemoved) return;
+            var request = NormalizeRecoveryToken(consumer, replayRequest);
+            if (!consumer.HasDeliveryProgressError)
+            {
+                var first = consumer.PendingStartToken;
+                if (failedToken is not null)
+                {
+                    if (first is null)
+                    {
+                        first = failedToken;
+                    }
+                    else if (!TryCompareQueueProgress(failedToken, first, out var comparison))
+                    {
+                        first = null;
+                    }
+                    else if (comparison < 0)
+                    {
+                        first = failedToken;
+                    }
+                }
+
+                consumer.DeliveryRecoveryToken = replayRequest is not null
+                    ? request
+                    : consumer.LastProcessedToken is { } processed
+                        ? StreamHandshakeToken.CreateDeliveyToken(processed)
+                        : first is { } start
+                            ? StreamHandshakeToken.CreateStartToken(start)
+                            : null;
+            }
+            else if (replayRequest is not null)
+            {
+                IncludeDeliveryRecoveryRequest(consumer, request);
+            }
+
+            if (!consumer.HasDeliveryProgressError)
+            {
+                consumer.DeliveryRecovery = new(startedAt ?? _timeProvider.GetTimestamp());
+                LogWarningDeliveryRecoveryRequired(new(QueueId), consumer.SubscriptionId, consumer.StreamId);
+            }
+
+            consumer.HasDeliveryProgressError = true;
+            consumer.IsCaughtUp = false;
+            consumer.DeliveryRecoveryCursor = null;
+            consumer.HasObservedRecoveryStart = false;
+            if (consumer.DeliveryRecovery is not { Stopped: true })
+            {
+                pendingConsumerRecoveries.Add(consumer);
+            }
+        }
+
+        private void RetryPendingConsumers()
+        {
+            foreach (var consumer in pendingConsumerRecoveries.ToArray())
+            {
+                if (!pubSubCache.TryGetValue(consumer.StreamId, out var stream)
+                    || !stream.TryGetConsumer(consumer.SubscriptionId, out var current)
+                    || !ReferenceEquals(current, consumer)
+                    || !consumer.HasDeliveryProgressError
+                    || consumer.DeliveryRecovery is { Stopped: true })
+                {
+                    pendingConsumerRecoveries.Remove(consumer);
+                }
+                else if (consumer.IsRegistered && consumer.PendingHandshakes == 0
+                    && consumer.State == StreamConsumerDataState.Inactive)
+                {
+                    RunConsumerCursor(consumer).Ignore();
+                }
+            }
+        }
+
+        private void RetryPendingWork(CancellationToken cancellationToken)
+        {
+            RetryPendingConsumers();
+            foreach (var pending in pubSubCache
+                .Where(static pair => pair.Value.RegistrationTask is { IsCompleted: true })
+                .ToArray())
+            {
+                RegisterStream(pending.Key, pending.Value.RegistrationStartToken,
+                    _timeProvider.GetUtcNow().UtcDateTime, cancellationToken);
+            }
+        }
+
+        private async Task StopConsumerRecovery(StreamConsumerData consumer, CancellationToken cancellationToken)
+        {
+            if (consumer.DeliveryRecovery is not { Stopped: false } recovery)
+            {
+                return;
+            }
+
+            recovery.Stopped = true;
+            pendingConsumerRecoveries.Remove(consumer);
+            consumer.SafeDisposeCursor(logger);
+            consumer.PendingStartToken = null;
+            consumer.PendingContinuationToken = null;
+            consumer.UnconfirmedDeliveryToken = null;
+            LogWarningDeliveryRecoveryStopped(new(QueueId), consumer.SubscriptionId, consumer.StreamId, recovery.Attempts);
+            if (!consumer.DeliveryRecoveryFailureReported)
+            {
+                // A replay boundary is not necessarily a failed event (failure handlers can dead-letter this token).
+                await ErrorProtocol(consumer, new StreamEventDeliveryFailureException(consumer.StreamId),
+                    true, null, null, cancellationToken: cancellationToken);
+            }
         }
 
         private static bool IsBefore(StreamSequenceToken current, StreamSequenceToken other)
@@ -1031,7 +1536,7 @@ namespace Orleans.Streams
 
         private void RegisterStream(
             QualifiedStreamId streamId,
-            StreamSequenceToken firstToken,
+            StreamSequenceToken? firstToken,
             DateTime now,
             CancellationToken cancellationToken)
         {
@@ -1040,25 +1545,50 @@ namespace Orleans.Streams
                 return;
             }
 
-            var streamData = new StreamConsumerCollection(now);
+            if (!pubSubCache.TryGetValue(streamId, out var streamData))
+            {
+                streamData = new StreamConsumerCollection(now) { RegistrationStartToken = firstToken };
+                pubSubCache.Add(streamId, streamData);
+            }
+            else if (streamData.RegistrationTask is null || !streamData.RegistrationTask.IsCompleted)
+            {
+                return;
+            }
 
-            // Create a fake cursor to point into a cache.
-            // That way we will not purge the event from the cache, until we talk to pub sub.
-            // This will help ensure the "casual consistency" between pre-existing subscripton (of a potentially new already subscribed consumer)
-            // and later production.
-            var pinCursor = queueCache is null ? null : GetCacheCursorOrThrow(streamId, firstToken);
+            var recovery = streamData.RegistrationRecovery ??= new(_timeProvider.GetTimestamp());
+            if (recovery.IsExhausted(_timeProvider, options.MaxEventDeliveryTime, RecoveryAttemptMax))
+            {
+                recovery.Stopped = true;
+                RetainStreamDeliveryProgress(streamData);
+                foreach (var consumer in streamData.AllConsumers())
+                {
+                    pendingConsumerRecoveries.Remove(consumer);
+                }
+                pubSubCache.Remove(streamId);
+                streamData.DisposeAll(logger);
+                LogWarningStreamRegistrationRecoveryStopped(new(QueueId), streamId, recovery.Attempts);
+                return;
+            }
+
+            if (!recovery.TryBeginAttempt(_timeProvider)) return;
             streamData.RegistrationTask = RegisterStreamAsync();
-            pubSubCache.Add(streamId, streamData);
 
             async Task RegisterStreamAsync()
             {
                 await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.ForceYielding);
 
+                var completed = false;
                 try
                 {
                     if (IsShutdown || cancellationToken.IsCancellationRequested)
                     {
                         return;
+                    }
+
+                    // Retain the original boundary and pin across retries, including failures before producer registration.
+                    if (queueCache is not null)
+                    {
+                        streamData.RegistrationCursor ??= GetCacheCursorOrThrow(streamId, streamData.RegistrationStartToken);
                     }
 
                     var subscribers = await RegisterAsStreamProducer(streamId, cancellationToken);
@@ -1075,75 +1605,72 @@ namespace Orleans.Streams
 
                     LogDebugGotBackSubscribers(subscribers.Count, streamId);
 
-                    // Await all initial subscriber handshakes before releasing the pin cursor so
-                    // that the first batch cannot be purged from the cache before each subscriber
-                    // has established its own cursor.
+                    completed = true;
                     if (subscribers.Count > 0)
                     {
-                        var addSubscriptionTasks = new List<Task>(subscribers.Count);
+                        var addSubscriptionTasks = new List<Task<bool>>(subscribers.Count);
                         foreach (PubSubSubscriptionState item in subscribers)
                         {
                             addSubscriptionTasks.Add(SubscribeWithIsolation(item));
                         }
 
-                        await Task.WhenAll(addSubscriptionTasks);
+                        completed = (await Task.WhenAll(addSubscriptionTasks)).All(static attached => attached);
                     }
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
-                    RemoveCanceledRegistration();
+                    completed = false;
+                    // The retained stream entry remains pending for the next uncanceled pump.
                 }
                 catch (Exception exception)
                 {
-                    FailRegistration(exception);
+                    completed = false;
+                    LogWarningFailedToRegisterStream(streamId, exception);
+                    StreamingEvents.EmitPullingAgentStreamRegistrationFailed(streamProviderName, Silo, QueueId, streamId.StreamId, exception);
                 }
                 finally
                 {
-                    streamData.RegistrationTask = null;
-                    pinCursor?.Dispose();
+                    if (completed)
+                    {
+                        streamData.RegistrationTask = null;
+                        streamData.RegistrationStartToken = null;
+                        streamData.RegistrationRecovery = null;
+                        streamData.DisposeRegistrationCursor(logger);
+                    }
+                    else
+                    {
+                        streamData.RegistrationTask = Task.CompletedTask;
+                        recovery.FinishAttempt(_timeProvider, deliveryBackoffProvider, logger);
+                        if (IsShutdown
+                            || !pubSubCache.TryGetValue(streamId, out var current) || !ReferenceEquals(current, streamData))
+                        {
+                            streamData.DisposeRegistrationCursor(logger);
+                        }
+                    }
                 }
             }
 
-            void RemoveCanceledRegistration()
-            {
-                if (pubSubCache.TryGetValue(streamId, out var cachedStreamData)
-                    && ReferenceEquals(cachedStreamData, streamData))
-                {
-                    pubSubCache.Remove(streamId);
-                }
-
-                streamData.DisposeAll(logger);
-            }
-
-            void FailRegistration(Exception exception)
-            {
-                LogWarningFailedToRegisterStream(streamId, exception);
-                StreamingEvents.EmitPullingAgentStreamRegistrationFailed(streamProviderName, Silo, QueueId, streamId.StreamId, exception);
-
-                // Only reached when producer registration itself fails.
-                if (pubSubCache.TryGetValue(streamId, out var cachedStreamData)
-                    && ReferenceEquals(cachedStreamData, streamData))
-                {
-                    pubSubCache.Remove(streamId);
-                }
-
-                streamData.DisposeAll(logger);
-            }
-
-            async Task SubscribeWithIsolation(PubSubSubscriptionState item)
+            async Task<bool> SubscribeWithIsolation(PubSubSubscriptionState item)
             {
                 if (IsShutdown)
                 {
-                    return;
+                    return false;
+                }
+
+                if (streamData.TryGetConsumer(item.SubscriptionId, out var existing) && existing.IsRegistered)
+                {
+                    return existing.PendingHandshakes == 0;
                 }
 
                 try
                 {
-                    await AddSubscriber_Impl(item.SubscriptionId, item.Stream, item.Consumer, item.FilterData, firstToken);
+                    await AddSubscriber_Impl(item.SubscriptionId, item.Stream, item.Consumer, item.FilterData, streamData.RegistrationStartToken);
+                    return !streamData.TryGetConsumer(item.SubscriptionId, out var consumer) || consumer.IsRegistered;
                 }
                 catch (Exception exception)
                 {
                     LogWarningFailedToAddSubscription(item.Stream, exception);
+                    return false;
                 }
             }
         }
@@ -1158,9 +1685,21 @@ namespace Orleans.Streams
                 }
 
                 // Some consumer might not be fully registered yet
+                consumerData.IsCaughtUp = false;
                 if (consumerData.IsRegistered)
                 {
-                    consumerData.Cursor?.Refresh(startToken);
+                    if (consumerData.DeliveryRecovery is { Stopped: true } && consumerData.Cursor is null)
+                    {
+                        // A nonfaulting subscription still receives new traffic, but does not restart abandoned replay.
+                        consumerData.PendingContinuationToken ??= startToken;
+                    }
+
+                    // Preserve recovery positions so the next move can detect missing replay data.
+                    if (consumerData.Cursor is { } cursor && !ReferenceEquals(cursor, consumerData.DeliveryRecoveryCursor))
+                    {
+                        cursor.Refresh(startToken);
+                    }
+
                     if (consumerData.State == StreamConsumerDataState.Inactive)
                     {
                         // wake up inactive consumers
@@ -1178,19 +1717,64 @@ namespace Orleans.Streams
             }
         }
 
-        private async Task RunConsumerCursor(StreamConsumerData consumerData, CancellationToken cancellationToken = default)
+        private async Task RunConsumerCursor(StreamConsumerData consumerData, CancellationToken cancellationToken = default, bool useCurrentCursor = false)
         {
             TagList? tags = null;
+            StreamRecoveryState? recoveryAttempt = null;
+            var ownsCursor = false;
             try
             {
                 // double check in case of interleaving
-                if (consumerData.State == StreamConsumerDataState.Active ||
-                    consumerData.Cursor is null) return;
+                if (IsShutdown || cancellationToken.IsCancellationRequested
+                    || consumerData.IsRemoved || consumerData.State == StreamConsumerDataState.Active
+                    || consumerData.PendingHandshakes != 0) return;
+
+                if (consumerData.HasDeliveryProgressError && consumerData.PendingHandshakes == 0
+                    && consumerData.DeliveryRecovery is { Stopped: false } recovery)
+                {
+                    if (consumerData.DeliveryRecoveryToken is null && !useCurrentCursor
+                        || recovery.IsExhausted(_timeProvider, options.MaxEventDeliveryTime, RecoveryAttemptMax))
+                    {
+                        consumerData.State = StreamConsumerDataState.Active;
+                        ownsCursor = true;
+                        await StopConsumerRecovery(consumerData, cancellationToken);
+                        return;
+                    }
+
+                    if (!recovery.TryBeginAttempt(_timeProvider)) return;
+                    recoveryAttempt = recovery;
+                }
+
+                var needsRecovery = consumerData.HasDeliveryProgressError && consumerData.DeliveryRecoveryToken is not null
+                    && consumerData.DeliveryRecovery is not { Stopped: true }
+                    && !useCurrentCursor
+                    && consumerData.PendingHandshakes == 0
+                    && (consumerData.Cursor is null || !ReferenceEquals(consumerData.Cursor, consumerData.DeliveryRecoveryCursor));
+                var continueNewTraffic = consumerData.DeliveryRecovery is { Stopped: true }
+                    && consumerData.Cursor is null && consumerData.PendingContinuationToken is not null;
+                if (consumerData.Cursor is null && !needsRecovery && !continueNewTraffic) return;
 
                 consumerData.State = StreamConsumerDataState.Active;
+                ownsCursor = true;
+                var replacedCursor = needsRecovery || continueNewTraffic;
+                if (needsRecovery)
+                {
+                    consumerData.SafeDisposeCursor(logger);
+                    consumerData.Cursor = GetRecoveryCursor(consumerData);
+                }
+                else if (continueNewTraffic)
+                {
+                    var token = consumerData.PendingContinuationToken;
+                    consumerData.PendingContinuationToken = null;
+                    consumerData.Cursor = GetCacheCursorOrThrow(consumerData.StreamId, token);
+                }
+
                 var deliveredAny = false;
                 while (!IsShutdown && !cancellationToken.IsCancellationRequested && consumerData.Cursor is not null)
                 {
+                    if (consumerData.PendingHandshakes != 0) break;
+                    var deliveryCursor = consumerData.Cursor;
+                    var cursorVersion = consumerData.CursorVersion;
                     var batchCursor = options.BatchContainerBatchSize > 1
                         ? consumerData.Cursor as IQueueCacheCursorBatchDelivery
                         : null;
@@ -1198,12 +1782,25 @@ namespace Orleans.Streams
                     ConsumerBatch nextBatch = default;
                     Exception? exceptionOccured = null;
                     var forceFaultSubscription = false;
+                    var deliveryPending = false;
                     try
                     {
                         nextBatch = GetBatchForConsumer(consumerData);
                         if (nextBatch.CursorResult.Kind == QueueCacheCursorMoveResultKind.CacheMiss)
                         {
+                            RecordDeliveryProgressError(consumerData);
                             consumerData.SafeDisposeCursor(logger);
+                            if (replacedCursor || consumerData.DeliveryRecovery is { Stopped: true })
+                            {
+                                break;
+                            }
+
+                            if (recoveryAttempt is null)
+                            {
+                                recoveryAttempt = consumerData.DeliveryRecovery!;
+                                if (!recoveryAttempt.TryBeginAttempt(_timeProvider)) break;
+                            }
+                            replacedCursor = true;
                             consumerData.Cursor = GetCacheMissRecoveryCursor(consumerData);
                             continue;
                         }
@@ -1215,6 +1812,9 @@ namespace Orleans.Streams
 
                         if (!nextBatch.HasProgress)
                         {
+                            consumerData.IsCaughtUp = nextBatch.CursorResult.Kind == QueueCacheCursorMoveResultKind.NoData
+                                && !consumerData.HasDeliveryProgressError
+                                && consumerData.UnconfirmedDeliveryToken is null;
                             // Only emit cursor-drained when we transitioned from delivering to empty,
                             // not on every empty poll.
                             if (deliveredAny)
@@ -1224,14 +1824,22 @@ namespace Orleans.Streams
                     }
                     catch (QueueCacheCursorContractException)
                     {
+                        RecordDeliveryProgressError(consumerData);
                         consumerData.SafeDisposeCursor(logger);
                         throw;
                     }
                     catch (Exception exc)
                     {
+                        RecordDeliveryProgressError(consumerData);
                         exceptionOccured = exc;
                         consumerData.SafeDisposeCursor(logger);
-                        consumerData.Cursor = GetRecoveryCursor(consumerData);
+                        if (recoveryAttempt is null && consumerData.DeliveryRecovery is { Stopped: false } recoveryState
+                            && recoveryState.TryBeginAttempt(_timeProvider))
+                        {
+                            recoveryAttempt = recoveryState;
+                            replacedCursor = true;
+                            consumerData.Cursor = GetRecoveryCursor(consumerData);
+                        }
                     }
 
                     if (exceptionOccured is null)
@@ -1240,11 +1848,12 @@ namespace Orleans.Streams
 
                         if (nextBatch.Batch is null)
                         {
-                            consumerData.LastProcessedToken = nextBatch.ProgressToken;
+                            RecordAcknowledgedDeliveryProgress(consumerData, nextBatch.ProgressToken, deliveryCursor, cursorVersion);
                             continue;
                         }
                     }
 
+                    long? deliveryStartedAt = null;
                     try
                     {
                         if (_streamInstruments?.PersistentStreamSentMessages.Enabled is true)
@@ -1262,22 +1871,50 @@ namespace Orleans.Streams
                         if (nextBatch.Batch is not null)
                         {
                             var batch = nextBatch.Batch;
+                            if (consumerData.UnconfirmedDeliveryToken is null
+                                || IsBefore(consumerData.UnconfirmedDeliveryToken, nextBatch.ProgressToken!))
+                            {
+                                consumerData.UnconfirmedDeliveryToken = nextBatch.ProgressToken;
+                            }
+
+                            var deliveryTime = options.MaxEventDeliveryTime;
+                            if (consumerData.DeliveryRecovery is { Stopped: false } activeRecovery)
+                            {
+                                deliveryTime = activeRecovery.RemainingTime(_timeProvider, deliveryTime);
+                                if (options.MaxEventDeliveryTime > TimeSpan.Zero && deliveryTime <= TimeSpan.Zero)
+                                {
+                                    await StopConsumerRecovery(consumerData, cancellationToken);
+                                    break;
+                                }
+                            }
+
+                            deliveryPending = true;
+                            deliveryStartedAt = _timeProvider.GetTimestamp();
                             StreamHandshakeToken? newToken = await AsyncExecutorWithRetries.ExecuteWithRetries(
-                                i => DeliverBatchToConsumer(consumerData, batch, cancellationToken),
-                                AsyncExecutorWithRetries.INFINITE_RETRIES,
+                                i => DeliverBatchToConsumer(consumerData, batch, cursorVersion, cancellationToken),
+                                consumerData.DeliveryRecovery is { Stopped: false } ? 1 : AsyncExecutorWithRetries.INFINITE_RETRIES,
                                 // Do not retry if the agent is shutting down, or if the exception is ClientNotAvailableException
-                                (exception, i) => exception is not ClientNotAvailableException && !IsShutdown,
-                                this.options.MaxEventDeliveryTime,
+                                (exception, i) => exception is not ClientNotAvailableException && !IsShutdown
+                                    && consumerData.CursorVersion == cursorVersion,
+                                deliveryTime,
                                 deliveryBackoffProvider,
                                 cancellationToken: cancellationToken);
+                            deliveryPending = false;
+                            if (consumerData.CursorVersion != cursorVersion)
+                            {
+                                continue;
+                            }
+
+                            StreamSequenceToken? acknowledgedToken = null;
                             if (newToken is not null)
                             {
+                                RecordReplayRequest(consumerData, newToken);
                                 consumerData.LastToken = newToken;
                                 IQueueCacheCursor newCursor;
                                 IBatchContainer? pendingBatch = null;
                                 if (newToken is StartPositionToken startPositionToken)
                                 {
-                                    consumerData.LastProcessedToken = null;
+                                    RecordDeliveryProgress(consumerData, null);
                                     try
                                     {
                                         newCursor = GetCacheCursorAtStartPosition(
@@ -1297,30 +1934,33 @@ namespace Orleans.Streams
                                         ?? throw new InvalidOperationException("A start handshake token must contain a stream sequence token.");
                                     if (SubscriptionMarker.IsImplicitSubscription(consumerData.SubscriptionId.Guid))
                                     {
-                                        consumerData.LastProcessedToken = sequenceToken;
+                                        acknowledgedToken = sequenceToken;
+                                        RecordDeliveryProgress(consumerData, acknowledgedToken);
                                         // An implicit recovery token identifies the last event processed by the prior activation.
                                         // The current batch is the receiver's first available message if that token was evicted.
                                         newCursor = GetAdvancedCursorOrFallback(
-                                            consumerData.StreamId,
+                                            consumerData,
                                             sequenceToken,
                                             batch.SequenceToken,
                                             out pendingBatch);
                                     }
                                     else
                                     {
-                                        consumerData.LastProcessedToken = null;
+                                        RecordDeliveryProgress(consumerData, null);
                                         newCursor = GetCacheCursorOrThrow(consumerData.StreamId, sequenceToken);
+                                        TrackDeliveryRecoveryCursor(consumerData, newCursor, newToken);
                                     }
                                 }
                                 else if (newToken is DeliveryToken)
                                 {
                                     var sequenceToken = newToken.Token
                                         ?? throw new InvalidOperationException("A delivery handshake token must contain a stream sequence token.");
-                                    consumerData.LastProcessedToken = sequenceToken;
+                                    acknowledgedToken = sequenceToken;
+                                    RecordDeliveryProgress(consumerData, acknowledgedToken);
                                     // The handshake token points to an already processed event, so advance past it.
                                     // The current batch is the receiver's first available message if that token was evicted.
                                     newCursor = GetAdvancedCursorOrFallback(
-                                        consumerData.StreamId,
+                                        consumerData,
                                         sequenceToken,
                                         batch.SequenceToken,
                                         out pendingBatch);
@@ -1337,13 +1977,28 @@ namespace Orleans.Streams
                             }
                             else
                             {
-                                // Track progress for the periodic delivery scan.
-                                consumerData.LastProcessedToken = nextBatch.ProgressToken;
+                                acknowledgedToken = nextBatch.ProgressToken;
+                                RecordAcknowledgedDeliveryProgress(consumerData, acknowledgedToken, deliveryCursor, cursorVersion);
+                            }
+
+                            // A rewind or an explicit start request does not acknowledge the attempted batch.
+                            if (acknowledgedToken is { } processed
+                                && consumerData.UnconfirmedDeliveryToken is { } attempted
+                                && !IsBefore(processed, attempted))
+                            {
+                                consumerData.UnconfirmedDeliveryToken = null;
                             }
                         }
                     }
                     catch (Exception exc)
                     {
+                        if (deliveryPending && consumerData.CursorVersion != cursorVersion)
+                        {
+                            continue;
+                        }
+
+                        RecordDeliveryProgressError(consumerData, failedToken: nextBatch.Batch?.SequenceToken,
+                            startedAt: deliveryStartedAt);
                         if (batchCursor is not null && nextBatch.Batch is not null)
                         {
                             batchCursor.RecordDeliveryFailure(nextBatch.Batch);
@@ -1372,20 +2027,51 @@ namespace Orleans.Streams
                             forceFaultSubscription,
                             cancellationToken);
                         if (faultedSubscription) return;
+                        if (nextBatch.Batch is not null)
+                        {
+                            // Retry through the normal pump rather than skipping the failed delivery or spinning here.
+                            break;
+                        }
                     }
                 }
-                consumerData.State = StreamConsumerDataState.Inactive;
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
-                consumerData.State = StreamConsumerDataState.Inactive;
             }
             catch (Exception exc)
             {
+                RecordDeliveryProgressError(consumerData);
                 // RunConsumerCursor is fired with .Ignore so we should log if anything goes wrong, because there is no one to catch the exception
                 LogErrorRunConsumerCursor(exc);
-                consumerData.State = StreamConsumerDataState.Inactive;
                 throw;
+            }
+            finally
+            {
+                if (ownsCursor)
+                {
+                    try
+                    {
+                        if (recoveryAttempt is not null && ReferenceEquals(recoveryAttempt, consumerData.DeliveryRecovery)
+                            && !recoveryAttempt.Stopped && !IsShutdown)
+                        {
+                            recoveryAttempt.FinishAttempt(_timeProvider, deliveryBackoffProvider, logger);
+                            if (recoveryAttempt.IsExhausted(_timeProvider, options.MaxEventDeliveryTime, RecoveryAttemptMax))
+                            {
+                                await StopConsumerRecovery(consumerData, cancellationToken);
+                            }
+                        }
+                    }
+                    finally
+                    {
+                        consumerData.State = StreamConsumerDataState.Inactive;
+                        if (!IsShutdown && !consumerData.IsRemoved && consumerData.PendingHandshakes == 0
+                            && consumerData.DeliveryRecovery is { Stopped: true }
+                            && consumerData.PendingContinuationToken is not null)
+                        {
+                            RunConsumerCursor(consumerData).Ignore();
+                        }
+                    }
+                }
             }
         }
 
@@ -1434,10 +2120,10 @@ namespace Orleans.Streams
                         throw new QueueCacheCursorContractException("The cursor move result is not initialized.");
                     }
 
-                    batchContainer = cursor.GetCurrent(out _)
-                        ?? throw new QueueCacheCursorContractException("A successful cursor move did not produce a current item.");
+                    batchContainer = GetCurrentBatchOrThrow(cursor);
                 }
 
+                ObserveDeliveryRecoveryStart(consumerData, batchContainer);
                 return ShouldDeliverBatch(streamId, batchContainer, filterData)
                     ? new ConsumerBatch(batchContainer, batchContainer.SequenceToken)
                     : new ConsumerBatch(null, batchContainer.SequenceToken);
@@ -1447,9 +2133,11 @@ namespace Orleans.Streams
                 int i = 0;
                 var batchContainers = new List<IBatchContainer>();
                 StreamSequenceToken? progressToken = null;
+                var sawBatch = pendingBatch is not null;
 
                 if (pendingBatch is not null)
                 {
+                    ObserveDeliveryRecoveryStart(consumerData, pendingBatch);
                     progressToken = pendingBatch.SequenceToken;
                     if (ShouldDeliverBatch(streamId, pendingBatch, filterData))
                     {
@@ -1476,8 +2164,9 @@ namespace Orleans.Streams
                         throw new QueueCacheCursorContractException("The cursor move result is not initialized.");
                     }
 
-                    var batchContainer = cursor.GetCurrent(out _)
-                        ?? throw new QueueCacheCursorContractException("A successful cursor move did not produce a current item.");
+                    var batchContainer = GetCurrentBatchOrThrow(cursor);
+                    ObserveDeliveryRecoveryStart(consumerData, batchContainer);
+                    sawBatch = true;
                     progressToken = batchContainer.SequenceToken;
 
                     if (!ShouldDeliverBatch(streamId, batchContainer, filterData))
@@ -1489,7 +2178,7 @@ namespace Orleans.Streams
 
                 if (progressToken is null)
                 {
-                    return new ConsumerBatch(QueueCacheCursorMoveResult.NoData);
+                    return new ConsumerBatch(sawBatch ? QueueCacheCursorMoveResult.Success : QueueCacheCursorMoveResult.NoData);
                 }
 
                 return i == 0
@@ -1500,18 +2189,33 @@ namespace Orleans.Streams
             return default;
         }
 
+        private static IBatchContainer GetCurrentBatchOrThrow(IQueueCacheCursor cursor)
+        {
+            var batch = cursor.GetCurrent(out var exception);
+            if (exception is not null)
+            {
+                throw exception;
+            }
+
+            return batch ?? throw new QueueCacheCursorContractException("A successful cursor move did not produce a current item.");
+        }
+
         private sealed class QueueCacheCursorContractException(string message) : InvalidOperationException(message);
 
         private async Task<StreamHandshakeToken?> DeliverBatchToConsumer(
             StreamConsumerData consumerData,
             IBatchContainer batch,
+            long cursorVersion,
             CancellationToken cancellationToken)
         {
             try
             {
                 StreamHandshakeToken? newToken = await ContextualizedDeliverBatchToConsumer(consumerData, batch, cancellationToken);
-                consumerData.LastToken = StreamHandshakeToken.CreateDeliveyToken(batch.SequenceToken); // this is the currently delivered token
-                consumerData.StartPositionIsProviderDefault = false;
+                if (consumerData.CursorVersion == cursorVersion)
+                {
+                    consumerData.LastToken = StreamHandshakeToken.CreateDeliveyToken(batch.SequenceToken); // this is the currently delivered token
+                    consumerData.StartPositionIsProviderDefault = false;
+                }
                 StreamingEvents.EmitMessageDelivered(streamProviderName, consumerData, batch, Silo);
 
                 return newToken;
@@ -1584,6 +2288,7 @@ namespace Orleans.Streams
             bool forceFaultSubscription = false,
             CancellationToken cancellationToken = default)
         {
+            if (consumerData.IsRemoved) return true;
             // for loss of client, we just remove the subscription
             if (exceptionOccured is ClientNotAvailableException)
             {
@@ -1592,8 +2297,24 @@ namespace Orleans.Streams
                 return true;
             }
 
+            if (consumerData.HasDeliveryProgressError)
+            {
+                if (consumerData.DeliveryRecovery is { Stopped: false }
+                    && consumerData.DeliveryRecoveryFailureReported && !forceFaultSubscription
+                    && consumerData.DeliveryRecoveryFailureIsDelivery == isDeliveryError
+                    && Equals(consumerData.DeliveryRecoveryFailureToken, token))
+                {
+                    return false;
+                }
+
+                consumerData.DeliveryRecoveryFailureReported = true;
+                consumerData.DeliveryRecoveryFailureIsDelivery = isDeliveryError;
+                consumerData.DeliveryRecoveryFailureToken = token;
+            }
+
             // notify consumer about the error or that the data is not available.
             await DeliverErrorToConsumer(consumerData, exceptionOccured, batch, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
+            if (consumerData.IsRemoved) return true;
             // record that there was a delivery failure
             if (isDeliveryError)
             {
@@ -1606,6 +2327,7 @@ namespace Orleans.Streams
                     consumerData.SubscriptionId, streamProviderName, consumerData.StreamId, token).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
             }
 
+            if (consumerData.IsRemoved) return true;
             // if configured to fault on delivery failure and this is not an implicit subscription, fault and remove the subscription
             if ((forceFaultSubscription || streamFailureHandler.ShouldFaultSubsriptionOnError)
                 && !SubscriptionMarker.IsImplicitSubscription(consumerData.SubscriptionId.Guid))
@@ -1619,13 +2341,17 @@ namespace Orleans.Streams
                         batch,
                         cancellationToken).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
 
+                    if (consumerData.IsRemoved) return true;
                     // mark subscription as faulted.
                     await pubSub.FaultSubscription(consumerData.StreamId, consumerData.SubscriptionId, cancellationToken);
                 }
                 finally
                 {
                     // remove subscription
-                    RemoveSubscriber_Impl(consumerData.SubscriptionId, consumerData.StreamId);
+                    if (!consumerData.IsRemoved)
+                    {
+                        RemoveSubscriber_Impl(consumerData.SubscriptionId, consumerData.StreamId);
+                    }
                 }
                 return true;
             }
@@ -1884,6 +2610,40 @@ namespace Orleans.Streams
             StreamSequenceToken token,
             StreamSequenceToken otherToken,
             Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Retaining the previous delivery watermark for queue {Queue}: token {Token} is incompatible with {OtherToken}."
+        )]
+        private partial void LogWarningIncompatibleQueueProgress(
+            QueueIdLogRecord queue,
+            StreamSequenceToken token,
+            StreamSequenceToken otherToken,
+            Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Cannot establish delivery checkpoint progress for queue {Queue}. {Reason} Receiver/provider recovery is required; later reads in this receiver lifetime do not establish replay continuity."
+        )]
+        private partial void LogErrorQueueRecoveryRequired(QueueIdLogRecord queue, string reason);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Delivery progress is constrained for subscription {SubscriptionId} on stream {StreamId} in queue {Queue}. Continuous replay is required to resume progress; unavailable data requires receiver/provider recovery or an explicit subscription resolution."
+        )]
+        private partial void LogWarningDeliveryRecoveryRequired(QueueIdLogRecord queue, GuidId subscriptionId, QualifiedStreamId streamId);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Stopping automatic replay after {Attempts} attempts for subscription {SubscriptionId} on stream {StreamId} in queue {Queue}. The unresolved delivery checkpoint constraint is retained; nonfaulting subscriptions can continue with new traffic."
+        )]
+        private partial void LogWarningDeliveryRecoveryStopped(QueueIdLogRecord queue, GuidId subscriptionId, QualifiedStreamId streamId, int attempts);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Stopping automatic registration recovery after {Attempts} attempts for stream {StreamId} in queue {Queue}. Registration resources are released and delivery checkpoint progress remains unknown."
+        )]
+        private partial void LogWarningStreamRegistrationRecoveryStopped(QueueIdLogRecord queue, QualifiedStreamId streamId, int attempts);
 
         [LoggerMessage(
             Level = LogLevel.Warning,

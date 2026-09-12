@@ -19,9 +19,15 @@ namespace Orleans.Streams
         [Id(2)]
         public bool StreamRegistered { get; set; }
 
-        // Not serialized - runtime-only in-flight registration tracking.
+        // A completed, nonnull task retains pending registration work for the next pump to retry.
         [NonSerialized]
         public Task? RegistrationTask;
+        [NonSerialized]
+        public StreamSequenceToken? RegistrationStartToken;
+        [NonSerialized]
+        public IQueueCacheCursor? RegistrationCursor;
+        [NonSerialized]
+        public StreamRecoveryState? RegistrationRecovery;
 
         public StreamConsumerCollection(DateTime now)
         {
@@ -41,6 +47,7 @@ namespace Orleans.Streams
         {
             if (!queueData.Remove(subscriptionId, out var consumer)) return false;
 
+            consumer.IsRemoved = true;
             consumer.SafeDisposeCursor(logger);
             return true;
         }
@@ -62,11 +69,27 @@ namespace Orleans.Streams
 
         public void DisposeAll(ILogger logger)
         {
+            DisposeRegistrationCursor(logger);
             foreach (StreamConsumerData consumer in queueData.Values)
             {
+                consumer.IsRemoved = true;
                 consumer.SafeDisposeCursor(logger);
             }
             queueData.Clear();
+        }
+
+        public void DisposeRegistrationCursor(ILogger logger)
+        {
+            var cursor = RegistrationCursor;
+            RegistrationCursor = null;
+            try
+            {
+                cursor?.Dispose();
+            }
+            catch (Exception exception)
+            {
+                Utils.LogIgnoredException(logger, exception, "Disposing the pending stream registration cursor.");
+            }
         }
 
         public int Count

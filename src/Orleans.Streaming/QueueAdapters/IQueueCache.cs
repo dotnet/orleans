@@ -99,11 +99,12 @@ namespace Orleans.Streams
         bool IsUnderPressure();
 
         /// <summary>
-        /// Updates the cache with the current delivery progress of all active subscriptions.
+        /// Updates the cache with the safe delivery-based checkpoint position.
         /// </summary>
         /// <param name="earliestSubscriptionToken">
-        /// The earliest last processed sequence token across registered subscriptions.
-        /// A <see langword="null"/> value indicates that there are no active subscriptions.
+        /// The delivery position constrained by subscriptions which still have outstanding work.
+        /// Includes previously established progress when subscription records have been removed.
+        /// A <see langword="null"/> value indicates that no delivery progress is known.
         /// The token is only valid for the duration of the call and must not be stored.
         /// </param>
         /// <param name="utcNow">The current UTC time.</param>
