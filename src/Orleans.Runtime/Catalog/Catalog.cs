@@ -135,6 +135,7 @@ namespace Orleans.Runtime
             Dictionary<string, object>? requestContextData,
             MigrationContext? rehydrationContext)
         {
+            PreparedGrainContext preparedContext = default;
             if (TryGetGrainContext(grainId, out var result))
             {
                 rehydrationContext?.Dispose();
@@ -146,28 +147,48 @@ namespace Orleans.Runtime
                 return null;
             }
 
-            lock (GetStripedLock(grainId))
+            try
             {
-                if (TryGetGrainContext(grainId, out result))
+                lock (GetStripedLock(grainId))
+                {
+                    if (TryGetGrainContext(grainId, out result))
+                    {
+                        rehydrationContext?.Dispose();
+                        return result;
+                    }
+
+                    if (_siloStatusOracle.CurrentStatus == SiloStatus.Active)
+                    {
+                        var address = new GrainAddress
+                        {
+                            SiloAddress = Silo,
+                            GrainId = grainId,
+                            ActivationId = ActivationId.NewId(),
+                            MembershipVersion = MembershipVersion.MinValue,
+                        };
+
+                        preparedContext = this.grainActivator.CreatePreparedContext(address);
+                        result = preparedContext.Context;
+                        activations.RecordNewTarget(result);
+                    }
+                }
+            }
+            catch (Exception exception) when (result is null)
+            {
+                try
                 {
                     rehydrationContext?.Dispose();
-                    return result;
                 }
-
-                if (_siloStatusOracle.CurrentStatus == SiloStatus.Active)
+                catch (Exception cleanupException)
                 {
-                    var address = new GrainAddress
-                    {
-                        SiloAddress = Silo,
-                        GrainId = grainId,
-                        ActivationId = ActivationId.NewId(),
-                        MembershipVersion = MembershipVersion.MinValue,
-                    };
-
-                    result = this.grainActivator.CreateInstance(address);
-                    activations.RecordNewTarget(result);
+                    throw new AggregateException(
+                        "Error creating grain activation and disposing its rehydration context.",
+                        exception,
+                        cleanupException);
                 }
-            } // End lock
+
+                throw;
+            }
 
             if (result is null)
             {
@@ -175,36 +196,103 @@ namespace Orleans.Runtime
                 return UnableToCreateActivation(this, grainId);
             }
 
-            // Start activation span with parent context from request if available
-            var parentContext = requestContextData.TryGetActivityContext();
-            var activationActivity = parentContext.HasValue
-                ? ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.ActivateGrain, ActivityKind.Internal, parentContext.Value)
-                : ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.ActivateGrain, ActivityKind.Internal);
-            if (activationActivity is not null)
+            IDisposable activationStartup;
+            var startAttempted = false;
+            try
             {
-                activationActivity.SetTag(ActivityTagKeys.GrainId, grainId.ToString());
-                activationActivity.SetTag(ActivityTagKeys.GrainType, grainId.Type.ToString());
-                activationActivity.SetTag(ActivityTagKeys.SiloId, Silo.ToString());
-                activationActivity.SetTag(ActivityTagKeys.ActivationCause, rehydrationContext is null ? "new" : "rehydrate");
-                if (result is ActivationData act)
+                // Start activation span with parent context from request if available
+                var parentContext = requestContextData.TryGetActivityContext();
+                var activationActivity = parentContext.HasValue
+                    ? ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.ActivateGrain, ActivityKind.Internal, parentContext.Value)
+                    : ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.ActivateGrain, ActivityKind.Internal);
+                if (activationActivity is not null)
                 {
-                    activationActivity.SetTag(ActivityTagKeys.ActivationId, act.ActivationId.ToString());
-                    act.SetActivationActivity(activationActivity);
-                    activationActivity.AddEvent(new ActivityEvent("creating"));
+                    activationActivity.SetTag(ActivityTagKeys.GrainId, grainId.ToString());
+                    activationActivity.SetTag(ActivityTagKeys.GrainType, grainId.Type.ToString());
+                    activationActivity.SetTag(ActivityTagKeys.SiloId, Silo.ToString());
+                    activationActivity.SetTag(ActivityTagKeys.ActivationCause, rehydrationContext is null ? "new" : "rehydrate");
+                    if (result is ActivationData act)
+                    {
+                        activationActivity.SetTag(ActivityTagKeys.ActivationId, act.ActivationId.ToString());
+                        act.SetActivationActivity(activationActivity);
+                        activationActivity.AddEvent(new ActivityEvent("creating"));
+                    }
+                }
+
+                startAttempted = true;
+                activationStartup = StartPreparedContext(preparedContext, result, activations);
+            }
+            catch (Exception exception)
+            {
+                List<Exception>? cleanupExceptions = null;
+                if (!startAttempted)
+                {
+                    if (activations.RemoveTarget(result))
+                    {
+                        LogTraceUnregisteredActivation(result);
+                    }
+
+                    try
+                    {
+                        AbortPreparedContext(
+                            preparedContext,
+                            result,
+                            new DeactivationReason(
+                                DeactivationReasonCode.ActivationFailed,
+                                exception,
+                                "Error preparing grain activation."));
+                    }
+                    catch (Exception cleanupException)
+                    {
+                        (cleanupExceptions ??= []).Add(cleanupException);
+                    }
+                }
+
+                try
+                {
+                    rehydrationContext?.Dispose();
+                }
+                catch (Exception cleanupException)
+                {
+                    (cleanupExceptions ??= []).Add(cleanupException);
+                }
+
+                if (cleanupExceptions is not null)
+                {
+                    cleanupExceptions.Insert(0, exception);
+                    throw new AggregateException("Error preparing grain activation and cleaning up the failed context.", cleanupExceptions);
+                }
+
+                throw;
+            }
+
+            using (activationStartup)
+            {
+                _catalogInstruments.OnActivationCreated();
+
+                try
+                {
+                    // Rehydration occurs before activation.
+                    if (rehydrationContext is not null)
+                    {
+                        result.Rehydrate(rehydrationContext);
+                    }
+
+                    // Initialize the new activation asynchronously.
+                    result.Activate(requestContextData);
+                    return result;
+                }
+                catch (Exception exception)
+                {
+                    result.Deactivate(
+                        new DeactivationReason(
+                            DeactivationReasonCode.ActivationFailed,
+                            exception,
+                            "Error starting grain activation."),
+                        CancellationToken.None);
+                    throw;
                 }
             }
-
-            _catalogInstruments.OnActivationCreated();
-
-            // Rehydration occurs before activation.
-            if (rehydrationContext is not null)
-            {
-                result.Rehydrate(rehydrationContext);
-            }
-
-            // Initialize the new activation asynchronously.
-            result.Activate(requestContextData);
-            return result;
 
             [MethodImpl(MethodImplOptions.NoInlining)]
             static IGrainContext? UnableToCreateActivation(Catalog self, GrainId grainId)
@@ -237,6 +325,37 @@ namespace Orleans.Runtime
                 }
 
                 return null;
+            }
+        }
+
+        internal static IDisposable StartPreparedContext(
+            PreparedGrainContext preparedContext,
+            IGrainContext context,
+            ActivationDirectory activations)
+        {
+            try
+            {
+                return preparedContext.Start();
+            }
+            catch
+            {
+                activations.RemoveTarget(context);
+                throw;
+            }
+        }
+
+        internal static void AbortPreparedContext(
+            PreparedGrainContext preparedContext,
+            IGrainContext context,
+            DeactivationReason reason)
+        {
+            if (preparedContext.HasStartup)
+            {
+                preparedContext.Abort();
+            }
+            else
+            {
+                context.Deactivate(reason, CancellationToken.None);
             }
         }
 

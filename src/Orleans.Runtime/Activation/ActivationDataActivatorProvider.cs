@@ -49,14 +49,13 @@ internal partial class ActivationDataActivatorProvider(
         return true;
     }
 
-    private partial class ActivationDataActivator : IGrainContextActivator
+    private partial class ActivationDataActivator : IPreparedGrainContextActivator
     {
         private readonly IOptions<SchedulingOptions> _schedulingOptions;
         private readonly IGrainActivator _grainActivator;
         private readonly IServiceProvider _serviceProvider;
         private readonly GrainTypeSharedContext _sharedComponents;
         private readonly Func<IGrainContext, WorkItemGroup> _createWorkItemGroup;
-        private readonly Action<object?> _startActivation;
 
         public ActivationDataActivator(
             IGrainActivator grainActivator,
@@ -73,30 +72,40 @@ internal partial class ActivationDataActivatorProvider(
                 context,
                 _schedulingOptions,
                 schedulerInstruments);
-            _startActivation = state => ((ActivationData)state!).Start(_grainActivator);
         }
 
         public IGrainContext CreateContext(GrainAddress activationAddress, IConfigureGrainContext[] configureActions)
+        {
+            var preparedContext = CreatePreparedContext(activationAddress, configureActions);
+            using var startup = preparedContext.Start();
+            return preparedContext.Context;
+        }
+
+        public PreparedGrainContext CreatePreparedContext(
+            GrainAddress activationAddress,
+            IConfigureGrainContext[] configureActions)
         {
             var context = new ActivationData(
                 activationAddress,
                 _createWorkItemGroup,
                 _serviceProvider,
-                _sharedComponents);
+                _sharedComponents,
+                _grainActivator);
 
-            foreach (var configure in configureActions)
+            try
             {
-                configure.Configure(context);
-            }
+                foreach (var configure in configureActions)
+                {
+                    configure.Configure(context);
+                }
 
-            using var ecSuppressor = ExecutionContext.SuppressFlow();
-            _ = Task.Factory.StartNew(
-                _startActivation,
-                context,
-                CancellationToken.None,
-                TaskCreationOptions.DenyChildAttach,
-                context.ActivationTaskScheduler);
-            return context;
+                return new(context, (IGrainContextStartup)context);
+            }
+            catch
+            {
+                ((IGrainContextStartup)context).Abort();
+                throw;
+            }
         }
     }
 }

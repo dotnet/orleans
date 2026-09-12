@@ -56,10 +56,24 @@ namespace Orleans.Runtime.Scheduler
             }
         }
 
+        internal void RunTaskSynchronously(Task task)
+        {
+            task.Start(this);
+            if (!TryExecuteTask(task))
+            {
+                throw new InvalidOperationException($"Unable to execute synchronous task {task.Id}.");
+            }
+        }
+
         /// <summary>Queues a task to the scheduler.</summary>
         /// <param name="task">The task to be queued.</param>
         protected override void QueueTask(Task task)
         {
+            if (workerGroup.IsCurrentTask(task))
+            {
+                return;
+            }
+
 #if DEBUG
             LogTraceQueueTask(myId, task.Id);
 #endif

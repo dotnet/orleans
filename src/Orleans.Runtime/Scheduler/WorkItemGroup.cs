@@ -56,6 +56,8 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
         get { lock (_lockObj) { return _workItems.Count; } }
     }
 
+    internal bool IsCurrentTask(Task task) => ReferenceEquals(_currentTask, task);
+
     public WorkItemGroup(
         IGrainContext grainContext,
         IOptions<SchedulingOptions> schedulingOptions,
@@ -116,6 +118,124 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
             }
 #endif
             ScheduleExecution(this);
+        }
+    }
+
+    internal ActivationStartup BeginActivationStartup()
+    {
+        lock (_lockObj)
+        {
+            if (_state != WorkGroupStatus.Waiting)
+            {
+                throw new InvalidOperationException($"Cannot reserve execution while {this} is {_state}.");
+            }
+
+            _state = WorkGroupStatus.Running;
+            return new(this);
+        }
+    }
+
+    private void RunTaskSynchronously(Task task)
+    {
+        long taskStart;
+        lock (_lockObj)
+        {
+            if (_state != WorkGroupStatus.Running || _currentTask is not null)
+            {
+                throw new InvalidOperationException($"Synchronous execution requires a reserved {this}.");
+            }
+
+            _currentTask = task;
+            _currentTaskStarted = taskStart = Environment.TickCount64;
+            _totalItemsEnqueued++;
+        }
+
+        RuntimeContext.SetExecutionContext(GrainContext, out var originalContext);
+        try
+        {
+#if DEBUG
+            LogTaskStart(task);
+#endif
+            TaskScheduler.RunTaskSynchronously(task);
+        }
+        finally
+        {
+            RuntimeContext.ResetExecutionContext(originalContext);
+            _totalItemsProcessed++;
+            var taskDurationMs = Environment.TickCount64 - taskStart;
+            if (taskDurationMs > (long)Math.Ceiling(_schedulingOptions.TurnWarningLengthThreshold.TotalMilliseconds))
+            {
+                _schedulerInstruments.OnLongRunningTurn();
+                LogLongRunningTurn(task, taskDurationMs);
+            }
+
+            _currentTask = null;
+        }
+    }
+
+    private void ReleaseExecution()
+    {
+        lock (_lockObj)
+        {
+            Debug.Assert(_state == WorkGroupStatus.Running);
+            Debug.Assert(_currentTask is null);
+            if (_workItems.Count > 0)
+            {
+                _state = WorkGroupStatus.Runnable;
+                ScheduleExecution(this);
+            }
+            else
+            {
+                _state = WorkGroupStatus.Waiting;
+            }
+        }
+    }
+
+    private void AbortExecution()
+    {
+        lock (_lockObj)
+        {
+            if (_state != WorkGroupStatus.Running || _currentTask is not null)
+            {
+                throw new InvalidOperationException($"Cannot abort execution while {this} is {_state}.");
+            }
+
+            _workItems.Clear();
+            _state = WorkGroupStatus.Waiting;
+        }
+    }
+    // One-shot scheduler reservation used while an activation is published and constructed.
+    internal sealed class ActivationStartup : IDisposable
+    {
+        private WorkItemGroup? _owner;
+        private int _constructorStarted;
+
+        internal ActivationStartup(WorkItemGroup owner)
+        {
+            _owner = owner;
+        }
+
+        public void RunConstructor(Task task)
+        {
+            if (Interlocked.Exchange(ref _constructorStarted, 1) != 0)
+            {
+                throw new InvalidOperationException("The activation constructor has already been run.");
+            }
+
+            (_owner ?? throw new ObjectDisposedException(nameof(ActivationStartup)))
+                .RunTaskSynchronously(task);
+        }
+
+        public void Dispose() => Interlocked.Exchange(ref _owner, null)?.ReleaseExecution();
+
+        public void Abort()
+        {
+            if (Volatile.Read(ref _constructorStarted) != 0)
+            {
+                throw new InvalidOperationException("An activation startup cannot be aborted after construction has begun.");
+            }
+
+            Interlocked.Exchange(ref _owner, null)?.AbortExecution();
         }
     }
 
