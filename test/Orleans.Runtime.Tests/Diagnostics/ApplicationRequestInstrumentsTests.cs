@@ -13,12 +13,10 @@ namespace Tester.Diagnostics;
 public class ApplicationRequestInstrumentsTests
 {
 #if NET10_0_OR_GREATER
-    private static readonly double[] ExpectedBoundaries =
+    private static readonly double[] ExampleBoundaries =
     [
-        0.1, 0.25, 0.5, 0.75,
-        1, 2, 4, 6, 8, 10, 50, 100,
-        200, 400, 800, 1_000, 1_500, 2_000,
-        5_000, 10_000, 15_000, 30_000
+        1, 5, 10, 25, 50, 100, 250,
+        500, 1_000, 2_500, 5_000, 10_000, 30_000, 60_000
     ];
 #endif
 
@@ -77,59 +75,31 @@ public class ApplicationRequestInstrumentsTests
     [TestSuite("BVT")]
     [TestProvider("None")]
     [Fact, TestCategory("BVT")]
-    public void RequestLatencyHistogram_ProvidesRequestSpecificBoundaryAdvice()
+    public void RequestLatencyHistogram_ExportsCountSumMinMaxAndConfiguredBuckets()
     {
-        using var listener = new MeterListener();
-        Instrument publishedInstrument = null!;
-        listener.InstrumentPublished = (instrument, _) =>
-        {
-            if (instrument.Name == InstrumentNames.APP_REQUESTS_LATENCY_HISTOGRAM)
-            {
-                publishedInstrument = instrument;
-            }
-        };
-        listener.Start();
+        using var test = new HistogramExportTest(ExampleBoundaries);
 
-        using var meter = new Meter($"ApplicationRequestInstrumentsTests.{Guid.NewGuid():N}");
-        using var meterFactory = new FixedMeterFactory(meter);
-        _ = new ApplicationRequestInstruments(new OrleansInstruments(meterFactory));
-
-        var histogram = Assert.IsType<Histogram<double>>(publishedInstrument);
-        Assert.Equal("ms", histogram.Unit);
-        Assert.NotNull(histogram.Advice);
-        Assert.Equal(ExpectedBoundaries, histogram.Advice!.HistogramBucketBoundaries);
-    }
-
-    [TestSuite("BVT")]
-    [TestProvider("None")]
-    [Fact, TestCategory("BVT")]
-    public void RequestLatencyHistogram_ExportsCountSumMinMaxAndAdvisedBuckets()
-    {
-        using var test = new HistogramExportTest();
-
-        test.Instruments.OnAppRequestsEnd(0.05);
-        test.Instruments.OnAppRequestsEnd(0.1);
-        test.Instruments.OnAppRequestsEnd(0.2);
         test.Instruments.OnAppRequestsEnd(0.5);
-        test.Instruments.OnAppRequestsEnd(1.5);
-        test.Instruments.OnAppRequestsEnd(30_001);
+        test.Instruments.OnAppRequestsEnd(1);
+        test.Instruments.OnAppRequestsEnd(2);
+        test.Instruments.OnAppRequestsEnd(10);
+        test.Instruments.OnAppRequestsEnd(60_000);
+        test.Instruments.OnAppRequestsEnd(60_001);
 
         var snapshot = test.Collect();
 
         Assert.Equal(6, snapshot.Count);
-        Assert.Equal(30_003.35, snapshot.Sum, 5);
-        Assert.Equal(0.05, snapshot.Min);
-        Assert.Equal(30_001, snapshot.Max);
-        Assert.Equal([.. ExpectedBoundaries, double.PositiveInfinity], snapshot.Buckets.Select(static bucket => bucket.Bound));
-        Assert.Equal([2L, 1, 1, 0, 0, 1], snapshot.Buckets.Take(6).Select(static bucket => bucket.Count));
-        Assert.All(snapshot.Buckets.Skip(6).Take(16), static bucket => Assert.Equal(0, bucket.Count));
-        Assert.Equal(1, snapshot.Buckets[^1].Count);
+        Assert.Equal(120_014.5, snapshot.Sum);
+        Assert.Equal(0.5, snapshot.Min);
+        Assert.Equal(60_001, snapshot.Max);
+        Assert.Equal([.. ExampleBoundaries, double.PositiveInfinity], snapshot.Buckets.Select(static bucket => bucket.Bound));
+        Assert.Equal([2L, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1], snapshot.Buckets.Select(static bucket => bucket.Count));
     }
 
     [TestSuite("BVT")]
     [TestProvider("None")]
     [Fact, TestCategory("BVT")]
-    public void RequestLatencyHistogram_ViewOverridesBoundaryAdvice()
+    public void RequestLatencyHistogram_UsesViewBoundaries()
     {
         using var test = new HistogramExportTest([1, 5]);
 
@@ -141,6 +111,7 @@ public class ApplicationRequestInstrumentsTests
 
         Assert.Equal([1, 5, double.PositiveInfinity], snapshot.Buckets.Select(static bucket => bucket.Bound));
         Assert.Equal([1L, 1, 1], snapshot.Buckets.Select(static bucket => bucket.Count));
+        Assert.Equal(1, snapshot.Buckets[^1].Count);
     }
 
     [TestSuite("BVT")]
