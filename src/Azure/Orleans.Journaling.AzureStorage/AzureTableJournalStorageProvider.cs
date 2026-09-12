@@ -1,4 +1,6 @@
+using System.Buffers;
 using System.Runtime.CompilerServices;
+using System.Text;
 using Azure.Data.Tables;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -116,12 +118,13 @@ internal sealed class AzureTableJournalStorageProvider : ILifecycleParticipant<I
         }
         else
         {
-            if (range.LowerBound is { } lowerBound)
+            // Ordinal UTF-16 boundaries can contain unpaired surrogates. Keep those constraints local.
+            if (range.LowerBound is { } lowerBound && IsWellFormedUnicode(lowerBound))
             {
                 filter += TableClient.CreateQueryFilter($" and JournalId ge {lowerBound}");
             }
 
-            if (range.UpperBound is { } upperBound)
+            if (range.UpperBound is { } upperBound && IsWellFormedUnicode(upperBound))
             {
                 filter += range.Contains(upperBound)
                     ? TableClient.CreateQueryFilter($" and JournalId le {upperBound}")
@@ -130,6 +133,21 @@ internal sealed class AzureTableJournalStorageProvider : ILifecycleParticipant<I
         }
 
         return filter;
+    }
+
+    private static bool IsWellFormedUnicode(ReadOnlySpan<char> value)
+    {
+        while (!value.IsEmpty)
+        {
+            if (Rune.DecodeFromUtf16(value, out _, out var consumed) != OperationStatus.Done)
+            {
+                return false;
+            }
+
+            value = value[consumed..];
+        }
+
+        return true;
     }
 
     private static bool TryGetJournalId(TableEntity entity, out JournalId journalId)
