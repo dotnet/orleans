@@ -7,7 +7,7 @@ ms.topic: reference
 
 # Orleans NuGet packages
 
-All official packages use the `Microsoft.Orleans` prefix and are published on [NuGet.org](https://www.nuget.org/profiles/Orleans). Keep Orleans package versions aligned within an application.
+Official packages use the `Microsoft.Orleans` prefix. Published packages are available on [NuGet.org](https://www.nuget.org/profiles/Orleans); the inventory also identifies packages awaiting their first publication. Keep Orleans package versions aligned within an application.
 
 ## Start with a metapackage
 
@@ -77,6 +77,7 @@ Memory persistence distributes records across cluster storage grains but isn't d
 | [Microsoft.Orleans.Reminders.Redis](https://www.nuget.org/packages/Microsoft.Orleans.Reminders.Redis) | Redis reminders. |
 | [Microsoft.Orleans.DurableJobs](https://www.nuget.org/packages/Microsoft.Orleans.DurableJobs) | Distributed scheduling for durable one-time jobs. |
 | [Microsoft.Orleans.DurableJobs.AzureStorage](https://www.nuget.org/packages/Microsoft.Orleans.DurableJobs.AzureStorage) | Azure Blob Storage for durable jobs. |
+| `Microsoft.Orleans.DurableTasks.Abstractions` | Pre-release alpha programming model abstractions for durable asynchronous operations. Awaiting first NuGet publication. |
 
 Use reminders for recurring durable callbacks and durable jobs for scheduled one-time work. Grain timers are activation-scoped and use the core runtime rather than a provider package.
 
