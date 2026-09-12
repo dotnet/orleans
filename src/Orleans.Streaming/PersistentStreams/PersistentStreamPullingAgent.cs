@@ -1381,6 +1381,20 @@ namespace Orleans.Streams
                 return;
             }
 
+            var acknowledgesUnconfirmedDelivery = false;
+            if (token is not null && consumer.UnconfirmedDeliveryToken is { } attempted)
+            {
+                if (!TryCompareQueueProgress(token, attempted, out var attemptedComparison))
+                {
+                    // Preserve the replay obligation and retry budget before accepting any new progress.
+                    RecordDeliveryProgressError(consumer);
+                    RecordDeliveryProgress(consumer, null);
+                    return;
+                }
+
+                acknowledgesUnconfirmedDelivery = attemptedComparison >= 0;
+            }
+
             // Opening or draining an empty recovery cursor does not prove that its missing data was replayed.
             if (consumer.HasDeliveryProgressError
                 && ReferenceEquals(consumer.DeliveryRecoveryCursor, deliveryCursor)
@@ -1401,9 +1415,7 @@ namespace Orleans.Streams
             }
 
             RecordDeliveryProgress(consumer, token);
-            if (token is not null
-                && consumer.UnconfirmedDeliveryToken is { } attempted
-                && !IsBefore(token, attempted))
+            if (acknowledgesUnconfirmedDelivery)
             {
                 consumer.UnconfirmedDeliveryToken = null;
             }
