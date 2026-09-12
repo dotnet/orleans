@@ -11,8 +11,8 @@ namespace Orleans.Serialization.Session
     /// </summary>
     public sealed class WellKnownTypeCollection
     {
-        private readonly Dictionary<uint, Type> _wellKnownTypes;
-        private readonly Dictionary<Type, uint> _wellKnownTypeToIdMap;
+        private volatile Dictionary<uint, Type> _wellKnownTypes = new();
+        private volatile Dictionary<Type, uint> _wellKnownTypeToIdMap = new();
 
         /// <summary>
         /// Initializes a new instance of the <see cref="WellKnownTypeCollection"/> class.
@@ -20,12 +20,32 @@ namespace Orleans.Serialization.Session
         /// <param name="config">The configuration.</param>
         public WellKnownTypeCollection(IOptions<TypeManifestOptions> config)
         {
-            _wellKnownTypes = config?.Value.WellKnownTypeIds ?? throw new ArgumentNullException(nameof(config));
-            _wellKnownTypeToIdMap = new Dictionary<Type, uint>(_wellKnownTypes.Count);
-            foreach (var item in _wellKnownTypes)
+            if (config is null)
             {
-                _wellKnownTypeToIdMap[item.Value] = item.Key;
+                throw new ArgumentNullException(nameof(config));
             }
+
+            Rebuild(config.Value.WellKnownTypeIds);
+        }
+
+        /// <summary>
+        /// Refreshes the type id maps after a hot reload metadata update.
+        /// </summary>
+        internal void OnManifestUpdated(TypeManifestOptions options) => Rebuild(options.WellKnownTypeIds);
+
+        private void Rebuild(Dictionary<uint, Type> wellKnownTypeIds)
+        {
+            // Snapshot the id map rather than aliasing the live options dictionary so that later manifest
+            // merges cannot race lock-free readers of this collection.
+            var wellKnownTypes = new Dictionary<uint, Type>(wellKnownTypeIds);
+            var wellKnownTypeToIdMap = new Dictionary<Type, uint>(wellKnownTypes.Count);
+            foreach (var item in wellKnownTypes)
+            {
+                wellKnownTypeToIdMap[item.Value] = item.Key;
+            }
+
+            _wellKnownTypes = wellKnownTypes;
+            _wellKnownTypeToIdMap = wellKnownTypeToIdMap;
         }
 
         /// <summary>

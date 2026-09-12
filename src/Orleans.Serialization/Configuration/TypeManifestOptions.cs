@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 #endif
 using System.Reflection;
+using System.Threading;
 using Orleans.Serialization.TypeSystem;
 
 namespace Orleans.Serialization.Configuration
@@ -23,14 +24,7 @@ namespace Orleans.Serialization.Configuration
             | DynamicallyAccessedMemberTypes.Interfaces;
 #endif
 
-        private readonly HashSet<Type> _activators = new();
-        private readonly HashSet<Type> _fieldCodecs = new();
-        private readonly HashSet<Type> _serializers = new();
-        private readonly HashSet<Type> _copiers = new();
-        private readonly HashSet<Type> _converters = new();
-        private readonly HashSet<Type> _interfaces = new();
-        private readonly HashSet<Type> _interfaceProxies = new();
-        private readonly HashSet<Type> _interfaceImplementations = new();
+        private ManifestCollections _collections = new();
 
         /// <summary>
         /// Gets or sets a value indicating whether <see cref="SerializerConfigurationAnalyzer"/> should be enabled.
@@ -51,7 +45,7 @@ namespace Orleans.Serialization.Configuration
                 "Direct collection access cannot preserve activator members required by trimming. "
                 + "Use AddActivator(Type) when registering activators.")]
 #endif
-            get => _activators;
+            get => Volatile.Read(ref _collections).Activators;
         }
 
         /// <summary>
@@ -64,7 +58,7 @@ namespace Orleans.Serialization.Configuration
                 "Direct collection access cannot preserve field codec members required by trimming. "
                 + "Use AddFieldCodec(Type) when registering field codecs.")]
 #endif
-            get => _fieldCodecs;
+            get => Volatile.Read(ref _collections).FieldCodecs;
         }
 
         /// <summary>
@@ -77,7 +71,7 @@ namespace Orleans.Serialization.Configuration
                 "Direct collection access cannot preserve serializer members required by trimming. "
                 + "Use AddSerializer(Type) when registering serializers.")]
 #endif
-            get => _serializers;
+            get => Volatile.Read(ref _collections).Serializers;
         }
 
         /// <summary>
@@ -90,7 +84,7 @@ namespace Orleans.Serialization.Configuration
                 "Direct collection access cannot preserve copier members required by trimming. "
                 + "Use AddCopier(Type) when registering copiers.")]
 #endif
-            get => _copiers;
+            get => Volatile.Read(ref _collections).Copiers;
         }
 
         /// <summary>
@@ -103,7 +97,7 @@ namespace Orleans.Serialization.Configuration
                 "Direct collection access cannot preserve converter members required by trimming. "
                 + "Use AddConverter(Type) when registering converters.")]
 #endif
-            get => _converters;
+            get => Volatile.Read(ref _collections).Converters;
         }
 
         /// <summary>
@@ -116,7 +110,7 @@ namespace Orleans.Serialization.Configuration
                 "Direct collection access cannot preserve interface members required by trimming. "
                 + "Use AddInterface(Type) when registering interfaces.")]
 #endif
-            get => _interfaces;
+            get => Volatile.Read(ref _collections).Interfaces;
         }
 
         /// <summary>
@@ -132,7 +126,7 @@ namespace Orleans.Serialization.Configuration
                 "Direct collection access cannot preserve proxy members required by trimming. "
                 + "Use AddInterfaceProxy(Type) when registering interface proxies.")]
 #endif
-            get => _interfaceProxies;
+            get => Volatile.Read(ref _collections).InterfaceProxies;
         }
 
         /// <summary>
@@ -145,18 +139,18 @@ namespace Orleans.Serialization.Configuration
                 "Direct collection access cannot preserve implementation members required by trimming. "
                 + "Use AddInterfaceImplementation(Type) when registering interface implementations.")]
 #endif
-            get => _interfaceImplementations;
+            get => Volatile.Read(ref _collections).InterfaceImplementations;
         }
 
         /// <summary>
         /// Gets the mapping of well-known type identifiers to their corresponding type.
         /// </summary>
-        public Dictionary<uint, Type> WellKnownTypeIds { get; } = new Dictionary<uint, Type>();
+        public Dictionary<uint, Type> WellKnownTypeIds => Volatile.Read(ref _collections).WellKnownTypeIds;
 
         /// <summary>
         /// Gets the mapping of well-known type aliases to their corresponding type.
         /// </summary>
-        public Dictionary<string, Type> WellKnownTypeAliases { get; } = new Dictionary<string, Type>();
+        public Dictionary<string, Type> WellKnownTypeAliases => Volatile.Read(ref _collections).WellKnownTypeAliases;
 
         /// <summary>
         /// Gets the set of allowed Orleans-formatted runtime type names.
@@ -187,7 +181,7 @@ namespace Orleans.Serialization.Configuration
         /// }));
         /// </code>
         /// </example>
-        public HashSet<string> AllowedTypes { get; } = new HashSet<string>(StringComparer.Ordinal);
+        public HashSet<string> AllowedTypes => Volatile.Read(ref _collections).AllowedTypes;
 
         /// <summary>
         /// Gets the set of assembly names whose types are allowed.
@@ -202,12 +196,12 @@ namespace Orleans.Serialization.Configuration
         ///     options.AddAllowedAssembly(typeof(MyMessage).Assembly)));
         /// </code>
         /// </example>
-        public HashSet<string> AllowedAssemblies { get; } = new HashSet<string>(StringComparer.Ordinal);
+        public HashSet<string> AllowedAssemblies => Volatile.Read(ref _collections).AllowedAssemblies;
 
         /// <summary>
         /// Gets the mapping from compound type aliases to types.
         /// </summary>
-        public CompoundTypeAliasTree CompoundTypeAliases { get; } = CompoundTypeAliasTree.Create();
+        public CompoundTypeAliasTree CompoundTypeAliases => Volatile.Read(ref _collections).CompoundTypeAliases;
 
         /// <summary>
         /// Gets or sets a value indicating whether to allow all types by default.
@@ -225,21 +219,21 @@ namespace Orleans.Serialization.Configuration
         /// </summary>
         internal HashSet<object> TypeManifestProviders { get; } = new();
 
-        internal HashSet<Type> ActivatorTypes => _activators;
+        internal HashSet<Type> ActivatorTypes => Volatile.Read(ref _collections).Activators;
 
-        internal HashSet<Type> FieldCodecTypes => _fieldCodecs;
+        internal HashSet<Type> FieldCodecTypes => Volatile.Read(ref _collections).FieldCodecs;
 
-        internal HashSet<Type> SerializerTypes => _serializers;
+        internal HashSet<Type> SerializerTypes => Volatile.Read(ref _collections).Serializers;
 
-        internal HashSet<Type> CopierTypes => _copiers;
+        internal HashSet<Type> CopierTypes => Volatile.Read(ref _collections).Copiers;
 
-        internal HashSet<Type> ConverterTypes => _converters;
+        internal HashSet<Type> ConverterTypes => Volatile.Read(ref _collections).Converters;
 
-        internal HashSet<Type> InterfaceTypes => _interfaces;
+        internal HashSet<Type> InterfaceTypes => Volatile.Read(ref _collections).Interfaces;
 
-        internal HashSet<Type> InterfaceProxyTypes => _interfaceProxies;
+        internal HashSet<Type> InterfaceProxyTypes => Volatile.Read(ref _collections).InterfaceProxies;
 
-        internal HashSet<Type> InterfaceImplementationTypes => _interfaceImplementations;
+        internal HashSet<Type> InterfaceImplementationTypes => Volatile.Read(ref _collections).InterfaceImplementations;
 
         /// <summary>
         /// Adds a serializer implementation type and preserves the members used to inspect and activate it.
@@ -249,7 +243,7 @@ namespace Orleans.Serialization.Configuration
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(ImplementationTypeMembers)]
 #endif
-            Type type) => _serializers.Add(type ?? throw new ArgumentNullException(nameof(type)));
+            Type type) => SerializerTypes.Add(type ?? throw new ArgumentNullException(nameof(type)));
 
         /// <summary>
         /// Adds a field codec implementation type and preserves the members used to inspect and activate it.
@@ -259,7 +253,7 @@ namespace Orleans.Serialization.Configuration
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(ImplementationTypeMembers)]
 #endif
-            Type type) => _fieldCodecs.Add(type ?? throw new ArgumentNullException(nameof(type)));
+            Type type) => FieldCodecTypes.Add(type ?? throw new ArgumentNullException(nameof(type)));
 
         /// <summary>
         /// Adds a copier implementation type and preserves the members used to inspect and activate it.
@@ -269,7 +263,7 @@ namespace Orleans.Serialization.Configuration
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(ImplementationTypeMembers)]
 #endif
-            Type type) => _copiers.Add(type ?? throw new ArgumentNullException(nameof(type)));
+            Type type) => CopierTypes.Add(type ?? throw new ArgumentNullException(nameof(type)));
 
         /// <summary>
         /// Adds a converter implementation type and preserves the members used to inspect and activate it.
@@ -279,7 +273,7 @@ namespace Orleans.Serialization.Configuration
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(ImplementationTypeMembers)]
 #endif
-            Type type) => _converters.Add(type ?? throw new ArgumentNullException(nameof(type)));
+            Type type) => ConverterTypes.Add(type ?? throw new ArgumentNullException(nameof(type)));
 
         /// <summary>
         /// Adds an activator implementation type and preserves the members used to inspect and activate it.
@@ -289,7 +283,7 @@ namespace Orleans.Serialization.Configuration
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(ImplementationTypeMembers)]
 #endif
-            Type type) => _activators.Add(type ?? throw new ArgumentNullException(nameof(type)));
+            Type type) => ActivatorTypes.Add(type ?? throw new ArgumentNullException(nameof(type)));
 
         /// <summary>
         /// Adds a generated interface type and preserves the methods and inherited interfaces used by generated invokables.
@@ -299,7 +293,7 @@ namespace Orleans.Serialization.Configuration
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(InterfaceTypeMembers)]
 #endif
-            Type type) => _interfaces.Add(type ?? throw new ArgumentNullException(nameof(type)));
+            Type type) => InterfaceTypes.Add(type ?? throw new ArgumentNullException(nameof(type)));
 
         /// <summary>
         /// Adds a generated proxy type and preserves its implemented interfaces.
@@ -310,7 +304,7 @@ namespace Orleans.Serialization.Configuration
             [DynamicallyAccessedMembers(
                 DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.Interfaces)]
 #endif
-            Type type) => _interfaceProxies.Add(type ?? throw new ArgumentNullException(nameof(type)));
+            Type type) => InterfaceProxyTypes.Add(type ?? throw new ArgumentNullException(nameof(type)));
 
         /// <summary>
         /// Adds a generated interface implementation type and preserves its implemented interfaces.
@@ -320,7 +314,14 @@ namespace Orleans.Serialization.Configuration
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.Interfaces)]
 #endif
-            Type type) => _interfaceImplementations.Add(type ?? throw new ArgumentNullException(nameof(type)));
+            Type type) => InterfaceImplementationTypes.Add(type ?? throw new ArgumentNullException(nameof(type)));
+
+        internal void MergeFrom(TypeManifestOptions additions)
+        {
+            var current = Volatile.Read(ref _collections);
+            var added = Volatile.Read(ref additions._collections);
+            Volatile.Write(ref _collections, current.Merge(added));
+        }
 
         /// <summary>
         /// Adds the Orleans-formatted runtime type name for <paramref name="type"/> to
@@ -353,6 +354,67 @@ namespace Orleans.Serialization.Configuration
             }
 
             AllowedAssemblies.Add(CachedTypeResolver.GetName(assembly));
+        }
+
+        private sealed class ManifestCollections
+        {
+            public HashSet<Type> Activators { get; init; } = new();
+            public HashSet<Type> FieldCodecs { get; init; } = new();
+            public HashSet<Type> Serializers { get; init; } = new();
+            public HashSet<Type> Copiers { get; init; } = new();
+            public HashSet<Type> Converters { get; init; } = new();
+            public HashSet<Type> Interfaces { get; init; } = new();
+            public HashSet<Type> InterfaceProxies { get; init; } = new();
+            public HashSet<Type> InterfaceImplementations { get; init; } = new();
+            public Dictionary<uint, Type> WellKnownTypeIds { get; init; } = new();
+            public Dictionary<string, Type> WellKnownTypeAliases { get; init; } = new();
+            public HashSet<string> AllowedTypes { get; init; } = new(StringComparer.Ordinal);
+            public HashSet<string> AllowedAssemblies { get; init; } = new(StringComparer.Ordinal);
+            public CompoundTypeAliasTree CompoundTypeAliases { get; init; } = CompoundTypeAliasTree.Create();
+
+            public ManifestCollections Merge(ManifestCollections additions)
+            {
+                var compoundTypeAliases = CompoundTypeAliases.Clone();
+                compoundTypeAliases.MergeFrom(additions.CompoundTypeAliases);
+
+                return new ManifestCollections
+                {
+                    Activators = Merge(Activators, additions.Activators),
+                    FieldCodecs = Merge(FieldCodecs, additions.FieldCodecs),
+                    Serializers = Merge(Serializers, additions.Serializers),
+                    Copiers = Merge(Copiers, additions.Copiers),
+                    Converters = Merge(Converters, additions.Converters),
+                    Interfaces = Merge(Interfaces, additions.Interfaces),
+                    InterfaceProxies = Merge(InterfaceProxies, additions.InterfaceProxies),
+                    InterfaceImplementations = Merge(InterfaceImplementations, additions.InterfaceImplementations),
+                    WellKnownTypeIds = Merge(WellKnownTypeIds, additions.WellKnownTypeIds),
+                    WellKnownTypeAliases = Merge(WellKnownTypeAliases, additions.WellKnownTypeAliases),
+                    AllowedTypes = Merge(AllowedTypes, additions.AllowedTypes),
+                    AllowedAssemblies = Merge(AllowedAssemblies, additions.AllowedAssemblies),
+                    CompoundTypeAliases = compoundTypeAliases,
+                };
+            }
+
+            private static HashSet<T> Merge<T>(HashSet<T> current, HashSet<T> additions)
+            {
+                var result = new HashSet<T>(current, current.Comparer);
+                result.UnionWith(additions);
+                return result;
+            }
+
+            private static Dictionary<TKey, TValue> Merge<TKey, TValue>(
+                Dictionary<TKey, TValue> current,
+                Dictionary<TKey, TValue> additions)
+                where TKey : notnull
+            {
+                var result = new Dictionary<TKey, TValue>(current, current.Comparer);
+                foreach (var pair in additions)
+                {
+                    result.TryAdd(pair.Key, pair.Value);
+                }
+
+                return result;
+            }
         }
     }
 }
