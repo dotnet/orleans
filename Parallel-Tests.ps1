@@ -28,7 +28,7 @@ if ([string]::IsNullOrWhiteSpace($testFilter)) {
 }
 
 if ([string]::IsNullOrWhiteSpace($testFilter)) {
-    $testFilter = "/[(Category=BVT)|(Category=SlowBVT)]";
+    $testFilter = "/[(Suite=BVT)|(Suite=SlowBVT)|(Category=BVT)|(Category=SlowBVT)]";
 }
 
 Write-Host "Test filters: `"$testFilter`"";
