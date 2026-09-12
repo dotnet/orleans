@@ -505,7 +505,6 @@ namespace Orleans.Streaming.EventHubs
             TaskCompletionSource recoveryCompletion)
         {
             var exceptions = new List<Exception>();
-            var resetSucceeded = false;
             try
             {
                 try
@@ -516,7 +515,6 @@ namespace Orleans.Streaming.EventHubs
                         this.receiverUsesCheckpoint = false;
                     }
 
-                    resetSucceeded = true;
                 }
                 catch (Exception exception)
                 {
@@ -581,13 +579,6 @@ namespace Orleans.Streaming.EventHubs
 
                 lock (this.cacheLock)
                 {
-                    if (!resetSucceeded)
-                    {
-                        this.recoveryCache = null;
-                        this.recoveredCursorProgress = null;
-                        this.recoveryPendingCursors = null;
-                    }
-
                     if (ReferenceEquals(this.recoveryTask, recoveryCompletion.Task))
                     {
                         this.recoveryTask = null;
@@ -906,7 +897,10 @@ namespace Orleans.Streaming.EventHubs
                 // finish return receiver closing task
                 try
                 {
-                    await ClosePendingReceiver(shutdownCancellationToken);
+                    using var cleanupCancellation = timeout == Timeout.InfiniteTimeSpan
+                        ? null
+                        : new CancellationTokenSource(timeout);
+                    await ClosePendingReceiver(cleanupCancellation?.Token ?? CancellationToken.None);
                 }
                 catch (Exception ex)
                 {
