@@ -93,7 +93,7 @@ public partial class ClusterManifestProviderTests
 
             membership.Update(CreateActiveMembershipSnapshot(2, local, [first, second]));
             Assert.True(await UpdateManifestAsync(provider, membership.CurrentSnapshot, cancellationToken));
-            Assert.Equal(1, directTarget.ReceivedCalls().Count());
+            Assert.Single(directTarget.ReceivedCalls());
             Assert.Equal(1, metrics.Sum(InstrumentNames.MANIFEST_CACHE_LOOKUPS, ("result", "miss"), ("source", "silo")));
             Assert.Equal(1, metrics.Sum(InstrumentNames.MANIFEST_CACHE_LOOKUPS, ("result", "hit"), ("source", "silo")));
             Assert.Equal(1, metrics.Sum(InstrumentNames.MANIFEST_FALLBACKS, ("reason", "missing")));
