@@ -22,6 +22,7 @@ interface [GrainInterfaceType("Orleans.Dashboard.Core.IDashboardGrain")] Orleans
   TopGrainMethods: TopGrainMethods(int, string[], System.Threading.CancellationToken) -> Task<Orleans.Concurrency.Immutable<System.Collections.Generic.Dictionary<string, Orleans.Dashboard.Model.History.GrainMethodAggregate[]>>>
 
 interface [GrainInterfaceType("Orleans.Dashboard.Core.IDashboardRemindersGrain")] Orleans.Dashboard.Core.IDashboardRemindersGrain [Version(0)]
+  GetAdvancedReminders: GetAdvancedReminders(int, int, System.Threading.CancellationToken) -> Task<Orleans.Concurrency.Immutable<Orleans.Dashboard.Model.AdvancedReminderResponse>>
   GetReminders: GetReminders(int, int, System.Threading.CancellationToken) -> Task<Orleans.Concurrency.Immutable<Orleans.Dashboard.Model.ReminderResponse>>
 
 interface [GrainInterfaceType("Orleans.Dashboard.Core.ISiloGrainProxy")] Orleans.Dashboard.Core.ISiloGrainProxy [Version(0)]
