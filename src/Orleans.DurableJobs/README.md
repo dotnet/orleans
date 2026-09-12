@@ -81,6 +81,10 @@ builder.UseOrleans(siloBuilder =>
             {
                 // Duration of each job shard (jobs are partitioned by time)
                 options.ShardDuration = TimeSpan.FromMinutes(5);
+
+                // Load eligible shards within this horizon and check at this interval
+                options.ShardLoadLookaheadPeriod = TimeSpan.FromMinutes(10);
+                options.ShardCheckInterval = TimeSpan.FromMinutes(5);
                 
                 // Maximum number of jobs that can execute concurrently on each silo
                 options.MaxConcurrentJobsPerSilo = 100;
@@ -100,6 +104,54 @@ builder.UseOrleans(siloBuilder =>
         });
 });
 ```
+
+## Shard discovery and lookahead
+
+Each silo discovers shards whose start time is within `DurableJobsOptions.ShardLoadLookaheadPeriod`
+of its current Durable Jobs time-provider clock. The default lookahead is ten minutes.
+A discovered shard starts processing once its start time enters `ShardActivationBufferPeriod`.
+`DurableJobsOptions.ShardCheckInterval` controls periodic discovery and writable-shard cleanup
+checks, with a default of five minutes. Membership changes also trigger checks.
+The lookahead accepts non-negative durations; zero selects shards whose start time is at or
+before the current time. The discovery horizon is capped at `DateTimeOffset.MaxValue`.
+The check interval accepts durations from 1 to 4294967294 milliseconds.
+
+Shard journals use names such as
+`jobs/shards/20260909T1200000000000Z-<unique-id>`. The fixed-width UTC start time
+precedes the unique suffix, so ordinal name order is shard-start-time order. Each sweep
+lists the raw `jobs/shards/` prefix with an inclusive `ListOptions.MaxId` bound covering the lookahead
+horizon. The range includes every earlier start time, including jobs overdue after a long
+outage. Future shard identities are filtered by the catalog before candidate metadata reads.
+
+Each periodic or membership check starts a fresh, locally scoped sweep. Discovery orders
+and deduplicates the selected identities, then reads current ownership metadata and attempts
+conditional claims oldest first. Assigned shards are delivered as they are opened, allowing
+execution to proceed while later candidates are evaluated. The claim budget limits new claims;
+locally owned shards remain eligible after that budget is exhausted.
+
+Catalog providers apply raw-prefix and range constraints using their storage capabilities.
+The timestamp representation also supports narrower day/hour prefixes and inclusive `MinId`
+and `MaxId` intervals for callers selecting a specific time window. Recovery starts at the
+shard namespace's beginning so that all overdue jobs remain eligible.
+Azure Table's default mapping uses indexed key ranges. Azure Blob and ordered general-purpose
+S3 listings can seek lower bounds and stop at upper bounds. S3 Express and Redis filter time
+bounds during their provider-defined traversal. Discovery orders the selected names itself
+to provide consistent oldest-first processing across providers. Storage listing work and request
+latency remain provider-dependent; candidate metadata work scales with the distinct identities
+returned for the due range.
+
+The sweep owns its enumeration and selected identity set until completion. Storage errors
+propagate to the runtime's error reporting, and a later check starts a fresh sweep. Shards
+already delivered to the local manager are tracked before cancellation is observed and
+continue through their execution lifecycle.
+Cancellation flows through listing, metadata, and journal operations. Shutdown cancels and
+awaits the active sweep, including enumeration disposal, then awaits running-shard cleanup
+and disposes cached shards which remained inactive.
+
+Shorter lookahead periods reduce early loading of recovered shards. Shorter check intervals
+increase sweep frequency and reduce the wait for newly inserted or newly eligible shards.
+The public `JobShardManager.AssignJobShardsAsync` method collects the same ordered discovery
+stream into its full-result list.
 
 ## Usage Examples
 

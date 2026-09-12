@@ -50,7 +50,34 @@ internal sealed class S3JournalStorageProvider : ILifecycleParticipant<ISiloLife
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var prefix = options?.Prefix ?? default;
+        var range = new JournalCatalogRange(options);
+        if (range.IsEmpty)
+        {
+            yield break;
+        }
+
+        var ordered = _options.UseOrderedListing;
+        var identityMapping = _options.UsesDefaultObjectKey;
+        var listingPrefix = range.ListingPrefix;
+        if (!identityMapping
+            && (string.IsNullOrWhiteSpace(listingPrefix)
+                || _options.GetObjectKeyPrefix is null && range.Prefix is null))
+        {
+            // A common prefix inferred from bounds can be whitespace, which cannot be represented
+            // as a JournalId for a custom mapper. Bounds alone also do not require a prefix mapper.
+            listingPrefix = null;
+        }
+
+        var objectKeyPrefix = _options.GetObjectKeyPrefixForCatalog(listingPrefix);
+        if (!ordered && objectKeyPrefix is not null)
+        {
+            var directoryEnd = objectKeyPrefix.LastIndexOf('/') + 1;
+            objectKeyPrefix = directoryEnd == 0 ? null : objectKeyPrefix[..directoryEnd];
+        }
+
+        var startAfter = ordered && identityMapping && range.LowerBound is { } lowerBound && System.Text.Ascii.IsValid(lowerBound)
+            ? lowerBound : null;
+        var maxObjectKey = ordered && identityMapping ? range.GetUpperBoundForSuffix("/wal") : null;
         var client = GetClient();
         var bucketName = GetBucketName();
         string? continuationToken = null;
@@ -61,6 +88,8 @@ internal sealed class S3JournalStorageProvider : ILifecycleParticipant<ISiloLife
                 new ListObjectsV2Request
                 {
                     BucketName = bucketName,
+                    Prefix = objectKeyPrefix,
+                    StartAfter = startAfter,
                     MaxKeys = 1000,
                     ContinuationToken = continuationToken,
                 },
@@ -70,7 +99,12 @@ internal sealed class S3JournalStorageProvider : ILifecycleParticipant<ISiloLife
             foreach (var item in response.S3Objects)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (TryGetJournalId(item.Key, prefix, out var id))
+                if (maxObjectKey is not null && string.CompareOrdinal(item.Key, maxObjectKey) > 0)
+                {
+                    yield break;
+                }
+
+                if (TryGetJournalId(item.Key, range, out var id))
                 {
                     yield return id;
                 }
@@ -83,11 +117,11 @@ internal sealed class S3JournalStorageProvider : ILifecycleParticipant<ISiloLife
         cancellationToken.ThrowIfCancellationRequested();
     }
 
-    private bool TryGetJournalId(string objectKey, JournalId prefix, out JournalId journalId)
+    private bool TryGetJournalId(string objectKey, JournalCatalogRange range, out JournalId journalId)
     {
         if (objectKey.EndsWith("/wal", StringComparison.Ordinal)
             && _options.TryParseJournalId(objectKey[..^"/wal".Length]) is { IsDefault: false } id
-            && prefix.IsPrefixOf(id))
+            && range.Contains(id.Value))
         {
             var journalObjectKey = _options.GetObjectKeyForJournal(id);
             var canonicalWalObjectKey = S3JournalStorageOptions.GetWalObjectKeyForJournal(id, journalObjectKey);

@@ -61,26 +61,42 @@ internal sealed class AzureBlobJournalStorageProvider : ILifecycleParticipant<IS
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var prefix = options?.Prefix ?? default;
-        var container = GetDefaultContainerClient();
+        var range = new JournalCatalogRange(options);
+        if (range.IsEmpty)
+        {
+            yield break;
+        }
 
+        var container = GetDefaultContainerClient();
+        var maxBlobName = range.GetUpperBoundForSuffix("/wal");
+        var startFrom = range.LowerBound is { } lowerBound && System.Text.Ascii.IsValid(lowerBound) ? lowerBound : null;
         await foreach (var page in container.GetBlobsAsync(
-            traits: BlobTraits.None,
-            states: BlobStates.None,
-            prefix: prefix.IsDefault ? null : prefix.Value,
-            cancellationToken: cancellationToken).AsPages(pageSizeHint: 5000))
+            new GetBlobsOptions
+            {
+                Prefix = range.ListingPrefix,
+                StartFrom = startFrom,
+            },
+            cancellationToken).AsPages(pageSizeHint: 5000))
         {
             cancellationToken.ThrowIfCancellationRequested();
             foreach (var item in page.Values)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                // Azure's flat List Blobs API returns names in lexical order. Every matching WAL
+                // is at or below this raw-name bound, including the WAL for MaxId itself.
+                if (maxBlobName is not null && string.CompareOrdinal(item.Name, maxBlobName) > 0)
+                {
+                    yield break;
+                }
+
                 if (item.Properties.BlobType is { } blobType && blobType != BlobType.Append
                     || !item.Name.EndsWith("/wal", StringComparison.Ordinal))
                 {
                     continue;
                 }
 
-                if (TryParseJournalId(item.Name[..^"/wal".Length], out var journalId) && prefix.IsPrefixOf(journalId))
+                if (TryParseJournalId(item.Name[..^"/wal".Length], out var journalId)
+                    && range.Contains(journalId.Value))
                 {
                     yield return journalId;
                 }

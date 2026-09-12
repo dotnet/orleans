@@ -511,6 +511,10 @@ namespace Orleans.Journaling
 
     public sealed partial class ListOptions
     {
+        public JournalId MaxId { get { throw null; } set { } }
+
+        public JournalId MinId { get { throw null; } set { } }
+
         public JournalId Prefix { get { throw null; } set { } }
     }
 

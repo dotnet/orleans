@@ -606,10 +606,20 @@ internal sealed class RedisJournalStorage : IJournalStorage
         return $"{baseKey}:metadata";
     }
 
-    internal static RedisValue GetMetadataKeyPattern(string keyPrefix)
-        => $"{EscapeRedisPattern(keyPrefix)}:journal:*:metadata";
+    internal static RedisValue GetMetadataKeyPattern(string keyPrefix, string? journalIdPrefix = null)
+    {
+        // An ordinal prefix can end halfway through a surrogate pair. Broaden the scan in that
+        // case since escaping the incomplete pair would not match the encoded complete character.
+        if (journalIdPrefix is { Length: > 0 } && char.IsHighSurrogate(journalIdPrefix[^1]))
+        {
+            journalIdPrefix = journalIdPrefix[..^1];
+        }
 
-    private static RedisKey GetDataKey(string keyPrefix, string keyName)
+        var encodedPrefix = Uri.EscapeDataString(journalIdPrefix ?? string.Empty);
+        return $"{EscapeRedisPattern(keyPrefix)}:journal:{{*}}:{EscapeRedisPattern(encodedPrefix)}*:metadata";
+    }
+
+    internal static RedisKey GetDataKey(string keyPrefix, string keyName)
     {
         var baseKey = GetJournalBaseKey(keyPrefix, keyName);
         return $"{baseKey}:data";
@@ -618,7 +628,30 @@ internal sealed class RedisJournalStorage : IJournalStorage
     private static string GetJournalBaseKey(string keyPrefix, string keyName)
     {
         var hashTag = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(keyName)));
-        return $"{keyPrefix}:journal:{{{hashTag}}}";
+        return $"{keyPrefix}:journal:{{{hashTag}}}:{Uri.EscapeDataString(keyName)}";
+    }
+
+    internal static JournalId GetJournalIdFromMetadataKey(string keyPrefix, RedisKey metadataKey)
+    {
+        var key = metadataKey.ToString();
+        var prefix = $"{keyPrefix}:journal:{{";
+        const string suffix = ":metadata";
+        const int hashTagLength = 64;
+        var keyNameOffset = prefix.Length + hashTagLength + 2;
+        if (key.StartsWith(prefix, StringComparison.Ordinal)
+            && key.EndsWith(suffix, StringComparison.Ordinal)
+            && key.Length > keyNameOffset + suffix.Length
+            && key.AsSpan(prefix.Length + hashTagLength, 2).SequenceEqual("}:"))
+        {
+            var keyName = Uri.UnescapeDataString(key[keyNameOffset..^suffix.Length]);
+            if (TryParseJournalId(keyName, out var journalId)
+                && GetMetadataKey(keyPrefix, keyName) == metadataKey)
+            {
+                return journalId;
+            }
+        }
+
+        throw new InvalidOperationException($"Redis journal metadata key '{metadataKey}' is malformed.");
     }
 
     private static string EscapeRedisPattern(string value)

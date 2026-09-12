@@ -60,13 +60,19 @@ internal sealed class RedisJournalStorageProvider : IJournalStorageProvider, IJo
         ListOptions? options = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        var prefix = options?.Prefix ?? default;
         cancellationToken.ThrowIfCancellationRequested();
+        var range = new JournalCatalogRange(options);
+        if (range.IsEmpty)
+        {
+            yield break;
+        }
+
+        var identityKeyMapping = _options.UsesDefaultKeyName;
         var connection = GetConnection();
         var database = GetDatabase();
         var journalIds = new HashSet<JournalId>();
-        var batch = new RedisKey[JournalIdReadBatchSize];
-        var pattern = RedisJournalStorage.GetMetadataKeyPattern(_keyPrefix);
+        var batch = identityKeyMapping ? [] : new RedisKey[JournalIdReadBatchSize];
+        var pattern = RedisJournalStorage.GetMetadataKeyPattern(_keyPrefix, identityKeyMapping ? range.ListingPrefix : null);
         var scannedServer = false;
         foreach (var endpoint in connection.GetEndPoints())
         {
@@ -88,6 +94,27 @@ internal sealed class RedisJournalStorageProvider : IJournalStorageProvider, IJo
                 database.Database,
                 pattern,
                 pageSize: ScanPageSize).GetAsyncEnumerator(cancellationToken);
+            if (identityKeyMapping)
+            {
+                while (true)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (!await metadataKeys.MoveNextAsync().ConfigureAwait(false))
+                    {
+                        break;
+                    }
+
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var journalId = RedisJournalStorage.GetJournalIdFromMetadataKey(_keyPrefix, metadataKeys.Current);
+                    if (range.Contains(journalId.Value) && journalIds.Add(journalId))
+                    {
+                        yield return journalId;
+                    }
+                }
+
+                continue;
+            }
+
             while (true)
             {
                 var count = 0;
@@ -152,7 +179,7 @@ internal sealed class RedisJournalStorageProvider : IJournalStorageProvider, IJo
                             $"Redis journal metadata '{batch[i]}' contains an invalid '{RedisJournalStorage.JournalIdMetadataKey}' value.");
                     }
 
-                    if (prefix.IsPrefixOf(journalId) && journalIds.Add(journalId))
+                    if (range.Contains(journalId.Value) && journalIds.Add(journalId))
                     {
                         cancellationToken.ThrowIfCancellationRequested();
                         yield return journalId;
