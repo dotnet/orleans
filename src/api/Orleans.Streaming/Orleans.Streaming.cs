@@ -105,7 +105,7 @@ namespace Orleans.Configuration
         public int MaxPendingReaders { get { throw null; } set { } }
 
         public int ReadBatchSize { get { throw null; } set { } }
-        public System.TimeSpan TemporaryTailRetryDelay { get { throw null; } set { } }
+
         public System.TimeSpan TemporaryTailRetryDelay { get { throw null; } set { } }
     }
 
