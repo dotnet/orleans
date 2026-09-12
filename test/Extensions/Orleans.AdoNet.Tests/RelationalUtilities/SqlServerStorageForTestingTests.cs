@@ -21,12 +21,14 @@ public class SqlServerStorageForTestingTests
     }
 
     [Theory]
-    [InlineData(924, true)]
-    [InlineData(1205, false)]
-    [InlineData(18456, false)]
-    public void ClassifiesRetryableDatabaseSetupErrors(int errorNumber, bool expected)
+    [InlineData(924, false, true)]
+    [InlineData(924, true, false)]
+    [InlineData(50924, true, true)]
+    [InlineData(1205, false, false)]
+    [InlineData(18456, false, false)]
+    public void ClassifiesRetryableDatabaseSetupErrors(int errorNumber, bool setupCommandStarted, bool expected)
     {
-        Assert.Equal(expected, SqlServerStorageForTesting.IsRetryableDatabaseSetupError(errorNumber));
+        Assert.Equal(expected, SqlServerStorageForTesting.IsRetryableDatabaseSetupError(errorNumber, setupCommandStarted));
     }
 
     [Fact]
@@ -66,17 +68,28 @@ public class SqlServerStorageForTestingTests
         await using var competingConnection = new SqlConnection(storage.CurrentConnectionString);
         await competingConnection.OpenAsync(cancellationToken);
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        var reconnectingClients = Enumerable.Range(0, 4)
-            .Select(_ => ReconnectUntilCanceledAsync(storage.CurrentConnectionString, cancellation.Token))
+        var reconnectAttempts = Enumerable.Range(0, 4)
+            .Select(_ => new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously))
+            .ToArray();
+        var reconnectingClients = reconnectAttempts
+            .Select(attempt => ReconnectAndHoldUntilCanceledAsync(
+                storage.CurrentConnectionString,
+                attempt,
+                cancellation.Token))
             .ToArray();
 
         try
         {
+            await Task.WhenAll(reconnectAttempts.Select(attempt => attempt.Task)).WaitAsync(cancellationToken);
             await storage.ExecuteSetupScriptBatchesAsync(
                 [
                     $"""
                     ALTER DATABASE [{TestDatabaseName}] SET READ_COMMITTED_SNAPSHOT OFF;
                     ALTER DATABASE [{TestDatabaseName}] SET READ_COMMITTED_SNAPSHOT ON;
+                    """,
+                    """
+                    IF OBJECT_ID(N'[SetupOwnershipBoundary]', 'U') IS NULL
+                    CREATE TABLE SetupOwnershipBoundary(Id INT NOT NULL);
                     """
                 ],
                 TestDatabaseName,
@@ -90,18 +103,27 @@ public class SqlServerStorageForTestingTests
 
         var databaseState = await storage.Storage.ReadAsync(
             """
-            SELECT user_access_desc, is_read_committed_snapshot_on
+            SELECT user_access_desc, is_read_committed_snapshot_on, OBJECT_ID(N'[SetupOwnershipBoundary]', 'U')
             FROM sys.databases
             WHERE name = @DatabaseName
             """,
             command => command.AddParameter("DatabaseName", TestDatabaseName),
-            (record, _, _) => Task.FromResult((record.GetString(0), record.GetBoolean(1))),
+            (record, _, _) => Task.FromResult((
+                record.GetString(0),
+                record.GetBoolean(1),
+                record.IsDBNull(2) ? (int?)null : record.GetInt32(2))),
             cancellationToken: cancellationToken);
 
-        Assert.Equal(("MULTI_USER", true), Assert.Single(databaseState));
+        var state = Assert.Single(databaseState);
+        Assert.Equal("MULTI_USER", state.Item1);
+        Assert.True(state.Item2);
+        Assert.NotNull(state.Item3);
     }
 
-    private static async Task ReconnectUntilCanceledAsync(string connectionString, CancellationToken cancellationToken)
+    private static async Task ReconnectAndHoldUntilCanceledAsync(
+        string connectionString,
+        TaskCompletionSource reconnectAttempt,
+        CancellationToken cancellationToken)
     {
         while (!cancellationToken.IsCancellationRequested)
         {
@@ -109,10 +131,14 @@ public class SqlServerStorageForTestingTests
             {
                 await using var connection = new SqlConnection(connectionString);
                 await connection.OpenAsync(cancellationToken);
+                reconnectAttempt.TrySetResult();
                 await using var command = connection.CreateCommand();
                 command.CommandText = "SELECT 1";
-                _ = await command.ExecuteScalarAsync(cancellationToken);
-                await Task.Delay(TimeSpan.FromMilliseconds(10), cancellationToken);
+                while (!cancellationToken.IsCancellationRequested)
+                {
+                    _ = await command.ExecuteScalarAsync(cancellationToken);
+                    await Task.Delay(TimeSpan.FromMilliseconds(10), cancellationToken);
+                }
             }
             catch (SqlException)
             {
