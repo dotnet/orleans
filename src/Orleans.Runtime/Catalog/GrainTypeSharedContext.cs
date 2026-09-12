@@ -75,6 +75,7 @@ public sealed class GrainTypeSharedContext
         Runtime = grainRuntime;
         MigrationManager = _serviceProvider.GetService<IActivationMigrationManager>();
         CatalogInstruments = serviceProvider.GetRequiredService<CatalogInstruments>();
+        GrainTypeMetrics = CatalogInstruments.GetGrainTypeMetrics(grainType);
         GrainInstruments = serviceProvider.GetRequiredService<GrainInstruments>();
         MessagingProcessingInstruments = serviceProvider.GetRequiredService<MessagingProcessingInstruments>();
 
@@ -90,6 +91,8 @@ public sealed class GrainTypeSharedContext
     /// </summary>
     public string GrainTypeName { get; }
 
+    internal GrainTypeMetrics GrainTypeMetrics { get; }
+    internal string GrainTypeMetricName => GrainTypeMetrics.GrainTypeTagValue;
     internal CatalogInstruments CatalogInstruments { get; }
     internal GrainInstruments GrainInstruments { get; }
     internal MessagingProcessingInstruments MessagingProcessingInstruments { get; }
@@ -249,7 +252,7 @@ public sealed class GrainTypeSharedContext
     /// <param name="grainContext">The grain activation.</param>
     public void OnCreateActivation(IGrainContext grainContext)
     {
-        GrainInstruments.IncrementGrainCounts(GrainTypeName);
+        GrainInstruments.IncrementGrainCounts(GrainTypeMetricName, GrainTypeName);
     }
 
     /// <summary>
@@ -258,7 +261,7 @@ public sealed class GrainTypeSharedContext
     /// <param name="grainContext">The grain activation.</param>
     public void OnDestroyActivation(IGrainContext grainContext)
     {
-        GrainInstruments.DecrementGrainCounts(GrainTypeName);
+        GrainInstruments.DecrementGrainCounts(GrainTypeMetricName, GrainTypeName);
     }
 }
 

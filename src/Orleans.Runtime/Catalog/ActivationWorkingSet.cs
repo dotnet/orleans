@@ -17,8 +17,9 @@ namespace Orleans.Runtime
     /// </summary>
     internal sealed partial class ActivationWorkingSet : IActivationWorkingSet, ILifecycleParticipant<ISiloLifecycle>
     {
-        private class MemberState
+        private class MemberState(GrainTypeMetrics metrics)
         {
+            public GrainTypeMetrics Metrics { get; } = metrics;
             public bool IsIdle { get; set; }
         }
 
@@ -26,6 +27,7 @@ namespace Orleans.Runtime
         private readonly ILogger _logger;
         private readonly IAsyncTimer _scanPeriodTimer;
         private readonly List<IActivationWorkingSetObserver> _observers;
+        private readonly CatalogInstruments _catalogInstruments;
 
         private int _activeCount;
         private Task? _runTask;
@@ -40,7 +42,8 @@ namespace Orleans.Runtime
             _logger = logger;
             _scanPeriodTimer = asyncTimerFactory.Create(TimeSpan.FromMilliseconds(5_000), nameof(ActivationWorkingSet) + "." + nameof(MonitorWorkingSet), timeProvider);
             _observers = observers.ToList();
-            catalogInstruments.RegisterActivationWorkingSetObserve(() => Count);
+            _catalogInstruments = catalogInstruments;
+            catalogInstruments.RegisterActivationWorkingSetObserve();
         }
 
         public int Count => _activeCount;
@@ -61,9 +64,11 @@ namespace Orleans.Runtime
         public void OnActivated(IActivationWorkingSetMember member)
         {
             Debug.Assert(member is not ActivationData activation || activation.IsValid);
-            if (_members.TryAdd(member, new MemberState()))
+            var state = CreateMemberState(member);
+            if (_members.TryAdd(member, state))
             {
                 Interlocked.Increment(ref _activeCount);
+                state.Metrics.OnWorkingSetAdded();
                 foreach (var observer in _observers)
                 {
                     observer.OnAdded(member);
@@ -81,9 +86,14 @@ namespace Orleans.Runtime
             {
                 state.IsIdle = false;
             }
-            else if (_members.TryAdd(member, new()))
+            else
             {
-                Interlocked.Increment(ref _activeCount);
+                state = CreateMemberState(member);
+                if (_members.TryAdd(member, state))
+                {
+                    Interlocked.Increment(ref _activeCount);
+                    state.Metrics.OnWorkingSetAdded();
+                }
             }
 
             foreach (var observer in _observers)
@@ -94,15 +104,23 @@ namespace Orleans.Runtime
 
         public void OnEvicted(IActivationWorkingSetMember member)
         {
-            if (_members.TryRemove(member, out _))
+            if (_members.TryRemove(member, out var state))
             {
                 Interlocked.Decrement(ref _activeCount);
+                state.Metrics.OnWorkingSetRemoved();
                 foreach (var observer in _observers)
                 {
                     observer.OnEvicted(member);
                 }
             }
         }
+
+        private MemberState CreateMemberState(IActivationWorkingSetMember member) => new(member switch
+        {
+            ActivationData activation => activation.Shared.GrainTypeMetrics,
+            IGrainContext context => _catalogInstruments.GetGrainTypeMetrics(context.GrainId.Type),
+            _ => _catalogInstruments.GetGrainTypeMetrics(default)
+        });
 
         public void OnDeactivating(IActivationWorkingSetMember member)
         {

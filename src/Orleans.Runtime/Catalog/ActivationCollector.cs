@@ -822,7 +822,7 @@ namespace Orleans.Runtime
             TimeSpan ageLimit)
         {
             LogDeactivateActivationsFromCollector(list.Count);
-            _catalogInstruments.ActivationShutdownViaCollection();
+            _catalogInstruments.ActivationShutdownViaCollection(GrainTypeMetrics.UnknownGrainType);
 
             var options = new ParallelOptions
             {

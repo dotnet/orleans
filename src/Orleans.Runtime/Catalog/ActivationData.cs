@@ -976,9 +976,12 @@ internal sealed partial class ActivationData :
 
     public async ValueTask DisposeAsync()
     {
-        _extras ??= new();
-        if (_extras.IsDisposing) return;
-        _extras.IsDisposing = true;
+        lock (_lock)
+        {
+            _extras ??= new();
+            if (_extras.IsDisposing) return;
+            _extras.IsDisposing = true;
+        }
 
         CancelPendingOperations();
 
@@ -992,26 +995,37 @@ internal sealed partial class ActivationData :
 
         try
         {
-            var activator = _shared.GetComponent(typeof(IGrainActivator)) as IGrainActivator;
-            if (activator != null && GrainInstance is { } instance)
+            try
             {
-                await activator.DisposeInstance(this, instance);
+                var activator = _shared.GetComponent(typeof(IGrainActivator)) as IGrainActivator;
+                if (activator != null && GrainInstance is { } instance)
+                {
+                    await activator.DisposeInstance(this, instance);
+                }
+            }
+            catch (ObjectDisposedException)
+            {
             }
         }
-        catch (ObjectDisposedException)
+        finally
         {
-        }
+            try
+            {
+                if (GrainInstance is not null)
+                {
+                    _shared.OnDestroyActivation(this);
+                }
 
-        try
-        {
-            _shared.OnDestroyActivation(this);
-            GetComponent<IActivationLifecycleObserver>()?.OnDestroyActivation(this);
+                GetComponent<IActivationLifecycleObserver>()?.OnDestroyActivation(this);
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+            finally
+            {
+                await DisposeAsync(_serviceScope);
+            }
         }
-        catch (ObjectDisposedException)
-        {
-        }
-
-        await DisposeAsync(_serviceScope);
     }
 
     private static async ValueTask DisposeAsync(object obj)
@@ -1734,7 +1748,7 @@ internal sealed partial class ActivationData :
 
     public void Activate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken)
     {
-        var metrics = CatalogInstruments.ActivationMetricTracker.Start(_shared.CatalogInstruments, IsUsingGrainDirectory);
+        var metrics = CatalogInstruments.ActivationMetricTracker.Start(_shared.CatalogInstruments, IsUsingGrainDirectory, _shared.GrainTypeMetricName);
         var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         cts.CancelAfter(_shared.InternalRuntime.CollectionOptions.Value.ActivationTimeout);
 
@@ -1822,7 +1836,7 @@ internal sealed partial class ActivationData :
                                 }
 
                                 success = false;
-                                _shared.CatalogInstruments.OnActivationConcurrentRegistrationAttempt();
+                                _shared.CatalogInstruments.OnActivationConcurrentRegistrationAttempt(_shared.GrainTypeMetricName);
                                 LogDuplicateActivation(
                                     _shared.Logger,
                                     Address,
@@ -1859,8 +1873,9 @@ internal sealed partial class ActivationData :
                 }
                 if (!success)
                 {
-                    Deactivate(new(DeactivationReasonCode.DirectoryFailure, registrationException, "Failed to register activation in grain directory."), cancellationToken);
+                    // Deactivation cancels the activation token, so capture the directory outcome first.
                     activationMetrics.DirectoryRegistrationFailed(registrationException, cancellationToken.IsCancellationRequested);
+                    Deactivate(new(DeactivationReasonCode.DirectoryFailure, registrationException, "Failed to register activation in grain directory."), cancellationToken);
 
                     // Activation failed.
                     if (registrationException is not null)
@@ -1924,7 +1939,7 @@ internal sealed partial class ActivationData :
                     {
                         if (cancellationToken.IsCancellationRequested && exception is ObjectDisposedException or OperationCanceledException)
                         {
-                            _shared.CatalogInstruments.OnActivationFailedToActivate();
+                            _shared.CatalogInstruments.OnActivationFailedToActivate(_shared.GrainTypeMetricName);
 
                             // This captures the case where user code in OnActivateAsync doesn't use the passed cancellation token
                             // and makes a call that tries to resolve the scoped IServiceProvider or other type that has been disposed because of cancellation,
@@ -1978,7 +1993,7 @@ internal sealed partial class ActivationData :
             }
             catch (Exception exception)
             {
-                _shared.CatalogInstruments.OnActivationFailedToActivate();
+                _shared.CatalogInstruments.OnActivationFailedToActivate(_shared.GrainTypeMetricName);
                 activationMetrics.Failed(cancellationToken.IsCancellationRequested);
                 var sourceException = (exception as OrleansLifecycleCanceledException)?.InnerException ?? exception;
                 LogErrorActivatingGrain(_shared.Logger, sourceException, this);
@@ -2038,7 +2053,7 @@ internal sealed partial class ActivationData :
     {
         using var _ = deactivateCommand.Activity;
 
-        var deactivationMetrics = CatalogInstruments.DeactivationMetricTracker.Start(_shared.CatalogInstruments);
+        var deactivationMetrics = CatalogInstruments.DeactivationMetricTracker.Start(_shared.CatalogInstruments, _shared.GrainTypeMetricName);
         var migrating = false;
         var encounteredError = false;
         try
@@ -2142,22 +2157,22 @@ internal sealed partial class ActivationData :
             if (IsStuckDeactivating)
             {
                 deactivationMetrics = deactivationMetrics.DeactivateStuckActivation();
-                _shared.CatalogInstruments.ActivationShutdownViaDeactivateStuckActivation();
+                _shared.CatalogInstruments.ActivationShutdownViaDeactivateStuckActivation(_shared.GrainTypeMetricName);
             }
             else if (migrating)
             {
                 deactivationMetrics = deactivationMetrics.Migration();
-                _shared.CatalogInstruments.ActivationShutdownViaMigration();
+                _shared.CatalogInstruments.ActivationShutdownViaMigration(_shared.GrainTypeMetricName);
             }
             else if (_isInWorkingSet)
             {
                 deactivationMetrics = deactivationMetrics.DeactivateOnIdle();
-                _shared.CatalogInstruments.ActivationShutdownViaDeactivateOnIdle();
+                _shared.CatalogInstruments.ActivationShutdownViaDeactivateOnIdle(_shared.GrainTypeMetricName);
             }
             else
             {
                 deactivationMetrics = deactivationMetrics.Collection();
-                _shared.CatalogInstruments.ActivationShutdownViaCollection();
+                _shared.CatalogInstruments.ActivationShutdownViaCollection(_shared.GrainTypeMetricName);
             }
 
             UnregisterMessageTarget();
