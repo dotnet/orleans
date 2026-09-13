@@ -586,6 +586,7 @@ namespace Orleans.Runtime.Messaging
                     Message.RejectionTypes.Transient,
                     reason,
                     exception);
+                rejection.SendingSilo = _siloAddress;
                 rejection.RequestContextData = null;
                 SendMessage(rejection);
                 return;

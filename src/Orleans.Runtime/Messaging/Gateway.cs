@@ -540,13 +540,13 @@ namespace Orleans.Runtime.Messaging
                 {
                     completionResult = _pendingRequests.TryComplete(message);
                     requestTrackingStopped = UnregisterRequestTrackingIfEmptyCore();
+                    if (completionResult != GatewayInFlightRequestTracker.CompletionResult.Deferred)
+                    {
+                        SendSyntheticResponse(message);
+                    }
                 }
 
                 EmitRequestTrackingStopped(requestTrackingStopped);
-                if (completionResult != GatewayInFlightRequestTracker.CompletionResult.Deferred)
-                {
-                    SendSyntheticResponse(message);
-                }
             }
 
             private void UpdateForwardedRequest(
@@ -573,14 +573,14 @@ namespace Orleans.Runtime.Messaging
                     }
 
                     requestTrackingStopped = UnregisterRequestTrackingIfEmptyCore();
+                    if (completedResponse is not null)
+                    {
+                        SendSyntheticResponse(completedResponse);
+                    }
                 }
 
                 EmitRequestTrackingStopped(requestTrackingStopped);
-                if (completedResponse is not null)
-                {
-                    SendSyntheticResponse(completedResponse);
-                }
-                else if (requestToReject is not null)
+                if (requestToReject is not null)
                 {
                     RejectClaimedRequest(requestToReject, requestToReject.TargetSilo!);
                 }
