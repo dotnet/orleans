@@ -129,11 +129,36 @@ public class GatewayInFlightRequestTrackerTests
 
         var completion = tracker.TryComplete(CreateResponse(original, Message.ResponseTypes.Success));
 
-        Assert.Equal(GatewayInFlightRequestTracker.CompletionResult.WrongDestination, completion);
+        Assert.Equal(GatewayInFlightRequestTracker.CompletionResult.Deferred, completion);
         Assert.Equal(1, tracker.Count);
         Assert.Equal(
             GatewayInFlightRequestTracker.CompletionResult.Completed,
             tracker.TryComplete(CreateResponse(retry, Message.ResponseTypes.Success)));
+        Assert.Equal(0, tracker.Count);
+    }
+
+    [Fact]
+    public void ForwardedResponseBeforeUpdateCompletesWhenUpdateArrives()
+    {
+        var tracker = CreateTracker();
+        var request = CreateMessage(1, Message.Directions.Request, Silo1);
+        Assert.True(tracker.Track(request));
+        var response = CreateResponse(request, Message.ResponseTypes.Success);
+        response.SendingSilo = Silo2;
+
+        Assert.Equal(GatewayInFlightRequestTracker.CompletionResult.Deferred, tracker.TryComplete(response));
+        Assert.Equal(1, tracker.Count);
+
+        Assert.True(tracker.TryUpdateDestination(
+            request.Id,
+            Silo1,
+            Silo2,
+            forwardCount: 1,
+            out var updatedTarget,
+            out var completedResponse));
+
+        Assert.Equal(Silo2, updatedTarget);
+        Assert.Same(response, completedResponse);
         Assert.Equal(0, tracker.Count);
     }
 
@@ -162,9 +187,16 @@ public class GatewayInFlightRequestTrackerTests
         var request = CreateMessage(1, Message.Directions.Request, Silo1);
         Assert.True(tracker.Track(request));
 
-        Assert.True(tracker.TryUpdateDestination(request.Id, Silo1, Silo2, forwardCount: 1, out var updatedTarget));
+        Assert.True(tracker.TryUpdateDestination(
+            request.Id,
+            Silo1,
+            Silo2,
+            forwardCount: 1,
+            out var updatedTarget,
+            out var completedResponse));
 
         Assert.Equal(Silo2, updatedTarget);
+        Assert.Null(completedResponse);
         Assert.Null(tracker.RemoveForSilo(Silo1));
         var updated = Assert.Single(tracker.RemoveForSilo(Silo2)!);
         Assert.Equal(1, updated.ForwardCount);
@@ -179,7 +211,7 @@ public class GatewayInFlightRequestTrackerTests
         request.ForwardCount = 2;
         Assert.True(tracker.Track(request));
 
-        Assert.False(tracker.TryUpdateDestination(request.Id, Silo1, Silo2, forwardCount: 1, out _));
+        Assert.False(tracker.TryUpdateDestination(request.Id, Silo1, Silo2, forwardCount: 1, out _, out _));
 
         Assert.Null(tracker.RemoveForSilo(Silo2));
         var current = Assert.Single(tracker.RemoveForSilo(Silo1)!);
@@ -195,10 +227,17 @@ public class GatewayInFlightRequestTrackerTests
         var request = CreateMessage(1, Message.Directions.Request, Silo1);
         Assert.True(tracker.Track(request));
 
-        Assert.False(tracker.TryUpdateDestination(request.Id, Silo2, silo3, forwardCount: 2, out _));
-        Assert.True(tracker.TryUpdateDestination(request.Id, Silo1, Silo2, forwardCount: 1, out var updatedTarget));
+        Assert.False(tracker.TryUpdateDestination(request.Id, Silo2, silo3, forwardCount: 2, out _, out _));
+        Assert.True(tracker.TryUpdateDestination(
+            request.Id,
+            Silo1,
+            Silo2,
+            forwardCount: 1,
+            out var updatedTarget,
+            out var completedResponse));
 
         Assert.Equal(silo3, updatedTarget);
+        Assert.Null(completedResponse);
         Assert.Null(tracker.RemoveForSilo(Silo1));
         Assert.Null(tracker.RemoveForSilo(Silo2));
         var updated = Assert.Single(tracker.RemoveForSilo(silo3)!);
@@ -214,7 +253,7 @@ public class GatewayInFlightRequestTrackerTests
         Assert.True(tracker.Track(original));
         Assert.True(tracker.Track(retry));
 
-        Assert.False(tracker.TryUpdateDestination(original.Id, Silo1, Silo2, forwardCount: 1, out _));
+        Assert.False(tracker.TryUpdateDestination(original.Id, Silo1, Silo2, forwardCount: 1, out _, out _));
 
         var current = Assert.Single(tracker.RemoveForSilo(Silo2)!);
         Assert.Equal(retry.Id, current.Id);
