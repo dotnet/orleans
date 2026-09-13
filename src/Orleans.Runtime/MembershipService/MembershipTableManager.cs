@@ -156,7 +156,7 @@ namespace Orleans.Runtime.MembershipService
                     // Shared reads remain available during shutdown; disposal ends their lifetime.
                     pending = this.pendingRefresh = this.RefreshInternal(
                         requireCleanup: false,
-                        requireFresh ? _shutdownCts.Token : _lifetimeCts.Token);
+                        _lifetimeCts.Token);
                     pending.Ignore();
                 }
 

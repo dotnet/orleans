@@ -1564,7 +1564,7 @@ namespace NonSilo.Tests.Membership
         }
 
         [Fact]
-        public async Task MembershipTableManager_FreshTargetRefreshStopsOnShutdown()
+        public async Task MembershipTableManager_FreshTargetRefreshStopsOnShutdownWithoutCancellingSharedRefresh()
         {
             var cancellationToken = TestContext.Current.CancellationToken;
             var innerMembershipTable = new InMemoryMembershipTable();
@@ -1582,7 +1582,7 @@ namespace NonSilo.Tests.Membership
             var readCount = 0;
             membershipTable.ReadAllOverride = token =>
             {
-                if (Interlocked.Increment(ref readCount) == 1)
+                if (Interlocked.Increment(ref readCount) <= 2)
                 {
                     return innerMembershipTable.ReadAllAsync(token);
                 }
@@ -1591,21 +1591,25 @@ namespace NonSilo.Tests.Membership
                 return blockedRead.Task;
             };
 
-            var refresh = manager.Refresh(
+            var freshRefresh = manager.Refresh(
                 targetVersion: new MembershipVersion(long.MaxValue),
                 cancellationToken: CancellationToken.None,
                 requireFresh: true);
             await blockedReadStarted.Task.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
+            var sharedRefresh = manager.Refresh(cancellationToken: cancellationToken);
 
             try
             {
                 await lifecycle.OnStop(cancellationToken);
-                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => refresh);
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => freshRefresh);
+                Assert.False(sharedRefresh.IsCompleted);
             }
             finally
             {
                 blockedRead.TrySetResult(blockedReadResult);
             }
+
+            await sharedRefresh.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
         }
 
         private static SiloAddress Silo(string value) => SiloAddress.FromParsableString(value);
