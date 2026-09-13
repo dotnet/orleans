@@ -687,7 +687,7 @@ internal sealed partial class DisseminationProtocol
             skip = 0;
         }
 
-    Complete:
+Complete:
         var members = _membership.CurrentSnapshots.AllMembers;
         lock (_receivedBatchCursorLock)
         {
