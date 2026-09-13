@@ -534,15 +534,19 @@ namespace Orleans.Runtime.Messaging
                     return;
                 }
 
+                GatewayInFlightRequestTracker.CompletionResult completionResult;
                 bool requestTrackingStopped;
                 lock (_requestLock)
                 {
-                    _pendingRequests.TryComplete(message);
+                    completionResult = _pendingRequests.TryComplete(message);
                     requestTrackingStopped = UnregisterRequestTrackingIfEmptyCore();
                 }
 
                 EmitRequestTrackingStopped(requestTrackingStopped);
-                SendSyntheticResponse(message);
+                if (completionResult != GatewayInFlightRequestTracker.CompletionResult.WrongDestination)
+                {
+                    SendSyntheticResponse(message);
+                }
             }
 
             private void UpdateForwardedRequest(
