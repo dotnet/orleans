@@ -1097,7 +1097,7 @@ Complete:
                 result = await applicationTask.WaitAsync(applicationCancellation.Token);
             }
 
-            applicationCancellation.Token.ThrowIfCancellationRequested();
+            cancellationToken.ThrowIfCancellationRequested();
         }
         catch (OperationCanceledException) when (
             lifetimeCancellation.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
@@ -1321,7 +1321,8 @@ Complete:
             return false;
         }
 
-        // Publishing is safe only if the namespace can materialize a complete repair for an unknown peer.
+        // Validate the complete repair chain for an unknown peer. Individual values must fit a batch,
+        // while the chain can be delivered across multiple acknowledged batches.
         var request = new DisseminationRepairRequest(
             key,
             fromVersion: null,
