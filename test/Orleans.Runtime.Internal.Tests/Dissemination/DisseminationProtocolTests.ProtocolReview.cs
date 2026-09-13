@@ -221,8 +221,9 @@ public partial class DisseminationProtocolTests
             if (cancelCaller)
             {
                 await caller.CancelAsync();
-                await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(
                     () => round.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+                Assert.Equal(caller.Token, exception.CancellationToken);
             }
             else
             {

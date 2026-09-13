@@ -7398,7 +7398,7 @@ public partial class DisseminationProtocolTests
 
             Assert.True(cancellation.IsCancellationRequested);
             Assert.True(applyCancellation.IsCancellationRequested);
-            Assert.Equal(applyCancellation, exception.CancellationToken);
+            Assert.Equal(cancellation.Token, exception.CancellationToken);
             Assert.Equal([cancelingKey], ns.ApplyAttempts);
             Assert.Equal(0, ns.GetVersion(laterKey));
         }
