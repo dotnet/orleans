@@ -30,6 +30,14 @@ function Invoke-TestCommand {
 function Test-IsUninitializedCoordinatorFailure {
     param([string[]] $Messages)
 
+    $text = [string]::Join([Environment]::NewLine, $Messages)
+    if (-not $text.Contains(
+        'Unhandled exception: One or more errors occurred. (Handle is not initialized.)',
+        [StringComparison]::Ordinal
+    )) {
+        return $false
+    }
+
     if (Test-Path -LiteralPath $ResultDirectory) {
         $resultFile = Get-ChildItem -LiteralPath $ResultDirectory -Recurse -File -Filter $ResultFilePattern -ErrorAction SilentlyContinue |
             Select-Object -First 1
@@ -38,11 +46,7 @@ function Test-IsUninitializedCoordinatorFailure {
         }
     }
 
-    $text = [string]::Join([Environment]::NewLine, $Messages)
-    return $text.Contains(
-        'Unhandled exception: One or more errors occurred. (Handle is not initialized.)',
-        [StringComparison]::Ordinal
-    )
+    return $true
 }
 
 $result = Invoke-TestCommand

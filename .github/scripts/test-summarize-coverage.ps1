@@ -864,6 +864,10 @@ exit 0
             $dotnetTestAction `
             '(?ms)^  - name: Test\r?\n(?:(?!^  - name: ).)*?invoke-test\.ps1 -ResultFilePattern ''test_results_\$\{\{ inputs\.result-id \}\}_\*\.trx'' -Command \$command' `
             'Ordinary test runs must use the coordinator retry wrapper.'
+        Assert-Matches `
+            (Get-Content -Raw -LiteralPath $invokeTestScriptPath) `
+            '(?s)if \(-not \$text\.Contains\(.*?\)\) \{\s*return \$false\s*\}.*?Get-ChildItem' `
+            'The test wrapper must check the rare failure signature before scanning for test results.'
 
         $previousAttemptFile = $env:ORLEANS_TEST_ATTEMPT_FILE
         $previousFailure = $env:ORLEANS_TEST_FAILURE
