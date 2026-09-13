@@ -501,7 +501,8 @@ BEGIN
         WHERE Eligible = FALSE;
 
         DELETE FROM OrleansStreamCleanupBatch
-        WHERE MessageId >= _FirstIneligibleMessageId;
+        WHERE _FirstIneligibleMessageId IS NOT NULL
+            AND MessageId >= _FirstIneligibleMessageId;
 
         SELECT
             COUNT(*),

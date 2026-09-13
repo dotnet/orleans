@@ -1001,6 +1001,50 @@ public sealed class RecoverableStreamReceiverTests
         Assert.Same(second, Assert.Single(registry.Receivers).Value);
     }
 
+    [Fact]
+    public async Task Registry_RemoveWaitsForInProgressCreation()
+    {
+        var queue = QueueId.GetQueueId("queue", 0, 0);
+        var receiverCreated = new TaskCompletionSource<TestCombinedReceiver>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFactory = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var registry = new QueueAdapterReceiverRegistry<TestCombinedReceiver>(_ =>
+        {
+            var receiver = new TestCombinedReceiver();
+            receiverCreated.SetResult(receiver);
+            releaseFactory.Task.GetAwaiter().GetResult();
+            return receiver;
+        });
+        var removalAttempted = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var removalLockAcquired = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var registryAccessor = new QueueAdapterReceiverRegistry<TestCombinedReceiver>.TestAccessor(registry)
+        {
+            OnRemoveAttempt = removalAttempted.SetResult,
+            OnRemoveLockAcquired = removalLockAcquired.SetResult,
+        };
+        var lookup = Task.Run(() => registry.GetOrCreate(queue));
+        var receiver = await receiverCreated.Task;
+        var removal = Task.Run(() => registry.Remove(queue, receiver));
+        await removalAttempted.Task;
+
+        try
+        {
+            Assert.False(removalLockAcquired.Task.IsCompleted);
+        }
+        finally
+        {
+            releaseFactory.TrySetResult();
+        }
+
+        Assert.Same(receiver, await lookup);
+        await removalLockAcquired.Task;
+        Assert.True(await removal);
+        Assert.Empty(registry.Receivers);
+    }
+
     private static RecoverableStreamReceiver<TestQueueMessage> CreateReceiver(
         IRecoverableStreamSource<TestQueueMessage> source,
         IStreamQueueCheckpointer<string> checkpointer)

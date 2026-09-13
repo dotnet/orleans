@@ -242,7 +242,9 @@ internal sealed partial class AdoNetRecoverableStream(
                 $"ADO.NET stream partition '{serviceId}/{providerId}/{queueId}' is missing while reconciling retained history.");
         var earliestAvailablePosition = state.EarliestMessageId ?? state.NextMessageId;
         if (_readOffset < earliestAvailablePosition - 1
-            || (state.NextMessageId > _readOffset + 1 && state.TailMessageId <= _readOffset))
+            || (state.NextMessageId > _readOffset + 1
+                && state.TailMessageId is { } tailMessageId
+                && tailMessageId <= _readOffset))
         {
             throw RetainFailure(
                 $"has a retention gap after admitted message {_readOffset}: "
