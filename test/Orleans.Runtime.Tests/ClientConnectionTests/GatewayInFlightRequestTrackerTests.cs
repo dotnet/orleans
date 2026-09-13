@@ -61,7 +61,7 @@ public class GatewayInFlightRequestTrackerTests
 
         var completed = tracker.TryComplete(CreateResponse(request, Message.ResponseTypes.Status));
 
-        Assert.False(completed);
+        Assert.Equal(GatewayInFlightRequestTracker.CompletionResult.NotTracked, completed);
         Assert.Equal(1, tracker.Count);
     }
 
@@ -77,7 +77,7 @@ public class GatewayInFlightRequestTrackerTests
 
         var completed = tracker.TryComplete(CreateResponse(request, (Message.ResponseTypes)responseType));
 
-        Assert.True(completed);
+        Assert.Equal(GatewayInFlightRequestTracker.CompletionResult.Completed, completed);
         Assert.Equal(0, tracker.Count);
     }
 
@@ -90,7 +90,7 @@ public class GatewayInFlightRequestTrackerTests
 
         var completed = tracker.TryComplete(request);
 
-        Assert.False(completed);
+        Assert.Equal(GatewayInFlightRequestTracker.CompletionResult.NotTracked, completed);
         Assert.Equal(1, tracker.Count);
     }
 
@@ -112,7 +112,28 @@ public class GatewayInFlightRequestTrackerTests
         Assert.Contains(removed, message => message.Id == request1.Id && Silo1.Equals(message.TargetSilo));
         Assert.Contains(removed, message => message.Id == request3.Id && Silo1.Equals(message.TargetSilo));
         Assert.Equal(1, tracker.Count);
-        Assert.True(tracker.TryComplete(CreateResponse(request2, Message.ResponseTypes.Success)));
+        Assert.Equal(
+            GatewayInFlightRequestTracker.CompletionResult.Completed,
+            tracker.TryComplete(CreateResponse(request2, Message.ResponseTypes.Success)));
+        Assert.Equal(0, tracker.Count);
+    }
+
+    [Fact]
+    public void LateResponseFromOldDestinationDoesNotCompleteRetry()
+    {
+        var tracker = CreateTracker();
+        var original = CreateMessage(1, Message.Directions.Request, Silo1);
+        var retry = CreateMessage(1, Message.Directions.Request, Silo2);
+        Assert.True(tracker.Track(original));
+        Assert.True(tracker.Track(retry));
+
+        var completion = tracker.TryComplete(CreateResponse(original, Message.ResponseTypes.Success));
+
+        Assert.Equal(GatewayInFlightRequestTracker.CompletionResult.WrongDestination, completion);
+        Assert.Equal(1, tracker.Count);
+        Assert.Equal(
+            GatewayInFlightRequestTracker.CompletionResult.Completed,
+            tracker.TryComplete(CreateResponse(retry, Message.ResponseTypes.Success)));
         Assert.Equal(0, tracker.Count);
     }
 
@@ -281,8 +302,12 @@ public class GatewayInFlightRequestTrackerTests
         tracker.Clear();
 
         Assert.Equal(0, tracker.Count);
-        Assert.False(tracker.TryComplete(CreateResponse(request1, Message.ResponseTypes.Success)));
-        Assert.False(tracker.TryComplete(CreateResponse(request2, Message.ResponseTypes.Error)));
+        Assert.Equal(
+            GatewayInFlightRequestTracker.CompletionResult.NotTracked,
+            tracker.TryComplete(CreateResponse(request1, Message.ResponseTypes.Success)));
+        Assert.Equal(
+            GatewayInFlightRequestTracker.CompletionResult.NotTracked,
+            tracker.TryComplete(CreateResponse(request2, Message.ResponseTypes.Error)));
     }
 
     [Fact]
@@ -412,11 +437,11 @@ public class GatewayInFlightRequestTrackerTests
         if (clearFirst)
         {
             tracker.Clear();
-            Assert.False(tracker.TryComplete(response));
+            Assert.Equal(GatewayInFlightRequestTracker.CompletionResult.NotTracked, tracker.TryComplete(response));
         }
         else
         {
-            Assert.True(tracker.TryComplete(response));
+            Assert.Equal(GatewayInFlightRequestTracker.CompletionResult.Completed, tracker.TryComplete(response));
             tracker.Clear();
         }
 
@@ -524,6 +549,7 @@ public class GatewayInFlightRequestTrackerTests
             Id = request.Id,
             Direction = Message.Directions.Response,
             Result = responseType,
+            SendingSilo = request.TargetSilo,
             TimeToLive = request.TimeToLive,
         };
 

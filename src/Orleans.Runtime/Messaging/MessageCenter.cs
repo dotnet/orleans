@@ -558,11 +558,14 @@ namespace Orleans.Runtime.Messaging
                     ? "Target silo is known to be dead"
                     : $"Exception while forwarding message: {exception}";
                 exception ??= new SiloUnavailableException();
-                SendRejection(
+                _messagingInstruments.OnRejectedMessage(message);
+                var rejection = messageFactory.CreateRejectionResponse(
                     message,
                     Message.RejectionTypes.Transient,
                     reason,
                     exception);
+                rejection.RequestContextData = null;
+                SendMessage(rejection);
                 return;
             }
 

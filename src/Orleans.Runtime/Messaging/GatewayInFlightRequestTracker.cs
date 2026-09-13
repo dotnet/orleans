@@ -49,20 +49,26 @@ namespace Orleans.Runtime.Messaging
             return true;
         }
 
-        internal bool TryComplete(Message response)
+        internal CompletionResult TryComplete(Message response)
         {
             if (response.Direction != Message.Directions.Response || response.Result == Message.ResponseTypes.Status)
             {
-                return false;
+                return CompletionResult.NotTracked;
             }
 
-            if (_requests?.Remove(response.Id) is true)
+            if (_requests is not { } requests || !requests.TryGetValue(response.Id, out var trackedRequest))
             {
-                _forwardingUpdates?.Remove(response.Id);
-                return true;
+                return CompletionResult.NotTracked;
             }
 
-            return false;
+            if (response.SendingSilo is not { } responseSilo || !responseSilo.Equals(trackedRequest.TargetSilo))
+            {
+                return CompletionResult.WrongDestination;
+            }
+
+            requests.Remove(response.Id);
+            _forwardingUpdates?.Remove(response.Id);
+            return CompletionResult.Completed;
         }
 
         internal bool TryUpdateDestination(
@@ -276,5 +282,12 @@ namespace Orleans.Runtime.Messaging
             SiloAddress SourceSilo,
             SiloAddress TargetSilo,
             int ForwardCount);
+
+        internal enum CompletionResult
+        {
+            NotTracked,
+            Completed,
+            WrongDestination,
+        }
     }
 }
