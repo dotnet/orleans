@@ -401,12 +401,25 @@ public sealed class RecoverableStreamReceiverTests
         {
             new TestQueueMessage(streamId, 1, "target-1"),
             new TestQueueMessage(streamId, 2, "target-2"),
+            new TestQueueMessage(streamId, 3, "target-3"),
+            new TestQueueMessage(streamId, 4, "target-4"),
         };
         var replayFactory = new TestReplaySourceFactory(history);
         var receiver = CreateReplayReceiver(
-            [new TestQueueMessage(streamId, 3, "target-3")],
+            [
+                new TestQueueMessage(streamId, 3, "target-3"),
+                new TestQueueMessage(streamId, 4, "target-4"),
+            ],
             replayFactory,
-            new TestCheckpointer(string.Empty));
+            new TestCheckpointer(string.Empty),
+            new RecoverableStreamReplayOptions
+            {
+                MaxConcurrentReaders = 1,
+                MaxPendingReaders = 1,
+                CacheSize = 4,
+                ReadBatchSize = 2,
+                TemporaryTailRetryDelay = TimeSpan.Zero,
+            });
         await receiver.Initialize(TimeSpan.FromSeconds(5));
         using var cursor = Assert.IsAssignableFrom<IAsyncQueueCacheCursor>(
             receiver.GetCacheCursor(streamId, new EventSequenceTokenV2(1)));
@@ -419,7 +432,8 @@ public sealed class RecoverableStreamReceiverTests
         _ = await receiver.GetQueueMessagesAsync(10, CancellationToken.None);
         var delivered = await ReadAll(cursor);
 
-        Assert.Equal([2, 3], delivered);
+        Assert.Equal([2, 3, 4], delivered);
+        Assert.Equal([1, 2], Assert.Single(replayFactory.Sources).AcceptedSequenceNumbers);
         await receiver.Shutdown(TimeSpan.FromSeconds(5));
     }
 
@@ -1807,6 +1821,7 @@ public sealed class RecoverableStreamReceiverTests
         public bool IsDisposed { get; private set; }
         public TaskCompletionSource Disposed { get; } =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public List<long> AcceptedSequenceNumbers { get; } = [];
 
         public async ValueTask<RecoverableStreamReplayReadResult<TestQueueMessage>> Read(
             int maxCount,
@@ -1830,6 +1845,9 @@ public sealed class RecoverableStreamReceiverTests
             _index += count;
             return new(page, _index == messages.Count);
         }
+
+        public void MessagesAdded(IReadOnlyList<TestQueueMessage> added)
+            => AcceptedSequenceNumbers.AddRange(added.Select(static message => message.SequenceNumber));
 
         public ValueTask DisposeAsync()
         {
