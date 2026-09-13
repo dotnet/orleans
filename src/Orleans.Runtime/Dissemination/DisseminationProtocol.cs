@@ -23,6 +23,9 @@ internal sealed partial class DisseminationProtocol
     private readonly object _antiEntropyResponseCursorLock = new();
     private readonly Dictionary<SiloAddress, AntiEntropyResponseCursor> _antiEntropyResponseCursors = [];
     private long _antiEntropyResponseCursorAccess;
+    private readonly object _receivedBatchCursorLock = new();
+    private readonly Dictionary<(SiloAddress Peer, bool AntiEntropy), ReceivedBatchCursor> _receivedBatchCursors = [];
+    private long _receivedBatchCursorAccess;
     private readonly object _valueUpdateLock = new();
     private readonly Dictionary<DigestKey, ValueUpdate> _lastValueUpdates = [];
     private readonly object _peerSupportLock = new();
@@ -124,6 +127,7 @@ internal sealed partial class DisseminationProtocol
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        var receivedTimestamp = _timeProvider.GetTimestamp();
         var options = _options.CurrentValue;
         if (!options.Enabled)
         {
@@ -135,14 +139,17 @@ internal sealed partial class DisseminationProtocol
 
         var receivedKeys = new Dictionary<IDisseminationNamespace, Dictionary<DisseminationKey, bool>>();
         var unsupportedNamespaces = new List<DisseminationNamespace>();
-        foreach (var (namespaceName, values) in batch.Values)
+        foreach (var namespaceName in batch.Values.Keys)
         {
-            if (!TryGetEnabledNamespace(namespaceName, out var disseminationNamespace))
+            if (!TryGetEnabledNamespace(namespaceName, out _))
             {
                 unsupportedNamespaces.Add(namespaceName);
-                continue;
             }
+        }
 
+        foreach (var (namespaceName, values) in SelectReceivedValues(batch.Sender, batch.Values, options, antiEntropy: false))
+        {
+            var disseminationNamespace = _namespaces[namespaceName];
             DisseminationInstruments.OnBroadcastReceived(disseminationNamespace.Name, "tree", values.Count);
             ConfirmPeerNamespaces(batch.Sender, [namespaceName]);
             var namespaceKeys = new Dictionary<DisseminationKey, bool>();
@@ -157,12 +164,23 @@ internal sealed partial class DisseminationProtocol
                     namespaceName,
                     item.Value.Key,
                     item.Value.ToVersion);
-                var result = await ApplyReceivedValue(
-                    disseminationNamespace,
-                    item,
-                    batch.Sender,
-                    options,
-                    cancellationToken);
+                DisseminationApplyResult result;
+                try
+                {
+                    result = await ApplyReceivedValue(
+                        disseminationNamespace,
+                        item,
+                        batch.Sender,
+                        options,
+                        receivedTimestamp,
+                        cancellationToken);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    throw;
+                }
+
                 if (result is DisseminationApplyResult.Applied)
                 {
                     namespaceKeys[item.Value.Key] = true;
@@ -245,7 +263,7 @@ internal sealed partial class DisseminationProtocol
             roundCancellationToken.ThrowIfCancellationRequested();
             // Push traffic suppresses redundant checks; admitted peers share this round's digest snapshot.
             var requestDigests = CreateAntiEntropyRequestDigests(_timeProvider.GetTimestamp());
-            var requests = CreateAntiEntropyRequests(membershipSnapshots, requestDigests, leases.Keys);
+            var requests = CreateAntiEntropyRequests(membershipSnapshots, requestDigests, leases.Keys, options);
             if (requests.Count == 0)
             {
                 return;
@@ -320,7 +338,8 @@ internal sealed partial class DisseminationProtocol
     private Dictionary<SiloAddress, DisseminationAntiEntropyRequest> CreateAntiEntropyRequests(
         DisseminationMembershipSnapshots membershipSnapshots,
         Dictionary<DisseminationNamespace, List<DigestEntry>> requestDigests,
-        IEnumerable<SiloAddress> peers)
+        IEnumerable<SiloAddress> peers,
+        DisseminationOptions options)
     {
         var result = new Dictionary<SiloAddress, DisseminationAntiEntropyRequest>();
         var namespacesByScope = new Dictionary<DisseminationMembershipScope, IDisseminationNamespace[]>();
@@ -369,6 +388,8 @@ internal sealed partial class DisseminationProtocol
                     Sender = _localSilo,
                     Digests = peerDigests,
                     SupportedNamespaces = supportedNamespaces,
+                    MaxResponseItems = options.MaxBatchItems,
+                    MaxResponseBytes = options.MaxBatchBytes,
                 });
             }
         }
@@ -522,6 +543,9 @@ internal sealed partial class DisseminationProtocol
         DisseminationOptions options,
         CancellationToken cancellationToken)
     {
+        // Completed exchanges get a separate local application window, even if another peer used its whole
+        // transport budget. No remote clock or transmission delay is inferred from a relative wire lifetime.
+        var receivedTimestamp = _timeProvider.GetTimestamp();
         // Keep each sender's chain intact and rank all repairs which completed within the round's hop lifetime.
         Dictionary<DigestKey, List<AntiEntropyRepair>>? repairs = null;
         foreach (var response in responses)
@@ -536,12 +560,10 @@ internal sealed partial class DisseminationProtocol
             // A response only includes namespaces which produced repairs. Absence is not evidence that an
             // up-to-date or unrelated namespace is unsupported, so confirmations are additive here.
             ConfirmPeerNamespaces(response.Sender, response.Values.Keys);
-            foreach (var (namespaceName, values) in response.Values)
+            foreach (var (namespaceName, values) in SelectReceivedValues(response.Sender, response.Values, options, antiEntropy: true))
             {
-                if (!TryGetEnabledNamespace(namespaceName, out var disseminationNamespace))
-                {
-                    continue;
-                }
+                cancellationToken.ThrowIfCancellationRequested();
+                var disseminationNamespace = _namespaces[namespaceName];
 
                 foreach (var stream in values.GroupBy(static item => item.Value.Key))
                 {
@@ -584,10 +606,115 @@ internal sealed partial class DisseminationProtocol
                         item,
                         candidate.Sender,
                         options,
+                        receivedTimestamp,
                         cancellationToken);
                 }
             }
         }
+    }
+
+    private Dictionary<DisseminationNamespace, List<DisseminationBroadcastValue>> SelectReceivedValues(
+        SiloAddress peer,
+        Dictionary<DisseminationNamespace, List<DisseminationBroadcastValue>> values,
+        DisseminationOptions options,
+        bool antiEntropy)
+    {
+        var result = new Dictionary<DisseminationNamespace, List<DisseminationBroadcastValue>>();
+        var totalCount = values.Values.Sum(static entries => (long)entries.Count);
+        var cursorKey = (peer, antiEntropy);
+        long position;
+        lock (_receivedBatchCursorLock)
+        {
+            position = _receivedBatchCursors.TryGetValue(cursorKey, out var cursor)
+                && cursor.TotalCount == totalCount && cursor.Position < totalCount
+                ? cursor.Position
+                : 0;
+        }
+
+        var skip = position;
+        var examined = 0;
+        var byteCount = 0;
+        foreach (var (namespaceName, entries) in values)
+        {
+            if (skip >= entries.Count)
+            {
+                skip -= entries.Count;
+                continue;
+            }
+
+            if (!TryGetEnabledNamespace(namespaceName, out var disseminationNamespace))
+            {
+                position += entries.Count - skip;
+                skip = 0;
+                continue;
+            }
+
+            for (var index = (int)skip; index < entries.Count; index++)
+            {
+                if (examined >= options.MaxBatchItems || byteCount >= options.MaxBatchBytes)
+                {
+                    goto Complete;
+                }
+
+                var item = entries[index];
+                var payloadBytes = item.Value.Payload.Length;
+                if (!ValidatePayloadSize(disseminationNamespace, item.Value, options))
+                {
+                    // Oversized entries consume inspection capacity, but must not pin the receive cursor.
+                    examined++;
+                    position++;
+                    continue;
+                }
+
+                if (payloadBytes > options.MaxBatchBytes - byteCount)
+                {
+                    // Preserve this candidate for a fresh budget instead of discarding a repair-chain suffix.
+                    goto Complete;
+                }
+
+                if (!result.TryGetValue(namespaceName, out var selected))
+                {
+                    selected = [];
+                    result.Add(namespaceName, selected);
+                }
+
+                selected.Add(item);
+                examined++;
+                byteCount += payloadBytes;
+                position++;
+            }
+
+            skip = 0;
+        }
+
+    Complete:
+        var members = _membership.CurrentSnapshots.AllMembers;
+        lock (_receivedBatchCursorLock)
+        {
+            // Do not wrap within a batch: doing so would reorder a key's delta chain. Subsequent deliveries
+            // resume an ordered, bounded interval, allowing later keys past a repeatedly rejected/hot prefix.
+            if (position < totalCount)
+            {
+                _receivedBatchCursors[cursorKey] = new(position, totalCount, ++_receivedBatchCursorAccess);
+            }
+            else
+            {
+                _receivedBatchCursors.Remove(cursorKey);
+            }
+
+            var nonMembers = _receivedBatchCursors
+                .Where(entry => !members.ContainsMember(entry.Key.Peer))
+                .OrderByDescending(static entry => entry.Value.LastAccess)
+                .Skip(MaxRetainedNonMemberResponseCursors)
+                .Select(static entry => entry.Key)
+                .ToArray();
+            foreach (var key in nonMembers)
+            {
+                _receivedBatchCursors.Remove(key);
+            }
+        }
+
+        return result;
     }
 
     public ValueTask<DisseminationAntiEntropyResponse> ReceiveAntiEntropy(
@@ -595,6 +722,16 @@ internal sealed partial class DisseminationProtocol
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (request.MaxResponseItems is { } maxResponseItems)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxResponseItems, nameof(request.MaxResponseItems));
+        }
+
+        if (request.MaxResponseBytes is { } maxResponseBytes)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxResponseBytes, nameof(request.MaxResponseBytes));
+        }
+
         ConfirmPeerNamespaces(request.Sender, request.SupportedNamespaces);
         ConfirmPeerNamespaces(request.Sender, request.Digests.Keys);
         // Incoming digests are passive evidence for existing peer pumps, not a reason to create new ones.
@@ -646,6 +783,10 @@ internal sealed partial class DisseminationProtocol
             }
         }
 
+        // Honor the recipient's budget at the responder's existing fair cursor. Independently truncating
+        // rotating responses at the receiver can repeatedly omit the same keys when the limits differ.
+        var maxResponseItems = Math.Min(options.MaxBatchItems, request.MaxResponseItems ?? int.MaxValue);
+        var maxResponseBytes = Math.Min(options.MaxBatchBytes, request.MaxResponseBytes ?? int.MaxValue);
         var valueCount = 0;
         var byteCount = 0;
         var truncated = false;
@@ -698,8 +839,8 @@ internal sealed partial class DisseminationProtocol
                 localDigest.Key,
                 peerDigest.Version,
                 toVersion: null,
-                options.MaxBatchItems - valueCount,
-                options.MaxBatchBytes - byteCount,
+                maxResponseItems - valueCount,
+                maxResponseBytes - byteCount,
                 requestedNamespace.Options.MaxPayloadBytes);
             var repair = requestedNamespace.CreateRepair(repairRequest);
             if (repair.Status is DisseminationRepairStatus.InsufficientCapacity)
@@ -711,8 +852,8 @@ internal sealed partial class DisseminationProtocol
                         localDigest.Key,
                         peerDigest.Version,
                         toVersion: null,
-                        options.MaxBatchItems,
-                        options.MaxBatchBytes,
+                        maxResponseItems,
+                        maxResponseBytes,
                         requestedNamespace.Options.MaxPayloadBytes);
                     var emptyBatchRepair = requestedNamespace.CreateRepair(emptyBatchRequest);
                     if (emptyBatchRepair.Status is DisseminationRepairStatus.Produced
@@ -870,6 +1011,7 @@ internal sealed partial class DisseminationProtocol
         DisseminationBroadcastValue item,
         SiloAddress sender,
         DisseminationOptions options,
+        long receivedTimestamp,
         CancellationToken cancellationToken)
     {
         try
@@ -879,6 +1021,7 @@ internal sealed partial class DisseminationProtocol
                 item,
                 sender,
                 options,
+                receivedTimestamp,
                 cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -904,6 +1047,7 @@ internal sealed partial class DisseminationProtocol
         DisseminationBroadcastValue item,
         SiloAddress sender,
         DisseminationOptions options,
+        long receivedTimestamp,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -913,7 +1057,11 @@ internal sealed partial class DisseminationProtocol
             return DisseminationApplyResult.Rejected;
         }
 
-        if (IsExpired(item))
+        var lifetime = item.TimeToLive < disseminationNamespace.Options.StaleItemTtl
+            ? item.TimeToLive
+            : disseminationNamespace.Options.StaleItemTtl;
+        var remainingLifetime = lifetime - _timeProvider.GetElapsedTime(receivedTimestamp);
+        if (remainingLifetime <= TimeSpan.Zero)
         {
             EmitApplyResult(namespaceName, item, sender, DisseminationApplyResult.Obsolete);
             return DisseminationApplyResult.Obsolete;
@@ -926,7 +1074,37 @@ internal sealed partial class DisseminationProtocol
             return terminalResult;
         }
 
-        var result = await disseminationNamespace.ApplyValueAsync(item.Value, cancellationToken);
+        using var lifetimeCancellation = new CancellationTokenSource(
+            remainingLifetime < MaxAntiEntropyRoundLifetime ? remainingLifetime : MaxAntiEntropyRoundLifetime,
+            _timeProvider);
+        using var applicationCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken,
+            lifetimeCancellation.Token);
+        DisseminationApplyResult result;
+        try
+        {
+            var application = disseminationNamespace.ApplyValueAsync(item.Value, applicationCancellation.Token);
+            if (application.IsCompletedSuccessfully)
+            {
+                result = application.Result;
+            }
+            else
+            {
+                // Only this local wait is bounded. Namespace owners must observe cancellation before mutating
+                // queued state; arbitrary implementations which ignore the token cannot be forcibly stopped.
+                var applicationTask = application.AsTask();
+                applicationTask.Ignore();
+                result = await applicationTask.WaitAsync(applicationCancellation.Token);
+            }
+
+            applicationCancellation.Token.ThrowIfCancellationRequested();
+        }
+        catch (OperationCanceledException) when (
+            lifetimeCancellation.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            result = DisseminationApplyResult.Obsolete;
+        }
+
         EmitApplyResult(namespaceName, item, sender, result);
         if (result is DisseminationApplyResult.Applied)
         {
@@ -1100,8 +1278,24 @@ internal sealed partial class DisseminationProtocol
         }
 
         var namespaceName = disseminationNamespace.Name;
-        DisseminationEvents.EmitPayloadDrop(namespaceName, value, _localSilo, "oversize", value.Payload.Length);
-        DisseminationInstruments.OnPayloadDropped(namespaceName, "oversize");
+        try
+        {
+            DisseminationEvents.EmitPayloadDrop(namespaceName, value, _localSilo, "oversize", value.Payload.Length);
+        }
+        catch (Exception exception)
+        {
+            LogDebugDisseminationDiagnosticFailed(_logger, exception, namespaceName, value.Key);
+        }
+
+        try
+        {
+            DisseminationInstruments.OnPayloadDropped(namespaceName, "oversize");
+        }
+        catch (Exception exception)
+        {
+            LogDebugDisseminationDiagnosticFailed(_logger, exception, namespaceName, value.Key);
+        }
+
         return false;
     }
 
@@ -1237,9 +1431,6 @@ internal sealed partial class DisseminationProtocol
         return true;
     }
 
-    private bool IsExpired(DisseminationBroadcastValue item) =>
-        item.TimeToLive <= TimeSpan.Zero;
-
     private DisseminationBroadcastValue CreateBroadcastValue(
         IDisseminationNamespace disseminationNamespace,
         DisseminationValue value) =>
@@ -1260,7 +1451,14 @@ internal sealed partial class DisseminationProtocol
             LogDebugDisseminationDiagnosticFailed(_logger, exception, namespaceName, item.Value.Key);
         }
 
-        DisseminationInstruments.OnValueApplied(namespaceName, result);
+        try
+        {
+            DisseminationInstruments.OnValueApplied(namespaceName, result);
+        }
+        catch (Exception exception)
+        {
+            LogDebugDisseminationDiagnosticFailed(_logger, exception, namespaceName, item.Value.Key);
+        }
     }
 
     private static int GetDigestCount(Dictionary<DisseminationNamespace, List<DigestEntry>> digest) => digest.Values.Sum(entries => entries.Count);
@@ -1303,6 +1501,8 @@ internal sealed partial class DisseminationProtocol
 
     private readonly record struct AntiEntropyResponseCursor(int Position, long LastAccess);
 
+    private readonly record struct ReceivedBatchCursor(long Position, long TotalCount, long LastAccess);
+
     private readonly record struct AntiEntropyRepair(
         IDisseminationNamespace Namespace,
         List<DisseminationBroadcastValue> Items,
@@ -1330,7 +1530,7 @@ internal sealed partial class DisseminationProtocol
 
     [LoggerMessage(
         Level = LogLevel.Debug,
-        Message = "Dissemination apply diagnostic failed for namespace {Namespace}, key {Key}.")]
+        Message = "Dissemination value diagnostic failed for namespace {Namespace}, key {Key}.")]
     private static partial void LogDebugDisseminationDiagnosticFailed(
         ILogger logger,
         Exception exception,

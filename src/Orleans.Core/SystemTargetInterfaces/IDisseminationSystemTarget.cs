@@ -262,6 +262,13 @@ internal sealed class DisseminationAntiEntropyRequest
 
     [Id(2)]
     public List<DisseminationNamespace> SupportedNamespaces { get; init; } = [];
+
+    // Older requests use the responder's own limits.
+    [Id(3)]
+    public int? MaxResponseItems { get; init; }
+
+    [Id(4)]
+    public int? MaxResponseBytes { get; init; }
 }
 
 [GenerateSerializer, Immutable]

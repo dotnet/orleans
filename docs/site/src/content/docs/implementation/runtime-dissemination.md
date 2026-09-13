@@ -75,15 +75,15 @@ The subsystem and each namespace default to disabled. Enable <xref:Orleans.Confi
 | Option | Default | Effect |
 |---|---:|---|
 | <xref:Orleans.Configuration.DisseminationOptions.MaxConcurrentSends> | 32 | Per-silo active local broadcast attempts. |
-| <xref:Orleans.Configuration.DisseminationOptions.MaxBatchItems> | 8,192 | Values materialized in one batch. |
-| <xref:Orleans.Configuration.DisseminationOptions.MaxBatchBytes> | 1 MiB | Serialized payload bytes in one batch. |
+| <xref:Orleans.Configuration.DisseminationOptions.MaxBatchItems> | 8,192 | Values materialized in an outgoing batch or examined in an incoming batch or repair response. |
+| <xref:Orleans.Configuration.DisseminationOptions.MaxBatchBytes> | 1 MiB | Serialized payload bytes in an outgoing batch or admitted from an incoming batch or repair response. |
 | <xref:Orleans.Configuration.DisseminationOverlayOptions.TargetHopCount> | 2 | Target depth used to derive fanout. |
 | <xref:Orleans.Configuration.DisseminationOverlayOptions.MinFanOutFactor> / <xref:Orleans.Configuration.DisseminationOverlayOptions.MaxFanOutFactor> | 4 / 32 | Bounds for derived fanout. |
 | <xref:Orleans.Configuration.DisseminationOverlayOptions.AntiEntropyInterval> | 5 seconds | Repair-round cadence and retry-delay ceiling. |
 | <xref:Orleans.Configuration.DisseminationOverlayOptions.AntiEntropyPeerCount> | 3 | Maximum peers selected in one repair round and independent per-silo active local repair attempt limit. |
 | <xref:Orleans.Configuration.DisseminationNamespaceOptions.MaxPendingItemCount> | 1,024 | Distinct retained keys per namespace and peer. |
 | <xref:Orleans.Configuration.DisseminationNamespaceOptions.MaxCoalescingDelay> | 100 ms | Normal-priority batching window. |
-| <xref:Orleans.Configuration.DisseminationNamespaceOptions.StaleItemTtl> | 30 seconds | Per-hop transport and application lifetime. |
+| <xref:Orleans.Configuration.DisseminationNamespaceOptions.StaleItemTtl> | 30 seconds | Independent local transport and application budgets for each hop. |
 | <xref:Orleans.Configuration.DisseminationNamespaceOptions.ExpectedUpdateCadence> | 10 seconds | Quiet period before a digest is offered for repair. |
 | <xref:Orleans.Configuration.DisseminationNamespaceOptions.MaxPayloadBytes> | 1 MiB | Maximum serialized value size for the namespace. |
 
@@ -121,6 +121,8 @@ Repair has its own admission gate, independent of broadcast slots. Across overla
 
 Digests identify namespace-owned keys, including missing state at version zero, so repair can discover work rejected during queue admission. Recently advanced streams suppress redundant probes until `ExpectedUpdateCadence` elapses. Responses obey item, batch-byte, payload-byte, and hop-lifetime bounds. Persistent per-requester cursors rotate truncated responses so hot early keys cannot starve later candidates. Cursor state for non-members is least-recently-used and bounded to 64 entries.
 
+Requests advertise the receiver's item and payload-byte limits. Responders use the smaller local and advertised limits, allowing their response cursor to provide fair service even when peers use different batch sizes. Older requests use the responder's own limits. Receivers independently cap incoming broadcasts and repair responses before grouping or applying values. Broadcast acknowledgments cover only the admitted keys at their actual local versions. Receive cursors advance through bounded ordered intervals for oversized deliveries while preserving the order of each repair chain. Cursor state is scoped to peer and direction, with at most 64 retained non-member cursors. Request digest inventory remains separate from these response admission budgets.
+
 Repairs from each sender remain ordered. Competing sender chains are ranked before application, and the namespace's monotonic apply contract rejects an obsolete or incompatible chain. Responses which completed successfully within their local attempt are still applied when another peer exceeds the round deadline. Late RPC faults are observed, and subsequent rounds repair responses which missed the application window. During a partition, local attempts remain bounded and retries follow the configured cadence; after connectivity and membership views recover, rotating peer selection and cursors continue convergence.
 
 ## Mixed-version behavior
@@ -133,7 +135,7 @@ Deployment-load publication uses dissemination for confirmed peers and the direc
 
 Protocol dictionaries use focused locks for membership projections, response cursors, value-update timestamps, peer capability evidence, and per-peer pump state. Network calls, namespace application, logging, diagnostic callbacks, and waiter continuations run outside those locks. Waiters use asynchronous continuations.
 
-Caller cancellation owns public operation lifetime and is checked before each received value is applied. Per-hop value TTL bounds the local broadcast RPC wait and anti-entropy round lifetime, independently of the runtime's cancellation-acknowledgment setting. Shared admission waits are pump-cancellable and retain their FIFO position while capacity is unavailable. Explicit flush and drain observers use their caller's cancellation token, with no separate observer TTL; supply a bounded token when waiting indefinitely for admission is unacceptable.
+Caller cancellation owns public operation lifetime and is checked before each received value is applied. Per-hop value TTL bounds the local broadcast RPC wait and anti-entropy exchange lifetime, independently of the runtime's cancellation-acknowledgment setting. Application has a separate local window capped by the receiving namespace's TTL. Broadcast values age from the start of receiver processing, including delays caused by earlier items; completed anti-entropy responses begin their application window after the exchanges finish. These windows use local elapsed time, preserving operation across clock skew. Namespace owners observe cancellation before committing queued or resumed work, including membership application following a pending refresh. Shared admission waits are pump-cancellable and retain their FIFO position while capacity is unavailable. Explicit flush and drain observers use their caller's cancellation token, with no separate observer TTL; supply a bounded token when waiting indefinitely for admission is unacceptable.
 
 Stopping rejects new notifications and repair admissions. Accepted broadcast work drains through acknowledgments, including retries with the usual backoff, within the shutdown caller's budget. Cancellation reports an incomplete drain and stops its queued admissions, local RPC waits, and pump timers. Each local attempt releases its managed admission lease during cleanup. Once pumps stop, the broadcast gate closes to further admissions. Repair cancellation is explicitly forwarded before disposing the round's linked sources, even when the local wait completes cancellation first.
 
