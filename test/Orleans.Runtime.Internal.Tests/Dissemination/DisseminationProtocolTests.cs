@@ -33,7 +33,7 @@ namespace UnitTests.Dissemination;
 [TestSuite("BVT")]
 [TestProvider("None")]
 [TestArea("Dissemination")]
-public class DisseminationProtocolTests
+public partial class DisseminationProtocolTests
 {
     [Fact]
     public async Task PublishPropagatesCancellationBeforeQueueing()

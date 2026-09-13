@@ -267,6 +267,7 @@ internal sealed partial class DisseminationBroadcastQueue
         private int _retryAttempt;
         private bool _wakeScheduled;
         private bool _stopping;
+        private bool _draining;
 
         public PeerQueuePump(SiloAddress peer, DisseminationBroadcastQueue owner)
         {
@@ -330,8 +331,7 @@ internal sealed partial class DisseminationBroadcastQueue
                     keyState ??= namespaceState.AddKey(key);
                     // A notification is only a wake-up. The namespace will choose the latest repair when this key is drained.
                     keyState.NotificationVersion = version;
-                    keyState.NotificationGeneration++;
-                    _notificationEpoch++;
+                    keyState.NotificationGeneration = ++_notificationEpoch;
                     var wasRetrying = _retryAttempt > 0;
                     _retryAttempt = 0;
                     var wasEmpty = DirtyCount == 0;
@@ -547,6 +547,7 @@ internal sealed partial class DisseminationBroadcastQueue
                 else
                 {
                     _stopping = true;
+                    _draining = drain;
                     if (drain)
                     {
                         if (_pumpFailure is { } pumpFailure)
@@ -588,19 +589,29 @@ internal sealed partial class DisseminationBroadcastQueue
                     _flushTimer.Wake();
                 }
 
-                if (flushCompletion is not null)
+                while (flushCompletion is not null)
                 {
                     flushCompletion.Ignore();
                     await flushCompletion.WaitAsync(cancellationToken);
+                    lock (_lock)
+                    {
+                        if (_pumpFailure is { } pumpFailure)
+                        {
+                            throw new InvalidOperationException($"The dissemination broadcast pump for {Peer} has failed.", pumpFailure);
+                        }
+
+                        flushCompletion = DirtyCount > 0 ? _nextFlushCompletion.Task : _activeFlushCompletion?.Task;
+                    }
                 }
             }
             finally
             {
-                if (!drain || cancellationToken.IsCancellationRequested)
+                lock (_lock)
                 {
-                    await _shutdownCts.CancelAsync();
+                    _draining = false;
                 }
 
+                await _shutdownCts.CancelAsync();
                 _flushTimer.Dispose();
                 try
                 {
@@ -689,7 +700,7 @@ internal sealed partial class DisseminationBroadcastQueue
                         _retryAttempt = 0;
                     }
 
-                    if (DirtyCount > 0 && !_stopping)
+                    if (DirtyCount > 0 && (!_stopping || _draining))
                     {
                         // Do not overwrite a timer which a newer notification already chose.
                         if (notificationEpoch == _notificationEpoch)
@@ -753,7 +764,7 @@ internal sealed partial class DisseminationBroadcastQueue
                 TaskCompletionSource? activeFlushCompletion;
                 lock (_lock)
                 {
-                    if (DirtyCount > 0 && !_stopping)
+                    if (DirtyCount > 0 && (!_stopping || _draining))
                     {
                         _retryAttempt++;
                         var delay = _owner.GetRetryDelay(_retryAttempt);
@@ -826,7 +837,7 @@ internal sealed partial class DisseminationBroadcastQueue
                     else if (!enabled || !nextWork.Namespace.Options.Enabled)
                     {
                         pending.Dequeue();
-                        CompleteUnsupported(nextWork);
+                        CompleteUnsupported(nextWork.Namespace.Name, initialWork);
                     }
                     else
                     {
@@ -863,7 +874,7 @@ internal sealed partial class DisseminationBroadcastQueue
                         if (!currentOptions.Enabled || !work.Namespace.Options.Enabled)
                         {
                             pending.Dequeue();
-                            CompleteUnsupported(work);
+                            CompleteUnsupported(work.Namespace.Name, initialWork);
                             continue;
                         }
 
@@ -965,7 +976,7 @@ internal sealed partial class DisseminationBroadcastQueue
                     {
                         if (unsupportedNamespaces.Contains(sent.Work.Namespace.Name))
                         {
-                            CompleteUnsupported(sent.Work);
+                            CompleteUnsupported(sent.Work.Namespace.Name, initialWork);
                             continue;
                         }
 
@@ -1099,7 +1110,8 @@ internal sealed partial class DisseminationBroadcastQueue
                         namespaceState.Namespace,
                         key,
                         keyState.NotificationGeneration,
-                        keyState.KnownVersion));
+                        keyState.KnownVersion,
+                        namespaceState));
                 }
             }
 
@@ -1221,18 +1233,64 @@ internal sealed partial class DisseminationBroadcastQueue
             }
         }
 
-        private void CompleteUnsupported(PendingKeyWork work)
+        private void CompleteUnsupported(DisseminationNamespace namespaceName, List<PendingKeyWork> work)
         {
-            // Treat this as peer capability evidence and forget the namespace until a new publication recreates it.
+            // Capability evidence completes this flush's generations, not publications made during the send.
             lock (_lock)
             {
-                if (!_statesByNamespace.TryGetValue(work.Namespace.Name, out var namespaceState))
+                if (!_statesByNamespace.TryGetValue(namespaceName, out var namespaceState))
                 {
                     return;
                 }
 
-                DirtyCount -= namespaceState.DirtyCount;
-                _statesByNamespace.Remove(work.Namespace.Name);
+                var matchesState = false;
+                foreach (var item in work)
+                {
+                    if (item.Namespace.Name != namespaceName
+                        || !ReferenceEquals(item.NamespaceState, namespaceState))
+                    {
+                        continue;
+                    }
+
+                    matchesState = true;
+                    if (!namespaceState.TryGetKey(item.Key, out var keyState)
+                        || keyState is null)
+                    {
+                        continue;
+                    }
+
+                    keyState.InFlight = false;
+                    if (keyState.NotificationGeneration != item.NotificationGeneration)
+                    {
+                        MarkDirtyUnsafe(namespaceState, keyState);
+                        continue;
+                    }
+
+                    if (keyState.Dirty)
+                    {
+                        namespaceState.DirtyCount--;
+                        DirtyCount--;
+                    }
+
+                    namespaceState.Keys.Remove(item.Key);
+                }
+
+                if (!matchesState)
+                {
+                    return;
+                }
+
+                namespaceState.KnownVersions.Clear();
+                foreach (var keyState in namespaceState.Keys.Values)
+                {
+                    keyState.KnownVersion = null;
+                }
+
+                if (namespaceState.Keys.Count == 0)
+                {
+                    _statesByNamespace.Remove(namespaceName);
+                }
+
                 if (DirtyCount == 0)
                 {
                     var completion = _nextFlushCompletion;
@@ -1286,7 +1344,7 @@ internal sealed partial class DisseminationBroadcastQueue
         {
             lock (_lock)
             {
-                if (_stopping)
+                if (_stopping && !_draining)
                 {
                     foreach (var item in work)
                     {
@@ -1335,6 +1393,7 @@ internal sealed partial class DisseminationBroadcastQueue
             out PeerKeyState keyState)
         {
             if (_statesByNamespace.TryGetValue(work.Namespace.Name, out namespaceState!)
+                && ReferenceEquals(namespaceState, work.NamespaceState)
                 && namespaceState.Keys.TryGetValue(work.Key, out keyState!))
             {
                 return true;
@@ -1523,7 +1582,8 @@ internal sealed partial class DisseminationBroadcastQueue
             IDisseminationNamespace Namespace,
             DisseminationKey Key,
             long NotificationGeneration,
-            long? KnownVersion);
+            long? KnownVersion,
+            PeerNamespaceState NamespaceState);
 
         private readonly record struct SentKey(
             PendingKeyWork Work,

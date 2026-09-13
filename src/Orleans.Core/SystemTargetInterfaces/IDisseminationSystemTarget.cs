@@ -165,6 +165,8 @@ internal readonly struct DisseminationKey(object? value) : IEquatable<Disseminat
         {
             string leftString when right is string rightString => StringComparer.Ordinal.Compare(leftString, rightString),
             SiloAddress leftSilo when right is SiloAddress rightSilo => leftSilo.CompareTo(rightSilo),
+            string when right is SiloAddress => -1,
+            SiloAddress when right is string => 1,
             _ => Comparer<object>.Default.Compare(left, right),
         };
     }
