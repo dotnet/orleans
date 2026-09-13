@@ -543,7 +543,7 @@ namespace Orleans.Runtime.Messaging
                 }
 
                 EmitRequestTrackingStopped(requestTrackingStopped);
-                if (completionResult != GatewayInFlightRequestTracker.CompletionResult.WrongDestination)
+                if (completionResult != GatewayInFlightRequestTracker.CompletionResult.Deferred)
                 {
                     SendSyntheticResponse(message);
                 }
@@ -555,6 +555,7 @@ namespace Orleans.Runtime.Messaging
                 SiloAddress forwardingTarget)
             {
                 Message? requestToReject = null;
+                Message? completedResponse = null;
                 bool requestTrackingStopped;
                 lock (_requestLock)
                 {
@@ -563,7 +564,9 @@ namespace Orleans.Runtime.Messaging
                             forwardingSource,
                             forwardingTarget,
                             update.ForwardCount,
-                            out var updatedTarget)
+                            out var updatedTarget,
+                            out completedResponse)
+                        && completedResponse is null
                         && _gateway.siloStatusOracle.IsDeadSilo(updatedTarget))
                     {
                         _pendingRequests.TryRemove(update.Id, out requestToReject);
@@ -573,7 +576,11 @@ namespace Orleans.Runtime.Messaging
                 }
 
                 EmitRequestTrackingStopped(requestTrackingStopped);
-                if (requestToReject is not null)
+                if (completedResponse is not null)
+                {
+                    SendSyntheticResponse(completedResponse);
+                }
+                else if (requestToReject is not null)
                 {
                     RejectClaimedRequest(requestToReject, requestToReject.TargetSilo!);
                 }

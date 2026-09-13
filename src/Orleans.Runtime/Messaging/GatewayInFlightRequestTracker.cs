@@ -9,6 +9,7 @@ namespace Orleans.Runtime.Messaging
         private Dictionary<CorrelationId, TrackedRequest>? _requests;
         // Updates can cross different silo connections, so later forwarding hops can arrive before earlier ones.
         private Dictionary<CorrelationId, List<ForwardingUpdate>>? _forwardingUpdates;
+        private Dictionary<CorrelationId, List<Message>>? _deferredResponses;
 
         internal int Count => _requests?.Count ?? 0;
 
@@ -46,6 +47,7 @@ namespace Orleans.Runtime.Messaging
             _requests ??= [];
             _requests[request.Id] = trackedRequest;
             _forwardingUpdates?.Remove(request.Id);
+            _deferredResponses?.Remove(request.Id);
             return true;
         }
 
@@ -63,11 +65,19 @@ namespace Orleans.Runtime.Messaging
 
             if (response.SendingSilo is not { } responseSilo || !responseSilo.Equals(trackedRequest.TargetSilo))
             {
-                return CompletionResult.WrongDestination;
+                _deferredResponses ??= [];
+                if (!_deferredResponses.TryGetValue(response.Id, out var responses))
+                {
+                    _deferredResponses[response.Id] = responses = [];
+                }
+
+                responses.RemoveAll(item => item.SendingSilo?.Equals(response.SendingSilo) is true);
+                responses.Add(response);
+                return CompletionResult.Deferred;
             }
 
             requests.Remove(response.Id);
-            _forwardingUpdates?.Remove(response.Id);
+            ClearAuxiliaryState(response.Id);
             return CompletionResult.Completed;
         }
 
@@ -76,9 +86,11 @@ namespace Orleans.Runtime.Messaging
             SiloAddress sourceSilo,
             SiloAddress targetSilo,
             int forwardCount,
-            out SiloAddress updatedTargetSilo)
+            out SiloAddress updatedTargetSilo,
+            out Message? completedResponse)
         {
             updatedTargetSilo = null!;
+            completedResponse = null;
             if (_requests is not { } requests || !requests.TryGetValue(requestId, out var trackedRequest))
             {
                 return false;
@@ -122,6 +134,17 @@ namespace Orleans.Runtime.Messaging
             }
 
             updatedTargetSilo = trackedRequest.TargetSilo;
+            var currentTargetSilo = updatedTargetSilo;
+            if (updated
+                && _deferredResponses is { } deferredResponses
+                && deferredResponses.TryGetValue(requestId, out var responses)
+                && responses.Find(response => response.SendingSilo?.Equals(currentTargetSilo) is true) is { } response)
+            {
+                requests.Remove(requestId);
+                ClearAuxiliaryState(requestId);
+                completedResponse = response;
+            }
+
             return updated;
         }
 
@@ -129,7 +152,7 @@ namespace Orleans.Runtime.Messaging
         {
             if (_requests?.Remove(requestId, out var trackedRequest) is true)
             {
-                _forwardingUpdates?.Remove(requestId);
+                ClearAuxiliaryState(requestId);
                 request = CreateRequest(trackedRequest);
                 return true;
             }
@@ -149,7 +172,7 @@ namespace Orleans.Runtime.Messaging
             if (targetSilo.Equals(trackedRequest.TargetSilo))
             {
                 requests.Remove(request.Id);
-                _forwardingUpdates?.Remove(request.Id);
+                ClearAuxiliaryState(request.Id);
                 requestToReject = CreateRequest(trackedRequest);
                 return true;
             }
@@ -158,7 +181,7 @@ namespace Orleans.Runtime.Messaging
             if (request.ForwardCount > trackedRequest.ForwardCount)
             {
                 requests.Remove(request.Id);
-                _forwardingUpdates?.Remove(request.Id);
+                ClearAuxiliaryState(request.Id);
                 requestToReject = request;
                 return true;
             }
@@ -194,7 +217,7 @@ namespace Orleans.Runtime.Messaging
                 foreach (var id in ids)
                 {
                     requests.Remove(id);
-                    _forwardingUpdates?.Remove(id);
+                    ClearAuxiliaryState(id);
                 }
             }
 
@@ -223,7 +246,7 @@ namespace Orleans.Runtime.Messaging
                 foreach (var id in expired)
                 {
                     requests.Remove(id);
-                    _forwardingUpdates?.Remove(id);
+                    ClearAuxiliaryState(id);
                 }
             }
         }
@@ -232,6 +255,13 @@ namespace Orleans.Runtime.Messaging
         {
             _requests?.Clear();
             _forwardingUpdates?.Clear();
+            _deferredResponses?.Clear();
+        }
+
+        private void ClearAuxiliaryState(CorrelationId requestId)
+        {
+            _forwardingUpdates?.Remove(requestId);
+            _deferredResponses?.Remove(requestId);
         }
 
         private Message CreateRequest(TrackedRequest request)
@@ -287,7 +317,7 @@ namespace Orleans.Runtime.Messaging
         {
             NotTracked,
             Completed,
-            WrongDestination,
+            Deferred,
         }
     }
 }
