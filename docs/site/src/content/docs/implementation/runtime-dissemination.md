@@ -49,7 +49,7 @@ A `DisseminationValue` names one key and a `[FromVersion, ToVersion]` transition
 
 The namespace reports whether a repair is current, produced, unavailable, or unable to fit the supplied item and byte budgets. Produced repairs can be complete or a valid prefix. Prefix acknowledgments establish the receiver's new baseline and let the next batch continue the chain.
 
-Membership uses the membership-table version plus a liveness fingerprint in its digest because `IAmAliveTime` can advance without a table-version change. It retains 32 snapshots, prefers a smaller diff when the peer baseline is present, and falls back to a full snapshot when history or capacity makes the diff unsuitable. Apply accepts same-version snapshots only when they advance liveness and preserves newer local liveness when applying a diff.
+Membership uses the membership-table version plus a liveness fingerprint in its digest because `IAmAliveTime` can advance without a table-version change. It retains 32 snapshots, prefers a smaller diff when the peer baseline is present, and falls back to a full snapshot when history or capacity makes the diff unsuitable. Current diffs identify their entries as the complete target inventory, so table cleanup is reflected even when a receiver retained a different same-version baseline. Older partial-diff payloads retain their incremental semantics. Apply accepts same-version snapshots only when they advance liveness. The membership manager merges maximum per-entry liveness when publishing full snapshots, and diff construction preserves newer local liveness before handing state to that same manager.
 
 Deployment-load versions are sample timestamps. Each repair is a full latest value. Application runs on the deployment-load publisher's scheduler and accepts samples only for Active silo generations in the membership oracle. Terminal membership transitions remove placement statistics, and the oracle's monotonic membership state rejects later samples for departed generations.
 
@@ -89,6 +89,8 @@ The subsystem and each namespace default to disabled. Enable <xref:Orleans.Confi
 
 Each integration has its own <xref:Orleans.Configuration.DisseminationNamespaceOptions>. Operators can enable and tune membership and deployment-load dissemination independently while retaining the local concurrency and per-message bounds.
 
+The anti-entropy loop waits without periodic timer wakeups while the subsystem is disabled. An options-change notification wakes the loop when enablement changes; disabling it returns the loop to the dormant wait. Shutdown removes the options subscription and observes the loop's completion.
+
 Enablement requires representative measurements of convergence, RPC volume, serialized bytes, allocation, CPU, and tail latency across stable membership, churn, and partition recovery. Tree delivery can reduce RPC counts while increasing serialized bytes through forwarding and repair. Compare the original runtime, the updated default-off path, and the enabled path at the intended cluster sizes and publication rates, including skewed peer speeds and rolling upgrades.
 
 ## Broadcast pumps and backpressure
@@ -123,7 +125,7 @@ Repairs from each sender remain ordered. Competing sender chains are ranked befo
 
 ## Mixed-version behavior
 
-Peer namespace support is evidence-driven. Inbound traffic, broadcast acknowledgments, and authoritative anti-entropy responses confirm support for one silo generation. An explicit unsupported response revokes it, and membership pruning removes evidence for departed generations.
+Peer namespace support is evidence-driven. Inbound traffic, broadcast acknowledgments, and authoritative anti-entropy responses confirm support for one silo generation. An explicit unsupported response revokes it and retires the publication generations covered by that flush. Publications admitted during the send remain queued with a fresh peer baseline. Membership pruning removes evidence for departed generations.
 
 Deployment-load publication uses dissemination for confirmed peers and the direct system target for unconfirmed peers. If dissemination is disabled, unavailable, rejected, or unable to accept the update within one refresh interval, direct fanout covers all Active peers. Membership direct gossip begins before optional dissemination and keeps the caller's cancellation and shutdown deadline.
 
@@ -133,7 +135,7 @@ Protocol dictionaries use focused locks for membership projections, response cur
 
 Caller cancellation owns public operation lifetime and is checked before each received value is applied. Per-hop value TTL bounds the local broadcast RPC wait and anti-entropy round lifetime, independently of the runtime's cancellation-acknowledgment setting. Shared admission waits are pump-cancellable and retain their FIFO position while capacity is unavailable. Explicit flush and drain observers use their caller's cancellation token, with no separate observer TTL; supply a bounded token when waiting indefinitely for admission is unacceptable.
 
-Stopping rejects new notifications and repair admissions. Accepted broadcast work can drain within the shutdown caller's budget; cancellation stops its queued admissions, local RPC waits, and pump timers. Each local attempt releases its managed admission lease during cleanup. Once pumps stop, the broadcast gate closes to further admissions. Repair cancellation is explicitly forwarded before disposing the round's linked sources, even when the local wait completes cancellation first.
+Stopping rejects new notifications and repair admissions. Accepted broadcast work drains through acknowledgments, including retries with the usual backoff, within the shutdown caller's budget. Cancellation reports an incomplete drain and stops its queued admissions, local RPC waits, and pump timers. Each local attempt releases its managed admission lease during cleanup. Once pumps stop, the broadcast gate closes to further admissions. Repair cancellation is explicitly forwarded before disposing the round's linked sources, even when the local wait completes cancellation first.
 
 A stalled destination occupies at most one active local broadcast slot and one independent local repair slot. Hop deadlines release those slots and signal cancellation, allowing queued broadcasts and future repair rounds to continue. Retry backoff, rotating peer selection, per-message budgets, and local admission together bound the pace and size of new attempts.
 

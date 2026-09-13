@@ -77,6 +77,7 @@ internal sealed partial class DisseminationSystemTarget : SystemTarget, IDissemi
 
         var shutdownToken = _shutdownCts.Token;
         _antiEntropyTask = this.RunOrQueueTask(() => RunAntiEntropyLoop(shutdownToken));
+        _antiEntropyTask.Ignore();
         return Task.CompletedTask;
     }
 
@@ -114,14 +115,25 @@ internal sealed partial class DisseminationSystemTarget : SystemTarget, IDissemi
 
     private async Task RunAntiEntropyLoop(CancellationToken cancellationToken)
     {
+        using var wakeTimer = new WakeTimer(_timeProvider);
+        using var subscription = _options.OnChange((_, _) => wakeTimer.Wake());
         try
         {
             while (true)
             {
-                await Task.Delay(
-                    _options.CurrentValue.Overlay.AntiEntropyInterval,
-                    _timeProvider,
-                    cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
+                var options = _options.CurrentValue;
+                wakeTimer.Change(options.Enabled ? options.Overlay.AntiEntropyInterval : Timeout.InfiniteTimeSpan);
+                if (!await wakeTimer.WaitAsync(cancellationToken))
+                {
+                    return;
+                }
+
+                if (!_options.CurrentValue.Enabled)
+                {
+                    continue;
+                }
+
                 try
                 {
                     await _protocol.RunAntiEntropyRound(cancellationToken);

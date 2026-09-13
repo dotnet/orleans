@@ -163,6 +163,7 @@ internal sealed class MembershipDisseminationNamespace(
             return DisseminationApplyResult.Rejected;
         }
 
+        // The membership manager merges maximum per-entry IAmAliveTime before publishing a full snapshot.
         var currentSnapshot = membershipManager.CurrentSnapshot;
         if (snapshot.Version < currentSnapshot.Version)
         {
@@ -216,7 +217,11 @@ internal sealed class MembershipDisseminationNamespace(
             return DisseminationApplyResult.Rejected;
         }
 
-        var entries = current.Entries.ToBuilder();
+        // Table cleanup can change the inventory without changing its version, so a receiver's
+        // baseline can contain entries which the sender never saw and therefore could not remove.
+        var entries = diff.IncludesAllEntries
+            ? ImmutableDictionary.CreateBuilder<SiloAddress, MembershipEntry>()
+            : current.Entries.ToBuilder();
         foreach (var silo in diff.RemovedSilos)
         {
             entries.Remove(silo);
@@ -335,7 +340,8 @@ internal sealed class MembershipDisseminationNamespace(
             baseSnapshot.Version,
             snapshot.Version,
             updated.ToImmutable(),
-            removed.ToImmutable());
+            removed.ToImmutable(),
+            includesAllEntries: true);
     }
 
     private static long GetFingerprint(MembershipTableSnapshot snapshot)
@@ -460,12 +466,14 @@ internal sealed class MembershipTableSnapshotDiff
         MembershipVersion baseVersion,
         MembershipVersion version,
         ImmutableArray<MembershipEntry> updatedEntries,
-        ImmutableArray<SiloAddress> removedSilos)
+        ImmutableArray<SiloAddress> removedSilos,
+        bool includesAllEntries = false)
     {
         BaseVersion = baseVersion;
         Version = version;
         UpdatedEntries = updatedEntries;
         RemovedSilos = removedSilos;
+        IncludesAllEntries = includesAllEntries;
     }
 
     [Id(0)]
@@ -479,4 +487,8 @@ internal sealed class MembershipTableSnapshotDiff
 
     [Id(3)]
     public ImmutableArray<SiloAddress> RemovedSilos { get; }
+
+    // Absent on older payloads, where UpdatedEntries can be only a partial update.
+    [Id(4)]
+    public bool IncludesAllEntries { get; }
 }
