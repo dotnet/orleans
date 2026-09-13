@@ -6,7 +6,6 @@ using Amazon.Runtime;
 using Amazon.S3;
 using Amazon.S3.Model;
 using Docker.DotNet;
-using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Configurations;
 using DotNet.Testcontainers.Containers;
 using Microsoft.Extensions.Configuration;
@@ -29,10 +28,7 @@ namespace Orleans.Journaling.Tests;
 [TestArea("Journaling")]
 public sealed class S3JournalStorageTests : IAsyncLifetime
 {
-    private const int MinioPort = 9000;
     private const string BucketName = "journaling-tests";
-    private const string AccessKey = "minioadmin";
-    private const string SecretKey = "minioadmin";
     private static readonly Lazy<string?> DockerSkipReason = new(GetDockerSkipReason);
     private readonly IContainer? _container;
     private AmazonS3Client? _client;
@@ -42,15 +38,7 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
     {
         if (DockerSkipReason.Value is null)
         {
-            _container = new ContainerBuilder("minio/minio:RELEASE.2025-09-07T16-13-09Z")
-                .WithEnvironment("MINIO_ROOT_USER", AccessKey)
-                .WithEnvironment("MINIO_ROOT_PASSWORD", SecretKey)
-                .WithCommand("server", "/data")
-                .WithPortBinding(MinioPort, true)
-                .WithWaitStrategy(Wait.ForUnixContainer().UntilHttpRequestIsSucceeded(request => request
-                    .ForPort(MinioPort)
-                    .ForPath("/minio/health/ready")))
-                .Build();
+            _container = SeaweedFSTestContainer.Create();
         }
     }
 
@@ -1481,10 +1469,10 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
 
         await _container!.StartAsync(TestContext.Current.CancellationToken);
         _client = new AmazonS3Client(
-            new BasicAWSCredentials(AccessKey, SecretKey),
+            new BasicAWSCredentials(SeaweedFSTestContainer.AccessKey, SeaweedFSTestContainer.SecretKey),
             new AmazonS3Config
             {
-                ServiceURL = $"http://127.0.0.1:{_container.GetMappedPublicPort(MinioPort)}",
+                ServiceURL = $"http://127.0.0.1:{_container.GetMappedPublicPort(SeaweedFSTestContainer.Port)}",
                 ForcePathStyle = true,
                 AuthenticationRegion = RegionEndpoint.USEast1.SystemName,
             });
@@ -1504,7 +1492,7 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task AppendReadReplaceAndDelete_RoundTripsThroughMinio()
+    public async Task AppendReadReplaceAndDelete_RoundTripsThroughSeaweedFS()
     {
         EnsureDockerAvailable();
         var storage = CreateStorage("journals/test", journalFormatKey: "json-lines");
@@ -1724,7 +1712,7 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
             var endpointAuthConfig = TestcontainersSettings.OS?.DockerEndpointAuthConfig;
             if (endpointAuthConfig is null)
             {
-                return "Docker is unavailable, so MinIO S3 journal storage tests are skipped.";
+                return "Docker is unavailable, so SeaweedFS S3 journal storage tests are skipped.";
             }
 
             using var dockerClient = endpointAuthConfig
@@ -1733,31 +1721,31 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
             var dockerInfo = dockerClient.System.GetSystemInfoAsync().GetAwaiter().GetResult();
             if (string.IsNullOrWhiteSpace(dockerInfo.OSType))
             {
-                return "Docker is unavailable, so MinIO S3 journal storage tests are skipped.";
+                return "Docker is unavailable, so SeaweedFS S3 journal storage tests are skipped.";
             }
 
             if (string.Equals(dockerInfo.OSType, "windows", StringComparison.OrdinalIgnoreCase))
             {
-                return "Docker is running in Windows container mode, so MinIO S3 journal storage tests are skipped.";
+                return "Docker is running in Windows container mode, so SeaweedFS S3 journal storage tests are skipped.";
             }
 
             return null;
         }
         catch (HttpRequestException)
         {
-            return "Docker is unavailable, so MinIO S3 journal storage tests are skipped.";
+            return "Docker is unavailable, so SeaweedFS S3 journal storage tests are skipped.";
         }
         catch (OperationCanceledException)
         {
-            return "Docker is unavailable, so MinIO S3 journal storage tests are skipped.";
+            return "Docker is unavailable, so SeaweedFS S3 journal storage tests are skipped.";
         }
         catch (DockerApiException)
         {
-            return "Docker is unavailable, so MinIO S3 journal storage tests are skipped.";
+            return "Docker is unavailable, so SeaweedFS S3 journal storage tests are skipped.";
         }
         catch (InvalidOperationException)
         {
-            return "Docker is unavailable, so MinIO S3 journal storage tests are skipped.";
+            return "Docker is unavailable, so SeaweedFS S3 journal storage tests are skipped.";
         }
     }
 

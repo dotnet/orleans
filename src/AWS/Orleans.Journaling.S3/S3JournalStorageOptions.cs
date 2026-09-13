@@ -68,7 +68,7 @@ public sealed class S3JournalStorageOptions
     /// Gets or sets a value indicating whether appends use S3 Express <see cref="Amazon.S3.Model.PutObjectRequest.WriteOffsetBytes"/>.
     /// </summary>
     /// <remarks>
-    /// Set this to <see langword="false"/> for S3-compatible emulators such as MinIO which do not support S3 Express append writes.
+    /// Set this to <see langword="false"/> to use conditional-rewrite appends with S3-compatible services such as SeaweedFS.
     /// </remarks>
     public bool UseS3ExpressAppend { get; set; } = true;
 

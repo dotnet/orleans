@@ -8,7 +8,6 @@ using Amazon.Runtime;
 using Amazon.S3;
 using Amazon.S3.Model;
 using Docker.DotNet;
-using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Configurations;
 using DotNet.Testcontainers.Containers;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -176,9 +175,6 @@ public sealed class S3JournalStoragePersistenceTestKitTests
 
 public sealed class S3JournalStoragePersistenceTestKitFixture : IAsyncLifetime
 {
-    private const int MinioPort = 9000;
-    private const string AccessKey = "minioadmin";
-    private const string SecretKey = "minioadmin";
     private static readonly Lazy<string?> DockerSkipReason = new(GetDockerSkipReason);
     private readonly IContainer? _container;
     private AmazonS3Client? _client;
@@ -188,15 +184,7 @@ public sealed class S3JournalStoragePersistenceTestKitFixture : IAsyncLifetime
     {
         if (DockerSkipReason.Value is null)
         {
-            _container = new ContainerBuilder("minio/minio:RELEASE.2025-09-07T16-13-09Z")
-                .WithEnvironment("MINIO_ROOT_USER", AccessKey)
-                .WithEnvironment("MINIO_ROOT_PASSWORD", SecretKey)
-                .WithCommand("server", "/data")
-                .WithPortBinding(MinioPort, true)
-                .WithWaitStrategy(Wait.ForUnixContainer().UntilHttpRequestIsSucceeded(request => request
-                    .ForPort(MinioPort)
-                    .ForPath("/minio/health/ready")))
-                .Build();
+            _container = SeaweedFSTestContainer.Create();
         }
     }
 
@@ -223,10 +211,10 @@ public sealed class S3JournalStoragePersistenceTestKitFixture : IAsyncLifetime
 
         await _container!.StartAsync(TestContext.Current.CancellationToken);
         _client = new AmazonS3Client(
-            new BasicAWSCredentials(AccessKey, SecretKey),
+            new BasicAWSCredentials(SeaweedFSTestContainer.AccessKey, SeaweedFSTestContainer.SecretKey),
             new AmazonS3Config
             {
-                ServiceURL = $"http://127.0.0.1:{_container.GetMappedPublicPort(MinioPort)}",
+                ServiceURL = $"http://127.0.0.1:{_container.GetMappedPublicPort(SeaweedFSTestContainer.Port)}",
                 ForcePathStyle = true,
                 AuthenticationRegion = RegionEndpoint.USEast1.SystemName,
             });
