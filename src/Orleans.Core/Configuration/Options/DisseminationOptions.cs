@@ -24,11 +24,17 @@ public sealed class DisseminationOptions
     /// <summary>
     /// Gets or sets the maximum total payload bytes in one dissemination batch.
     /// </summary>
+    /// <remarks>
+    /// Bounds outgoing batches and the values admitted from each incoming broadcast or repair response.
+    /// </remarks>
     public int MaxBatchBytes { get; set; } = 1024 * 1024;
 
     /// <summary>
     /// Gets or sets the maximum number of items in one dissemination batch.
     /// </summary>
+    /// <remarks>
+    /// Bounds outgoing batches and the values examined in each incoming broadcast or repair response.
+    /// </remarks>
     public int MaxBatchItems { get; set; } = 8 * 1024;
 
     /// <summary>
@@ -152,11 +158,14 @@ public sealed class DisseminationNamespaceOptions
     public TimeSpan MaxCoalescingDelay { get; set; } = TimeSpan.FromMilliseconds(100);
 
     /// <summary>
-    /// Gets or sets how long a namespace value remains useful.
+    /// Gets or sets the local transport and application budgets for a namespace value.
     /// </summary>
     /// <remarks>
-    /// The lifetime bounds transport and application independently for each dissemination hop. Forwarding
-    /// re-materializes the value with a new hop lifetime.
+    /// Each hop has independent local transport and application windows. Broadcast application ages from
+    /// the start of receiver processing, including earlier items in the batch. Anti-entropy application
+    /// starts a new window after exchanges finish. Received lifetimes are capped by the local namespace
+    /// setting, and owners observe cancellation before applying queued state. Forwarding re-materializes
+    /// the current value with a new hop lifetime. These local windows use each silo's own clock.
     /// </remarks>
     /// <value>The lifetime is 30 seconds by default and must be greater than zero.</value>
     public TimeSpan StaleItemTtl { get; set; } = TimeSpan.FromSeconds(30);

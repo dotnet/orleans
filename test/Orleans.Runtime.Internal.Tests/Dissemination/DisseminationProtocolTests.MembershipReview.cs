@@ -345,7 +345,8 @@ public partial class DisseminationProtocolTests
 
     private static MembershipTableManager CreateMembershipReviewManager(
         SiloAddress local,
-        out IFatalErrorHandler fatalErrorHandler)
+        out IFatalErrorHandler fatalErrorHandler,
+        IMembershipTable membershipTable = null!)
     {
         var timer = Substitute.For<IAsyncTimer>();
         var timers = Substitute.For<IAsyncTimerFactory>();
@@ -354,7 +355,7 @@ public partial class DisseminationProtocolTests
         return new MembershipTableManager(
             new FakeLocalSiloDetails(local),
             Options.Create(new ClusterMembershipOptions()),
-            Substitute.For<IMembershipTable>(),
+            membershipTable ?? Substitute.For<IMembershipTable>(),
             fatalErrorHandler,
             Substitute.For<IMembershipGossiper>(),
             NullLogger<MembershipTableManager>.Instance,
