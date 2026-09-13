@@ -304,6 +304,11 @@ internal sealed partial class DisseminationProtocol
             roundCancellationToken.ThrowIfCancellationRequested();
             await ApplyAntiEntropyResponses(responses, options, roundCancellationToken);
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            throw;
+        }
         finally
         {
             foreach (var lease in leases.Values)
