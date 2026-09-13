@@ -38,11 +38,10 @@ function Test-IsUninitializedCoordinatorFailure {
         }
     }
 
-    $failureMessage = 'Unhandled exception: One or more errors occurred. (Handle is not initialized.)'
-    return $null -ne (
-        $Messages |
-            Where-Object { [string]::Equals($_, $failureMessage, [StringComparison]::Ordinal) } |
-            Select-Object -First 1
+    $text = [string]::Join([Environment]::NewLine, $Messages)
+    return $text.Contains(
+        'Unhandled exception: One or more errors occurred. (Handle is not initialized.)',
+        [StringComparison]::Ordinal
     )
 }
 

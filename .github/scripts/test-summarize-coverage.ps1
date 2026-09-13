@@ -833,7 +833,7 @@ $attempt = if (Test-Path -LiteralPath $env:ORLEANS_TEST_ATTEMPT_FILE) {
 
 $attempt++
 Set-Content -LiteralPath $env:ORLEANS_TEST_ATTEMPT_FILE -Value $attempt
-if (($env:ORLEANS_TEST_FAILURE -eq 'handle' -and $attempt -eq 1) -or
+if ((($env:ORLEANS_TEST_FAILURE -eq 'handle' -or $env:ORLEANS_TEST_FAILURE -eq 'decorated-handle') -and $attempt -eq 1) -or
     $env:ORLEANS_TEST_FAILURE -eq 'handle-always' -or
     $env:ORLEANS_TEST_FAILURE -eq 'handle-with-results') {
     if ($env:ORLEANS_TEST_FAILURE -eq 'handle-with-results') {
@@ -842,7 +842,11 @@ if (($env:ORLEANS_TEST_FAILURE -eq 'handle' -and $attempt -eq 1) -or
         Set-Content -LiteralPath (Join-Path $testResults 'test_results_case_Example.Tests_net8.0_x64.trx') -Value '<TestRun />'
     }
 
-    Write-Output 'Unhandled exception: One or more errors occurred. (Handle is not initialized.)'
+    if ($env:ORLEANS_TEST_FAILURE -eq 'decorated-handle') {
+        Write-Output '[runner] Unhandled exception: One or more errors occurred. (Handle is not initialized.) '
+    } else {
+        Write-Output 'Unhandled exception: One or more errors occurred. (Handle is not initialized.)'
+    }
     exit 1
 }
 
@@ -872,6 +876,12 @@ exit 0
             & $invokeTestScriptPath -TestCommand $fakeTest -ResultDirectory $resultDirectory -ResultFilePattern $resultFilePattern -Command @('test', '--forwarded-argument')
             Assert-Equal 0 $LASTEXITCODE 'The coordinator retry should succeed.'
             Assert-Equal 2 ([int] (Get-Content -Raw -LiteralPath $attemptFile)) 'The coordinator attempt count differs.'
+
+            Remove-Item -LiteralPath $attemptFile
+            $env:ORLEANS_TEST_FAILURE = 'decorated-handle'
+            & $invokeTestScriptPath -TestCommand $fakeTest -ResultDirectory $resultDirectory -ResultFilePattern $resultFilePattern -Command @('test', '--forwarded-argument')
+            Assert-Equal 0 $LASTEXITCODE 'A decorated coordinator failure should succeed on retry.'
+            Assert-Equal 2 ([int] (Get-Content -Raw -LiteralPath $attemptFile)) 'The decorated coordinator attempt count differs.'
 
             Remove-Item -LiteralPath $attemptFile
             $env:ORLEANS_TEST_FAILURE = 'test'
