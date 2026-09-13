@@ -60,6 +60,7 @@ internal sealed class KinesisPooledAdapterReceiver : IQueueAdapterReceiver, IQue
             topologyMonitor,
             getRecordsInterval,
             timeProvider,
+            ownsClients: false,
             replayOptions,
             onShutdown)
     {
@@ -78,6 +79,37 @@ internal sealed class KinesisPooledAdapterReceiver : IQueueAdapterReceiver, IQue
         TimeProvider timeProvider,
         RecoverableStreamReplayOptions? replayOptions = null,
         Action<KinesisPooledAdapterReceiver>? onShutdown = null)
+        : this(
+            clientFactory,
+            streamName,
+            partition,
+            checkpointerFactory,
+            cacheOptions,
+            serializer,
+            loggerFactory,
+            topologyMonitor,
+            getRecordsInterval,
+            timeProvider,
+            ownsClients: true,
+            replayOptions,
+            onShutdown)
+    {
+    }
+
+    private KinesisPooledAdapterReceiver(
+        Func<IAmazonKinesis> clientFactory,
+        string streamName,
+        string partition,
+        IStreamQueueCheckpointerFactory checkpointerFactory,
+        SimpleQueueCacheOptions cacheOptions,
+        Serializer<KinesisBatchContainer.Body> serializer,
+        ILoggerFactory loggerFactory,
+        KinesisShardTopologyMonitor topologyMonitor,
+        TimeSpan getRecordsInterval,
+        TimeProvider timeProvider,
+        bool ownsClients,
+        RecoverableStreamReplayOptions? replayOptions,
+        Action<KinesisPooledAdapterReceiver>? onShutdown)
     {
         _checkpointerFactory = checkpointerFactory;
         _partition = partition;
@@ -90,7 +122,8 @@ internal sealed class KinesisPooledAdapterReceiver : IQueueAdapterReceiver, IQue
             streamName,
             partition,
             topologyMonitor,
-            readThrottle);
+            readThrottle,
+            ownsClients);
         _dataAdapter = new(streamName, partition, serializer);
         _cache = CreateCache(cacheOptions.CacheSize, trackPurgedMetadata: false);
         _replayCacheFactory = () => CreateCache(_replayOptions.CacheSize, trackPurgedMetadata: true);
@@ -99,7 +132,8 @@ internal sealed class KinesisPooledAdapterReceiver : IQueueAdapterReceiver, IQue
             streamName,
             partition,
             topologyMonitor,
-            readThrottle);
+            readThrottle,
+            ownsClients);
 
         RecoverableStreamQueueCache<KinesisCacheRecord> CreateCache(
             int cacheSize,

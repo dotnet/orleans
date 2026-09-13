@@ -29,7 +29,8 @@ internal sealed class KinesisRecoverableStreamSource(
     string streamName,
     string partition,
     KinesisShardTopologyMonitor topologyMonitor,
-    KinesisShardReadThrottle readThrottle)
+    KinesisShardReadThrottle readThrottle,
+    bool ownsClient = true)
     : IRecoverableStreamSource<KinesisCacheRecord>, IRecoverableStreamReplaySource<KinesisCacheRecord>
 {
     private string? _shardIterator;
@@ -190,7 +191,11 @@ internal sealed class KinesisRecoverableStreamSource(
 
     public Task Shutdown(CancellationToken cancellationToken)
     {
-        client.Dispose();
+        if (ownsClient)
+        {
+            client.Dispose();
+        }
+
         return cancellationToken.IsCancellationRequested
             ? Task.FromCanceled(cancellationToken)
             : Task.CompletedTask;
@@ -260,7 +265,8 @@ internal sealed class KinesisReplaySourceFactory(
     string streamName,
     string partition,
     KinesisShardTopologyMonitor topologyMonitor,
-    KinesisShardReadThrottle readThrottle)
+    KinesisShardReadThrottle readThrottle,
+    bool ownsClient = true)
     : IRecoverableStreamReplaySourceFactory<KinesisCacheRecord>
 {
     public async ValueTask<IRecoverableStreamReplaySource<KinesisCacheRecord>> Create(
@@ -279,7 +285,8 @@ internal sealed class KinesisReplaySourceFactory(
             streamName,
             partition,
             topologyMonitor,
-            readThrottle);
+            readThrottle,
+            ownsClient);
         try
         {
             await source.InitializeReplay(kinesisToken, cancellationToken);

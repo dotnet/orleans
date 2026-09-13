@@ -555,7 +555,7 @@ internal sealed class RecoverableStreamReplayManager<TQueueMessage>
                         fragment.AtProviderTail |= read.IsAtTail;
                     }
 
-                    fragment.Source.MessagesAdded(read.Messages);
+                    fragment.Source.MessagesAdded(admitted);
                 }
                 else
                 {

@@ -562,6 +562,105 @@ public sealed class KinesisRuntimeTests
     }
 
     [Fact]
+    public async Task PooledReceiver_SharedClientRemainsCallerOwnedAfterReplay()
+    {
+        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = services.GetRequiredService<Serializer<KinesisBatchContainer.Body>>();
+        var streamId = StreamId.Create("namespace", Guid.NewGuid());
+        var client = Substitute.For<IAmazonKinesis>();
+        client.GetShardIteratorAsync(
+                Arg.Any<GetShardIteratorRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns(call => new GetShardIteratorResponse
+            {
+                ShardIterator = call.Arg<GetShardIteratorRequest>().ShardIteratorType == ShardIteratorType.TRIM_HORIZON
+                    ? "live-iterator"
+                    : "replay-iterator",
+            });
+        client.GetRecordsAsync(
+                Arg.Is<GetRecordsRequest>(request => request.ShardIterator == "live-iterator"),
+                Arg.Any<CancellationToken>())
+            .Returns(
+                new GetRecordsResponse
+                {
+                    NextShardIterator = "live-iterator",
+                    MillisBehindLatest = 0,
+                    Records = [CreateRecord(5)],
+                },
+                new GetRecordsResponse
+                {
+                    NextShardIterator = "live-iterator",
+                    MillisBehindLatest = 0,
+                    Records = [],
+                });
+        client.GetRecordsAsync(
+                Arg.Is<GetRecordsRequest>(request => request.ShardIterator == "replay-iterator"),
+                Arg.Any<CancellationToken>())
+            .Returns(new GetRecordsResponse
+            {
+                NextShardIterator = "replay-iterator",
+                MillisBehindLatest = 0,
+                Records = [CreateRecord(2), CreateRecord(3), CreateRecord(4), CreateRecord(5)],
+            });
+        var checkpointer = Substitute.For<IStreamQueueCheckpointer<string>>();
+        checkpointer.Load(Arg.Any<CancellationToken>()).Returns(string.Empty);
+        var checkpointerFactory = Substitute.For<IStreamQueueCheckpointerFactory>();
+        checkpointerFactory.Create("shard-1", Arg.Any<CancellationToken>()).Returns(checkpointer);
+        var timeProvider = new FakeTimeProvider { AutoAdvanceAmount = TimeSpan.FromMilliseconds(200) };
+        var topologyMonitor = new KinesisShardTopologyMonitor(
+            client,
+            "stream",
+            ["shard-1"],
+            TimeSpan.FromMinutes(1),
+            timeProvider,
+            NullLogger<KinesisShardTopologyMonitor>.Instance);
+        var receiver = new KinesisPooledAdapterReceiver(
+            client,
+            "stream",
+            "shard-1",
+            checkpointerFactory,
+            new SimpleQueueCacheOptions { CacheSize = 10 },
+            serializer,
+            NullLoggerFactory.Instance,
+            topologyMonitor,
+            TimeSpan.FromMilliseconds(200),
+            timeProvider,
+            new RecoverableStreamReplayOptions
+            {
+                MaxConcurrentReaders = 1,
+                MaxPendingReaders = 1,
+                CacheSize = 10,
+                ReadBatchSize = 10,
+                TemporaryTailRetryDelay = TimeSpan.Zero,
+            });
+        await receiver.Initialize(TimeSpan.FromSeconds(5));
+        _ = await receiver.GetQueueMessagesAsync(10, TestContext.Current.CancellationToken);
+
+        using var cursor = Assert.IsAssignableFrom<IAsyncQueueCacheCursor>(
+            receiver.GetCacheCursor(streamId, new KinesisSequenceToken("stream", "shard-1", "2", 0, 0)));
+        while (await cursor.MoveNextAsync(TestContext.Current.CancellationToken)
+            == QueueCacheCursorMoveNextResult.ItemAvailable)
+        {
+            ((IQueueCacheCursorProgress)cursor).RecordDeliverySuccess();
+        }
+
+        Assert.Empty(await receiver.GetQueueMessagesAsync(10, TestContext.Current.CancellationToken));
+        await receiver.Shutdown(TimeSpan.FromSeconds(5));
+        client.DidNotReceive().Dispose();
+
+        Amazon.Kinesis.Model.Record CreateRecord(long sequence)
+            => new()
+            {
+                SequenceNumber = sequence.ToString(),
+                Data = new MemoryStream(KinesisBatchContainer.ToKinesisPayload(
+                    serializer,
+                    streamId,
+                    [sequence],
+                    requestContext: null)),
+            };
+    }
+
+    [Fact]
     public async Task ReplayReader_InvalidTokenAndExpiredSequence_SurfaceDataNotAvailable()
     {
         var client = Substitute.For<IAmazonKinesis>();
