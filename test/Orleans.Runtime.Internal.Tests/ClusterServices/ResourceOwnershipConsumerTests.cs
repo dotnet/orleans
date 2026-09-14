@@ -171,6 +171,192 @@ public sealed class ResourceOwnershipConsumerTests
         Assert.Equal(new byte[] { 1 }, (await Read(consumer, current.Id)).ToArray());
     }
 
+    [Theory(Timeout = 30_000)]
+    [InlineData("assignments")]
+    [InlineData("participants")]
+    public async Task InitialInstallationRejectsConflictingCanonicalContentBeforeProtocolWork(string changedContent)
+    {
+        await using var provider = Create(new(), new());
+        var current = await Publish(provider, changedContent == "assignments" ? TestServiceMembership.B : TestServiceMembership.A);
+        var conflicting = new RegisteredClusterServiceView(
+            current.Id, current.Predecessor, current.MembershipWatermark, current.Configuration,
+            changedContent == "participants" ? [TestServiceMembership.A] : current.Participants,
+            current.Resources, [KeyValuePair.Create(TestServiceMembership.Resource, TestServiceMembership.A)]);
+        var protocol = new Protocol();
+        await using var consumer = new ResourceOwnershipConsumer(TestServiceMembership.A, provider, protocol);
+
+        var failure = await Assert.ThrowsAsync<ClusterServiceAuthorityException>(() => consumer.InstallViewAsync(conflicting));
+
+        Assert.Contains($"Canonical view identity '{current.Id}' has conflicting content.", failure.Message);
+        Assert.Equal(0, protocol.Recoveries);
+        Assert.Equal(0, protocol.Fences);
+        Assert.Equal(0, protocol.Checkpoints);
+        Assert.Equal(0, protocol.Handoffs);
+        await Assert.ThrowsAsync<ClusterServiceViewUnavailableException>(() => Read(consumer, current.Id).AsTask());
+        Assert.True(provider.TryGetCurrentView(out var authoritative));
+        Assert.Same(current, authoritative);
+        await consumer.InstallViewAsync(current).WaitAsync(TestContext.Current.CancellationToken);
+        if (changedContent == "participants")
+        {
+            Assert.Equal(new byte[] { 1 }, (await Read(consumer, current.Id)).ToArray());
+        }
+    }
+
+    [Fact(Timeout = 30_000)]
+    public async Task InitialInstallationAcceptsEquivalentCanonicalContent()
+    {
+        await using var provider = Create(new(), new());
+        var current = await Publish(provider, TestServiceMembership.A);
+        var equivalent = MakeView(current.Id.Revision, TestServiceMembership.A);
+        Assert.NotSame(current, equivalent);
+        var protocol = new Protocol();
+        await using var consumer = new ResourceOwnershipConsumer(TestServiceMembership.A, provider, protocol);
+
+        var installation = consumer.InstallViewAsync(equivalent);
+        await installation.WaitAsync(TestContext.Current.CancellationToken);
+
+        Assert.Same(installation, consumer.InstallViewAsync(current));
+        Assert.Equal(new byte[] { 1 }, (await Read(consumer, current.Id)).ToArray());
+        Assert.Equal(1, protocol.Recoveries);
+        Assert.Equal(1, protocol.Fences);
+        Assert.Equal(0, protocol.Checkpoints);
+        Assert.Equal(0, protocol.Handoffs);
+    }
+
+    [Theory(Timeout = 30_000)]
+    [InlineData("assignments")]
+    [InlineData("participants")]
+    [InlineData("none")]
+    public async Task ProviderCatchUpValidatesInstalledCanonicalContentBeforeAdmission(string changedContent)
+    {
+        await using var provider = Create(new(), new());
+        var first = await Publish(provider, TestServiceMembership.A);
+        var delivered = MakeView(first.Id.Revision + 1, TestServiceMembership.A, first.Id);
+        var protocol = new Protocol();
+        await using var consumer = new ResourceOwnershipConsumer(TestServiceMembership.A, provider, protocol);
+        await consumer.InstallViewAsync(delivered).WaitAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(new byte[] { 1 }, (await Read(consumer, delivered.Id)).ToArray());
+        var current = await Publish(provider, changedContent == "assignments" ? TestServiceMembership.B : TestServiceMembership.A,
+            changedContent == "participants" ? [TestServiceMembership.A] : null);
+        Assert.Equal(delivered.Id, current.Id);
+        var executed = false;
+
+        var operation = consumer.ExecuteAsync(TestServiceMembership.Resource, delivered.Id, (_, _) =>
+        {
+            executed = true;
+            return ValueTask.FromResult<ReadOnlyMemory<byte>>(new byte[] { 42 });
+        }, TestContext.Current.CancellationToken).AsTask();
+
+        if (changedContent == "none")
+        {
+            Assert.Equal(new byte[] { 42 }, (await operation).ToArray());
+            Assert.True(executed);
+            Assert.Equal(new byte[] { 42 }, (await Read(consumer, current.Id)).ToArray());
+        }
+        else
+        {
+            await Assert.ThrowsAsync<ClusterServiceAuthorityException>(() => operation);
+            Assert.False(executed);
+        }
+
+        Assert.Equal(1, protocol.Recoveries);
+        Assert.Equal(1, protocol.Fences);
+        Assert.Equal(0, protocol.Checkpoints);
+        Assert.Equal(0, protocol.Handoffs);
+    }
+
+    [Theory(Timeout = 30_000)]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ProviderCatchUpValidatesCanonicalContentBeforeHandoff(bool conflicting)
+    {
+        await using var provider = Create(new(), new());
+        var first = await Publish(provider, TestServiceMembership.A);
+        var protocol = new Protocol();
+        await using var consumer = new ResourceOwnershipConsumer(TestServiceMembership.A, provider, protocol);
+        await consumer.InstallViewAsync(first).WaitAsync(TestContext.Current.CancellationToken);
+        await consumer.ExecuteAsync(TestServiceMembership.Resource, first.Id,
+            static (_, _) => ValueTask.FromResult<ReadOnlyMemory<byte>>(new byte[] { 42 }), TestContext.Current.CancellationToken);
+        var delivered = MakeView(first.Id.Revision + 1, TestServiceMembership.B, first.Id);
+        await consumer.InstallViewAsync(delivered).WaitAsync(TestContext.Current.CancellationToken);
+        var current = await Publish(provider, conflicting ? TestServiceMembership.A : TestServiceMembership.B);
+        Assert.Equal(delivered.Id, current.Id);
+        var request = new ResourceHandoffRequest(TestServiceMembership.Resource, TestServiceMembership.B, first.Id, delivered.Id, Guid.NewGuid());
+
+        var handoff = consumer.CreateHandoffAsync(request, TestContext.Current.CancellationToken).AsTask();
+
+        if (conflicting)
+        {
+            await Assert.ThrowsAsync<ClusterServiceAuthorityException>(() => handoff);
+        }
+        else
+        {
+            var state = await handoff;
+            Assert.Equal(request.PreviousView, state.PreviousView);
+            Assert.Equal(request.TargetView, state.TargetView);
+            Assert.Equal(request.ReceiverId, state.ReceiverId);
+            Assert.Equal(new byte[] { 42 }, state.State.ToArray());
+        }
+
+        Assert.Equal(1, protocol.Checkpoints);
+        Assert.Equal(new byte[] { 42 }, protocol.Durable.ToArray());
+        Assert.Equal(1, protocol.Recoveries);
+        Assert.Equal(1, protocol.Fences);
+    }
+
+    [Theory(Timeout = 30_000)]
+    [InlineData("recovery")]
+    [InlineData("fence")]
+    public async Task ProviderCatchUpWithConflictingCanonicalContentPreventsActivation(string delayedStage)
+    {
+        await using var provider = Create(new(), new());
+        var first = await Publish(provider, TestServiceMembership.A);
+        var delivered = MakeView(first.Id.Revision + 1, TestServiceMembership.A, first.Id);
+        var started = Signal();
+        var resume = Signal();
+        var protocol = new Protocol
+        {
+            Recover = async (_, _, token) =>
+            {
+                if (delayedStage == "recovery")
+                {
+                    started.SetResult();
+                    await resume.Task.WaitAsync(token);
+                }
+
+                return new byte[] { 99 };
+            },
+            Fence = async (_, _, token) =>
+            {
+                if (delayedStage == "fence")
+                {
+                    started.SetResult();
+                    await resume.Task.WaitAsync(token);
+                }
+
+                return new(ClusterServiceFencingMode.External, 12345);
+            }
+        };
+        await using var consumer = new ResourceOwnershipConsumer(TestServiceMembership.A, provider, protocol);
+        var installation = consumer.InstallViewAsync(delivered);
+        await started.Task.WaitAsync(TestContext.Current.CancellationToken);
+        var current = await Publish(provider, TestServiceMembership.B);
+        Assert.Equal(delivered.Id, current.Id);
+
+        resume.SetResult();
+
+        var failure = await Assert.ThrowsAsync<ClusterServiceAuthorityException>(() => installation);
+        var gates = Assert.IsType<ResourceTransitionGateMap<string, RegisteredServiceViewId>>(typeof(ResourceOwnershipConsumer)
+            .GetField("_gates", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(consumer));
+        Assert.True(gates.TryGetBlockingTransition(TestServiceMembership.Resource, delivered.Id, out var completion));
+        Assert.Same(failure, await Assert.ThrowsAsync<ClusterServiceAuthorityException>(() => completion));
+        await Assert.ThrowsAsync<ClusterServiceAuthorityException>(() => Read(consumer, delivered.Id).AsTask());
+        Assert.Equal(1, protocol.Recoveries);
+        Assert.Equal(delayedStage == "fence" ? 1 : 0, protocol.Fences);
+        Assert.Equal(0, protocol.Checkpoints);
+        Assert.Equal(new byte[] { 1 }, protocol.Durable.ToArray());
+    }
+
     [Fact(Timeout = 30_000)]
     public async Task DelayedOldAuthorityDeliveryCannotInitializeAReplacementConsumer()
     {
