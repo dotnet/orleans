@@ -63,6 +63,8 @@ namespace Orleans.Runtime
                 SendingSilo = request.TargetSilo,
                 SendingGrain = request.TargetGrain,
                 CacheInvalidationHeader = request.CacheInvalidationHeader,
+                TimeToLive = request.TimeToLive,
+                GatewayRequestAttempt = request.GatewayRequestAttempt,
                 RequestContextData = RequestContextExtensions.Export(_deepCopier),
             };
 

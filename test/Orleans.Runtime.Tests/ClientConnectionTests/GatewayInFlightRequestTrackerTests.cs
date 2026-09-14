@@ -129,11 +129,24 @@ public class GatewayInFlightRequestTrackerTests
 
         var completion = tracker.TryComplete(CreateResponse(original, Message.ResponseTypes.Success));
 
-        Assert.Equal(GatewayInFlightRequestTracker.CompletionResult.Deferred, completion);
+        Assert.Equal(GatewayInFlightRequestTracker.CompletionResult.Superseded, completion);
         Assert.Equal(1, tracker.Count);
         Assert.Equal(
             GatewayInFlightRequestTracker.CompletionResult.Completed,
             tracker.TryComplete(CreateResponse(retry, Message.ResponseTypes.Success)));
+        Assert.Equal(0, tracker.Count);
+    }
+
+    [Fact]
+    public void LegacyResponseCompletesMatchingDestination()
+    {
+        var tracker = CreateTracker();
+        var request = CreateMessage(1, Message.Directions.Request, Silo1);
+        Assert.True(tracker.Track(request));
+        var response = CreateResponse(request, Message.ResponseTypes.Success);
+        response.GatewayRequestAttempt = 0;
+
+        Assert.Equal(GatewayInFlightRequestTracker.CompletionResult.Completed, tracker.TryComplete(response));
         Assert.Equal(0, tracker.Count);
     }
 
@@ -156,6 +169,7 @@ public class GatewayInFlightRequestTrackerTests
                 Silo1,
                 Silo2,
                 forwardCount: 1,
+                request.GatewayRequestAttempt,
                 out var updatedTarget,
                 out var completedResponse));
 
@@ -196,6 +210,7 @@ public class GatewayInFlightRequestTrackerTests
                 Silo1,
                 Silo2,
                 forwardCount: 1,
+                request.GatewayRequestAttempt,
                 out var updatedTarget,
                 out var completedResponse));
 
@@ -208,6 +223,28 @@ public class GatewayInFlightRequestTrackerTests
     }
 
     [Fact]
+    public void LegacyForwardingUpdateAdvancesDestination()
+    {
+        var tracker = CreateTracker();
+        var request = CreateMessage(1, Message.Directions.Request, Silo1);
+        Assert.True(tracker.Track(request));
+
+        Assert.Equal(
+            GatewayInFlightRequestTracker.ForwardingUpdateResult.Applied,
+            tracker.TryUpdateDestination(
+                request.Id,
+                Silo1,
+                Silo2,
+                forwardCount: 1,
+                attempt: 0,
+                out var updatedTarget,
+                out var completedResponse));
+
+        Assert.Equal(Silo2, updatedTarget);
+        Assert.Null(completedResponse);
+    }
+
+    [Fact]
     public void StaleForwardingUpdateDoesNotReplaceNewerDestination()
     {
         var tracker = CreateTracker();
@@ -217,7 +254,14 @@ public class GatewayInFlightRequestTrackerTests
 
         Assert.Equal(
             GatewayInFlightRequestTracker.ForwardingUpdateResult.Ignored,
-            tracker.TryUpdateDestination(request.Id, Silo1, Silo2, forwardCount: 1, out _, out _));
+            tracker.TryUpdateDestination(
+                request.Id,
+                Silo1,
+                Silo2,
+                forwardCount: 1,
+                request.GatewayRequestAttempt,
+                out _,
+                out _));
 
         Assert.Null(tracker.RemoveForSilo(Silo2));
         var current = Assert.Single(tracker.RemoveForSilo(Silo1)!);
@@ -235,7 +279,14 @@ public class GatewayInFlightRequestTrackerTests
 
         Assert.Equal(
             GatewayInFlightRequestTracker.ForwardingUpdateResult.Recorded,
-            tracker.TryUpdateDestination(request.Id, Silo2, silo3, forwardCount: 2, out _, out _));
+            tracker.TryUpdateDestination(
+                request.Id,
+                Silo2,
+                silo3,
+                forwardCount: 2,
+                request.GatewayRequestAttempt,
+                out _,
+                out _));
         Assert.Equal(
             GatewayInFlightRequestTracker.ForwardingUpdateResult.Applied,
             tracker.TryUpdateDestination(
@@ -243,6 +294,7 @@ public class GatewayInFlightRequestTrackerTests
                 Silo1,
                 Silo2,
                 forwardCount: 1,
+                request.GatewayRequestAttempt,
                 out var updatedTarget,
                 out var completedResponse));
 
@@ -264,12 +316,52 @@ public class GatewayInFlightRequestTrackerTests
         Assert.True(tracker.Track(retry));
 
         Assert.Equal(
-            GatewayInFlightRequestTracker.ForwardingUpdateResult.Recorded,
-            tracker.TryUpdateDestination(original.Id, Silo1, Silo2, forwardCount: 1, out _, out _));
+            GatewayInFlightRequestTracker.ForwardingUpdateResult.Ignored,
+            tracker.TryUpdateDestination(
+                original.Id,
+                Silo1,
+                Silo2,
+                forwardCount: 1,
+                original.GatewayRequestAttempt,
+                out _,
+                out _));
 
         var current = Assert.Single(tracker.RemoveForSilo(Silo2)!);
         Assert.Equal(retry.Id, current.Id);
         Assert.Equal(0, current.ForwardCount);
+    }
+
+    [Fact]
+    public void OldAttemptResponseDoesNotCompleteRetryForwardedBackToSameSilo()
+    {
+        var tracker = CreateTracker();
+        var original = CreateMessage(1, Message.Directions.Request, Silo1);
+        Assert.True(tracker.Track(original));
+        var retry = CreateMessage(1, Message.Directions.Request, Silo2);
+        Assert.True(tracker.Track(retry));
+
+        Assert.Equal(
+            GatewayInFlightRequestTracker.CompletionResult.Superseded,
+            tracker.TryComplete(CreateResponse(original, Message.ResponseTypes.Success)));
+        Assert.Equal(
+            GatewayInFlightRequestTracker.ForwardingUpdateResult.Applied,
+            tracker.TryUpdateDestination(
+                retry.Id,
+                Silo2,
+                Silo1,
+                forwardCount: 1,
+                retry.GatewayRequestAttempt,
+                out var updatedTarget,
+                out var completedResponse));
+
+        Assert.Equal(Silo1, updatedTarget);
+        Assert.Null(completedResponse);
+        var retryResponse = CreateResponse(retry, Message.ResponseTypes.Success);
+        retryResponse.SendingSilo = Silo1;
+        Assert.Equal(
+            GatewayInFlightRequestTracker.CompletionResult.Completed,
+            tracker.TryComplete(retryResponse));
+        Assert.Equal(0, tracker.Count);
     }
 
     [Fact]
@@ -293,7 +385,14 @@ public class GatewayInFlightRequestTrackerTests
 
         Assert.Equal(
             GatewayInFlightRequestTracker.ForwardingUpdateResult.Applied,
-            tracker.TryUpdateDestination(request.Id, Silo1, Silo2, forwardCount: 1, out _, out var completedResponse));
+            tracker.TryUpdateDestination(
+                request.Id,
+                Silo1,
+                Silo2,
+                forwardCount: 1,
+                request.GatewayRequestAttempt,
+                out _,
+                out var completedResponse));
         Assert.Null(completedResponse);
         Assert.Equal(1, tracker.Count);
     }
@@ -507,9 +606,9 @@ public class GatewayInFlightRequestTrackerTests
     {
         var tracker = CreateTracker();
         var request = CreateMessage(1, Message.Directions.Request, Silo1);
+        Assert.True(tracker.Track(request));
         var response = CreateResponse(request, Message.ResponseTypes.Error);
         response.BodyObject = new OperationCanceledException();
-        Assert.True(tracker.Track(request));
 
         if (clearFirst)
         {
@@ -640,6 +739,7 @@ public class GatewayInFlightRequestTrackerTests
             Direction = Message.Directions.Response,
             Result = responseType,
             SendingSilo = request.TargetSilo,
+            GatewayRequestAttempt = request.GatewayRequestAttempt,
             TimeToLive = request.TimeToLive,
         };
 
