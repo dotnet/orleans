@@ -7,6 +7,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Cassandra;
 using Orleans.Persistence.Cassandra;
+using Orleans.Persistence.TestKit;
 using Orleans.Runtime;
 using Orleans.Serialization.Activators;
 using Orleans.Serialization.Serializers;
@@ -401,6 +402,28 @@ public sealed class CassandraPersistenceIntegrationTests : IClassFixture<Cassand
         await second.ReadStateAsync("state", grainId, secondRead);
         Assert.Equal(1, Assert.IsType<TestState>(firstRead.State).Value);
         Assert.Equal(2, Assert.IsType<TestState>(secondRead.State).Value);
+    }
+
+    [Fact]
+    [TestCategory("ModelBased")]
+    public async Task ModelBasedGeneratedConformanceWithRetainedClearRows()
+    {
+        var table = NewTableName();
+        using var storage = await StartStorageAsync(table, createTable: true);
+        var runner = new GrainStorageModelBasedTestRunner(storage, "CassandraRetainedClear");
+
+        await runner.RunGeneratedConformanceTests(TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    [TestCategory("ModelBased")]
+    public async Task ModelBasedGeneratedConformanceWithDeletedClearRows()
+    {
+        var table = NewTableName();
+        using var storage = await StartStorageAsync(table, createTable: true, deleteStateOnClear: true);
+        var runner = new GrainStorageModelBasedTestRunner(storage, "CassandraDeletedClear");
+
+        await runner.RunGeneratedConformanceTests(TestContext.Current.CancellationToken);
     }
 
     private async Task<CassandraGrainStorage> StartStorageAsync(
