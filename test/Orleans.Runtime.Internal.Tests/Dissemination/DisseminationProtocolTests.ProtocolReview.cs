@@ -212,7 +212,7 @@ public partial class DisseminationProtocolTests
         harness.StatusOracle.SetStatus(harness.ActiveTwo, SiloStatus.Joining);
         var restarted = SiloAddress.New(harness.ActiveOne.Endpoint, harness.ActiveOne.Generation + 1);
         harness.StatusOracle.SetStatus(restarted, SiloStatus.Active);
-        var digests = ns.Digests.OrderBy(static digest => (SiloAddress)digest.Key.Value).ToArray();
+        var digests = ns.Digests.OrderBy(static digest => Assert.IsType<SiloAddress>(digest.Key.Value)).ToArray();
         Assert.Equal(
             new[] { harness.Local, restarted }.Order(),
             digests.Select(static digest => Assert.IsType<SiloAddress>(digest.Key.Value)));
