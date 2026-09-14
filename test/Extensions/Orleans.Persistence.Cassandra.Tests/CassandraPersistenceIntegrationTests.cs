@@ -51,7 +51,7 @@ public sealed class CassandraPersistenceIntegrationTests : IClassFixture<Cassand
                 ["grain_id"] = "text",
                 ["state_name"] = "text",
                 ["grain_type"] = "text",
-                ["version"] = "bigint",
+                ["etag"] = "uuid",
                 ["record_exists"] = "boolean",
                 ["state"] = "blob",
                 ["updated_at"] = "timestamp"
@@ -79,7 +79,7 @@ public sealed class CassandraPersistenceIntegrationTests : IClassFixture<Cassand
     }
 
     [Fact]
-    public async Task ExistingSchemaAndNumericBigintEtagsAreCompatible()
+    public async Task PrecreatedUuidEtagSchemaIsUsable()
     {
         var table = NewTableName();
         await CreateTableAsync(table);
@@ -87,29 +87,31 @@ public sealed class CassandraPersistenceIntegrationTests : IClassFixture<Cassand
         var grainId = GrainId.Create("compat", "existing");
         var stateName = "state";
         var existing = new TestState(7);
-        await InsertRawAsync(table, serviceId, grainId, stateName, version: 41, recordExists: true, existing);
+        var existingEtag = Guid.Parse("01993e48-9a00-7000-8000-000000000001");
+        await InsertRawAsync(table, serviceId, grainId, stateName, existingEtag, recordExists: true, existing);
 
         using var storage = await StartStorageAsync(table, serviceId);
         var loaded = new GrainState<TestState>(new());
         await storage.ReadStateAsync(stateName, grainId, loaded);
 
         Assert.True(loaded.RecordExists);
-        Assert.Equal("41", loaded.ETag);
+        Assert.Equal(existingEtag.ToString("D"), loaded.ETag);
         Assert.Equal(7, Assert.IsType<TestState>(loaded.State).Value);
 
         loaded.State = new TestState(8);
         await storage.WriteStateAsync(stateName, grainId, loaded);
-        Assert.Equal("42", loaded.ETag);
+        AssertUuidV7(loaded.ETag);
+        Assert.NotEqual(existingEtag.ToString("D"), loaded.ETag);
 
         var raw = await ReadRawAsync(table, serviceId, grainId, stateName);
         Assert.NotNull(raw);
-        Assert.Equal(42L, raw.GetValue<long>("version"));
+        Assert.Equal(Guid.Parse(loaded.ETag!), raw.GetValue<Guid>("etag"));
         Assert.True(raw.GetValue<bool>("record_exists"));
         Assert.Equal(8, Deserialize<TestState>(raw.GetValue<byte[]>("state")).Value);
     }
 
     [Fact]
-    public async Task FirstInsertVersionQualifiedUpdateAndStaleUpdateConflict()
+    public async Task FirstInsertEtagQualifiedUpdateAndStaleUpdateConflict()
     {
         var table = NewTableName();
         using var storage = await StartStorageAsync(table, createTable: true);
@@ -117,20 +119,22 @@ public sealed class CassandraPersistenceIntegrationTests : IClassFixture<Cassand
         var state = new GrainState<TestState>(new(1));
 
         await storage.WriteStateAsync("state", grainId, state);
-        Assert.Equal("1", state.ETag);
+        AssertUuidV7(state.ETag);
+        var firstEtag = state.ETag;
         Assert.Equal(grainId.Type.ToString(), (await ReadRawAsync(table, "cassandra-persistence-tests", grainId, "state"))!.GetValue<string>("grain_type"));
 
         state.State = new(2);
         await storage.WriteStateAsync("state", grainId, state);
-        Assert.Equal("2", state.ETag);
+        AssertUuidV7(state.ETag);
+        Assert.NotEqual(firstEtag, state.ETag);
 
-        var stale = new GrainState<TestState>(new(3)) { ETag = "1" };
+        var stale = new GrainState<TestState>(new(3)) { ETag = firstEtag };
         await Assert.ThrowsAsync<InconsistentStateException>(
             () => storage.WriteStateAsync("state", grainId, stale));
     }
 
     [Fact]
-    public async Task LogicalClearAdvancesVersionAndPhysicalClearRemovesRow()
+    public async Task LogicalClearChangesEtagAndPhysicalClearRemovesRow()
     {
         var logicalTable = NewTableName();
         using (var storage = await StartStorageAsync(logicalTable, createTable: true))
@@ -140,15 +144,17 @@ public sealed class CassandraPersistenceIntegrationTests : IClassFixture<Cassand
             await storage.WriteStateAsync("state", grainId, state);
             await storage.ClearStateAsync("state", grainId, state);
 
-            Assert.Equal("2", state.ETag);
+            AssertUuidV7(state.ETag);
+            var tombstoneEtag = state.ETag;
             var read = new GrainState<TestState>(new(9));
             await storage.ReadStateAsync("state", grainId, read);
             Assert.False(read.RecordExists);
-            Assert.Equal("2", read.ETag);
+            Assert.Equal(tombstoneEtag, read.ETag);
 
             read.State = new(2);
             await storage.WriteStateAsync("state", grainId, read);
-            Assert.Equal("3", read.ETag);
+            AssertUuidV7(read.ETag);
+            Assert.NotEqual(tombstoneEtag, read.ETag);
         }
 
         var physicalTable = NewTableName();
@@ -168,6 +174,32 @@ public sealed class CassandraPersistenceIntegrationTests : IClassFixture<Cassand
     }
 
     [Fact]
+    public async Task PhysicalDeleteAndRecreateRejectsTheDeletedRowsEtag()
+    {
+        var table = NewTableName();
+        using var storage = await StartStorageAsync(table, createTable: true, deleteStateOnClear: true);
+        var grainId = GrainId.Create("clear", Guid.NewGuid().ToString("N"));
+        var original = new GrainState<TestState>(new(1));
+
+        await storage.WriteStateAsync("state", grainId, original);
+        var stale = new GrainState<TestState>(new(2)) { ETag = original.ETag };
+        await storage.ClearStateAsync("state", grainId, original);
+
+        var recreated = new GrainState<TestState>(new(3));
+        await storage.WriteStateAsync("state", grainId, recreated);
+        AssertUuidV7(recreated.ETag);
+        Assert.NotEqual(stale.ETag, recreated.ETag);
+
+        await Assert.ThrowsAsync<InconsistentStateException>(
+            () => storage.WriteStateAsync("state", grainId, stale));
+
+        var read = new GrainState<TestState>(new());
+        await storage.ReadStateAsync("state", grainId, read);
+        Assert.Equal(3, Assert.IsType<TestState>(read.State).Value);
+        Assert.Equal(recreated.ETag, read.ETag);
+    }
+
+    [Fact]
     public async Task ClearWithoutEtagHandlesMissingActiveAndRetainedRows()
     {
         var logicalTable = NewTableName();
@@ -182,22 +214,24 @@ public sealed class CassandraPersistenceIntegrationTests : IClassFixture<Cassand
             var grainId = GrainId.Create("clear", "active");
             var active = new GrainState<TestState>(new(1));
             await storage.WriteStateAsync("state", grainId, active);
+            var activeEtag = active.ETag;
             var conflicting = new GrainState<TestState>(new());
             await Assert.ThrowsAsync<InconsistentStateException>(
                 () => storage.ClearStateAsync("state", grainId, conflicting));
             var activeRow = await ReadRawAsync(logicalTable, "cassandra-persistence-tests", grainId, "state");
             Assert.NotNull(activeRow);
-            Assert.Equal(1L, activeRow.GetValue<long>("version"));
+            Assert.Equal(Guid.Parse(activeEtag!), activeRow.GetValue<Guid>("etag"));
             Assert.True(activeRow.GetValue<bool>("record_exists"));
             Assert.Equal(1, Deserialize<TestState>(activeRow.GetValue<byte[]>("state")).Value);
 
             await storage.ClearStateAsync("state", grainId, active);
             var retained = new GrainState<TestState>(new());
             await storage.ClearStateAsync("state", grainId, retained);
-            Assert.Equal("2", retained.ETag);
+            Assert.Equal(active.ETag, retained.ETag);
+            AssertUuidV7(retained.ETag);
             var tombstone = await ReadRawAsync(logicalTable, "cassandra-persistence-tests", grainId, "state");
             Assert.NotNull(tombstone);
-            Assert.Equal(2L, tombstone.GetValue<long>("version"));
+            Assert.Equal(Guid.Parse(retained.ETag!), tombstone.GetValue<Guid>("etag"));
             Assert.False(tombstone.GetValue<bool>("record_exists"));
         }
 
@@ -213,6 +247,7 @@ public sealed class CassandraPersistenceIntegrationTests : IClassFixture<Cassand
             var grainId = GrainId.Create("clear", "physical-active");
             var active = new GrainState<TestState>(new(1));
             await storage.WriteStateAsync("state", grainId, active);
+            var activeEtag = active.ETag;
             var conflicting = new GrainState<TestState>(new());
             await Assert.ThrowsAsync<InconsistentStateException>(
                 () => storage.ClearStateAsync("state", grainId, conflicting));
@@ -220,11 +255,11 @@ public sealed class CassandraPersistenceIntegrationTests : IClassFixture<Cassand
             var read = new GrainState<TestState>(new());
             await storage.ReadStateAsync("state", grainId, read);
             Assert.True(read.RecordExists);
-            Assert.Equal("1", read.ETag);
+            Assert.Equal(activeEtag, read.ETag);
             Assert.Equal(1, Assert.IsType<TestState>(read.State).Value);
             var activeRow = await ReadRawAsync(physicalTable, "cassandra-persistence-tests", grainId, "state");
             Assert.NotNull(activeRow);
-            Assert.Equal(1L, activeRow.GetValue<long>("version"));
+            Assert.Equal(Guid.Parse(activeEtag!), activeRow.GetValue<Guid>("etag"));
             Assert.True(activeRow.GetValue<bool>("record_exists"));
             Assert.Equal(1, Deserialize<TestState>(activeRow.GetValue<byte[]>("state")).Value);
         }
@@ -236,7 +271,7 @@ public sealed class CassandraPersistenceIntegrationTests : IClassFixture<Cassand
             var state = new GrainState<TestState>(new(1));
             await retainingStorage.WriteStateAsync("state", grainId, state);
             await retainingStorage.ClearStateAsync("state", grainId, state);
-            Assert.Equal("2", state.ETag);
+            AssertUuidV7(state.ETag);
             Assert.NotNull(await ReadRawAsync(retainedTable, "cassandra-persistence-tests", grainId, "state"));
         }
 
@@ -272,7 +307,7 @@ public sealed class CassandraPersistenceIntegrationTests : IClassFixture<Cassand
         var read = new GrainState<TestState>(new());
         await first.ReadStateAsync("state", grainId, read);
         Assert.True(read.RecordExists);
-        Assert.Equal("1", read.ETag);
+        AssertUuidV7(read.ETag);
         Assert.Contains(Assert.IsType<TestState>(read.State).Value, new[] { 1, 2 });
     }
 
@@ -295,12 +330,12 @@ public sealed class CassandraPersistenceIntegrationTests : IClassFixture<Cassand
         await second.ReadStateAsync("state", grainId, secondRead);
         Assert.Equal(1, Assert.IsType<TestState>(firstRead.State).Value);
         Assert.Equal(2, Assert.IsType<TestState>(secondRead.State).Value);
-        Assert.Equal(1L, (await ReadRawAsync(table, "service-one", grainId, "state"))!.GetValue<long>("version"));
-        Assert.Equal(1L, (await ReadRawAsync(table, "service-two", grainId, "state"))!.GetValue<long>("version"));
+        Assert.Equal(Guid.Parse(firstState.ETag!), (await ReadRawAsync(table, "service-one", grainId, "state"))!.GetValue<Guid>("etag"));
+        Assert.Equal(Guid.Parse(secondState.ETag!), (await ReadRawAsync(table, "service-two", grainId, "state"))!.GetValue<Guid>("etag"));
     }
 
     [Fact]
-    public async Task ContendedVersionQualifiedUpdatesAllowOnlyOneWriter()
+    public async Task ContendedEtagQualifiedUpdatesAllowOnlyOneWriter()
     {
         var table = NewTableName();
         using var firstSession = await StartSessionAsync();
@@ -315,6 +350,7 @@ public sealed class CassandraPersistenceIntegrationTests : IClassFixture<Cassand
         var secondUpdate = new GrainState<TestState>(new());
         await first.ReadStateAsync("state", grainId, firstUpdate);
         await second.ReadStateAsync("state", grainId, secondUpdate);
+        var initialEtag = firstUpdate.ETag;
         firstUpdate.State = new(2);
         secondUpdate.State = new(3);
 
@@ -327,17 +363,18 @@ public sealed class CassandraPersistenceIntegrationTests : IClassFixture<Cassand
         Assert.Equal(1, results.Count(static success => !success));
         var winningUpdate = results[0] ? firstUpdate : secondUpdate;
         var losingUpdate = results[0] ? secondUpdate : firstUpdate;
-        Assert.Equal("2", winningUpdate.ETag);
-        Assert.Equal("1", losingUpdate.ETag);
+        AssertUuidV7(winningUpdate.ETag);
+        Assert.Equal(initialEtag, losingUpdate.ETag);
+        Assert.NotEqual(initialEtag, winningUpdate.ETag);
         var row = await ReadRawAsync(table, "cassandra-persistence-tests", grainId, "state");
         Assert.NotNull(row);
-        Assert.Equal(2L, row.GetValue<long>("version"));
+        Assert.Equal(Guid.Parse(winningUpdate.ETag!), row.GetValue<Guid>("etag"));
         Assert.True(row.GetValue<bool>("record_exists"));
         Assert.Contains(Deserialize<TestState>(row.GetValue<byte[]>("state")).Value, new[] { 2, 3 });
     }
 
     [Fact]
-    public async Task ContendedVersionQualifiedClearsAllowOnlyOneWriter()
+    public async Task ContendedEtagQualifiedClearsAllowOnlyOneWriter()
     {
         var table = NewTableName();
         using var firstSession = await StartSessionAsync();
@@ -352,6 +389,7 @@ public sealed class CassandraPersistenceIntegrationTests : IClassFixture<Cassand
         var secondClear = new GrainState<TestState>(new());
         await first.ReadStateAsync("state", grainId, firstClear);
         await second.ReadStateAsync("state", grainId, secondClear);
+        var initialEtag = firstClear.ETag;
 
         using var barrier = new Barrier(2);
         var results = await Task.WhenAll(
@@ -362,11 +400,12 @@ public sealed class CassandraPersistenceIntegrationTests : IClassFixture<Cassand
         Assert.Equal(1, results.Count(static success => !success));
         var winningClear = results[0] ? firstClear : secondClear;
         var losingClear = results[0] ? secondClear : firstClear;
-        Assert.Equal("2", winningClear.ETag);
-        Assert.Equal("1", losingClear.ETag);
+        AssertUuidV7(winningClear.ETag);
+        Assert.Equal(initialEtag, losingClear.ETag);
+        Assert.NotEqual(initialEtag, winningClear.ETag);
         var row = await ReadRawAsync(table, "cassandra-persistence-tests", grainId, "state");
         Assert.NotNull(row);
-        Assert.Equal(2L, row.GetValue<long>("version"));
+        Assert.Equal(Guid.Parse(winningClear.ETag!), row.GetValue<Guid>("etag"));
         Assert.False(row.GetValue<bool>("record_exists"));
     }
 
@@ -475,7 +514,7 @@ public sealed class CassandraPersistenceIntegrationTests : IClassFixture<Cassand
                 grain_id text,
                 state_name text,
                 grain_type text,
-                version bigint,
+                etag uuid,
                 record_exists boolean,
                 state blob,
                 updated_at timestamp,
@@ -489,18 +528,18 @@ public sealed class CassandraPersistenceIntegrationTests : IClassFixture<Cassand
         string serviceId,
         GrainId grainId,
         string stateName,
-        long version,
+        Guid etag,
         bool recordExists,
         TestState state)
     {
         var prepared = await _container.Session.PrepareAsync(
-            $"INSERT INTO {CassandraIdentifier.Quote(table)} (service_id, grain_id, state_name, grain_type, version, record_exists, state, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+            $"INSERT INTO {CassandraIdentifier.Quote(table)} (service_id, grain_id, state_name, grain_type, etag, record_exists, state, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
         await _container.Session.ExecuteAsync(prepared.Bind(
             serviceId,
             grainId.ToString(),
             stateName,
             typeof(TestState).FullName!,
-            version,
+            etag,
             recordExists,
             SerializeValue(state),
             DateTimeOffset.UtcNow));
@@ -509,7 +548,7 @@ public sealed class CassandraPersistenceIntegrationTests : IClassFixture<Cassand
     private async Task<Row?> ReadRawAsync(string table, string serviceId, GrainId grainId, string stateName)
     {
         var prepared = await _container.Session.PrepareAsync(
-            $"SELECT grain_type, version, record_exists, state FROM {CassandraIdentifier.Quote(table)} WHERE service_id = ? AND grain_id = ? AND state_name = ?");
+            $"SELECT grain_type, etag, record_exists, state FROM {CassandraIdentifier.Quote(table)} WHERE service_id = ? AND grain_id = ? AND state_name = ?");
         return (await _container.Session.ExecuteAsync(prepared.Bind(serviceId, grainId.ToString(), stateName))).FirstOrDefault();
     }
 
@@ -546,6 +585,13 @@ public sealed class CassandraPersistenceIntegrationTests : IClassFixture<Cassand
 
     private static T Deserialize<T>(byte[] value) =>
         JsonSerializer.Deserialize<T>(value)!;
+
+    private static void AssertUuidV7(string? etag)
+    {
+        Assert.True(Guid.TryParse(etag, out var value));
+        Assert.NotEqual(Guid.Empty, value);
+        Assert.Equal('7', value.ToString("D")[14]);
+    }
 
     private sealed class TestState
     {
