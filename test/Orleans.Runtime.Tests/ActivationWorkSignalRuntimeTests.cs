@@ -13,7 +13,7 @@ public sealed class ActivationWorkSignalRuntimeTests : TestClusterPerTest
     [Fact]
     public async Task IdleActivationDeactivationCompletesAndReactivates()
     {
-        var grain = GrainFactory.GetGrain<ICatalogTestGrain>(Random.Shared.NextInt64());
+        var grain = GrainFactory.GetGrain<ICatalogTestGrain>(10116);
         var initialActivationId = await grain.GetActivationId();
 
         await HostedCluster.DeactivateAsync(grain).WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
@@ -29,6 +29,6 @@ public sealed class ActivationWorkSignalRuntimeTests : TestClusterPerTest
             .Select(key => GrainFactory.GetGrain<ICatalogTestGrain>(key).GetActivationId());
         await Task.WhenAll(activationTasks);
 
-        await HostedCluster.StopAllSilosAsync().WaitAsync(TimeSpan.FromMinutes(1), TestContext.Current.CancellationToken);
+        await HostedCluster.StopAllSilosAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromMinutes(1), TestContext.Current.CancellationToken);
     }
 }

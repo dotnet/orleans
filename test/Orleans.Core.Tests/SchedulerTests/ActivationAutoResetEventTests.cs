@@ -41,7 +41,7 @@ public class ActivationAutoResetEventTests
         Assert.False(nextWait.IsCompleted);
 
         signal.Signal();
-        await nextWait.AsTask().WaitAsync(TimeSpan.FromSeconds(5));
+        await nextWait.AsTask().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -55,7 +55,7 @@ public class ActivationAutoResetEventTests
 
         signal.Signal();
 
-        await wait.AsTask().WaitAsync(TimeSpan.FromSeconds(5));
+        await wait.AsTask().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -71,7 +71,7 @@ public class ActivationAutoResetEventTests
         Assert.False(wait.IsCompleted);
 
         signal.Signal();
-        await wait.AsTask().WaitAsync(TimeSpan.FromSeconds(5));
+        await wait.AsTask().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         signal.Signal();
         await signal.WaitAsync();
@@ -88,7 +88,7 @@ public class ActivationAutoResetEventTests
 
         awaiter.UnsafeOnCompleted(continuationRan.SetResult);
         signal.Signal();
-        await continuationRan.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await continuationRan.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         signal.Signal();
         awaiter.GetResult();
@@ -97,7 +97,7 @@ public class ActivationAutoResetEventTests
         Assert.False(nextWait.IsCompleted);
 
         signal.Signal();
-        await nextWait.AsTask().WaitAsync(TimeSpan.FromSeconds(5));
+        await nextWait.AsTask().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -124,15 +124,15 @@ public class ActivationAutoResetEventTests
             signalers[i] = Task.Run(() =>
             {
                 ready.Signal();
-                start.Wait();
+                start.Wait(TestContext.Current.CancellationToken);
                 signal.Signal();
-            });
+            }, TestContext.Current.CancellationToken);
         }
 
-        Assert.True(ready.Wait(TimeSpan.FromSeconds(5)));
+        Assert.True(ready.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
         start.Set();
-        await Task.WhenAll(signalers).WaitAsync(TimeSpan.FromSeconds(5));
-        await continuationRan.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await Task.WhenAll(signalers).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        await continuationRan.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         Assert.Equal(1, continuationCount);
         awaiter.GetResult();
@@ -140,7 +140,7 @@ public class ActivationAutoResetEventTests
         Assert.False(nextWait.IsCompleted);
 
         signal.Signal();
-        await nextWait.AsTask().WaitAsync(TimeSpan.FromSeconds(5));
+        await nextWait.AsTask().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -154,7 +154,7 @@ public class ActivationAutoResetEventTests
         Assert.Throws<InvalidOperationException>(() => signal.WaitAsync());
 
         signal.Signal();
-        await wait.AsTask().WaitAsync(TimeSpan.FromSeconds(5));
+        await wait.AsTask().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
     }
 
     [Theory]
@@ -185,7 +185,7 @@ public class ActivationAutoResetEventTests
             signal.Signal();
         }
 
-        await continuationRan.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await continuationRan.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         awaiter.GetResult();
         Assert.Equal(1, continuationCount);
     }
@@ -212,7 +212,7 @@ public class ActivationAutoResetEventTests
             ValueTaskSourceOnCompletedFlags.None));
 
         signal.Signal();
-        await firstContinuationRan.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await firstContinuationRan.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         Assert.False(secondContinuationRan.Task.IsCompleted);
         await wait;
     }
@@ -234,14 +234,14 @@ public class ActivationAutoResetEventTests
             var firstRegistered = Register(firstContinuationRan);
             var secondRegistered = Register(secondContinuationRan);
 
-            start.SignalAndWait();
-            var registrations = await Task.WhenAll(firstRegistered, secondRegistered).WaitAsync(TimeSpan.FromSeconds(5));
+            start.SignalAndWait(TestContext.Current.CancellationToken);
+            var registrations = await Task.WhenAll(firstRegistered, secondRegistered).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
             Assert.Equal(1, registrations.Count(static registered => registered));
 
             signal.Signal();
             var winningContinuation = registrations[0] ? firstContinuationRan : secondContinuationRan;
             var losingContinuation = registrations[0] ? secondContinuationRan : firstContinuationRan;
-            await winningContinuation.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await winningContinuation.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
             Assert.False(losingContinuation.Task.IsCompleted);
             await wait;
 
@@ -249,7 +249,7 @@ public class ActivationAutoResetEventTests
             {
                 return Task.Run(() =>
                 {
-                    start.SignalAndWait();
+                    start.SignalAndWait(TestContext.Current.CancellationToken);
                     try
                     {
                         source.OnCompleted(
@@ -263,7 +263,7 @@ public class ActivationAutoResetEventTests
                     {
                         return false;
                     }
-                });
+                }, TestContext.Current.CancellationToken);
             }
         }
     }
@@ -284,22 +284,22 @@ public class ActivationAutoResetEventTests
 
             var register = Task.Run(() =>
             {
-                start.SignalAndWait();
+                start.SignalAndWait(TestContext.Current.CancellationToken);
                 awaiter.UnsafeOnCompleted(() =>
                 {
                     Interlocked.Increment(ref continuationCount);
                     continuationRan.TrySetResult();
                 });
-            });
+            }, TestContext.Current.CancellationToken);
             var complete = Task.Run(() =>
             {
-                start.SignalAndWait();
+                start.SignalAndWait(TestContext.Current.CancellationToken);
                 signal.Signal();
-            });
+            }, TestContext.Current.CancellationToken);
 
-            start.SignalAndWait();
-            await Task.WhenAll(register, complete).WaitAsync(TimeSpan.FromSeconds(5));
-            await continuationRan.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            start.SignalAndWait(TestContext.Current.CancellationToken);
+            await Task.WhenAll(register, complete).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await continuationRan.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
             awaiter.GetResult();
             Assert.Equal(1, continuationCount);
         }
@@ -321,7 +321,7 @@ public class ActivationAutoResetEventTests
         Assert.Throws<InvalidOperationException>(() => staleWait.GetAwaiter().UnsafeOnCompleted(static () => { }));
 
         signal.Signal();
-        await currentWait.AsTask().WaitAsync(TimeSpan.FromSeconds(5));
+        await currentWait.AsTask().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -334,7 +334,7 @@ public class ActivationAutoResetEventTests
         Assert.Throws<InvalidOperationException>(() => wait.GetAwaiter().GetResult());
 
         signal.Signal();
-        await wait.AsTask().WaitAsync(TimeSpan.FromSeconds(5));
+        await wait.AsTask().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -350,15 +350,15 @@ public class ActivationAutoResetEventTests
         {
             order.Enqueue(1);
             queuedWorkStarted.Set();
-            releaseQueuedWork.Wait();
+            releaseQueuedWork.Wait(TestContext.Current.CancellationToken);
         });
-        Assert.True(queuedWorkStarted.Wait(TimeSpan.FromSeconds(5)));
+        Assert.True(queuedWorkStarted.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
 
         var observedScheduler = WaitAndCaptureScheduler(signal, order);
         signal.Signal();
         releaseQueuedWork.Set();
 
-        var observed = await observedScheduler.WaitAsync(TimeSpan.FromSeconds(5));
+        var observed = await observedScheduler.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         Assert.Same(context, observed.Context);
         Assert.Same(context.WorkItemGroup.TaskScheduler, observed.Scheduler);
         Assert.Equal([1, 2], order);
@@ -374,7 +374,10 @@ public class ActivationAutoResetEventTests
         {
             for (var i = 0; i < 500; i++)
             {
-                signalRequested.WaitOne();
+                if (!signalRequested.WaitOne(TimeSpan.FromSeconds(10)))
+                {
+                    break;
+                }
                 signal.Signal();
             }
         })
@@ -394,7 +397,7 @@ public class ActivationAutoResetEventTests
             {
                 var wait = signal.WaitAsync().AsTask();
                 signalRequested.Set();
-                await wait.WaitAsync(TimeSpan.FromSeconds(5));
+                await wait.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
             }
         }
 

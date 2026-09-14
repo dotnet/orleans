@@ -15,8 +15,8 @@ namespace Orleans.Runtime;
 /// </summary>
 internal sealed class ActivationAutoResetEvent(WorkItemGroup scheduler) : IValueTaskSource
 {
-    // The status word defines the current event epoch. Interlocked transitions ensure that exactly one
-    // signaler completes a registered waiter and that signals remain visible until the waiter resets the epoch.
+    // The status word tracks two flags: SignaledFlag and WaitingFlag. Interlocked transitions ensure that exactly one
+    // signaler completes a registered waiter, signals coalesce while already signaled, and reset clears both flags.
     private const uint SignaledFlag = 1;
     private const uint WaitingFlag = 1 << 1;
     private const uint ResetMask = ~SignaledFlag & ~WaitingFlag;
@@ -121,9 +121,14 @@ internal sealed class ActivationAutoResetEvent(WorkItemGroup scheduler) : IValue
         [StackTraceHidden]
         public void GetResult(short token)
         {
-            if (token != _version || !ReferenceEquals(Volatile.Read(ref _continuation), Sentinel))
+            if (token != _version)
             {
-                ThrowInvalidOperationException();
+                ThrowInvalidTokenException();
+            }
+
+            if (!ReferenceEquals(Volatile.Read(ref _continuation), Sentinel))
+            {
+                ThrowIncompleteOperationException();
             }
         }
 
@@ -146,7 +151,7 @@ internal sealed class ActivationAutoResetEvent(WorkItemGroup scheduler) : IValue
 
                 if (!ReferenceEquals(storedContinuation, Sentinel))
                 {
-                    ThrowInvalidOperationException();
+                    ThrowContinuationAlreadyRegisteredException();
                 }
             }
             finally
@@ -171,7 +176,7 @@ internal sealed class ActivationAutoResetEvent(WorkItemGroup scheduler) : IValue
                 continuation = _continuation;
                 if (ReferenceEquals(continuation, Sentinel))
                 {
-                    ThrowInvalidOperationException();
+                    ThrowAlreadyCompletedException();
                 }
 
                 continuationState = _continuationState;
@@ -200,14 +205,21 @@ internal sealed class ActivationAutoResetEvent(WorkItemGroup scheduler) : IValue
 
         private readonly void QueueContinuation(Action<object?> continuation, object? state)
         {
-            _scheduler.QueueAction(continuation, state!);
+            if (state is null)
+            {
+                _scheduler.QueueAction(static s => ((Action<object?>)s)(null), continuation);
+            }
+            else
+            {
+                _scheduler.QueueAction(continuation, state);
+            }
         }
 
         private readonly void ValidateToken(short token)
         {
             if (token != _version)
             {
-                ThrowInvalidOperationException();
+                ThrowInvalidTokenException();
             }
         }
 
@@ -218,6 +230,19 @@ internal sealed class ActivationAutoResetEvent(WorkItemGroup scheduler) : IValue
         }
 
         [DoesNotReturn, StackTraceHidden]
-        private static void ThrowInvalidOperationException() => throw new InvalidOperationException();
+        private static void ThrowInvalidTokenException() =>
+            throw new InvalidOperationException("The token supplied to the ValueTaskSource operation does not match the current operation version.");
+
+        [DoesNotReturn, StackTraceHidden]
+        private static void ThrowContinuationAlreadyRegisteredException() =>
+            throw new InvalidOperationException("A continuation has already been registered with the ValueTaskSource.");
+
+        [DoesNotReturn, StackTraceHidden]
+        private static void ThrowAlreadyCompletedException() =>
+            throw new InvalidOperationException("The ValueTaskSource has already been completed.");
+
+        [DoesNotReturn, StackTraceHidden]
+        private static void ThrowIncompleteOperationException() =>
+            throw new InvalidOperationException("The ValueTaskSource operation has not completed.");
     }
 }
