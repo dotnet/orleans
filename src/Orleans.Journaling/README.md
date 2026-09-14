@@ -136,9 +136,9 @@ Storage providers fetch pages internally and yield matching identities as they d
 | Provider | How narrowly discovery scans | Remaining work |
 | --- | --- | --- |
 | Volatile | An ordered key index selects a view covering the requested prefix and bounds. | Snapshots selected keys and checks current journal existence. |
-| Azure Table, default mapping | Order-preserving partition keys allow direct indexed prefix and lower/upper key filters. | Queries include the journal header row condition; the service controls work inside the selected key range. |
+| Azure Table, default mapping | Printable ASCII ids use two uppercase hex digits per byte, allowing direct indexed prefix and lower/upper key filters. | Queries include the journal header row condition; the service controls work inside the selected key range. |
 | Azure Table, custom mapping | Canonical journal-id filters limit returned headers. | Arbitrary mappings can require a table scan because the journal-id property is not indexed. |
-| Azure Blob | Native raw prefix and `StartFrom` seek to an ASCII lower bound; ordered traversal stops at a safe upper WAL-key bound. | The final page can contain entries beyond the range, plus checkpoint blobs. |
+| Azure Blob | The `wal/` namespace and raw id prefix select WAL blobs; `StartFrom` seeks to an ASCII lower bound and ordered traversal stops at an ASCII upper bound. | The final page can contain WALs beyond the range. Checkpoints occupy a separate namespace. |
 | S3 general-purpose, ordered listing enabled | Identity-mapped keys use native raw prefixes and `StartAfter`, then stop at a safe upper WAL-key bound. | The final page can overrun the range. Custom key mappings use their configured native prefix and identity filtering. |
 | S3 Express directory buckets | A native directory prefix limits the namespace. | Directory prefixes end in `/`; partial-name and time bounds are filtered during unordered traversal. |
 | Redis | Readable key names enable native `SCAN MATCH` prefix filtering and local key-range checks before identity metadata reads for the default mapping. | `SCAN MATCH` still traverses the server keyspace. Custom key mappings read canonical ids from matching metadata hashes. |

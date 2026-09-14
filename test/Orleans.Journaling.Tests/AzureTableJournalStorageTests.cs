@@ -38,6 +38,41 @@ public sealed class AzureTableJournalStorageTests
     }
 
     [Fact]
+    public async Task AppendAsync_DefaultMapping_LongestPrintableAsciiId_RoundTrips()
+    {
+        var store = new FakeTableStore();
+        var journalId = new JournalId(new string('~', 512));
+        var storage = CreateStorage(store, journalId: journalId);
+
+        await storage.AppendAsync(new ReadOnlySequence<byte>([1, 2]), TestContext.Current.CancellationToken);
+        var consumer = new CapturingJournalStorageConsumer();
+        await CreateStorage(store, journalId: journalId).ReadAsync(consumer, TestContext.Current.CancellationToken);
+
+        Assert.Equal([1, 2], consumer.Bytes.ToArray());
+        var header = Assert.Single(store.AddCalls);
+        Assert.Equal(string.Concat(Enumerable.Repeat("7E", 512)), header.PartitionKey);
+        Assert.Equal(journalId.Value, header.Properties[AzureTableJournalStorage.JournalIdPropertyName]);
+    }
+
+    [Fact]
+    public async Task AppendAsync_CustomMapping_RoundTripsUnicodeJournalIdAndCanonicalHeader()
+    {
+        var store = new FakeTableStore();
+        var journalId = new JournalId("café/😀\0");
+        static void Configure(AzureTableJournalStorageOptions options) => options.GetPartitionKey = _ => "custom";
+        var storage = CreateStorage(store, journalId: journalId, configure: Configure);
+
+        await storage.AppendAsync(new ReadOnlySequence<byte>([1, 2]), TestContext.Current.CancellationToken);
+        var consumer = new CapturingJournalStorageConsumer();
+        await CreateStorage(store, journalId: journalId, configure: Configure).ReadAsync(consumer, TestContext.Current.CancellationToken);
+
+        Assert.Equal([1, 2], consumer.Bytes.ToArray());
+        var header = Assert.Single(store.AddCalls);
+        Assert.Equal("custom", header.PartitionKey);
+        Assert.Equal(journalId.Value, header.Properties[AzureTableJournalStorage.JournalIdPropertyName]);
+    }
+
+    [Fact]
     public async Task AppendAsync_ChunksLargePayloadAcrossPropertiesAndRows()
     {
         var store = new FakeTableStore();
@@ -749,7 +784,7 @@ public sealed class AzureTableJournalStorageTests
     [Fact]
     public void DefaultPartitionKey_HexEncodesJournalIdValue()
     {
-        Assert.Equal("006A006F00750072006E0061006C0073002F0074006500730074", AzureTableJournalStorageOptions.GetDefaultPartitionKey(new JournalId("journals/test")));
+        Assert.Equal("6A6F75726E616C732F74657374", AzureTableJournalStorageOptions.GetDefaultPartitionKey(new JournalId("journals/test")));
     }
 
     [Fact]

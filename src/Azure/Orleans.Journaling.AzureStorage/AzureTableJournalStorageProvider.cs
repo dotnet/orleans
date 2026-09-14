@@ -64,7 +64,10 @@ internal sealed class AzureTableJournalStorageProvider : ILifecycleParticipant<I
     {
         cancellationToken.ThrowIfCancellationRequested();
         var range = new JournalCatalogRange(options);
-        if (range.IsEmpty)
+        if (range.IsEmpty
+            || (_options.UsesDefaultPartitionKey
+                && range.Prefix is { } prefix
+                && prefix.AsSpan().IndexOfAnyExceptInRange(' ', '~') >= 0))
         {
             yield break;
         }
@@ -99,13 +102,13 @@ internal sealed class AzureTableJournalStorageProvider : ILifecycleParticipant<I
         {
             if (range.LowerBound is { } lowerBound)
             {
-                var lowerKey = AzureTableJournalStorageOptions.EncodePartitionKey(lowerBound);
+                var lowerKey = GetPartitionKeyBound(lowerBound);
                 filter += TableClient.CreateQueryFilter($" and PartitionKey ge {lowerKey}");
             }
 
             if (range.MaxId is { } maxId)
             {
-                var upperKey = AzureTableJournalStorageOptions.EncodePartitionKey(maxId);
+                var upperKey = GetPartitionKeyBound(maxId);
                 filter += TableClient.CreateQueryFilter($" and PartitionKey le {upperKey}");
             }
 
@@ -133,6 +136,20 @@ internal sealed class AzureTableJournalStorageProvider : ILifecycleParticipant<I
         }
 
         return filter;
+    }
+
+    private static string GetPartitionKeyBound(string value)
+    {
+        var index = value.AsSpan().IndexOfAnyExceptInRange(' ', '~');
+        if (index < 0)
+        {
+            return AzureTableJournalStorageOptions.EncodePartitionKey(value);
+        }
+
+        // No stored id can equal an unsupported bound. At its first unsupported code unit,
+        // 1F sorts after the exact prefix but before any descendant; 7F sorts after all descendants.
+        return AzureTableJournalStorageOptions.EncodePartitionKey(value[..index])
+            + (value[index] < ' ' ? "1F" : "7F");
     }
 
     private static bool IsWellFormedUnicode(ReadOnlySpan<char> value)

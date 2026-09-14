@@ -33,9 +33,13 @@ public sealed class JournalStorageCatalogTests
         string[] ids =
         [
             "tenant/z", "tenant2", "tenant", "tenant/a", "tenant/a/child", "tenantish/child",
-            "tenant%2Fone", "tenant%2Fone/child", " leading space ", "raw\uD800", "raw\uD801",
-            "unicode/\u00E9", "percent%2f", @"back\slash", "tenant/",
+            "tenant%2Fone", "tenant%2Fone/child", " leading space ",
+            "percent%2f", @"back\slash", "tenant/",
         ];
+        if (kind != "AzureTable")
+        {
+            ids = [.. ids, "raw\uD800", "raw\uD801", "unicode/\u00E9"];
+        }
         await using var context = await CreateAsync(kind, ids);
 
         AssertMembership(ids, await DrainAsync(context.Catalog.ListAsync(cancellationToken: TestContext.Current.CancellationToken)));
@@ -278,7 +282,7 @@ public sealed class JournalStorageCatalogTests
         {
             Assert.Equal(kind == "AzureBlob" ? 5000 : 1000, request.Maximum);
             Assert.Equal(cancellation.Token, request.CancellationToken);
-            Assert.Equal(kind == "AzureBlob" ? "tenant" : null, request.Prefix);
+            Assert.Equal(kind == "AzureBlob" ? "wal/tenant" : null, request.Prefix);
         });
         if (kind == "AzureTable")
         {
@@ -342,7 +346,7 @@ public sealed class JournalStorageCatalogTests
 
         Assert.Equal(["jobs/shards/a", "jobs/shards/child", "jobs/shards/z", "jobs/shards2"], result);
         Assert.Equal(2, context.Native.Requests.Count);
-        Assert.All(context.Native.Requests, request => Assert.Equal("jobs/shards", request.Prefix));
+        Assert.All(context.Native.Requests, request => Assert.Equal("wal/jobs/shards", request.Prefix));
     }
 
     [Fact]
@@ -350,16 +354,48 @@ public sealed class JournalStorageCatalogTests
     {
         BlobItem[] blobs =
         [
-            Blob("tenant/z/wal"), Blob("tenant/block/wal", BlobType.Block),
-            Blob("tenant/page/wal", BlobType.Page), Blob("tenant/chk.1"),
-            Blob("tenant/child/wal"), Blob("tenant/case/WAL"), Blob("/wal"),
-            Blob(" \t /wal"), Blob("tenant2/wal"), Blob("tenant/wal"),
+            Blob("wal/tenant/z"), Blob("wal/tenant/block", BlobType.Block),
+            Blob("wal/tenant/page", BlobType.Page), Blob("checkpoints/tenant/snapshot", BlobType.Block),
+            Blob("wal/tenant/child"), Blob("WAL/tenant/case"), Blob("wal/"),
+            Blob("wal/ \t "), Blob("wal/tenant2"), Blob("wal/tenant"),
         ];
         await using var context = await CreateAsync("AzureBlob", [], blobs: blobs);
         Assert.Equal(
-            ["tenant/child", "tenant", "tenant/z", "tenant2"],
+            ["tenant", "tenant/child", "tenant/z", "tenant2"],
             await DrainAsync(context.Catalog.ListAsync(new() { Prefix = new("tenant") }, TestContext.Current.CancellationToken)));
-        Assert.Equal(8, context.Native.Requests.Sum(request => request.ResultCount));
+        Assert.Equal(6, context.Native.Requests.Sum(request => request.ResultCount));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("tenant/")]
+    public async Task AzureBlobListAsync_SeparatePrefixExcludesRetainedCheckpointsFromEveryPage(string? prefix)
+    {
+        string[] ids = ["tenant", "tenant/a", "tenant/b"];
+        var blobs = ids.Select(id => Blob($"wal/{id}"))
+            .Concat(ids.SelectMany(id => Enumerable.Range(0, 256)
+                .Select(index => Blob($"checkpoints/{id}/{index}", BlobType.Block))))
+            .Append(Blob("unrelated/tenant"))
+            .ToArray();
+        await using var context = await CreateAsync("AzureBlob", [], blobs: blobs);
+        var expected = prefix is null ? ids : ids[1..];
+
+        Assert.Equal(expected, await DrainAsync(context.Catalog.ListAsync(
+            new() { Prefix = prefix is null ? default : new(prefix) }, TestContext.Current.CancellationToken)));
+        Assert.Equal(expected.Length, context.Native.Requests.Sum(request => request.ResultCount));
+        Assert.Equal(prefix is null ? 2 : 1, context.Native.Requests.Count);
+        Assert.All(context.Native.Requests, request => Assert.Equal("wal/" + prefix, request.Prefix));
+    }
+
+    [Fact]
+    public async Task AzureBlobListAsync_WalPrefixRequiresANonWhitespaceJournalId()
+    {
+        await using var context = await CreateAsync("AzureBlob", [],
+            blobs: [Blob("wal/"), Blob("wal/ \t "), Blob("wal/wal/tenant"), Blob("wal/tenant/wal")]);
+
+        Assert.Equal(["tenant/wal", "wal/tenant"], await DrainAsync(
+            context.Catalog.ListAsync(cancellationToken: TestContext.Current.CancellationToken)));
+        Assert.All(context.Native.Requests, request => Assert.Equal("wal/", request.Prefix));
     }
 
     [Fact]
@@ -377,16 +413,17 @@ public sealed class JournalStorageCatalogTests
     }
 
     [Fact]
-    public async Task AzureBlobListAsync_MaxIdIncludesExactJournalWalAfterCheckpoint()
+    public async Task AzureBlobListAsync_MaxIdIncludesExactJournalAndExcludesCheckpointsBeforePagination()
     {
         await using var context = await CreateAsync("AzureBlob", [],
-            blobs: [Blob("a/chk.1", BlobType.Block), Blob("a/wal"), Blob("b/chk.1", BlobType.Block), Blob("b/wal"), Blob("z/wal")]);
+            blobs: [Blob("checkpoints/a/1", BlobType.Block), Blob("wal/a"), Blob("checkpoints/b/1", BlobType.Block), Blob("wal/b"), Blob("wal/z")]);
         context.Native.Failure = new InvalidOperationException("future tail must not be requested");
         context.Native.FailureAtRequest = 3;
 
         Assert.Equal(["a"], await DrainAsync(context.Catalog.ListAsync(
             new() { MaxId = new("a") }, TestContext.Current.CancellationToken)));
-        Assert.Equal([2, 2], context.Native.Requests.Select(request => request.ResultCount));
+        Assert.Equal(2, Assert.Single(context.Native.Requests).ResultCount);
+        Assert.Equal("wal/", context.Native.Requests[0].Prefix);
         Assert.Equal(1, context.Native.DisposedEnumerators);
     }
 
@@ -415,8 +452,8 @@ public sealed class JournalStorageCatalogTests
         Assert.Equal(2, context.Native.Requests.Count);
         Assert.All(context.Native.Requests, request =>
         {
-            Assert.Equal(prefix, request.Prefix);
-            Assert.Equal(kind == "AzureBlob" ? prefix : null, request.LowerStart);
+            Assert.Equal(kind == "AzureBlob" ? "wal/" + prefix : prefix, request.Prefix);
+            Assert.Equal(kind == "AzureBlob" ? "wal/" + prefix : null, request.LowerStart);
             Assert.Equal(kind == "AzureBlob" ? 5000 : 1000, request.Maximum);
             Assert.Equal(2, request.ResultCount);
         });
@@ -429,10 +466,10 @@ public sealed class JournalStorageCatalogTests
     [InlineData("Missing")]
     public async Task AzureBlobListAsync_RawPrefixFiltersWalTypeAndDoesNotDuplicateIds(string exactWal)
     {
-        var blobs = new List<BlobItem> { Blob("tenant/wal-child/wal"), Blob("tenant/z/wal") };
+        var blobs = new List<BlobItem> { Blob("wal/tenant/wal-child"), Blob("wal/tenant/z") };
         if (exactWal != "Missing")
         {
-            blobs.Add(Blob("tenant/wal", exactWal == "Append" ? BlobType.Append : BlobType.Block));
+            blobs.Add(Blob("wal/tenant", exactWal == "Append" ? BlobType.Append : BlobType.Block));
         }
 
         await using var context = await CreateAsync("AzureBlob", [], blobs: blobs.ToArray());
@@ -440,7 +477,7 @@ public sealed class JournalStorageCatalogTests
             new() { Prefix = new("tenant"), MaxId = new("tenant/z") }, TestContext.Current.CancellationToken));
 
         Assert.Equal(exactWal == "Append" ? ["tenant", "tenant/wal-child", "tenant/z"] : new[] { "tenant/wal-child", "tenant/z" }, result);
-        Assert.All(context.Native.Requests, request => Assert.Equal("tenant", request.Prefix));
+        Assert.All(context.Native.Requests, request => Assert.Equal("wal/tenant", request.Prefix));
     }
 
     [Theory]
@@ -471,7 +508,7 @@ public sealed class JournalStorageCatalogTests
             new() { Prefix = new("tenant"), MaxId = new("tenant/z") }, cancellation.Token).GetAsyncEnumerator(cancellation.Token))
         {
             Assert.True(await enumerator.MoveNextAsync());
-            Assert.Equal("tenant/a", enumerator.Current.Value);
+            Assert.Equal("tenant", enumerator.Current.Value);
             if (cancel)
             {
                 cancellation.Cancel();
@@ -480,7 +517,7 @@ public sealed class JournalStorageCatalogTests
             }
         }
 
-        Assert.Equal("tenant", Assert.Single(context.Native.Requests).Prefix);
+        Assert.Equal("wal/tenant", Assert.Single(context.Native.Requests).Prefix);
         Assert.Equal(1, context.Native.DisposedEnumerators);
     }
 
@@ -497,7 +534,7 @@ public sealed class JournalStorageCatalogTests
 
         Assert.Equal(cancellation.Token, exception.CancellationToken);
         var request = Assert.Single(context.Native.Requests);
-        Assert.Equal("tenant", request.Prefix);
+        Assert.Equal("wal/tenant", request.Prefix);
         Assert.Equal(0, request.ResultCount);
     }
 
@@ -507,7 +544,7 @@ public sealed class JournalStorageCatalogTests
         await using var context = await CreateAsync("AzureBlob", ["tenant", "tenant/a", "tenant/b"]);
         context.Native.EmptyFirstPage = true;
 
-        Assert.Equal(["tenant/a", "tenant"], await DrainAsync(context.Catalog.ListAsync(
+        Assert.Equal(["tenant", "tenant/a"], await DrainAsync(context.Catalog.ListAsync(
             new() { Prefix = new("tenant"), MaxId = new("tenant/a") }, TestContext.Current.CancellationToken)));
         Assert.Equal([0, 2, 1], context.Native.Requests.Select(request => request.ResultCount));
         Assert.Equal(1, context.Native.DisposedEnumerators);
@@ -522,7 +559,7 @@ public sealed class JournalStorageCatalogTests
 
         Assert.Equal(["tenant"], await DrainAsync(context.Catalog.ListAsync(
             new() { Prefix = new("tenant"), MaxId = new(maximum) }, TestContext.Current.CancellationToken)));
-        Assert.Equal("tenant", Assert.Single(context.Native.Requests).Prefix);
+        Assert.Equal("wal/tenant", Assert.Single(context.Native.Requests).Prefix);
     }
 
     [Theory]
@@ -561,8 +598,8 @@ public sealed class JournalStorageCatalogTests
         Assert.Equal([2, 1], context.Native.Requests.Select(request => request.ResultCount));
         Assert.All(context.Native.Requests, request =>
         {
-            Assert.Equal(common, request.Prefix);
-            Assert.Equal(kind == "AzureBlob" || request.Cursor is null ? minimum : null, request.LowerStart);
+            Assert.Equal(kind == "AzureBlob" ? "wal/" + common : common, request.Prefix);
+            Assert.Equal(kind == "AzureBlob" ? "wal/" + minimum : request.Cursor is null ? minimum : null, request.LowerStart);
         });
     }
 
@@ -578,8 +615,8 @@ public sealed class JournalStorageCatalogTests
         Assert.Equal(ids[1..3], await DrainAsync(context.Catalog.ListAsync(
             new() { Prefix = new(prefix) }, TestContext.Current.CancellationToken)));
         var request = Assert.Single(context.Native.Requests);
-        Assert.Equal(prefix, request.Prefix);
-        Assert.Equal(kind == "AzureBlob" ? prefix : null, request.LowerStart);
+        Assert.Equal(kind == "AzureBlob" ? "wal/" + prefix : prefix, request.Prefix);
+        Assert.Equal(kind == "AzureBlob" ? "wal/" + prefix : null, request.LowerStart);
         Assert.Equal(2, request.ResultCount);
     }
 
@@ -633,7 +670,7 @@ public sealed class JournalStorageCatalogTests
     [InlineData("a/0")]
     [InlineData("a/w")]
     [InlineData("a/wal!")]
-    public async Task AzureBlobListAsync_MaxIdPreservesShorterIdsWhoseWalSortsLater(string maximum)
+    public async Task AzureBlobListAsync_MaxIdPreservesShorterIdsInJournalOrder(string maximum)
     {
         string[] ids = ["a", "a!", "a/0", "a/w", "a/wal!", "z"];
         await using var context = await CreateAsync("AzureBlob", ids);
@@ -982,12 +1019,12 @@ public sealed class JournalStorageCatalogTests
                     Provider = new VolatileJournalStorageProvider();
                     break;
                 case "AzureBlob":
-                    var container = new FakeContainer(Native, blobs ?? ids.Select(id => Blob($"{id}/wal")).ToArray());
+                    var container = new FakeContainer(Native, blobs ?? ids.Select(id => Blob($"wal/{id}")).ToArray());
                     var blobOptions = new AzureBlobJournalStorageOptions { ContainerName = "journals" };
                     blobOptions.ConfigureBlobServiceClient(_ => Task.FromResult<BlobServiceClient>(new FakeBlobService(container)));
                     if (blobLayout == "EquivalentDelegate")
                     {
-                        blobOptions.GetWalBlobName = id => $"{id.Value}/wal";
+                        blobOptions.GetWalBlobName = id => $"wal/{id.Value}";
                     }
                     else if (blobLayout == "WrapperFactory")
                     {

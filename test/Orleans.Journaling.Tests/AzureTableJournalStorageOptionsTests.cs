@@ -23,7 +23,7 @@ public sealed class AzureTableJournalStorageOptionsTests
 
         Assert.Equal(AzureTableJournalStorageOptions.DEFAULT_TABLE_NAME, options.TableName);
         Assert.Equal("journal", options.TableName);
-        Assert.Equal("00740065006E0061006E0074002F006A006F00750072006E0061006C", options.GetPartitionKey(journalId));
+        Assert.Equal("74656E616E742F6A6F75726E616C", options.GetPartitionKey(journalId));
         Assert.True(options.UsesDefaultPartitionKey);
         Assert.Null(options.ClientOptions);
         Assert.Null(options.TableServiceClient);
@@ -42,25 +42,23 @@ public sealed class AzureTableJournalStorageOptionsTests
     }
 
     [Theory]
-    [InlineData("-._~09AZaz", "002D002E005F007E003000390041005A0061007A")]
-    [InlineData("a/b", "0061002F0062")]
-    [InlineData("\\#?", "005C0023003F")]
-    [InlineData("\0\u0001\u001F\u007F", "00000001001F007F")]
-    [InlineData(" +%", "0020002B0025")]
-    [InlineData("café/😀", "00630061006600E9002FD83DDE00")]
-    public void GetDefaultPartitionKey_EncodesUtf16CodeUnitsAsUppercaseHex(string value, string expected)
+    [InlineData("-._~09AZaz", "2D2E5F7E3039415A617A")]
+    [InlineData("a/b", "612F62")]
+    [InlineData("\\#?", "5C233F")]
+    [InlineData(" +%", "202B25")]
+    public void GetDefaultPartitionKey_EncodesPrintableAsciiBytesAsUppercaseHex(string value, string expected)
     {
         var partitionKey = AzureTableJournalStorageOptions.GetDefaultPartitionKey(new JournalId(value));
 
         Assert.Equal(expected, partitionKey);
-        Assert.Equal(value.Length * 4, partitionKey.Length);
+        Assert.Equal(value.Length * 2, partitionKey.Length);
         Assert.DoesNotContain(partitionKey, static character => character is '/' or '\\' or '#' or '?' or '\0');
     }
 
     [Fact]
-    public void GetDefaultPartitionKey_PreservesOrdinalOrderingAndRawPrefixesIncludingSurrogates()
+    public void GetDefaultPartitionKey_PreservesOrdinalOrderingAndRawPrefixesForPrintableAscii()
     {
-        string[] values = ["a", "a/", "a0", "a\u007F", "aé", "a\uD7FF", "a\uD800", "a😀", "a\uD83D", "a\uDFFF", "a\uE000", "a\uFFFF"];
+        var values = new[] { "a" }.Concat(Enumerable.Range(' ', '~' - ' ' + 1).Select(value => "a" + (char)value)).ToArray();
         var options = new AzureTableJournalStorageOptions();
         foreach (var left in values)
         {
@@ -77,9 +75,51 @@ public sealed class AzureTableJournalStorageOptionsTests
             }
         }
 
-        Assert.Equal("0061D800", options.GetPartitionKey(new JournalId("a\uD800")));
-        Assert.Equal("0061DFFF", options.GetPartitionKey(new JournalId("a\uDFFF")));
-        Assert.Equal("0061D83DDE00", options.GetPartitionKey(new JournalId("a😀")));
+        Assert.Equal("6120", options.GetPartitionKey(new JournalId("a ")));
+        Assert.Equal("617E", options.GetPartitionKey(new JournalId("a~")));
+    }
+
+    [Theory]
+    [InlineData(0x00)]
+    [InlineData(0x1F)]
+    [InlineData(0x7F)]
+    [InlineData(0x85)]
+    [InlineData(0xA0)]
+    [InlineData(0xE9)]
+    [InlineData(0xD800)]
+    [InlineData(0xDFFF)]
+    [InlineData(0xFFFF)]
+    public void GetDefaultPartitionKey_UnsupportedCharacter_ThrowsExplicitly(int character)
+    {
+        var exception = Assert.Throws<ArgumentException>(() =>
+            new AzureTableJournalStorageOptions().GetPartitionKeyForJournal(new JournalId("journal/" + (char)character)));
+
+        Assert.Equal("journalId", exception.ParamName);
+        Assert.Contains("printable ASCII", exception.Message);
+    }
+
+    [Theory]
+    [InlineData(0x00)]
+    [InlineData(0x7F)]
+    [InlineData(0xE9)]
+    [InlineData(0xD800)]
+    [InlineData(0xDFFF)]
+    [InlineData(0xFFFF)]
+    public void GetPartitionKeyForJournal_CustomMapper_AcceptsUnsupportedAndLongJournalIds(int character)
+    {
+        var journalId = new JournalId(new string('a', 512) + (char)character);
+        JournalId mappedId = default;
+        var options = new AzureTableJournalStorageOptions
+        {
+            GetPartitionKey = id =>
+            {
+                mappedId = id;
+                return "custom";
+            },
+        };
+
+        Assert.Equal("custom", options.GetPartitionKeyForJournal(journalId));
+        Assert.Equal(journalId, mappedId);
     }
 
     [Fact]
@@ -183,7 +223,7 @@ public sealed class AzureTableJournalStorageOptionsTests
     [Fact]
     public void GetDefaultPartitionKey_EncodedValueExceedsAzureLimit_ThrowsLocally()
     {
-        var journalId = new JournalId(new string('a', 257));
+        var journalId = new JournalId(new string('a', 513));
 
         var exception = Assert.Throws<ArgumentException>(
             () => AzureTableJournalStorageOptions.GetDefaultPartitionKey(journalId));
@@ -193,13 +233,13 @@ public sealed class AzureTableJournalStorageOptionsTests
     }
 
     [Fact]
-    public void GetDefaultPartitionKey_256Utf16CodeUnits_FitsAzureLimit()
+    public void GetDefaultPartitionKey_512PrintableAsciiCharacters_FitsAzureLimit()
     {
-        var journalId = new JournalId(new string('\uFFFF', 256));
+        var journalId = new JournalId(new string('~', 512));
 
         var partitionKey = new AzureTableJournalStorageOptions().GetPartitionKeyForJournal(journalId);
 
-        Assert.Equal(new string('F', 1024), partitionKey);
+        Assert.Equal(string.Concat(Enumerable.Repeat("7E", 512)), partitionKey);
     }
 
     [Fact]

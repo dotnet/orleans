@@ -68,12 +68,14 @@ internal sealed class AzureBlobJournalStorageProvider : ILifecycleParticipant<IS
         }
 
         var container = GetDefaultContainerClient();
-        var maxBlobName = range.GetUpperBoundForSuffix("/wal");
-        var startFrom = range.LowerBound is { } lowerBound && System.Text.Ascii.IsValid(lowerBound) ? lowerBound : null;
+        var maxBlobName = range.MaxId is { } maxId && System.Text.Ascii.IsValid(maxId)
+            ? AzureBlobJournalStorageLayout.GetWalBlobName(maxId) : null;
+        var startFrom = range.LowerBound is { } lowerBound && System.Text.Ascii.IsValid(lowerBound)
+            ? AzureBlobJournalStorageLayout.GetWalBlobName(lowerBound) : null;
         await foreach (var page in container.GetBlobsAsync(
             new GetBlobsOptions
             {
-                Prefix = range.ListingPrefix,
+                Prefix = AzureBlobJournalStorageLayout.GetWalBlobName(range.ListingPrefix ?? string.Empty),
                 StartFrom = startFrom,
             },
             cancellationToken).AsPages(pageSizeHint: 5000))
@@ -89,13 +91,12 @@ internal sealed class AzureBlobJournalStorageProvider : ILifecycleParticipant<IS
                     yield break;
                 }
 
-                if (item.Properties.BlobType is { } blobType && blobType != BlobType.Append
-                    || !item.Name.EndsWith("/wal", StringComparison.Ordinal))
+                if (item.Properties.BlobType is { } blobType && blobType != BlobType.Append)
                 {
                     continue;
                 }
 
-                if (TryParseJournalId(item.Name[..^"/wal".Length], out var journalId)
+                if (AzureBlobJournalStorageLayout.TryGetJournalId(item.Name, out var journalId)
                     && range.Contains(journalId.Value))
                 {
                     yield return journalId;
@@ -117,20 +118,6 @@ internal sealed class AzureBlobJournalStorageProvider : ILifecycleParticipant<IS
     private BlobContainerClient GetDefaultContainerClient()
         => _defaultContainer ?? throw new InvalidOperationException(
             $"{nameof(AzureBlobJournalStorageProvider)} has not been initialized. Ensure the silo lifecycle has started before using journal storage.");
-
-    private static bool TryParseJournalId(string value, out JournalId journalId)
-    {
-        try
-        {
-            journalId = new JournalId(value);
-            return true;
-        }
-        catch (ArgumentException)
-        {
-            journalId = default;
-            return false;
-        }
-    }
 
     private static IJournalFormat GetJournalFormat(IServiceProvider serviceProvider, string journalFormatKey)
     {
