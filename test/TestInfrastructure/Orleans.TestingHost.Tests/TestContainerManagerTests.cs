@@ -70,14 +70,23 @@ public class TestContainerManagerTests
     }
 
     [Fact]
-    public async Task StartupCancellationIsPropagated()
+    public async Task StartupCancellationReturnsUnavailable()
     {
-        var expected = new OperationCanceledException("Container startup timed out.");
-        var manager = CreateManager((_, _) => Task.FromException(expected));
+        var manager = CreateManager((_, _) => Task.FromException(new OperationCanceledException("Container startup timed out.")));
 
-        var actual = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => manager.EnsureStartedAsync());
+        var started = await manager.EnsureStartedAsync();
 
-        Assert.Same(expected, actual);
+        Assert.False(started);
+    }
+
+    [Fact]
+    public async Task StartupHttpFailureReturnsUnavailable()
+    {
+        var manager = CreateManager((_, _) => Task.FromException(new HttpRequestException("Docker connection failed.")));
+
+        var started = await manager.EnsureStartedAsync();
+
+        Assert.False(started);
     }
 
     private static TestContainerManager<object> CreateManager(Func<object, CancellationToken, Task> startAsync)
