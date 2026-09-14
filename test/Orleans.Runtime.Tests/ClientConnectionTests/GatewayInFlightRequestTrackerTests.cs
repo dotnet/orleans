@@ -149,13 +149,15 @@ public class GatewayInFlightRequestTrackerTests
         Assert.Equal(GatewayInFlightRequestTracker.CompletionResult.Deferred, tracker.TryComplete(response));
         Assert.Equal(1, tracker.Count);
 
-        Assert.True(tracker.TryUpdateDestination(
-            request.Id,
-            Silo1,
-            Silo2,
-            forwardCount: 1,
-            out var updatedTarget,
-            out var completedResponse));
+        Assert.Equal(
+            GatewayInFlightRequestTracker.ForwardingUpdateResult.Applied,
+            tracker.TryUpdateDestination(
+                request.Id,
+                Silo1,
+                Silo2,
+                forwardCount: 1,
+                out var updatedTarget,
+                out var completedResponse));
 
         Assert.Equal(Silo2, updatedTarget);
         Assert.Same(response, completedResponse);
@@ -187,13 +189,15 @@ public class GatewayInFlightRequestTrackerTests
         var request = CreateMessage(1, Message.Directions.Request, Silo1);
         Assert.True(tracker.Track(request));
 
-        Assert.True(tracker.TryUpdateDestination(
-            request.Id,
-            Silo1,
-            Silo2,
-            forwardCount: 1,
-            out var updatedTarget,
-            out var completedResponse));
+        Assert.Equal(
+            GatewayInFlightRequestTracker.ForwardingUpdateResult.Applied,
+            tracker.TryUpdateDestination(
+                request.Id,
+                Silo1,
+                Silo2,
+                forwardCount: 1,
+                out var updatedTarget,
+                out var completedResponse));
 
         Assert.Equal(Silo2, updatedTarget);
         Assert.Null(completedResponse);
@@ -211,7 +215,9 @@ public class GatewayInFlightRequestTrackerTests
         request.ForwardCount = 2;
         Assert.True(tracker.Track(request));
 
-        Assert.False(tracker.TryUpdateDestination(request.Id, Silo1, Silo2, forwardCount: 1, out _, out _));
+        Assert.Equal(
+            GatewayInFlightRequestTracker.ForwardingUpdateResult.Ignored,
+            tracker.TryUpdateDestination(request.Id, Silo1, Silo2, forwardCount: 1, out _, out _));
 
         Assert.Null(tracker.RemoveForSilo(Silo2));
         var current = Assert.Single(tracker.RemoveForSilo(Silo1)!);
@@ -227,14 +233,18 @@ public class GatewayInFlightRequestTrackerTests
         var request = CreateMessage(1, Message.Directions.Request, Silo1);
         Assert.True(tracker.Track(request));
 
-        Assert.False(tracker.TryUpdateDestination(request.Id, Silo2, silo3, forwardCount: 2, out _, out _));
-        Assert.True(tracker.TryUpdateDestination(
-            request.Id,
-            Silo1,
-            Silo2,
-            forwardCount: 1,
-            out var updatedTarget,
-            out var completedResponse));
+        Assert.Equal(
+            GatewayInFlightRequestTracker.ForwardingUpdateResult.Recorded,
+            tracker.TryUpdateDestination(request.Id, Silo2, silo3, forwardCount: 2, out _, out _));
+        Assert.Equal(
+            GatewayInFlightRequestTracker.ForwardingUpdateResult.Applied,
+            tracker.TryUpdateDestination(
+                request.Id,
+                Silo1,
+                Silo2,
+                forwardCount: 1,
+                out var updatedTarget,
+                out var completedResponse));
 
         Assert.Equal(silo3, updatedTarget);
         Assert.Null(completedResponse);
@@ -253,11 +263,39 @@ public class GatewayInFlightRequestTrackerTests
         Assert.True(tracker.Track(original));
         Assert.True(tracker.Track(retry));
 
-        Assert.False(tracker.TryUpdateDestination(original.Id, Silo1, Silo2, forwardCount: 1, out _, out _));
+        Assert.Equal(
+            GatewayInFlightRequestTracker.ForwardingUpdateResult.Recorded,
+            tracker.TryUpdateDestination(original.Id, Silo1, Silo2, forwardCount: 1, out _, out _));
 
         var current = Assert.Single(tracker.RemoveForSilo(Silo2)!);
         Assert.Equal(retry.Id, current.Id);
         Assert.Equal(0, current.ForwardCount);
+    }
+
+    [Fact]
+    public void DeferredResponsesAreBoundedByForwardingLimit()
+    {
+        var silo3 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 33333), 3);
+        var silo4 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 44444), 4);
+        var tracker = CreateTracker(maxForwardCount: 1);
+        var request = CreateMessage(1, Message.Directions.Request, Silo1);
+        Assert.True(tracker.Track(request));
+        var response2 = CreateResponse(request, Message.ResponseTypes.Success);
+        response2.SendingSilo = Silo2;
+        var response3 = CreateResponse(request, Message.ResponseTypes.Success);
+        response3.SendingSilo = silo3;
+        var response4 = CreateResponse(request, Message.ResponseTypes.Success);
+        response4.SendingSilo = silo4;
+
+        Assert.Equal(GatewayInFlightRequestTracker.CompletionResult.Deferred, tracker.TryComplete(response2));
+        Assert.Equal(GatewayInFlightRequestTracker.CompletionResult.Deferred, tracker.TryComplete(response3));
+        Assert.Equal(GatewayInFlightRequestTracker.CompletionResult.Deferred, tracker.TryComplete(response4));
+
+        Assert.Equal(
+            GatewayInFlightRequestTracker.ForwardingUpdateResult.Applied,
+            tracker.TryUpdateDestination(request.Id, Silo1, Silo2, forwardCount: 1, out _, out var completedResponse));
+        Assert.Null(completedResponse);
+        Assert.Equal(1, tracker.Count);
     }
 
     [Fact]
@@ -535,9 +573,20 @@ public class GatewayInFlightRequestTrackerTests
     public void ResponseForDeadOriginGatewayCanUseLocalProxyDelivery()
     {
         var response = CreateMessage(1, Message.Directions.Response, Silo1);
+        response.TargetGrain = ClientGrainId.Create().GrainId;
 
         Assert.True(MessageCenter.ShouldRouteResponseViaTargetSilo(response, Silo2));
         Assert.True(MessageCenter.CanDeliverToProxyLocally(response, Silo2, targetSiloIsDead: true));
+        Assert.True(MessageCenter.ShouldReaddressResponse(response, targetSiloIsDead: true));
+        Assert.False(MessageCenter.ShouldReaddressResponse(response, targetSiloIsDead: false));
+    }
+
+    [Fact]
+    public void GrainResponseIsNotReaddressedWhenTargetSiloIsDead()
+    {
+        var response = CreateMessage(1, Message.Directions.Response, Silo1);
+
+        Assert.False(MessageCenter.ShouldReaddressResponse(response, targetSiloIsDead: true));
     }
 
     [Fact]
@@ -566,12 +615,14 @@ public class GatewayInFlightRequestTrackerTests
 
         Assert.False(MessageCenter.ShouldRouteResponseViaTargetSilo(message, Silo2));
         Assert.True(MessageCenter.CanDeliverToProxyLocally(message, Silo2, targetSiloIsDead: false));
+        Assert.False(MessageCenter.ShouldReaddressResponse(message, targetSiloIsDead: true));
     }
 
     private static GatewayInFlightRequestTracker CreateTracker(
         TimeProvider? timeProvider = null,
-        TimeSpan? responseTimeout = null) =>
-        new(timeProvider ?? TimeProvider.System, responseTimeout ?? TimeSpan.FromSeconds(30));
+        TimeSpan? responseTimeout = null,
+        int maxForwardCount = 2) =>
+        new(timeProvider ?? TimeProvider.System, responseTimeout ?? TimeSpan.FromSeconds(30), maxForwardCount);
 
     private static Message CreateMessage(long id, Message.Directions direction, SiloAddress targetSilo) =>
         new()

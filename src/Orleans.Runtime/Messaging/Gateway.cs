@@ -157,12 +157,18 @@ namespace Orleans.Runtime.Messaging
 
         internal async Task StopAsync()
         {
-            Volatile.Write(ref isStopping, 1);
+            List<ClientState> clientsToClear;
+            lock (clients)
+            {
+                Volatile.Write(ref isStopping, 1);
+                clientsToClear = [.. clients.Values];
+            }
+
             siloStatusOracle.UnSubscribeFromSiloStatusEvents(this);
             gatewayMaintenanceTimer.Dispose();
             requestMaintenanceTimer.Dispose();
             await Task.WhenAll(gatewayMaintenanceTask, requestMaintenanceTask).ConfigureAwait(false);
-            foreach (var (_, client) in clients)
+            foreach (var client in clientsToClear)
             {
                 client.ClearPendingRequests();
             }
@@ -183,9 +189,14 @@ namespace Orleans.Runtime.Messaging
 
         internal ClientState RecordOpenedConnection(GatewayInboundConnection connection, ClientGrainId clientId)
         {
-            LogInformationGatewayClientOpenedSocket(logger, connection.RemoteEndPoint, clientId);
             lock (clients)
             {
+                if (IsStopping)
+                {
+                    throw new ConnectionAbortedException("The gateway is stopping and cannot accept new client connections.");
+                }
+
+                LogInformationGatewayClientOpenedSocket(logger, connection.RemoteEndPoint, clientId);
                 if (clients.TryGetValue(clientId, out var clientState))
                 {
                     var oldSocket = clientState.Connection;
@@ -447,7 +458,10 @@ namespace Orleans.Runtime.Messaging
 
                 _gateway = gateway;
                 Id = id;
-                _pendingRequests = new(gateway.timeProvider, gateway.messagingOptions.ResponseTimeout);
+                _pendingRequests = new(
+                    gateway.timeProvider,
+                    gateway.messagingOptions.ResponseTimeout,
+                    gateway.messagingOptions.MaxForwardCount);
                 _disconnectedSince.Restart();
                 _messageLoop = Task.Run(RunMessageLoop);
             }
@@ -565,7 +579,7 @@ namespace Orleans.Runtime.Messaging
                             forwardingTarget,
                             update.ForwardCount,
                             out var updatedTarget,
-                            out completedResponse)
+                            out completedResponse) == GatewayInFlightRequestTracker.ForwardingUpdateResult.Applied
                         && completedResponse is null
                         && _gateway.siloStatusOracle.IsDeadSilo(updatedTarget))
                     {
