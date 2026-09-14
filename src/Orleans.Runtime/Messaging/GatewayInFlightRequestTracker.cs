@@ -4,8 +4,12 @@ using System.Collections.Generic;
 namespace Orleans.Runtime.Messaging
 {
     // ClientState serializes access so that registration and the transport enqueue are atomic with removal.
-    internal sealed class GatewayInFlightRequestTracker(TimeProvider timeProvider, TimeSpan responseTimeout)
+    internal sealed class GatewayInFlightRequestTracker(
+        TimeProvider timeProvider,
+        TimeSpan responseTimeout,
+        int maxForwardCount)
     {
+        private readonly int _maxDeferredResponses = Math.Max(1, maxForwardCount + 1);
         private Dictionary<CorrelationId, TrackedRequest>? _requests;
         // Updates can cross different silo connections, so later forwarding hops can arrive before earlier ones.
         private Dictionary<CorrelationId, List<ForwardingUpdate>>? _forwardingUpdates;
@@ -63,7 +67,12 @@ namespace Orleans.Runtime.Messaging
                 return CompletionResult.NotTracked;
             }
 
-            if (response.SendingSilo is not { } responseSilo || !responseSilo.Equals(trackedRequest.TargetSilo))
+            if (response.SendingSilo is not { } responseSilo)
+            {
+                return CompletionResult.Deferred;
+            }
+
+            if (!responseSilo.Equals(trackedRequest.TargetSilo))
             {
                 _deferredResponses ??= [];
                 if (!_deferredResponses.TryGetValue(response.Id, out var responses))
@@ -71,7 +80,12 @@ namespace Orleans.Runtime.Messaging
                     _deferredResponses[response.Id] = responses = [];
                 }
 
-                responses.RemoveAll(item => item.SendingSilo?.Equals(response.SendingSilo) is true);
+                responses.RemoveAll(item => item.SendingSilo?.Equals(responseSilo) is true);
+                if (responses.Count >= _maxDeferredResponses)
+                {
+                    responses.RemoveAt(0);
+                }
+
                 responses.Add(response);
                 return CompletionResult.Deferred;
             }
@@ -81,7 +95,7 @@ namespace Orleans.Runtime.Messaging
             return CompletionResult.Completed;
         }
 
-        internal bool TryUpdateDestination(
+        internal ForwardingUpdateResult TryUpdateDestination(
             CorrelationId requestId,
             SiloAddress sourceSilo,
             SiloAddress targetSilo,
@@ -93,12 +107,12 @@ namespace Orleans.Runtime.Messaging
             completedResponse = null;
             if (_requests is not { } requests || !requests.TryGetValue(requestId, out var trackedRequest))
             {
-                return false;
+                return ForwardingUpdateResult.Ignored;
             }
 
             if (forwardCount <= trackedRequest.ForwardCount)
             {
-                return false;
+                return ForwardingUpdateResult.Ignored;
             }
 
             _forwardingUpdates ??= [];
@@ -145,7 +159,7 @@ namespace Orleans.Runtime.Messaging
                 completedResponse = response;
             }
 
-            return updated;
+            return updated ? ForwardingUpdateResult.Applied : ForwardingUpdateResult.Recorded;
         }
 
         internal bool TryRemove(CorrelationId requestId, out Message request)
@@ -318,6 +332,13 @@ namespace Orleans.Runtime.Messaging
             NotTracked,
             Completed,
             Deferred,
+        }
+
+        internal enum ForwardingUpdateResult
+        {
+            Ignored,
+            Recorded,
+            Applied,
         }
     }
 }
