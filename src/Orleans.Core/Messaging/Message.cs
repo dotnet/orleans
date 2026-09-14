@@ -14,9 +14,12 @@ namespace Orleans.Runtime
         public const int LENGTH_HEADER_SIZE = 8;
         public const int LENGTH_META_HEADER = 4;
         internal const int MaxCacheInvalidationHeaderEntries = 16;
+        internal const string GatewayRequestAttemptKey = "#GatewayRequestAttempt";
 
         [NonSerialized]
         private short _retryCount;
+        [NonSerialized]
+        private long _gatewayRequestAttempt;
 
         public CoarseStopwatch _timeToExpiry;
 
@@ -201,6 +204,16 @@ namespace Orleans.Runtime
             set => _retryCount = value;
         }
 
+        internal long GatewayRequestAttempt
+        {
+            get => _gatewayRequestAttempt;
+            set
+            {
+                _gatewayRequestAttempt = value;
+                UpdateRequestContextFlag();
+            }
+        }
+
         public bool HasCacheInvalidationHeader => CacheInvalidationHeader is { Count: > 0 };
 
         public bool IsSystemMessage
@@ -373,9 +386,12 @@ namespace Orleans.Runtime
             set
             {
                 _requestContextData = value;
-                _headers.SetFlag(MessageFlags.HasRequestContextData, value is not null);
+                UpdateRequestContextFlag();
             }
         }
+
+        private void UpdateRequestContextFlag() =>
+            _headers.SetFlag(MessageFlags.HasRequestContextData, _requestContextData is not null || _gatewayRequestAttempt != 0);
 
         public GrainInterfaceType InterfaceType
         {
