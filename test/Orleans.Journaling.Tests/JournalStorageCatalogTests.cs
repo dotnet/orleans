@@ -562,7 +562,7 @@ public sealed class JournalStorageCatalogTests
         Assert.All(context.Native.Requests, request =>
         {
             Assert.Equal(common, request.Prefix);
-            Assert.Equal(minimum, request.LowerStart);
+            Assert.Equal(kind == "AzureBlob" || request.Cursor is null ? minimum : null, request.LowerStart);
         });
     }
 
@@ -1012,20 +1012,37 @@ public sealed class JournalStorageCatalogTests
                     var s3Options = new S3JournalStorageOptions { BucketName = "journals", S3Client = _client, UseOrderedListing = false };
                     configureS3?.Invoke(s3Options);
                     var objects = (keys ?? ids.Select(id => $"{id}/wal").ToArray()).Select(key => new S3Object { Key = key }).ToArray();
+                    var continuationRecords = new Dictionary<string, S3Object[]>();
                     _client.ListObjectsV2Async(Arg.Any<ListObjectsV2Request>(), Arg.Any<CancellationToken>()).Returns(call =>
                     {
                         var request = call.Arg<ListObjectsV2Request>();
                         Assert.Equal("journals", request.BucketName);
-                        var matching = objects.Where(item => (request.Prefix is null
-                            || item.Key.StartsWith(request.Prefix, StringComparison.Ordinal))
-                            && (request.StartAfter is null || string.CompareOrdinal(item.Key, request.StartAfter) > 0));
-                        if (s3Options.UseOrderedListing)
+                        S3Object[] records;
+                        if (request.ContinuationToken is { } token)
                         {
-                            matching = matching.OrderBy(item => item.Key, StringComparer.Ordinal);
+                            Assert.Null(request.StartAfter);
+                            records = continuationRecords[token];
+                        }
+                        else
+                        {
+                            var matching = objects.Where(item => (request.Prefix is null
+                                || item.Key.StartsWith(request.Prefix, StringComparison.Ordinal))
+                                && (request.StartAfter is null || string.CompareOrdinal(item.Key, request.StartAfter) > 0));
+                            if (s3Options.UseOrderedListing)
+                            {
+                                matching = matching.OrderBy(item => item.Key, StringComparer.Ordinal);
+                            }
+
+                            records = matching.ToArray();
                         }
 
-                        var page = Native.Fetch(matching.ToArray(), request.ContinuationToken, request.MaxKeys, request.Prefix,
+                        var page = Native.Fetch(records, request.ContinuationToken, request.MaxKeys, request.Prefix,
                             call.Arg<CancellationToken>(), request.StartAfter);
+                        if (page.NextCursor is { } nextToken)
+                        {
+                            continuationRecords[nextToken] = records;
+                        }
+
                         return Task.FromResult(new ListObjectsV2Response
                         {
                             S3Objects = page.Values.ToList(),

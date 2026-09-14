@@ -91,7 +91,7 @@ internal sealed class S3JournalStorageProvider : ILifecycleParticipant<ISiloLife
                 {
                     BucketName = bucketName,
                     Prefix = objectKeyPrefix,
-                    StartAfter = startAfter,
+                    StartAfter = continuationToken is null ? startAfter : null,
                     MaxKeys = 1000,
                     ContinuationToken = continuationToken,
                 },

@@ -281,6 +281,64 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
             await provider.CloseAsync(cancellationToken);
         }
 
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task ListAsync_OrderedSeekIsOnlySentOnInitialPage(bool emptyFirstPage)
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var requests = new List<ListObjectsV2Request>();
+            var client = CreateTrackingClient();
+            client.ListObjectsV2Async(Arg.Any<ListObjectsV2Request>(), Arg.Any<CancellationToken>())
+                .Returns(call =>
+                {
+                    var request = call.Arg<ListObjectsV2Request>();
+                    requests.Add(request);
+                    Assert.Equal(cancellationToken, call.Arg<CancellationToken>());
+                    Assert.False(request.StartAfter is not null && request.ContinuationToken is not null);
+                    return Task.FromResult(requests.Count switch
+                    {
+                        1 => new ListObjectsV2Response
+                        {
+                            S3Objects = emptyFirstPage ? null : [new S3Object { Key = "journals/b/wal" }],
+                            IsTruncated = true,
+                            NextContinuationToken = "opaque-next"
+                        },
+                        2 => new ListObjectsV2Response
+                        {
+                            S3Objects = [new S3Object { Key = "journals/c/wal" }],
+                            IsTruncated = true,
+                            NextContinuationToken = "opaque-last"
+                        },
+                        3 => new ListObjectsV2Response
+                        {
+                            S3Objects = [new S3Object { Key = "journals/d/wal" }],
+                            IsTruncated = false
+                        },
+                        _ => throw new InvalidOperationException("Unexpected extra listing request.")
+                    });
+                });
+            var options = CreateOptions();
+            options.S3Client = client;
+            options.UseOrderedListing = true;
+            var provider = CreateProvider(options);
+            await provider.InitializeAsync(cancellationToken);
+            var listed = new List<JournalId>();
+            await foreach (var id in provider.ListAsync(
+                new() { Prefix = new("journals/"), MinId = new("journals/b"), MaxId = new("journals/d") },
+                cancellationToken))
+            {
+                listed.Add(id);
+            }
+
+            Assert.Equal(emptyFirstPage ? new[] { "journals/c", "journals/d" } : ["journals/b", "journals/c", "journals/d"],
+                listed.Select(id => id.Value));
+            Assert.Equal(new string?[] { "journals/b", null, null }, requests.Select(request => request.StartAfter));
+            Assert.Equal(new string?[] { null, "opaque-next", "opaque-last" }, requests.Select(request => request.ContinuationToken));
+            Assert.All(requests, request => Assert.Equal("journals/", request.Prefix));
+            await provider.CloseAsync(cancellationToken);
+        }
+
         [Fact]
         public async Task ListAsync_NullObjectCollectionObservesResponseCancellation()
         {
