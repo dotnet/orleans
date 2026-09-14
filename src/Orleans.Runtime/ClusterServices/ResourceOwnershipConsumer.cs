@@ -73,7 +73,7 @@ internal sealed class ResourceOwnershipConsumer : IAsyncDisposable
         lock (_lock)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            ValidateProviderView(view.Id);
+            ValidateCanonicalView(view, ValidateProviderView(view.Id));
             if (_view is { } installed && view.Id.CompareTo(installed.Id) <= 0)
             {
                 if (view.Id == installed.Id && installed.HasSameContent(view))
@@ -334,7 +334,12 @@ internal sealed class ResourceOwnershipConsumer : IAsyncDisposable
     private RetainedState ValidateHandoff(ResourceHandoffRequest request)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        ValidateProviderView(request.TargetView);
+        var current = ValidateProviderView(request.TargetView);
+        if (_view is { } installed)
+        {
+            ValidateCanonicalView(installed, current);
+        }
+
         if (_view is null || _view.Id != request.TargetView
             || !_view.TryGetPredecessor(out var predecessor) || predecessor != request.PreviousView
             || !_view.ResourceOwners.TryGetValue(request.Resource, out var destination) || !destination.Equals(request.Destination)
@@ -507,7 +512,12 @@ internal sealed class ResourceOwnershipConsumer : IAsyncDisposable
     private void ValidateOwnership(string resource, RegisteredServiceViewId view)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        ValidateProviderView(view);
+        var current = ValidateProviderView(view);
+        if (_view is { } installed)
+        {
+            ValidateCanonicalView(installed, current);
+        }
+
         if (_view is null || _view.Id != view
             || !_view.ResourceOwners.TryGetValue(resource, out var owner) || !owner.Equals(_local)
             || !_provider.IsOwnerLive(_local, _view.MembershipWatermark))
@@ -516,12 +526,22 @@ internal sealed class ResourceOwnershipConsumer : IAsyncDisposable
         }
     }
 
-    private void ValidateProviderView(RegisteredServiceViewId view)
+    private RegisteredClusterServiceView ValidateProviderView(RegisteredServiceViewId view)
     {
         var current = ValidateProviderAuthority(view);
         if (current.Id.CompareTo(view) > 0)
         {
             throw new ClusterServiceViewUnavailableException($"Service view '{view}' was superseded by '{current.Id}'.");
+        }
+
+        return current;
+    }
+
+    private static void ValidateCanonicalView(RegisteredClusterServiceView view, RegisteredClusterServiceView current)
+    {
+        if (view.Id == current.Id && !ReferenceEquals(view, current) && !current.HasSameContent(view))
+        {
+            throw new ClusterServiceAuthorityException($"Canonical view identity '{view.Id}' has conflicting content.");
         }
     }
 
