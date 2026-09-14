@@ -54,6 +54,7 @@ Every multi-silo production cluster needs a shared membership provider.
 | --- | --- |
 | [Microsoft.Orleans.Persistence.AdoNet](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.AdoNet) | ADO.NET-compatible relational databases |
 | [Microsoft.Orleans.Persistence.AzureStorage](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.AzureStorage) | Azure Table and Blob Storage |
+| [Microsoft.Orleans.Persistence.Cassandra](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.Cassandra) | Apache Cassandra |
 | [Microsoft.Orleans.Persistence.Cosmos](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.Cosmos) | Azure Cosmos DB |
 | [Microsoft.Orleans.Persistence.DynamoDB](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.DynamoDB) | Amazon DynamoDB |
 | [Microsoft.Orleans.Persistence.Firestore](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.Firestore) | Google Cloud Firestore |
