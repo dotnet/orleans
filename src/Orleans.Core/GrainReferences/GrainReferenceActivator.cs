@@ -184,7 +184,9 @@ namespace Orleans.GrainReferences
     internal class RpcProvider
     {
         private readonly TypeConverter _typeConverter;
-        private readonly Dictionary<GrainInterfaceType, Type> _mapping;
+        private readonly TypeManifestOptions _config;
+        private readonly GrainInterfaceTypeResolver _resolver;
+        private Dictionary<GrainInterfaceType, Type> _mapping;
 
         /// <summary>
         /// Initializes a new  instance of the <see cref="RpcProvider"/> class.
@@ -198,9 +200,21 @@ namespace Orleans.GrainReferences
             TypeConverter typeConverter)
         {
             _typeConverter = typeConverter;
-            var proxyTypes = config.Value.InterfaceProxyTypes;
-            _mapping = new Dictionary<GrainInterfaceType, Type>();
-            foreach (var proxyType in proxyTypes)
+            _config = config.Value;
+            _resolver = resolver;
+            _mapping = BuildMapping(_config, _resolver);
+        }
+
+        /// <summary>
+        /// Rebuilds the proxy mapping after a hot reload metadata update so that proxies for newly added
+        /// grain interfaces resolve without a restart.
+        /// </summary>
+        internal void OnManifestUpdated() => Volatile.Write(ref _mapping, BuildMapping(_config, _resolver));
+
+        private static Dictionary<GrainInterfaceType, Type> BuildMapping(TypeManifestOptions config, GrainInterfaceTypeResolver resolver)
+        {
+            var mapping = new Dictionary<GrainInterfaceType, Type>();
+            foreach (var proxyType in config.InterfaceProxyTypes)
             {
                 if (!typeof(IAddressable).IsAssignableFrom(proxyType))
                 {
@@ -215,8 +229,10 @@ namespace Orleans.GrainReferences
 
                 var grainInterface = GetMainInterface(type);
                 var id = resolver.GetGrainInterfaceType(grainInterface);
-                _mapping[id] = type;
+                mapping[id] = type;
             }
+
+            return mapping;
 
             static Type GetMainInterface(Type t)
             {
@@ -266,7 +282,7 @@ namespace Orleans.GrainReferences
                 args = default;
             }
 
-            if (!_mapping.TryGetValue(lookupId, out result))
+            if (!Volatile.Read(ref _mapping).TryGetValue(lookupId, out result))
             {
                 return false;
             }

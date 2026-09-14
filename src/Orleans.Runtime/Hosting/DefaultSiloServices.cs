@@ -330,6 +330,11 @@ namespace Orleans.Hosting
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ClusterManifestProvider>();
             services.AddSingleton<ClusterManifestSystemTarget>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ClusterManifestSystemTarget>();
+            if (System.Reflection.Metadata.MetadataUpdater.IsSupported)
+            {
+                services.AddSingleton<SiloHotReloadRefresher>();
+                services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, SiloHotReloadRefresher>();
+            }
 
             //Add default option formatter if none is configured, for options which are required to be configured
             services.ConfigureFormatter<SiloOptions>();

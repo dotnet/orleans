@@ -28,6 +28,7 @@ namespace Orleans.Runtime.Metadata
 #else
         private readonly object _currentLock = new();
 #endif
+        private GrainManifest _localGrainManifest;
         private ClusterManifest _current;
         private IInternalGrainFactory? _grainFactory;
         private Task? _runTask;
@@ -45,7 +46,7 @@ namespace Orleans.Runtime.Metadata
             _services = services;
             _clusterMembershipService = clusterMembershipService;
             _fatalErrorHandler = fatalErrorHandler;
-            LocalGrainManifest = siloManifestProvider.SiloManifest;
+            _localGrainManifest = siloManifestProvider.SiloManifest;
             _current = CreateClusterManifest(
                 MajorMinorVersion.MinValue,
                 ImmutableDictionary<SiloAddress, GrainManifest>.Empty);
@@ -59,7 +60,39 @@ namespace Orleans.Runtime.Metadata
 
         public IAsyncEnumerable<ClusterManifest> Updates => _updates;
 
-        public GrainManifest LocalGrainManifest { get; }
+        public GrainManifest LocalGrainManifest => Volatile.Read(ref _localGrainManifest);
+
+        /// <summary>
+        /// Publishes an updated manifest for the local silo after a hot reload metadata update. Only the
+        /// minor version is bumped: placement (<see cref="Versions.CachedVersionSelectorManager"/>) spin-waits
+        /// until the manifest's major version matches the membership version, so the major version must not
+        /// be advanced here.
+        /// </summary>
+        internal void OnLocalManifestUpdated(GrainManifest localManifest)
+        {
+            lock (_currentLock)
+            {
+                Volatile.Write(ref _localGrainManifest, localManifest);
+            }
+
+            // Publish with a retry: a concurrently published manifest (e.g. built from membership processing
+            // before this update) can win the race while still carrying the previous local manifest.
+            for (var attempt = 0; attempt < 3; attempt++)
+            {
+                var current = _current;
+                if (current.Silos.TryGetValue(_localSiloAddress, out var existing) && ReferenceEquals(existing, localManifest))
+                {
+                    return;
+                }
+
+                var version = new MajorMinorVersion(current.Version.Major, current.Version.Minor + 1);
+                var updated = CreateClusterManifest(version, current.Silos.SetItem(_localSiloAddress, localManifest));
+                if (TryPublishManifest(updated))
+                {
+                    return;
+                }
+            }
+        }
 
         private ClusterManifest EnsureValidManifestForCurrentMembership(ClusterMembershipSnapshot clusterMembership)
         {
