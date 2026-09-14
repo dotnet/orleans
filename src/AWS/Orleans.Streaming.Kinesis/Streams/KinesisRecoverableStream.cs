@@ -320,6 +320,7 @@ internal sealed class KinesisReplaySourceFactory(
         out KinesisSequenceToken normalized)
     {
         if (token is KinesisSequenceToken kinesisToken
+            && !string.IsNullOrEmpty(kinesisToken.ShardSequence)
             && string.Equals(kinesisToken.StreamName, streamName, StringComparison.Ordinal)
             && string.Equals(kinesisToken.ShardId, partition, StringComparison.Ordinal))
         {
@@ -328,6 +329,7 @@ internal sealed class KinesisReplaySourceFactory(
         }
 
         if (token is PartitionedStreamSequenceToken partitionedToken
+            && !string.IsNullOrEmpty(partitionedToken.Position)
             && string.Equals(partitionedToken.ProviderIdentity, streamName, StringComparison.Ordinal)
             && string.Equals(partitionedToken.PartitionIdentity, partition, StringComparison.Ordinal))
         {
@@ -340,7 +342,12 @@ internal sealed class KinesisReplaySourceFactory(
             return true;
         }
 
-        if (token is KinesisSequenceToken { StreamName: null, ShardId: null } legacyToken)
+        if (token is KinesisSequenceToken
+            {
+                StreamName: null,
+                ShardId: null,
+                ShardSequence.Length: > 0,
+            } legacyToken)
         {
             normalized = new(
                 streamName,
@@ -456,7 +463,9 @@ internal sealed class KinesisRecoverableStreamDataAdapter(
 
     public bool TryGetOffset(StreamSequenceToken token, out string offset)
     {
-        if (token is KinesisSequenceToken kinesisToken && IsPartitionMatch(kinesisToken))
+        if (token is KinesisSequenceToken kinesisToken
+            && !string.IsNullOrEmpty(kinesisToken.ShardSequence)
+            && IsPartitionMatch(kinesisToken))
         {
             offset = kinesisToken.ShardSequence;
             return true;
@@ -482,7 +491,9 @@ internal sealed class KinesisRecoverableStreamDataAdapter(
         StreamSequenceToken token,
         out KinesisSequenceToken normalized)
     {
-        if (token is KinesisSequenceToken kinesisToken && IsPartitionMatch(kinesisToken))
+        if (token is KinesisSequenceToken kinesisToken
+            && !string.IsNullOrEmpty(kinesisToken.ShardSequence)
+            && IsPartitionMatch(kinesisToken))
         {
             normalized = kinesisToken.StreamName is null
                 ? new(
@@ -496,6 +507,7 @@ internal sealed class KinesisRecoverableStreamDataAdapter(
         }
 
         if (token is PartitionedStreamSequenceToken partitionedToken
+            && !string.IsNullOrEmpty(partitionedToken.Position)
             && string.Equals(partitionedToken.ProviderIdentity, streamName, StringComparison.Ordinal)
             && string.Equals(partitionedToken.PartitionIdentity, partition, StringComparison.Ordinal))
         {

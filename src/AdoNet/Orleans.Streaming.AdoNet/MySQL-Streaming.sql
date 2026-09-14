@@ -838,6 +838,7 @@ BEGIN
         END IF;
 
         SELECT
+            _CurrentOwnerEpoch AS OwnerEpoch,
             FALSE AS Ran,
             0 AS DeletedCount,
             NULL AS DeletedThroughMessageId,
@@ -937,6 +938,7 @@ BEGIN
         END IF;
 
         SELECT
+            _CurrentOwnerEpoch AS OwnerEpoch,
             TRUE AS Ran,
             _DeletedCount AS DeletedCount,
             _DeletedThroughMessageId AS DeletedThroughMessageId,

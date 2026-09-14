@@ -702,8 +702,21 @@ public sealed class KinesisRuntimeTests
         await Assert.ThrowsAsync<DataNotAvailableException>(
             async () => await factory.Create(
                 StreamId.Create("namespace", Guid.NewGuid()),
+                new KinesisSequenceToken("stream", "shard-1", string.Empty, 0, 0),
+                TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<DataNotAvailableException>(
+            async () => await factory.Create(
+                StreamId.Create("namespace", Guid.NewGuid()),
+                new PartitionedStreamSequenceToken("stream", "shard-1", string.Empty, 0),
+                TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<DataNotAvailableException>(
+            async () => await factory.Create(
+                StreamId.Create("namespace", Guid.NewGuid()),
                 new KinesisSequenceToken("stream", "shard-1", "1", 0, 0),
                 TestContext.Current.CancellationToken));
+        await client.Received(1).GetShardIteratorAsync(
+            Arg.Any<GetShardIteratorRequest>(),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]

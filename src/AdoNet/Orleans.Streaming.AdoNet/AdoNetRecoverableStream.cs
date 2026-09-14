@@ -130,6 +130,13 @@ internal sealed partial class AdoNetRecoverableStream(
             AdoNetStreamTime.ToSqlSeconds(options.CleanupInterval),
             options.CleanupBatchSize,
             cancellationToken);
+        if (cleanup.OwnerEpoch != _partition.OwnerEpoch)
+        {
+            throw new InvalidOperationException(
+                $"ADO.NET stream partition ownership was lost for '{serviceId}/{providerId}/{queueId}' at epoch {_partition.OwnerEpoch}. "
+                + "The stale receiver cannot continue reading.");
+        }
+
         if (cleanup.HardDeletedCount > 0)
         {
             LogHardRetentionCrossed(

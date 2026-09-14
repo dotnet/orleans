@@ -791,6 +791,7 @@ namespace Orleans.Tests.SqlUtils
             return ReadAsync(
                 dbStoredQueries.CleanupStreamMessagesKey,
                 record => new AdoNetStreamCleanupResult(
+                    GetNullableInt64(record, nameof(AdoNetStreamCleanupResult.OwnerEpoch)),
                     Convert.ToBoolean(record[nameof(AdoNetStreamCleanupResult.Ran)]),
                     Convert.ToInt32(record[nameof(AdoNetStreamCleanupResult.DeletedCount)]),
                     GetNullableInt64(record, nameof(AdoNetStreamCleanupResult.DeletedThroughMessageId)),
