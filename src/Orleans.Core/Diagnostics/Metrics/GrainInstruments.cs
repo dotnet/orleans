@@ -1,7 +1,5 @@
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics.Metrics;
-using System.Runtime.CompilerServices;
 using System.Threading;
 
 namespace Orleans.Runtime;
@@ -10,7 +8,6 @@ internal sealed class GrainInstruments
 {
     private readonly UpDownCounter<int> _grainCounts;
     private readonly UpDownCounter<int> _systemTargetCounts;
-    internal ConcurrentDictionary<string, StrongBox<int>> GrainCounts { get; } = new();
 
     public GrainInstruments(OrleansInstruments instruments)
     {
@@ -18,18 +15,16 @@ internal sealed class GrainInstruments
         _systemTargetCounts = instruments.Meter.CreateUpDownCounter<int>(InstrumentNames.SYSTEM_TARGET_COUNTS);
     }
 
-    internal StrongBox<int> GetGrainCount(string grainTypeName) => GrainCounts.GetOrAdd(grainTypeName, static _ => new());
-
-    internal void IncrementGrainCounts(string grainType, StrongBox<int> grainCount)
+    internal void IncrementGrainCounts(GrainTypeMetrics metrics)
     {
-        Interlocked.Increment(ref grainCount.Value);
-        _grainCounts.Add(1, new KeyValuePair<string, object?>(GrainTypeMetrics.TagName, grainType));
+        Interlocked.Increment(ref metrics.GrainCount);
+        _grainCounts.Add(1, new KeyValuePair<string, object?>(GrainTypeMetrics.TagName, metrics.GrainTypeTagValue));
     }
 
-    internal void DecrementGrainCounts(string grainType, StrongBox<int> grainCount)
+    internal void DecrementGrainCounts(GrainTypeMetrics metrics)
     {
-        Interlocked.Decrement(ref grainCount.Value);
-        _grainCounts.Add(-1, new KeyValuePair<string, object?>(GrainTypeMetrics.TagName, grainType));
+        Interlocked.Decrement(ref metrics.GrainCount);
+        _grainCounts.Add(-1, new KeyValuePair<string, object?>(GrainTypeMetrics.TagName, metrics.GrainTypeTagValue));
     }
 
     internal void IncrementSystemTargetCounts(string systemTargetTypeName)

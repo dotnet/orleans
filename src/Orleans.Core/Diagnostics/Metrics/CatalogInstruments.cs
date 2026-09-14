@@ -217,6 +217,17 @@ internal sealed class CatalogInstruments(OrleansInstruments instruments)
     internal bool TryGetGrainTypeMetrics(GrainType grainType, [NotNullWhen(true)] out GrainTypeMetrics? result) =>
         _grainTypes.TryGetValue(grainType, out result);
 
+    internal IEnumerable<GrainTypeMetrics> GrainTypes
+    {
+        get
+        {
+            foreach (var entry in _grainTypes)
+            {
+                yield return entry.Value;
+            }
+        }
+    }
+
     private IEnumerable<Measurement<int>> ObserveActivationCounts()
     {
         foreach (var entry in _grainTypes)

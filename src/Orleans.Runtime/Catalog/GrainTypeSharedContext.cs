@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -60,8 +59,10 @@ public sealed class GrainTypeSharedContext
             throw new KeyNotFoundException($"Could not find corresponding grain class for grain of type {grainType}");
         }
 
+        CatalogInstruments = serviceProvider.GetRequiredService<CatalogInstruments>();
+        GrainTypeMetrics = CatalogInstruments.GetGrainTypeMetrics(grainType);
+        Interlocked.CompareExchange(ref GrainTypeMetrics.GrainClassName, RuntimeTypeNameFormatter.Format(grainClass), null);
         SerializerSessionPool = serializerSessionPool;
-        GrainTypeName = RuntimeTypeNameFormatter.Format(grainClass);
         Logger = loggerFactory.CreateLogger("Orleans.Grain");
         SchedulerLogger = loggerFactory.CreateLogger<WorkItemGroup>();
         MessagingOptions = messagingOptions.Value;
@@ -75,10 +76,7 @@ public sealed class GrainTypeSharedContext
         SchedulingOptions = schedulingOptions.Value;
         Runtime = grainRuntime;
         MigrationManager = _serviceProvider.GetService<IActivationMigrationManager>();
-        CatalogInstruments = serviceProvider.GetRequiredService<CatalogInstruments>();
-        GrainTypeMetrics = CatalogInstruments.GetGrainTypeMetrics(grainType);
         GrainInstruments = serviceProvider.GetRequiredService<GrainInstruments>();
-        GrainCount = GrainInstruments.GetGrainCount(GrainTypeName);
         MessagingProcessingInstruments = serviceProvider.GetRequiredService<MessagingProcessingInstruments>();
 
         CollectionAgeLimit = GetCollectionAgeLimit(
@@ -91,13 +89,12 @@ public sealed class GrainTypeSharedContext
     /// <summary>
     /// Gets the grain instance type name, if available.
     /// </summary>
-    public string GrainTypeName { get; }
+    public string GrainTypeName => GrainTypeMetrics.GrainClassName!;
 
     internal GrainTypeMetrics GrainTypeMetrics { get; }
     internal string GrainTypeMetricName => GrainTypeMetrics.GrainTypeTagValue;
     internal CatalogInstruments CatalogInstruments { get; }
     internal GrainInstruments GrainInstruments { get; }
-    internal StrongBox<int> GrainCount { get; }
     internal MessagingProcessingInstruments MessagingProcessingInstruments { get; }
 
     private static TimeSpan GetCollectionAgeLimit(GrainType grainType, Type grainClass, GrainManifest siloManifest, GrainCollectionOptions collectionOptions)
@@ -255,7 +252,7 @@ public sealed class GrainTypeSharedContext
     /// <param name="grainContext">The grain activation.</param>
     public void OnCreateActivation(IGrainContext grainContext)
     {
-        GrainInstruments.IncrementGrainCounts(GrainTypeMetricName, GrainCount);
+        GrainInstruments.IncrementGrainCounts(GrainTypeMetrics);
     }
 
     /// <summary>
@@ -264,7 +261,7 @@ public sealed class GrainTypeSharedContext
     /// <param name="grainContext">The grain activation.</param>
     public void OnDestroyActivation(IGrainContext grainContext)
     {
-        GrainInstruments.DecrementGrainCounts(GrainTypeMetricName, GrainCount);
+        GrainInstruments.DecrementGrainCounts(GrainTypeMetrics);
     }
 }
 

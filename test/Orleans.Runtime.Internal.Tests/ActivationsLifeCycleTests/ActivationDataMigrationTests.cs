@@ -165,9 +165,7 @@ public class ActivationDataMigrationTestsRuntimeMetrics
         Assert.NotSame(first, second);
         Assert.Same(shared, second.Shared);
         Assert.Same(first.Shared.GrainTypeMetrics, second.Shared.GrainTypeMetrics);
-        Assert.Same(first.Shared.GrainCount, second.Shared.GrainCount);
-        Assert.Same(services.GetRequiredService<GrainInstruments>().GetGrainCount(shared.GrainTypeName), shared.GrainCount);
-        Assert.Equal(2, shared.GrainCount.Value);
+        Assert.Equal(2, shared.GrainTypeMetrics.GrainCount);
         Assert.Same(first.Shared.GrainTypeMetricName, second.Shared.GrainTypeMetricName);
         if (kind == "named")
         {
@@ -197,7 +195,6 @@ public class ActivationDataMigrationTestsRuntimeMetrics
         Assert.NotSame(first, replacement);
         Assert.NotEqual(first.ActivationId, replacement.ActivationId);
         Assert.Same(shared, replacement.Shared);
-        Assert.Same(shared.GrainCount, replacement.Shared.GrainCount);
         Assert.Same(shared.GrainTypeMetricName, replacement.Shared.GrainTypeMetricName);
 
         // An obsolete context must not remove the replacement which owns the same GrainId.
@@ -213,7 +210,7 @@ public class ActivationDataMigrationTestsRuntimeMetrics
         catalog.UnregisterMessageTarget(second);
         AssertCounts(services, lateListener, baseline, shared, 0, 0, 0);
         AssertCounts(services, lateListener, baseline, shared, 0, 0, 0);
-        Assert.Equal(0, shared.GrainCount.Value);
+        Assert.Equal(0, shared.GrainTypeMetrics.GrainCount);
         AssertActivationEvents(metrics, shared, created: 3, destroyed: 3, failed: 0, instances: [1, 1, -1, 1, -1, -1]);
         AssertActivationLatencies(metrics, shared, "success", "success", "success");
         AssertDeactivationMetrics(metrics, shared, "deactivateOnIdle", "deactivateOnIdle", "deactivateOnIdle");
@@ -702,8 +699,7 @@ public class ActivationDataMigrationTestsRuntimeMetrics
             Assert.Same(shared.GrainTypeMetricName, second.Shared.GrainTypeMetricName);
             parent = Assert.IsType<StatelessWorkerGrainContext>(services.GetRequiredService<ActivationDirectory>().FindTarget(id));
             Assert.Same(shared.GrainTypeMetrics, parent.GrainTypeMetrics);
-            Assert.Same(first.Shared.GrainCount, second.Shared.GrainCount);
-            Assert.Equal(2, shared.GrainCount.Value);
+            Assert.Equal(2, shared.GrainTypeMetrics.GrainCount);
             Assert.Null(parent.GrainInstance);
             Assert.NotSame(parent, first);
             Assert.NotSame(parent, second);
@@ -984,6 +980,8 @@ public class ActivationDataMigrationTestsRuntimeMetrics
         Assert.Same(shared, activation.Shared);
         Assert.Same(services.GetRequiredService<CatalogInstruments>().GetGrainTypeMetrics(canonical), shared.GrainTypeMetrics);
         Assert.Equal(canonical.ToString(), shared.GrainTypeMetricName);
+        Assert.Equal(Orleans.Serialization.TypeSystem.RuntimeTypeNameFormatter.Format(implementation), shared.GrainTypeName);
+        Assert.Same(shared.GrainTypeMetrics.GrainClassName, shared.GrainTypeName);
         Assert.NotEqual(shared.GrainTypeName, shared.GrainTypeMetricName);
         return shared;
     }
@@ -1051,7 +1049,8 @@ public class ActivationDataMigrationTestsRuntimeMetrics
             Assert.Equal(entry.Value, snapshot[entry.Key]);
         }
 
-        var statistics = new GrainCountStatistics(services.GetRequiredService<GrainInstruments>()).GetSimpleGrainStatistics().ToDictionary();
+        Assert.Equal(instanceCount, shared.GrainTypeMetrics.GrainCount);
+        var statistics = new GrainCountStatistics(services.GetRequiredService<CatalogInstruments>()).GetSimpleGrainStatistics().ToDictionary();
         if (instanceCount == 0)
         {
             Assert.False(statistics.ContainsKey(shared.GrainTypeName));

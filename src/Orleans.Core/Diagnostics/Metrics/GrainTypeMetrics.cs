@@ -12,6 +12,9 @@ internal sealed class GrainTypeMetrics
     private int _activationCount;
     private int _workingSetCount;
 
+    internal int GrainCount;
+    internal string? GrainClassName;
+
     internal GrainTypeMetrics(GrainType grainType)
     {
         GrainTypeTagValue = grainType.ToString();
