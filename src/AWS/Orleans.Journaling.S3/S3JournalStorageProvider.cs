@@ -96,7 +96,8 @@ internal sealed class S3JournalStorageProvider : ILifecycleParticipant<ISiloLife
                 cancellationToken).ConfigureAwait(false);
 
             cancellationToken.ThrowIfCancellationRequested();
-            foreach (var item in response.S3Objects)
+            // AWS SDK v4 represents an empty listing page with a null collection.
+            foreach (var item in response.S3Objects ?? [])
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (maxObjectKey is not null && string.CompareOrdinal(item.Key, maxObjectKey) > 0)

@@ -219,6 +219,125 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
             await provider.CloseAsync(CancellationToken.None);
         }
 
+        [Theory]
+        [InlineData(false, false)]
+        [InlineData(false, true)]
+        [InlineData(true, false)]
+        [InlineData(true, true)]
+        public async Task ListAsync_NullObjectCollectionHonorsContinuation(bool ordered, bool hasContinuation)
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var requests = new List<ListObjectsV2Request>();
+            var client = CreateTrackingClient();
+            client.ListObjectsV2Async(Arg.Any<ListObjectsV2Request>(), Arg.Any<CancellationToken>())
+                .Returns(call =>
+                {
+                    var request = call.Arg<ListObjectsV2Request>();
+                    requests.Add(request);
+                    Assert.Equal(cancellationToken, call.Arg<CancellationToken>());
+                    return Task.FromResult(requests.Count switch
+                    {
+                        1 => new ListObjectsV2Response
+                        {
+                            S3Objects = null,
+                            IsTruncated = hasContinuation,
+                            NextContinuationToken = hasContinuation ? "next" : null
+                        },
+                        2 when hasContinuation => new ListObjectsV2Response
+                        {
+                            S3Objects = [new S3Object { Key = "journals/alpha/wal" }],
+                            IsTruncated = true,
+                            NextContinuationToken = "last"
+                        },
+                        3 when hasContinuation => new ListObjectsV2Response
+                        {
+                            S3Objects = null,
+                            IsTruncated = false
+                        },
+                        _ => throw new InvalidOperationException("Unexpected extra listing request.")
+                    });
+                });
+            var options = CreateOptions();
+            options.S3Client = client;
+            options.UseOrderedListing = ordered;
+            var provider = CreateProvider(options);
+            await provider.InitializeAsync(cancellationToken);
+
+            var listed = new List<JournalId>();
+            await foreach (var journalId in provider.ListAsync(new() { Prefix = new("journals/") }, cancellationToken))
+            {
+                listed.Add(journalId);
+            }
+
+            Assert.Equal(hasContinuation ? new[] { new JournalId("journals/alpha") } : [], listed);
+            Assert.Equal(hasContinuation ? new string?[] { null, "next", "last" } : [null],
+                requests.Select(request => request.ContinuationToken));
+            Assert.All(requests, request =>
+            {
+                Assert.Equal("journaling-tests", request.BucketName);
+                Assert.Equal("journals/", request.Prefix);
+                Assert.Equal(ordered ? "journals/" : null, request.StartAfter);
+            });
+            await provider.CloseAsync(cancellationToken);
+        }
+
+        [Fact]
+        public async Task ListAsync_NullObjectCollectionObservesResponseCancellation()
+        {
+            using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+            var client = CreateTrackingClient();
+            client.ListObjectsV2Async(Arg.Any<ListObjectsV2Request>(), Arg.Any<CancellationToken>())
+                .Returns(_ =>
+                {
+                    cancellation.Cancel();
+                    return Task.FromResult(new ListObjectsV2Response
+                    {
+                        S3Objects = null,
+                        IsTruncated = true,
+                        NextContinuationToken = "next"
+                    });
+                });
+            var options = CreateOptions();
+            options.S3Client = client;
+            var provider = CreateProvider(options);
+            await provider.InitializeAsync(TestContext.Current.CancellationToken);
+
+            await using var enumerator = provider.ListAsync(cancellationToken: cancellation.Token).GetAsyncEnumerator(cancellation.Token);
+            var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => enumerator.MoveNextAsync().AsTask());
+
+            Assert.Equal(cancellation.Token, exception.CancellationToken);
+            await client.Received(1).ListObjectsV2Async(Arg.Any<ListObjectsV2Request>(), cancellation.Token);
+            await provider.CloseAsync(TestContext.Current.CancellationToken);
+        }
+
+        [Fact]
+        public async Task ListAsync_NullObjectCollectionPreservesLaterServiceFailure()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var failure = new AmazonS3Exception("The continuation request failed.");
+            var client = CreateTrackingClient();
+            client.ListObjectsV2Async(Arg.Any<ListObjectsV2Request>(), Arg.Any<CancellationToken>())
+                .Returns(call => call.Arg<ListObjectsV2Request>().ContinuationToken is null
+                    ? Task.FromResult(new ListObjectsV2Response
+                    {
+                        S3Objects = null,
+                        IsTruncated = true,
+                        NextContinuationToken = "next"
+                    })
+                    : Task.FromException<ListObjectsV2Response>(failure));
+            var options = CreateOptions();
+            options.S3Client = client;
+            var provider = CreateProvider(options);
+            await provider.InitializeAsync(cancellationToken);
+
+            await using var enumerator = provider.ListAsync(cancellationToken: cancellationToken).GetAsyncEnumerator(cancellationToken);
+            Assert.Same(failure, await Assert.ThrowsAsync<AmazonS3Exception>(() => enumerator.MoveNextAsync().AsTask()));
+            await client.Received(2).ListObjectsV2Async(Arg.Any<ListObjectsV2Request>(), cancellationToken);
+            await client.Received(1).ListObjectsV2Async(
+                Arg.Is<ListObjectsV2Request>(request => request.ContinuationToken == "next"), cancellationToken);
+            await provider.CloseAsync(cancellationToken);
+        }
+
         [Fact]
         public async Task ListAsync_WhenAliasMapsToCanonicalJournalId_ReturnsCanonicalIdentityOnce()
         {
