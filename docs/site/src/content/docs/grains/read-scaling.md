@@ -1,7 +1,7 @@
 ---
 title: Scale grain reads
 description: Choose interleaved reads or an application-managed read model for read-heavy Orleans grains.
-ms.date: 09/05/2026
+ms.date: 09/14/2026
 ms.topic: concept-article
 ---
 
@@ -46,7 +46,7 @@ Choose a query topology based on the required scaling behavior:
 The read model's protocol defines its consistency guarantee:
 
 1. The command grain assigns a monotonically increasing version and commits the state and version together.
-1. The command path publishes a snapshot or event carrying that version. Use an outbox or another resumable projection mechanism to durably record publication alongside the command state.
+1. The command path publishes a snapshot or event carrying that version. Commit an outbox record atomically with the command state. When the stores don't share an atomic commit boundary, use a resumable publisher which detects committed versions without publication records and recovers the missing publications.
 1. Projection handlers process duplicate versions idempotently. A snapshot can replace any older snapshot. An incremental projection applies the next expected version and starts recovery when a later version reveals a gap.
 1. Reader caches replace their local value only with a newer version. Update or invalidation notifications accelerate convergence; activation, cache-miss, and periodic refresh paths compare against the durable view so that replaced workers and missed notifications converge.
 1. Every query returns the version it observed. This makes the freshness boundary available to callers and telemetry.
