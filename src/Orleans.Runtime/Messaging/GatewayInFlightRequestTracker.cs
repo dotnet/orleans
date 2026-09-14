@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -9,6 +10,7 @@ namespace Orleans.Runtime.Messaging
         TimeSpan responseTimeout,
         int maxForwardCount)
     {
+        private static long _nextAttempt;
         private readonly int _maxDeferredResponses = Math.Max(1, maxForwardCount + 1);
         private Dictionary<CorrelationId, TrackedRequest>? _requests;
         // Updates can cross different silo connections, so later forwarding hops can arrive before earlier ones.
@@ -33,8 +35,14 @@ namespace Orleans.Runtime.Messaging
                 return false;
             }
 
+            if (request.GatewayRequestAttempt == 0)
+            {
+                request.GatewayRequestAttempt = Interlocked.Increment(ref _nextAttempt);
+            }
+
             var trackedRequest = new TrackedRequest(
                 request.Id,
+                request.GatewayRequestAttempt,
                 request.IsSystemMessage,
                 request.IsReadOnly,
                 request.IsAlwaysInterleave,
@@ -65,6 +73,11 @@ namespace Orleans.Runtime.Messaging
             if (_requests is not { } requests || !requests.TryGetValue(response.Id, out var trackedRequest))
             {
                 return CompletionResult.NotTracked;
+            }
+
+            if (response.GatewayRequestAttempt != 0 && response.GatewayRequestAttempt != trackedRequest.Attempt)
+            {
+                return CompletionResult.Superseded;
             }
 
             if (response.SendingSilo is not { } responseSilo)
@@ -100,12 +113,18 @@ namespace Orleans.Runtime.Messaging
             SiloAddress sourceSilo,
             SiloAddress targetSilo,
             int forwardCount,
+            long attempt,
             out SiloAddress updatedTargetSilo,
             out Message? completedResponse)
         {
             updatedTargetSilo = null!;
             completedResponse = null;
             if (_requests is not { } requests || !requests.TryGetValue(requestId, out var trackedRequest))
+            {
+                return ForwardingUpdateResult.Ignored;
+            }
+
+            if (attempt != 0 && attempt != trackedRequest.Attempt)
             {
                 return ForwardingUpdateResult.Ignored;
             }
@@ -294,6 +313,7 @@ namespace Orleans.Runtime.Messaging
             {
                 Direction = Message.Directions.Request,
                 Id = request.Id,
+                GatewayRequestAttempt = request.Attempt,
                 IsSystemMessage = request.IsSystemMessage,
                 IsReadOnly = request.IsReadOnly,
                 IsAlwaysInterleave = request.IsAlwaysInterleave,
@@ -309,6 +329,7 @@ namespace Orleans.Runtime.Messaging
 
         private readonly record struct TrackedRequest(
             CorrelationId Id,
+            long Attempt,
             bool IsSystemMessage,
             bool IsReadOnly,
             bool IsAlwaysInterleave,
@@ -332,6 +353,7 @@ namespace Orleans.Runtime.Messaging
             NotTracked,
             Completed,
             Deferred,
+            Superseded,
         }
 
         internal enum ForwardingUpdateResult
