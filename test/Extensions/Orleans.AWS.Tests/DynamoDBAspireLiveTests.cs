@@ -67,10 +67,11 @@ public sealed class DynamoDBAspireLiveTests
             AssertProviderOptions(membershipOptions.Service, membershipOptions.TableName, membershipOptions.UseProvisionedThroughput, endpoint, tableName);
             AssertProviderOptions(gatewayOptions.Service, gatewayOptions.TableName, gatewayOptions.UseProvisionedThroughput, endpoint, tableName);
 
-            await membership.InitializeMembershipTable(tryInitTableVersion: true);
+            var cancellationToken = TestContext.Current.CancellationToken;
+            await membership.InitializeMembershipTableAsync(tryInitTableVersion: true, cancellationToken);
             await gateway.InitializeGatewayListProvider();
 
-            var initial = await membership.ReadAll();
+            var initial = await membership.ReadAllAsync(cancellationToken);
             Assert.Empty(initial.Members);
             Assert.Equal(0, initial.Version.Version);
 
@@ -90,9 +91,9 @@ public sealed class DynamoDBAspireLiveTests
                 Status = SiloStatus.Active,
             };
 
-            Assert.True(await membership.InsertRow(entry, initial.Version.Next()));
+            Assert.True(await membership.InsertRowAsync(entry, initial.Version.Next(), cancellationToken));
 
-            var stored = await membership.ReadRow(siloAddress);
+            var stored = await membership.ReadRowAsync(siloAddress, cancellationToken);
             var storedEntry = Assert.Single(stored.Members).Item1;
             Assert.Equal(entry.SiloName, storedEntry.SiloName);
             Assert.Equal(SiloStatus.Active, storedEntry.Status);
@@ -110,7 +111,7 @@ public sealed class DynamoDBAspireLiveTests
             {
                 try
                 {
-                    await membership.DeleteMembershipTableEntries(clusterId);
+                    await membership.DeleteMembershipTableEntriesAsync(clusterId, CancellationToken.None);
                 }
                 catch (ResourceNotFoundException)
                 {
