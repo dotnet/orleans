@@ -533,6 +533,7 @@ namespace Orleans.Runtime.Messaging
 
             public void Send(Message msg)
             {
+                msg.GatewayRequestAttempt = 0;
                 _pendingToSend.Enqueue(msg);
                 _signal.Signal();
                 LogTraceQueuedMessage(_gateway.logger, msg, msg.TargetGrain);
@@ -554,7 +555,8 @@ namespace Orleans.Runtime.Messaging
                 {
                     completionResult = _pendingRequests.TryComplete(message);
                     requestTrackingStopped = UnregisterRequestTrackingIfEmptyCore();
-                    if (completionResult != GatewayInFlightRequestTracker.CompletionResult.Deferred)
+                    if (completionResult is GatewayInFlightRequestTracker.CompletionResult.Completed
+                        or GatewayInFlightRequestTracker.CompletionResult.NotTracked)
                     {
                         SendSyntheticResponse(message);
                     }
@@ -578,6 +580,7 @@ namespace Orleans.Runtime.Messaging
                             forwardingSource,
                             forwardingTarget,
                             update.ForwardCount,
+                            update.GatewayRequestAttempt,
                             out var updatedTarget,
                             out completedResponse) == GatewayInFlightRequestTracker.ForwardingUpdateResult.Applied
                         && completedResponse is null
@@ -699,19 +702,31 @@ namespace Orleans.Runtime.Messaging
             public void RejectRequestsToSilo(SiloAddress deadSilo)
             {
                 List<Message>? requests;
+                List<Message>? rejections = null;
                 bool requestTrackingStopped;
                 lock (_requestLock)
                 {
                     requests = _pendingRequests.RemoveForSilo(deadSilo);
                     requestTrackingStopped = UnregisterRequestTrackingIfEmptyCore();
+                    if (requests is not null)
+                    {
+                        foreach (var request in requests)
+                        {
+                            if (TryRejectClaimedRequestCore(request, deadSilo) is { } rejection)
+                            {
+                                rejections ??= [];
+                                rejections.Add(rejection);
+                            }
+                        }
+                    }
                 }
 
                 EmitRequestTrackingStopped(requestTrackingStopped);
-                if (requests is not null)
+                if (rejections is not null)
                 {
-                    foreach (var request in requests)
+                    foreach (var rejection in rejections)
                     {
-                        RejectClaimedRequest(request, deadSilo);
+                        EmitDeadSiloRequestRejected(rejection);
                     }
                 }
             }
@@ -735,19 +750,33 @@ namespace Orleans.Runtime.Messaging
 
             private void RejectClaimedRequest(Message request, SiloAddress deadSilo)
             {
-                Message rejection;
+                Message? rejection;
                 lock (_requestLock)
                 {
-                    if (_pendingRequests.Contains(request.Id))
-                    {
-                        return;
-                    }
-
-                    _gateway._messagingInstruments.OnRejectedMessage(request);
-                    rejection = _gateway.CreateDeadSiloRejection(request, deadSilo);
-                    SendSyntheticResponse(rejection);
+                    rejection = TryRejectClaimedRequestCore(request, deadSilo);
                 }
 
+                if (rejection is not null)
+                {
+                    EmitDeadSiloRequestRejected(rejection);
+                }
+            }
+
+            private Message? TryRejectClaimedRequestCore(Message request, SiloAddress deadSilo)
+            {
+                if (_pendingRequests.Contains(request.Id))
+                {
+                    return null;
+                }
+
+                _gateway._messagingInstruments.OnRejectedMessage(request);
+                var rejection = _gateway.CreateDeadSiloRejection(request, deadSilo);
+                SendSyntheticResponse(rejection);
+                return rejection;
+            }
+
+            private void EmitDeadSiloRequestRejected(Message rejection)
+            {
                 try
                 {
                     GatewayEvents.EmitDeadSiloRequestRejected(_gateway.siloAddress, Id.GrainId, rejection);
