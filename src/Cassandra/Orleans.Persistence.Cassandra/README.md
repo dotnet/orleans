@@ -38,7 +38,7 @@ CREATE TABLE grain_state
     grain_id text,
     state_name text,
     grain_type text,
-    version bigint,
+    etag uuid,
     record_exists boolean,
     state blob,
     updated_at timestamp,
@@ -46,8 +46,9 @@ CREATE TABLE grain_state
 )
 ```
 
-This schema is compatible with existing deployments using the same column names and types. ETags are decimal
-representations of the `version` `bigint`. Wildcard ETags, including `*`, are intentionally not supported.
+ETags are UUIDv7 values stored in the `etag` `uuid` column and exposed as standard UUID strings. UUIDv7 provides an
+approximately time-ordered value for diagnostics while the ETag remains opaque to Orleans. Wildcard ETags, including
+`*`, are intentionally not supported.
 
 Table creation is opt-in. The provider can create the table, but it never creates the keyspace. Create the keyspace
 before starting the silo, using the replication settings required by your Cassandra deployment.
@@ -69,7 +70,7 @@ failure model of your Cassandra deployment.
 
 ## Clearing state and cancellation
 
-By default, clearing state keeps a tombstone row, sets `record_exists` to `false`, and advances the numeric ETag.
+By default, clearing state keeps a tombstone row, sets `record_exists` to `false`, and assigns a new UUIDv7 ETag.
 Set `DeleteStateOnClear` to perform a physical delete instead. With no ETag, a clear is allowed when no active row
 exists; it cannot safely remove or overwrite an active row and reports a version conflict.
 
@@ -80,9 +81,8 @@ requests and waits for them during shutdown, and cleans up provider-owned resour
 ## Tests
 
 The provider includes unit tests and Testcontainers-based integration tests. Set `CASSANDRAVERSION` to a
-Cassandra container tag to run the integration tests. The tests cover schema creation, existing-schema
-compatibility, numeric ETags, lightweight-transaction conflicts, clear behavior, service isolation, and lifecycle
-handling.
+Cassandra container tag to run the integration tests. The tests cover schema creation, UUIDv7 ETags,
+lightweight-transaction conflicts, clear behavior, service isolation, and lifecycle handling.
 
 ## Documentation
 

@@ -1,7 +1,7 @@
 using System;
 using System.Diagnostics;
-using System.Globalization;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using Cassandra;
@@ -68,7 +68,7 @@ internal sealed class CassandraGrainStorage : IGrainStorage, ILifecycleParticipa
     internal readonly record struct CassandraResult(
         bool Applied,
         bool? RecordExists,
-        long? Version,
+        Guid? ETag,
         byte[]? State);
 
     private string TableName => _options.TableName ?? "grain_state";
@@ -148,7 +148,7 @@ internal sealed class CassandraGrainStorage : IGrainStorage, ILifecycleParticipa
                             grain_id text,
                             state_name text,
                             grain_type text,
-                            version bigint,
+                            etag uuid,
                             record_exists boolean,
                             state blob,
                             updated_at timestamp,
@@ -157,12 +157,12 @@ internal sealed class CassandraGrainStorage : IGrainStorage, ILifecycleParticipa
                         """).SetConsistencyLevel(_options.ConsistencyLevel), cancellationToken, trackOperation: true, onCancellation: onExecuteCancellation).ConfigureAwait(false);
                 }
 
-                _read = await PrepareAsync(session, $"SELECT version, record_exists, state FROM {QuotedTableName} WHERE service_id = ? AND grain_id = ? AND state_name = ?", cancellationToken, onPrepareCancellation).ConfigureAwait(false);
-                _insert = await PrepareAsync(session, $"INSERT INTO {QuotedTableName} (service_id, grain_id, state_name, grain_type, version, record_exists, state, updated_at) VALUES (?, ?, ?, ?, ?, true, ?, ?) IF NOT EXISTS", cancellationToken, onPrepareCancellation, true).ConfigureAwait(false);
-                _update = await PrepareAsync(session, $"UPDATE {QuotedTableName} SET grain_type = ?, version = ?, record_exists = true, state = ?, updated_at = ? WHERE service_id = ? AND grain_id = ? AND state_name = ? IF version = ?", cancellationToken, onPrepareCancellation, true).ConfigureAwait(false);
-                _clearWithEtag = await PrepareAsync(session, $"UPDATE {QuotedTableName} SET record_exists = false, state = null, version = ?, updated_at = ? WHERE service_id = ? AND grain_id = ? AND state_name = ? IF version = ?", cancellationToken, onPrepareCancellation).ConfigureAwait(false);
+                _read = await PrepareAsync(session, $"SELECT etag, record_exists, state FROM {QuotedTableName} WHERE service_id = ? AND grain_id = ? AND state_name = ?", cancellationToken, onPrepareCancellation).ConfigureAwait(false);
+                _insert = await PrepareAsync(session, $"INSERT INTO {QuotedTableName} (service_id, grain_id, state_name, grain_type, etag, record_exists, state, updated_at) VALUES (?, ?, ?, ?, ?, true, ?, ?) IF NOT EXISTS", cancellationToken, onPrepareCancellation, true).ConfigureAwait(false);
+                _update = await PrepareAsync(session, $"UPDATE {QuotedTableName} SET grain_type = ?, etag = ?, record_exists = true, state = ?, updated_at = ? WHERE service_id = ? AND grain_id = ? AND state_name = ? IF etag = ?", cancellationToken, onPrepareCancellation, true).ConfigureAwait(false);
+                _clearWithEtag = await PrepareAsync(session, $"UPDATE {QuotedTableName} SET record_exists = false, state = null, etag = ?, updated_at = ? WHERE service_id = ? AND grain_id = ? AND state_name = ? IF etag = ?", cancellationToken, onPrepareCancellation).ConfigureAwait(false);
                 _deleteWithoutEtag = await PrepareAsync(session, $"DELETE FROM {QuotedTableName} WHERE service_id = ? AND grain_id = ? AND state_name = ? IF record_exists = false", cancellationToken, onPrepareCancellation).ConfigureAwait(false);
-                _delete = await PrepareAsync(session, $"DELETE FROM {QuotedTableName} WHERE service_id = ? AND grain_id = ? AND state_name = ? IF version = ?", cancellationToken, onPrepareCancellation, true).ConfigureAwait(false);
+                _delete = await PrepareAsync(session, $"DELETE FROM {QuotedTableName} WHERE service_id = ? AND grain_id = ? AND state_name = ? IF etag = ?", cancellationToken, onPrepareCancellation, true).ConfigureAwait(false);
 
                 bool publishSession;
                 lock (_operationLock)
@@ -381,7 +381,7 @@ internal sealed class CassandraGrainStorage : IGrainStorage, ILifecycleParticipa
 
         bool applied = false;
         bool? recordExists = null;
-        long? version = null;
+        Guid? etag = null;
         byte[]? state = null;
         foreach (var column in rows.Columns)
         {
@@ -393,8 +393,8 @@ internal sealed class CassandraGrainStorage : IGrainStorage, ILifecycleParticipa
                 case "record_exists":
                     recordExists = row.GetValue<bool>(column.Name);
                     break;
-                case "version":
-                    version = row.GetValue<long>(column.Name);
+                case "etag":
+                    etag = row.IsNull(column.Name) ? null : row.GetValue<Guid>(column.Name);
                     break;
                 case "state":
                     state = row.IsNull(column.Name) ? null : row.GetValue<byte[]>(column.Name);
@@ -402,7 +402,7 @@ internal sealed class CassandraGrainStorage : IGrainStorage, ILifecycleParticipa
             }
         }
 
-        return new CassandraResult(applied, recordExists, version, state);
+        return new CassandraResult(applied, recordExists, etag, state);
     }
 
     private static async Task<T> WaitAsync<T>(
@@ -483,13 +483,13 @@ internal sealed class CassandraGrainStorage : IGrainStorage, ILifecycleParticipa
         {
             grainState.RecordExists = false;
             grainState.State = CreateInstance<T>();
-            grainState.ETag = result.Version is { } version ? FormatVersion(version) : null;
+            grainState.ETag = result.ETag is { } etag ? FormatETag(etag) : null;
             return;
         }
 
         grainState.RecordExists = true;
         grainState.State = _serializer.Deserialize<T>(result.State!);
-        grainState.ETag = FormatVersion(result.Version!.Value);
+        grainState.ETag = FormatETag(result.ETag!.Value);
     }
 
     public Task WriteStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState) =>
@@ -504,9 +504,9 @@ internal sealed class CassandraGrainStorage : IGrainStorage, ILifecycleParticipa
         var grainType = grainId.Type.ToString();
         var payload = _serializer.Serialize(grainState.State).ToArray();
         var now = DateTimeOffset.UtcNow;
-        var next = expected is null ? 1 : NextVersion(expected.Value, nameof(WriteStateAsync));
+        var next = CreateVersion7();
         var statement = expected is null
-            ? _insert!.Bind(_clusterOptions.ServiceId, grainId.ToString(), stateName, grainType, 1L, payload, now)
+            ? _insert!.Bind(_clusterOptions.ServiceId, grainId.ToString(), stateName, grainType, next, payload, now)
             : _update!.Bind(grainType, next, payload, now, _clusterOptions.ServiceId, grainId.ToString(), stateName, expected.Value);
         var result = await SessionExecuteAsync(Session, statement.SetConsistencyLevel(_options.ConsistencyLevel).SetSerialConsistencyLevel(_options.SerialConsistencyLevel), cancellationToken).ConfigureAwait(false);
         if (!Applied(result))
@@ -514,7 +514,7 @@ internal sealed class CassandraGrainStorage : IGrainStorage, ILifecycleParticipa
             throw Inconsistent(nameof(WriteStateAsync), stateName, grainId, grainState.ETag);
         }
 
-        grainState.ETag = FormatVersion(next);
+        grainState.ETag = FormatETag(next);
         grainState.RecordExists = true;
     }
 
@@ -527,8 +527,8 @@ internal sealed class CassandraGrainStorage : IGrainStorage, ILifecycleParticipa
         ArgumentNullException.ThrowIfNull(grainState);
         cancellationToken.ThrowIfCancellationRequested();
         var expected = ParseEtag(grainState.ETag, nameof(ClearStateAsync));
-        var next = expected is null || _options.DeleteStateOnClear ? 0 : NextVersion(expected.Value, nameof(ClearStateAsync));
-        string? resultingEtag = expected is null ? null : _options.DeleteStateOnClear ? null : FormatVersion(next);
+        var next = expected is null || _options.DeleteStateOnClear ? default : CreateVersion7();
+        string? resultingEtag = expected is null ? null : _options.DeleteStateOnClear ? null : FormatETag(next);
         if (expected is not null)
         {
             CassandraResult result;
@@ -572,9 +572,9 @@ internal sealed class CassandraGrainStorage : IGrainStorage, ILifecycleParticipa
                 throw Inconsistent(nameof(ClearStateAsync), stateName, grainId, grainState.ETag);
             }
 
-            if (result.Version is { } version)
+            if (result.ETag is { } etag)
             {
-                resultingEtag = FormatVersion(version);
+                resultingEtag = FormatETag(etag);
             }
         }
 
@@ -585,26 +585,37 @@ internal sealed class CassandraGrainStorage : IGrainStorage, ILifecycleParticipa
 
     private static bool Applied(CassandraResult result) => result.Applied;
     private static bool HasActiveRow(CassandraResult result) => result.RecordExists is true;
-    private static string FormatVersion(long version)
+    private static string FormatETag(Guid etag) => etag.ToString("D");
+
+    private static Guid CreateVersion7()
     {
-        if (version < 0) throw new InconsistentStateException($"Invalid negative Cassandra version: {version}.", null, version.ToString(CultureInfo.InvariantCulture));
-        return version.ToString(CultureInfo.InvariantCulture);
+#if NET10_0_OR_GREATER
+        return Guid.CreateVersion7();
+#else
+        Span<byte> random = stackalloc byte[10];
+        RandomNumberGenerator.Fill(random);
+        var timestamp = (ulong)DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var randomA = (ushort)((random[0] << 8 | random[1]) & 0x0FFF);
+        return new Guid(
+            (int)(timestamp >> 16),
+            (short)timestamp,
+            (short)(0x7000 | randomA),
+            (byte)(0x80 | (random[2] & 0x3F)),
+            random[3],
+            random[4],
+            random[5],
+            random[6],
+            random[7],
+            random[8],
+            random[9]);
+#endif
     }
 
-    private static long NextVersion(long version, string operation)
-    {
-        if (version == long.MaxValue)
-        {
-            throw new InconsistentStateException($"Cassandra version cannot advance beyond {long.MaxValue} for {operation}.", null, FormatVersion(version));
-        }
-
-        return version + 1;
-    }
-    private static long? ParseEtag(string? etag, string operation)
+    private static Guid? ParseEtag(string? etag, string operation)
     {
         if (string.IsNullOrWhiteSpace(etag)) return null;
-        if (long.TryParse(etag, NumberStyles.Integer, CultureInfo.InvariantCulture, out var result) && result >= 0) return result;
-        throw new InconsistentStateException($"Invalid numeric ETag for {operation}: '{etag}'.", null, etag);
+        if (Guid.TryParse(etag, out var result) && result != Guid.Empty) return result;
+        throw new InconsistentStateException($"Invalid UUID ETag for {operation}: '{etag}'.", null, etag);
     }
     private InconsistentStateException Inconsistent(string operation, string stateName, GrainId grainId, string? etag) =>
         new($"Version conflict ({operation}): ServiceId={_clusterOptions.ServiceId} ProviderName={_name} StateName={stateName} GrainId={grainId} ETag={etag}.", null, etag);

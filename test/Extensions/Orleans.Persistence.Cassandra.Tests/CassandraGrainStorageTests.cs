@@ -39,42 +39,45 @@ public sealed class CassandraGrainStorageTests
     }
 
     [Fact]
-    public async Task NumericEtagsAndLogicalClearProgressVersions()
+    public async Task UuidV7EtagsChangeOnMutationAndLogicalClear()
     {
         var fake = new FakeCassandra();
         using var storage = await CreateStorage(fake, deleteStateOnClear: false);
-        var grainId = GrainId.Create("test", "numeric");
+        var grainId = GrainId.Create("test", "uuid");
         var state = new GrainState<TestState>(new TestState(1));
 
         await storage.WriteStateAsync("state", grainId, state);
-        Assert.Equal("1", state.ETag);
+        AssertUuidV7(state.ETag);
+        var firstEtag = state.ETag;
 
         state.State = new TestState(2);
         await storage.WriteStateAsync("state", grainId, state);
-        Assert.Equal("2", state.ETag);
+        AssertUuidV7(state.ETag);
+        Assert.NotEqual(firstEtag, state.ETag);
 
-        var stale = new GrainState<TestState>(new TestState(3)) { ETag = "1" };
+        var stale = new GrainState<TestState>(new TestState(3)) { ETag = firstEtag };
         await Assert.ThrowsAsync<InconsistentStateException>(
             () => storage.WriteStateAsync("state", grainId, stale));
 
         state.State = new TestState(4);
         await storage.ClearStateAsync("state", grainId, state);
-        Assert.Equal("3", state.ETag);
+        AssertUuidV7(state.ETag);
+        Assert.NotEqual(firstEtag, state.ETag);
         Assert.False(state.RecordExists);
 
         var read = new GrainState<TestState>(new TestState(99));
         await storage.ReadStateAsync("state", grainId, read);
         Assert.False(read.RecordExists);
-        Assert.Equal("3", read.ETag);
+        Assert.Equal(state.ETag, read.ETag);
         Assert.Equal(0, Assert.IsType<TestState>(read.State).Value);
     }
 
     [Fact]
-    public async Task VersionOverflowFailsBeforeIssuingWrite()
+    public async Task EmptyEtagFailsBeforeIssuingWrite()
     {
         var fake = new FakeCassandra();
         using var storage = await CreateStorage(fake);
-        var state = new GrainState<TestState>(new TestState(1)) { ETag = long.MaxValue.ToString() };
+        var state = new GrainState<TestState>(new TestState(1)) { ETag = Guid.Empty.ToString("D") };
         var executionCount = fake.ExecutionCount;
 
         await Assert.ThrowsAsync<InconsistentStateException>(
@@ -84,8 +87,8 @@ public sealed class CassandraGrainStorageTests
     }
 
     [Theory]
-    [InlineData("not-a-number")]
-    [InlineData("-1")]
+    [InlineData("not-a-guid")]
+    [InlineData("00000000-0000-0000-0000-000000000000")]
     [InlineData("*")]
     public async Task InvalidAndWildcardEtagsAreRejected(string etag)
     {
@@ -193,22 +196,24 @@ public sealed class CassandraGrainStorageTests
         var read = new GrainState<TestState>(new TestState(3));
         await storage.ReadStateAsync("state", grainId, read);
         Assert.True(read.RecordExists);
-        Assert.Equal("1", read.ETag);
+        Assert.Equal(state.ETag, read.ETag);
         Assert.Equal(1, Assert.IsType<TestState>(read.State).Value);
     }
 
     [Fact]
-    public async Task PhysicalClearWithStaleNumericEtagConflictsAndPreservesActiveRow()
+    public async Task PhysicalClearWithStaleEtagConflictsAndPreservesActiveRow()
     {
         var fake = new FakeCassandra();
         using var storage = await CreateStorage(fake, deleteStateOnClear: true);
         var grainId = GrainId.Create("test", "physical-stale-clear");
         var state = new GrainState<TestState>(new TestState(1));
         await storage.WriteStateAsync("state", grainId, state);
+        var firstEtag = state.ETag;
 
         state.State = new TestState(2);
         await storage.WriteStateAsync("state", grainId, state);
-        var stale = new GrainState<TestState>(new TestState(3)) { ETag = "1" };
+        var currentEtag = state.ETag;
+        var stale = new GrainState<TestState>(new TestState(3)) { ETag = firstEtag };
 
         await Assert.ThrowsAsync<InconsistentStateException>(
             () => storage.ClearStateAsync("state", grainId, stale));
@@ -216,8 +221,34 @@ public sealed class CassandraGrainStorageTests
         var read = new GrainState<TestState>(new TestState(4));
         await storage.ReadStateAsync("state", grainId, read);
         Assert.True(read.RecordExists);
-        Assert.Equal("2", read.ETag);
+        Assert.Equal(currentEtag, read.ETag);
         Assert.Equal(2, Assert.IsType<TestState>(read.State).Value);
+    }
+
+    [Fact]
+    public async Task PhysicalDeleteAndRecreateRejectsTheDeletedRowsEtag()
+    {
+        var fake = new FakeCassandra();
+        using var storage = await CreateStorage(fake, deleteStateOnClear: true);
+        var grainId = GrainId.Create("test", "recreated");
+        var original = new GrainState<TestState>(new TestState(1));
+
+        await storage.WriteStateAsync("state", grainId, original);
+        var stale = new GrainState<TestState>(new TestState(2)) { ETag = original.ETag };
+        await storage.ClearStateAsync("state", grainId, original);
+
+        var recreated = new GrainState<TestState>(new TestState(3));
+        await storage.WriteStateAsync("state", grainId, recreated);
+        AssertUuidV7(recreated.ETag);
+        Assert.NotEqual(stale.ETag, recreated.ETag);
+
+        await Assert.ThrowsAsync<InconsistentStateException>(
+            () => storage.WriteStateAsync("state", grainId, stale));
+
+        var read = new GrainState<TestState>(new());
+        await storage.ReadStateAsync("state", grainId, read);
+        Assert.Equal(3, Assert.IsType<TestState>(read.State).Value);
+        Assert.Equal(recreated.ETag, read.ETag);
     }
 
     [Fact]
@@ -238,7 +269,7 @@ public sealed class CassandraGrainStorageTests
     }
 
     [Fact]
-    public async Task ClearWithoutEtagPreservesTombstoneVersionAndAllowsNextWrite()
+    public async Task ClearWithoutEtagPreservesTombstoneEtagAndAllowsNextWrite()
     {
         var fake = new FakeCassandra();
         using var storage = await CreateStorage(fake);
@@ -247,15 +278,17 @@ public sealed class CassandraGrainStorageTests
 
         await storage.WriteStateAsync("state", grainId, state);
         await storage.ClearStateAsync("state", grainId, state);
-        Assert.Equal("2", state.ETag);
+        AssertUuidV7(state.ETag);
+        var tombstoneEtag = state.ETag;
 
         var clear = new GrainState<TestState>(new TestState(2));
         await storage.ClearStateAsync("state", grainId, clear);
-        Assert.Equal("2", clear.ETag);
+        Assert.Equal(tombstoneEtag, clear.ETag);
 
         clear.State = new TestState(3);
         await storage.WriteStateAsync("state", grainId, clear);
-        Assert.Equal("3", clear.ETag);
+        AssertUuidV7(clear.ETag);
+        Assert.NotEqual(tombstoneEtag, clear.ETag);
     }
 
     [Fact]
@@ -603,6 +636,13 @@ public sealed class CassandraGrainStorageTests
             closePathEntered);
     }
 
+    private static void AssertUuidV7(string? etag)
+    {
+        Assert.True(Guid.TryParse(etag, out var value));
+        Assert.NotEqual(Guid.Empty, value);
+        Assert.Equal('7', value.ToString("D")[14]);
+    }
+
     private sealed class TestState
     {
         public TestState() { }
@@ -739,17 +779,17 @@ public sealed class CassandraGrainStorageTests
                         {
                             var key = new RowKey((string)values[0], (string)values[1], (string)values[2]);
                             if (_rows.ContainsKey(key)) return Applied(false);
-                            _rows[key] = new StoredRow(1, true, (byte[])values[5]);
+                            _rows[key] = new StoredRow((Guid)values[4], true, (byte[])values[5]);
                             return Applied(true);
                         }
                         case "update":
-                            return Update(new RowKey((string)values[4], (string)values[5], (string)values[6]), (long)values[7], (long)values[1], (byte[])values[2]);
+                            return Update(new RowKey((string)values[4], (string)values[5], (string)values[6]), (Guid)values[7], (Guid)values[1], (byte[])values[2]);
                         case "clear":
-                            return UpdateClear(new RowKey((string)values[2], (string)values[3], (string)values[4]), (long)values[5], (long)values[0]);
+                            return UpdateClear(new RowKey((string)values[2], (string)values[3], (string)values[4]), (Guid)values[5], (Guid)values[0]);
                         case "delete":
                         {
                             var key = new RowKey((string)values[0], (string)values[1], (string)values[2]);
-                            if (!_rows.TryGetValue(key, out var existing) || existing.Version != (long)values[3]) return Applied(false);
+                            if (!_rows.TryGetValue(key, out var existing) || existing.ETag != (Guid)values[3]) return Applied(false);
                             _rows.Remove(key);
                             return Applied(true);
                         }
@@ -787,19 +827,19 @@ public sealed class CassandraGrainStorageTests
 
         private CassandraGrainStorage.CassandraResult Read(RowKey key) =>
             _rows.TryGetValue(key, out var row)
-                ? new(false, row.RecordExists, row.Version, row.State)
+                ? new(false, row.RecordExists, row.ETag, row.State)
                 : default;
 
-        private CassandraGrainStorage.CassandraResult Update(RowKey key, long expected, long next, byte[] state)
+        private CassandraGrainStorage.CassandraResult Update(RowKey key, Guid expected, Guid next, byte[] state)
         {
-            if (!_rows.TryGetValue(key, out var row) || row.Version != expected) return Applied(false);
+            if (!_rows.TryGetValue(key, out var row) || row.ETag != expected) return Applied(false);
             _rows[key] = new StoredRow(next, true, state);
             return Applied(true);
         }
 
-        private CassandraGrainStorage.CassandraResult UpdateClear(RowKey key, long expected, long next)
+        private CassandraGrainStorage.CassandraResult UpdateClear(RowKey key, Guid expected, Guid next)
         {
-            if (!_rows.TryGetValue(key, out var row) || row.Version != expected) return Applied(false);
+            if (!_rows.TryGetValue(key, out var row) || row.ETag != expected) return Applied(false);
             _rows[key] = new StoredRow(next, false, null);
             return Applied(true);
         }
@@ -826,7 +866,7 @@ public sealed class CassandraGrainStorageTests
         }
 
         private sealed record RowKey(string ServiceId, string GrainId, string StateName);
-        private sealed record StoredRow(long Version, bool RecordExists, byte[]? State);
+        private sealed record StoredRow(Guid ETag, bool RecordExists, byte[]? State);
 
         private class InstrumentedCluster : DispatchProxy
         {
