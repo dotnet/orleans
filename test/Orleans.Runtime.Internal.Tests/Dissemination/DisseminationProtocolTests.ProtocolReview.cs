@@ -185,6 +185,49 @@ public partial class DisseminationProtocolTests
         }
     }
 
+    [Fact]
+    public void LoadNamespaceDigestsPruneInactiveCacheEntriesAndReuseActivePayloads()
+    {
+        var harness = CreatePhase5DeploymentLoadPublisherHarness();
+        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = services.GetRequiredService<Serializer>();
+        var ns = new DeploymentLoadStatisticsDisseminationNamespace(
+            harness.Publisher,
+            new TestOptionsMonitor<DeploymentLoadPublisherOptions>(new()),
+            serializer);
+        var statistics = CreatePhase5Statistics(1);
+        var cached = new Dictionary<SiloAddress, DisseminationValue>();
+        foreach (var silo in new[] { harness.Local, harness.ActiveOne, harness.ActiveTwo })
+        {
+            harness.Publisher.PeriodicStatistics[silo] = statistics;
+            cached.Add(silo, ns.CreateValue(silo, statistics));
+        }
+
+        Assert.Equal(
+            cached.Keys.Order(),
+            ns.Digests.Select(static digest => Assert.IsType<SiloAddress>(digest.Key.Value)).Order());
+        Assert.All(cached, entry => Assert.True(entry.Value.Payload.Equals(ns.CreateValue(entry.Key, statistics).Payload)));
+
+        harness.StatusOracle.SetStatus(harness.ActiveOne, SiloStatus.Dead);
+        harness.StatusOracle.SetStatus(harness.ActiveTwo, SiloStatus.Joining);
+        var restarted = SiloAddress.New(harness.ActiveOne.Endpoint, harness.ActiveOne.Generation + 1);
+        harness.StatusOracle.SetStatus(restarted, SiloStatus.Active);
+        var digests = ns.Digests.OrderBy(static digest => (SiloAddress)digest.Key.Value).ToArray();
+        Assert.Equal(
+            new[] { harness.Local, restarted }.Order(),
+            digests.Select(static digest => Assert.IsType<SiloAddress>(digest.Key.Value)));
+        Assert.Equal(statistics.DateTime.Ticks, digests.Single(digest => digest.Key == new DisseminationKey(harness.Local)).Version);
+        Assert.Equal(0, digests.Single(digest => digest.Key == new DisseminationKey(restarted)).Version);
+        Assert.True(cached[harness.Local].Payload.Equals(ns.CreateValue(harness.Local, statistics).Payload));
+        Assert.False(cached[harness.ActiveOne].Payload.Equals(ns.CreateValue(harness.ActiveOne, statistics).Payload));
+        Assert.False(cached[harness.ActiveTwo].Payload.Equals(ns.CreateValue(harness.ActiveTwo, statistics).Payload));
+
+        harness.StatusOracle.SetStatus(harness.Local, SiloStatus.Stopping);
+        harness.StatusOracle.SetStatus(restarted, SiloStatus.Dead);
+        Assert.Empty(ns.Digests);
+        Assert.False(cached[harness.Local].Payload.Equals(ns.CreateValue(harness.Local, statistics).Payload));
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

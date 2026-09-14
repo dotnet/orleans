@@ -44,9 +44,9 @@ internal sealed class DeploymentLoadStatisticsDisseminationNamespace(
     {
         get
         {
-            var activeSilos = deploymentLoadPublisher.GetActiveSilosForStatisticsDigest();
+            var activeSilos = deploymentLoadPublisher.GetActiveSiloStatusesForStatisticsDigest();
             PruneCache(activeSilos);
-            foreach (var siloAddress in activeSilos)
+            foreach (var siloAddress in activeSilos.Keys)
             {
                 yield return new DigestEntry(siloAddress, GetVersion(siloAddress));
             }
@@ -114,14 +114,16 @@ internal sealed class DeploymentLoadStatisticsDisseminationNamespace(
         return new(deploymentLoadPublisher.ApplyDisseminatedRuntimeStatisticsAsync(siloAddress, statistics, cancellationToken));
     }
 
-    private void PruneCache(IReadOnlyCollection<SiloAddress> activeSilos)
+    private void PruneCache(Dictionary<SiloAddress, SiloStatus> activeSilos)
     {
-        var activeSiloSet = activeSilos.ToHashSet();
         lock (_cacheLock)
         {
-            foreach (var key in _cachedValues.Keys.Where(key => !activeSiloSet.Contains(key)).ToArray())
+            foreach (var key in _cachedValues.Keys)
             {
-                _cachedValues.Remove(key);
+                if (!activeSilos.ContainsKey(key))
+                {
+                    _cachedValues.Remove(key);
+                }
             }
         }
     }

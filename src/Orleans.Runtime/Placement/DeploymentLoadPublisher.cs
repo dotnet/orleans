@@ -181,8 +181,8 @@ namespace Orleans.Runtime
             _siloStatusOracle.GetApproximateSiloStatus(siloAddress) != SiloStatus.Active
             || (_periodicStats.TryGetValue(siloAddress, out var old) && old.DateTime.Ticks > timestampTicks);
 
-        internal IReadOnlyCollection<SiloAddress> GetActiveSilosForStatisticsDigest() =>
-            _siloStatusOracle.GetApproximateSiloStatuses(onlyActive: true).Keys;
+        internal Dictionary<SiloAddress, SiloStatus> GetActiveSiloStatusesForStatisticsDigest() =>
+            _siloStatusOracle.GetApproximateSiloStatuses(onlyActive: true);
 
         internal async Task<bool> TryPublishStatisticsViaDissemination(
             SiloRuntimeStatistics myStats,
