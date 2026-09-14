@@ -145,7 +145,10 @@ namespace Orleans.Runtime.Messaging
 
         public void SendMessage(Message msg) => SendMessage(msg, sendMessage: null);
 
-        internal void SendMessage(Message msg, Action<Message, Connection?, Exception?>? sendMessage)
+        internal void SendMessage(
+            Message msg,
+            Action<Message, Connection?, Exception?>? sendMessage,
+            bool allowResponseReaddress = true)
         {
             Debug.Assert(!msg.IsLocalOnly);
 
@@ -197,6 +200,14 @@ namespace Orleans.Runtime.Messaging
                 if (CanDeliverToProxyLocally(msg, _siloAddress, targetSiloIsDead) && TryDeliverToProxy(msg))
                 {
                     // Message was successfully delivered to the proxy.
+                    return;
+                }
+
+                if (allowResponseReaddress && ShouldReaddressResponse(msg, targetSiloIsDead))
+                {
+                    var deadTargetSilo = msg.TargetSilo!;
+                    msg.TargetSilo = null;
+                    _ = ReaddressResponseAsync(this, msg, deadTargetSilo);
                     return;
                 }
 
@@ -324,6 +335,36 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
+        private static async Task ReaddressResponseAsync(
+            MessageCenter messageCenter,
+            Message message,
+            SiloAddress deadTargetSilo)
+        {
+            try
+            {
+                await messageCenter.placementService.AddressMessage(message);
+            }
+            catch (Exception exception)
+            {
+                messageCenter.messagingTrace.OnDispatcherSelectTargetFailed(message, exception);
+                messageCenter.RejectMessage(message, Message.RejectionTypes.Unrecoverable, exception);
+                return;
+            }
+
+            if (message.TargetSilo is not { } targetSilo
+                || targetSilo.Equals(deadTargetSilo)
+                || messageCenter.siloStatusOracle.IsDeadSilo(targetSilo))
+            {
+                messageCenter.RejectMessage(
+                    message,
+                    Message.RejectionTypes.Transient,
+                    new SiloUnavailableException($"No live gateway is available for client {message.TargetGrain}."));
+                return;
+            }
+
+            messageCenter.SendMessage(message, sendMessage: null, allowResponseReaddress: false);
+        }
+
         internal static bool ShouldRouteResponseViaTargetSilo(Message message, SiloAddress localSilo) =>
             message.Direction == Message.Directions.Response
             && message.TargetSilo is { } targetSilo
@@ -334,6 +375,11 @@ namespace Orleans.Runtime.Messaging
             SiloAddress localSilo,
             bool targetSiloIsDead) =>
             !ShouldRouteResponseViaTargetSilo(message, localSilo) || targetSiloIsDead;
+
+        internal static bool ShouldReaddressResponse(Message message, bool targetSiloIsDead) =>
+            message.Direction == Message.Directions.Response
+            && targetSiloIsDead
+            && message.TargetGrain.IsClient();
 
         public void DispatchLocalMessage(Message message) => ReceiveMessage(message);
 
@@ -657,7 +703,14 @@ namespace Orleans.Runtime.Messaging
             void OnAddressingFailure(Message m, Exception ex)
             {
                 this.messagingTrace.OnDispatcherSelectTargetFailed(m, ex);
-                RejectMessage(m, Message.RejectionTypes.Unrecoverable, ex);
+                if (sendMessage is null)
+                {
+                    RejectMessage(m, Message.RejectionTypes.Unrecoverable, ex);
+                }
+                else
+                {
+                    sendMessage(m, null, ex);
+                }
             }
         }
 
