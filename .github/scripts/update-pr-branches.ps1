@@ -19,6 +19,8 @@ Use -PassThru to emit full result objects. Their Review property contains unreso
 threads (including outdated threads), code suggestion counts, and the latest
 Copilot review's state, overview recommendation, URL, reviewed commit, and body.
 Review.Checks contains GitHub's aggregate check state and counts for the head commit.
+CompletedWithoutConclusion retains runs reported as COMPLETED separately from
+outcome counts; GitHub's aggregate state determines the CI grouping.
 Recommendations are extracted from Copilot's Markdown overview heading.
 .EXAMPLE
 .\update-pr-branches.ps1 -WhatIf
@@ -254,6 +256,7 @@ query($owner: String!, $name: String!, $number: Int!, $endCursor: String) {
         Pending = 0
         Failed = 0
         Skipped = 0
+        CompletedWithoutConclusion = 0
         CountsByState = @()
     }
     if ($null -ne $rollup) {
@@ -269,6 +272,7 @@ query($owner: String!, $name: String!, $number: Int!, $endCursor: String) {
                 '^(EXPECTED|PENDING|QUEUED|WAITING|IN_PROGRESS)$' { $checks.Pending += $count.count }
                 '^(ACTION_REQUIRED|CANCELLED|ERROR|FAILURE|STALE|STARTUP_FAILURE|TIMED_OUT)$' { $checks.Failed += $count.count }
                 '^(NEUTRAL|SKIPPED)$' { $checks.Skipped += $count.count }
+                '^COMPLETED$' { $checks.CompletedWithoutConclusion += $count.count }
             }
         }
     }
@@ -315,16 +319,22 @@ function Get-MergeabilityGroup {
         $checks = $review.Checks
         $checksRank, $checksLabel, $checksText = switch ($checks.State) {
             'SUCCESS' { 0; 'Checks passing'; "`u{2713} CI $($checks.Total)" }
-            { $_ -in 'PENDING', 'EXPECTED' } { 1; 'Checks pending'; "`u{23F3} CI $($checks.Pending) pending" }
+            { $_ -in 'PENDING', 'EXPECTED' } {
+                1; 'Checks pending'
+                if ($checks.Pending -gt 0) { "`u{23F3} CI $($checks.Pending) pending" } else { "`u{23F3} CI pending" }
+            }
             'NONE' { 2; 'No checks'; '? CI none' }
             { $_ -in 'FAILURE', 'ERROR' } {
                 3; 'Checks failed'
-                $text = "`u{2717} CI $($checks.Failed) failed"
+                $text = if ($checks.Failed -gt 0) { "`u{2717} CI $($checks.Failed) failed" } else { "`u{2717} CI failed" }
                 if ($checks.Pending -gt 0) {
                     $text += ", $($checks.Pending) pending"
                 }
                 $text
             }
+        }
+        if ($checks.CompletedWithoutConclusion -gt 0) {
+            $checksText += ", $($checks.CompletedWithoutConclusion) completed (outcome unspecified)"
         }
         if ($Result.Status -ne 'Failed' -and $Result.HeadSha -ne $review.HeadSha) {
             $blockingRank = 2
@@ -447,7 +457,7 @@ function Write-ResultSummary {
         } else {
             Write-Verbose "PR review decision: $($item.Review.Decision); Copilot code suggestions: $($item.Review.CopilotSuggestionCount)"
             $checks = $item.Review.Checks
-            Write-Verbose "Checks: $($checks.State); $($checks.Passed) passed, $($checks.Pending) pending, $($checks.Failed) failed, $($checks.Skipped) skipped."
+            Write-Verbose "Checks: $($checks.State); $($checks.Passed) passed, $($checks.Pending) pending, $($checks.Failed) failed, $($checks.Skipped) skipped, $($checks.CompletedWithoutConclusion) completed without a conclusion."
             if ($null -ne $item.Review.CopilotReview) {
                 Write-Verbose "GitHub review state: $($item.Review.CopilotReview.State); reviewed commit: $($item.Review.CopilotReview.CommitSha)"
             }
