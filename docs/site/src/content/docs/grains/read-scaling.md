@@ -9,11 +9,11 @@ ms.topic: concept-article
 
 Read-heavy entities scale from an explicit consistency boundary. Orleans provides request interleaving, addressable grains, and stateless worker pools that applications can combine into these patterns:
 
-| Requirement | Pattern | Runtime outcome |
-|---|---|---|
-| One authoritative activation with more concurrent progress while reads await I/O | Mark query methods with <xref:Orleans.Concurrency.ReadOnlyAttribute> | Read-only requests can interleave with other read-only requests on the activation. |
-| A fixed, addressable set of read replicas | Route queries across normal reader grains with application-selected keys | Each replica has one activation, and the application controls the replica count, routing, and versioned updates. |
-| Demand-based reads across multiple activations or services | Build a versioned read model and serve it through stateless workers or another query service | The command grain remains the single writer while independent readers scale across the cluster. |
+Requirement | Pattern | Runtime outcome
+--- | --- | ---
+One authoritative activation with more concurrent progress while reads await I/O | Mark query methods with <xref:Orleans.Concurrency.ReadOnlyAttribute> | Read-only requests can interleave with other read-only requests on the activation.
+A fixed, addressable set of read replicas | Route queries across normal reader grains with application-selected keys | Each replica has one activation, and the application controls the replica count, routing, and versioned updates.
+Demand-based reads across multiple activations or services | Build a versioned read model and serve it through stateless workers or another query service | The command grain remains the single writer while independent readers scale across the cluster.
 
 Partitioning the entity into several grain keys is another option when the domain invariants can be divided by key. Each partition then has its own writer and activation.
 
@@ -21,7 +21,7 @@ Partitioning the entity into several grain keys is another option when the domai
 
 Use a normal grain as the owner of the entity and mark query methods with <xref:Orleans.Concurrency.ReadOnlyAttribute>:
 
-:::code language="csharp" source="../snippets/compiled/Grains/RequestsAndVersioningSnippets.cs" id="single_writer_interleaved_readers":::
+:::code language="csharp" source="../snippets/compiled/Grains/ReadScalingSnippets.cs" id="single_writer_interleaved_readers":::
 
 The attribute is part of the grain interface because it controls request scheduling. Multiple incomplete `Get` calls can make progress together when they await the recommendation service. The activation continues to execute one turn at a time, giving I/O-heavy reads more concurrency while preserving single-threaded grain execution.
 
