@@ -101,6 +101,43 @@ public sealed class CassandraGrainStorageTests
     }
 
     [Fact]
+    public async Task ConfiguredConsistencyLevelsAreAppliedToCassandraStatements()
+    {
+        var fake = new FakeCassandra();
+        var options = CreateOptions(fake.Session);
+        options.ConsistencyLevel = ConsistencyLevel.LocalQuorum;
+        options.SerialConsistencyLevel = ConsistencyLevel.LocalSerial;
+        var storage = CreateProvider(options, fake);
+        var lifecycle = new SiloLifecycleSubject(NullLogger<SiloLifecycleSubject>.Instance);
+        storage.Participate(lifecycle);
+        await lifecycle.OnStart(TestContext.Current.CancellationToken);
+        using (storage)
+        {
+            var grainId = GrainId.Create("test", "consistency");
+            var state = new GrainState<TestState>(new TestState(1));
+
+            await storage.WriteStateAsync("state", grainId, state);
+            await storage.ReadStateAsync("state", grainId, new GrainState<TestState>(new()));
+            await storage.ClearStateAsync("state", grainId, state);
+        }
+
+        Assert.Contains(
+            fake.ExecutedStatements,
+            statement => statement.Kind == "read"
+                && statement.ConsistencyLevel == ConsistencyLevel.LocalQuorum);
+        Assert.Contains(
+            fake.ExecutedStatements,
+            statement => statement.Kind == "insert"
+                && statement.ConsistencyLevel == ConsistencyLevel.LocalQuorum
+                && statement.SerialConsistencyLevel == ConsistencyLevel.LocalSerial);
+        Assert.Contains(
+            fake.ExecutedStatements,
+            statement => statement.Kind == "clear"
+                && statement.ConsistencyLevel == ConsistencyLevel.LocalQuorum
+                && statement.SerialConsistencyLevel == ConsistencyLevel.LocalSerial);
+    }
+
+    [Fact]
     public async Task PhysicalClearRemovesEtagAndRetainedClearIsIdempotent()
     {
         var fake = new FakeCassandra();
@@ -648,6 +685,7 @@ public sealed class CassandraGrainStorageTests
         public TaskCompletionSource PrepareCompleted { get; private set; } = Completed();
         public int ExecutionCount { get; private set; }
         public int PrepareInvocationCount { get; private set; }
+        public ConcurrentQueue<(string Kind, ConsistencyLevel? ConsistencyLevel, ConsistencyLevel SerialConsistencyLevel)> ExecutedStatements { get; } = [];
 
         public void BlockExecution()
         {
@@ -689,6 +727,7 @@ public sealed class CassandraGrainStorageTests
                     return default;
                 }
 
+                ExecutedStatements.Enqueue((kind, statement.ConsistencyLevel, statement.SerialConsistencyLevel));
                 var values = bound.QueryValues;
                 lock (_lock)
                 {
