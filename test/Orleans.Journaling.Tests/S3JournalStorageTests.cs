@@ -276,7 +276,7 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
             {
                 Assert.Equal("journaling-tests", request.BucketName);
                 Assert.Equal("journals/", request.Prefix);
-                Assert.Equal(ordered ? "journals/" : null, request.StartAfter);
+                Assert.Null(request.StartAfter);
             });
             await provider.CloseAsync(cancellationToken);
         }

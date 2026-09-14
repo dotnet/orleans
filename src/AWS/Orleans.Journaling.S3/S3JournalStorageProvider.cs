@@ -75,7 +75,9 @@ internal sealed class S3JournalStorageProvider : ILifecycleParticipant<ISiloLife
             objectKeyPrefix = directoryEnd == 0 ? null : objectKeyPrefix[..directoryEnd];
         }
 
-        var startAfter = ordered && identityMapping && range.LowerBound is { } lowerBound && System.Text.Ascii.IsValid(lowerBound)
+        // A native prefix already excludes earlier keys; seek only when the lower bound narrows it further.
+        var startAfter = ordered && identityMapping && range.LowerBound is { } lowerBound
+            && string.CompareOrdinal(lowerBound, range.ListingPrefix) > 0 && System.Text.Ascii.IsValid(lowerBound)
             ? lowerBound : null;
         var maxObjectKey = ordered && identityMapping ? range.GetUpperBoundForSuffix("/wal") : null;
         var client = GetClient();

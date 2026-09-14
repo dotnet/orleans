@@ -416,7 +416,7 @@ public sealed class JournalStorageCatalogTests
         Assert.All(context.Native.Requests, request =>
         {
             Assert.Equal(prefix, request.Prefix);
-            Assert.Equal(prefix, request.LowerStart);
+            Assert.Equal(kind == "AzureBlob" ? prefix : null, request.LowerStart);
             Assert.Equal(kind == "AzureBlob" ? 5000 : 1000, request.Maximum);
             Assert.Equal(2, request.ResultCount);
         });
@@ -579,8 +579,38 @@ public sealed class JournalStorageCatalogTests
             new() { Prefix = new(prefix) }, TestContext.Current.CancellationToken)));
         var request = Assert.Single(context.Native.Requests);
         Assert.Equal(prefix, request.Prefix);
-        Assert.Equal(prefix, request.LowerStart);
+        Assert.Equal(kind == "AzureBlob" ? prefix : null, request.LowerStart);
         Assert.Equal(2, request.ResultCount);
+    }
+
+    [Theory]
+    [InlineData("journals", null, null, "journals", null)]
+    [InlineData("journals", "journal", "journals/zeta", "journals", null)]
+    [InlineData("journals", "journals", "journals/zeta", "journals", null)]
+    [InlineData("journals", "journals/alpha", "journals/alpha", "journals/alpha", null)]
+    [InlineData("journals/", "journals/alpha", "journals/zeta", "journals/", "journals/alpha")]
+    public async Task S3ListAsync_OrderedSeekOnlyNarrowsBeyondNativePrefix(
+        string prefix, string? minId, string? maxId, string nativePrefix, string? startAfter)
+    {
+        string[] ids = ["before/a", "journals/alpha", "journals/zeta", "other/beta"];
+        await using var context = await CreateAsync("S3", ids, configureS3: options => options.UseOrderedListing = true);
+
+        var result = await DrainAsync(context.Catalog.ListAsync(
+            new()
+            {
+                Prefix = new(prefix),
+                MinId = minId is null ? default : new(minId),
+                MaxId = maxId is null ? default : new(maxId)
+            },
+            TestContext.Current.CancellationToken));
+
+        Assert.Equal(maxId == "journals/alpha" ? new[] { "journals/alpha" } : ["journals/alpha", "journals/zeta"], result);
+        Assert.All(context.Native.Requests, request =>
+        {
+            Assert.Equal(nativePrefix, request.Prefix);
+            Assert.Equal(startAfter, request.LowerStart);
+        });
+        Assert.Equal(result.Count, context.Native.Requests.Sum(request => request.ResultCount));
     }
 
     [Theory]
