@@ -1,7 +1,7 @@
 ---
 title: Log-consistency providers
 description: Compare built-in Orleans Event Sourcing log-consistency providers.
-ms.date: 08/02/2026
+ms.date: 08/22/2026
 ms.topic: concept-article
 ---
 
@@ -13,7 +13,7 @@ ms.topic: concept-article
 |---|---|---|---|
 | State storage | Current state snapshot, version, metadata | No | Reads and writes the complete state record |
 | Log storage | Complete event sequence and metadata in one record | Yes | Reads and writes the complete event sequence |
-| Custom storage | Application-defined | No, through <xref:Orleans.EventSourcing.JournaledGrain`2> | Determined by the implementation |
+| Custom storage | Application-defined | When the implementation exposes event segments | Determined by the implementation |
 
 ## State storage
 
@@ -31,7 +31,8 @@ It supports <xref:Orleans.EventSourcing.JournaledGrain`2.RetrieveConfirmedEvents
 
 <xref:Orleans.EventSourcing.CustomStorage.LogConsistencyProvider> calls the real
 <xref:Orleans.EventSourcing.CustomStorage.ICustomStorageInterface`2> methods
-implemented by the grain:
+implemented by the grain or returned by a keyed
+<xref:Orleans.EventSourcing.CustomStorage.ICustomStorageFactory>:
 
 :::code language="csharp" source="../../snippets/compiled/EventSourcing/EventSourcingSnippets.cs" id="custom_storage_operations":::
 
@@ -40,6 +41,9 @@ implemented by the grain:
 <xref:Orleans.EventSourcing.CustomStorage.ICustomStorageInterface`2.ClearStoredState*>
 clears the application-owned state when the provider supports destructive log
 clearing.
+
+<xref:Orleans.EventSourcing.CustomStorage.ICustomStorageInterface`2.RetrieveLogSegment*>
+returns confirmed events for <xref:Orleans.EventSourcing.JournaledGrain`2.RetrieveConfirmedEvents*> when the storage implementation retains them.
 
 The provider retries after exceptions. If storage committed but the response was lost, the same update can be submitted again. The implementation must make retries idempotent or detect duplicate submissions. Returning success before the update is durable violates <xref:Orleans.EventSourcing.JournaledGrain`2.ConfirmEvents*> semantics.
 
