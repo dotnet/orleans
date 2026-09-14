@@ -41,6 +41,8 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
     private readonly ConcurrentDictionary<WritableShardKey, IJobShard> _writeableShards = new();
     private readonly ConcurrentDictionary<string, WritableShardKey> _writeableShardKeys = new();
     private readonly ConcurrentDictionary<string, Task> _runningShards = new();
+    private readonly object _activationLock = new();
+    private bool _stopping;
     private readonly SemaphoreSlim _shardCreationLock = new(1, 1);
     private readonly SemaphoreSlim _shardCheckSignal = new(0);
 
@@ -224,7 +226,13 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
 
     private async Task Stop(CancellationToken ct)
     {
-        var runningShards = _runningShards.Values.ToArray();
+        Task[] runningShards;
+        lock (_activationLock)
+        {
+            _stopping = true;
+            runningShards = _runningShards.Values.ToArray();
+        }
+
         LogStopping(_logger, runningShards.Length);
 
         _cts.Cancel();
@@ -245,8 +253,8 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
         {
             try
             {
-                // Include final activations and retain failures from tasks which already left the running set.
-                await Task.WhenAll(runningShards.Concat(_runningShards.Values));
+                // Admission is closed; every accepted activation already has its execution task in this snapshot.
+                await Task.WhenAll(runningShards);
             }
             finally
             {
@@ -544,8 +552,9 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
 
     private void TryActivateShard(IJobShard shard)
     {
+        var shardId = shard.Id;
         // Only start if not already running
-        if (_runningShards.ContainsKey(shard.Id))
+        if (_runningShards.ContainsKey(shardId))
         {
             return;
         }
@@ -557,12 +566,21 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
             return;
         }
 
-        if (_runningShards.TryAdd(shard.Id, Task.CompletedTask))
+        AsyncClosureWorkItem workItem;
+        lock (_activationLock)
         {
-            LogStartingShard(_logger, shard.Id, shard.StartTime, shard.EndTime);
-            using var _ = new ExecutionContextSuppressor();
-            _runningShards[shard.Id] = this.RunOrQueueTask(() => RunShardWithCleanupAsync(shard));
+            if (_stopping || _runningShards.ContainsKey(shardId))
+            {
+                return;
+            }
+
+            workItem = new AsyncClosureWorkItem(() => RunShardWithCleanupAsync(shard), this);
+            _runningShards[shardId] = workItem.Task;
         }
+
+        LogStartingShard(_logger, shardId, shard.StartTime, shard.EndTime);
+        using var _ = new ExecutionContextSuppressor();
+        WorkItemGroup.QueueWorkItem(workItem);
     }
 
     private async Task RunShardWithCleanupAsync(IJobShard shard)
