@@ -62,7 +62,27 @@ internal sealed class TestContainerManager<TContainer>
         }
 
         var container = _container.Value;
-        await _startAsync(container, CancellationToken.None).ConfigureAwait(false);
+        try
+        {
+            await _startAsync(container, CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (DockerUnavailableException exception)
+        {
+            return GetDockerUnavailableSkipReason(exception);
+        }
+        catch (HttpRequestException exception)
+        {
+            return GetDockerUnavailableSkipReason(exception);
+        }
+        catch (OperationCanceledException exception)
+        {
+            return GetDockerUnavailableSkipReason(exception);
+        }
+        catch (DockerApiException exception)
+        {
+            return GetDockerUnavailableSkipReason(exception);
+        }
+
         _onStarted?.Invoke(container);
         return null;
     }
@@ -88,23 +108,25 @@ internal sealed class TestContainerManager<TContainer>
         }
         catch (DockerUnavailableException exception)
         {
-            return $"Docker is unavailable. {exception.Message}";
+            return GetDockerUnavailableSkipReason(exception);
         }
         catch (HttpRequestException exception)
         {
-            return $"Docker is unavailable. {exception.Message}";
+            return GetDockerUnavailableSkipReason(exception);
         }
         catch (OperationCanceledException exception)
         {
-            return $"Docker is unavailable. {exception.Message}";
+            return GetDockerUnavailableSkipReason(exception);
         }
         catch (DockerApiException exception)
         {
-            return $"Docker is unavailable. {exception.Message}";
+            return GetDockerUnavailableSkipReason(exception);
         }
         catch (InvalidOperationException exception)
         {
-            return $"Docker is unavailable. {exception.Message}";
+            return GetDockerUnavailableSkipReason(exception);
         }
     }
+
+    private static string GetDockerUnavailableSkipReason(Exception exception) => $"Docker is unavailable. {exception.Message}";
 }

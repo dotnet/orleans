@@ -1,3 +1,4 @@
+using DotNet.Testcontainers.Configurations;
 using Testcontainers.Azurite;
 
 namespace TestExtensions;
@@ -47,10 +48,10 @@ public static class AzuriteContainerManager
 
     private static AzuriteContainer CreateContainer()
     {
-        // AzuriteBuilder supplies the blob, queue, and table host bindings.
+        // AzuriteBuilder supplies the all-interface blob, queue, and table host bindings.
         return new AzuriteBuilder(
             "mcr.microsoft.com/azure-storage/azurite:3.35.0@sha256:647c63a91102a9d8e8000aab803436e1fc85fbb285e7ce830a82ee5d6661cf37")
-            .WithCommand("--skipApiVersionCheck")
+            .WithCommand(new AppendEnumerable<string>(["--skipApiVersionCheck"]))
             .Build();
     }
 }
