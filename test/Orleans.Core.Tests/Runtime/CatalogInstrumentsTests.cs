@@ -73,7 +73,7 @@ public class CatalogInstrumentsTests
 
     [TestSuite("BVT"), TestProvider("None")]
     [Theory, TestCategory("BVT"), TestCategory("Runtime")]
-    [InlineData(null, "unknown")]
+    [InlineData(null, "")]
     [InlineData("unknown", "unknown")]
     [InlineData("orders.é`1[System.Int32]", "orders.é`1[System.Int32]")]
     public void GrainTypeMetrics_DefaultAndTypedMeasurementsHaveStableTags(string? typeName, string expectedName)
@@ -85,23 +85,32 @@ public class CatalogInstrumentsTests
         Assert.Equal(expectedName, metrics.GrainTypeTagValue);
         Assert.Equal(0, activation.Value);
         Assert.Equal(0, workingSet.Value);
-        Assert.Equal(expectedName == "unknown" ? 2 : 1, activation.Tags.Length);
-        Assert.Equal("grain_type", activation.Tags[0].Key);
-        Assert.Same(metrics.GrainTypeTagValue, Assert.IsType<string>(activation.Tags[0].Value));
-        // Measurement<T> defensively copies the tag array; the cached string must still be reused.
-        Assert.Equal(expectedName == "unknown" ? 2 : 1, workingSet.Tags.Length);
-        Assert.Equal("grain_type", workingSet.Tags[0].Key);
-        Assert.Same(metrics.GrainTypeTagValue, workingSet.Tags[0].Value);
-        Assert.Same(metrics.GrainTypeTagValue, metrics.ActivationCount.Tags[0].Value);
-        Assert.Same(metrics.GrainTypeTagValue, metrics.WorkingSetCount.Tags[0].Value);
-        if (expectedName == "unknown")
+        metrics.OnActivationAdded();
+        metrics.OnWorkingSetAdded();
+        metrics.OnWorkingSetAdded();
+        Assert.Equal(1, metrics.ActivationCount.Value);
+        Assert.Equal(2, metrics.WorkingSetCount.Value);
+        Assert.Equal(0, activation.Value);
+        Assert.Equal(0, workingSet.Value);
+        foreach (var measurement in new[] { activation, workingSet, metrics.ActivationCount, metrics.WorkingSetCount })
         {
-            Assert.Equal("grain_type_known", activation.Tags[1].Key);
-            Assert.Equal(typeName is not null, Assert.IsType<bool>(activation.Tags[1].Value));
-            Assert.Equal("grain_type_known", workingSet.Tags[1].Key);
-            Assert.Same(activation.Tags[1].Value, workingSet.Tags[1].Value);
-            Assert.Same(activation.Tags[1].Value, metrics.ActivationCount.Tags[1].Value);
+            if (typeName is null)
+            {
+                Assert.Empty(measurement.Tags.ToArray());
+            }
+            else
+            {
+                // Measurement<T> copies tags, but must reuse the cached canonical string.
+                var tag = Assert.Single(measurement.Tags.ToArray());
+                Assert.Equal("grain_type", tag.Key);
+                Assert.Same(metrics.GrainTypeTagValue, Assert.IsType<string>(tag.Value));
+            }
         }
+        metrics.OnActivationRemoved();
+        metrics.OnWorkingSetRemoved();
+        metrics.OnWorkingSetRemoved();
+        Assert.Equal(0, metrics.ActivationCount.Value);
+        Assert.Equal(0, metrics.WorkingSetCount.Value);
     }
 
     [TestSuite("BVT"), TestProvider("None")]
@@ -204,15 +213,17 @@ public class CatalogInstrumentsTests
             AssertTags(observation.Tags, ("grain_type", entry.GrainTypeTagValue));
         }
 
-        var unknown = instruments.GetGrainTypeMetrics(default);
-        Assert.Equal("unknown", unknown.GrainTypeTagValue);
-        Assert.Same(unknown, instruments.GetGrainTypeMetrics(default));
-        Assert.True(instruments.TryGetGrainTypeMetrics(default, out var foundUnknown));
-        Assert.Same(unknown, foundUnknown);
+        var untyped = instruments.GetGrainTypeMetrics(default);
+        Assert.Equal("", untyped.GrainTypeTagValue);
+        Assert.Empty(untyped.ActivationCount.Tags.ToArray());
+        Assert.Empty(untyped.WorkingSetCount.Tags.ToArray());
+        Assert.Same(untyped, instruments.GetGrainTypeMetrics(default));
+        Assert.True(instruments.TryGetGrainTypeMetrics(default, out var foundUntyped));
+        Assert.Same(untyped, foundUntyped);
         var different = instruments.GetGrainTypeMetrics(GrainType.Create("cached-invoices"));
         Assert.NotSame(entry, different);
         Assert.NotEqual(entry.GrainTypeTagValue, different.GrainTypeTagValue);
-        Assert.NotSame(unknown, instruments.GetGrainTypeMetrics(GrainType.Create("unknown")));
+        Assert.NotSame(untyped, instruments.GetGrainTypeMetrics(GrainType.Create("unknown")));
         var otherEntry = other.Instruments.GetGrainTypeMetrics(type);
         Assert.NotSame(entry, otherEntry);
         entry.OnActivationAdded();
@@ -424,12 +435,12 @@ public class CatalogInstrumentsTests
         using var fixture = new CatalogMetricFixture();
         var first = fixture.Instruments.GetGrainTypeMetrics(GrainType.Create("event-orders")).GrainTypeTagValue;
         var second = fixture.Instruments.GetGrainTypeMetrics(GrainType.Create("event-invoices")).GrainTypeTagValue;
-        var unknown = fixture.Instruments.GetGrainTypeMetrics(default).GrainTypeTagValue;
+        var unknown = fixture.Instruments.GetGrainTypeMetrics(GrainType.Create("unknown")).GrainTypeTagValue;
         var untouched = fixture.Instruments.GetGrainTypeMetrics(GrainType.Create("event-untouched"));
         var observations = new List<RecordedMeasurement<int>>();
         using var listener = fixture.Capture(observations);
         var names = new[] { first, second, first, unknown };
-        foreach (var name in names) RecordCatalogEvent(fixture.Instruments, operation, name, isKnown: name != "unknown");
+        foreach (var name in names) RecordCatalogEvent(fixture.Instruments, operation, name);
 
         Assert.Equal(names.Length, observations.Count);
         for (var i = 0; i < observations.Count; i++)
@@ -439,8 +450,8 @@ public class CatalogInstrumentsTests
             Assert.Equal(instrumentName, item.Instrument.Name);
             Assert.Equal(1, item.Value);
             if (operation == "pass") Assert.Empty(item.Tags);
-            else if (via is null) AssertMetadataTags(item.Tags, names[i] != "unknown", ("grain_type", names[i]));
-            else AssertMetadataTags(item.Tags, names[i] != "unknown", ("via", via), ("grain_type", names[i]));
+            else if (via is null) AssertTags(item.Tags, ("grain_type", names[i]));
+            else AssertTags(item.Tags, ("via", via), ("grain_type", names[i]));
         }
         if (operation != "pass")
         {
@@ -451,6 +462,38 @@ public class CatalogInstrumentsTests
         Assert.DoesNotContain(observations, item => item.Tags.Any(tag => Equals(tag.Value, untouched.GrainTypeTagValue)));
         Assert.Equal(0, untouched.ActivationCount.Value);
         Assert.Equal(0, untouched.WorkingSetCount.Value);
+    }
+
+    [TestSuite("BVT"), TestProvider("None")]
+    [Fact, TestCategory("BVT"), TestCategory("Runtime")]
+    public void CollectionShutdown_UntypedBatchAndTypedActivationsRemainAdditive()
+    {
+        using var fixture = new CatalogMetricFixture();
+        var known = fixture.Instruments.GetGrainTypeMetrics(GrainType.Create("collection-orders"));
+        var unknown = fixture.Instruments.GetGrainTypeMetrics(GrainType.Create("unknown"));
+        fixture.Instruments.ActivationShutdownViaCollection(); // Disabled events are not replayed.
+        var observations = new List<RecordedMeasurement<int>>();
+        using var listener = fixture.Capture(observations);
+        Assert.Empty(observations);
+
+        fixture.Instruments.ActivationShutdownViaCollection();
+        fixture.Instruments.ActivationShutdownViaCollection(known.GrainTypeTagValue);
+        fixture.Instruments.ActivationShutdownViaCollection(unknown.GrainTypeTagValue);
+
+        Assert.Equal(3, observations.Count);
+        Assert.All(observations, item =>
+        {
+            Assert.IsType<Counter<int>>(item.Instrument);
+            Assert.Equal(InstrumentNames.CATALOG_ACTIVATION_SHUTDOWN, item.Instrument.Name);
+            Assert.Equal(1, item.Value);
+        });
+        AssertTags(observations[0].Tags, ("via", "collection"));
+        AssertTags(observations[1].Tags, ("via", "collection"), ("grain_type", known.GrainTypeTagValue));
+        AssertTags(observations[2].Tags, ("via", "collection"), ("grain_type", unknown.GrainTypeTagValue));
+        Assert.Equal(3, observations.Sum(item => item.Value));
+        Assert.False(fixture.Instruments.TryGetGrainTypeMetrics(default, out _));
+        Assert.Equal(0, known.ActivationCount.Value);
+        Assert.Equal(0, unknown.ActivationCount.Value);
     }
 
     [TestSuite("BVT"), TestProvider("None")]
@@ -494,7 +537,7 @@ public class CatalogInstrumentsTests
         using var fixture = new CatalogMetricFixture();
         var type = GrainType.Create("warm-cache-orders");
         var entry = fixture.Instruments.GetGrainTypeMetrics(type);
-        var unknown = fixture.Instruments.GetGrainTypeMetrics(default);
+        var untyped = fixture.Instruments.GetGrainTypeMetrics(default);
         entry.OnActivationAdded();
         entry.OnWorkingSetAdded();
         var mismatches = 0;
@@ -505,7 +548,7 @@ public class CatalogInstrumentsTests
                 || !ReferenceEquals(entry, hit) || !ReferenceEquals(entry, found)
                 || !ReferenceEquals(entry.GrainTypeTagValue, hit.GrainTypeTagValue)
                 || !ReferenceEquals(entry.GrainTypeTagValue, found.GrainTypeTagValue)
-                || !ReferenceEquals(unknown, fixture.Instruments.GetGrainTypeMetrics(default)))
+                || !ReferenceEquals(untyped, fixture.Instruments.GetGrainTypeMetrics(default)))
             {
                 mismatches++;
             }
@@ -519,20 +562,15 @@ public class CatalogInstrumentsTests
         Assert.Equal(0, mismatches);
         Assert.Equal(1, entry.ActivationCount.Value);
         Assert.Equal(1, entry.WorkingSetCount.Value);
-        Assert.Equal(0, unknown.ActivationCount.Value);
+        Assert.Equal(0, untyped.ActivationCount.Value);
     }
 
     [TestSuite("BVT"), TestProvider("None")]
-    [Theory, TestCategory("BVT"), TestCategory("Runtime")]
-    [InlineData("warm-recording-orders", true)]
-    [InlineData("unknown", true)]
-    [InlineData("unknown", false)]
-    public void WarmCatalogRecording_AllocatesZeroWithLiveCallbacks(string typeName, bool isKnown)
+    [Fact, TestCategory("BVT"), TestCategory("Runtime")]
+    public void WarmCatalogRecording_AllocatesZeroWithLiveCallbacks()
     {
         using var fixture = new CatalogMetricFixture();
-        var type = fixture.Instruments.GetGrainTypeMetrics(isKnown ? GrainType.Create(typeName) : default).GrainTypeTagValue;
-        var hasDiscriminator = type == "unknown";
-        var boxedKnown = hasDiscriminator ? fixture.Instruments.GetGrainTypeMetrics(isKnown ? GrainType.Create(typeName) : default).ActivationCount.Tags[1].Value : null;
+        var type = fixture.Instruments.GetGrainTypeMetrics(GrainType.Create("warm-recording-orders")).GrainTypeTagValue;
         var exception = new InvalidOperationException("directory unavailable");
         var counts = new int[9];
         var sums = new double[9];
@@ -546,7 +584,6 @@ public class CatalogInstrumentsTests
             sums[index] += value;
             if (!double.IsFinite(value) || value < 0 || (index < 7 && value != 1)) invalidValues++;
             var expectedTagCount = index == 6 ? 0 : index == 7 ? 3 : index is 5 or 8 ? 2 : 1;
-            if (hasDiscriminator && index != 6) expectedTagCount++;
             if (tags.Length != expectedTagCount) tagMismatches++;
             var typeTags = 0;
             foreach (var tag in tags)
@@ -555,10 +592,6 @@ public class CatalogInstrumentsTests
                 {
                     typeTags++;
                     if (!ReferenceEquals(type, tag.Value)) tagMismatches++;
-                }
-                else if (tag.Key == "grain_type_known")
-                {
-                    if (!hasDiscriminator || !ReferenceEquals(boxedKnown, tag.Value)) tagMismatches++;
                 }
                 else if (tag.Key is not ("status" or "directory" or "via")) tagMismatches++;
             }
@@ -569,14 +602,14 @@ public class CatalogInstrumentsTests
         Assert.True(fixture.Instruments.ActivationLatencyEnabled);
         Assert.True(fixture.Instruments.DeactivationLatencyEnabled);
         Assert.True(fixture.Instruments.NonExistentActivationsEnabled);
-        for (var i = 0; i < 1024; i++) RecordCatalogBatch(fixture.Instruments, type, exception, isKnown);
+        for (var i = 0; i < 1024; i++) RecordCatalogBatch(fixture.Instruments, type, exception);
         Array.Clear(counts);
         Array.Clear(sums);
         tagMismatches = invalidValues = 0;
         const int iterations = 2048;
 
         var before = GC.GetAllocatedBytesForCurrentThread();
-        for (var i = 0; i < iterations; i++) RecordCatalogBatch(fixture.Instruments, type, exception, isKnown);
+        for (var i = 0; i < iterations; i++) RecordCatalogBatch(fixture.Instruments, type, exception);
         var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
 
         Assert.Equal(0L, allocated);
@@ -612,124 +645,6 @@ public class CatalogInstrumentsTests
         Assert.Equal(new[] { 1, 1, 1, 1, 1, 4, 1, 20, 6 }, counts);
     }
 
-    [TestSuite("BVT"), TestProvider("None")]
-    [Theory, TestCategory("BVT"), TestCategory("Runtime")]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void UnknownLifecycle_KnownAndUnavailablePreserveOutcomesAndRecordOnce(bool knownFirst)
-    {
-        using var fixture = new CatalogMetricFixture();
-        var counters = new List<RecordedMeasurement<int>>();
-        var histograms = new List<RecordedMeasurement<double>>();
-        using var counterListener = fixture.Capture(counters);
-        using var histogramListener = fixture.Capture(histograms);
-        var exception = new InvalidOperationException("directory unavailable");
-        string[] statuses = ["error", "success", "error", "canceled", "canceled", "duplicate", "duplicate", "directory_error", "canceled"];
-        foreach (var known in new[] { knownFirst, !knownFirst })
-        {
-            counters.Clear();
-            histograms.Clear();
-            RecordCatalogBatch(fixture.Instruments, "unknown", exception, known);
-
-            Assert.Equal(10, counters.Count);
-            for (var i = 0; i < counters.Count; i++)
-            {
-                var item = counters[i];
-                Assert.IsType<Counter<int>>(item.Instrument);
-                Assert.Equal(i < 5 ? i : i < 9 ? 5 : 6, CatalogInstrumentIndex(item.Instrument.Name));
-                Assert.Equal(1, item.Value);
-                if (i == 9) Assert.Empty(item.Tags);
-                else if (i < 5) AssertMetadataTags(item.Tags, known, ("grain_type", "unknown"));
-                else AssertMetadataTags(item.Tags, known, ("grain_type", "unknown"), ("via", CatalogEvents[i]));
-            }
-
-            Assert.Equal(26, histograms.Count);
-            Assert.Equal(12.5, histograms[0].Value);
-            Assert.Equal(0, histograms[1].Value);
-            Assert.Equal(34.25, histograms[2].Value);
-            for (var i = 0; i < histograms.Count; i++)
-            {
-                var item = histograms[i];
-                Assert.IsType<Histogram<double>>(item.Instrument);
-                Assert.Equal("ms", item.Instrument.Unit);
-                Assert.True(double.IsFinite(item.Value) && item.Value >= 0);
-                if (i is 0 or 1 || i is >= 3 and < 21)
-                {
-                    Assert.Equal(InstrumentNames.CATALOG_ACTIVATION_LATENCY, item.Instrument.Name);
-                    var status = i == 0 ? "success" : i == 1 ? "error" : statuses[(i - 3) / 2];
-                    var directory = i == 0 || (i >= 3 && (i - 3) % 2 == 1) ? "enabled" : "disabled";
-                    AssertMetadataTags(item.Tags, known, ("grain_type", "unknown"), ("status", status), ("directory", directory));
-                }
-                else
-                {
-                    Assert.Equal(InstrumentNames.CATALOG_DEACTIVATION_LATENCY, item.Instrument.Name);
-                    AssertMetadataTags(item.Tags, known, ("grain_type", "unknown"), ("via", i == 2 ? "collection" : DeactivationReasons[i - 21]));
-                }
-            }
-        }
-    }
-
-    [TestSuite("BVT"), TestProvider("None")]
-    [Theory, TestCategory("BVT"), TestCategory("Runtime")]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void Directory_DefaultAndNamedUnknownCoexistAcrossRepeatedSnapshotsAndRemoval(bool knownFirst)
-    {
-        using var fixture = new CatalogMetricFixture();
-        using var directory = new ActivationDirectory(fixture.Instruments);
-        var named = DirectoryContext("unknown", "named-one");
-        var namedSecond = DirectoryContext("unknown", "named-two");
-        var unavailable = NSubstitute.Substitute.For<IGrainContext>();
-        NSubstitute.SubstituteExtensions.Returns(unavailable.GrainId, default(GrainId));
-        NSubstitute.SubstituteExtensions.Returns(unavailable.Equals(NSubstitute.Arg.Any<IGrainContext>()),
-            call => ReferenceEquals(unavailable, call.Arg<IGrainContext>()));
-        var first = knownFirst ? named : unavailable;
-        var second = knownFirst ? unavailable : named;
-        directory.RecordNewTarget(first);
-        directory.RecordNewTarget(second);
-        directory.RecordNewTarget(namedSecond);
-        directory.RecordNewTarget(first);
-        var observations = new List<RecordedMeasurement<int>>();
-        using var listener = fixture.Capture(observations);
-        var namedMetrics = fixture.Instruments.GetGrainTypeMetrics(GrainType.Create("unknown"));
-        var unavailableMetrics = fixture.Instruments.GetGrainTypeMetrics(default);
-        Assert.NotSame(namedMetrics, unavailableMetrics);
-        Assert.Same(named, directory.FindTarget(named.GrainId));
-        Assert.Same(unavailable, directory.FindTarget(default));
-        Snapshot(2, 1);
-        Assert.True(directory.RemoveTarget(first));
-        Assert.False(directory.RemoveTarget(first));
-        Snapshot(knownFirst ? 1 : 2, knownFirst ? 1 : 0);
-        Assert.True(directory.RemoveTarget(second));
-        Snapshot(1, 0);
-        Assert.True(directory.RemoveTarget(namedSecond));
-        Snapshot(0, 0);
-        Assert.Empty(directory);
-        Assert.Same(namedMetrics, fixture.Instruments.GetGrainTypeMetrics(GrainType.Create("unknown")));
-        Assert.Same(unavailableMetrics, fixture.Instruments.GetGrainTypeMetrics(default));
-
-        void Snapshot(int knownCount, int unavailableCount)
-        {
-            // All writes are complete before scraping. A second scrape must repeat, not accumulate.
-            for (var scrape = 0; scrape < 2; scrape++)
-            {
-                observations.Clear();
-                listener.RecordObservableInstruments();
-                Assert.Equal(2, observations.Count);
-                foreach (var known in new[] { true, false })
-                {
-                    var item = Assert.Single(observations, item => item.Tags.Any(tag => tag.Key == "grain_type_known" && Equals(tag.Value, known)));
-                    Assert.IsType<ObservableGauge<int>>(item.Instrument);
-                    Assert.Equal(InstrumentNames.CATALOG_ACTIVATION_COUNT, item.Instrument.Name);
-                    Assert.Equal(known ? knownCount : unavailableCount, item.Value);
-                    AssertMetadataTags(item.Tags, known, ("grain_type", known ? namedMetrics.GrainTypeTagValue : unavailableMetrics.GrainTypeTagValue));
-                }
-                Assert.Equal(knownCount + unavailableCount, directory.Count);
-                Assert.Equal(directory.Count, observations.Sum(item => item.Value));
-            }
-        }
-    }
-
     private static void SetActivationOutcome(ref CatalogInstruments.ActivationMetricTracker tracker, string outcome, Exception exception)
     {
         switch (outcome)
@@ -757,19 +672,19 @@ public class CatalogInstrumentsTests
         _ => throw new ArgumentOutOfRangeException(nameof(via))
     };
 
-    private static void RecordCatalogEvent(CatalogInstruments instruments, string operation, string type, bool isKnown = true)
+    private static void RecordCatalogEvent(CatalogInstruments instruments, string operation, string type)
     {
         switch (operation)
         {
-            case "created": instruments.OnActivationCreated(type, isKnown); break;
-            case "destroyed": instruments.OnActivationDestroyed(type, isKnown); break;
-            case "failed": instruments.OnActivationFailedToActivate(type, isKnown); break;
-            case "concurrent": instruments.OnActivationConcurrentRegistrationAttempt(type, isKnown); break;
-            case "nonexistent": instruments.OnNonExistentActivation(type, isKnown); break;
-            case "collection": instruments.ActivationShutdownViaCollection(type, isKnown); break;
-            case "deactivateOnIdle": instruments.ActivationShutdownViaDeactivateOnIdle(type, isKnown); break;
-            case "deactivateStuckActivation": instruments.ActivationShutdownViaDeactivateStuckActivation(type, isKnown); break;
-            case "migration": instruments.ActivationShutdownViaMigration(type, isKnown); break;
+            case "created": instruments.OnActivationCreated(type); break;
+            case "destroyed": instruments.OnActivationDestroyed(type); break;
+            case "failed": instruments.OnActivationFailedToActivate(type); break;
+            case "concurrent": instruments.OnActivationConcurrentRegistrationAttempt(type); break;
+            case "nonexistent": instruments.OnNonExistentActivation(type); break;
+            case "collection": instruments.ActivationShutdownViaCollection(type); break;
+            case "deactivateOnIdle": instruments.ActivationShutdownViaDeactivateOnIdle(type); break;
+            case "deactivateStuckActivation": instruments.ActivationShutdownViaDeactivateStuckActivation(type); break;
+            case "migration": instruments.ActivationShutdownViaMigration(type); break;
             case "pass": instruments.OnActivationCollected(); break;
             default: throw new ArgumentOutOfRangeException(nameof(operation));
         }
@@ -794,17 +709,17 @@ public class CatalogInstrumentsTests
         }
     }
 
-    private static void RecordCatalogBatch(CatalogInstruments instruments, string type, Exception exception, bool isKnown = true)
+    private static void RecordCatalogBatch(CatalogInstruments instruments, string type, Exception exception)
     {
-        foreach (var operation in CatalogEvents) RecordCatalogEvent(instruments, operation, type, isKnown);
-        instruments.OnActivationCompleted(TimeSpan.FromTicks(125000), "success", true, type, isKnown);
-        instruments.OnActivationCompleted(TimeSpan.FromTicks(-125000), "error", false, type, isKnown);
-        instruments.OnDeactivationCompleted(TimeSpan.FromTicks(342500), "collection", type, isKnown);
+        foreach (var operation in CatalogEvents) RecordCatalogEvent(instruments, operation, type);
+        instruments.OnActivationCompleted(TimeSpan.FromTicks(125000), "success", true, type);
+        instruments.OnActivationCompleted(TimeSpan.FromTicks(-125000), "error", false, type);
+        instruments.OnDeactivationCompleted(TimeSpan.FromTicks(342500), "collection", type);
         foreach (var outcome in ActivationOutcomes)
         {
             for (var directory = 0; directory < 2; directory++)
             {
-                var activation = CatalogInstruments.ActivationMetricTracker.Start(instruments, directory != 0, type, isKnown);
+                var activation = CatalogInstruments.ActivationMetricTracker.Start(instruments, directory != 0, type);
                 SetActivationOutcome(ref activation, outcome, exception);
                 activation.Record();
                 activation.Record();
@@ -812,7 +727,7 @@ public class CatalogInstrumentsTests
         }
         foreach (var via in DeactivationReasons)
         {
-            var deactivation = WithDeactivationReason(CatalogInstruments.DeactivationMetricTracker.Start(instruments, type, isKnown), via);
+            var deactivation = WithDeactivationReason(CatalogInstruments.DeactivationMetricTracker.Start(instruments, type), via);
             deactivation.RecordIfNeeded();
             deactivation.Record();
         }
@@ -858,20 +773,6 @@ public class CatalogInstrumentsTests
             var tag = Assert.Single(actual, tag => tag.Key == key);
             Assert.Equal(value, Assert.IsType<string>(tag.Value));
             if (key == "grain_type") Assert.Same(value, tag.Value);
-        }
-    }
-
-    private static void AssertMetadataTags(KeyValuePair<string, object?>[] actual, bool isKnown, params (string Key, string Value)[] expected)
-    {
-        if (expected.Any(tag => tag is ("grain_type", "unknown")))
-        {
-            var discriminator = Assert.Single(actual, tag => tag.Key == "grain_type_known");
-            Assert.Equal(isKnown, Assert.IsType<bool>(discriminator.Value));
-            AssertTags(actual.Where(tag => tag.Key != "grain_type_known").ToArray(), expected);
-        }
-        else
-        {
-            AssertTags(actual, expected);
         }
     }
 

@@ -3,7 +3,6 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics.Metrics;
-using MetricsTagList = System.Diagnostics.TagList;
 
 namespace Orleans.Runtime;
 
@@ -35,23 +34,21 @@ internal sealed class CatalogInstruments(OrleansInstruments instruments)
         private readonly ValueStopwatch _stopwatch;
         private readonly bool _usesDirectory;
         private readonly string? _grainType;
-        private readonly bool _isGrainTypeKnown;
         private string? _status;
 
-        private ActivationMetricTracker(CatalogInstruments instruments, ValueStopwatch stopwatch, bool usesDirectory, string grainType, bool isGrainTypeKnown, string status)
+        private ActivationMetricTracker(CatalogInstruments instruments, ValueStopwatch stopwatch, bool usesDirectory, string grainType, string status)
         {
             _instruments = instruments;
             _stopwatch = stopwatch;
             _usesDirectory = usesDirectory;
             _grainType = grainType;
-            _isGrainTypeKnown = isGrainTypeKnown;
             _status = status;
         }
 
-        public static ActivationMetricTracker Start(CatalogInstruments instruments, bool usesDirectory, string grainType, bool isGrainTypeKnown = true)
+        public static ActivationMetricTracker Start(CatalogInstruments instruments, bool usesDirectory, string grainType)
         {
             return instruments.ActivationLatencyEnabled
-                ? new(instruments, ValueStopwatch.StartNew(), usesDirectory, grainType, isGrainTypeKnown, ActivationStatusError)
+                ? new(instruments, ValueStopwatch.StartNew(), usesDirectory, grainType, ActivationStatusError)
                 : default;
         }
 
@@ -78,7 +75,7 @@ internal sealed class CatalogInstruments(OrleansInstruments instruments)
 
             var status = _status;
             _status = null;
-            _instruments.OnActivationCompleted(_stopwatch.Elapsed, status, _usesDirectory, _grainType!, _isGrainTypeKnown);
+            _instruments.OnActivationCompleted(_stopwatch.Elapsed, status, _usesDirectory, _grainType!);
         }
 
         private void SetStatus(string status)
@@ -96,23 +93,21 @@ internal sealed class CatalogInstruments(OrleansInstruments instruments)
         private readonly ValueStopwatch _stopwatch;
         private readonly string? _via;
         private readonly string? _grainType;
-        private readonly bool _isGrainTypeKnown;
         private bool _recorded;
 
-        private DeactivationMetricTracker(CatalogInstruments instruments, ValueStopwatch stopwatch, string via, string grainType, bool isGrainTypeKnown, bool recorded)
+        private DeactivationMetricTracker(CatalogInstruments instruments, ValueStopwatch stopwatch, string via, string grainType, bool recorded)
         {
             _instruments = instruments;
             _stopwatch = stopwatch;
             _via = via;
             _grainType = grainType;
-            _isGrainTypeKnown = isGrainTypeKnown;
             _recorded = recorded;
         }
 
-        public static DeactivationMetricTracker Start(CatalogInstruments instruments, string grainType, bool isGrainTypeKnown = true)
+        public static DeactivationMetricTracker Start(CatalogInstruments instruments, string grainType)
         {
             return instruments.DeactivationLatencyEnabled
-                ? new(instruments, ValueStopwatch.StartNew(), DeactivationViaUnknown, grainType, isGrainTypeKnown, recorded: false)
+                ? new(instruments, ValueStopwatch.StartNew(), DeactivationViaUnknown, grainType, recorded: false)
                 : default;
         }
 
@@ -132,7 +127,7 @@ internal sealed class CatalogInstruments(OrleansInstruments instruments)
             }
 
             _recorded = true;
-            _instruments.OnDeactivationCompleted(_stopwatch.Elapsed, _via, _grainType!, _isGrainTypeKnown);
+            _instruments.OnDeactivationCompleted(_stopwatch.Elapsed, _via, _grainType!);
             return this;
         }
 
@@ -141,7 +136,7 @@ internal sealed class CatalogInstruments(OrleansInstruments instruments)
             Record();
         }
 
-        private DeactivationMetricTracker WithVia(string via) => _via is null ? this : new(_instruments!, _stopwatch, via, _grainType!, _isGrainTypeKnown, _recorded);
+        private DeactivationMetricTracker WithVia(string via) => _via is null ? this : new(_instruments!, _stopwatch, via, _grainType!, _recorded);
     }
 
     private readonly Counter<int> _activationFailedToActivate = instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_FAILED_TO_ACTIVATE);
@@ -150,21 +145,29 @@ internal sealed class CatalogInstruments(OrleansInstruments instruments)
 
     private readonly Counter<int> _activationShutdown = instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_SHUTDOWN);
 
-    internal void ActivationShutdownViaCollection(string grainType, bool isGrainTypeKnown = true) => OnActivationShutdown(DeactivationViaCollection, grainType, isGrainTypeKnown);
-    internal void ActivationShutdownViaDeactivateOnIdle(string grainType, bool isGrainTypeKnown = true) => OnActivationShutdown(DeactivationViaDeactivateOnIdle, grainType, isGrainTypeKnown);
-    internal void ActivationShutdownViaMigration(string grainType, bool isGrainTypeKnown = true) => OnActivationShutdown(DeactivationViaMigration, grainType, isGrainTypeKnown);
-    internal void ActivationShutdownViaDeactivateStuckActivation(string grainType, bool isGrainTypeKnown = true) => OnActivationShutdown(DeactivationViaDeactivateStuckActivation, grainType, isGrainTypeKnown);
+    internal void ActivationShutdownViaCollection()
+    {
+        if (_activationShutdown.Enabled)
+        {
+            _activationShutdown.Add(1, new KeyValuePair<string, object?>(ViaTagName, DeactivationViaCollection));
+        }
+    }
+
+    internal void ActivationShutdownViaCollection(string grainType) => OnActivationShutdown(DeactivationViaCollection, grainType);
+    internal void ActivationShutdownViaDeactivateOnIdle(string grainType) => OnActivationShutdown(DeactivationViaDeactivateOnIdle, grainType);
+    internal void ActivationShutdownViaMigration(string grainType) => OnActivationShutdown(DeactivationViaMigration, grainType);
+    internal void ActivationShutdownViaDeactivateStuckActivation(string grainType) => OnActivationShutdown(DeactivationViaDeactivateStuckActivation, grainType);
 
     private readonly Histogram<double> _deactivationLatency = instruments.Meter.CreateHistogram<double>(InstrumentNames.CATALOG_DEACTIVATION_LATENCY, MillisecondsUnit);
     internal bool DeactivationLatencyEnabled => _deactivationLatency.Enabled;
 
-    internal void OnDeactivationCompleted(TimeSpan latency, string via, string grainType, bool isGrainTypeKnown = true)
+    internal void OnDeactivationCompleted(TimeSpan latency, string via, string grainType)
     {
         if (_deactivationLatency.Enabled)
         {
-            var tags = new MetricsTagList { { ViaTagName, via } };
-            GrainTypeMetrics.AddTags(ref tags, grainType, isGrainTypeKnown);
-            _deactivationLatency.Record(latency.TotalMilliseconds, tags);
+            _deactivationLatency.Record(latency.TotalMilliseconds,
+                new KeyValuePair<string, object?>(ViaTagName, via),
+                new KeyValuePair<string, object?>(GrainTypeMetrics.TagName, grainType));
         }
     }
 
@@ -230,33 +233,31 @@ internal sealed class CatalogInstruments(OrleansInstruments instruments)
         }
     }
 
-    internal void OnActivationCompleted(TimeSpan latency, string status, bool usesDirectory, string grainType, bool isGrainTypeKnown = true)
+    internal void OnActivationCompleted(TimeSpan latency, string status, bool usesDirectory, string grainType)
     {
         if (_activationLatency.Enabled)
         {
-            var tags = new MetricsTagList
-            {
-                { StatusTagName, status },
-                { DirectoryTagName, usesDirectory ? DirectoryEnabled : DirectoryDisabled }
-            };
-            GrainTypeMetrics.AddTags(ref tags, grainType, isGrainTypeKnown);
-            _activationLatency.Record(Math.Max(0, latency.TotalMilliseconds), tags);
+            _activationLatency.Record(
+                Math.Max(0, latency.TotalMilliseconds),
+                new KeyValuePair<string, object?>(StatusTagName, status),
+                new KeyValuePair<string, object?>(DirectoryTagName, usesDirectory ? DirectoryEnabled : DirectoryDisabled),
+                new KeyValuePair<string, object?>(GrainTypeMetrics.TagName, grainType));
         }
     }
 
-    internal void OnActivationFailedToActivate(string grainType, bool isGrainTypeKnown = true)
+    internal void OnActivationFailedToActivate(string grainType)
     {
         if (_activationFailedToActivate.Enabled)
         {
-            _activationFailedToActivate.Add(1, GrainTypeMetrics.CreateTags(grainType, isGrainTypeKnown));
+            _activationFailedToActivate.Add(1, new KeyValuePair<string, object?>(GrainTypeMetrics.TagName, grainType));
         }
     }
 
-    internal void OnActivationConcurrentRegistrationAttempt(string grainType, bool isGrainTypeKnown = true)
+    internal void OnActivationConcurrentRegistrationAttempt(string grainType)
     {
         if (_activationConcurrentRegistrationAttempts.Enabled)
         {
-            _activationConcurrentRegistrationAttempts.Add(1, GrainTypeMetrics.CreateTags(grainType, isGrainTypeKnown));
+            _activationConcurrentRegistrationAttempts.Add(1, new KeyValuePair<string, object?>(GrainTypeMetrics.TagName, grainType));
         }
     }
 
@@ -265,37 +266,28 @@ internal sealed class CatalogInstruments(OrleansInstruments instruments)
         _activationCollections.Add(1);
     }
 
-    internal void OnActivationCreated(string grainType, bool isGrainTypeKnown = true)
+    internal void OnActivationCreated(string grainType)
     {
-        if (_activationsCreated.Enabled)
-        {
-            _activationsCreated.Add(1, GrainTypeMetrics.CreateTags(grainType, isGrainTypeKnown));
-        }
+        _activationsCreated.Add(1, new KeyValuePair<string, object?>(GrainTypeMetrics.TagName, grainType));
     }
 
-    internal void OnActivationDestroyed(string grainType, bool isGrainTypeKnown = true)
+    internal void OnActivationDestroyed(string grainType)
     {
-        if (_activationsDestroyed.Enabled)
-        {
-            _activationsDestroyed.Add(1, GrainTypeMetrics.CreateTags(grainType, isGrainTypeKnown));
-        }
+        _activationsDestroyed.Add(1, new KeyValuePair<string, object?>(GrainTypeMetrics.TagName, grainType));
     }
 
-    internal void OnNonExistentActivation(string grainType, bool isGrainTypeKnown = true)
+    internal void OnNonExistentActivation(string grainType)
     {
-        if (_nonExistentActivations.Enabled)
-        {
-            _nonExistentActivations.Add(1, GrainTypeMetrics.CreateTags(grainType, isGrainTypeKnown));
-        }
+        _nonExistentActivations.Add(1, new KeyValuePair<string, object?>(GrainTypeMetrics.TagName, grainType));
     }
 
-    private void OnActivationShutdown(string via, string grainType, bool isGrainTypeKnown)
+    private void OnActivationShutdown(string via, string grainType)
     {
         if (_activationShutdown.Enabled)
         {
-            var tags = new MetricsTagList { { ViaTagName, via } };
-            GrainTypeMetrics.AddTags(ref tags, grainType, isGrainTypeKnown);
-            _activationShutdown.Add(1, tags);
+            _activationShutdown.Add(1,
+                new KeyValuePair<string, object?>(ViaTagName, via),
+                new KeyValuePair<string, object?>(GrainTypeMetrics.TagName, grainType));
         }
     }
 }

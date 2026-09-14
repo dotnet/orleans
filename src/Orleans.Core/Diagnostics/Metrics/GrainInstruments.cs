@@ -23,19 +23,13 @@ internal sealed class GrainInstruments
     internal void IncrementGrainCounts(string grainType, StrongBox<int> grainCount)
     {
         Interlocked.Increment(ref grainCount.Value);
-        if (_grainCounts.Enabled)
-        {
-            _grainCounts.Add(1, GrainTypeMetrics.CreateTags(grainType));
-        }
+        _grainCounts.Add(1, new KeyValuePair<string, object?>(GrainTypeMetrics.TagName, grainType));
     }
 
     internal void DecrementGrainCounts(string grainType, StrongBox<int> grainCount)
     {
         Interlocked.Decrement(ref grainCount.Value);
-        if (_grainCounts.Enabled)
-        {
-            _grainCounts.Add(-1, GrainTypeMetrics.CreateTags(grainType));
-        }
+        _grainCounts.Add(-1, new KeyValuePair<string, object?>(GrainTypeMetrics.TagName, grainType));
     }
 
     internal void IncrementSystemTargetCounts(string systemTargetTypeName)

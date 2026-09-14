@@ -39,13 +39,11 @@ See [Upgrade deployment and rollback](migration/deployment-and-rollback.md) befo
 
 Update dashboard groupings, filters, recording rules, and OpenTelemetry views to retain `grain_type`. For a mixed-version rollout, use the emitting service version to select the old or new schema. Map old CLR names to canonical names using the deployment's grain-type registrations before combining series. Count each emitter's series once in combined views.
 
-For `grain_type=unknown`, activation, request timeout/cancellation, and streaming metrics now also emit the boolean `grain_type_known`: `true` for a real grain named `unknown`, and `false` for unavailable type metadata. Retain this discriminator in type-level groupings and filters. Earlier releases' `unknown` series combine these cases; treat those historical observations as a combined category when comparing across the upgrade.
-
 Activation gauges now emit a snapshot for each cached type, including zero after the last activation leaves. Obtain cluster totals by summing the latest fresh observation from each silo and type. Preserve emitter identity through export and configure stale-series expiry in the backend. Lifecycle counters retain additive event semantics: summing their per-type increases over the same interval recovers total event volume.
 
-The shutdown counter retains its historical additional event for each nonempty collection batch with `grain_type=unknown`, `grain_type_known=false`, `via=collection`; individual shutdown events carry their activation's canonical type. The collection-scan counter retains scan-level measurements. `orleans-system-targets` retains its `type` key, and management grain statistics retain CLR display names with per-silo accounting.
+The shutdown counter retains its historical additional event for each nonempty collection batch with only `via=collection`; individual shutdown events carry their activation's canonical type. Include both typed and untyped contributions when aggregating total shutdown events. The collection-scan counter retains scan-level measurements. `orleans-system-targets` retains its `type` key, and management grain statistics retain CLR display names with per-silo accounting.
 
-See the [metrics catalog](host/monitoring/metrics-catalog.md#grain-type-identity-and-aggregation) for units, lifecycle outcomes, population scopes, and the `unknown` convention.
+See the [metrics catalog](host/monitoring/metrics-catalog.md#grain-type-identity-and-aggregation) for units, lifecycle outcomes, population scopes, and aggregation.
 
 ## Package version policy
 

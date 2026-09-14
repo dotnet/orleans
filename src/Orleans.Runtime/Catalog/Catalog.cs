@@ -2,7 +2,6 @@ using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.GrainDirectory;
-using Orleans.Metadata;
 using Orleans.Runtime.GrainDirectory;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
@@ -102,7 +101,7 @@ namespace Orleans.Runtime
 
                 // this should be removed once we've refactored the deactivation code path. For now safe to keep.
                 activationCollector.TryCancelCollection(activation as ICollectibleGrainContext);
-                _catalogInstruments.OnActivationDestroyed(GetGrainTypeMetricName(activation), isGrainTypeKnown: !activation.GrainId.Type.IsDefault);
+                _catalogInstruments.OnActivationDestroyed(GetGrainTypeMetricName(activation));
             }
         }
 
@@ -195,7 +194,7 @@ namespace Orleans.Runtime
                 }
             }
 
-            _catalogInstruments.OnActivationCreated(GetGrainTypeMetricName(result), isGrainTypeKnown: !grainId.Type.IsDefault);
+            _catalogInstruments.OnActivationCreated(GetGrainTypeMetricName(result));
 
             // Rehydration occurs before activation.
             if (rehydrationContext is not null)
@@ -225,15 +224,10 @@ namespace Orleans.Runtime
                 if (self._catalogInstruments.NonExistentActivationsEnabled)
                 {
                     var instruments = self._catalogInstruments;
-                    if (!instruments.TryGetGrainTypeMetrics(grainId.Type, out var metrics)
-                        && self.serviceProvider.GetRequiredService<GrainPropertiesResolver>().TryGetGrainProperties(grainId.Type, out _))
-                    {
-                        metrics = instruments.GetGrainTypeMetrics(grainId.Type);
-                    }
-
-                    instruments.OnNonExistentActivation(
-                        metrics?.GrainTypeTagValue ?? GrainTypeMetrics.UnknownGrainType,
-                        isGrainTypeKnown: metrics is not null && !grainId.Type.IsDefault);
+                    var grainTypeName = instruments.TryGetGrainTypeMetrics(grainId.Type, out var metrics)
+                        ? metrics.GrainTypeTagValue
+                        : grainId.Type.ToString();
+                    instruments.OnNonExistentActivation(grainTypeName);
                 }
 
                 var grainLocator = self.serviceProvider.GetRequiredService<GrainLocator>();

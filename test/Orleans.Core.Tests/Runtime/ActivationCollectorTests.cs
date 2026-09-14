@@ -958,33 +958,55 @@ namespace UnitTests.Runtime
             Assert.Empty(metrics.Events);
         }
 
-        [Fact, TestCategory("Activation")]
-        public async Task WorkingSet_NonContextMemberUsesUnknown()
+        [Theory, TestCategory("Activation")]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task WorkingSet_UntypedMemberAndLiteralUnknownHaveDistinctPopulationTags(bool untypedFirst)
         {
             using var metrics = new AccountingMetricFixture();
             await using var scans = new WorkingSetScanDriver(timeProvider);
             var observer = Substitute.For<IActivationWorkingSetObserver>();
             var workingSet = new ActivationWorkingSet(scans.Factory, NullLogger<ActivationWorkingSet>.Instance, [observer], metrics.Instruments, timeProvider);
             var typed = WorkingSetMember("working-typed", "one");
-            var unknown = Substitute.For<IActivationWorkingSetMember>();
-            Assert.False(unknown is IGrainContext);
+            var unknown = WorkingSetMember("unknown", "one");
+            var secondUnknown = WorkingSetMember("unknown", "two");
+            var untyped = Substitute.For<IActivationWorkingSetMember>();
+            Assert.False(untyped is IGrainContext);
+            if (untypedFirst) workingSet.OnActivated(untyped);
             workingSet.OnActivated(typed);
             workingSet.OnActivated(unknown);
+            workingSet.OnActivated(secondUnknown);
+            if (!untypedFirst) workingSet.OnActivated(untyped);
+            workingSet.OnActive(untyped);
             workingSet.OnActive(unknown);
             metrics.StartListening();
-            metrics.AssertWorkingSetSnapshot(workingSet, ("working-typed", 1), ("unknown", 1));
-            metrics.AssertWorkingSetSnapshot(workingSet, ("working-typed", 1), ("unknown", 1));
+            metrics.AssertWorkingSetSnapshot(workingSet, ("working-typed", 1), ("unknown", 2), (null, 1));
+            metrics.AssertWorkingSetSnapshot(workingSet, ("working-typed", 1), ("unknown", 2), (null, 1));
 
+            workingSet.OnDeactivating(untyped);
+            workingSet.OnDeactivated(untyped);
+            workingSet.OnEvicted(untyped);
+            observer.Received(1).OnEvicted(untyped);
+            observer.DidNotReceive().OnEvicted(unknown);
+            observer.DidNotReceive().OnEvicted(secondUnknown);
+            Assert.DoesNotContain(untyped, workingSet.Members);
+            Assert.Equal(3, workingSet.Members.Count());
+            metrics.AssertWorkingSetSnapshot(workingSet, ("working-typed", 1), ("unknown", 2), (null, 0));
+            metrics.AssertWorkingSetSnapshot(workingSet, ("working-typed", 1), ("unknown", 2), (null, 0));
             workingSet.OnDeactivating(unknown);
             workingSet.OnDeactivated(unknown);
             workingSet.OnEvicted(unknown);
+            metrics.AssertWorkingSetSnapshot(workingSet, ("working-typed", 1), ("unknown", 1), (null, 0));
+            workingSet.OnDeactivated(secondUnknown);
             Assert.Same(typed, Assert.Single(workingSet.Members));
             observer.Received(1).OnEvicted(unknown);
+            observer.Received(1).OnEvicted(secondUnknown);
             observer.DidNotReceive().OnEvicted(typed);
-            metrics.AssertWorkingSetSnapshot(workingSet, ("working-typed", 1), ("unknown", 0));
+            metrics.AssertWorkingSetSnapshot(workingSet, ("working-typed", 1), ("unknown", 0), (null, 0));
             workingSet.OnDeactivated(typed);
             Assert.Empty(workingSet.Members);
-            metrics.AssertWorkingSetSnapshot(workingSet, ("working-typed", 0), ("unknown", 0));
+            metrics.AssertWorkingSetSnapshot(workingSet, ("working-typed", 0), ("unknown", 0), (null, 0));
+            metrics.AssertWorkingSetSnapshot(workingSet, ("working-typed", 0), ("unknown", 0), (null, 0));
             Assert.Empty(metrics.Events);
         }
 
@@ -1077,7 +1099,7 @@ namespace UnitTests.Runtime
         }
 
         [Fact, TestCategory("Activation")]
-        public async Task Collector_NonemptyBatchHasOneUnknownShutdown()
+        public async Task Collector_NonemptyBatchHasOneUntypedShutdown()
         {
             using var metrics = new AccountingMetricFixture();
             using var batchCollector = new ActivationCollector(timeProvider, Options.Create(new GrainCollectionOptions()),
@@ -1142,7 +1164,7 @@ namespace UnitTests.Runtime
                 Assert.Same(unrelated, Assert.Single(workingSet.Members));
                 metrics.AssertWorkingSetSnapshot(workingSet, ("batch-orders", 0), ("batch-invoices", 0), ("batch-unrelated", 1));
                 metrics.AssertWorkingSetSnapshot(workingSet, ("batch-orders", 0), ("batch-invoices", 0), ("batch-unrelated", 1));
-                // Historical collector scope: one unknown shutdown for the batch, not one per fake context.
+                // Historical collector scope: one untyped shutdown for the batch, not one per fake context.
                 AssertCollectionEvents(metrics.Events, passes: 1, batches: 1);
                 await batchCollector.CollectStaleActivations(cancellationToken);
                 AssertCollectionEvents(metrics.Events, passes: 2, batches: 1);
@@ -1212,10 +1234,9 @@ namespace UnitTests.Runtime
             {
                 Assert.IsType<Counter<int>>(item.Instrument);
                 Assert.Equal(1, item.Value);
-                Assert.Equal(3, item.Tags.Length);
-                Assert.Equal("collection", Assert.Single(item.Tags, tag => tag.Key == "via").Value);
-                Assert.Same(GrainTypeMetrics.UnknownGrainType, Assert.Single(item.Tags, tag => tag.Key == "grain_type").Value);
-                Assert.False(Assert.IsType<bool>(Assert.Single(item.Tags, tag => tag.Key == "grain_type_known").Value));
+                var tag = Assert.Single(item.Tags);
+                Assert.Equal("via", tag.Key);
+                Assert.Equal("collection", tag.Value);
             });
         }
 
@@ -1256,7 +1277,7 @@ namespace UnitTests.Runtime
                 _listener.Start();
             }
 
-            public void AssertWorkingSetSnapshot(ActivationWorkingSet workingSet, params (string Type, int Count)[] expected)
+            public void AssertWorkingSetSnapshot(ActivationWorkingSet workingSet, params (string? Type, int Count)[] expected)
             {
                 Assert.NotNull(_listener);
                 _snapshot.Clear();
@@ -1264,19 +1285,24 @@ namespace UnitTests.Runtime
                 Assert.Equal(expected.Length, _snapshot.Count);
                 foreach (var (type, count) in expected)
                 {
-                    var item = Assert.Single(_snapshot, item => Equals(Assert.Single(item.Tags, tag => tag.Key == "grain_type").Value, type));
+                    var item = Assert.Single(_snapshot, item => type is null
+                        ? item.Tags.Length == 0
+                        : item.Tags.Any(tag => tag.Key == "grain_type" && Equals(tag.Value, type)));
                     Assert.IsType<ObservableGauge<int>>(item.Instrument);
                     Assert.Equal(InstrumentNames.CATALOG_ACTIVATION_WORKING_SET, item.Instrument.Name);
                     Assert.Equal(count, item.Value);
-                    Assert.Equal(type == "unknown" ? 2 : 1, item.Tags.Length);
-                    if (type == "unknown")
+                    Assert.True(Instruments.TryGetGrainTypeMetrics(type is null ? default : GrainType.Create(type), out var cached));
+                    if (type is null)
                     {
-                        Assert.False(Assert.IsType<bool>(Assert.Single(item.Tags, tag => tag.Key == "grain_type_known").Value));
+                        Assert.Empty(item.Tags);
+                        Assert.Equal("", cached.GrainTypeTagValue);
                     }
-                    var tag = Assert.Single(item.Tags, tag => tag.Key == "grain_type");
-                    Assert.Equal("grain_type", tag.Key);
-                    Assert.True(Instruments.TryGetGrainTypeMetrics(type == "unknown" ? default : GrainType.Create(type), out var cached));
-                    Assert.Same(cached.GrainTypeTagValue, tag.Value);
+                    else
+                    {
+                        var tag = Assert.Single(item.Tags);
+                        Assert.Equal("grain_type", tag.Key);
+                        Assert.Same(cached.GrainTypeTagValue, tag.Value);
+                    }
                 }
                 Assert.Equal(expected.Sum(item => item.Count), workingSet.Count);
                 Assert.Equal(workingSet.Count, _snapshot.Sum(item => item.Value));
